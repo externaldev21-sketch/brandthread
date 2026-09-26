@@ -13,6 +13,7 @@ const ATTACHMENT_META: Record<MessageAttachmentType, { icon: keyof typeof Feathe
   post: { icon: 'file-text', label: 'Post' },
   order: { icon: 'package', label: 'Order' },
   profile: { icon: 'user', label: 'Profile' },
+  thread_cash: { icon: 'dollar-sign', label: 'Thread Cash' },
 };
 
 interface ConversationPreviewProps {

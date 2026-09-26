@@ -42,7 +42,8 @@ import ChatWallpaper from '@/components/chat/ChatWallpaper';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaViewer from '@/components/chat/MediaViewer';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
+import { ThreadCashAttachButton, ThreadCashMessageCard } from '@/components/thread-cash/ChatAttachThreadCash';
+import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 import {
   ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
 } from '@/components/chat/ReactionBar';
@@ -180,8 +181,13 @@ export default function BuyerConversationScreen() {
   const flatListRef = useRef<FlatList<ListRow>>(null);
   const api = useApi();
   const { userId } = useAuth();
-  // THREAD CASH HOOK POINT — see components/thread-cash/ChatAttachThreadCash.tsx.
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
+  // A sent/claimed/cancelled Thread Cash bubble's status is set once, in the
+  // message's own attachment meta, at send time — it never gets rewritten
+  // server-side. Claim/cancel outcomes are reflected here for the rest of
+  // this screen's session; a fresh message fetch elsewhere will show the
+  // original status again until the server exposes a live lookup.
+  const [threadCashOverrides, setThreadCashOverrides] = useState<Record<string, ThreadCashTransferStatus>>({});
   /** The signed-in Clerk user; legacy local records used the literal 'me'. */
   const myId = userId ?? MY_USER_ID;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
@@ -655,6 +661,39 @@ export default function BuyerConversationScreen() {
           </View>
           <Text style={s.voiceDur}>{att.meta?.duration ? `${att.meta.duration}s` : '…'}</Text>
         </PressableScale>
+      );
+    }
+    if (att.type === 'thread_cash') {
+      const transferId = att.meta?.transferId ?? '';
+      const senderId = att.meta?.senderId ?? '';
+      const amountCents = Number(att.meta?.amountCents ?? 0);
+      const status = threadCashOverrides[transferId] ?? ((att.meta?.status as ThreadCashTransferStatus) ?? 'pending');
+      return (
+        <ThreadCashMessageCard
+          amountCents={amountCents}
+          note={att.meta?.note || null}
+          status={status}
+          isRecipient={senderId !== myId}
+          isSender={senderId === myId}
+          onClaim={async () => {
+            try {
+              await api.threadCash.claim({ transferId });
+              setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
+            } catch (e: any) {
+              Alert.alert('Could not claim', e?.message ?? 'Please try again.');
+              throw e;
+            }
+          }}
+          onCancel={senderId === myId ? async () => {
+            try {
+              await api.threadCash.cancel({ transferId });
+              setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
+            } catch (e: any) {
+              Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
+              throw e;
+            }
+          } : undefined}
+        />
       );
     }
     // Default: product / order / post / profile card
@@ -1296,15 +1335,37 @@ export default function BuyerConversationScreen() {
               }
             </PressableScale>
 
-            {/* THREAD CASH HOOK POINT: minimal attach entry, OFF by default
-                behind the 'threadCashSend' flag. Rendering a sent Thread Cash
-                message in the thread above is left for this screen's own
-                renderAttachment/message-list logic to wire up. */}
+            {/* Minimal attach entry — works for any conversation participant
+                (buyer-to-buyer friends included), server-gated by mutual
+                follow at send AND claim. The transfer is already final by
+                the time onSent fires, so the bubble is posted immediately
+                rather than staged in the composer. */}
             {threadCashSendEnabled && sellerUserId ? (
               <ThreadCashAttachButton
                 recipientId={sellerUserId}
                 conversationId={conv?.id ?? ''}
-                onSent={() => {}}
+                onSent={async ({ transferId, amountCents, note }) => {
+                  if (!conv) return;
+                  try {
+                    await sendMessage(conv.id, '', {
+                      type: 'thread_cash',
+                      title: 'Thread Cash',
+                      accentColor: theme.accent,
+                      meta: {
+                        transferId,
+                        senderId: myId,
+                        amountCents: String(amountCents),
+                        status: 'pending',
+                        ...(note ? { note } : {}),
+                      },
+                    });
+                    const msgs = await getMessages(conv.id);
+                    setMessages(msgs);
+                    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+                  } catch (e) {
+                    Alert.alert('Sent, but the chat message failed', apiErrorMessage(e, 'The Thread Cash send went through — refresh to see it in chat.'));
+                  }
+                }}
               />
             ) : null}
 

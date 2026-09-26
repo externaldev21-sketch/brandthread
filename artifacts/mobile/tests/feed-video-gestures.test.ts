@@ -25,20 +25,33 @@ describe('Scrubbable video progress bar', () => {
   });
 
   it('thickens the bar while dragging', () => {
-    expect(feed).toMatch(/thickness.*=.*useRef\(new Animated\.Value\(2\)\)/);
-    expect(feed).toContain("Animated.timing(thickness, { toValue: 6");
-    expect(feed).toContain("Animated.timing(thickness, { toValue: 2");
+    expect(feed).toMatch(/thickness.*=.*useRef\(new Animated\.Value\(3\)\)/);
+    expect(feed).toContain("Animated.timing(thickness, { toValue: 7");
+    expect(feed).toContain("Animated.timing(thickness, { toValue: 3");
   });
 
-  it('shows a time bubble only while dragging', () => {
+  it('shows a time bubble only while dragging, with current/total time', () => {
     expect(feed).toContain('formatPlaybackTime(');
     expect(feed).toContain('{dragging && (');
     expect(feed).toContain('styles.scrubBubble');
+    expect(feed).toContain('{formatPlaybackTime(shown * duration)} / {formatPlaybackTime(duration)}');
   });
 
-  it('gives haptic feedback on grab and release', () => {
-    expect(feed).toMatch(/onPanResponderGrant: \(evt\) => \{\s*setDragging\(true\);\s*Haptics\.impactAsync/);
-    expect(feed).toMatch(/onPanResponderRelease: \(\) => \{\s*setDragging\(false\);\s*Haptics\.impactAsync/);
+  it('shows a round thumb on the track while dragging', () => {
+    expect(feed).toContain('styles.scrubThumb');
+    expect(feed).toContain('thumbScale');
+  });
+
+  it('gives haptic feedback on grab and release, plus a tick every few percent while dragging', () => {
+    expect(feed).toMatch(/onPanResponderGrant: \(evt\) => \{\s*setDragging\(true\);[\s\S]*?hapticLight\(\);/);
+    expect(feed).toMatch(/onPanResponderRelease: \(\) => \{\s*setDragging\(false\);\s*hapticLight\(\);/);
+    expect(feed).toContain('hapticSelection();');
+  });
+
+  it('pauses the real player for the duration of the drag and resumes on release unless the post was already paused', () => {
+    expect(feed).toContain('player.pause();');
+    expect(feed).toContain('if (!externallyPaused) player.play();');
+    expect(feed).toContain('externallyPaused={paused}');
   });
 });
 
@@ -75,5 +88,31 @@ describe('Press-and-hold 2x speed / hold-to-pause', () => {
   it('a quick tap still falls through to the existing single/double-tap handling', () => {
     expect(feed).toContain('function handleQuickTap(');
     expect(feed).toContain('handleQuickTap();');
+  });
+});
+
+describe('Feed page/video container sizing (web all-black bug)', () => {
+  // Regression coverage: the sharp video wrapper had no explicit
+  // width/height and relied on StyleSheet.absoluteFill resolving against an
+  // ancestor's height. Inside a virtualized FlatList cell on web that
+  // ancestor can measure 0 height, silently collapsing the whole video area
+  // to e.g. 390x0 while the separately explicit-sized blurred tab-bar
+  // mirror strip kept rendering fine — an all-black screen with nothing
+  // playing. Every layer in the chain must carry an explicit size, not just
+  // absoluteFill/flex.
+
+  it('gives the page-level Pressable and its inner view an explicit width/height, not just absoluteFill', () => {
+    expect(feed).toContain('<Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>');
+    expect(feed).toContain('<View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>');
+  });
+
+  it('gives the sharp-clip wrapper inside VideoVisual an explicit size, independent of its ancestor', () => {
+    expect(feed).toContain('const clipSize = pageWidth != null && pageHeight != null ? { width: pageWidth, height: pageHeight } : null;');
+    expect(feed).toContain('<View style={[StyleSheet.absoluteFill, clipSize, sharpClipStyle]}>');
+  });
+
+  it('re-fires the play effect once the page has a real measured size, not just on isActive/paused/focus', () => {
+    expect(feed).toMatch(/if \(isActive && !paused && isScreenFocused && \(pageWidth \?\? 0\) > 0 && \(pageHeight \?\? 0\) > 0\) \{\s*player\.play\(\);/);
+    expect(feed).toContain('}, [isActive, paused, isScreenFocused, player, pageWidth, pageHeight]);');
   });
 });

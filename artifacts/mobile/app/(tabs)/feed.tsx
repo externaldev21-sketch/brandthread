@@ -19,6 +19,7 @@ import {
 } from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
+import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
@@ -55,6 +56,7 @@ import {
 import { ShopProductSheet } from '@/components/ShopProductSheet';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { FeedGestureGuide } from '@/components/FeedGestureGuide';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
@@ -844,20 +846,37 @@ function formatPlaybackTime(totalSeconds: number): string {
   return h > 0 ? `${h}:${mm}:${String(sec).padStart(2, '0')}` : `${mm}:${String(sec).padStart(2, '0')}`;
 }
 
-/** Scrubbable playback bar: tap/drag to seek, thickens while dragging, shows
- * a time bubble, and gives haptic feedback on grab and release. */
+/** Scrubbable playback bar — sits exactly on the seam where the sharp video
+ * stops and the blurred tab-bar strip begins (Reels-style: a thin line right
+ * above the bar, not floating inside either region).
+ *
+ * Real scrubbing, not a passive indicator: drag anywhere on the hit area to
+ * seek live; the video pauses for the duration of the drag (so it doesn't
+ * fight the seek) and resumes automatically on release, unless the post was
+ * already manually paused (tap-to-pause elsewhere on the video is untouched
+ * — this component only ever touches the player directly, never the parent's
+ * `paused`/`holdPaused` state). While dragging: the line thickens, a round
+ * thumb appears on it, a "current / total" time bubble tracks the thumb, and
+ * a light haptic "tick" fires every ~3% of the scrub so long drags feel
+ * textured rather than silent. */
 function ScrubProgressBar({
-  player, progress, bottom,
+  player, progress, bottom, externallyPaused = false,
 }: {
   player: ReturnType<typeof useVideoPlayer>;
   progress: number;
   bottom: number;
+  /** True while the post is deliberately paused (tap or hold) — on release,
+   * the scrubber leaves it paused instead of resuming playback. */
+  externallyPaused?: boolean;
 }) {
+  const { theme } = useAppTheme();
   const [dragging, setDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(progress);
   const [trackWidth, setTrackWidth] = useState(0);
-  const thickness = useRef(new Animated.Value(2)).current;
+  const thickness = useRef(new Animated.Value(3)).current;
+  const thumbScale = useRef(new Animated.Value(0)).current;
   const trackWidthRef = useRef(0);
+  const lastTickFraction = useRef(0);
 
   useEffect(() => { trackWidthRef.current = trackWidth; }, [trackWidth]);
   useEffect(() => { if (!dragging) setDragProgress(progress); }, [progress, dragging]);
@@ -869,6 +888,10 @@ function ScrubProgressBar({
     setDragProgress(fraction);
     const duration = player.duration;
     if (duration > 0) player.currentTime = fraction * duration;
+    if (Math.abs(fraction - lastTickFraction.current) >= 0.03) {
+      lastTickFraction.current = fraction;
+      hapticSelection();
+    }
   }).current;
 
   const panResponder = useRef(
@@ -877,8 +900,13 @@ function ScrubProgressBar({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
         setDragging(true);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        Animated.timing(thickness, { toValue: 6, duration: 120, useNativeDriver: false }).start();
+        lastTickFraction.current = progress;
+        hapticLight();
+        player.pause();
+        Animated.parallel([
+          Animated.timing(thickness, { toValue: 7, duration: 120, useNativeDriver: false }),
+          Animated.spring(thumbScale, { toValue: 1, useNativeDriver: true, speed: 30 }),
+        ]).start();
         seekToLocationX(evt.nativeEvent.locationX);
       },
       onPanResponderMove: (evt) => {
@@ -886,18 +914,28 @@ function ScrubProgressBar({
       },
       onPanResponderRelease: () => {
         setDragging(false);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }).start();
+        hapticLight();
+        Animated.parallel([
+          Animated.timing(thickness, { toValue: 3, duration: 150, useNativeDriver: false }),
+          Animated.timing(thumbScale, { toValue: 0, duration: 120, useNativeDriver: true }),
+        ]).start();
+        if (!externallyPaused) player.play();
       },
       onPanResponderTerminate: () => {
         setDragging(false);
-        Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }).start();
+        Animated.parallel([
+          Animated.timing(thickness, { toValue: 3, duration: 150, useNativeDriver: false }),
+          Animated.timing(thumbScale, { toValue: 0, duration: 120, useNativeDriver: true }),
+        ]).start();
+        if (!externallyPaused) player.play();
       },
     }),
   ).current;
 
   const shown = dragging ? dragProgress : progress;
-  const bubbleLeft = trackWidth > 0 ? Math.min(Math.max(shown * trackWidth - 20, 0), Math.max(trackWidth - 40, 0)) : 0;
+  const thumbLeft = trackWidth > 0 ? shown * trackWidth : 0;
+  const duration = player.duration || 0;
+  const bubbleLeft = trackWidth > 0 ? Math.min(Math.max(thumbLeft - 34, 0), Math.max(trackWidth - 68, 0)) : 0;
 
   return (
     <View
@@ -910,12 +948,33 @@ function ScrubProgressBar({
     >
       {dragging && (
         <View style={[styles.scrubBubble, { left: bubbleLeft }]} pointerEvents="none">
-          <Text style={styles.scrubBubbleText}>{formatPlaybackTime(shown * (player.duration || 0))}</Text>
+          <Text style={styles.scrubBubbleText}>
+            {formatPlaybackTime(shown * duration)} / {formatPlaybackTime(duration)}
+          </Text>
         </View>
       )}
       <Animated.View style={[styles.progressTrack, { height: thickness }]}>
-        <View style={[styles.progressFill, { width: `${shown * 100}%` }]} />
+        <View style={[styles.progressFill, { width: `${shown * 100}%` }]}>
+          <LinearGradient
+            colors={[theme.accentLight ?? theme.accent, theme.accent]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
       </Animated.View>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.scrubThumb,
+          {
+            left: thumbLeft,
+            backgroundColor: theme.accentLight ?? theme.accent,
+            opacity: thumbScale,
+            transform: [{ scale: thumbScale }],
+          },
+        ]}
+      />
     </View>
   );
 }
@@ -1007,9 +1066,19 @@ function VideoVisual({
     // relying on isActive alone, which never changes across that round trip
     // and left the last decoded frame frozen/gray on web until some other
     // state change happened to re-run this effect.
-    if (isActive && !paused && isScreenFocused) player.play();
-    else player.pause();
-  }, [isActive, paused, isScreenFocused, player]);
+    //
+    // pageWidth/pageHeight are also dependencies: on web, this cell can
+    // mount (and this effect can first run) before the FlatList/parent has
+    // measured a non-zero size for it, which — combined with the container-
+    // sizing bug above — used to leave the player permanently paused with
+    // nothing ever re-triggering play() once a real size arrived. Re-running
+    // this effect when the page's measured size changes closes that gap.
+    if (isActive && !paused && isScreenFocused && (pageWidth ?? 0) > 0 && (pageHeight ?? 0) > 0) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isActive, paused, isScreenFocused, player, pageWidth, pageHeight]);
   React.useEffect(() => {
     player.playbackRate = rate;
   }, [player, rate]);
@@ -1022,9 +1091,18 @@ function VideoVisual({
   const showBottomStrip = immersive && fit === 'cover' && bottomStripHeight > 0 && pageWidth != null && pageHeight != null;
   const sharpClipStyle = showBottomStrip ? { bottom: bottomStripHeight, overflow: 'hidden' as const } : null;
 
+  // Explicit size on the sharp-clip wrapper itself rather than trusting it
+  // to inherit height from an ancestor: on web, absoluteFill inside a
+  // virtualized FlatList cell can resolve against an ancestor whose own
+  // height collapsed to 0 (flex/auto sizing there doesn't behave like
+  // native), which silently zeroed the entire video area while the
+  // separately explicit-sized blurred mirror strip kept rendering fine —
+  // exactly the all-black-with-nothing-playing symptom this was causing.
+  const clipSize = pageWidth != null && pageHeight != null ? { width: pageWidth, height: pageHeight } : null;
+
   return (
     <>
-      <View style={[StyleSheet.absoluteFill, sharpClipStyle]}>
+      <View style={[StyleSheet.absoluteFill, clipSize, sharpClipStyle]}>
         {immersive && fit === 'contain' && posterImage && (
           <CachedImage
             source={posterImage}
@@ -1064,6 +1142,17 @@ function VideoVisual({
       </View>
       {showBottomStrip && (
         <View pointerEvents="none" style={[styles.bottomBlurStrip, { height: bottomStripHeight }]}>
+          {/* The poster frame sits underneath the mirrored live player so the
+              strip is never a hard black flash before this clip's first
+              frame has decoded (e.g. right after a swipe lands on it) — it's
+              covered the instant the mirror below has something to show. */}
+          {posterImage && (
+            <CachedImage
+              source={posterImage}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+            />
+          )}
           <View style={{ position: 'absolute', left: 0, width: pageWidth!, height: pageHeight!, top: -(pageHeight! - bottomStripHeight) }}>
             <VideoView
               player={player}
@@ -1084,10 +1173,14 @@ function VideoVisual({
               { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.82)' : 'rgba(0,0,0,0.38)' },
             ]}
           />
+          {/* A hairline seam at the top of the strip gives the floating tab
+              bar a defined edge to sit on, instead of the blur/darken simply
+              fading the video away with no boundary. */}
+          <View style={styles.bottomBlurStripSeam} pointerEvents="none" />
         </View>
       )}
       {progressBottom != null && isActive && (
-        <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} />
+        <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} externallyPaused={paused} />
       )}
     </>
   );
@@ -1124,7 +1217,12 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
   );
 }
 
-// ─── Shop pill — compact glass trigger above the creator name ────────────────
+// ─── Shop CTA — an editorial "shop the look" card, elegantly integrated ──────
+// above the creator/caption block rather than a bare floating pill. Carries a
+// product thumb, an eyebrow label, the product name and price, and a chevron
+// affordance — reads as a merchandising surface, not a slapped-on badge. A
+// slow shimmer sweep plus a spring pop-in (on first mount, i.e. whenever the
+// page becomes the active cell) give it presence without being noisy.
 
 function ShopPill({
   tag, extraCount, onPress,
@@ -1133,57 +1231,79 @@ function ShopPill({
   extraCount: number;
   onPress: () => void;
 }) {
+  const { theme } = useAppTheme();
   const shimmer = useRef(new Animated.Value(0)).current;
+  const pop = useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
+    Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 9 }).start();
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.delay(1400),
-        Animated.timing(shimmer, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.delay(1600),
+        Animated.timing(shimmer, { toValue: 1, duration: 1000, useNativeDriver: true }),
         Animated.timing(shimmer, { toValue: 0, duration: 0, useNativeDriver: true }),
       ]),
     );
     loop.start();
     return () => loop.stop();
-  }, [shimmer]);
+  }, [shimmer, pop]);
 
   return (
-    <TouchableOpacity
-      style={styles.shopPill}
-      activeOpacity={0.82}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
+    <Animated.View
+      style={{
+        opacity: pop,
+        transform: [
+          { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) },
+          { translateY: pop.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+        ],
+      }}
     >
-      <BlurView intensity={38} tint="dark" style={StyleSheet.absoluteFill} />
-      <View style={styles.shopPillThumb}>
-        {tag.imageUri ? (
-          <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <Feather name="shopping-bag" size={13} color="#111111" />
-        )}
-      </View>
-      <Text style={styles.shopPillPrice} numberOfLines={1}>
-        {formatCents(tag.priceCents)}{extraCount > 0 ? ` · +${extraCount}` : ''}
-      </Text>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.shopPillShimmer,
-          {
-            opacity: shimmer.interpolate({ inputRange: [0, 0.15, 0.85, 1], outputRange: [0, 0.55, 0.55, 0] }),
-            transform: [{ translateX: shimmer.interpolate({ inputRange: [0, 1], outputRange: [-90, 90] }) }],
-          },
-        ]}
+      <TouchableOpacity
+        style={[styles.shopPill, { borderColor: `${theme.accent}55` }]}
+        activeOpacity={0.85}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
       >
-        <LinearGradient
-          colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-    </TouchableOpacity>
+        <BlurView intensity={42} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={[styles.shopPillAccentEdge, { backgroundColor: theme.accent }]} />
+        <View style={styles.shopPillThumb}>
+          {tag.imageUri ? (
+            <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          ) : (
+            <Feather name="shopping-bag" size={15} color="#111111" />
+          )}
+        </View>
+        <View style={styles.shopPillTextCol}>
+          <Text style={styles.shopPillEyebrow}>SHOP THE LOOK</Text>
+          <View style={styles.shopPillNameRow}>
+            <Text style={styles.shopPillName} numberOfLines={1}>{tag.productName}</Text>
+            <Text style={styles.shopPillDot}>·</Text>
+            <Text style={styles.shopPillPrice} numberOfLines={1}>
+              {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
+            </Text>
+          </View>
+        </View>
+        <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.75)" />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.shopPillShimmer,
+            {
+              opacity: shimmer.interpolate({ inputRange: [0, 0.15, 0.85, 1], outputRange: [0, 0.45, 0.45, 0] }),
+              transform: [{ translateX: shimmer.interpolate({ inputRange: [0, 1], outputRange: [-140, 220] }) }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -1228,9 +1348,14 @@ function SpotlightPage({
   /** 2x while holding the right side of the video. */
   const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
   const { showToast } = useFeedToast();
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
+  /** Ring that flashes out from behind the rail heart on like — a second,
+   * smaller echo of the double-tap burst so a single tap on the rail icon
+   * gets its own moment instead of only the icon itself popping. */
+  const likeRing = useRef(new Animated.Value(0)).current;
   const speedPillOpacity = useRef(new Animated.Value(0)).current;
   const repostSpin = useRef(new Animated.Value(0)).current;
   const repostScale = useRef(new Animated.Value(1)).current;
@@ -1240,6 +1365,27 @@ function SpotlightPage({
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTriggered = useRef(false);
+  /** Chrome entrance: the rail + bottom-info block settle in with a soft
+   * rise-and-fade whenever this page becomes the active cell (first mount,
+   * or swiping back to a previously-seen post), instead of appearing
+   * instantly — the small per-item "arrival" beat that makes swiping feel
+   * directed rather than like frames simply being swapped. Inactive cells
+   * hold their chrome fully visible with no motion so nothing pops mid-swipe. */
+  const chromeIn = useRef(new Animated.Value(isActive ? 1 : 0.001)).current;
+  const wasActive = useRef(isActive);
+  React.useEffect(() => {
+    if (isActive && !wasActive.current) {
+      chromeIn.setValue(0.001);
+      Animated.spring(chromeIn, { toValue: 1, useNativeDriver: true, speed: 15, bounciness: 6 }).start();
+    } else if (!isActive) {
+      chromeIn.setValue(1);
+    }
+    wasActive.current = isActive;
+  }, [isActive, chromeIn]);
+  const chromeStyle = {
+    opacity: chromeIn,
+    transform: [{ translateY: chromeIn.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+  };
   const friendReposts = item.friendReposts ?? [];
   const hasRepostIdentity = engagement?.reposted === true || friendReposts.length > 0;
   const repostLabel = engagement?.reposted
@@ -1265,6 +1411,8 @@ function SpotlightPage({
       Animated.spring(heartScale, { toValue: 1.35, useNativeDriver: true, speed: 40 }),
       Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
     ]).start();
+    likeRing.setValue(0);
+    Animated.timing(likeRing, { toValue: 1, duration: 480, useNativeDriver: true }).start();
   }
 
   /** Arrows spin a full turn with a pop of scale — repost toggled either way. */
@@ -1345,8 +1493,16 @@ function SpotlightPage({
 
   return (
     <View style={{ width: pageWidth, height: pageHeight, backgroundColor: '#000' }}>
-      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
-        <View style={StyleSheet.absoluteFill}>
+      {/* Explicit width/height on the Pressable itself, not just its
+          absoluteFill'd parent: on web, a plain Pressable/View with no
+          intrinsic content and only absolutely-positioned children can
+          collapse to 0 height inside a virtualized FlatList cell (flex/auto
+          sizing there doesn't reliably inherit the ancestor's height the way
+          native does) — which silently zeroed out the whole video area
+          (390x0) while the separately-sized blurred mirror strip kept
+          rendering, producing an all-black screen with nothing playing. */}
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
+        <View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>
           {item.contentType === 'video'
             ? (
               <VideoVisual
@@ -1359,7 +1515,7 @@ function SpotlightPage({
                 posterSource={item.videoPosterSource}
                 fallbackColor={item.accentColor}
                 immersive={immersive}
-                progressBottom={immersive ? bottomClearance - 10 : undefined}
+                progressBottom={immersive ? bottomClearance : undefined}
                 pageAspect={pageHeight > 0 ? pageWidth / pageHeight : undefined}
                 pageWidth={pageWidth}
                 pageHeight={pageHeight}
@@ -1401,19 +1557,19 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
-      {/* ─ Shop pill — compact, sits above the creator name ─ */}
+      {/* ─ Shop CTA — sits above the creator name, integrated as a merch card ─ */}
       {!!item.productTags?.length && (
-        <View style={[styles.mediaTags, { bottom: bottomClearance + (hasRepostIdentity ? 148 : 112) }]} pointerEvents="box-none">
+        <Animated.View style={[styles.mediaTags, chromeStyle, { bottom: bottomClearance + (hasRepostIdentity ? 158 : 122) }]} pointerEvents="box-none">
           <ShopPill
             tag={item.productTags[0]}
             extraCount={Math.max(0, item.productTags.length - 1)}
             onPress={() => onShopTag(item, item.productTags![0])}
           />
-        </View>
+        </Animated.View>
       )}
 
       {/* ─ Right action rail ─ */}
-      <View style={[styles.rail, { bottom: bottomClearance }]}>
+      <Animated.View style={[styles.rail, chromeStyle, { bottom: bottomClearance }]}>
         {/* Avatar + follow badge */}
         <View style={styles.railAvatarWrap}>
           <TouchableOpacity
@@ -1445,27 +1601,41 @@ function SpotlightPage({
           )}
         </View>
 
-        {/* Like */}
-        <EngagementButton
-          icon="heart"
-          solidIcon="heart"
-          iconSize={22}
-          count={formatCount(engagement?.likes ?? 0)}
-          active={engagement?.liked ?? false}
-          activeColor="#EF4444"
-          inactiveColor={ON_DARK}
-          accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${formatCount(engagement?.likes ?? 0)} likes`}
-          accessibilityState={{ checked: engagement?.liked ?? false }}
-          scaleAnim={heartScale}
-          style={styles.railActionContent}
-          onPress={async () => {
-            bumpHeart();
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            await onLike(item.id);
-          }}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          testID={`like-btn-${item.id}`}
-        />
+        {/* Like — a ring echoes outward from behind the icon on every tap
+            that likes the post (not just the double-tap burst on the video
+            itself), so the rail control has its own moment of feedback. */}
+        <View style={styles.railLikeWrap} pointerEvents="box-none">
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.railLikeRing,
+              {
+                opacity: likeRing.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.55, 0] }),
+                transform: [{ scale: likeRing.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.9] }) }],
+              },
+            ]}
+          />
+          <EngagementButton
+            icon="heart"
+            solidIcon="heart"
+            iconSize={25}
+            count={formatCount(engagement?.likes ?? 0)}
+            active={engagement?.liked ?? false}
+            activeColor="#EF4444"
+            inactiveColor={ON_DARK}
+            accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${formatCount(engagement?.likes ?? 0)} likes`}
+            accessibilityState={{ checked: engagement?.liked ?? false }}
+            scaleAnim={heartScale}
+            style={styles.railActionContent}
+            onPress={async () => {
+              bumpHeart();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              await onLike(item.id);
+            }}
+            hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+            testID={`like-btn-${item.id}`}
+          />
+        </View>
 
         {/* Comments — not async, opens navigation */}
         <TouchableOpacity
@@ -1476,7 +1646,7 @@ function SpotlightPage({
           accessibilityRole="button"
           accessibilityLabel={`Comments, ${formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}`}
         >
-          <FontAwesome name="commenting" size={21} color={ON_DARK} />
+          <FontAwesome name="commenting" size={24} color={ON_DARK} />
           <Text style={styles.railCount}>{formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}</Text>
         </TouchableOpacity>
 
@@ -1484,7 +1654,7 @@ function SpotlightPage({
         <EngagementButton
           icon="repeat"
           solidIcon="retweet"
-          iconSize={22}
+          iconSize={25}
           count={formatCount(engagement?.reposts ?? 0)}
           active={engagement?.reposted ?? false}
           activeColor={theme.accent}
@@ -1507,7 +1677,7 @@ function SpotlightPage({
         <EngagementButton
           icon="bookmark"
           solidIcon="bookmark"
-          iconSize={21}
+          iconSize={24}
           count={formatCount(engagement?.saves ?? item.saves)}
           active={engagement?.saved ?? false}
           activeColor={GOLD}
@@ -1538,11 +1708,11 @@ function SpotlightPage({
             setShareOpen(true);
           }}
         >
-          <FontAwesome name="share" size={21} color={ON_DARK} />
+          <FontAwesome name="share" size={24} color={ON_DARK} />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
-      </View>
+      </Animated.View>
 
       <ThreadShareSheet
         visible={shareOpen}
@@ -1559,7 +1729,7 @@ function SpotlightPage({
       />
 
       {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─ */}
-      <View style={[styles.bottomInfo, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance }]} pointerEvents="box-none">
+      <Animated.View style={[styles.bottomInfo, chromeStyle, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance }]} pointerEvents="box-none">
         {hasRepostIdentity && (
           <TouchableOpacity
             style={styles.repostIdentity}
@@ -1614,10 +1784,19 @@ function SpotlightPage({
           </View>
         </TouchableOpacity>
 
-         <Text style={styles.caption} numberOfLines={2}>
-           {item.caption}
-            {item.caption.length > 86 && <Text style={styles.moreText}> more</Text>}
-         </Text>
+        <Pressable
+          onPress={() => item.caption.length > 86 && setCaptionExpanded(v => !v)}
+          accessibilityRole={item.caption.length > 86 ? 'button' : 'text'}
+          accessibilityLabel={item.caption.length > 86 ? (captionExpanded ? 'Collapse caption' : 'Expand caption') : undefined}
+          hitSlop={{ top: 4, bottom: 4 }}
+        >
+          <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
+            {item.caption}
+            {item.caption.length > 86 && (
+              <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
+            )}
+          </Text>
+        </Pressable>
 
         <Pressable
           style={styles.soundRow}
@@ -1630,7 +1809,7 @@ function SpotlightPage({
            <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={12} color={`${ON_DARK}CC`} />
           <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -1786,6 +1965,9 @@ export default function FeedScreen({
   const pageHeight = viewportSize.height || windowHeight;
   const viewportReady = viewportSize.width > 0 && viewportSize.height > 0;
   const [showSearch, setShowSearch] = useState(false);
+  /** Buyer Threads Home's own search toggle — the glass top bar swaps to a
+   * search row in place, same searchQuery state as the legacy top bar. */
+  const [buyerSearchOpen, setBuyerSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRepostEducation, setShowRepostEducation] = useState(false);
@@ -1813,6 +1995,7 @@ export default function FeedScreen({
   const repostPendingRef = useRef(new Set<string>());
   const cartPulse = useRef(new Animated.Value(1)).current;
   const cartTargetRef = useRef<View>(null);
+  const feedListRef = useRef<FlatList<FeedItem>>(null);
 
   useEffect(() => {
     let active = true;
@@ -2378,6 +2561,19 @@ export default function FeedScreen({
     return () => { cancelled = true; };
   }, [sellerFeedPosts]);
 
+  /** Top-bar LIVE button: jumps the feed to the nearest active live stream
+   * card already mixed into displayItems, ahead of the current position
+   * when one exists downstream, otherwise the closest one behind it. */
+  function jumpToNearestLive() {
+    const indices: number[] = [];
+    displayItems.forEach((it, i) => { if ((it as any)._isLive) indices.push(i); });
+    if (!indices.length) return;
+    const ahead = indices.find(i => i > activeIndex);
+    const target = ahead ?? indices[indices.length - 1];
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    feedListRef.current?.scrollToIndex({ index: target, animated: true });
+  }
+
   function handleOpenComments(id: string) {
     const item = allItems.find(i => i.id === id);
     if (!item || isLiveStreamItem(item) || isJustDroppedItem(item)) return;
@@ -2444,8 +2640,14 @@ export default function FeedScreen({
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
   // Buyer Home plays edge to edge behind the floating tab bar, so every
   // overlay (shop tag, caption, rail, progress) starts above the bar.
+  // Buyer Home: this is the exact height of the floating tab bar's zone
+  // (its own bottom margin + the capsule + its breathing room) — nothing
+  // extra added. The sharp video fills every pixel above it edge to edge;
+  // the blurred tab-bar strip and the scrub line both key off this same
+  // number so the seam between "sharp video" and "blurred bar backdrop"
+  // lands in exactly one place, with no added gap or oversized band.
   const bottomClearance = isBuyerSurface
-    ? buyerBarInset + 6
+    ? buyerBarInset
     : Math.max(previewBottomInset, 8) + 14;
 
   return (
@@ -2485,6 +2687,7 @@ export default function FeedScreen({
        * events for this screen specifically.
        */}
       {viewportReady && <FlatList
+        ref={feedListRef}
         // The creator player remounts once its videos load so it opens at the tapped one.
         key={`thread-${pageWidth}x${pageHeight}${isCreatorFeed && feedLoading ? '-loading' : ''}`}
         data={displayItems}
@@ -2636,14 +2839,30 @@ export default function FeedScreen({
         <>
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(0,0,0,0.42)', 'rgba(0,0,0,0)']}
-            style={[styles.topScrim, { height: insets.top + 120 }]}
+            colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.14)', 'rgba(0,0,0,0)']}
+            locations={[0, 0.55, 1]}
+            style={[styles.topScrim, { height: insets.top + 130 }]}
           />
+          {/* Full-width base scrim — a longer, gentler falloff than before so
+              the transition from clean video to legible text reads as one
+              continuous gradient instead of a hard "curtain" appearing low
+              in the frame. */}
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0.62)']}
-            locations={[0, 0.45, 1]}
-            style={[styles.bottomScrim, { height: bottomClearance + 240 }]}
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.34)', 'rgba(0,0,0,0.7)']}
+            locations={[0, 0.3, 0.62, 1]}
+            style={[styles.bottomScrim, { height: bottomClearance + 300 }]}
+          />
+          {/* Focused scrim: a second, tighter gradient sitting only behind
+              the creator/caption column, so that text block reads with real
+              contrast against any frame while the right rail and the video
+              elsewhere stay comparatively clean and bright — the layered
+              "spotlight" read premium feeds use instead of one flat wash. */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.52)']}
+            locations={[0, 1]}
+            style={[styles.bottomFocusScrim, { height: bottomClearance + 190, width: Math.min(windowWidth * 0.82, 340) }]}
           />
         </>
       )}
@@ -2694,78 +2913,141 @@ export default function FeedScreen({
         </View>
       ) : isBuyerSurface ? (
         <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none">
-          {/* Buyer Home: Friends · Following | For You · Cart. Search lives in the tab bar. */}
-          <View style={styles.buyerTopRow}>
-            <TouchableOpacity
-              style={styles.buyerTopBtn}
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                router.navigate('/(buyer)/friends' as never);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Friends"
-              testID="buyer-home-friends"
-            >
-              <BuyerNavIcon name="friends" color={ON_DARK} size={24} strokeWidth={1.9} />
-            </TouchableOpacity>
-            {/* Drops entry point — small, additive */}
-            <TouchableOpacity
-              style={styles.buyerTopBtn}
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                router.push('/buyer-drops' as never);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Drops"
-              testID="buyer-home-drops"
-            >
-              <Feather name="zap" size={22} color={ON_DARK} />
-            </TouchableOpacity>
-            <View style={styles.buyerFeedTabs}>
-                {([
-                  ['following', 'Following'],
-                  ['for-you', 'Threads'],
-                ] as const).map(([key, label]) => (
-                  <TouchableOpacity
-                    key={key}
-                    style={[styles.feedTab, styles.buyerFeedTab]}
-                    onPress={() => {
-                      setActiveIndex(0);
-                      setFeedTab(key);
-                    }}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: feedTab === key }}
-                  >
-                    <Text style={[styles.feedTabText, styles.buyerFeedTabText, feedTab === key && styles.feedTabTextActive]}>{label}</Text>
-                    {feedTab === key && <View style={[styles.feedTabUnderline, styles.buyerFeedTabUnderline, { backgroundColor: theme.accent }]} />}
-                  </TouchableOpacity>
-                ))}
+          {/* Buyer Threads Home: For You feed chrome — Friends + Drops entry
+              points, a centered "Following | Threads" glass pill switcher
+              (real SegmentedControl from the shared design system, extended
+              with a translucent `variant="glass"` for use over video — see
+              components/ui/SegmentedControl.tsx), a LIVE jump-to button that
+              only appears while a live stream is actually mixed into the
+              feed, search, activity and cart. */}
+          {buyerSearchOpen ? (
+            <View style={styles.buyerSearchRow}>
+              <BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
+              <Feather name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
+              <TextInput
+                style={styles.buyerSearchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search creators, products…"
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                autoFocus
+                returnKeyType="search"
+                onSubmitEditing={() => setBuyerSearchOpen(false)}
+              />
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => { setBuyerSearchOpen(false); setSearchQuery(''); }}
+                accessibilityRole="button"
+                accessibilityLabel="Close search"
+              >
+                <Feather name="x" size={18} color={ON_DARK} />
+              </TouchableOpacity>
             </View>
-            <ActivityBellButton color={ON_DARK} size={22} style={styles.buyerTopBtn} badgeBorderColor={BG} />
-            <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
-            <TouchableOpacity
-              style={styles.buyerTopBtn}
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/(buyer)/cart' as never);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-            >
-              <Feather name="shopping-cart" size={22} color={ON_DARK} />
-              {cartCount > 0 && (
-                <View style={[styles.cartCountBadge, styles.buyerCartBadge, { backgroundColor: theme.accent }]}>
-                  <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
-                    {cartCount > 99 ? '99+' : cartCount}
-                  </Text>
-                </View>
+          ) : (
+          <View style={styles.buyerTopRow}>
+            <View style={styles.buyerTopCluster}>
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  router.navigate('/(buyer)/friends' as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Friends"
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                testID="buyer-home-friends"
+              >
+                <BuyerNavIcon name="friends" color={ON_DARK} size={22} strokeWidth={1.9} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  router.push('/buyer-drops' as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Drops"
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                testID="buyer-home-drops"
+              >
+                <Feather name="zap" size={20} color={ON_DARK} />
+              </TouchableOpacity>
+              {activeLiveStreams.length > 0 && (
+                <TouchableOpacity
+                  style={styles.liveJumpBtn}
+                  activeOpacity={0.78}
+                  onPress={jumpToNearestLive}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Jump to live, ${activeLiveStreams.length} streaming now`}
+                  hitSlop={{ top: 5, bottom: 5, left: 4, right: 5 }}
+                >
+                  <View style={styles.liveJumpDot} />
+                  <Text style={styles.liveJumpText}>LIVE</Text>
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
-            </Animated.View>
+            </View>
+
+            <View style={styles.buyerTabSwitcherWrap} pointerEvents="box-none">
+              <SegmentedControl
+                variant="glass"
+                size="compact"
+                style={{ minWidth: 176, maxWidth: 220, width: '100%' }}
+                testID="buyer-home-tabs"
+                options={[
+                  { id: 'following', label: 'Following' },
+                  { id: 'for-you', label: 'Threads' },
+                ]}
+                selectedId={feedTab}
+                onChange={(id) => {
+                  setActiveIndex(0);
+                  setFeedTab(id as 'following' | 'for-you');
+                }}
+              />
+            </View>
+
+            <View style={styles.buyerTopCluster}>
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setBuyerSearchOpen(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Search"
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                testID="buyer-home-search"
+              >
+                <Feather name="search" size={20} color={ON_DARK} />
+              </TouchableOpacity>
+              <ActivityBellButton color={ON_DARK} size={20} style={styles.buyerTopBtnCompact} badgeBorderColor={BG} />
+              <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtnCompact, { transform: [{ scale: cartPulse }] }]}>
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/(buyer)/cart' as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+              >
+                <Feather name="shopping-cart" size={20} color={ON_DARK} />
+                {cartCount > 0 && (
+                  <View style={[styles.cartCountBadge, styles.buyerCartBadge, { backgroundColor: theme.accent }]}>
+                    <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              </Animated.View>
+            </View>
           </View>
+          )}
         </View>
       ) : (
       <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none">
@@ -2961,21 +3243,36 @@ const styles = StyleSheet.create({
   videoFill: { width: '100%', height: '100%' },
   letterboxBackdrop: { opacity: 0.55 },
   bottomBlurStrip: { position: 'absolute', left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+  bottomBlurStripSeam: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  bottomFocusScrim: { position: 'absolute', bottom: 0, left: 0 },
   progressHitArea: {
     position: 'absolute', left: 16, right: 16, height: 28, justifyContent: 'center',
   },
   progressTrack: {
-    borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden',
+    borderRadius: RADII.pill, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)',
   },
-  progressFill: { height: '100%', borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.92)' },
+  progressFill: {
+    height: '100%', borderRadius: RADII.pill, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.92)',
+    shadowColor: '#fff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4,
+  },
   scrubBubble: {
     position: 'absolute', bottom: 22, minWidth: 40, alignItems: 'center',
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm,
     backgroundColor: 'rgba(0,0,0,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
   },
   scrubBubbleText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
+  scrubThumb: {
+    position: 'absolute', top: '50%', width: 13, height: 13, borderRadius: 7,
+    marginTop: -6.5, marginLeft: -6.5,
+    borderWidth: 2, borderColor: ON_DARK,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.4, shadowRadius: 3, elevation: 4,
+  },
   speedPill: {
     position: 'absolute', top: '42%', alignSelf: 'center',
     flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -2987,38 +3284,59 @@ const styles = StyleSheet.create({
   mediaDotActive: { width: 18, backgroundColor: ON_DARK },
   mediaTags: { position: 'absolute', left: 16, right: 86, alignItems: 'flex-start' },
   shopPill: {
-    height: 34, flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: RADII.pill, paddingLeft: 4, paddingRight: 12, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.24,
-    shadowRadius: 6, elevation: 5,
+    minHeight: 52, maxWidth: 260, flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: RADII.card, paddingLeft: 7, paddingRight: 12, paddingVertical: 7, overflow: 'hidden',
+    borderWidth: 1,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3,
+    shadowRadius: 8, elevation: 6,
   },
+  shopPillAccentEdge: { position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: 2 },
   shopPillThumb: {
-    width: 26, height: 26, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: ON_DARK, overflow: 'hidden',
+    width: 38, height: 38, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ON_DARK, overflow: 'hidden', marginLeft: 3,
   },
+  shopPillTextCol: { flexShrink: 1, gap: 1 },
+  shopPillEyebrow: {
+    color: 'rgba(255,255,255,0.62)', fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1.1,
+  },
+  shopPillNameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5, maxWidth: 170 },
+  shopPillName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12.5, flexShrink: 1 },
+  shopPillDot: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
   shopPillPrice: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 12.5, ...TABULAR_NUMS },
-  shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
+  shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 60 },
 
   rail: {
-    position: 'absolute', right: 8, width: 48, bottom: 116, alignItems: 'center', gap: 15,
+    position: 'absolute', right: 10, width: 52, bottom: 116, alignItems: 'center', gap: 19,
   },
-  railAvatarWrap: { alignItems: 'center', marginBottom: 2 },
-  railAvatar: { width: 40, height: 40, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: ON_DARK },
+  railAvatarWrap: { alignItems: 'center', marginBottom: 3 },
+  railAvatar: {
+    width: 44, height: 44, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: ON_DARK,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
+  },
   railAvatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
   railFollowBadge: {
-    position: 'absolute', bottom: -8, width: 19, height: 19, borderRadius: RADII.pill,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000',
+    position: 'absolute', bottom: -8, width: 20, height: 20, borderRadius: RADII.pill,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
-  railBtn: { width: 48, alignItems: 'center', gap: 2 },
-  railActionContent: { width: 48, alignItems: 'center', gap: 2 },
-  railCount: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: ON_DARK, ...TABULAR_NUMS },
+  railBtn: { width: 48, alignItems: 'center', gap: 3 },
+  railActionContent: { width: 48, alignItems: 'center', gap: 3 },
+  railLikeWrap: { width: 48, alignItems: 'center', justifyContent: 'center' },
+  railLikeRing: {
+    position: 'absolute', top: 4, width: 34, height: 34, borderRadius: RADII.pill,
+    borderWidth: 2, borderColor: '#EF4444',
+  },
+  railCount: {
+    fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: ON_DARK, ...TABULAR_NUMS,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
 
   bottomInfo: {
-    position: 'absolute', left: 16, right: 84, bottom: 26, height: 104,
-    justifyContent: 'flex-end', gap: 8,
+    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 112,
+    justifyContent: 'flex-end', gap: 10,
   },
-  bottomInfoWithRepost: { height: 140 },
+  bottomInfoWithRepost: { minHeight: 148 },
   repostIdentity: {
     alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32,
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -3035,24 +3353,52 @@ const styles = StyleSheet.create({
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
-    height: 38, fontSize: 14, fontFamily: FONT.regular, color: ON_DARK,
-    lineHeight: 19,
+    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK,
+    lineHeight: 20.5, letterSpacing: 0.1,
+    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
-  moreText: { fontFamily: FONT.semibold, color: ON_DARK },
-  creatorRow: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  creatorName: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1 },
-  soundRow: { height: 16, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  soundText: { fontSize: FS.xs, fontFamily: FONT.regular, color: `${ON_DARK}CC`, flexShrink: 1 },
+  moreText: { fontFamily: FONT.bold, color: ON_DARK },
+  creatorRow: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorName: {
+    fontSize: FS.base + 3, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+  },
+  soundRow: {
+    height: 24, flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start', paddingHorizontal: 9, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+  },
+  soundText: { fontSize: FS.xs, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
 
-  topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 12, paddingBottom: 4 },
+  topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 10, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  buyerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
+  buyerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: 2 },
+  // Compact 36×36 visual footprint with 5pt hitSlop on every button above =
+  // a real 44×44+ touch target while leaving the centered pill enough room
+  // to breathe at 375pt width (5 icon buttons + LIVE badge otherwise crowd
+  // "Following"/"Threads" onto two lines).
+  buyerTopBtnCompact: { width: 33, height: 36, alignItems: 'center', justifyContent: 'center' },
+  // Full 44x44 touch target — used by the creator-profile-videos player's
+  // simpler back/cart top bar (isCreatorFeed), distinct from the compact
+  // buyer Threads Home top row above which needs to fit more controls.
   buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  buyerFeedTabs: { flex: 1, flexDirection: 'row', justifyContent: 'center', gap: 18 },
-  buyerCartBadge: { top: 5, right: 3 },
-  buyerFeedTabUnderline: { position: 'absolute', bottom: 6, alignSelf: 'center' },
-  buyerFeedTab: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
-  buyerFeedTabText: { fontSize: FS.base, textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
+  buyerTopCluster: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  buyerTabSwitcherWrap: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  buyerCartBadge: { top: 3, right: 1 },
+  liveJumpBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36,
+    paddingHorizontal: 8, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.55)',
+  },
+  liveJumpDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
+  liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
+  buyerSearchRow: {
+    flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: RADII.pill,
+    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+  },
+  buyerSearchInput: {
+    flex: 1, height: 44, paddingHorizontal: 10, fontSize: FS.sm, fontFamily: FONT.regular, color: ON_DARK,
+  },
   topAvatarBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   topAvatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },
