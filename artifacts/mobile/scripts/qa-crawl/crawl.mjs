@@ -455,17 +455,23 @@ async function crawlRole(browser, role, viewport, maxPages, seedRoutes, onFlush)
     });
 
     const pageResult = await Promise.race([
-      processRoute({ context, route, key, depth, from, viewport, role, qaUserId, findings, pagesVisited }),
+      processRoute({ context, route, key, depth, from, viewport, role, qaUserId, findings, pagesVisited }).catch(
+        (e) => ({ harnessError: String(e).slice(0, 300) }),
+      ),
       watchdog,
     ]);
 
-    if (pageResult === "timeout") {
+    const harnessFailed = pageResult === "timeout" || (pageResult && pageResult.harnessError);
+    if (harnessFailed) {
+      const isTimeout = pageResult === "timeout";
       findings.push({
         role,
         viewport: viewport.name,
         route: key,
         reachedFrom: from,
-        navError: `PAGE_TIMEOUT: exceeded ${PAGE_TIMEOUT_MS}ms -- likely a wedged browser page/CDP connection, not a real app hang. Route abandoned so the crawl could continue.`,
+        navError: isTimeout
+          ? `PAGE_TIMEOUT: exceeded ${PAGE_TIMEOUT_MS}ms -- likely a wedged browser page/CDP connection, not a real app hang. Route abandoned so the crawl could continue.`
+          : `HARNESS_ERROR: ${pageResult.harnessError} -- likely a crashed/closed browser page or context, not a real app bug. Route abandoned so the crawl could continue.`,
         loadTimeMs: PAGE_TIMEOUT_MS,
         slow: true,
         consoleErrors: [],
