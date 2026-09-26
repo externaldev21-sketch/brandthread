@@ -1854,6 +1854,26 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
   };
 }
 
+/**
+ * Preview catalog products need a real multi-photo gallery to test the
+ * full-bleed swipeable carousel (product shots + "model photos"), not just
+ * the single video poster frame. Reuse the runway poster set — 3-5 images
+ * per product, cycled by an offset derived from the product id so different
+ * preview products don't all show the same sequence.
+ */
+function buildPreviewGalleryUris(item: SpotlightItem, productId: string): string[] {
+  const pool = FASHION_PREVIEW_POSTER_URIS;
+  if (pool.length === 0) return item.videoPosterUri ? [item.videoPosterUri] : [];
+  let seed = 0;
+  for (let i = 0; i < productId.length; i++) seed = (seed * 31 + productId.charCodeAt(i)) >>> 0;
+  const count = 3 + (seed % 3); // 3-5 images
+  const start = seed % pool.length;
+  const uris = Array.from({ length: count }, (_, i) => pool[(start + i) % pool.length]);
+  // Lead with this post's own poster so the first frame still matches the tag.
+  if (item.videoPosterUri && !uris.includes(item.videoPosterUri)) uris[0] = item.videoPosterUri;
+  return uris;
+}
+
 function buildPreviewShopProduct(
   item: SpotlightItem,
   tag: { productId: string; productName: string; priceCents: number },
@@ -1863,6 +1883,7 @@ function buildPreviewShopProduct(
     id: `${optionId}-${label.toLowerCase()}`,
     label,
   }));
+  const galleryUris = buildPreviewGalleryUris(item, tag.productId);
   return {
     id: tag.productId,
     sellerId: item.sellerId ?? `preview-seller-${item.id}`,
@@ -1871,7 +1892,7 @@ function buildPreviewShopProduct(
     name: tag.productName,
     description: item.caption.replace(/^Preview ·\s*/, ''),
     priceCents: tag.priceCents,
-    imageUris: item.videoPosterUri ? [item.videoPosterUri] : [],
+    imageUris: galleryUris,
     category: 'High Fashion',
     isPreOrder: false,
     cancellationPolicy: 'Preview item — no real order will be placed.',
