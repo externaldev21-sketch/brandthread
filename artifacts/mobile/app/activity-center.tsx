@@ -230,7 +230,10 @@ function Avatar({ actor, size, styles, ring }: {
  * of a jumbled overlap), with a "+N" pill for anyone beyond them. Shared by
  * feed rows and the "New followers" summary row.
  */
-function AvatarPair({ actors, hidden, styles, ring }: {
+function AvatarPair({ row, actors, hidden, styles, ring }: {
+  /** Omitted for summary rows (e.g. "New followers") that don't correspond
+   *  to one specific activity row — no type badge renders in that case. */
+  row?: ActivityRow;
   actors: ActivityActor[];
   hidden: number;
   styles: Styles;
@@ -242,7 +245,7 @@ function AvatarPair({ actors, hidden, styles, ring }: {
     return (
       <View style={styles.leading}>
         <Avatar actor={first} size={44} styles={styles} />
-        <ActivityTypeBadge row={row} styles={styles} />
+        {row && <ActivityTypeBadge row={row} styles={styles} />}
       </View>
     );
   }
@@ -261,13 +264,13 @@ function AvatarPair({ actors, hidden, styles, ring }: {
           </Text>
         </View>
       )}
-      <ActivityTypeBadge row={row} styles={styles} />
+      {row && <ActivityTypeBadge row={row} styles={styles} />}
     </View>
   );
 }
 
 function ActivityAvatarStack({ row, styles, ring }: { row: ActivityRow; styles: Styles; ring: string }) {
-  return <AvatarPair actors={row.actors} hidden={row.actorCount - 2} styles={styles} ring={ring} />;
+  return <AvatarPair row={row} actors={row.actors} hidden={row.actorCount - 2} styles={styles} ring={ring} />;
 }
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
