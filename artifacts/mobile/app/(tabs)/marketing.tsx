@@ -72,7 +72,7 @@ export default function MarketingScreen() {
   const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
   const [referrals, setReferrals] = useState<ReferralStats | null>(null);
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 : 0;
 
   useFocusEffect(

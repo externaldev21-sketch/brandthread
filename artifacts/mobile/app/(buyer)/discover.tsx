@@ -34,8 +34,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Platform,
-  Pressable,
+    Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -798,7 +797,7 @@ export default function DiscoverScreen() {
   const { theme } = useAppTheme();
   const { isSignedIn } = useAuth();
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = insets.top;
   const { width: winWidth } = useWindowDimensions();
   const showcaseSkeletonWidth = Math.min(Math.max(winWidth - 54 - GUTTER * 2, 1), 370);
 

@@ -7,7 +7,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  RefreshControl, Platform, ActivityIndicator,
+  RefreshControl, ActivityIndicator,
   Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -260,7 +260,7 @@ export default function AnalyticsScreen() {
   const api = useApi();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = insets.top;
 
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);

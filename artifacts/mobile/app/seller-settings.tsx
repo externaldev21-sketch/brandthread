@@ -3,7 +3,7 @@
  * Profile card + search + compact grouped iOS-Settings-style sections.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -55,7 +55,7 @@ export default function SellerSettingsScreen() {
   // to the avatar (not a separate first/last-name pair that may be blank),
   // so the avatar and the name text can never disagree.
   const profileInitials = getInitials(profileName, 'BT');
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
+  const topPad = insets.top;
   const tabBarInset = useTabBarMetrics(2).occupiedHeight;
 
   const groups = useMemo(() => {

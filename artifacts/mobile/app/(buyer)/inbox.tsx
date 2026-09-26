@@ -218,14 +218,11 @@ export default function InboxScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
-  // react-native-web doesn't fill in a real top safe-area inset (no notch/
-  // dynamic-island polyfill), so `insets.top` reads 0 on web and the header
-  // clipped under the dynamic island in a device-frame screenshot. Same
-  // fixed value Discover already uses for this (app/(buyer)/discover.tsx's
-  // `topPad`) — the buyer-wide header standardization (shared PageHeader)
-  // another session is landing should absorb this; keep it isolated here so
-  // that swap is a one-line change.
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  // Real safe-area inset on every platform, including web (see the
+  // `viewport-fit=cover` meta tag in app/+html.tsx, which is what makes
+  // react-native-safe-area-context's web implementation return a non-zero
+  // `insets.top` under a simulated notch instead of always 0).
+  const topPad = insets.top;
   // The buyer tab shell already centers route content in a max-width column
   // on wide/web viewports, so this only needs the ordinary phone gutter —
   // an extra centered-padding calculation here would double up with that

@@ -435,8 +435,8 @@ export default function CreatePostScreen() {
   const editId   = typeof params.editId === 'string' ? params.editId : undefined;
   const isSellerSetup = isSellerSetupOrigin(params.from);
 
-  const topPad = Platform.OS === 'web' ? 20 : insets.top;
-  const botPad = Platform.OS === 'web' ? 20 : insets.bottom;
+  const topPad = insets.top;
+  const botPad = insets.bottom;
 
   function leaveSetupDestination() {
     if (isSellerSetup) { router.replace(SELLER_HOME_ROUTE as never); return; }

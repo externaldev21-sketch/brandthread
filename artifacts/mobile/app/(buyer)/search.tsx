@@ -73,7 +73,7 @@ export default function SearchScreen() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [filters, setFilters] = useState<SearchFilters>({});
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
+  const topPad = insets.top;
   const recentKey = `bt:buyer-search-recent:${userId ?? 'anon'}`;
   const trimmedQuery = query.trim();
 

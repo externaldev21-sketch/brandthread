@@ -1929,7 +1929,7 @@ export default function FeedScreen({
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
-  const previewTopInset = Platform.OS === 'web' ? 67 : insets.top;
+  const previewTopInset = insets.top;
   const previewBottomInset = insets.bottom;
   const isBuyerSurface = buyerMode || showFashionPreview;
   const isCreatorFeed = !!creatorFeed;
