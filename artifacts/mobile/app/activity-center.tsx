@@ -33,7 +33,6 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -43,7 +42,9 @@ import { EmptyState, SkeletonBlock } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { ThemedRefreshControl } from '@/components/ui';
+import { Button, ThemedRefreshControl } from '@/components/ui';
+import { ThreadCashCoinMark } from '@/components/thread-cash/ChatAttachThreadCash';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
@@ -89,6 +90,11 @@ type ListSection = ActivitySection<ActivityRow> & { data: ActivityRow[] };
 
 // ─── Avatars ──────────────────────────────────────────────────────────────────
 
+/**
+ * A real profile photo when one exists; otherwise a plain monochrome
+ * initials circle (never the old per-actor hashed rainbow color — that read
+ * as off-brand/noisy next to real photos).
+ */
 function Avatar({ actor, size, styles, ring }: {
   actor: ActivityActor;
   size: number;
@@ -96,21 +102,21 @@ function Avatar({ actor, size, styles, ring }: {
   ring?: string;
 }) {
   const { theme } = useAppTheme();
+  const ringStyle = ring ? { borderWidth: 2, borderColor: ring } : null;
+  const dimensions = { width: size, height: size, borderRadius: size / 2 };
+
+  if (actor.avatarUrl) {
+    return (
+      <View style={[dimensions, ringStyle, styles.avatarPhotoWrap]}>
+        <CachedImage source={{ uri: actor.avatarUrl }} style={dimensions} accessibilityIgnoresInvertColors />
+      </View>
+    );
+  }
+
   return (
-    <View
-      style={[
-        styles.avatar,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: actor.color || theme.accent,
-        },
-        ring ? { borderWidth: 2, borderColor: ring } : null,
-      ]}
-    >
+    <View style={[styles.avatar, dimensions, { backgroundColor: theme.cardElevated }, ringStyle]}>
       <Text
-        style={[styles.avatarText, { color: theme.onAccent, fontSize: size >= 40 ? FS.sm : FS.xs }]}
+        style={[styles.avatarText, { color: theme.muted, fontSize: size >= 40 ? FS.sm : FS.xs }]}
         allowFontScaling={false}
         numberOfLines={1}
       >
@@ -121,11 +127,19 @@ function Avatar({ actor, size, styles, ring }: {
 }
 
 /**
- * One actor: a full-size avatar. Two or more: two overlapping avatars, with a
- * "+N" chip for anyone beyond them.
+ * One actor: a full-size avatar. Two or more: a clean diagonal 2-avatar
+ * stack (back top-left, front bottom-right, a ring around the front avatar
+ * in the row's own background so the two read as separate circles instead
+ * of a jumbled overlap), with a "+N" pill for anyone beyond them. Shared by
+ * feed rows and the "New followers" summary row.
  */
-function ActivityAvatarStack({ row, styles, ring }: { row: ActivityRow; styles: Styles; ring: string }) {
-  const [first, second] = row.actors;
+function AvatarPair({ actors, hidden, styles, ring }: {
+  actors: ActivityActor[];
+  hidden: number;
+  styles: Styles;
+  ring: string;
+}) {
+  const [first, second] = actors;
   if (!first) return null;
   if (!second) {
     return (
@@ -134,14 +148,13 @@ function ActivityAvatarStack({ row, styles, ring }: { row: ActivityRow; styles: 
       </View>
     );
   }
-  const hidden = row.actorCount - 2;
   return (
-    <View style={styles.leading} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View style={styles.stackWrap} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <View style={styles.stackBack}>
-        <Avatar actor={second} size={30} styles={styles} />
+        <Avatar actor={second} size={36} styles={styles} />
       </View>
       <View style={styles.stackFront}>
-        <Avatar actor={first} size={32} styles={styles} ring={ring} />
+        <Avatar actor={first} size={36} styles={styles} ring={ring} />
       </View>
       {hidden > 0 && (
         <View style={[styles.moreChip, { borderColor: ring }]}>
@@ -152,6 +165,10 @@ function ActivityAvatarStack({ row, styles, ring }: { row: ActivityRow; styles: 
       )}
     </View>
   );
+}
+
+function ActivityAvatarStack({ row, styles, ring }: { row: ActivityRow; styles: Styles; ring: string }) {
+  return <AvatarPair actors={row.actors} hidden={row.actorCount - 2} styles={styles} ring={ring} />;
 }
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
@@ -179,7 +196,14 @@ const ActivityRowView = React.memo(function ActivityRowView({
   const parts = activityMessage(row);
   const detail = activityDetail(row);
   const followBack = isFollowBackRow(row);
-  const rowBackground = unread ? theme.card : theme.background;
+  // A follow row for a single person always shows a real Follow back /
+  // Following state instead of a generic icon — even once it's mutual (cta
+  // cleared), "Following" reads better than a bare person icon.
+  const isSingleFollowRow = row.type === 'new_follower' && row.actorCount === 1 && !!row.targetId;
+  const alreadyFollowing = isSingleFollowRow && !followBack;
+  // The coin mark already carries the "$" glyph, so the trailing label is
+  // just the number (no redundant second "$").
+  const cashAmount = row.type === 'thread_cash_received' ? row.body?.match(/^\$([\d,.]+)/)?.[1] : null;
   const sentence = parts.map((p) => p.text).join('');
 
   return (
@@ -190,72 +214,88 @@ const ActivityRowView = React.memo(function ActivityRowView({
       onAction={() => onDismiss(row)}
       accessibilityLabel="Dismiss activity"
     >
-      <PressableScale
-        style={[styles.row, { backgroundColor: rowBackground }]}
-        onPress={() => onPress(row)}
-        accessibilityRole="button"
-        accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
-      >
-        {row.actors.length > 0 ? (
-          <ActivityAvatarStack row={row} styles={styles} ring={rowBackground} />
-        ) : (
-          <View style={styles.leading}>
-            <View style={styles.iconCircle}>
-              <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
-            </View>
-          </View>
-        )}
+      <View style={styles.row}>
+        {/*
+          The Follow back / Following button is a real interactive control
+          (components/ui/Button), so it must be a sibling of the row's own
+          tap target rather than nested inside it — two interactive
+          `accessibilityRole="button"` elements one inside the other render
+          as invalid nested <button> HTML on web.
 
-        <View style={styles.center}>
-          <Text style={styles.message} numberOfLines={3}>
-            {parts.map((part, index) => (
-              <Text key={index} style={part.bold ? styles.messageBold : undefined}>{part.text}</Text>
-            ))}
-            <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
-          </Text>
-          {detail ? <Text style={styles.detail} numberOfLines={2}>{detail}</Text> : null}
+          PressableScale only forwards a plain style object to its INNER
+          Animated.View, never to the outer Pressable/<button> itself (see
+          its own implementation) — so the shrink-to-fit-the-row constraint
+          has to live on a wrapping plain View instead, or the unconstrained
+          <button> renders at its content width and overflows the screen.
+        */}
+        <View style={styles.tapAreaWrap}>
+        <PressableScale
+          style={styles.tapArea}
+          onPress={() => onPress(row)}
+          accessibilityRole="button"
+          accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
+        >
+          {row.actors.length > 0 ? (
+            <ActivityAvatarStack row={row} styles={styles} ring={theme.background} />
+          ) : (
+            <View style={styles.leading}>
+              <View style={styles.iconCircle}>
+                <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
+              </View>
+            </View>
+          )}
+
+          <View style={styles.center}>
+            <Text style={styles.message} numberOfLines={3}>
+              {parts.map((part, index) => (
+                <Text key={index} style={part.bold || unread ? styles.messageBold : undefined}>{part.text}</Text>
+              ))}
+              <Text style={styles.time}>
+                {'  '}
+                {unread && <Text style={{ color: theme.accent }}>{'• '}</Text>}
+                {relativeTime(row.createdAt, now, { compact: true })}
+              </Text>
+            </Text>
+            {detail ? <Text style={styles.detail} numberOfLines={2}>{detail}</Text> : null}
+          </View>
+
+          {/* Follows never show a generic icon box — a single follower gets
+              the real Follow back / Following button (rendered as a sibling
+              below); a merged multi-follower row shows nothing trailing. */}
+          {row.type === 'new_follower' ? null : row.type === 'thread_cash_received' ? (
+            <View style={styles.cashTrailing}>
+              <ThreadCashCoinMark size={18} color={theme.text} accent={theme.accent} />
+              {cashAmount ? <Text style={styles.cashAmount} numberOfLines={1}>{cashAmount}</Text> : null}
+            </View>
+          ) : row.targetImageUrl ? (
+            <View style={styles.thumbClip}>
+              <CachedImage
+                source={{ uri: row.targetImageUrl }}
+                style={styles.thumb}
+                recyclingKey={row.key}
+                accessibilityIgnoresInvertColors
+              />
+            </View>
+          ) : row.actors.length > 0 ? (
+            <View style={styles.thumbFallback}>
+              <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
+            </View>
+          ) : null}
+        </PressableScale>
         </View>
 
-        {followBack ? (
-          <PressableScale
-            style={[
-              styles.followBtn,
-              followState === 'done'
-                ? { backgroundColor: 'transparent', borderColor: theme.border }
-                : { backgroundColor: theme.accent, borderColor: theme.accent },
-            ]}
-            disabled={followState !== 'idle'}
+        {isSingleFollowRow && (
+          <Button
+            label={alreadyFollowing || followState === 'done' ? 'Following' : 'Follow back'}
+            variant={alreadyFollowing || followState === 'done' ? 'secondary' : 'primary'}
+            size="compact"
+            loading={followState === 'pending'}
+            disabled={alreadyFollowing || followState !== 'idle'}
             onPress={() => onFollowBack(row)}
-            accessibilityRole="button"
-            accessibilityLabel={followState === 'done' ? 'Following' : `Follow back ${row.actors[0]?.name ?? ''}`}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            {followState === 'pending' ? (
-              <ActivityIndicator size="small" color={theme.onAccent} />
-            ) : (
-              <Text
-                style={[styles.followText, { color: followState === 'done' ? theme.text : theme.onAccent }]}
-                numberOfLines={1}
-              >
-                {followState === 'done' ? 'Following' : 'Follow back'}
-              </Text>
-            )}
-          </PressableScale>
-        ) : row.targetImageUrl ? (
-          <CachedImage
-            source={{ uri: row.targetImageUrl }}
-            style={styles.thumb}
-            recyclingKey={row.key}
-            accessibilityIgnoresInvertColors
+            accessibilityLabel={alreadyFollowing || followState === 'done' ? 'Following' : `Follow back ${row.actors[0]?.name ?? ''}`}
           />
-        ) : row.actors.length > 0 ? (
-          <View style={styles.thumbFallback}>
-            <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
-          </View>
-        ) : null}
-
-        {unread && <View style={styles.unreadDot} />}
-      </PressableScale>
+        )}
+      </View>
     </SwipeActionRow>
   );
 });
@@ -292,22 +332,16 @@ function NewFollowersRow({ summary, styles, onPress }: {
   const label = summary.count === 1 ? summary.actors[0]?.name ?? 'Someone' : `${summary.count} new followers`;
   return (
     <PressableScale style={styles.summaryRow} onPress={onPress} accessibilityRole="button" accessibilityLabel={`New followers: ${label}`}>
-      <View style={styles.summaryStack} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        {summary.actors.slice(0, 3).map((actor, index) => (
-          <View key={actor.id ?? actor.name} style={[styles.summaryAvatarWrap, { left: index * 14, zIndex: 3 - index }]}>
-            <Avatar actor={actor} size={32} styles={styles} ring={theme.background} />
-          </View>
-        ))}
-      </View>
+      <AvatarPair actors={summary.actors} hidden={Math.max(0, summary.count - 2)} styles={styles} ring={theme.background} />
       <View style={styles.center}>
         <Text style={styles.message}>
           <Text style={styles.messageBold}>New followers</Text>
           {'  '}
           <Text style={styles.detail}>{label}</Text>
+          {summary.hasUnread && <Text style={{ color: theme.accent }}>{'  •'}</Text>}
         </Text>
       </View>
       <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
-      {summary.hasUnread && <View style={styles.unreadDot} />}
     </PressableScale>
   );
 }
@@ -333,10 +367,10 @@ function OrdersRow({ count, hasUnread, styles, onPress }: {
           <Text style={styles.messageBold}>Orders</Text>
           {'  '}
           <Text style={styles.detail}>{count} update{count === 1 ? '' : 's'}</Text>
+          {hasUnread && <Text style={{ color: theme.accent }}>{'  •'}</Text>}
         </Text>
       </View>
       <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
-      {hasUnread && <View style={styles.unreadDot} />}
     </PressableScale>
   );
 }
@@ -351,7 +385,7 @@ function SuggestedRow({ person, followState, styles, onFollow, onDismiss }: {
   onDismiss: (person: SuggestedPerson) => void;
 }) {
   const { theme } = useAppTheme();
-  const actor: ActivityActor = { id: person.userId, name: person.name, initials: person.initials, color: person.color };
+  const actor: ActivityActor = { id: person.userId, name: person.name, initials: person.initials, color: person.color, avatarUrl: person.avatarUrl ?? undefined };
   return (
     <View style={styles.suggestedRow}>
       <Avatar actor={actor} size={44} styles={styles} />
@@ -359,27 +393,15 @@ function SuggestedRow({ person, followState, styles, onFollow, onDismiss }: {
         <Text style={styles.message} numberOfLines={1}>{person.name}</Text>
         <Text style={styles.detail} numberOfLines={1}>{person.reason}</Text>
       </View>
-      <PressableScale
-        style={[
-          styles.followBtn,
-          followState === 'done'
-            ? { backgroundColor: 'transparent', borderColor: theme.border }
-            : { backgroundColor: theme.accent, borderColor: theme.accent },
-        ]}
+      <Button
+        label={followState === 'done' ? 'Following' : 'Follow'}
+        variant={followState === 'done' ? 'secondary' : 'primary'}
+        size="compact"
+        loading={followState === 'pending'}
         disabled={followState !== 'idle'}
         onPress={() => onFollow(person)}
-        accessibilityRole="button"
         accessibilityLabel={followState === 'done' ? 'Following' : `Follow ${person.name}`}
-        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-      >
-        {followState === 'pending' ? (
-          <ActivityIndicator size="small" color={theme.onAccent} />
-        ) : (
-          <Text style={[styles.followText, { color: followState === 'done' ? theme.text : theme.onAccent }]} numberOfLines={1}>
-            {followState === 'done' ? 'Following' : 'Follow'}
-          </Text>
-        )}
-      </PressableScale>
+      />
       {followState !== 'done' && (
         <PressableScale
           style={styles.dismissBtn}
@@ -395,17 +417,24 @@ function SuggestedRow({ person, followState, styles, onFollow, onDismiss }: {
   );
 }
 
-function SuggestedForYouSection({ people, followStates, styles, onFollow, onDismiss }: {
+function SuggestedForYouSection({ people, followStates, styles, onFollow, onDismiss, onSeeAll }: {
   people: SuggestedPerson[];
   followStates: Record<string, 'pending' | 'done'>;
   styles: Styles;
   onFollow: (person: SuggestedPerson) => void;
   onDismiss: (person: SuggestedPerson) => void;
+  onSeeAll: () => void;
 }) {
+  const { theme } = useAppTheme();
   if (people.length === 0) return null;
   return (
     <View style={styles.suggestedSection}>
-      <Text style={styles.sectionTitle} accessibilityRole="header">Suggested for you</Text>
+      <View style={styles.suggestedHeaderRow}>
+        <Text style={styles.sectionTitle} numberOfLines={1} accessibilityRole="header">Suggested for you</Text>
+        <PressableScale onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all suggested people" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={[styles.detail, { color: theme.accent }]} numberOfLines={1}>See all</Text>
+        </PressableScale>
+      </View>
       {people.map((person) => (
         <SuggestedRow
           key={person.userId}
@@ -425,7 +454,7 @@ function SuggestedForYouSection({ people, followStates, styles, onFollow, onDism
 export default function ActivityCenterScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
+  const tabBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { role } = useRole();
   const api = useApi();
@@ -740,6 +769,7 @@ export default function ActivityCenterScreen() {
         styles={styles}
         onFollow={(p) => { void handleSuggestedFollow(p); }}
         onDismiss={(p) => { void handleSuggestedDismiss(p); }}
+        onSeeAll={() => router.push('/buyer-friend-requests?tab=suggested' as never)}
       />
     </>
   );
@@ -748,11 +778,17 @@ export default function ActivityCenterScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title="Activity"
-        actions={hasUnread ? [{
-          icon: 'check-circle',
-          onPress: () => { void handleMarkAll(); },
-          accessibilityLabel: 'Mark all activity as read',
-        }] : []}
+        rightElement={hasUnread ? (
+          <PressableScale
+            style={styles.markAllBtn}
+            onPress={() => { void handleMarkAll(); }}
+            accessibilityRole="button"
+            accessibilityLabel="Mark all activity as read"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="check" size={ICON.md} color={theme.accent} />
+          </PressableScale>
+        ) : undefined}
       />
 
       {status === 'loading' ? (
@@ -793,7 +829,7 @@ export default function ActivityCenterScreen() {
           ListFooterComponent={listFooter}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: insets.bottom + SP.xl },
+            { paddingBottom: tabBarInset + SP.md },
             sections.length === 0 && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}
@@ -821,13 +857,14 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   sectionHeader: {
     paddingHorizontal: SP.md,
-    paddingTop: SP.md,
+    paddingTop: SP.lg - 4,
     paddingBottom: SP.sm,
   },
   sectionTitle: {
+    flex: 1,
     color: theme.text,
     fontFamily: FONT.bold,
-    fontSize: FS.base,
+    fontSize: FS.md,
     letterSpacing: -0.2,
   },
 
@@ -837,7 +874,22 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     gap: SP.sm + 4,
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm + 2,
-    minHeight: 68,
+    minHeight: 64,
+    backgroundColor: theme.background,
+  },
+  // The shrink-to-fit-the-row constraint lives here, not on `tapArea` — see
+  // the comment at its call site (PressableScale forwards a plain style
+  // object only to its inner Animated.View, never to the outer <button>).
+  tapAreaWrap: {
+    flex: 1,
+    flexBasis: 0,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  tapArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm + 4,
   },
   leading: {
     width: 44,
@@ -847,9 +899,18 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarPhotoWrap: {
+    overflow: 'hidden',
+  },
   avatarText: {
     fontFamily: FONT.bold,
     letterSpacing: 0.2,
+  },
+  // A back+front diagonal pair: back top-left, front bottom-right, sized to
+  // fit both plus the front avatar's ring without clipping.
+  stackWrap: {
+    width: 50,
+    height: 50,
   },
   stackBack: {
     position: 'absolute',
@@ -858,18 +919,18 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   stackFront: {
     position: 'absolute',
-    right: -2,
-    bottom: -2,
+    left: 14,
+    top: 14,
   },
   moreChip: {
     position: 'absolute',
-    left: -4,
-    bottom: -3,
-    minWidth: 22,
-    height: 18,
+    right: -2,
+    bottom: -2,
+    minWidth: 20,
+    height: 20,
     paddingHorizontal: 4,
-    borderRadius: 9,
-    borderWidth: 1.5,
+    borderRadius: 10,
+    borderWidth: 2,
     backgroundColor: theme.cardElevated,
     alignItems: 'center',
     justifyContent: 'center',
@@ -884,14 +945,16 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: theme.cardElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   center: {
     flex: 1,
+    flexBasis: 0,
+    flexShrink: 1,
+    minWidth: 0,
+    overflow: 'hidden',
     gap: 2,
   },
   message: {
@@ -899,6 +962,9 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontFamily: FONT.regular,
     fontSize: FS.sm + 1,
     lineHeight: 19,
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: '100%',
   },
   messageBold: {
     fontFamily: FONT.semibold,
@@ -915,44 +981,41 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     lineHeight: 18,
   },
 
-  thumb: {
+  thumbClip: {
     width: 44,
     height: 44,
     borderRadius: RADIUS.xs,
-    backgroundColor: theme.cardElevated,
+    overflow: 'hidden',
+  },
+  thumb: {
+    width: 44,
+    height: 44,
   },
   thumbFallback: {
     width: 44,
     height: 44,
     borderRadius: RADIUS.xs,
-    backgroundColor: theme.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.borderSubtle,
+    backgroundColor: theme.cardElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  followBtn: {
-    minWidth: 96,
-    height: 32,
-    paddingHorizontal: SP.sm + 4,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
+  cashTrailing: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
   },
-  followText: {
+  cashAmount: {
+    color: theme.text,
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
   },
-  unreadDot: {
-    position: 'absolute',
-    left: 6,
-    top: '50%',
-    marginTop: -3,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.accent,
+  markAllBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   skeletonWrap: {
@@ -980,20 +1043,20 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     gap: SP.sm + 4,
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm + 4,
-    minHeight: 60,
-  },
-  summaryStack: {
-    width: 58,
-    height: 32,
-  },
-  summaryAvatarWrap: {
-    position: 'absolute',
-    top: 0,
+    minHeight: 64,
   },
 
   suggestedSection: {
     marginTop: SP.md,
     paddingTop: SP.sm,
+  },
+  suggestedHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+    paddingTop: SP.lg - 4,
+    paddingBottom: SP.sm,
   },
   suggestedRow: {
     flexDirection: 'row',
@@ -1001,7 +1064,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     gap: SP.sm + 4,
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm + 2,
-    minHeight: 68,
+    minHeight: 64,
   },
   dismissBtn: {
     width: 28,
