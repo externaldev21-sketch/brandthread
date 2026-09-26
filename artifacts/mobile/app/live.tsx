@@ -113,6 +113,20 @@ function LivePage({
     >
       <Pressable style={StyleSheet.absoluteFill} onPress={onVideoPress} accessible={false}>
         {video.kind === 'video' ? (
+          <>
+          {/* Poster underlay: VideoVisual drops its own poster on the
+              `play` event, a beat before the first frame paints — without
+              this the page's black background flashed for a frame as each
+              stream became active. */}
+          {(video.posterSource || video.posterUri) ? (
+            <CachedImage
+              source={video.posterSource ?? { uri: video.posterUri! }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+          ) : null}
           <VideoVisual
             source={video.source as never}
             isActive={isActive}
@@ -125,6 +139,7 @@ function LivePage({
             pageWidth={pageWidth}
             pageHeight={pageHeight}
           />
+          </>
         ) : (
           <View style={[StyleSheet.absoluteFill, styles.rtcWrap]}>
             {video.posterUri ? <CachedImage source={{ uri: video.posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={18} /> : null}

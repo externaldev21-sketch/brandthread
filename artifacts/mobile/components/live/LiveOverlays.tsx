@@ -7,7 +7,6 @@ import {
   Animated, Easing, Platform, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, RADIUS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
@@ -45,7 +44,6 @@ export function LiveHostPill({
 }) {
   return (
     <View style={styles.hostPill} testID="live-host-pill">
-      <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
       <Pressable
         onPress={onOpenHost}
         style={styles.hostTap}
@@ -307,8 +305,10 @@ export function LiveCommentBar({ onSend, disabled }: { onSend: (text: string) =>
     try { await onSend(t); } catch { setText(t); } finally { setBusy(false); }
   };
   return (
+    // Plain translucent fill, no BlurView: on web an absolutely-positioned
+    // blur layer paints above the (unpositioned) <input> and its
+    // backdrop-filter blurred the typed text and placeholder.
     <View style={styles.commentPill}>
-      <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
       <TextInput
         value={text}
         onChangeText={setText}
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
 
   commentPill: {
     flex: 1, height: 40, borderRadius: RADIUS.pill, overflow: 'hidden', flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.34)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: 'rgba(0,0,0,0.42)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.24)',
   },
   commentInput: {
     flex: 1, height: 40, paddingHorizontal: 16, color: '#fff', fontFamily: FONT.regular, fontSize: FS.sm,

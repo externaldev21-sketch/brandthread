@@ -114,7 +114,10 @@ export function LiveHostRing({
   return (
     <Pressable
       onPress={() => openLive({ streamId, hostId })}
-      accessibilityRole="button"
+      // react-native-web renders a "button" role as a real <button>, and
+      // these avatars sit inside rows that already are one — nested
+      // <button>s are invalid HTML, so web keeps it a labelled div.
+      accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
       accessibilityLabel={`${hostName ?? 'This creator'} is live. Watch now`}
       hitSlop={4}
     >
