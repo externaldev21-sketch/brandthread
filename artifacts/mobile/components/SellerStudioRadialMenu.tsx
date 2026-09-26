@@ -538,6 +538,7 @@ export default function SellerStudioRadialMenu({
 
                 <ScrollView
                   horizontal
+                  nestedScrollEnabled
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.pinnedRow}
                   testID="seller-control-center-pinned-row"
@@ -744,7 +745,9 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
 
   saveFailedNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginBottom: SP.xs },
 
-  pinnedRow: { gap: PIN_TILE_GAP, paddingBottom: SP.sm, paddingRight: SP.xs },
+  // paddingRight gives the last tile (e.g. Payouts) full clearance from the
+  // sheet edge instead of sitting flush against it once scrolled all the way.
+  pinnedRow: { gap: PIN_TILE_GAP, paddingBottom: SP.sm, paddingRight: SP.lg },
 
   pinTile: {
     borderRadius: RADIUS.lg,
