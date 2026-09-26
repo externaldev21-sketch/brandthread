@@ -986,7 +986,9 @@ export default function InboxScreen() {
                       <BrandthreadLogo size={26} />
                     </View>
                   ) : (
-                    <LiveHostRing hostId={participant.userId} hostName={participant.name} size={64} pressToWatch>
+                    // Ring drawn on the avatar edge: this horizontal
+                    // ScrollView clips anything outside the 64pt avatar.
+                    <LiveHostRing hostId={participant.userId} hostName={participant.name} size={64} ringGap={-2} pressToWatch>
                       {participant.avatarUri ? (
                         <Image source={{ uri: participant.avatarUri }} style={s.activeRailAvatar} />
                       ) : (

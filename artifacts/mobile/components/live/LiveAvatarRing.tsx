@@ -23,7 +23,8 @@ export function LiveAvatarRing({
   /** Diameter of the wrapped avatar. */
   size: number;
   children: React.ReactNode;
-  /** Space between avatar edge and ring. */
+  /** Space between avatar edge and ring. -2 draws the ring on the avatar's
+   *  own edge (nothing outside its box) for clipping containers. */
   ringGap?: number;
   showTag?: boolean;
   testID?: string;
@@ -49,24 +50,31 @@ export function LiveAvatarRing({
 
   const ringSize = size + ringGap * 2 + 4;
   const tagScale = Math.max(0.75, Math.min(1.15, size / 48));
+  // An inset ring sits on the avatar's own edge, so it must paint above it.
+  const inset = ringGap < 0;
+  const ring = (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.ring,
+        inset && { borderWidth: 2.5 },
+        {
+          width: ringSize,
+          height: ringSize,
+          borderRadius: ringSize / 2,
+          top: -(ringGap + 2),
+          left: -(ringGap + 2),
+          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: inset ? [1, 1] : [1, 1.06] }) }],
+          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.72] }),
+        },
+      ]}
+    />
+  );
   return (
     <View style={{ width: size, height: size }} testID={testID}>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.ring,
-          {
-            width: ringSize,
-            height: ringSize,
-            borderRadius: ringSize / 2,
-            top: -(ringGap + 2),
-            left: -(ringGap + 2),
-            transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }],
-            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.72] }),
-          },
-        ]}
-      />
+      {!inset && ring}
       {children}
+      {inset && ring}
       {showTag && (
         <View pointerEvents="none" style={[styles.tagWrap, { bottom: -(ringGap + 6) * tagScale }]}>
           <View style={[styles.tag, { transform: [{ scale: tagScale }] }]}>

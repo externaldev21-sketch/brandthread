@@ -98,6 +98,6 @@ describe('Entry points', () => {
 
   it('Messages rows ring live people and tapping the avatar opens their live', () => {
     expect(inbox).toContain('<LiveHostRing hostId={participant.userId} hostName={participant.name} size={60} pressToWatch>');
-    expect(inbox).toContain('<LiveHostRing hostId={participant.userId} hostName={participant.name} size={64} pressToWatch>');
+    expect(inbox).toContain('<LiveHostRing hostId={participant.userId} hostName={participant.name} size={64} ringGap={-2} pressToWatch>');
   });
 });
