@@ -50,6 +50,15 @@ import {
 import {
   isPreviewConversationId, getPreviewConversation, getPreviewMessages,
 } from '@/lib/previewInbox';
+import {
+  parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed,
+  type AgentQuickReply,
+} from '@/lib/agentChat';
+
+/** Well-known clerkId of the official Brandthread Agent account — matches
+ *  the preview seed (lib/previewInboxData.ts) and the api-server system
+ *  account (lib/brandthreadAgent.ts). */
+const BRANDTHREAD_AGENT_USER_ID = 'brandthread-agent';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -200,6 +209,7 @@ export default function BuyerConversationScreen() {
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [agentTyping, setAgentTyping] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [isRecording, setIsRecording]         = useState(false);
@@ -270,8 +280,30 @@ export default function BuyerConversationScreen() {
         loadedConv = getPreviewConversation(params.id);
         setConv(loadedConv);
         setMessaging({ blockedByMe: false, unavailable: false });
-        if (loadedConv) setMessages(getPreviewMessages(loadedConv.id));
         setIsLoading(false);
+        if (loadedConv) {
+          const seeded = getPreviewMessages(loadedConv.id);
+          const alreadyPlayed = await hasWelcomePlayed(loadedConv.id);
+          if (alreadyPlayed || !loadedConv.isOfficial) {
+            // Ordinary preview threads, or a Brandthread Agent thread whose
+            // welcome has already played once — show everything at once.
+            setMessages(seeded);
+          } else {
+            // First time opening the Brandthread Agent preview thread: type
+            // the seeded welcome messages in one at a time, with a natural
+            // typing pause between them, then remember it played.
+            setMessages([]);
+            for (let i = 0; i < seeded.length; i++) {
+              setAgentTyping(true);
+              await new Promise((resolve) => setTimeout(resolve, 700 + Math.random() * 500));
+              setAgentTyping(false);
+              setMessages((prev) => [...prev, seeded[i]]);
+              setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+              await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+            await markWelcomePlayed(loadedConv.id);
+          }
+        }
         return;
       }
 
@@ -390,7 +422,10 @@ export default function BuyerConversationScreen() {
   // presence signals ConversationParticipant carries; the backend does not
   // currently populate them (see socialTypes.ts), so this line is simply
   // omitted rather than fabricating an "online"/"typing…" state from nothing.
-  const statusLine = statusLineFor(participant);
+  const isAgentConv = !!conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID;
+  const statusLine = isAgentConv
+    ? (agentTyping ? 'typing…' : 'Official Brandthread AI')
+    : statusLineFor(participant);
 
   // Show "View store" button for any seller conversation (resolved or pre-created)
   const convType = conv?.type ?? params.type ?? '';
@@ -713,6 +748,47 @@ export default function BuyerConversationScreen() {
         />
       );
     }
+    if (att.type === 'quick_replies') {
+      const options = parseQuickReplies(att.meta?.optionsJson);
+      return (
+        <View style={s.quickReplyRow}>
+          {options.map((opt) => (
+            <PressableScale rippleEnabled={false}
+              key={opt.label}
+              style={[s.quickReplyChip, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}
+              activeOpacity={0.7}
+              onPress={() => sendQuickReply(opt)}
+              accessibilityRole="button"
+              accessibilityLabel={opt.label}
+            >
+              <Text style={[s.quickReplyChipText, { color: theme.text }]}>{opt.label}</Text>
+            </PressableScale>
+          ))}
+        </View>
+      );
+    }
+    if (att.type === 'agent_card') {
+      const deepLink = att.meta?.deepLink;
+      const cardKind = att.meta?.cardKind;
+      return (
+        <PressableScale rippleEnabled={false}
+          style={s.attachCard}
+          activeOpacity={deepLink ? 0.7 : 1}
+          onPress={() => { if (deepLink) router.push(deepLink as never); }}
+        >
+          <Feather
+            name={cardKind === 'thread_cash' ? 'dollar-sign' : cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
+            size={ICON.sm}
+            color={theme.accent}
+          />
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
+            {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={2}>{att.subtitle}</Text> : null}
+          </View>
+          {deepLink && <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />}
+        </PressableScale>
+      );
+    }
     // Default: product / order / post / profile card
     return (
       <PressableScale rippleEnabled={false}
@@ -792,6 +868,92 @@ export default function BuyerConversationScreen() {
 
   // ── Send message ────────────────────────────────────────────────────────────
 
+  /** Sends one freeform (or quick-reply) message to the Brandthread Agent.
+   *  Real conversations hit the real AI endpoint; a seeded preview
+   *  conversation (no backend to call) uses a canned reply matching the same
+   *  tone/content instead — see lib/agentChat.ts. */
+  async function sendToAgent(messageText: string) {
+    if (!conv) return;
+    const optimistic: Message = {
+      id: `local-${Date.now()}`,
+      conversationId: conv.id,
+      fromId: MY_USER_ID,
+      fromName: 'You',
+      fromInitials: 'Y',
+      fromColor: '#8B5CF6',
+      text: messageText,
+      reactions: [],
+      status: 'sent',
+      ts: Date.now(),
+      deletedForMe: false,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    setAgentTyping(true);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+
+    if (isPreviewConversationId(conv.id)) {
+      // No backend reachable in preview — canned reply, paced like a real
+      // reply so the typing indicator reads naturally.
+      const { text: replyText, cardKind } = cannedAgentReply(messageText);
+      await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 700));
+      setAgentTyping(false);
+      setMessages((prev) => [...prev, {
+        id: `local-agent-${Date.now()}`,
+        conversationId: conv.id,
+        fromId: participant?.userId ?? BRANDTHREAD_AGENT_USER_ID,
+        fromName: displayName,
+        fromInitials: participant?.initials ?? 'BT',
+        fromColor: participant?.color ?? '#0A0A0B',
+        text: replyText,
+        attachment: cardKind
+          ? { type: 'agent_card', title: cardKind === 'thread_cash' ? 'How Thread Cash works' : 'Go to Discover', meta: { cardKind, deepLink: cardKind === 'thread_cash' ? '/thread-cash' : '/(buyer)/discover' } }
+          : undefined,
+        reactions: [],
+        status: 'read',
+        ts: Date.now(),
+        deletedForMe: false,
+      }]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      return;
+    }
+
+    try {
+      // Best-effort short timeout so a genuinely unreachable API (e.g. dev
+      // web preview with no backend) still falls back gracefully instead of
+      // hanging the typing indicator.
+      const result = await Promise.race([
+        api.brandthreadAgent.sendMessage({ conversationId: conv.id, text: messageText }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
+      ]);
+      const msgs = await getMessages(conv.id);
+      setMessages(msgs);
+      void result;
+    } catch {
+      const { text: replyText } = cannedAgentReply(messageText);
+      setMessages((prev) => [...prev.filter((m) => m.id !== optimistic.id), optimistic, {
+        id: `local-agent-fallback-${Date.now()}`,
+        conversationId: conv.id,
+        fromId: participant?.userId ?? BRANDTHREAD_AGENT_USER_ID,
+        fromName: displayName,
+        fromInitials: participant?.initials ?? 'BT',
+        fromColor: participant?.color ?? '#0A0A0B',
+        text: replyText,
+        reactions: [],
+        status: 'read',
+        ts: Date.now(),
+        deletedForMe: false,
+      }]);
+    } finally {
+      setAgentTyping(false);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    }
+  }
+
+  function sendQuickReply(reply: AgentQuickReply) {
+    hapticSelection();
+    void sendToAgent(reply.value);
+  }
+
   async function handleSend() {
     if (!conv || !canSend) return;
     const t = text.trim();
@@ -800,6 +962,12 @@ export default function BuyerConversationScreen() {
     setText('');
     setSelectedAttachment(null);
     setReplyTo(null);
+
+    if (isAgentConv && !att && !replyingTo) {
+      await sendToAgent(t);
+      return;
+    }
+
     setIsSending(true);
     try {
       await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
@@ -1116,7 +1284,17 @@ export default function BuyerConversationScreen() {
             accessibilityRole="button"
             accessibilityLabel={`View ${displayName}'s profile`}
           >
-            <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+            <View style={s.headerNameRow}>
+              <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+              {isAgentConv && (
+                <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
+                  <Feather name="check-circle" size={13} color={theme.accent} style={{ marginLeft: 4 }} />
+                  <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
+                    <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
+                  </View>
+                </View>
+              )}
+            </View>
             {statusLine ? (
               <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
                 {statusLine}
@@ -1746,11 +1924,29 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     paddingHorizontal: SP.xs,
   },
+  headerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   headerName: {
     fontSize: FS.md,
     fontFamily: FONT.bold,
     color: theme.text,
     letterSpacing: -0.2,
+  },
+  headerAiBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerAiTag: {
+    borderRadius: RADIUS.xs,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginLeft: 4,
+  },
+  headerAiTagText: {
+    fontSize: 10,
+    fontFamily: FONT.bold,
   },
   headerStatusLine: {
     fontSize: FS.xs,
@@ -1955,6 +2151,22 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderColor: theme.border,
     padding: SP.sm,
     marginBottom: SP.xs,
+  },
+  quickReplyRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.xs,
+    marginTop: SP.xs,
+  },
+  quickReplyChip: {
+    borderWidth: 1,
+    borderRadius: RADIUS.pill,
+    paddingVertical: 6,
+    paddingHorizontal: SP.sm,
+  },
+  quickReplyChipText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
   },
   attachTitle: {
     fontSize: FS.sm,
