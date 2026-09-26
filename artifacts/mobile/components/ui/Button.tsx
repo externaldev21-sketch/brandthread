@@ -15,6 +15,7 @@ import {
   ActivityIndicator, Animated, Platform, Pressable, PressableProps,
   StyleProp, StyleSheet, Text, View, ViewStyle,
 } from 'react-native';
+import type { GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,11 +29,23 @@ import { RADII } from '@/constants/radii';
 import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
-export type ButtonSize = 'default' | 'small';
+/**
+ * 'default' (lg, 52pt) and 'small' (md, 44pt) are the original two sizes —
+ * unchanged, every existing call site keeps its current height. 'compact'
+ * (sm, 36pt) is for tight inline row actions (e.g. Accept/Decline on a
+ * message-request row) where even 'small' is taller than the row wants.
+ */
+export type ButtonSize = 'default' | 'small' | 'compact';
 
 export interface ButtonProps {
   label: string;
-  onPress: () => void;
+  /**
+   * Takes the underlying GestureResponderEvent optionally — most callers
+   * ignore it, but a Button nested inside another pressable row (e.g. a
+   * quick action on an order row) needs it to call event.stopPropagation()
+   * so the row's own onPress doesn't also fire on web.
+   */
+  onPress: (event?: GestureResponderEvent) => void;
   variant?: ButtonVariant;
   size?: ButtonSize;
   icon?: keyof typeof Feather.glyphMap;
@@ -75,13 +88,13 @@ export function Button({
   const palette = useColors();
   const { scale, pressed, onPressIn, onPressOut } = usePressScale();
   const isDisabled = disabled || loading;
-  const height = size === 'small' ? COMP.buttonHSm : COMP.buttonH;
+  const height = size === 'compact' ? 36 : size === 'small' ? COMP.buttonHSm : COMP.buttonH;
 
-  const handlePress = () => {
+  const handlePress = (event: GestureResponderEvent) => {
     if (isDisabled) return;
     if (variant === 'destructive') hapticWarning();
     else hapticLight();
-    onPress();
+    onPress(event);
   };
 
   const variantStyle = ((): { bg: string; fg: string; border?: string } => {
