@@ -106,6 +106,7 @@ const PRESS_OUT_SPRING = { speed: 14, bounciness: 11, useNativeDriver: NATIVE_DR
 export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.96, activeOpacity = 0.88, ...rest }: PressableScaleProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
+  const { theme } = useAppTheme();
 
   return (
     <Pressable
@@ -114,6 +115,7 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
       onPress={onPress}
       disabled={disabled}
       hitSlop={hitSlop}
+      android_ripple={{ color: `${theme.accent}2E`, borderless: false }}
       onPressIn={(e) => {
         Animated.parallel([
           Animated.spring(scale, { toValue: activeScale, ...PRESS_IN_SPRING }),

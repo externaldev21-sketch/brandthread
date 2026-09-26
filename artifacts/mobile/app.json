@@ -243,6 +243,10 @@
       "favicon": "./assets/images/icon.png",
       "output": "static"
     },
+    "androidNavigationBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#0A0A0B"
+    },
     "plugins": [
       "./plugins/with-verify-app-identity",
       [

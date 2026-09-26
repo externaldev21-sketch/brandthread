@@ -15,6 +15,11 @@ export type ThreadCashConfig = {
   expiryDays: number | null;
   /** null = a redemption can cover up to the full order total. */
   maxRedemptionPerOrderCents: number | null;
+  /** Anti-farming: rolling-24h caps and eligibility for sending to a friend. */
+  dailySendCapCents: number;
+  dailyReceiveCapCents: number;
+  minAccountAgeHoursForSend: number;
+  maxCheckInsPerDevicePerDay: number;
 };
 
 export const DEFAULT_THREAD_CASH_CONFIG: ThreadCashConfig = {
@@ -24,6 +29,10 @@ export const DEFAULT_THREAD_CASH_CONFIG: ThreadCashConfig = {
   graceHours: 6,
   expiryDays: null,
   maxRedemptionPerOrderCents: null,
+  dailySendCapCents: 2000,
+  dailyReceiveCapCents: 5000,
+  minAccountAgeHoursForSend: 24,
+  maxCheckInsPerDevicePerDay: 3,
 };
 
 export type StreakState = {

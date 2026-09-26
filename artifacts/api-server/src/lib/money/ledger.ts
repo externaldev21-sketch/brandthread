@@ -40,6 +40,14 @@ export const LEDGER_ACCOUNTS = {
   seller_card_payments: "seller_card_payments",
   /** Opening balances migrated from before the ledger existed. */
   legacy_opening: "legacy_opening",
+  /**
+   * Brandthread's own cost of covering a Thread Cash discount at checkout so
+   * the seller still receives their full item-price payout (party = seller).
+   * Recognised as an expense when Thread Cash is spent (Thread Cash itself is
+   * tracked separately, as SUM(thread_cash_entries), not as a balance-sheet
+   * liability in this ledger — see docs/payments/thread-cash-checkout-todo.md).
+   */
+  thread_cash_seller_topup: "thread_cash_seller_topup",
 } as const;
 export type LedgerAccount = keyof typeof LEDGER_ACCOUNTS;
 
