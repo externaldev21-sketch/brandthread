@@ -72,17 +72,27 @@ const webPolishCss = `
   [role="button"]:not([aria-disabled="true"]):active {
     filter: brightness(0.92);
   }
+  /* Keyboard focus: a soft theme-tinted glow drawn INSIDE the element's own
+     box (box-shadow, not outline — outline ignores border-radius and by
+     default sits outside the box, which is what used to make a tap on a
+     tightly packed control, like a profile tab, show a hard rectangular
+     white ring bleeding into the row above it). --bt-accent is set on
+     :root by AppThemeContext whenever the active theme changes (see
+     contexts/AppThemeContext.tsx), so this is correct in all 12 themes,
+     never a fixed white. Every element already keeps its own border-radius,
+     so the glow follows pills, chips and circles exactly. */
   [role="button"]:focus-visible,
   [role="tab"]:focus-visible,
   [role="link"]:focus-visible,
   input:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid rgba(255,255,255,0.85);
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-  [role="button"]:focus:not(:focus-visible) {
     outline: none;
+    box-shadow: inset 0 0 0 2px var(--bt-accent, rgba(255,255,255,0.55));
+  }
+  [role="button"]:focus:not(:focus-visible),
+  [role="tab"]:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
   }
 
   /* Thin, unobtrusive scrollbars instead of the browser's chunky default —
