@@ -30,6 +30,9 @@ const {
   getBuyerOrdersWithStatusMock: vi.fn(),
 }));
 
+vi.mock('@/components/profile/ProfileCover', async () =>
+  (await import('./helpers/profileCoverMock')).profileCoverMockModule);
+
 vi.mock('react-native', () => {
   const React = require('react') as typeof import('react');
   const nativeComponent = (name: string) => {

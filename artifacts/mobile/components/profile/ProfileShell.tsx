@@ -44,6 +44,7 @@ import {
 import { PROFILE_GRID_GAP, SHOP_PILL_HEIGHT, useProfileLayout } from './profileLayout';
 import { computeEmptyArea } from './profileEmptyStates';
 import { ProfileEmptyAreaContext } from './ProfileEmptyAreaContext';
+import { loadBuyerSettings } from '@/lib/buyerSettings';
 /** Compact sticky header height below the status bar. */
 const COMPACT_BAR = 64;
 
@@ -73,6 +74,8 @@ export interface ProfileShellProps<T> {
     badgeIcon?: keyof typeof Feather.glyphMap;
   };
   hero: { videoUri?: string | null; posterUri?: string | null };
+  /** Owner-only cover-video affordance ("Add cover video" / "Edit cover"), shown in the hero. */
+  coverAffordance?: React.ReactNode;
   /**
    * True only when the viewer is looking at their own profile. Owner-only
    * pieces (the Thread Cash wallet chip) are gated here, never on role.
@@ -112,7 +115,7 @@ export interface ProfileShellProps<T> {
 
 export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const {
-    testID, identity, avatar, hero, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, actions, extras,
+    testID, identity, avatar, hero, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, actions, extras,
     tabs, section, data, renderItem, keyExtractor, numColumns = 1, listKey,
     ListEmptyComponent, ListFooterComponent, onEndReached, refreshing = false, onRefresh,
     renderFloating, bottomInset = 0,
@@ -136,6 +139,14 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     setFocused(true);
     return () => setFocused(false);
   }, []));
+
+  // "Use less cellular data" → the hero shows its poster frame only.
+  const [dataSaver, setDataSaver] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    loadBuyerSettings().then((settings) => { if (alive) setDataSaver(!!settings.dataSaver); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -205,7 +216,8 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     [scrollY],
   );
 
-  const heroActive = focused && heroOnScreen && !reduceMotion;
+  const heroPosterOnly = reduceMotion || dataSaver;
+  const heroActive = focused && heroOnScreen && !heroPosterOnly;
   // The compact identity sits between the floating controls; when a wide
   // control (e.g. the account switcher) leaves no room for a readable name
   // (avatar + ~7 characters), only the bar shows.
@@ -247,7 +259,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       {/* ── Hero ── */}
       <View style={[styles.hero, { height: heroHeight }]}>
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateY: heroTranslate }, { scale: heroScale }] }]}>
-          <ProfileHeroMedia videoUri={hero.videoUri} posterUri={hero.posterUri} active={heroActive} height={heroHeight} />
+          <ProfileHeroMedia videoUri={hero.videoUri} posterUri={hero.posterUri} active={heroActive} height={heroHeight} posterOnly={heroPosterOnly} />
         </Animated.View>
         <LinearGradient
           pointerEvents="none"
@@ -261,6 +273,9 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']} // theme-exempt: keeps floating controls legible over bright video
           style={[styles.topScrim, { height: insets.top + 110 }]}
         />
+        {isOwnProfile && coverAffordance ? (
+          <View style={[styles.coverSlot, { top: insets.top + 64 }]} pointerEvents="box-none">{coverAffordance}</View>
+        ) : null}
         <Animated.View
           style={[
             styles.identity,
@@ -436,6 +451,7 @@ function makeStyles(theme: AppThemePreset) {
     actions: { paddingHorizontal: SP.md, paddingTop: SP.md, gap: SP.sm },
     extras: { paddingTop: SP.md, gap: SP.md },
     tabsBlock: { paddingTop: SP.lg },
+    coverSlot: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
     gridRow: { gap: PROFILE_GRID_GAP },
 
     compact: {
