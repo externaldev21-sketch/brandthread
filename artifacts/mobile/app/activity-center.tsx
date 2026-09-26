@@ -1,16 +1,22 @@
 /**
- * Activity Center — one place for everything that happened to you.
+ * Activity — one place for everything that happened to you.
  *
- * Buyers see likes, comments, mentions, follows, price drops and restocks on
- * saved items, new products from followed brands, and order updates. Sellers
- * see sales, payouts, inventory alerts and social activity. Both read the same
- * per-user notifications feed that powers push notifications
- * (GET /api/buyer/notifications), paged 30 at a time.
+ * Buyers see follows/follow-backs, likes on posts/videos/stories/highlights,
+ * comments, replies, mentions, reposts, Thread Cash received, order updates
+ * (collapsed into one "Orders" row) and, at the bottom, real "Suggested for
+ * you" people to follow. Sellers see the same feed plus sales/payouts/
+ * inventory alerts. Both read the same per-user notifications feed that
+ * powers push notifications (GET /api/buyer/notifications), paged 30 at a
+ * time — see lib/activityEvents.ts (api-server) for what writes to it.
  *
- * Rows are grouped New / Today / This week / Earlier; repeat likes, comments
- * and follows merge into one row ("Jay and 12 others liked your post"). Unread
- * rows are marked read after they have been on screen for a moment. Swipe a row
- * left to dismiss it.
+ * Rows are grouped New / Today / This week / This month / Earlier; repeat
+ * likes, comments, reposts and follows merge into one row ("Jay and 12
+ * others liked your post"). Unread rows are marked read after they have been
+ * on screen for a moment. Swipe a row left to dismiss it. There is no
+ * websocket/SSE layer in this codebase, so `watchActivityRealtime` short-
+ * polls the tiny /unread-count endpoint while this screen is focused and
+ * refetches the first page when something changed — close enough to feel
+ * live (~1-2s) without new server infra.
  *
  * This is deliberately separate from buyer-notifications.tsx, which remains as
  * the classic notifications list.
@@ -19,7 +25,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  ScrollView,
   SectionList,
   StyleSheet,
   Text,
@@ -38,51 +43,46 @@ import { EmptyState, SkeletonBlock } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { Chip, ThemedRefreshControl } from '@/components/ui';
+import { ThemedRefreshControl } from '@/components/ui';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
+import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { isPreviewActivityEnabled, getPreviewActivity, getPreviewSuggestedPeople } from '@/lib/previewActivity';
 import {
-  ACTIVITY_FILTERS,
   ACTIVITY_PAGE_SIZE,
   activityDetail,
   activityHref,
   activityIcon,
+  activityKind,
   activityMessage,
   applyRead,
   buildActivitySections,
   createReadTracker,
   isFollowBackRow,
+  newFollowersSummary,
   relativeTime,
   type ActivityActor,
-  type ActivityFilter,
   type ActivityItem,
   type ActivityRow,
   type ActivitySection,
+  type NewFollowersSummary,
 } from '@/lib/activity';
 import {
   dismissActivity,
+  dismissSuggestedPerson,
   getActivity,
+  getSuggestedPeople,
   markActivityRead,
   markAllActivityRead,
+  watchActivityRealtime,
+  type SuggestedPerson,
 } from '@/services/activityService';
 import { setSellerFollowing } from '@/services/socialService';
 
-const EMPTY_COPY: Record<ActivityFilter, { icon: 'activity' | 'package' | 'heart'; message: string }> = {
-  all: {
-    icon: 'activity',
-    message: 'Nothing has happened yet. Likes, follows, orders and drops from brands you follow will land here.',
-  },
-  orders: {
-    icon: 'package',
-    message: 'No order activity yet. Sales, shipping updates and payouts will show up here.',
-  },
-  social: {
-    icon: 'heart',
-    message: 'No social activity yet. Follow a few brands and share a post to get things moving.',
-  },
-};
+const EMPTY_ICON = 'activity' as const;
+const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
 
 type Styles = ReturnType<typeof makeStyles>;
 type ListSection = ActivitySection<ActivityRow> & { data: ActivityRow[] };
@@ -278,6 +278,148 @@ function SkeletonRows({ styles }: { styles: Styles }) {
   );
 }
 
+// ─── New followers summary ─────────────────────────────────────────────────
+// A compact row (stacked avatars, "N new followers") above the dated
+// sections — tapping it opens the full followers list. Mirrors Beli's
+// "started following you" row and BeReal's requests row at the top.
+
+function NewFollowersRow({ summary, styles, onPress }: {
+  summary: NewFollowersSummary;
+  styles: Styles;
+  onPress: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const label = summary.count === 1 ? summary.actors[0]?.name ?? 'Someone' : `${summary.count} new followers`;
+  return (
+    <PressableScale style={styles.summaryRow} onPress={onPress} accessibilityRole="button" accessibilityLabel={`New followers: ${label}`}>
+      <View style={styles.summaryStack} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {summary.actors.slice(0, 3).map((actor, index) => (
+          <View key={actor.id ?? actor.name} style={[styles.summaryAvatarWrap, { left: index * 14, zIndex: 3 - index }]}>
+            <Avatar actor={actor} size={32} styles={styles} ring={theme.background} />
+          </View>
+        ))}
+      </View>
+      <View style={styles.center}>
+        <Text style={styles.message}>
+          <Text style={styles.messageBold}>New followers</Text>
+          {'  '}
+          <Text style={styles.detail}>{label}</Text>
+        </Text>
+      </View>
+      <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+      {summary.hasUnread && <View style={styles.unreadDot} />}
+    </PressableScale>
+  );
+}
+
+// ─── Orders summary ─────────────────────────────────────────────────────────
+// Order/payout updates never appear individually in the social feed — one
+// row links out to Orders, keeping shopping noise out of the Activity tab.
+
+function OrdersRow({ count, hasUnread, styles, onPress }: {
+  count: number;
+  hasUnread: boolean;
+  styles: Styles;
+  onPress: () => void;
+}) {
+  const { theme } = useAppTheme();
+  return (
+    <PressableScale style={styles.summaryRow} onPress={onPress} accessibilityRole="button" accessibilityLabel={`Orders, ${count} update${count === 1 ? '' : 's'}`}>
+      <View style={[styles.leading, styles.iconCircle]}>
+        <Feather name="package" size={ICON.md} color={theme.accentLight} />
+      </View>
+      <View style={styles.center}>
+        <Text style={styles.message}>
+          <Text style={styles.messageBold}>Orders</Text>
+          {'  '}
+          <Text style={styles.detail}>{count} update{count === 1 ? '' : 's'}</Text>
+        </Text>
+      </View>
+      <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+      {hasUnread && <View style={styles.unreadDot} />}
+    </PressableScale>
+  );
+}
+
+// ─── Suggested for you ─────────────────────────────────────────────────────
+
+function SuggestedRow({ person, followState, styles, onFollow, onDismiss }: {
+  person: SuggestedPerson;
+  followState: 'idle' | 'pending' | 'done';
+  styles: Styles;
+  onFollow: (person: SuggestedPerson) => void;
+  onDismiss: (person: SuggestedPerson) => void;
+}) {
+  const { theme } = useAppTheme();
+  const actor: ActivityActor = { id: person.userId, name: person.name, initials: person.initials, color: person.color };
+  return (
+    <View style={styles.suggestedRow}>
+      <Avatar actor={actor} size={44} styles={styles} />
+      <View style={styles.center}>
+        <Text style={styles.message} numberOfLines={1}>{person.name}</Text>
+        <Text style={styles.detail} numberOfLines={1}>{person.reason}</Text>
+      </View>
+      <PressableScale
+        style={[
+          styles.followBtn,
+          followState === 'done'
+            ? { backgroundColor: 'transparent', borderColor: theme.border }
+            : { backgroundColor: theme.accent, borderColor: theme.accent },
+        ]}
+        disabled={followState !== 'idle'}
+        onPress={() => onFollow(person)}
+        accessibilityRole="button"
+        accessibilityLabel={followState === 'done' ? 'Following' : `Follow ${person.name}`}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      >
+        {followState === 'pending' ? (
+          <ActivityIndicator size="small" color={theme.onAccent} />
+        ) : (
+          <Text style={[styles.followText, { color: followState === 'done' ? theme.text : theme.onAccent }]} numberOfLines={1}>
+            {followState === 'done' ? 'Following' : 'Follow'}
+          </Text>
+        )}
+      </PressableScale>
+      {followState !== 'done' && (
+        <PressableScale
+          style={styles.dismissBtn}
+          onPress={() => onDismiss(person)}
+          accessibilityRole="button"
+          accessibilityLabel={`Not interested in ${person.name}`}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Feather name="x" size={ICON.sm} color={theme.muted} />
+        </PressableScale>
+      )}
+    </View>
+  );
+}
+
+function SuggestedForYouSection({ people, followStates, styles, onFollow, onDismiss }: {
+  people: SuggestedPerson[];
+  followStates: Record<string, 'pending' | 'done'>;
+  styles: Styles;
+  onFollow: (person: SuggestedPerson) => void;
+  onDismiss: (person: SuggestedPerson) => void;
+}) {
+  if (people.length === 0) return null;
+  return (
+    <View style={styles.suggestedSection}>
+      <Text style={styles.sectionTitle} accessibilityRole="header">Suggested for you</Text>
+      {people.map((person) => (
+        <SuggestedRow
+          key={person.userId}
+          person={person}
+          followState={followStates[person.userId] ?? 'idle'}
+          styles={styles}
+          onFollow={onFollow}
+          onDismiss={onDismiss}
+        />
+      ))}
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ActivityCenterScreen() {
@@ -289,22 +431,25 @@ export default function ActivityCenterScreen() {
   const api = useApi();
   const { user } = useUser();
 
-  const [filter, setFilter] = useState<ActivityFilter>('all');
   const [items, setItems] = useState<ActivityItem[]>([]);
   // Ids that were unread when the page loaded. They stay in "New" for this
   // visit even after being marked read, so rows don't jump while you look at
   // them; the next refresh moves them to their dated section.
   const [sessionNew, setSessionNew] = useState<Set<string>>(() => new Set());
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [errorKind, setErrorKind] = useState<'auth' | 'offline' | 'server'>('offline');
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [followStates, setFollowStates] = useState<Record<string, 'pending' | 'done'>>({});
   const [now, setNow] = useState(() => Date.now());
+  const [suggested, setSuggested] = useState<SuggestedPerson[]>([]);
+  const [suggestedFollowState, setSuggestedFollowState] = useState<Record<string, 'pending' | 'done'>>({});
 
   const requestId = useRef(0);
   const itemsRef = useRef<ActivityItem[]>([]);
   itemsRef.current = items;
+  const retriedRef = useRef(false);
 
   const tracker = useMemo(() => createReadTracker({
     markRead: markActivityRead,
@@ -313,44 +458,80 @@ export default function ActivityCenterScreen() {
   }), []);
   useEffect(() => () => tracker.dispose(), [tracker]);
 
+  const loadSuggested = useCallback(async () => {
+    try {
+      const people = await getSuggestedPeople();
+      if (people.length > 0 || !isPreviewActivityEnabled()) { setSuggested(people); return; }
+      setSuggested(getPreviewSuggestedPeople());
+    } catch {
+      setSuggested(isPreviewActivityEnabled() ? getPreviewSuggestedPeople() : []);
+    }
+  }, []);
+
   const loadFirstPage = useCallback(async (mode: 'initial' | 'refresh' | 'focus') => {
     const id = ++requestId.current;
     if (mode === 'initial') setStatus('loading');
     if (mode === 'refresh') setRefreshing(true);
     try {
-      const page = await getActivity({ limit: ACTIVITY_PAGE_SIZE, offset: 0, filter });
+      const page = await getActivity({ limit: ACTIVITY_PAGE_SIZE, offset: 0 });
       if (id !== requestId.current) return;
-      setItems(page);
-      setSessionNew(new Set(page.filter((item) => !item.isRead).map((item) => item.id)));
+      retriedRef.current = false;
+      // The dev-web preview has no live backend to seed a real feed from —
+      // show the same rich seeded world every other preview screen uses
+      // instead of an empty "Activity will show up here".
+      const resolved = page.length === 0 && isPreviewActivityEnabled() ? getPreviewActivity() : page;
+      setItems(resolved);
+      setSessionNew(new Set(resolved.filter((item) => !item.isRead).map((item) => item.id)));
       setHasMore(page.length === ACTIVITY_PAGE_SIZE);
       setNow(Date.now());
       setStatus('ready');
-    } catch {
+    } catch (err) {
       if (id !== requestId.current) return;
+      if (isPreviewActivityEnabled()) {
+        // Never show a false error in the dev-web preview — there is no
+        // backend to reach at all, so a fetch failure here is expected.
+        retriedRef.current = false;
+        const seeded = getPreviewActivity();
+        setItems(seeded);
+        setSessionNew(new Set(seeded.filter((item) => !item.isRead).map((item) => item.id)));
+        setHasMore(false);
+        setNow(Date.now());
+        setStatus('ready');
+        return;
+      }
       // Keep what's on screen if a background refresh fails.
-      setStatus((current) => (current === 'ready' && itemsRef.current.length > 0 ? 'ready' : 'error'));
+      if (itemsRef.current.length > 0) { setStatus('ready'); return; }
+      if (!retriedRef.current) {
+        retriedRef.current = true;
+        setTimeout(() => { void loadFirstPage(mode); }, 800);
+        return;
+      }
+      const kind = err instanceof ApiError
+        ? (err.status === 401 || err.status === 403 ? 'auth' : err.status >= 500 ? 'server' : 'offline')
+        : 'offline';
+      setErrorKind(kind);
+      setStatus('error');
     } finally {
       if (id === requestId.current) setRefreshing(false);
     }
-  }, [filter]);
+  }, []);
 
-  // Runs on focus, and again whenever the filter (and so loadFirstPage)
-  // changes while the screen is focused.
+  // Runs on focus, and periodically while focused (no websocket/SSE layer —
+  // see watchActivityRealtime's own comment).
   const loadedOnce = useRef(false);
   useFocusEffect(useCallback(() => {
     void loadFirstPage(loadedOnce.current ? 'focus' : 'initial');
+    void loadSuggested();
     loadedOnce.current = true;
-  }, [loadFirstPage]));
 
-  const changeFilter = useCallback((next: ActivityFilter) => {
-    // Chip already fires a selection haptic on tap.
-    if (next === filter) return;
-    setItems([]);
-    setHasMore(true);
-    setStatus('loading');
-    loadedOnce.current = false;
-    setFilter(next);
-  }, [filter]);
+    const lastKnown = { current: '' };
+    const realtime = watchActivityRealtime(() => {
+      // Something changed server-side (a new event, or a read/dismiss from
+      // another device) — quietly refresh the first page in place.
+      void loadFirstPage('focus');
+    });
+    return () => realtime.stop();
+  }, [loadFirstPage, loadSuggested]));
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || status !== 'ready') return;
@@ -358,7 +539,7 @@ export default function ActivityCenterScreen() {
     setLoadingMore(true);
     try {
       // Dismissed rows are gone server-side, so the loaded count is the offset.
-      const page = await getActivity({ limit: ACTIVITY_PAGE_SIZE, offset: itemsRef.current.length, filter });
+      const page = await getActivity({ limit: ACTIVITY_PAGE_SIZE, offset: itemsRef.current.length });
       if (id !== requestId.current) return;
       setItems((prev) => {
         const seen = new Set(prev.map((item) => item.id));
@@ -370,14 +551,28 @@ export default function ActivityCenterScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [filter, hasMore, loadingMore, status]);
+  }, [hasMore, loadingMore, status]);
 
   const readIds = useMemo(() => new Set(items.filter((item) => item.isRead).map((item) => item.id)), [items]);
 
+  // Order updates are collapsed into a single "Orders" summary row instead of
+  // appearing individually — keeps shopping noise out of the social feed.
+  const orderItems = useMemo(() => items.filter((item) => activityKind(item) === 'orders'), [items]);
+  const socialItems = useMemo(() => items.filter((item) => activityKind(item) !== 'orders'), [items]);
+  const orderSummary = useMemo(() => (orderItems.length === 0 ? null : {
+    count: orderItems.length,
+    hasUnread: orderItems.some((item) => !item.isRead),
+  }), [orderItems]);
+
+  const followSummary: NewFollowersSummary | null = useMemo(
+    () => newFollowersSummary(items.map((item) => (sessionNew.has(item.id) ? { ...item, isRead: false } : item))),
+    [items, sessionNew],
+  );
+
   const sections: ListSection[] = useMemo(() => buildActivitySections(
-    items.map((item) => (sessionNew.has(item.id) ? { ...item, isRead: false } : item)),
+    socialItems.map((item) => (sessionNew.has(item.id) ? { ...item, isRead: false } : item)),
     new Date(now),
-  ).map((section) => ({ ...section, data: section.items })), [items, sessionNew, now]);
+  ).map((section) => ({ ...section, data: section.items })), [socialItems, sessionNew, now]);
 
   const hasUnread = items.some((item) => !item.isRead);
 
@@ -457,6 +652,44 @@ export default function ActivityCenterScreen() {
     }
   }, []);
 
+  const handleOrdersPress = useCallback(() => {
+    const ids = orderItems.filter((item) => !item.isRead).map((item) => item.id);
+    if (ids.length > 0) tracker.markNow(ids);
+    router.push((role === 'seller' ? '/(tabs)/orders' : '/(buyer)/orders') as never);
+  }, [orderItems, role, router, tracker]);
+
+  const handleNewFollowersPress = useCallback(() => {
+    const ids = items.filter((item) => item.type === 'new_follower' && !item.isRead).map((item) => item.id);
+    if (ids.length > 0) tracker.markNow(ids);
+    router.push('/connections?type=followers' as never);
+  }, [items, router, tracker]);
+
+  const handleSuggestedFollow = useCallback(async (person: SuggestedPerson) => {
+    hapticPrimaryAction();
+    setSuggestedFollowState((prev) => ({ ...prev, [person.userId]: 'pending' }));
+    try {
+      await setSellerFollowing(person.userId, true);
+      hapticSuccessAction();
+      setSuggestedFollowState((prev) => ({ ...prev, [person.userId]: 'done' }));
+    } catch {
+      setSuggestedFollowState((prev) => {
+        const next = { ...prev };
+        delete next[person.userId];
+        return next;
+      });
+      Alert.alert('Could not follow', 'Please try again in a moment.');
+    }
+  }, []);
+
+  const handleSuggestedDismiss = useCallback(async (person: SuggestedPerson) => {
+    setSuggested((prev) => prev.filter((row) => row.userId !== person.userId));
+    try {
+      await dismissSuggestedPerson(person.userId);
+    } catch {
+      // Not worth restoring a dismissed suggestion over a transient failure.
+    }
+  }, []);
+
   // ── Render ─────────────────────────────────────────────────────────────────
   const renderItem = useCallback(({ item: row }: { item: ActivityRow }) => (
     <ActivityRowView
@@ -477,7 +710,39 @@ export default function ActivityCenterScreen() {
     </View>
   ), [styles]);
 
-  const empty = EMPTY_COPY[filter];
+  const errorMessage = errorKind === 'auth'
+    ? "Sign in again to see your activity."
+    : errorKind === 'server'
+      ? "Brandthread couldn't load your activity right now. Try again shortly."
+      : "Your activity couldn't load. Check your connection and try again.";
+
+  const listHeader = (
+    <>
+      {followSummary && (
+        <NewFollowersRow summary={followSummary} styles={styles} onPress={handleNewFollowersPress} />
+      )}
+      {orderSummary && (
+        <OrdersRow count={orderSummary.count} hasUnread={orderSummary.hasUnread} styles={styles} onPress={handleOrdersPress} />
+      )}
+    </>
+  );
+
+  const listFooter = (
+    <>
+      {loadingMore && (
+        <View style={styles.footer}>
+          <ActivityIndicator color={theme.muted} />
+        </View>
+      )}
+      <SuggestedForYouSection
+        people={suggested}
+        followStates={suggestedFollowState}
+        styles={styles}
+        onFollow={(p) => { void handleSuggestedFollow(p); }}
+        onDismiss={(p) => { void handleSuggestedDismiss(p); }}
+      />
+    </>
+  );
 
   return (
     <View style={styles.container}>
@@ -490,31 +755,14 @@ export default function ActivityCenterScreen() {
         }] : []}
       />
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipScroll}
-        contentContainerStyle={styles.chipRow}
-        accessibilityRole="tablist"
-      >
-        {ACTIVITY_FILTERS.map((chip) => (
-          <Chip
-            key={chip.key}
-            label={chip.label}
-            selected={chip.key === filter}
-            onPress={() => changeFilter(chip.key)}
-          />
-        ))}
-      </ScrollView>
-
       {status === 'loading' ? (
         <SkeletonRows styles={styles} />
       ) : status === 'error' ? (
         <View style={styles.stateWrap}>
           <EmptyState
-            icon="wifi-off"
+            icon={errorKind === 'auth' ? 'lock' : 'wifi-off'}
             variant="error"
-            message="Your activity couldn't load. Check your connection and try again."
+            message={errorMessage}
             actionLabel="Try again"
             onAction={() => { void loadFirstPage('initial'); }}
           />
@@ -536,16 +784,13 @@ export default function ActivityCenterScreen() {
               onRefresh={() => { void loadFirstPage('refresh'); }}
             />
           )}
+          ListHeaderComponent={listHeader}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
-              <EmptyState icon={empty.icon} message={empty.message} />
+              <EmptyState icon={EMPTY_ICON} message={EMPTY_MESSAGE} />
             </View>
           )}
-          ListFooterComponent={loadingMore ? (
-            <View style={styles.footer}>
-              <ActivityIndicator color={theme.muted} />
-            </View>
-          ) : null}
+          ListFooterComponent={listFooter}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: insets.bottom + SP.xl },
@@ -568,17 +813,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     backgroundColor: theme.background,
   },
 
-  // Filter chips: intentionally quiet so the title stays the focal point.
-  chipScroll: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
-  chipRow: {
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    gap: SP.xs,
-    alignItems: 'center',
-  },
   listContent: {
     paddingTop: SP.xs,
   },
@@ -738,5 +972,41 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   footer: {
     paddingVertical: SP.lg,
+  },
+
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm + 4,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm + 4,
+    minHeight: 60,
+  },
+  summaryStack: {
+    width: 58,
+    height: 32,
+  },
+  summaryAvatarWrap: {
+    position: 'absolute',
+    top: 0,
+  },
+
+  suggestedSection: {
+    marginTop: SP.md,
+    paddingTop: SP.sm,
+  },
+  suggestedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm + 4,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm + 2,
+    minHeight: 68,
+  },
+  dismissBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
