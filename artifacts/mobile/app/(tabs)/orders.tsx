@@ -4,15 +4,16 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Share } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRAD_DARK_FADE } from '@/lib/theme';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, SearchBar } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
 import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
@@ -27,6 +28,7 @@ import { clearBadge } from '@/lib/orderBadgeStore';
 import { formatCents } from '@/lib/money';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { useScrollReset } from '@/hooks/useScrollReset';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -689,6 +691,7 @@ function SellerOrdersListSkeleton() {
 }
 
 export default function OrdersScreen() {
+  const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const { background: BG, surface: SCREEN_BG, text: FG, muted: MUTED, subtle: SUBTLE, error: RED, success: SUCCESS, warning: ORANGE, accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM, border: BORDER, borderSubtle: BORDER_ACTIVE, card: CARD, cardElevatedGlass: CARD_ELEVATED_GLASS } = theme;
@@ -956,9 +959,9 @@ export default function OrdersScreen() {
   }, [orders, ordersOwnerId, userId]);
 
   const handleMoreMenu = useCallback(() => {
-    Alert.alert('Orders', 'Choose an action', [
+    showActionSheet('Orders', 'Choose an action', [
       { text: 'Export CSV', onPress: handleExportCsv },
-      { text: 'Bulk Actions', onPress: () => Alert.alert('Bulk', 'Long-press orders to select.') },
+      { text: 'Bulk Actions', onPress: () => showActionSheet('Bulk', 'Long-press orders to select.', [{ text: 'OK' }]) },
       { text: 'Refresh', onPress: onRefresh },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -1019,6 +1022,16 @@ export default function OrdersScreen() {
   const keyExtractor = useCallback((row: OrderListItem) => row.key, []);
   const getItemType = useCallback((row: OrderListItem) => row.type, []);
 
+  // Belt-and-suspenders alongside contentContainerStyle's paddingBottom below:
+  // FlashList's web renderer doesn't always honor a large contentContainerStyle
+  // bottom padding, letting the last row sit under the floating tab bar — a
+  // real DOM footer of that height guarantees the scrollable area actually
+  // extends past the bar.
+  const ListFooterComponent = useCallback(
+    () => <View style={{ height: tabBarMetrics.occupiedHeight }} />,
+    [tabBarMetrics.occupiedHeight],
+  );
+
   const ListHeaderComponent = useCallback(() => (
     <View style={s.listHeader}>
       {(loadError || updatesPaused) && (
@@ -1072,7 +1085,7 @@ export default function OrdersScreen() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[s.root, { paddingTop: insets.top, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? 67 : insets.top) + 12, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
       {/* ── Fixed header ── */}
       <View style={s.header}>
         {/* Title row */}
@@ -1133,22 +1146,32 @@ export default function OrdersScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Status pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.pillsRow}
-        >
-          {FILTERS.map(({ key, label }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              active={activeFilter === key}
-              onPress={() => setActiveFilter(key)}
-              count={key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined}
-            />
-          ))}
-        </ScrollView>
+        {/* Status pills — horizontal scroll with a trailing fade so the last
+            chip reads as scrollable instead of abruptly clipped. */}
+        <View style={{ position: 'relative' }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.pillsRow}
+          >
+            {FILTERS.map(({ key, label }) => (
+              <FilterChip
+                key={key}
+                label={label}
+                active={activeFilter === key}
+                onPress={() => setActiveFilter(key)}
+                count={key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined}
+              />
+            ))}
+          </ScrollView>
+          <LinearGradient
+            pointerEvents="none"
+            colors={GRAD_DARK_FADE}
+            start={{ x: 1, y: 0 }}
+            end={{ x: 0, y: 0 }}
+            style={s.pillsFade}
+          />
+        </View>
       </View>
 
       {/* ── Order list (section list for date groups) ── */}
@@ -1158,12 +1181,14 @@ export default function OrdersScreen() {
         </View>
       ) : (
         <FlashList
+          ref={scrollResetRef}
           data={listRows}
           keyExtractor={keyExtractor}
           getItemType={getItemType}
           renderItem={renderItem}
           extraData={selectedIdSet}
           ListHeaderComponent={ListHeaderComponent}
+          ListFooterComponent={ListFooterComponent}
           ListEmptyComponent={ListEmptyComponent}
           contentContainerStyle={[
             s.listContent,
@@ -1250,16 +1275,12 @@ const createStyles = (theme: any) => {
   // Header
   header: {
     backgroundColor: BG,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SP.md,
-    paddingTop: SP.sm,
-    paddingBottom: SP.sm,
     minHeight: 44,
   },
   titleBtn: {
@@ -1268,10 +1289,10 @@ const createStyles = (theme: any) => {
     gap: 4,
   },
   titleText: {
-    fontSize: FS.xl,
+    fontSize: 20,
     fontFamily: FONT.bold,
     color: FG,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   titleActions: {
     flexDirection: 'row',
@@ -1331,6 +1352,13 @@ const createStyles = (theme: any) => {
     paddingBottom: SP.sm,
     paddingTop: 2,
     gap: SP.xs,
+  },
+  pillsFade: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: SP.sm,
+    width: 28,
   },
 
   // List header

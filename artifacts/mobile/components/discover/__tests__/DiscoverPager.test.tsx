@@ -80,7 +80,7 @@ vi.mock('react-native', () => {
       Text: el('AnimatedText'),
       createAnimatedComponent: (c: unknown) => c,
     },
-    Easing: { out: () => () => 0, cubic: () => 0, inOut: () => () => 0 },
+    Easing: { out: () => () => 0, cubic: () => 0, inOut: () => () => 0, bezier: (..._points: number[]) => (t: number) => t },
   };
 });
 
@@ -122,7 +122,7 @@ vi.mock('react-native-reanimated', () => {
     withSequence: (...v: unknown[]) => v[0],
     interpolate: (value: number, input: number[], output: number[]) => output[1] ?? output[0],
     Extrapolation: { CLAMP: 'clamp' },
-    Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, inOut: (fn: unknown) => fn, ease: (v: number) => v },
+    Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, inOut: (fn: unknown) => fn, ease: (v: number) => v, bezier: (..._points: number[]) => (t: number) => t },
   };
 });
 

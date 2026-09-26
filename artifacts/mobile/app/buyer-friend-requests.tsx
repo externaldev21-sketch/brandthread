@@ -4,7 +4,7 @@ import {
   Alert, StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -41,8 +41,10 @@ export default function BuyerFriendRequestsScreen() {
   const router = useRouter();
   const api    = useApi();
   const { userId } = useAuth();
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const initialTab: Tab = params.tab === 'suggested' || params.tab === 'sent' ? params.tab : 'incoming';
 
-  const [tab,      setTab]      = useState<Tab>('incoming');
+  const [tab,      setTab]      = useState<Tab>(initialTab);
   const [incoming, setIncoming] = useState<FollowRow[]>([]);   // followers I haven't followed back
   const [sent,     setSent]     = useState<FollowRow[]>([]);   // people I follow who don't follow back
   const [suggestions, setSuggestions] = useState<FriendSuggestion[]>([]);

@@ -14,9 +14,8 @@ import {
   View, Text, ScrollView, StyleSheet, Image,
   ActivityIndicator, Alert, TextInput,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { StickyFooter } from '@/components/layout';
+import { Header, StickyFooter } from '@/components/layout';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -28,17 +27,18 @@ import {
 import {
   Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
 } from '@/services/cartTypes';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
-  FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
+  FONT, FS, SP, RADIUS, COMP, ICON, TYPE, SHADOW_SM,
 } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import {
-  BrandthreadHeader, EmptyState, BrandedLoader, PressableScale, useUndoToast,
+  EmptyState, BrandedLoader, PressableScale, useUndoToast,
 } from '@/components/BrandthreadUI';
 import {
   Button, Card, ErrorState, QuantityStepper, StickyBottomCTA, ThemedRefreshControl,
@@ -250,14 +250,14 @@ function CartItemRow({
 const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm, alignItems: 'flex-start' },
   rowBusy: { opacity: 0.7 },
-  checkbox: { width: COMP.minTouchTarget, height: 100, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
+  checkbox: { width: COMP.minTouchTarget, height: 108, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
   checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
   },
   img: {
-    width: 80, height: 100, borderRadius: RADIUS.md,
+    width: 88, height: 108, borderRadius: RADIUS.lg,
     backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
@@ -269,15 +269,15 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   preOrderText: { fontSize: FS.xs, fontFamily: FONT.medium },
   unavailBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: `${theme.error}26`, borderRadius: RADIUS.xs,
-    paddingHorizontal: 6, paddingVertical: 3,
+    backgroundColor: `${theme.error}26`, borderRadius: RADIUS.pill,
+    paddingHorizontal: 8, paddingVertical: 3,
     alignSelf: 'flex-start', marginBottom: 4,
   },
   unavailText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, flex: 1, flexShrink: 1 },
   stockWarnRow: {
     flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4,
-    backgroundColor: `${theme.warning}26`, borderRadius: RADIUS.xs,
-    paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start',
+    backgroundColor: `${theme.warning}26`, borderRadius: RADIUS.pill,
+    paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start',
   },
   stockWarnCritical: { backgroundColor: `${theme.error}26` },
   stockWarn: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.warning },
@@ -285,7 +285,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   priceBlock: { alignItems: 'flex-end' },
   comparePrice: { fontSize: FS.xs, ...TABULAR_NUMS, fontFamily: FONT.regular, color: theme.subtle, textDecorationLine: 'line-through' },
-  price: { ...TYPE.bodyMedium, ...TABULAR_NUMS, fontFamily: FONT.bold, color: theme.text },
+  price: { fontSize: FS.md, ...TABULAR_NUMS, fontFamily: FONT.bold, color: theme.text },
   priceDiscounted: { color: theme.success },
   actions: { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: COMP.minTouchTarget, paddingVertical: 4, paddingHorizontal: 8 },
@@ -373,9 +373,12 @@ function SellerGroup({
 }
 
 const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
-  root: { marginBottom: SP.md },
+  root: {
+    marginBottom: SP.md, borderRadius: RADIUS.xl,
+    ...SHADOW_SM, shadowColor: theme.shadowColor, shadowOpacity: 0.12,
+  },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  avatar: { width: 36, height: 36, borderRadius: RADII.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 38, height: 38, borderRadius: RADII.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   sellerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
@@ -497,10 +500,10 @@ const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CartScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const barInset = useBuyerTabBarInset();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeScreenStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { push } = useThreadPull();
   const api = useApi();
@@ -844,22 +847,23 @@ export default function CartScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Header — full-cart totals stay visible at the top too, not just the footer.
-          Same BrandthreadHeader treatment used by Orders/Following so the tab-reachable
-          buyer screens read as one shell. */}
-      <View style={{ paddingTop: insets.top }}>
-        <BrandthreadHeader
-          title="Cart"
-          rightElement={hasItems ? (
-            <View style={s.headerRight}>
-              <View style={[s.headerBadge, { backgroundColor: theme.accent }]}>
-                <Text style={[s.headerBadgeText, { color: theme.onAccent }]}>{cart.items.reduce((s, i) => s + i.quantity, 0)}</Text>
-              </View>
-              <Text style={s.headerSubtotal}>{fmtPrice(summary.subtotalCents)}</Text>
+      {/* Shared page header — identical large-title size/weight/offset to every other
+          tab-root page. Full-cart totals stay visible at the top too, not just the
+          footer, via belowTitle since the count badge + subtotal aren't a simple
+          icon action. */}
+      <Header
+        title="Cart"
+        largeTitle
+        showBack={false}
+        belowTitle={hasItems ? (
+          <View style={s.headerRight}>
+            <View style={[s.headerBadge, { backgroundColor: theme.accent }]}>
+              <Text style={[s.headerBadgeText, { color: theme.onAccent }]}>{cart.items.reduce((s, i) => s + i.quantity, 0)}</Text>
             </View>
-          ) : undefined}
-        />
-      </View>
+            <Text style={s.headerSubtotal}>{fmtPrice(summary.subtotalCents)}</Text>
+          </View>
+        ) : undefined}
+      />
 
       {!hasItems && !hasSaved && !loadError ? (
         <EmptyState
@@ -898,6 +902,7 @@ export default function CartScreen() {
             </PressableScale>
           )}
           <ScrollView
+            ref={scrollResetRef}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <ThemedRefreshControl

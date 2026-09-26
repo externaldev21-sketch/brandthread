@@ -39,14 +39,13 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
-import { EmptyState, SkeletonBlock } from '@/components/layout';
-import { TabPageHeader } from '@/components/layout/TabPageHeader';
+import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/components/layout';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ThemedRefreshControl } from '@/components/ui';
@@ -277,6 +276,13 @@ const ActivityRowView = React.memo(function ActivityRowView({
   const parts = activityMessage(row);
   const detail = activityDetail(row);
   const followBack = isFollowBackRow(row);
+  // A follow row for a single person always shows a real Follow back /
+  // Following control instead of a generic icon — even once it's mutual
+  // (cta cleared), "Following" reads better than a bare person icon. (PR
+  // #118, re-applied on top of PR #123/#130's Threads-style row.)
+  const isSingleFollowRow = row.type === 'new_follower' && row.actorCount === 1 && !!row.targetId;
+  const alreadyFollowing = isSingleFollowRow && !followBack;
+  const showFollowControl = followBack || isSingleFollowRow;
   const sentence = parts.map((p) => p.text).join('');
   // "$5.00 · tap to view" → "+$5.00": the amount is the whole point of a
   // Thread Cash row, so it gets its own bold green line instead of reading
@@ -291,79 +297,98 @@ const ActivityRowView = React.memo(function ActivityRowView({
   };
 
   return (
-    <PressableScale
-      style={styles.row}
-      onPress={() => onPress(row)}
-      onLongPress={longPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
-    >
-      {row.actors.length > 0 ? (
-        <ActivityAvatarStack row={row} styles={styles} />
-      ) : (
-        <View style={styles.leading}>
-          <View style={styles.iconCircle}>
-            {row.type === 'thread_cash_received' ? (
-              <ThreadCashBillIcon size={ICON.md} />
-            ) : (
-              <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
-            )}
+    <View style={styles.row}>
+      {/*
+        The Follow back / Following control is a real interactive element,
+        so it must be a sibling of the row's own tap target rather than
+        nested inside it — two interactive `accessibilityRole="button"`
+        elements one inside the other render as invalid nested <button>
+        HTML on web (PR #118, re-applied here on top of this row's Threads
+        redesign). Long-press for Dismiss lives on the tap target, not a
+        swipe action — see the removed `SwipeActionRow` note above.
+      */}
+      <PressableScale
+        style={styles.tapArea}
+        onPress={() => onPress(row)}
+        onLongPress={longPress}
+        accessibilityRole="button"
+        accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
+      >
+        {row.actors.length > 0 ? (
+          <ActivityAvatarStack row={row} styles={styles} />
+        ) : (
+          <View style={styles.leading}>
+            <View style={styles.iconCircle}>
+              {row.type === 'thread_cash_received' ? (
+                <ThreadCashBillIcon size={ICON.md} />
+              ) : (
+                <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
+              )}
+            </View>
           </View>
+        )}
+
+        <View style={styles.center}>
+          <Text style={styles.message} numberOfLines={2}>
+            {parts.map((part, index) => (
+              <Text key={index} style={part.bold ? styles.messageBold : styles.messageMuted}>{part.text}</Text>
+            ))}
+            <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
+          </Text>
+          {cashAmount ? (
+            <Text style={[styles.detail, { color: theme.success, fontFamily: FONT.bold }]}>{`+${cashAmount}`}</Text>
+          ) : detail ? (
+            <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
+          ) : null}
         </View>
-      )}
 
-      <View style={styles.center}>
-        <Text style={styles.message} numberOfLines={2}>
-          {parts.map((part, index) => (
-            <Text key={index} style={part.bold ? styles.messageBold : styles.messageMuted}>{part.text}</Text>
-          ))}
-          <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
-        </Text>
-        {cashAmount ? (
-          <Text style={[styles.detail, { color: theme.success, fontFamily: FONT.bold }]}>{`+${cashAmount}`}</Text>
-        ) : detail ? (
-          <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
+        {/* Follows never show a generic thumbnail — a single follower gets
+            the real Follow back / Following control (rendered as a sibling
+            below, not nested here); a merged multi-follower row shows
+            nothing trailing. Thread Cash rows show nothing trailing either
+            — the bill badge on the avatar plus the green amount above
+            already say everything the row needs. */}
+        {showFollowControl || row.type === 'thread_cash_received' ? null : row.targetImageUrl ? (
+          <CachedImage
+            source={{ uri: row.targetImageUrl }}
+            style={styles.thumb}
+            recyclingKey={row.key}
+            accessibilityIgnoresInvertColors
+          />
+        ) : row.actors.length > 0 ? (
+          <View style={styles.thumbFallback}>
+            <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
+          </View>
         ) : null}
-      </View>
+      </PressableScale>
 
-      {followBack ? (
+      {showFollowControl && (
         <PressableScale
           style={[
             styles.followBtn,
-            followState === 'done'
+            alreadyFollowing || followState === 'done'
               ? { backgroundColor: 'transparent', borderColor: theme.border }
               : { backgroundColor: theme.accent, borderColor: theme.accent },
           ]}
-          disabled={followState !== 'idle'}
+          disabled={alreadyFollowing || followState !== 'idle'}
           onPress={() => onFollowBack(row)}
           accessibilityRole="button"
-          accessibilityLabel={followState === 'done' ? 'Following' : `Follow back ${row.actors[0]?.name ?? ''}`}
+          accessibilityLabel={alreadyFollowing || followState === 'done' ? 'Following' : `Follow back ${row.actors[0]?.name ?? ''}`}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           {followState === 'pending' ? (
             <ActivityIndicator size="small" color={theme.onAccent} />
           ) : (
             <Text
-              style={[styles.followText, { color: followState === 'done' ? theme.text : theme.onAccent }]}
+              style={[styles.followText, { color: alreadyFollowing || followState === 'done' ? theme.text : theme.onAccent }]}
               numberOfLines={1}
             >
-              {followState === 'done' ? 'Following' : 'Follow back'}
+              {alreadyFollowing || followState === 'done' ? 'Following' : 'Follow back'}
             </Text>
           )}
         </PressableScale>
-      ) : row.type === 'thread_cash_received' ? null : row.targetImageUrl ? (
-        <CachedImage
-          source={{ uri: row.targetImageUrl }}
-          style={styles.thumb}
-          recyclingKey={row.key}
-          accessibilityIgnoresInvertColors
-        />
-      ) : row.actors.length > 0 ? (
-        <View style={styles.thumbFallback}>
-          <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
-        </View>
-      ) : null}
-    </PressableScale>
+      )}
+    </View>
   );
 });
 
@@ -449,7 +474,7 @@ function SuggestedForYouSection({ people, followStates, styles, onFollow, onDism
   if (people.length === 0) return null;
   return (
     <View style={styles.suggestedSection}>
-      <Text style={styles.sectionTitle} accessibilityRole="header">Suggested for you</Text>
+      <Text style={[styles.sectionTitle, styles.suggestedTitle]} accessibilityRole="header" numberOfLines={1} ellipsizeMode="tail">Suggested for you</Text>
       {people.map((person) => (
         <SuggestedRow
           key={person.userId}
@@ -469,7 +494,11 @@ function SuggestedForYouSection({ people, followStates, styles, onFollow, onDism
 export default function ActivityCenterScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
+  // This screen is a pushed stack route (reached from the bell icon), not a
+  // buyer-tab route — there is no floating tab bar to clear here, just the
+  // home-indicator safe area.
+  const screenPadding = useScreenPadding({ withTabBarInset: false });
+  const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>();
   const router = useRouter();
   const { role } = useRole();
   const api = useApi();
@@ -761,7 +790,7 @@ export default function ActivityCenterScreen() {
 
   const renderSectionHeader = useCallback(({ section }: { section: ListSection }) => (
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle} accessibilityRole="header">{section.title}</Text>
+      <Text style={styles.sectionTitle} accessibilityRole="header" numberOfLines={1}>{section.title}</Text>
     </View>
   ), [styles]);
 
@@ -790,16 +819,17 @@ export default function ActivityCenterScreen() {
 
   return (
     <View style={styles.container}>
-      <TabPageHeader
+      <PageHeader
         title="Activity"
+        showBack={false}
+        largeTitle
         actions={hasUnread ? [{
-          name: 'check-circle',
+          icon: 'check-circle',
           onPress: () => { void handleMarkAll(); },
           accessibilityLabel: 'Mark all activity as read',
         }] : []}
+        belowTitle={<ActivityFilterChips selected={chip} onSelect={setChip} styles={styles} />}
       />
-
-      <ActivityFilterChips selected={chip} onSelect={setChip} styles={styles} />
 
       {status === 'loading' ? (
         <SkeletonRows styles={styles} />
@@ -815,6 +845,7 @@ export default function ActivityCenterScreen() {
         </View>
       ) : (
         <SectionList
+          ref={listRef}
           sections={sections}
           keyExtractor={(row) => row.key}
           renderItem={renderItem}
@@ -839,7 +870,7 @@ export default function ActivityCenterScreen() {
           ListFooterComponent={listFooter}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: insets.bottom + SP.xl },
+            { paddingBottom: screenPadding.bottom + SP.xl },
             sections.length === 0 && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}
@@ -869,12 +900,14 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // this row always reserves real vertical space in the screen's flex
   // column, however the horizontal ScrollView itself sizes on a given
   // platform — nothing below it can ever render through/over the chips.
+  // Rendered inside PageHeader's `belowTitle` slot, which already applies
+  // the screen's horizontal gutter and a top gap — this only adds the
+  // trailing breathing room before the list starts.
   chipRow: {
-    height: 36 + SP.sm * 2,
+    height: 36 + SP.sm,
   },
   chipScrollContent: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
+    paddingBottom: SP.sm,
     gap: SP.sm,
     alignItems: 'center',
   },
@@ -911,6 +944,16 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
     minHeight: 68,
+  },
+  // The Follow back / Following control renders as a sibling of this
+  // PressableScale, not nested inside it (see the ActivityRowView call
+  // site) — `tapArea` just needs to take the remaining row width so the
+  // control still lands flush against the row's trailing edge.
+  tapArea: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm + 4,
   },
   // Sibling of each row (SectionList's ItemSeparatorComponent, not a row
   // child), so it needs the row's own left padding folded into its inset:
@@ -1050,6 +1093,14 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   suggestedSection: {
     marginTop: SP.md,
     paddingTop: SP.sm,
+  },
+  // The title reuses the shared `sectionTitle` style (no horizontal padding
+  // of its own) but sits in a section whose *rows* set their own
+  // paddingHorizontal independently — so the title needs an explicit gutter
+  // or it renders flush against the screen edge. (PR #118 fix, re-applied
+  // on top of PR #123/#130's Threads-style rebuild of this section.)
+  suggestedTitle: {
+    paddingHorizontal: SP.md,
   },
   suggestedRow: {
     flexDirection: 'row',

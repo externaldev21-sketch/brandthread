@@ -6,6 +6,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@clerk/expo';
 import { type SearchResult, type TrendingTerm, type SuggestedBrand, type SuggestedProduct, type SearchCategory } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
@@ -14,10 +15,11 @@ import { AnimatedEntrance, EmptyState } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { FONT, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
+import { FONT, GUTTER, GRID_MAX_WIDTH, GRAD_DARK_FADE } from '@/lib/theme';
 import { GridSkeleton, ResponsiveContainer, useGridColumns } from '@/components/layout';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { Chip, ListRow, SkeletonBlock, ThemedRefreshControl } from '@/components/ui';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -109,6 +111,18 @@ export default function SearchScreen() {
   const productResults = useMemo(() => results.filter((result): result is ProductResult => result.kind === 'product'), [results]);
   const brandResults   = useMemo(() => results.filter((result): result is BrandResult => result.kind === 'brand'), [results]);
   const videoResults   = useMemo(() => results.filter((result): result is VideoResult => result.kind === 'video'), [results]);
+
+  // "Showing N results" — the settled-count line search results grids
+  // (Zalando, Thrive Market) show above the tabs/filter row, so a query
+  // reads as answered the moment it lands, before scanning any tiles.
+  const resultsCountLabel = useMemo(() => {
+    const count = activeTab === 'people' ? people.length
+      : activeTab === 'brands' ? brandResults.length
+      : activeTab === 'products' ? productResults.length
+      : activeTab === 'videos' ? videoResults.length
+      : results.length + people.length;
+    return `${count.toLocaleString()} result${count === 1 ? '' : 's'}`;
+  }, [activeTab, people.length, brandResults.length, productResults.length, videoResults.length, results.length]);
 
   // Fixed-column product grid (2 on phone, 3-4 on iPad) with an even gutter —
   // measured from the grid's own laid-out width so it also works inside the
@@ -628,26 +642,19 @@ export default function SearchScreen() {
     return chips;
   }, [filters, suggestedBrands]);
 
+  const scrollResetRef = useScrollReset<ScrollView>();
+
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
       <TabPageHeader title="Search" />
       <ScrollView
+        ref={scrollResetRef}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={
           <ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        <AnimatedEntrance>
-          <View style={styles.titleBlock}>
-            <Text style={[styles.subtitle, { color: muted }]}>
-              {trimmedQuery.length === 0
-                ? 'Brands, pieces and people on Brandthread'
-                : `Showing matches for "${trimmedQuery}"`}
-            </Text>
-          </View>
-        </AnimatedEntrance>
-
         {trimmedQuery.length === 0 ? (
           <View testID="buyer-search-empty-state" accessibilityLabel="Search is empty">
             {recentSearches.length > 0 && (
@@ -743,16 +750,25 @@ export default function SearchScreen() {
                     ))}
                   </View>
                 ) : (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.brandCardRow}>
-                    {suggestedBrands.map((b) => (
-                      <BrandCard
-                        key={b.id}
-                        brand={b}
-                        width={128}
-                        onPress={() => goToBrand(b.sellerId)}
-                      />
-                    ))}
-                  </ScrollView>
+                  <View style={{ position: 'relative' }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.brandCardRow}>
+                      {suggestedBrands.map((b) => (
+                        <BrandCard
+                          key={b.id}
+                          brand={b}
+                          width={128}
+                          onPress={() => goToBrand(b.sellerId)}
+                        />
+                      ))}
+                    </ScrollView>
+                    <LinearGradient
+                      pointerEvents="none"
+                      colors={GRAD_DARK_FADE}
+                      start={{ x: 1, y: 0 }}
+                      end={{ x: 0, y: 0 }}
+                      style={styles.brandCardFade}
+                    />
+                  </View>
                 )}
               </AnimatedEntrance>
             )}
@@ -794,6 +810,10 @@ export default function SearchScreen() {
           </View>
         ) : (
           <>
+            {!searching && (
+              <Text style={styles.resultsCount} numberOfLines={1}>{resultsCountLabel}</Text>
+            )}
+
             {/* Tabs share a row with the Filters button instead of the button
                 getting a whole row to itself below — a single icon-only
                 circle here, same footprint as the tab pills, so it never
@@ -918,6 +938,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
   discoverRow: { paddingHorizontal: SCREEN_GUTTER },
   brandCardRow: { flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xxs },
+  brandCardFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 28 },
+  resultsCount: {
+    ...TYPE_SCALE.caption, color: theme.muted, fontFamily: FONT.semibold,
+    paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.xs, paddingBottom: SPACING.xxs,
+  },
   tabsRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
     paddingRight: SCREEN_GUTTER,
@@ -931,7 +956,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3,
     alignItems: 'center', justifyContent: 'center',
   },
-  filterCountBadgeText: { fontSize: 10, fontFamily: FONT.bold, color: '#FFFFFF' },
+  // theme.onAccent, not a fixed white — several presets (e.g. monochrome,
+  // silver) use a near-white accent, where white text would disappear.
+  filterCountBadgeText: { fontSize: 10, fontFamily: FONT.bold, color: theme.onAccent },
   filterBarRow: {
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SPACING.xs,
     paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.xs, paddingBottom: SPACING.sm,
