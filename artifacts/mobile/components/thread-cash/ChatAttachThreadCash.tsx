@@ -20,7 +20,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Pressable, Alert, Animated, Easing } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { ThreadCashCoin } from './ThreadCashBill';
+import { ThreadCashBill, ThreadCashBillIcon } from './ThreadCashBill';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/ui/Button';
@@ -45,14 +45,15 @@ function formatAmountDisplay(cents: number): string {
 }
 
 /**
- * The Thread Cash mark, wherever a small coin glyph is needed inline (the
+ * The Thread Cash mark, wherever a small bill glyph is needed inline (the
  * attach button, the sheet's balance pill and badge, the message card).
- * Renders the owner's actual Thread Cash coin art (see ThreadCashBill.tsx)
- * rather than a generic dollar-sign glyph. `color`/`accent` are kept as
- * no-op props for call-site compatibility; only `size` and `disabled`
- * (dimmed via opacity) affect the render.
+ * Thread Cash is cash, not a coin — this is always a little bill (see
+ * ThreadCashBillIcon in ThreadCashBill.tsx), never a round coin or a
+ * generic dollar-sign glyph. `color`/`accent` are kept as no-op props for
+ * call-site compatibility; only `size` and `disabled` (dimmed via opacity)
+ * affect the render.
  */
-export function ThreadCashCoinMark({
+export function ThreadCashBillMark({
   size = 20,
   disabled = false,
 }: {
@@ -61,7 +62,7 @@ export function ThreadCashCoinMark({
   accent?: string;
   disabled?: boolean;
 }) {
-  return <ThreadCashCoin size={size} style={disabled ? { opacity: 0.5 } : undefined} />;
+  return <ThreadCashBillIcon size={size} style={disabled ? { opacity: 0.5 } : undefined} />;
 }
 
 type SheetStep = 'amount' | 'keypad' | 'confirm';
@@ -232,7 +233,7 @@ export function ThreadCashAttachButton({
           accessibilityState={{ disabled }}
           style={[styles.attachButton, { borderColor: theme.borderSubtle }, disabled && styles.attachButtonDisabled]}
         >
-          <ThreadCashCoinMark size={18} color={theme.text} accent={theme.accent} disabled={disabled} />
+          <ThreadCashBillMark size={18} color={theme.text} accent={theme.accent} disabled={disabled} />
         </TouchableOpacity>
       )}
       <Modal transparent animationType="fade" visible={open} onRequestClose={() => setOpen(false)}>
@@ -240,7 +241,7 @@ export function ThreadCashAttachButton({
         <SheetRise style={[styles.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {/* Circular badge, half in / half out of the sheet's top edge */}
           <View style={[styles.badge, { backgroundColor: theme.accent, borderColor: theme.card }]}>
-            <ThreadCashCoinMark size={26} color={theme.onAccent} accent={theme.onAccent} />
+            <ThreadCashBillMark size={26} color={theme.onAccent} accent={theme.onAccent} />
           </View>
 
           <View style={styles.sheetHeader}>
@@ -254,7 +255,7 @@ export function ThreadCashAttachButton({
               <Feather name="chevron-down" size={22} color={theme.muted} />
             </TouchableOpacity>
             <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-              <ThreadCashCoinMark size={14} color={theme.text} accent={theme.accent} />
+              <ThreadCashBillMark size={14} color={theme.text} accent={theme.accent} />
               <Text style={[styles.balanceText, { color: theme.text }]} testID="thread-cash-balance">
                 {balanceCents == null ? '···' : formatCents(balanceCents)}
               </Text>
@@ -467,15 +468,10 @@ export function ThreadCashMessageCard({
   // its own and got crushed once it landed inside a chat bubble.
   return (
     <View style={[styles.card, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-      <View style={[styles.cardCoinCircle, { backgroundColor: theme.accentDim }]}>
-        <ThreadCashCoinMark size={20} />
-      </View>
-      <View style={styles.cardTextCol} onLayout={(e) => setAmountWidth(e.nativeEvent.layout.width)}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>{formatCents(amountCents)} Thread Cash</Text>
-          {status === 'pending' && amountWidth > 0 && <ShimmerSweep width={amountWidth} height={20} />}
-        </View>
-        <Text style={[styles.cardSubtitle, { color: theme.muted }]} numberOfLines={1}>{subtitle}</Text>
+      <ThreadCashBillMark size={28} color={theme.onAccent} accent={theme.onAccent} />
+      <View style={styles.cardAmountWrap} onLayout={(e) => setAmountWidth(e.nativeEvent.layout.width)}>
+        <Text style={[styles.cardAmount, { color: theme.onAccent }]}>{formatCents(amountCents)}</Text>
+        {status === 'pending' && amountWidth > 0 && <ShimmerSweep width={amountWidth} height={34} />}
       </View>
 
       {showAccept ? (

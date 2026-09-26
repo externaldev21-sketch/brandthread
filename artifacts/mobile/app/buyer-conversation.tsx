@@ -39,13 +39,13 @@ import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
-import { ThreadCashCoin } from '@/components/thread-cash/ThreadCashBill';
+import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { formatCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaViewer from '@/components/chat/MediaViewer';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashCoinMark } from '@/components/thread-cash/ChatAttachThreadCash';
+import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashBillMark } from '@/components/thread-cash/ChatAttachThreadCash';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 import {
   ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
@@ -1159,7 +1159,7 @@ export default function BuyerConversationScreen() {
           >
             <View style={[s.agentCardIconCircle, { backgroundColor: theme.accentDim }]}>
               {cardKind === 'thread_cash' ? (
-                <ThreadCashCoin size={18} />
+                <ThreadCashBillIcon size={18} />
               ) : (
                 <Feather
                   name={cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
@@ -1705,7 +1705,7 @@ export default function BuyerConversationScreen() {
                       accessibilityLabel={threadCashMutual !== true ? `Thread Cash — ${threadCashDisabledReason}` : 'Send Thread Cash'}
                       accessibilityState={{ disabled: threadCashMutual !== true }}
                     >
-                      <ThreadCashCoinMark size={ICON.md} color={theme.text} accent={theme.accent} disabled={threadCashMutual !== true} />
+                      <ThreadCashBillMark size={ICON.md} color={theme.text} accent={theme.accent} disabled={threadCashMutual !== true} />
                     </PressableScale>
                   )}
                   onSent={async ({ transferId, amountCents, note }) => {

@@ -8,7 +8,7 @@
  * before — nothing about eligibility, amounts, or business logic changed.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -20,7 +20,8 @@ import { SkeletonBlock } from '@/components/ui';
 import { TABULAR_NUMS, tabularType } from '@/constants/typography';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
-import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
+import { ThreadCashBill, ThreadCashBillStack, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 
 function historyLabel(entry: ThreadCashEntry): string {
   switch (entry.source) {
@@ -131,10 +132,19 @@ export default function ThreadCashScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const api = useApi();
+  const celebrateThreadCash = useCelebrateThreadCash();
   const [status, setStatus] = useState<ThreadCashStatus | null>(null);
   const [history, setHistory] = useState<ThreadCashEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [usingPreview, setUsingPreview] = useState(false);
+
+  // Dev-only: a hidden long-press on the balance replays the money-burst
+  // celebration on demand, so it can be screenshotted/recorded without
+  // waiting on a real claim. Never present in a production build.
+  const previewBurst = useCallback(() => {
+    if (!__DEV__) return;
+    celebrateThreadCash({ amount: 500, from: 'Preview' });
+  }, [celebrateThreadCash]);
 
   const load = useCallback(async () => {
     // Dev web preview only: the preview session has no real signed-in Clerk
@@ -186,7 +196,10 @@ export default function ThreadCashScreen() {
 
             {/* Balance */}
             <BrandthreadCard glow style={styles.balanceCard}>
-              <ThreadCashBill width={180} style={styles.balanceBill} />
+              {/* Hidden dev-only long-press to replay the money-burst celebration for screenshots. */}
+              <Pressable onLongPress={previewBurst} disabled={!__DEV__}>
+                <ThreadCashBillStack width={280} style={styles.balanceStack} />
+              </Pressable>
               <Text style={[styles.balanceLabel, { color: theme.muted }]}>Your balance</Text>
               <Text style={[styles.balanceValue, tabularType('display'), { color: theme.text }]}>
                 {formatCents(status?.balanceCents ?? 0)}
@@ -200,7 +213,7 @@ export default function ThreadCashScreen() {
             <BrandthreadCard style={styles.streakCard}>
               <View style={styles.streakHeading}>
                 {/* Always the bill icon — never the coin — for Thread Cash. */}
-                <ThreadCashBill width={26} />
+                <ThreadCashBillIcon size={18} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.streakTitle, { color: theme.text }]}>
                   {currentStreak > 0 ? `${currentStreak}-day streak` : 'Start your streak'}
@@ -294,7 +307,7 @@ export default function ThreadCashScreen() {
             <BrandthreadCard style={styles.rulesCard}>
               {[
                 'Keep the app open for a few active minutes a day to earn Thread Cash and build your streak',
-                'Missing a day may reset your streak — a short grace period is built in',
+                'Miss a calendar day and your streak resets to day 1 — no grace period',
                 "Thread Cash is not money: it can't be withdrawn, cashed out, or sent as cash",
                 status?.config.expiryDays
                   ? `Thread Cash expires ${status.config.expiryDays} days after it's earned`
@@ -326,11 +339,22 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.borderSubtle,
   },
   previewBannerText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle },
-  balanceCard: { alignItems: 'center', paddingVertical: SP.lg, marginTop: SP.sm },
-  balanceBill: { marginBottom: SP.sm },
+  balanceCard: { alignItems: 'center', paddingVertical: SP.md, marginTop: SP.sm },
+  // A small stack of two bills, fanned like the owner's stacked-bills art:
+  // a duller, more-rotated bill behind, the crisp one tilted slightly on top.
+  balanceStack: {
+    marginBottom: SP.xs,
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
   balanceLabel: { fontSize: FS.sm, fontFamily: FONT.medium },
-  balanceValue: { marginTop: SP.xs },
-  balanceHint: { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.sm, paddingHorizontal: SP.md, lineHeight: 16 },
+  // Balance snaps to the `display` type-scale role (44/48 Bold) via tabularType('display')
+  // applied at the call site, rather than the old one-off fontSize: 40 (see design doc audit).
+  balanceValue: { marginTop: 2 },
+  balanceHint: { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.xs, paddingHorizontal: SP.md },
   streakCard: { marginTop: SP.md },
   streakHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   streakFlame: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
