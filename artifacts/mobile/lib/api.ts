@@ -790,6 +790,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{ available: boolean; error?: string }>(
           `/api/auth/username/check?username=${encodeURIComponent(username)}`
         ),
+      /** Same check, usable before sign-up completes (no session yet) —
+       *  the onboarding auth step picks a username before a Clerk account
+       *  exists, so it can't call the authenticated variant above. */
+      checkUsernamePublic: (username: string) =>
+        get<{ available: boolean; error?: string }>(
+          `/api/public/username-check?username=${encodeURIComponent(username)}`
+        ),
       /** Update editable profile fields. username must be letters/numbers/underscores, 3-30 chars. */
       updateProfile: (body: {
         displayName?: string;

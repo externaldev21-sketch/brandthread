@@ -35,6 +35,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { useUsernameLiveCheck } from '@/lib/onboarding/useUsernameLiveCheck';
 import { useAuth, useSSO, useSignUp, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -638,6 +639,7 @@ function BuyerAuthStep({
   const appleOAuthFlagEnabled = useFeatureFlag('oauthAppleEnabled');
   const appleOAuthEnabled = Platform.OS === 'ios' && appleOAuthFlagEnabled;
   const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
+  const usernameLiveCheck = useUsernameLiveCheck(username);
 
   const [phase, setPhase]               = useState<BuyerAuthPhase>('choose');
   const [email, setEmail]               = useState('');
@@ -670,7 +672,7 @@ function BuyerAuthStep({
 
   const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
   const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
-  const canSubmit = email.includes('@') && password.length >= 8 && isUsernameValid;
+  const canSubmit = email.includes('@') && password.length >= 8 && isUsernameValid && !usernameLiveCheck.error && !usernameLiveCheck.checking;
   const canVerify = code.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
 
@@ -877,7 +879,7 @@ function BuyerAuthStep({
             <Text style={sba.label}>Choose your @username</Text>
             <TextInput
               testID="onboarding-username-input"
-              style={[sba.input, usernameError ? { borderColor: 'rgba(248,113,113,0.5)' } : undefined]}
+              style={[sba.input, (usernameError || usernameLiveCheck.error) ? { borderColor: 'rgba(248,113,113,0.5)' } : undefined]}
               placeholder="e.g. alex_style"
               placeholderTextColor={MUTED2}
               value={username}
@@ -897,9 +899,15 @@ function BuyerAuthStep({
             />
             {usernameError
               ? <Text style={sba.hint}>{usernameError}</Text>
-              : username.length > 0
-                ? <Text style={sba.hint}>@{username} · letters, numbers, underscores only</Text>
-                : <Text style={sba.hint}>Letters, numbers, and underscores only</Text>}
+              : usernameLiveCheck.error
+                ? <Text style={sba.hint}>{usernameLiveCheck.error}</Text>
+                : usernameLiveCheck.checking
+                  ? <Text style={sba.hint}>Checking availability…</Text>
+                  : username.length >= 3
+                    ? <Text style={sba.hint}>@{username} is available</Text>
+                    : username.length > 0
+                      ? <Text style={sba.hint}>@{username} · letters, numbers, underscores only</Text>
+                      : <Text style={sba.hint}>Letters, numbers, and underscores only</Text>}
           </View>
 
           <View style={sba.inputWrap}>
@@ -1082,6 +1090,7 @@ function SharedAuthStep({
   const appleOAuthEnabled = Platform.OS === 'ios' && appleOAuthFlagEnabled;
   const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
   const showAnyOAuth = appleOAuthEnabled || googleOAuthEnabled;
+  const usernameLiveCheck = useUsernameLiveCheck(username);
 
   const [phase, setPhase]             = useState<SharedAuthPhase>('form');
   const [email, setEmail]             = useState('');
@@ -1119,13 +1128,15 @@ function SharedAuthStep({
   const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
   const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
   const passwordsMatch = password === confirmPassword;
-  const canSubmit = email.includes('@') && password.length >= 8 && passwordsMatch && isUsernameValid && formFirstName.trim().length >= 1;
+  const canSubmit = email.includes('@') && password.length >= 8 && passwordsMatch && isUsernameValid
+    && !usernameLiveCheck.error && !usernameLiveCheck.checking && formFirstName.trim().length >= 1;
   const missingFields: string[] = [];
   if (!email.includes('@')) missingFields.push('a valid email');
   if (formFirstName.trim().length < 1) missingFields.push('your first name');
   if (password.length < 8) missingFields.push('a password (8+ characters)');
   else if (!passwordsMatch) missingFields.push('matching passwords');
   if (!isUsernameValid) missingFields.push('a username');
+  else if (usernameLiveCheck.error) missingFields.push('a different username');
   const missingFieldsHint = missingFields.length === 0
     ? ''
     : missingFields.length === 1
@@ -1435,11 +1446,15 @@ function SharedAuthStep({
             autoCapitalize="none"
             autoCorrect={false}
             maxLength={30}
-            error={usernameError || null}
-            valid={isUsernameValid}
-            hint={username.length > 0
-              ? `@${username} · letters, numbers, underscores only`
-              : 'Letters, numbers, and underscores only'}
+            error={usernameError || usernameLiveCheck.error || null}
+            valid={isUsernameValid && !usernameLiveCheck.error && !usernameLiveCheck.checking}
+            hint={usernameLiveCheck.checking
+              ? 'Checking availability…'
+              : username.length >= 3 && !usernameLiveCheck.error
+                ? `@${username} is available`
+                : username.length > 0
+                  ? `@${username} · letters, numbers, underscores only`
+                  : 'Letters, numbers, and underscores only'}
           />
         </Reveal>
 
