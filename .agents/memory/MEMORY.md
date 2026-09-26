@@ -86,3 +86,4 @@
 - [Expo web chat focus](expo-web-chat-focus.md) — browser taps can focus a textarea then immediately blur it through an ancestor press handler.
 - [Git provider vs connector auth](git-provider-vs-connector-auth.md) — a healthy GitHub API integration does not repair expired Git push credentials.
 - [Expo screen layouts and route context](expo-screen-layout-route-context.md) — screenLayout wrappers render outside per-screen route context; pass the route argument explicitly.
+- [Concurrent Git rebase](concurrent-git-rebase.md) — a shared checkout can be rebased by another session; protect the original branch and conflict worktree before aborting.
