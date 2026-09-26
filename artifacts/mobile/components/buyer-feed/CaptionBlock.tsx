@@ -88,7 +88,7 @@ export function CaptionBlock({
         </TouchableOpacity>
       )}
 
-      {shopPill}
+      {!!shopPill && <View style={styles.shopPillWrap}>{shopPill}</View>}
 
       <TouchableOpacity
         activeOpacity={0.8}
@@ -134,13 +134,19 @@ export function CaptionBlock({
 }
 
 const styles = StyleSheet.create({
+  // One consistent vertical rhythm, set as explicit per-step margins (not a
+  // uniform `gap`, since each step needs its own value): shop pill -> 12pt
+  // -> creator name row -> 6pt -> caption -> 8pt -> sound line -> (the
+  // caller's own gap to the progress bar, see RAIL_BOTTOM_GAP/
+  // CAPTION_BOTTOM_GAP in app/(tabs)/feed.tsx).
   root: {
     position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 112,
-    justifyContent: 'flex-end', gap: 8,
+    justifyContent: 'flex-end',
   },
   rootWithRepost: { minHeight: 148 },
+  shopPillWrap: { marginBottom: 12, alignItems: 'flex-start' },
   repostIdentity: {
-    alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32,
+    alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 7,
     paddingHorizontal: 7, paddingVertical: 5,
@@ -154,13 +160,13 @@ const styles = StyleSheet.create({
   repostAvatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#35353A' },
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
-  creatorRow: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorRow: { minHeight: 30, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
   creatorName: {
     fontSize: FS.base + 3, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   caption: {
-    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK,
+    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 8,
     lineHeight: 20.5, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },

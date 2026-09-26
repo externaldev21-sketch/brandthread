@@ -39,10 +39,11 @@ export function ShopAnchorPill({
 }) {
   const { theme } = useAppTheme();
   const { width: windowWidth } = useWindowDimensions();
-  // ~60% of screen width, clamped to a sane range for very small/large
-  // screens — wide enough that the name and price both get real room
-  // instead of truncating to "Sculpte…"/"$…" garbage.
-  const pillWidth = Math.round(Math.max(220, Math.min(windowWidth * 0.6, 320)));
+  // The name's own max width — ~60% of screen width — not a fixed pill
+  // width: the pill itself sizes to its content (thumb + name + price +
+  // chevron), only the name is capped so a long product name truncates
+  // before it can push the price or chevron out.
+  const nameMaxWidth = Math.round(windowWidth * 0.6);
   const shimmer = useRef(new Animated.Value(0)).current;
   const pop = useRef(new Animated.Value(0)).current;
 
@@ -70,7 +71,7 @@ export function ShopAnchorPill({
       }}
     >
       <TouchableOpacity
-        style={[styles.pill, { width: pillWidth, borderColor: `${theme.accent}55` }]}
+        style={[styles.pill, { borderColor: `${theme.accent}55` }]}
         activeOpacity={0.85}
         onPress={onPress}
         accessibilityRole="button"
@@ -81,18 +82,19 @@ export function ShopAnchorPill({
           {tag.imageUri ? (
             <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
-            <Feather name="shopping-bag" size={11} color="#111111" />
+            <Feather name="shopping-bag" size={13} color="#111111" />
           )}
         </View>
-        {/* Name takes the flexible remainder; price/dot/chevron are fixed and
-            never shrink, so the price is always fully visible even when the
-            name is long enough to need the ellipsis. */}
-        <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">{tag.productName}</Text>
-        <Text style={styles.dot}>·</Text>
+        {/* Name is single-line, allowed up to ~60% of screen width, and
+            truncates only if it must; price is flexShrink: 0 so it is
+            always rendered in full, never sacrificed for the name. */}
+        <Text style={[styles.name, { maxWidth: nameMaxWidth }]} numberOfLines={1} ellipsizeMode="tail">
+          {tag.productName}
+        </Text>
         <Text style={styles.price} numberOfLines={1}>
           {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
         </Text>
-        <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.75)" />
+        <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.75)" />
         <Animated.View
           pointerEvents="none"
           style={[
@@ -116,28 +118,26 @@ export function ShopAnchorPill({
 }
 
 const styles = StyleSheet.create({
-  // ~30pt tall, width set inline to ~60% of screen width (see pillWidth
-  // above) — still roughly half the height of the old two-line merch card,
-  // but wide enough that the name and price both get real, non-truncated
-  // room, matching TikTok Shop's compact anchor pill.
+  // Sizes to its own content (thumb + name + price + chevron) rather than a
+  // fixed/percentage pill width — a small tappable tag, not a card
+  // overlaying the video. 28pt thumbnail, 8pt internal padding, a 12pt gap
+  // between name and price (via the name's own marginRight, not a uniform
+  // row `gap`, so that gap can differ from the tighter thumb->name and
+  // price->chevron spacing) and the price never shrinks or truncates.
   pill: {
-    height: 30, flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: RADII.pill, paddingLeft: 4, paddingRight: 10, overflow: 'hidden',
+    height: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center',
+    borderRadius: RADII.pill, paddingHorizontal: 8, overflow: 'hidden',
     borderWidth: 1,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25,
     shadowRadius: 5, elevation: 4,
   },
   thumb: {
-    width: 22, height: 22, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: ON_DARK, overflow: 'hidden',
+    width: 28, height: 28, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ON_DARK, overflow: 'hidden', marginRight: 8,
   },
-  // flex: 1 (the flexible remainder) so the name takes whatever room is left
-  // after the fixed-width thumb/dot/price/chevron — never squeezed to a
-  // sliver by them, and never squeezing the price in turn.
-  name: { flex: 1, color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12.5 },
-  dot: { color: 'rgba(255,255,255,0.5)', fontSize: 12.5, flexShrink: 0 },
+  name: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13, flexShrink: 1, marginRight: 12 },
   // flexShrink: 0 — the price never gives up space to the name; it is
-  // always rendered in full.
-  price: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 12.5, ...TABULAR_NUMS },
+  // always rendered in full, never truncated.
+  price: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, marginRight: 8, ...TABULAR_NUMS },
   shimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
 });

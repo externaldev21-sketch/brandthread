@@ -158,16 +158,26 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
   );
 }
 
+// Gap between the text's own rendered bottom edge and the underline —
+// measured from TikTok: the bar sits tight to the glyph baseline, not below
+// the tab's padded touch target.
+const UNDERLINE_GAP = 4.5;
+// Underline thickness — thin, fully rounded caps.
+const UNDERLINE_HEIGHT = 2.5;
+
 /**
  * Plain-text TikTok-style tab bar: no pill/background at all, each label
  * sized to its own content (never clipped regardless of container width),
- * with a short underline that slides beneath the active tab via a
- * near-critically-damped spring (no bounce/overshoot).
+ * with a short underline that slides *and resizes* beneath the active tab
+ * via a near-critically-damped spring (no bounce/overshoot).
  *
- * Each tab measures its own on-screen x-offset and width via onLayout; the
- * indicator reads whichever entry is currently selected, so it is always
- * exact even before every tab has been measured (falls back to hidden until
- * the active tab's own layout has landed).
+ * The underline's width and x-position come from measuring the active
+ * label's own `<Text>` — not its padded `Pressable` touch target — via two
+ * `measureInWindow` reads (root, then the text) subtracted against each
+ * other. Measuring the touch target instead of the text itself was the
+ * previous bug: it produced a small, arbitrarily-clamped stub sized off the
+ * padded container rather than the actual glyphs, sitting nowhere near the
+ * real text width.
  */
 function UnderlineTabs({
   options, selectedId, onChange, testID, height, style,
@@ -179,18 +189,18 @@ function UnderlineTabs({
   height: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  const [layouts, setLayouts] = useState<Record<string, { x: number; width: number }>>({});
+  const [layouts, setLayouts] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({});
   const activeLayout = layouts[selectedId];
   const x = useSharedValue(0);
   const w = useSharedValue(0);
   const hasMeasuredOnce = useRef(false);
   const rootRef = useRef<View>(null);
-  const tabRefs = useRef<Record<string, View | null>>({});
+  const textRefs = useRef<Record<string, Text | null>>({});
 
   React.useEffect(() => {
     if (!activeLayout) return;
-    const underlineWidth = Math.max(16, Math.min(activeLayout.width * 0.55, 28));
-    const underlineX = activeLayout.x + (activeLayout.width - underlineWidth) / 2;
+    const underlineX = activeLayout.x;
+    const underlineWidth = activeLayout.width;
     if (!hasMeasuredOnce.current) {
       // First measurement (mount / initial layout): snap in place instead of
       // sliding in from x=0, which read as an unintended "wipe" animation.
@@ -203,34 +213,36 @@ function UnderlineTabs({
     }
   }, [activeLayout, x, w]);
 
-  // Re-measure a tab against the root's own on-screen position, rather than
-  // trusting onLayout's `nativeEvent.layout.x` to already be relative to the
-  // immediate parent: on web, a Pressable wraps its child in extra
-  // (non-`position: relative`) responder layers, and that x/y can end up
-  // measured relative to some further-up ancestor instead — here, the whole
-  // top bar row — which put the underline under the search icon instead of
-  // under "Threads". Two absolute `measureInWindow` reads (root, tab) and a
-  // subtraction sidesteps that ambiguity entirely on every platform.
+  // Two absolute `measureInWindow` reads (root, then the label's own Text)
+  // and a subtraction — not `onLayout`'s `nativeEvent.layout`, which is only
+  // relative to the Text's immediate parent (the padded Pressable), not the
+  // tablist root the underline is positioned within.
   const measureTab = useCallback((id: string) => {
     const root = rootRef.current;
-    const tab = tabRefs.current[id];
-    if (!root || !tab) return;
-    root.measureInWindow((rootX) => {
-      tab.measureInWindow((tabX, _tabY, width) => {
-        if (!Number.isFinite(rootX) || !Number.isFinite(tabX) || width <= 0) return;
-        const relativeX = tabX - rootX;
+    const label = textRefs.current[id];
+    if (!root || !label) return;
+    root.measureInWindow((rootX, rootY) => {
+      label.measureInWindow((labelX, labelY, width, height) => {
+        if (!Number.isFinite(rootX) || !Number.isFinite(labelX) || width <= 0 || height <= 0) return;
+        const next = { x: labelX - rootX, y: labelY - rootY, width, height };
         setLayouts(prev => {
           const existing = prev[id];
-          if (existing && Math.abs(existing.x - relativeX) < 0.5 && Math.abs(existing.width - width) < 0.5) return prev;
-          return { ...prev, [id]: { x: relativeX, width } };
+          if (
+            existing
+            && Math.abs(existing.x - next.x) < 0.5
+            && Math.abs(existing.y - next.y) < 0.5
+            && Math.abs(existing.width - next.width) < 0.5
+            && Math.abs(existing.height - next.height) < 0.5
+          ) return prev;
+          return { ...prev, [id]: next };
         });
       });
     });
   }, []);
 
   const handleTabLayout = useCallback((id: string) => {
-    // Layout has just landed for this tab, but on web the just-mounted
-    // native views aren't always immediately measurable in the same tick —
+    // Layout has just landed for this label, but on web the just-mounted
+    // native view isn't always immediately measurable in the same tick —
     // deferring one frame makes measureInWindow reliably return real
     // numbers instead of occasionally reading a stale/zeroed rect.
     requestAnimationFrame(() => measureTab(id));
@@ -254,19 +266,22 @@ function UnderlineTabs({
         return (
           <Pressable
             key={option.id}
-            ref={(node) => { tabRefs.current[option.id] = node as unknown as View | null; }}
             accessibilityRole="tab"
             accessibilityLabel={option.label}
             accessibilityState={{ selected }}
             onPress={() => { if (!selected) { hapticToggle(); onChange(option.id); } }}
-            onLayout={() => handleTabLayout(option.id)}
             style={styles.underlineSegment}
             testID={testID ? `${testID}-${option.id}` : undefined}
           >
             <Text
+              ref={(node) => { textRefs.current[option.id] = node; }}
+              onLayout={() => handleTabLayout(option.id)}
               style={[
                 styles.underlineLabel,
-                { fontFamily: selected ? FONT.bold : FONT.semibold, color: selected ? '#FFFFFF' : 'rgba(255,255,255,0.62)' },
+                {
+                  fontFamily: selected ? FONT.bold : FONT.medium,
+                  color: selected ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                },
               ]}
               numberOfLines={1}
             >
@@ -276,7 +291,10 @@ function UnderlineTabs({
         );
       })}
       {!!activeLayout && (
-        <Animated.View pointerEvents="none" style={[styles.underlineBar, indicatorStyle]} />
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.underlineBar, { top: activeLayout.y + activeLayout.height + UNDERLINE_GAP }, indicatorStyle]}
+        />
       )}
     </View>
   );
@@ -301,9 +319,12 @@ const styles = StyleSheet.create({
   // `underlineRoot`'s `center`) before any transform is applied — so without
   // this, translateX was being added on top of an already-centered position
   // instead of measured from the container's left edge, landing the
-  // underline far to the right of where the math intended (as far as the
-  // search icon next to the tab bar).
+  // underline under the search icon instead of under the active tab.
+  // `top` is set inline per-render from the measured label's own bottom
+  // edge + UNDERLINE_GAP, not a fixed offset from the container — a fixed
+  // offset from the padded touch target is what previously floated the bar
+  // well below the actual glyphs instead of tight to the baseline.
   underlineBar: {
-    position: 'absolute', left: 0, bottom: -6, height: 3, borderRadius: RADII.pill, backgroundColor: '#FFFFFF',
+    position: 'absolute', left: 0, height: UNDERLINE_HEIGHT, borderRadius: RADII.pill, backgroundColor: '#FFFFFF',
   },
 });
