@@ -5,7 +5,6 @@
  */
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
@@ -14,6 +13,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
 import { TABULAR_NUMS, tabularType } from '@/constants/typography';
 import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
+import { ThreadCashBill, ThreadCashCoin } from '@/components/thread-cash/ThreadCashBill';
 
 function historyLabel(entry: ThreadCashEntry): string {
   switch (entry.source) {
@@ -66,6 +66,7 @@ export default function ThreadCashScreen() {
           <View style={{ paddingHorizontal: SP.md }}>
             {/* Balance */}
             <BrandthreadCard glow style={styles.balanceCard}>
+              <ThreadCashBill width={180} style={styles.balanceBill} />
               <Text style={[styles.balanceLabel, { color: theme.muted }]}>Your balance</Text>
               <Text style={[styles.balanceValue, tabularType('display'), { color: theme.text }]}>
                 {formatCents(status?.balanceCents ?? 0)}
@@ -78,7 +79,7 @@ export default function ThreadCashScreen() {
             {/* Streak row */}
             <BrandthreadCard style={styles.streakCard}>
               <View style={styles.streakHeading}>
-                <Feather name="zap" size={16} color={theme.accent} />
+                <ThreadCashCoin size={18} />
                 <Text style={[styles.streakTitle, { color: theme.text }]}>
                   {currentStreak > 0 ? `${currentStreak}-day streak` : 'Start your streak'}
                 </Text>
@@ -92,10 +93,12 @@ export default function ThreadCashScreen() {
                       style={[
                         styles.streakDay,
                         { borderColor: theme.borderSubtle },
-                        lit && { backgroundColor: theme.accent, borderColor: theme.accent },
+                        lit && { backgroundColor: theme.accentDim, borderColor: theme.accent },
                       ]}
                     >
-                      <Text style={[styles.streakDayText, TABULAR_NUMS, { color: lit ? theme.onAccent : theme.muted }]}>{day}</Text>
+                      {lit ? <ThreadCashCoin size={16} /> : (
+                        <Text style={[styles.streakDayText, TABULAR_NUMS, { color: theme.muted }]}>{day}</Text>
+                      )}
                     </View>
                   );
                 })}
@@ -113,7 +116,7 @@ export default function ThreadCashScreen() {
                 compact
                 icon="dollar-sign"
                 title="No Thread Cash activity yet"
-                description="Check in daily to start earning."
+                description="Keep the app open a few minutes a day to start earning."
               />
             ) : (
               history.map((entry) => (
@@ -135,7 +138,7 @@ export default function ThreadCashScreen() {
             <Text style={[styles.sectionTitle, { color: theme.text }]}>How it works</Text>
             <BrandthreadCard style={styles.rulesCard}>
               <Text style={[styles.rulesText, { color: theme.muted }]}>
-                • Check in once a day to earn Thread Cash and build your streak{'\n'}
+                • Keep the app open for a few active minutes a day to earn Thread Cash and build your streak{'\n'}
                 • Missing a day may reset your streak — a short grace period is built in{'\n'}
                 • Thread Cash is not money: it can't be withdrawn, cashed out, or sent as cash{'\n'}
                 {status?.config.expiryDays
@@ -152,6 +155,7 @@ export default function ThreadCashScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   balanceCard: { alignItems: 'center', paddingVertical: SP.lg, marginTop: SP.sm },
+  balanceBill: { marginBottom: SP.sm },
   balanceLabel: { fontSize: FS.sm, fontFamily: FONT.medium },
   // Balance snaps to the `display` type-scale role (44/48 Bold) via tabularType('display')
   // applied at the call site, rather than the old one-off fontSize: 40 (see design doc audit).

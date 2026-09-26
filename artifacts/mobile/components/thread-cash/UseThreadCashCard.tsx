@@ -14,7 +14,6 @@
  */
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { randomUUID } from 'expo-crypto';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -22,6 +21,7 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import type { CheckoutThreadCashRedemption } from '@/services/cartTypes';
 import { HapticSwitch } from '@/components/BrandthreadUI';
+import { ThreadCashCoin } from './ThreadCashBill';
 
 export function UseThreadCashCard({
   maxDiscountCents,
@@ -107,7 +107,7 @@ export function UseThreadCashCard({
       isDisabled && { opacity: 0.6 },
     ]}>
       <View style={[styles.icon, { backgroundColor: theme.accentDim }]}>
-        <Feather name="dollar-sign" size={16} color={theme.accent} />
+        <ThreadCashCoin size={20} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.title, { color: theme.text }]}>Thread Cash</Text>

@@ -19,8 +19,8 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Pressable, Alert, Animated, Easing } from 'react-native';
-import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
+import { ThreadCashBill, ThreadCashCoin } from './ThreadCashBill';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/ui/Button';
@@ -45,52 +45,23 @@ function formatAmountDisplay(cents: number): string {
 }
 
 /**
- * The Thread Cash mark: a monochrome "$" inside a thin dashed ring — a small
- * stitch/thread detail evoking Brandthread's own thread motif, rather than a
- * generic filled dollar-sign glyph. The theme's accent is used only as a
- * tiny highlight dot on the ring, never as a full gold-filled glyph, so it
- * reads correctly both on monochrome and on the gold-family presets
- * (gold, black-gold, emerald-gold) alike. `disabled` mutes both the ring and
- * the highlight to a flat, non-interactive read.
+ * The Thread Cash mark, wherever a small coin glyph is needed inline (the
+ * attach button, the sheet's balance pill and badge, the message card).
+ * Renders the owner's actual Thread Cash coin art (see ThreadCashBill.tsx)
+ * rather than a generic dollar-sign glyph. `color`/`accent` are kept as
+ * no-op props for call-site compatibility; only `size` and `disabled`
+ * (dimmed via opacity) affect the render.
  */
 export function ThreadCashCoinMark({
   size = 20,
-  color,
-  accent,
   disabled = false,
 }: {
   size?: number;
-  color: string;
-  accent: string;
+  color?: string;
+  accent?: string;
   disabled?: boolean;
 }) {
-  const r = size / 2 - 1.6;
-  const cx = size / 2;
-  const cy = size / 2;
-  return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <Circle
-        cx={cx} cy={cy} r={r}
-        stroke={color}
-        strokeOpacity={disabled ? 0.5 : 1}
-        strokeWidth={1.3}
-        strokeDasharray={`${Math.max(1.6, r * 0.5)} ${Math.max(1.6, r * 0.55)}`}
-        fill="none"
-      />
-      <SvgText
-        x={cx} y={cy + size * 0.155}
-        fontSize={size * 0.5}
-        fontWeight="700"
-        fill={color}
-        fillOpacity={disabled ? 0.5 : 1}
-        textAnchor="middle"
-      >
-        $
-      </SvgText>
-      {/* Tiny accent highlight — a single stitch tick, not a filled glyph */}
-      <Circle cx={cx} cy={cy - r} r={disabled ? 0 : 1.2} fill={accent} />
-    </Svg>
-  );
+  return <ThreadCashCoin size={size} style={disabled ? { opacity: 0.5 } : undefined} />;
 }
 
 type SheetStep = 'amount' | 'keypad' | 'confirm';
@@ -488,7 +459,10 @@ export function ThreadCashMessageCard({
   };
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.accent }]}>
+    <View style={[styles.card, { backgroundColor: theme.accent, overflow: 'hidden' }]}>
+      <View style={styles.cardBillWatermark} pointerEvents="none">
+        <ThreadCashBill width={260} />
+      </View>
       <ThreadCashCoinMark size={28} color={theme.onAccent} accent={theme.onAccent} />
       <View style={styles.cardAmountWrap} onLayout={(e) => setAmountWidth(e.nativeEvent.layout.width)}>
         <Text style={[styles.cardAmount, { color: theme.onAccent }]}>{formatCents(amountCents)}</Text>
@@ -554,6 +528,7 @@ const styles = StyleSheet.create({
   confirmBlock: { alignItems: 'center', marginBottom: SP.lg },
   confirmNote: { fontSize: FS.xs, fontFamily: FONT.regular, fontStyle: 'italic', marginTop: SP.xs },
   card: { borderRadius: RADIUS.lg, padding: SP.md, alignItems: 'center', gap: SP.xs, minWidth: 200, maxWidth: 240 },
+  cardBillWatermark: { position: 'absolute', top: -10, left: '50%', marginLeft: -130, opacity: 0.18 },
   cardAmountWrap: { position: 'relative' },
   cardAmount: { fontSize: FS.xxl, fontFamily: FONT.bold },
   cardNote: { fontSize: FS.xs, fontFamily: FONT.regular, fontStyle: 'italic', textAlign: 'center' },

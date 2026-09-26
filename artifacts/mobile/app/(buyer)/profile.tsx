@@ -51,6 +51,8 @@ import {
 } from '@/components/profile/ProfileCover';
 import { profileEmptyState, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
+import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRow';
+import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
 // Statuses still "in flight" — an order in one of these is what the My Orders
 // card surfaces first; a fully-resolved order (delivered/cancelled/refunded/
@@ -218,6 +220,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [threadCashBalanceCents, setThreadCashBalanceCents] = useState(0);
+  const [threadCashStreak, setThreadCashStreak] = useState<ThreadCashStreakState | null>(null);
   // Live follower/following counts from the server (the locally cached
   // profile counts went stale after every follow).
   const [socialCounts, setSocialCounts] = useState<{ followers: number; following: number } | null>(null);
@@ -295,7 +298,11 @@ export default function ProfileScreen() {
     let active = true;
     if (user?.id && threadCashEnabled) {
       void api.threadCash.get()
-        .then(status => { if (active) setThreadCashBalanceCents(Math.max(0, status.balanceCents)); })
+        .then(status => {
+          if (!active) return;
+          setThreadCashBalanceCents(Math.max(0, status.balanceCents));
+          setThreadCashStreak(status.streak);
+        })
         .catch(() => {});
     }
     return () => { active = false; };
@@ -539,6 +546,9 @@ export default function ProfileScreen() {
 
   const extras = (
     <>
+      {/* ── Thread Cash streak — 7-dot week row, flag-gated ── */}
+      {threadCashEnabled ? <ThreadCashStreakRow streak={threadCashStreak} /> : null}
+
       {/* ── Stories & highlights stay next to the profile details ── */}
       <ProfileStoriesRow
         items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor }))}

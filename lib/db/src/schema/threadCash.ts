@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, boolean, primaryKey } from 'drizzle-orm/pg-core';
 
 // ─── Thread Cash ────────────────────────────────────────────────────────────
 // A platform-funded, non-cash reward credit for buyers. It cannot be cashed
@@ -76,6 +76,23 @@ export const threadCashConfig = pgTable('thread_cash_config', {
   updatedBy:           text('updated_by'),
   updatedAt:           timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// Anti-abuse for the active-time daily claim: the client reports cumulative
+// active seconds, but the server independently counts heartbeats it
+// actually received that (buyer-local) day, and requires a minimum count
+// before paying out — a client that just fabricates "420 seconds elapsed"
+// without ever pinging the server can't claim. One row per buyer per local
+// day; heartbeatCount only ever increments.
+export const threadCashHeartbeats = pgTable('thread_cash_heartbeats', {
+  buyerId:        text('buyer_id').notNull(),
+  localDate:      text('local_date').notNull(), // buyer-local YYYY-MM-DD
+  heartbeatCount: integer('heartbeat_count').notNull().default(0),
+  activeSeconds:  integer('active_seconds').notNull().default(0),
+  createdAt:      timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:      timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.buyerId, t.localDate] }),
+}));
 
 // Send-in-chat (Apple-Cash-style) transfers. Feature-flagged OFF by default
 // (see PR notes): peer-to-peer transfer of cash-like value has
