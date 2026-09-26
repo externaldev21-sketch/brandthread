@@ -185,16 +185,17 @@ const EditorialTile = React.memo(function EditorialTile({ item, theme }: { item:
         {item.isUrgent && (
           <View style={[tile.urgentDot, { backgroundColor: theme.accent }]} />
         )}
-        {item.priceCents != null && (
-          <View style={tile.pricePill}>
-            <Text style={[TYPE_SCALE.caption, TABULAR_NUMS, { fontFamily: FONT.bold, color: '#0A0A0B' }]}>
-              {formatCents(item.priceCents)}
-            </Text>
-          </View>
-        )}
       </LinearGradient>
-      <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text, marginTop: 8 }]} numberOfLines={1}>{item.name}</Text>
-      <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 1 }]} numberOfLines={1}>{item.brand}</Text>
+      {/* Image, then name / brand / price below it with an 8pt rhythm — never
+          an overlay pill sitting on the image's bottom edge, which clipped
+          against the image and crowded the name below it. */}
+      <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text, marginTop: 8 }]} numberOfLines={2}>{item.name}</Text>
+      <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 4 }]} numberOfLines={1}>{item.brand}</Text>
+      {item.priceCents != null && (
+        <Text style={[TYPE_SCALE.caption, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.text, marginTop: 4 }]}>
+          {formatCents(item.priceCents)}
+        </Text>
+      )}
     </Pressable>
   );
 });
@@ -205,11 +206,6 @@ const tile = StyleSheet.create({
   fallback: { alignItems: 'center', justifyContent: 'center' },
   fallbackText: { fontSize: 34, fontFamily: FONT.bold, color: '#FFFFFF' },
   urgentDot: { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4 },
-  pricePill: {
-    position: 'absolute', bottom: 10, left: 10,
-    paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADII.pill,
-    backgroundColor: '#FFFFFF',
-  },
 });
 
 function TileRailSkeleton() {
@@ -220,6 +216,7 @@ function TileRailSkeleton() {
           <SkeletonBlock width={TILE_WIDTH} height={TILE_IMAGE_HEIGHT} radius={RADII.sheet} />
           <SkeletonBlock width="80%" height={12} />
           <SkeletonBlock width="50%" height={11} />
+          <SkeletonBlock width="35%" height={11} />
         </View>
       ))}
     </ScrollView>
@@ -619,7 +616,7 @@ function DiscoverHero({
           <Text style={dh.counterChipText}>{activeIndex + 1}/{items.length}</Text>
         </View>
         <Text style={dh.title} numberOfLines={1}>Just Dropped</Text>
-        <Pressable onPress={onShopAll} style={dh.shopAllPill} accessibilityRole="button" accessibilityLabel="Shop all">
+        <Pressable onPress={onShopAll} style={dh.shopAllPill} accessibilityRole="button" accessibilityLabel="Shop all" hitSlop={8}>
           <Text style={dh.shopAllText}>Shop all</Text>
         </Pressable>
       </View>
