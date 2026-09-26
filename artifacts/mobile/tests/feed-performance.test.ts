@@ -10,10 +10,17 @@ import { describe, expect, it } from 'vitest';
 const feed = readFileSync(resolve(__dirname, '../app/(tabs)/feed.tsx'), 'utf8');
 
 describe('Feed video list virtualization bounds', () => {
-  it('caps how many pages (and video players) are ever mounted at once', () => {
-    expect(feed).toContain('windowSize={5}');
-    expect(feed).toContain('maxToRenderPerBatch={2}');
-    expect(feed).toContain('initialNumToRender={3}');
+  it('caps how many pages (and video players) are ever mounted at once on native', () => {
+    // Native keeps the tight cap (only ~3 pages ever mounted, decoding
+    // videos off-screen is expensive there). Web renders the whole (small,
+    // ~10-item) preview feed instead of virtualizing it away — a low window
+    // there let fast/paginated swiping outrun react-native-web's scroll-
+    // driven render batching and land on a page that had never been
+    // mounted at all (reported as the feed "going blank" after a few
+    // swipes).
+    expect(feed).toContain("windowSize={Platform.OS === 'web' ? 21 : 5}");
+    expect(feed).toContain("maxToRenderPerBatch={Platform.OS === 'web' ? displayItems.length : 2}");
+    expect(feed).toContain("initialNumToRender={Platform.OS === 'web' ? displayItems.length : 3}");
   });
 
   it('detaches far off-screen native views on native platforms', () => {

@@ -15,6 +15,12 @@ export const PRESS_DURATION_MS = 120;
 /** Sheets (BottomSheet, action sheets) spring in with this feel. */
 export const SHEET_SPRING = { damping: 20, stiffness: 220 } as const;
 
+/** Sliding tab/segment indicators (e.g. the feed's top tab underline): a
+ *  near-critically-damped spring (damping ratio ~1.1) so it glides to rest
+ *  with no visible bounce/overshoot, unlike SHEET_SPRING (ratio ~0.67, tuned
+ *  for a springier sheet entrance rather than a precise indicator). */
+export const TAB_INDICATOR_SPRING = { damping: 30, stiffness: 260, mass: 0.7 } as const;
+
 /** Screen push transition (Stack navigator). */
 export const SCREEN_PUSH_MS = 280;
 /** Cubic ease-out curve equivalent, for renderers that take bezier points. */
