@@ -30,6 +30,9 @@ const {
   routerMock: { push: vi.fn() },
 }));
 
+vi.mock("@/components/profile/ProfileCover", async () =>
+  (await import("./helpers/profileCoverMock")).profileCoverMockModule);
+
 vi.mock("react-native", () => {
   const React = require("react") as any;
   const nativeComponent = (name: string) => {
@@ -59,6 +62,7 @@ vi.mock("react-native", () => {
       ScrollView: AnimatedScrollView,
       event: () => () => {},
       timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      spring: () => ({ start: (cb?: () => void) => cb?.() }),
     },
     Image: nativeComponent("Image"),
     KeyboardAvoidingView: nativeComponent("KeyboardAvoidingView"),
@@ -275,7 +279,7 @@ async function renderScreen(): Promise<ReactTestRenderer> {
 
 async function openEditor(renderer: ReactTestRenderer) {
   await act(async () => {
-    renderer.root.findByProps({ testID: "profile-edit-details" }).props.onPress();
+    renderer.root.findAll((node) => node.props.testID === "profile-edit-details" && typeof node.props.onLongPress === "function")[0].props.onLongPress();
   });
 }
 
@@ -320,6 +324,13 @@ describe("seller Profile brand details save", () => {
     await act(async () => {
       renderer?.unmount();
     });
+  });
+
+  it("opens the full seller Edit Profile screen from Edit Profile (the quick sheet stays on long-press)", async () => {
+    renderer = await renderScreen();
+    const edit = renderer.root.findAll((node) => node.props.testID === "profile-edit-details" && typeof node.props.onPress === "function")[0];
+    await act(async () => { edit.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith("/edit-profile");
   });
 
   it("updates the displayed Profile details only after the save succeeds", async () => {

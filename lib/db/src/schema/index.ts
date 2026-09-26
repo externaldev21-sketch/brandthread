@@ -5,6 +5,7 @@ export * from './subscriptionEntitlements';
 export * from './security';
 export * from './money';
 export * from './threadCash';
+export * from './shopifyFulfillment';
 export * from './metaAds';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
@@ -56,6 +57,12 @@ export const users = pgTable('users', {
   subscriptionTrialStartedAt: timestamp('subscription_trial_started_at', { withTimezone: true }),
   subscriptionTrialEndsAt:    timestamp('subscription_trial_ends_at', { withTimezone: true }),
   subscriptionTrialBannerDismissedTrialEnd: text('subscription_trial_banner_dismissed_trial_end'),
+  // Buyer-only "Watching Threads" gesture coach mark on the feed. Stores the
+  // FEED_GESTURES_TIP_VERSION the user has already seen (0 = never shown).
+  // Bumping the client-side version constant shows the tip one more time per
+  // user, then persists the new version — server-side so it survives
+  // reinstalls, new devices and cleared local storage, not just AsyncStorage.
+  feedGesturesTipSeenVersion: integer('feed_gestures_tip_seen_version').notNull().default(0),
   // Trust signals & Stripe Identity verification
   verified:                     boolean('verified').notNull().default(false),
   /** 'unverified' | 'pending' | 'verified' | 'failed' */
@@ -83,6 +90,18 @@ export const users = pgTable('users', {
   // by a later Clerk sync.
   logoUrl:   text('logo_url'),
   bannerUrl: text('banner_url'),
+  // Profile cover video (all account types) — a short, always-muted looping
+  // clip shown in the profile hero. Separate from the avatar. Server-rendered
+  // compressed rendition + poster frame, both public object paths served via
+  // /api/profile/cover-media. `coverVideoUpdatedAt` drives the once-per-24h
+  // change limit (setting AND removing both count as a change).
+  coverVideoUrl:              text('cover_video_url'),
+  coverPosterUrl:             text('cover_poster_url'),
+  coverVideoUpdatedAt:        timestamp('cover_video_updated_at', { withTimezone: true }),
+  coverVideoModerationStatus: text('cover_video_moderation_status').notNull().default('visible'),
+  // First-visit coach mark ("add a cover video") — shown exactly once per
+  // account, server-side so it survives reinstalls and other devices.
+  coverCoachmarkSeenAt:       timestamp('cover_coachmark_seen_at', { withTimezone: true }),
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
   // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
   username: text('username').unique(),
@@ -153,7 +172,9 @@ export const products = pgTable('products', {
   removalKind: text('removal_kind'),
   images: json('images').$type<string[]>().notNull().default([]),
   tags: json('tags').$type<string[]>().notNull().default([]),
-  styleTags:             json('style_tags').$type<string[]>().notNull().default([]),
+  // jsonb, not json: migration 088 GIN-indexes this with jsonb_path_ops for
+  // For You style-match candidate generation, which only jsonb supports.
+  styleTags:             jsonb('style_tags').$type<string[]>().notNull().default([]),
   // ── Pre-order / demand gauging ───────────────────────────────────────────
   isPreOrder:            boolean('is_pre_order').notNull().default(false),
   preOrderClosingDate:   timestamp('pre_order_closing_date'),
@@ -370,6 +391,15 @@ export const orders = pgTable('orders', {
   sellerNetCents: integer('seller_net_cents').notNull().default(0),
   refundedCents: integer('refunded_cents').notNull().default(0),
   platformFeeRefundedCents: integer('platform_fee_refunded_cents').notNull().default(0),
+  // Thread Cash spent on this order (platform-funded, tracked separately from
+  // discountAmountCents above since the seller is still paid in full for this
+  // portion — see lib/threadCash/wallet.ts). Refunded/cancelled orders return
+  // this amount to the buyer's Thread Cash balance exactly once.
+  threadCashAppliedCents: integer('thread_cash_applied_cents').notNull().default(0),
+  // The platform-funded supplemental transfer that topped the seller up to
+  // the full item price (destination charges only). A full refund reverses
+  // exactly this transfer in addition to the buyer's card refund.
+  stripeThreadCashTransferId: text('stripe_thread_cash_transfer_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -429,7 +459,9 @@ export const posts = pgTable('posts', {
   aspectRatio: text('aspect_ratio').notNull().default('9:16'),
   caption: text('caption'),
   hashtags: json('hashtags').$type<string[]>().notNull().default([]),
-  styleTags: json('style_tags').$type<string[]>().notNull().default([]),
+  // jsonb, not json: migration 088 GIN-indexes this with jsonb_path_ops for
+  // For You style-match candidate generation, which only jsonb supports.
+  styleTags: jsonb('style_tags').$type<string[]>().notNull().default([]),
   sound: json('sound').$type<{
     soundId: string;
     soundTitle: string;
@@ -531,6 +563,12 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // order creation by the paid-order webhook (see lib/discounts.ts).
   discountCodeId: text('discount_code_id'),
   discountCodeAmountCents: integer('discount_code_amount_cents').notNull().default(0),
+  // Optional Thread Cash redemption reserved for this Stripe Checkout Session.
+  // Platform-funded (unlike loyalty/discount code above): it discounts the
+  // buyer's Stripe charge only — it must never reduce platformFeeCents /
+  // processingFeeEstimateCents below, which stay computed on the full price.
+  threadCashToken: text('thread_cash_token'),
+  threadCashDiscountCents: integer('thread_cash_discount_cents').notNull().default(0),
   // Money decisions fixed when the Stripe session was created.
   chargeModel: text('charge_model'),        // 'destination' | 'held'
   dropId: uuid('drop_id'),                  // server-derived from the products
@@ -1751,7 +1789,9 @@ export const notificationBatchQueue = pgTable('notification_batch_queue', {
   // Running count of collapsed events and a rolling sample of actor names,
   // used to compose the eventual "X and 4 others liked your item" copy.
   count:        integer('count').notNull().default(1),
-  actorNames:   json('actor_names').notNull().default([]).$type<string[]>(),
+  // jsonb, not json: lib/push.ts's enqueueBatchedNotification uses
+  // jsonb_array_length()/|| on this column, which only jsonb supports.
+  actorNames:   jsonb('actor_names').notNull().default([]).$type<string[]>(),
   cta:          text('cta'),
   firstEventAt: timestamp('first_event_at').defaultNow().notNull(),
   lastEventAt:  timestamp('last_event_at').defaultNow().notNull(),

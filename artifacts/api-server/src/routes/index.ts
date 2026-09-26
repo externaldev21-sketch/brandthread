@@ -27,6 +27,7 @@ import aiRouter from "./ai";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
 import profileMediaRouter from "./profile-media";
+import profileCoverRouter from "./profile-cover";
 import buyerRouter from "./buyer";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter from "./connect";
@@ -95,6 +96,9 @@ import shopifyImportRouter from "./shopify-import";
 import designStudioRouter from "./design-studio";
 import packagePresetsRouter from "./package-presets";
 import webhooksShippoRouter from "./webhooks-shippo";
+import webhooksShopifyRouter from "./webhooks-shopify";
+import shopifyOauthCallbackRouter from "./shopify-oauth-callback";
+import shopifyRouter from "./shopify";
 
 const router = Router();
 
@@ -102,9 +106,14 @@ const router = Router();
 router.use("/config/features", featureFlagsRouter);
 router.use("/public",          publicRouter);
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
+router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);
+router.use("/webhooks/shopify", webhooksShopifyRouter);
+// Shopify's OAuth redirect hits the seller's browser directly (no Brandthread
+// session) — mounted unauthenticated, before the authenticated /shopify group.
+router.use("/shopify/oauth/callback", shopifyOauthCallbackRouter);
 router.use("/support",         supportRouter);
 router.use("/support-chat",    supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
@@ -127,6 +136,7 @@ router.use("/customers",       tc, customersRouter);
 router.use("/drops",           tc, dropsRouter);
 router.use("/analytics",       tc, analyticsRouter);
 router.use("/integrations",    tc, integrationsRouter);
+router.use("/shopify",         tc, shopifyRouter);
 // ─── Growth-plan-gated AI design routes ───────────────────────────────────────
 router.use("/logo",            tc, requirePlan("growth"), logoRouter);
 router.use("/mockup",          tc, requirePlan("growth"), mockupRouter);

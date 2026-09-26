@@ -6,27 +6,40 @@
  *  - is a single Pressable — nothing interactive is nested inside another
  *    pressable, so web never renders a button inside a button.
  */
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { SHOP_PILL_HEIGHT } from './profileLayout';
 
 type PressState = { pressed: boolean; hovered?: boolean; focused?: boolean };
 type FeatherName = keyof typeof Feather.glyphMap;
 
-/** Hover wash + focus ring painted inside a pressable's own bounds (web only states). */
+/**
+ * Hover wash, press fill and keyboard-focus glow, all painted INSIDE a
+ * pressable's own bounds (never an outer ring — a hard border-width ring
+ * used to render here for the focused state, which on the monochrome theme
+ * is a near-white accent and read as a plain white outline touching
+ * whatever sat above a tightly packed row like the profile tabs). The
+ * pressed and focused washes are both theme.accent at low opacity — a soft
+ * tint, never a hard line — and the pressed one fades in/out with the
+ * press itself instead of appearing instantly.
+ */
 export function InteractionLayer({ state, radius, theme }: { state: PressState; radius: number; theme: AppThemePreset }) {
   return (
     <>
       {state.hovered ? (
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, backgroundColor: `${theme.text}14` }]} />
       ) : null}
+      {state.pressed ? (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, backgroundColor: `${theme.accent}22` }]} />
+      ) : null}
       {state.focused ? (
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, borderWidth: 2, borderColor: theme.accent }]} />
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, backgroundColor: `${theme.accent}1F`, borderWidth: 1, borderColor: `${theme.accent}55` }]} />
       ) : null}
     </>
   );
@@ -38,6 +51,7 @@ export function ProfileButton({
   label,
   icon,
   onPress,
+  onLongPress,
   variant = 'secondary',
   disabled,
   accessibilityLabel,
@@ -48,6 +62,7 @@ export function ProfileButton({
   label: string;
   icon?: FeatherName;
   onPress: () => void;
+  onLongPress?: () => void;
   variant?: 'primary' | 'secondary';
   disabled?: boolean;
   accessibilityLabel?: string;
@@ -64,6 +79,7 @@ export function ProfileButton({
     <View style={[styles.buttonWrap, style]}>
       <PressableScale
         onPress={() => { hapticLight(); onPress(); }}
+        onLongPress={onLongPress ? () => { hapticLight(); onLongPress(); } : undefined}
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
@@ -122,6 +138,37 @@ export function ProfileGlassButton({
           <InteractionLayer state={state as PressState} radius={22} theme={theme} />
           <Feather name={icon} size={19} color={theme.text} />
           {badge ? <View style={[styles.glassBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} /> : null}
+        </>
+      )}
+    </PressableScale>
+  );
+}
+
+// ─── Wallet chip ──────────────────────────────────────────────────────────────
+
+/**
+ * Compact Thread Cash balance pill for the profile's top bar ("$ 12.50").
+ * Display only — tapping opens the existing wallet screen; P2P stays off.
+ * ProfileShell renders it only on the viewer's own profile.
+ */
+export function ProfileWalletChip({ balanceLabel, onPress }: { balanceLabel: string; onPress: () => void }) {
+  const { theme } = useAppTheme();
+  return (
+    <PressableScale
+      onPress={() => { hapticSelection(); onPress(); }}
+      accessibilityRole="button"
+      accessibilityLabel={`Thread Cash wallet, ${balanceLabel}`}
+      testID="profile-wallet-chip"
+      hitSlop={4}
+      style={[styles.walletChip, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
+    >
+      {(state) => (
+        <>
+          <InteractionLayer state={state as PressState} radius={22} theme={theme} />
+          <View style={[styles.walletIcon, { backgroundColor: theme.accent }]}>
+            <Feather name="dollar-sign" size={12} color={theme.onAccent} />
+          </View>
+          <Text style={[styles.walletText, { color: theme.text }]} numberOfLines={1}>{balanceLabel}</Text>
         </>
       )}
     </PressableScale>
@@ -208,7 +255,8 @@ export interface ProfileTab {
 /**
  * Equal-width tabs with the icon stacked above the label, so four tabs fit a
  * 375pt phone without icons colliding into their labels. The active tab is
- * marked with a short accent "stitch" under the label.
+ * marked by an animated pill indicator that slides to whichever tab is
+ * pressed, instead of each tab drawing its own static mark.
  */
 export function ProfileTabs({
   tabs,
@@ -220,8 +268,23 @@ export function ProfileTabs({
   onChange: (key: string) => void;
 }) {
   const { theme } = useAppTheme();
+  const [rowWidth, setRowWidth] = useState(0);
+  const activeIndex = Math.max(tabs.findIndex((tab) => tab.key === active), 0);
+  const indicatorX = useRef(new Animated.Value(activeIndex)).current;
+
+  useEffect(() => {
+    Animated.spring(indicatorX, { toValue: activeIndex, useNativeDriver: true, speed: 18, bounciness: 6 }).start();
+  }, [activeIndex, indicatorX]);
+
+  const cellWidth = tabs.length > 0 ? rowWidth / tabs.length : 0;
+  const indicatorWidth = Math.max(0, Math.min(cellWidth - SP.md * 2, 64));
+
   return (
-    <View style={[styles.tabs, { borderColor: theme.border, backgroundColor: theme.background }]} accessibilityRole="tablist">
+    <View
+      style={[styles.tabs, { borderColor: theme.border, backgroundColor: theme.background }]}
+      accessibilityRole="tablist"
+      onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
+    >
       {tabs.map((tab) => {
         const selected = tab.key === active;
         const color = selected ? theme.text : theme.muted;
@@ -238,17 +301,39 @@ export function ProfileTabs({
               {(state) => (
                 <>
                   <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
-                  <Feather name={tab.icon} size={17} color={color} />
+                  <Feather name={tab.icon} size={21} color={color} />
                   <Text style={[styles.tabLabel, { color }, selected && styles.tabLabelActive]} numberOfLines={1}>
                     {tab.label}{typeof tab.count === 'number' && tab.count > 0 ? ` ${tab.count}` : ''}
                   </Text>
-                  <View style={[styles.tabStitch, { backgroundColor: selected ? theme.accent : 'transparent' }]} />
                 </>
               )}
             </PressableScale>
           </View>
         );
       })}
+      {cellWidth > 0 && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.tabIndicator,
+            {
+              width: indicatorWidth,
+              backgroundColor: theme.accent,
+              transform: [
+                {
+                  translateX: indicatorX.interpolate({
+                    inputRange: [0, Math.max(tabs.length - 1, 1)],
+                    outputRange: [
+                      cellWidth / 2 - indicatorWidth / 2,
+                      cellWidth * Math.max(tabs.length - 1, 1) + cellWidth / 2 - indicatorWidth / 2,
+                    ],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      )}
     </View>
   );
 }
@@ -287,30 +372,58 @@ export function ShopPill({
   testID?: string;
 }) {
   const { theme } = useAppTheme();
+  const floating = bottom !== undefined;
+  // Floating CTA springs up into place once, like a sticky "Shop" bar landing.
+  const rise = useRef(new Animated.Value(floating ? 1 : 0)).current;
+  useEffect(() => {
+    if (!floating) return;
+    let cancelled = false;
+    const settle = () => rise.setValue(0);
+    let query: Promise<boolean> | undefined;
+    try { query = AccessibilityInfo.isReduceMotionEnabled?.(); } catch { query = undefined; }
+    if (!query) { settle(); return; }
+    query
+      .then((reduce) => {
+        if (cancelled) return;
+        if (reduce) { settle(); return; }
+        Animated.spring(rise, { toValue: 0, damping: 14, stiffness: 160, mass: 0.9, useNativeDriver: true }).start();
+      })
+      .catch(settle);
+    return () => { cancelled = true; };
+  }, [floating, rise]);
+  const riseStyle = floating
+    ? {
+        opacity: rise.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+        transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [0, 90] }) }],
+      }
+    : null;
+
   return (
-    <View pointerEvents="box-none" style={bottom === undefined ? styles.pillInline : [styles.pillWrap, { bottom }]}>
+    <Animated.View pointerEvents="box-none" style={[floating ? [styles.pillWrap, { bottom }] : styles.pillInline, riseStyle]}>
       <PressableScale
         onPress={() => { hapticLight(); onPress(); }}
         accessibilityRole="button"
         accessibilityLabel={sublabel ? `${label}, ${sublabel}` : label}
         testID={testID}
-        style={[styles.pill, { backgroundColor: theme.accent, shadowColor: theme.shadowColor }]}
+        style={[styles.pill, !floating && styles.pillFull, { backgroundColor: theme.accent, shadowColor: theme.shadowColor }]}
       >
         {(state) => (
           <>
             <InteractionLayer state={state as PressState} radius={RADIUS.pill} theme={theme} />
-            <View style={[styles.pillIcon, { backgroundColor: `${theme.onAccent}14` }]}>
-              <Feather name="shopping-bag" size={16} color={theme.onAccent} />
+            <View style={[styles.pillIcon, { backgroundColor: theme.onAccent }]}>
+              <Feather name="shopping-bag" size={20} color={theme.accent} />
             </View>
             <View style={styles.pillCopy}>
               <Text style={[styles.pillLabel, { color: theme.onAccent }]} numberOfLines={1}>{label}</Text>
               {sublabel ? <Text style={[styles.pillSub, { color: theme.onAccent }]} numberOfLines={1}>{sublabel}</Text> : null}
             </View>
-            <Feather name="arrow-right" size={17} color={theme.onAccent} />
+            <View style={[styles.pillArrow, { borderColor: `${theme.onAccent}33` }]}>
+              <Feather name="arrow-up-right" size={18} color={theme.onAccent} />
+            </View>
           </>
         )}
       </PressableScale>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -341,55 +454,63 @@ const styles = StyleSheet.create({
   buttonWrap: { flex: 1 },
   flexCell: { flex: 1 },
   button: {
-    minHeight: 46, borderRadius: RADIUS.md, borderWidth: 1,
+    minHeight: 48, borderRadius: RADIUS.md, borderWidth: 1,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: SP.xs, paddingHorizontal: SP.md, overflow: 'hidden',
+    gap: 6, paddingHorizontal: SP.md, overflow: 'hidden',
   },
-  buttonText: { fontFamily: FONT.semibold, fontSize: FS.sm, flexShrink: 1 },
+  buttonText: { fontFamily: FONT.bold, fontSize: FS.base, flexShrink: 1 },
   disabled: { opacity: 0.5 },
 
   glass: {
     width: 44, height: 44, borderRadius: 22, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
+  walletChip: {
+    height: 44, borderRadius: 22, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
+    gap: 6, paddingLeft: 7, paddingRight: 12, overflow: 'hidden',
+  },
+  walletIcon: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  walletText: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
   glassBadge: { position: 'absolute', top: 9, right: 9, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
 
   statsRow: {
     flexDirection: 'row', alignItems: 'stretch',
-    borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth,
-    marginHorizontal: SP.md, paddingVertical: SP.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: SP.md, paddingBottom: SP.sm,
   },
   statSlot: { flex: 1, justifyContent: 'center' },
-  statCell: { height: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, gap: 2 },
-  statValue: { fontFamily: FONT.bold, fontSize: FS.lg, lineHeight: 24, letterSpacing: -0.3 },
-  statLabel: { fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14 },
-  statDivider: { width: StyleSheet.hairlineWidth, marginVertical: SP.sm },
+  statCell: { height: 64, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, gap: 2 },
+  statValue: { ...TYPE_SCALE.title1, ...TABULAR_NUMS, letterSpacing: -0.8 },
+  statLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, letterSpacing: 0.8, textTransform: 'uppercase' },
+  statDivider: { width: StyleSheet.hairlineWidth, marginVertical: SP.md },
 
   tabs: {
     flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: SP.xs,
+    paddingHorizontal: SP.xs, position: 'relative',
   },
-  tab: { minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: SP.sm, paddingHorizontal: 2 },
-  tabLabel: { fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14 },
-  tabLabelActive: { fontFamily: FONT.semibold },
-  tabStitch: { width: 18, height: 2, borderRadius: 1, marginTop: 2 },
+  tab: { minHeight: 60, alignItems: 'center', justifyContent: 'flex-end', gap: 5, paddingTop: SP.sm, paddingBottom: SP.sm, paddingHorizontal: 2 },
+  tabLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, lineHeight: 17 },
+  tabLabelActive: { fontFamily: FONT.bold },
+  tabIndicator: { position: 'absolute', bottom: -StyleSheet.hairlineWidth, left: 0, height: 3, borderRadius: 2 },
 
-  section: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: SP.sm },
+  section: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: SP.md },
   sectionStitch: { flex: 1, borderTopWidth: 1, borderStyle: 'dashed' },
-  sectionText: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.6, textTransform: 'uppercase' },
+  sectionText: { fontFamily: FONT.bold, fontSize: FS.base, letterSpacing: 2, textTransform: 'uppercase' },
 
   pillWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: SP.md },
-  pillInline: { alignItems: 'center', paddingHorizontal: SP.md },
+  pillInline: { alignItems: 'stretch', paddingHorizontal: SP.md },
   pill: {
-    height: SHOP_PILL_HEIGHT, minWidth: 220, maxWidth: 420, borderRadius: RADIUS.pill,
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingLeft: 6, paddingRight: SP.lg, overflow: 'hidden',
-    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 18, elevation: 8,
+    height: SHOP_PILL_HEIGHT, minWidth: 300, maxWidth: 460, borderRadius: RADIUS.pill,
+    flexDirection: 'row', alignItems: 'center', gap: SP.md,
+    paddingLeft: 7, paddingRight: 7, overflow: 'hidden',
+    shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.5, shadowRadius: 28, elevation: 14,
   },
-  pillIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  pillFull: { maxWidth: undefined, minWidth: 0, alignSelf: 'stretch' },
+  pillIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
   pillCopy: { flexShrink: 1, flexGrow: 1 },
-  pillLabel: { fontFamily: FONT.bold, fontSize: FS.base, lineHeight: 19 },
-  pillSub: { fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14, opacity: 0.72 },
+  pillLabel: { fontFamily: FONT.bold, fontSize: FS.md, lineHeight: 21, letterSpacing: -0.3 },
+  pillSub: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14, opacity: 0.7 },
+  pillArrow: { width: 46, height: 46, borderRadius: 23, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
 
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',

@@ -7,7 +7,7 @@
  * morph, and a count-up number, for later screen-level adoption.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import Animated, {
   interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming,
@@ -89,11 +89,13 @@ export interface FollowMorphButtonProps {
   /** Disables interaction (e.g. while a follow/unfollow request is in flight) without changing the visual state. */
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Additive: label type override so the button can match a surrounding button row. */
+  labelStyle?: StyleProp<TextStyle>;
 }
 
 /** Text/style cross-fades between "Follow" (solid) and "Following" (outline). */
 export function FollowMorphButton({
-  following, onChange, small, followLabel = 'Follow', followingLabel = 'Following', disabled, style,
+  following, onChange, small, followLabel = 'Follow', followingLabel = 'Following', disabled, style, labelStyle,
 }: FollowMorphButtonProps) {
   const { theme } = useAppTheme();
   const progress = useSharedValue(following ? 1 : 0);
@@ -120,7 +122,7 @@ export function FollowMorphButton({
       onPress={() => { hapticToggle(); onChange(!following); }}
     >
       <Animated.View style={[styles.followBtn, small && styles.followBtnSmall, animatedStyle, disabled && styles.followBtnDisabled, style]}>
-        <Animated.Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold }, textStyle]}>
+        <Animated.Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold }, labelStyle, textStyle]}>
           {following ? followingLabel : followLabel}
         </Animated.Text>
       </Animated.View>

@@ -24,9 +24,12 @@ describe('Feed video list virtualization bounds', () => {
     // isFocused is required alongside isActive so a modal pushed on top of
     // the feed (e.g. the comments sheet) pauses playback, and — just as
     // important — coming back re-issues play() rather than leaving the
-    // last decoded frame frozen.
-    expect(feed).toContain('if (isActive && !paused && isScreenFocused) player.play();');
-    expect(feed).toContain('else player.pause();');
+    // last decoded frame frozen. The page's measured size is also required
+    // (pageWidth/pageHeight > 0) so a cell that mounts before it has a real
+    // layout doesn't get stuck paused forever once it is finally measured.
+    expect(feed).toContain('if (isActive && !paused && isScreenFocused && (pageWidth ?? 0) > 0 && (pageHeight ?? 0) > 0) {');
+    expect(feed).toContain('player.play();');
+    expect(feed).toContain('player.pause();');
   });
 
   it('shows the poster immediately, swapping to live video once playback starts (instant start)', () => {

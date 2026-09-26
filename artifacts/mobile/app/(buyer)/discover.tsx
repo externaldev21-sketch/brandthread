@@ -22,9 +22,6 @@
  *                  + api.publicSellers.get() per followed seller (no dedicated
  *                  endpoint exists yet). Signed-in only.
  *
- *   Drops        — publicDrops.list()
- *                  Live and upcoming drops.
- *
  *   Trending     — publicTrending.get(20)
  *                  Engagement-ranked posts. Posts only — no commerce signals.
  *                  Navigates to seller profile via brandId, not to product detail.
@@ -67,8 +64,6 @@ import {
   ClaimedRemainingLabel,
   TimeRemainingLabel,
   UrgencyBar,
-  UpcomingCountdown,
-  LivePulseDot,
   URGENCY_UNITS_THRESHOLD,
   type CommerceSignalData,
 } from '@/components/CommerceSignal';
@@ -78,6 +73,7 @@ import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { hapticLight, hapticMedium, hapticToggle } from '@/lib/haptics';
+import { isPreviewCatalogEnabled, getPreviewCatalog, getPreviewCatalogByDemand } from '@/lib/previewCatalog';
 
 // ─── API-backed types ──────────────────────────────────────────────────────────
 
@@ -94,23 +90,6 @@ interface LiveProduct {
   endsAt?: string | null;
   tags?: string[];
   variants?: Array<{ priceCents?: number }>;
-}
-
-interface LiveDrop {
-  id: string;
-  name: string;
-  type: string;
-  releaseAt?: string | null;
-  endsAt?: string | null;
-  isLive?: boolean;
-  isUpcoming?: boolean;
-  isEnded?: boolean;
-  currentPriceCents?: number | null;
-  claimedUnits?: number;
-  remainingUnits?: number;
-  demandCount?: number | null;
-  seller?: { displayName?: string; brandName?: string };
-  products?: { images?: string[] }[];
 }
 
 /** Pick the best available product image: a background-removed cutout first, else the framed photo. */
@@ -496,83 +475,6 @@ const makeShowcaseStyles = (theme: AppThemePreset) => StyleSheet.create({
   dotActive:      { width: 18, backgroundColor: theme.text },
 });
 
-// ─── Drop row ─────────────────────────────────────────────────────────────────
-
-interface DropRowItem {
-  id: string;
-  dropId: string;
-  brand: string;
-  name: string;
-  imageUri?: string;
-  initials: string;
-  colorHex: string;
-  isLive?: boolean;
-  releaseAt?: string | null;
-  endsAt?: string | null;
-  commerce: CommerceSignalData;
-}
-
-const DropRow = React.memo(function DropRow({ item }: { item: DropRowItem }) {
-  const router = useRouter();
-  const { theme } = useAppTheme();
-  const isUrgentUnits =
-    (item.commerce.remainingUnits ?? 0) > 0 &&
-    (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
-
-  function handlePress() {
-    hapticMedium();
-    router.push((`/buyer-drop-detail?dropId=${encodeURIComponent(item.dropId)}&dropName=${encodeURIComponent(item.name)}`) as never);
-  }
-
-  return (
-    <Card
-      onPress={handlePress}
-      accessibilityLabel={`${item.name} by ${item.brand}${item.isLive ? ', live now' : ''}`}
-      style={[dr.row, { borderColor: item.isLive ? `${theme.accent}55` : theme.border }]}
-    >
-      {item.imageUri ? (
-        <CachedImage source={{ uri: item.imageUri }} style={dr.avatar} contentFit="cover" />
-      ) : (
-        <View style={[dr.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.bold, color: theme.text }]}>{item.initials}</Text>
-        </View>
-      )}
-      <View style={{ flex: 1 }}>
-        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
-        <ClaimedRemainingLabel
-          claimedUnits={item.commerce.claimedUnits ?? 0}
-          remainingUnits={item.commerce.remainingUnits ?? 0}
-          urgent={isUrgentUnits}
-          accent={theme.accent}
-          style={{ marginTop: 3 }}
-        />
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 5 }}>
-        {item.commerce.currentPriceCents != null && (
-          <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.text }]}>{formatCents(item.commerce.currentPriceCents)}</Text>
-        )}
-        {item.isLive ? (
-          <View style={dr.liveRow}>
-            <LivePulseDot color={theme.accent} />
-            <Text style={[TYPE_SCALE.caption, { fontFamily: FONT.semibold, color: theme.accent }]}>Live now</Text>
-          </View>
-        ) : item.releaseAt ? (
-          <UpcomingCountdown releaseAt={item.releaseAt} />
-        ) : null}
-        {!!item.endsAt && item.isLive && (
-          <TimeRemainingLabel endsAt={item.endsAt} accent={theme.accent} />
-        )}
-      </View>
-    </Card>
-  );});
-
-const dr = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
-  avatar:   { width: 52, height: 52, borderRadius: RADII.card, overflow: 'hidden' },
-  liveRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-});
-
 // ─── Trending post row ────────────────────────────────────────────────────────
 // Trending items are engagement-ranked posts. They carry no productId and no
 // product demand fields. We show brand/caption, navigate to seller profile via
@@ -901,10 +803,6 @@ export default function DiscoverScreen() {
   const [followedLoading, setFollowedLoading] = useState(true);
   const [followedError,   setFollowedError]   = useState<string | null>(null);
 
-  const [dropsItems,   setDropsItems]   = useState<DropRowItem[]>([]);
-  const [dropsLoading, setDropsLoading] = useState(true);
-  const [dropsError,   setDropsError]   = useState<string | null>(null);
-
   const [trendingItems,   setTrendingItems]   = useState<TrendingRowItem[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(true);
   const [trendingError,   setTrendingError]   = useState<string | null>(null);
@@ -918,7 +816,15 @@ export default function DiscoverScreen() {
     setHighDemandError(null);
     try {
       const rows = await api.publicProducts.highDemand(6);
-      const safe = Array.isArray(rows) ? rows : [];
+      let safe = Array.isArray(rows) ? rows : [];
+      // Nothing testable without real sellers yet: in preview/dev only, seed
+      // from the bundled preview catalog so this rail has real-looking data
+      // to browse. Never used when the real API actually returned rows, and
+      // never compiled into a production build (isPreviewCatalogEnabled is
+      // hard-gated on __DEV__).
+      if (safe.length === 0 && isPreviewCatalogEnabled()) {
+        safe = getPreviewCatalogByDemand(6);
+      }
       setHighDemandItems(safe.map((p: any): EditorialTileItem => {
         const fallbackPrice = (p.variants ?? [])[0]?.priceCents ?? null;
         const remaining = typeof p.remainingUnits === 'number' ? p.remainingUnits : 0;
@@ -948,7 +854,10 @@ export default function DiscoverScreen() {
     setForYouError(null);
     try {
       const rows = await api.publicProducts.list({ limit: 8 });
-      const safe: LiveProduct[] = Array.isArray(rows) ? rows : [];
+      let safe: LiveProduct[] = Array.isArray(rows) ? rows : [];
+      if (safe.length === 0 && isPreviewCatalogEnabled()) {
+        safe = getPreviewCatalog();
+      }
       setForYouItems(safe.map((row, i): ProductCardItem => {
         const fallbackPrice = (row.variants ?? [])[0]?.priceCents ?? null;
         return {
@@ -1020,51 +929,6 @@ export default function DiscoverScreen() {
     }
   }, [api, isSignedIn]);
 
-  // ─ Fetch Drops ────────────────────────────────────────────────────────
-  const fetchDrops = useCallback(async () => {
-    setDropsLoading(true);
-    setDropsError(null);
-    try {
-      const rows = await (api as any).publicDrops?.list?.() ?? [];
-      const safe: LiveDrop[] = Array.isArray(rows)
-        ? rows
-        : Array.isArray((rows as any)?.drops) ? (rows as any).drops : [];
-      const filtered = safe
-        .filter(d => !d.isEnded)
-        .sort((a, b) => (b.isLive ? 1 : 0) - (a.isLive ? 1 : 0))
-        .slice(0, 6);
-      setDropsItems(filtered.map((d): DropRowItem => {
-        const firstImg = (d.products ?? []).flatMap(p => p.images ?? []).find(Boolean);
-        const sellerName = d.seller?.brandName ?? d.seller?.displayName ?? 'Brand';
-        return {
-          id:        d.id,
-          dropId:    d.id,
-          brand:     sellerName,
-          name:      d.name,
-          imageUri:  firstImg,
-          initials:  sellerName.slice(0, 2).toUpperCase(),
-          colorHex:  theme.accent,
-          isLive:    d.isLive,
-          releaseAt: d.releaseAt,
-          endsAt:    d.endsAt,
-          commerce: {
-            currentPriceCents: d.currentPriceCents ?? null,
-            claimedUnits:      d.claimedUnits  ?? 0,
-            remainingUnits:    d.remainingUnits ?? 0,
-            demandCount:       d.demandCount   ?? null,
-            endsAt:            d.endsAt,
-          },
-        };
-      }));
-    } catch {
-      // Do NOT reset dropsItems — keep previous data visible if available
-      setDropsError('Could not load drops. Tap to retry.');
-    } finally {
-      setDropsLoading(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme.accent]);
-
   // ─ Fetch Trending posts ───────────────────────────────────────────────
   // publicTrending.get(limit: number) → { trending: TrendingItem[] }
   // TrendingItem = post: id, rank, brand, brandId, caption.
@@ -1104,16 +968,15 @@ export default function DiscoverScreen() {
     fetchHighDemand();
     fetchProducts();
     fetchFollowed();
-    fetchDrops();
     fetchTrending();
-  }, [fetchHighDemand, fetchProducts, fetchFollowed, fetchDrops, fetchTrending]);
+  }, [fetchHighDemand, fetchProducts, fetchFollowed, fetchTrending]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     hapticLight();
-    Promise.all([fetchHighDemand(), fetchProducts(), fetchFollowed(), fetchDrops(), fetchTrending()])
+    Promise.all([fetchHighDemand(), fetchProducts(), fetchFollowed(), fetchTrending()])
       .finally(() => setRefreshing(false));
-  }, [fetchHighDemand, fetchProducts, fetchFollowed, fetchDrops, fetchTrending]);
+  }, [fetchHighDemand, fetchProducts, fetchFollowed, fetchTrending]);
 
   return (
     <ScrollView
@@ -1270,36 +1133,6 @@ export default function DiscoverScreen() {
           )}
         </ResponsiveContainer>
       )}
-
-      {/* ─ Drops ─ */}
-      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
-        <EditorialSectionHead
-          kicker="Don't miss out"
-          title="Drops"
-          sub={dropsItems.some(d => d.isLive) ? 'Live now and coming up' : 'Coming up'}
-          action="See all"
-          onAction={() => router.push('/buyer-drops' as never)}
-          theme={theme}
-        />
-      </ResponsiveContainer>
-      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-        <View style={{ gap: 10 }}>
-          {dropsLoading ? (
-            <ListSkeleton rows={3} />
-          ) : dropsError ? (
-            <SectionError message={dropsError} onRetry={fetchDrops} />
-          ) : dropsItems.length === 0 ? (
-            <EmptyState
-              icon="calendar"
-              title="No upcoming drops right now"
-              description="Follow sellers to get notified the moment a new drop goes live."
-              action={{ label: 'See all drops', onPress: () => router.push('/buyer-drops' as never) }}
-            />
-          ) : (
-            dropsItems.map(item => <DropRow key={item.id} item={item} />)
-          )}
-        </View>
-      </ResponsiveContainer>
 
       {/* ─ Trending — engagement-ranked posts, separate from High Demand ─ */}
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>

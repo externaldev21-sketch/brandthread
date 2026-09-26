@@ -94,6 +94,7 @@ export function Button({
       onPressOut={onPressOut}
       testID={testID}
       style={[fullWidth && styles.fullWidth]}
+      android_ripple={{ color: `${palette.foreground}33`, borderless: false }}
     >
       <Animated.View
         style={[

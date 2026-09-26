@@ -4,7 +4,9 @@
  * theme's hero gradient with the Brandthread thread drawn across it.
  *
  * Playback only runs while `active` (screen focused, hero on screen, Reduce
- * Motion off) so a profile never keeps decoding video off-screen.
+ * Motion off) so a profile never keeps decoding video off-screen. A profile
+ * cover video uses the same path (always muted, looping, poster first); with
+ * `posterOnly` (Reduce Motion / data saver) no player is created at all.
  */
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -19,16 +21,18 @@ export function ProfileHeroMedia({
   posterUri,
   active,
   height,
+  posterOnly = false,
 }: {
   videoUri?: string | null;
   posterUri?: string | null;
   active: boolean;
   height: number;
+  posterOnly?: boolean;
 }) {
   const { theme } = useAppTheme();
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.card }]} pointerEvents="none">
-      {videoUri ? (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.card }]} pointerEvents="none" testID="profile-hero-media">
+      {videoUri && !(posterOnly && posterUri) ? (
         <HeroVideo uri={videoUri} posterUri={posterUri ?? null} active={active} />
       ) : posterUri ? (
         <CachedImage source={{ uri: posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />

@@ -1204,6 +1204,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       klaviyoSync:        () => post<any>('/api/integrations/klaviyo/sync', {}),
       klaviyoDisconnect:  () => del<any>('/api/integrations/klaviyo'),
     },
+    shopify: {
+      status:        () => get<any>('/api/shopify/status'),
+      connectStart:  (shopDomain: string, purpose: 'import' | 'fulfillment') =>
+        post<{ authorizeUrl: string }>('/api/shopify/connect/start', { shopDomain, purpose }),
+      connectCustomApp: (shopDomain: string, accessToken: string, purpose: 'import' | 'fulfillment') =>
+        post<any>('/api/shopify/connect/custom-app', { shopDomain, accessToken, purpose }),
+      disconnect:    () => post<any>('/api/shopify/disconnect', {}),
+      fulfillmentEnable:  () => post<any>('/api/shopify/fulfillment/enable', {}),
+      fulfillmentDisable: () => post<any>('/api/shopify/fulfillment/disable', {}),
+      products:      (pageInfo?: string) =>
+        get<{ products: Array<{ shopifyProductId: string; title: string; image: string | null; variantCount: number; alreadyImported: boolean }>; nextPageInfo: string | null }>(
+          `/api/shopify/products${pageInfo ? `?pageInfo=${encodeURIComponent(pageInfo)}` : ''}`,
+        ),
+      importProducts: (shopifyProductIds: string[], publishStatus: 'draft' | 'active') =>
+        post<{ imported: number; updated: number; skipped: Array<{ shopifyProductId: string; reason: string }> }>(
+          '/api/shopify/products/import', { shopifyProductIds, publishStatus },
+        ),
+    },
     buyer: {
       addresses: {
         list:   () => get<any[]>('/api/buyer/addresses'),
@@ -1242,10 +1260,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             clientIdempotencyKey?: string;
             /** One-time rewards token created by /api/loyalty/redeem. */
             loyaltyToken?: string;
-            /** THREAD CASH HOOK POINT: one-time token from /api/thread-cash/redeem.
-             *  The server currently rejects any request that includes this (see
-             *  routes/buyer.ts) until the checkout money flow can fund it without
-             *  changing seller payout — see docs/payments/thread-cash-checkout-todo.md. */
+            /** One-time token from /api/thread-cash/redeem. Discounts the card
+             *  charge only (never a full payment method) — see
+             *  docs/payments/thread-cash-checkout-todo.md. In-stock (destination
+             *  charge) checkouts only; the server rejects it for preorders. */
             threadCashToken?: string;
             /** Seller discount code, validated fresh server-side and applied to this charge. */
             discountCode?: string;
@@ -1427,6 +1445,33 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ recorded: true }>('/api/call/events', body),
     },
     /** Unauthenticated public endpoints — no Authorization header needed. */
+    /**
+     * Profile cover video (buyer + seller). The server enforces ≤30s and one
+     * change per 24h (setting and removing both count); a 429 ApiError's
+     * message is the user-facing "You can change your cover again in X hours".
+     */
+    profileCover: {
+      get: () => freshGet<{
+        coverVideoUrl: string | null;
+        coverPosterUrl: string | null;
+        coverVideoUpdatedAt: string | null;
+        canChange: boolean;
+        retryAfterHours?: number;
+        message?: string;
+      }>('/api/profile/cover-video'),
+      upload: (uri: string, mimeType?: string | null, trim?: { start: number; duration: number } | null) =>
+        uploadVideo<{ coverVideoUrl: string; coverPosterUrl: string; coverVideoUpdatedAt: string }>(
+          trim
+            ? `/api/profile/cover-video?trimStart=${encodeURIComponent(trim.start.toFixed(2))}&trimDuration=${encodeURIComponent(trim.duration.toFixed(2))}`
+            : '/api/profile/cover-video',
+          { uri, mimeType },
+          getToken,
+          getCacheScope,
+        ),
+      remove: () => del<{ coverVideoUrl: null; coverPosterUrl: null; coverVideoUpdatedAt: string | null }>('/api/profile/cover-video'),
+      coachmark: () => freshGet<{ seen: boolean; hasCover: boolean }>('/api/profile/cover-coachmark'),
+      markCoachmarkSeen: () => post<{ seen: true }>('/api/profile/cover-coachmark/seen', {}),
+    },
     publicProducts: {
       list: (opts: { limit?: number; category?: string; tag?: string } = {}) => {
         const params = new URLSearchParams();
@@ -2002,6 +2047,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       update: (settings: { dmPrivacy?: 'requests' | 'followers_only' }) =>
         patch<{ dmPrivacy: 'requests' | 'followers_only' }>('/api/auth/privacy', settings),
     },
+    /**
+     * Server-side "seen" state for the buyer "Watching Threads" gesture coach
+     * mark — source of truth across reinstalls/devices. See
+     * lib/feedGestureGuideStorage.ts for the local cache + fallback logic.
+     */
+    feedGesturesTip: {
+      get: () => get<{ seenVersion: number }>('/api/auth/feed-gestures-tip'),
+      markSeen: (version: number) =>
+        patch<{ seenVersion: number }>('/api/auth/feed-gestures-tip', { version }),
+    },
     /** Public seller storefront — profile + products + posts */
     publicSellers: {
       get: (sellerId: string) =>
@@ -2552,12 +2607,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<ThreadCashCheckInResult>('/api/thread-cash/check-in', body),
       history: (limit = 50) =>
         get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
-      redeem: (body: { amountCents: number }) =>
+      redeem: (body: { amountCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body),
-      send: (body: { recipientId: string; conversationId?: string; amountCents: number }) =>
+      send: (body: { recipientId: string; conversationId?: string; note?: string; amountCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; transferId: string }>('/api/thread-cash/send', body),
       claim: (body: { transferId: string }) =>
         post<{ ok: boolean; amountCents: number }>('/api/thread-cash/claim', body),
+      cancel: (body: { transferId: string }) =>
+        post<{ ok: boolean }>('/api/thread-cash/cancel', body),
     },
     /** Public trending feed — no auth required. */
     publicTrending: {

@@ -32,6 +32,11 @@ import {
   releaseLoyaltyRedemption,
 } from "./loyalty";
 import {
+  consumeThreadCashRedemption,
+  releaseThreadCashRedemption,
+} from "../lib/threadCash/wallet";
+import { applyThreadCashSellerTopup } from "../lib/threadCash/checkoutTopup";
+import {
   isOrderConfirmationEligibleStatus,
   sendOrderConfirmationEmail,
 } from "../lib/brandthreadEmail";
@@ -58,6 +63,7 @@ import {
 } from "../lib/money/escrow";
 import { postLedgerTransaction } from "../lib/money/ledger";
 import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
+import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -580,6 +586,11 @@ export async function handleCheckoutPaid(
     } catch (err) {
       logger.error({ err, orderId: existing.id }, "Order confirmation email delivery failed");
     }
+    try {
+      await applyThreadCashSellerTopup(stripe, existing.id);
+    } catch (err) {
+      logger.error({ err, orderId: existing.id }, "Thread Cash seller top-up failed");
+    }
     logger.info({ stripeSessionId: sessionId, orderId: existing.id }, "Order already exists for checkout session; skipping");
     return;
   }
@@ -662,6 +673,13 @@ export async function handleCheckoutPaid(
   const totalCents    = typeof session.amount_total === "number" ? session.amount_total : subtotalCents;
   const totalDetails = session.total_details ?? {};
   const loyaltyDiscountCents = Math.max(0, csRecord.loyaltyDiscountCents ?? 0);
+  // Thread Cash discounts the buyer's Stripe charge (folded into the same
+  // combined coupon as loyalty/discount code — see routes/buyer.ts) but must
+  // never reduce the platform-fee/seller-payout basis. It is carved back out
+  // of `stripeDiscountCents` below before that feeds splitOrder(), and the
+  // resulting gap is topped up separately (applyThreadCashSellerTopup, for
+  // destination charges only — see lib/threadCash/checkoutTopup.ts).
+  const threadCashAppliedCents = Math.max(0, csRecord.threadCashDiscountCents ?? 0);
   const taxCents = Number.isInteger(totalDetails.amount_tax)
     ? Math.max(0, totalDetails.amount_tax)
     : 0;
@@ -752,6 +770,7 @@ export async function handleCheckoutPaid(
         grossChargedCents: totalCents,
         paidAt: successfulPaymentAt,
         discountAmountCents: stripeDiscountCents,
+        threadCashAppliedCents: oversoldItems.length === 0 ? threadCashAppliedCents : 0,
         stripePaymentIntentId:   piId,
         stripeCheckoutSessionId: sessionId,
         ...(shippingAddress && { shippingAddress }),
@@ -764,7 +783,10 @@ export async function handleCheckoutPaid(
     // transaction as the order row (lib/money/escrow.ts).
     const split = splitOrder({
       subtotalCents,
-      discountCents: Math.min(stripeDiscountCents, subtotalCents),
+      // Thread Cash must never reduce the platform-fee / seller-payout
+      // basis — only loyalty and the discount code do that (see comment
+      // above threadCashAppliedCents).
+      discountCents: Math.min(Math.max(0, stripeDiscountCents - threadCashAppliedCents), subtotalCents),
       shippingCents,
       taxCents,
       grossCents: totalCents,
@@ -820,6 +842,27 @@ export async function handleCheckoutPaid(
           tx,
           buyerId,
           csRecord.loyaltyToken,
+          csRecord.id,
+        );
+      }
+    }
+
+    // Same idempotency boundary as the loyalty redemption above: a webhook
+    // retry can never spend the same Thread Cash token twice.
+    if (csRecord.threadCashToken && buyerId) {
+      if (oversoldItems.length === 0) {
+        await consumeThreadCashRedemption(
+          tx,
+          buyerId,
+          csRecord.threadCashToken,
+          csRecord.id,
+          order.id,
+        );
+      } else {
+        await releaseThreadCashRedemption(
+          tx,
+          buyerId,
+          csRecord.threadCashToken,
           csRecord.id,
         );
       }
@@ -984,6 +1027,22 @@ export async function handleCheckoutPaid(
         await sendOrderConfirmationForOrder(createdOrderId);
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Order confirmation email delivery failed");
+      }
+
+      // Fulfillment via Shopify (opt-in): forward this paid order to the
+      // seller's Shopify store if they've linked products and turned it on.
+      // Fire-and-forget — a failure here never blocks the paid order itself;
+      // forwardOrderToShopifyIfLinked marks its own row 'failed' for retry.
+      setImmediate(() => {
+        forwardOrderToShopifyIfLinked(createdOrderId!).catch((err) => {
+          logger.error({ err, orderId: createdOrderId }, "Shopify order forwarding failed");
+        });
+      });
+
+      try {
+        await applyThreadCashSellerTopup(stripe, createdOrderId);
+      } catch (err) {
+        logger.error({ err, orderId: createdOrderId }, "Thread Cash seller top-up failed");
       }
     }
 

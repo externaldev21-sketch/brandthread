@@ -11,7 +11,12 @@ import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP } from '@/lib/theme';
 
-export { feedGestureGuideKey, hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
+export {
+  FEED_GESTURES_TIP_VERSION,
+  feedGestureGuideKey,
+  hasSeenFeedGestureGuide,
+  markFeedGestureGuideSeen,
+} from '@/lib/feedGestureGuideStorage';
 
 // ─── Animated gesture glyphs — simple line-art hand cues, no image assets ────
 

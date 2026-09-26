@@ -154,7 +154,7 @@ export interface ConversationParticipant {
 
 export type MessageAttachmentType =
   | 'image' | 'video' | 'voice'
-  | 'product' | 'post' | 'order' | 'profile';
+  | 'product' | 'post' | 'order' | 'profile' | 'thread_cash';
 
 export interface MessageAttachment {
   type: MessageAttachmentType;

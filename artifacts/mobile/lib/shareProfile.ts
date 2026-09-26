@@ -42,3 +42,51 @@ export function buildCanonicalProfileUrl(rawUsername: string | null | undefined)
 export function isValidNormalizedUsername(username: string): boolean {
   return /^[a-z0-9_]{3,30}$/.test(username);
 }
+
+export type ShareLinkResult = 'shared' | 'copied' | 'unavailable';
+
+/**
+ * Share a profile link through whatever the platform actually supports:
+ *  - native (iOS/Android): the system share sheet (`Share.share`), link included;
+ *  - web with the Web Share API (mobile Safari/Chrome): `navigator.share`;
+ *  - web without it (most desktop browsers): copy the link to the clipboard.
+ * react-native-web's `Share.share` rejects when `navigator.share` is missing,
+ * so web never calls it directly. A user cancelling the sheet is not an error.
+ * Dependencies are injected so this stays free of react-native imports.
+ */
+export async function shareLinkWithFallback({
+  url,
+  message,
+  platformOS,
+  nativeShare,
+  webNavigator,
+}: {
+  url: string;
+  message: string;
+  platformOS: string;
+  nativeShare: (content: { message: string; url?: string; title?: string }) => Promise<unknown>;
+  webNavigator?: {
+    share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
+    clipboard?: { writeText?: (text: string) => Promise<void> };
+  } | null;
+}): Promise<ShareLinkResult> {
+  if (platformOS !== 'web') {
+    // iOS renders `url` as a rich link; Android only reads `message`.
+    await nativeShare(platformOS === 'ios' ? { message, url } : { message: `${message} ${url}` });
+    return 'shared';
+  }
+  if (webNavigator?.share) {
+    try {
+      await webNavigator.share({ title: message, text: message, url });
+      return 'shared';
+    } catch (error) {
+      if ((error as { name?: string } | null)?.name === 'AbortError') return 'shared';
+      // Fall through to copying when the browser refuses (e.g. not a user gesture).
+    }
+  }
+  if (webNavigator?.clipboard?.writeText) {
+    await webNavigator.clipboard.writeText(url);
+    return 'copied';
+  }
+  return 'unavailable';
+}
