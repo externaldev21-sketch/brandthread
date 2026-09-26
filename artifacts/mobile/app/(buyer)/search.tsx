@@ -3,7 +3,6 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Platform, useWindowDimensions, Animated as RNAnimated, Pressable,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,7 +15,7 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
-import { GridSkeleton, ResponsiveContainer, useGridColumns } from '@/components/layout';
+import { GridSkeleton, Header, ResponsiveContainer, useGridColumns } from '@/components/layout';
 import { Chip, ListRow, SkeletonBlock, ThemedRefreshControl } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
@@ -38,7 +37,6 @@ type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
 type VideoResult = Extract<SearchResult, { kind: 'video' }>;
 
 export default function SearchScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   // Deep links may still pass ?q=; the tab bar's inline field owns the text.
   const { q: linkQuery } = useLocalSearchParams<{ q?: string }>();
@@ -73,7 +71,6 @@ export default function SearchScreen() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [filters, setFilters] = useState<SearchFilters>({});
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
   const recentKey = `bt:buyer-search-recent:${userId ?? 'anon'}`;
   const trimmedQuery = query.trim();
 
@@ -628,25 +625,22 @@ export default function SearchScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
+      <Header
+        title="Search"
+        subtitle={trimmedQuery.length === 0
+          ? 'Brands, pieces and people on Brandthread'
+          : `Showing matches for "${trimmedQuery}"`}
+        largeTitle
+        showBack={false}
+      />
       <ScrollView
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingTop: topPad + 12 }}
         refreshControl={
           <ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        <AnimatedEntrance>
-          <View style={styles.titleBlock}>
-            <Text style={[styles.title, { color: fg }]} accessibilityRole="header">Search</Text>
-            <Text style={[styles.subtitle, { color: muted }]}>
-              {trimmedQuery.length === 0
-                ? 'Brands, pieces and people on Brandthread'
-                : `Showing matches for "${trimmedQuery}"`}
-            </Text>
-          </View>
-        </AnimatedEntrance>
-
         {trimmedQuery.length === 0 ? (
           <View testID="buyer-search-empty-state" accessibilityLabel="Search is empty">
             {recentSearches.length > 0 && (

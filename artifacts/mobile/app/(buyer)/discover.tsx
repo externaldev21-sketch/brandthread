@@ -50,7 +50,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
-import { FONT, SP, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
+import { COMP, FONT, SP, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -820,7 +820,10 @@ const dh = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   wordmark: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 20, letterSpacing: -0.4 },
-  glassBtn: { width: 40, height: 40 },
+  // Same 44pt touch target as every other page's header action buttons
+  // (this hero header is a bespoke full-bleed treatment, like the feed and
+  // profile hero, but its icon buttons still match the app-wide size).
+  glassBtn: { width: COMP.iconBtn, height: COMP.iconBtn },
   topBar: {
     marginTop: SP.lg,
     flexDirection: 'row', alignItems: 'center', gap: 10,

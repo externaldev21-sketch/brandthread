@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -27,20 +27,25 @@ const COLLAPSE_DISTANCE = LARGE_TITLE_HEIGHT - COMPACT_HEIGHT;
  */
 export function Header({
   title,
+  subtitle,
   largeTitle,
   onBack,
   showBack = true,
   actions = [],
   scrollY,
   transparent = false,
+  belowTitle,
 }: {
   title: string;
+  subtitle?: string;
   largeTitle?: boolean;
   onBack?: () => void;
   showBack?: boolean;
   actions?: HeaderAction[];
   scrollY?: Animated.Value;
   transparent?: boolean;
+  /** Extra chrome rendered directly under the large title at the same gutter (search field, filter row) — root pages only. */
+  belowTitle?: React.ReactNode;
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -107,8 +112,11 @@ export function Header({
       {largeTitle && (
         <Animated.View style={[styles.largeTitleWrap, { opacity: largeOpacity }]}>
           <Text numberOfLines={1} style={[styles.largeTitle, { color: theme.text }]}>{title}</Text>
+          {subtitle && <Text numberOfLines={2} style={[styles.subtitle, { color: theme.muted }]}>{subtitle}</Text>}
         </Animated.View>
       )}
+
+      {belowTitle && <View style={styles.belowTitle}>{belowTitle}</View>}
 
       <Animated.View style={[styles.hairline, { backgroundColor: theme.border, opacity: borderOpacity }]} />
     </View>
@@ -119,6 +127,15 @@ export function Header({
 export function useHeaderScrollY() {
   return useRef(new Animated.Value(0)).current;
 }
+
+/**
+ * `Header` under its canonical page-header name. Tab-root pages (Discover,
+ * Messages, Search, Orders, Products, Settings, Dashboard, …) render this
+ * with `largeTitle showBack={false}` for identical title size/weight/
+ * letter-spacing/top-offset everywhere; pushed screens render it with the
+ * default `showBack`. One component, two conventions — see file header.
+ */
+export const PageHeader = Header;
 
 const styles = StyleSheet.create({
   wrap: {
@@ -152,14 +169,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: GUTTER,
     paddingTop: SP.xs,
     paddingBottom: SP.md,
-    position: Platform.OS === 'web' ? 'relative' : 'absolute',
-    top: COMPACT_HEIGHT,
-    left: 0,
-    right: 0,
   },
   largeTitle: {
     fontFamily: FONT.bold,
     fontSize: FS.h2,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    marginTop: SP.xs,
+  },
+  belowTitle: {
+    paddingHorizontal: GUTTER,
+    paddingBottom: SP.md,
   },
   hairline: {
     height: StyleSheet.hairlineWidth,

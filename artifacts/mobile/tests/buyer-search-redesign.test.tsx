@@ -205,6 +205,12 @@ vi.mock('@/components/layout', () => ({
   GridSkeleton: () => React.createElement('GridSkeleton', {}),
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => React.createElement('View', {}, children),
   useGridColumns: () => 2,
+  Header: ({ title, subtitle }: any) => React.createElement(
+    'View',
+    { testID: 'search-header' },
+    React.createElement('Text', {}, title),
+    subtitle ? React.createElement('Text', {}, subtitle) : null,
+  ),
 }));
 
 vi.mock('@/contexts/BuyerSearchContext', () => ({

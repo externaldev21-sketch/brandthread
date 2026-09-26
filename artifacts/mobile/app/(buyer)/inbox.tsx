@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { ListSkeleton } from '@/components/layout';
+import { Header, ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -25,7 +25,6 @@ import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 import { FollowerAvatarCard } from '@/components/inbox/FollowerAvatarCard';
-import { IconButton } from '@/components/ui/IconButton';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 
@@ -723,23 +722,13 @@ export default function InboxScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: SCREEN_BG }]}>
-      {/* Header — big bold large-title style, no back arrow */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm, paddingHorizontal: gutter }]}>
-        <Text style={[s.headerTitle, { color: theme.text }]}>Messages</Text>
-        <IconButton
-          name="edit-3"
-          size={22}
-          variant="filled"
-          color={theme.text}
-          onPress={openCompose}
-          accessibilityLabel="New message"
-          testID="inbox-header-compose"
-        />
-      </View>
-
-      {/* Search — always available, not gated behind a tab */}
-      {!loading && (
-        <View style={{ paddingHorizontal: gutter }}>
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
+      <Header
+        title="Messages"
+        largeTitle
+        showBack={false}
+        actions={[{ icon: 'edit-3', onPress: openCompose, accessibilityLabel: 'New message' }]}
+        belowTitle={!loading ? (
           <View style={[s.searchRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
             <Feather name="search" size={16} color={theme.muted} />
             <TextInput
@@ -763,8 +752,8 @@ export default function InboxScreen() {
               </PressableScale>
             )}
           </View>
-        </View>
-      )}
+        ) : undefined}
+      />
 
       {/* Conversations list */}
       {loading ? (
@@ -976,22 +965,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   },
   composeAvatar: {
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
-  },
-
-  // Header — bold, large-title treatment (not a small centered header)
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: SP.md,
-    backgroundColor: 'transparent',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: FS.h1,
-    fontFamily: FONT.bold,
-    letterSpacing: -0.5,
-    textAlign: 'left',
   },
 
   // Followers rail
