@@ -129,17 +129,35 @@ buyerRouter.get("/", async (req, res) => {
   return res.json(rows.map((row, index) => adapt(row, images[index])));
 });
 
+/**
+ * Cheap enough to short-poll every ~1.5s while a screen is focused (bell
+ * badge, Activity Center) — the codebase has no websocket/SSE layer, so this
+ * plus ETag/304 is how "real-time" delivery is approximated. `latestId`
+ * changes on every new event (read/dismiss don't touch it), so the client
+ * can tell "count changed" apart from "something new arrived" if it wants to.
+ */
 buyerRouter.get("/unread-count", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const [row] = await db
-    .select({ count: sql<number>`cast(count(*) as int)` })
-    .from(notificationsFeed)
-    .where(and(
-      eq(notificationsFeed.userId, userId),
-      eq(notificationsFeed.isRead, false),
-      eq(notificationsFeed.isMuted, false),
-    ));
-  return res.json({ count: row?.count ?? 0 });
+  const [[countRow], [latestRow]] = await Promise.all([
+    db.select({ count: sql<number>`cast(count(*) as int)` })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, userId),
+        eq(notificationsFeed.isRead, false),
+        eq(notificationsFeed.isMuted, false),
+      )),
+    db.select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(eq(notificationsFeed.userId, userId))
+      .orderBy(desc(notificationsFeed.createdAt), desc(notificationsFeed.id))
+      .limit(1),
+  ]);
+  const count = countRow?.count ?? 0;
+  const etag = `"${count}-${latestRow?.id ?? "none"}"`;
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("ETag", etag);
+  if (req.headers["if-none-match"] === etag) { res.status(304).end(); return; }
+  return res.json({ count, latestId: latestRow?.id ?? null });
 });
 
 buyerRouter.patch("/read-all", async (req, res) => {

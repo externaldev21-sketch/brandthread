@@ -21,7 +21,6 @@ import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
@@ -58,6 +57,7 @@ import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { FeedGestureGuide } from '@/components/FeedGestureGuide';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
+import { getCachedFeedPosts, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
 import {
@@ -1199,89 +1199,126 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
   );
 }
 
-// ─── Shop CTA — an editorial "shop the look" card, elegantly integrated ──────
-// above the creator/caption block rather than a bare floating pill. Carries a
-// product thumb, an eyebrow label, the product name and price, and a chevron
-// affordance — reads as a merchandising surface, not a slapped-on badge. A
-// slow shimmer sweep plus a spring pop-in (on first mount, i.e. whenever the
-// page becomes the active cell) give it presence without being noisy.
+// ─── Shop side tab — a collapsed tab flush against the left screen edge ─────
+// (the right edge is the action rail) that glides out into a full card on
+// tap, rather than an always-visible price pill sitting over the video.
+// Fully solid/flat (no BlurView/backdrop-filter, no shimmer): the earlier
+// pill's frosted-glass background re-sampled the moving video behind it
+// every frame during a swipe, which read as a shimmer/glitch — this has no
+// live-sampling background at all, only a fixed solid fill. Collapsed by
+// default with zero mount/entrance animation (only a user tap ever starts
+// the expand/collapse spring), and force-collapses (no animation skipped —
+// this one transition is allowed since it's a direct response to the cell
+// leaving, matching "collapses back on swiping to the next video" in spec)
+// when the cell stops being active, so it never carries an expanded state
+// into a swipe.
+const SHOP_TAB_COLLAPSE_MS = 4000;
 
-function ShopPill({
-  tag, extraCount, onPress,
+function ShopSideTab({
+  tag, extraCount, onPress, isActive,
 }: {
   tag: SpotlightProductTag;
   extraCount: number;
   onPress: () => void;
+  isActive: boolean;
 }) {
-  const { theme } = useAppTheme();
-  const { width: windowWidth } = useWindowDimensions();
-  const shimmer = useRef(new Animated.Value(0)).current;
-  const pop = useRef(new Animated.Value(0)).current;
+  const [expanded, setExpanded] = useState(false);
+  const anim = useRef(new Animated.Value(0)).current;
+  const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  React.useEffect(() => {
-    Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 9 }).start();
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.delay(1600),
-        Animated.timing(shimmer, { toValue: 1, duration: 1000, useNativeDriver: true }),
-        Animated.timing(shimmer, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [shimmer, pop]);
+  const clearCollapseTimer = useCallback(() => {
+    if (collapseTimer.current) {
+      clearTimeout(collapseTimer.current);
+      collapseTimer.current = null;
+    }
+  }, []);
+
+  const collapse = useCallback(() => {
+    clearCollapseTimer();
+    setExpanded(false);
+    Animated.spring(anim, { toValue: 0, useNativeDriver: false, speed: 18, bounciness: 0 }).start();
+  }, [anim, clearCollapseTimer]);
+
+  const expand = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setExpanded(true);
+    Animated.spring(anim, { toValue: 1, useNativeDriver: false, speed: 18, bounciness: 0 }).start();
+    clearCollapseTimer();
+    collapseTimer.current = setTimeout(collapse, SHOP_TAB_COLLAPSE_MS);
+  }, [anim, clearCollapseTimer, collapse]);
+
+  useEffect(() => {
+    if (!isActive) collapse();
+    // Only reacting to the cell becoming inactive — becoming active must
+    // never itself start an animation (see the module comment above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
+
+  useEffect(() => () => clearCollapseTimer(), [clearCollapseTimer]);
+
+  const width = anim.interpolate({ inputRange: [0, 1], outputRange: [28, 218] });
+  const collapsedOpacity = anim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [1, 0, 0] });
+  const expandedOpacity = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 0, 1] });
+  const expandedTranslate = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [8, 8, 0] });
 
   return (
-    <Animated.View
-      style={{
-        opacity: pop,
-        transform: [
-          { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) },
-          { translateY: pop.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
-        ],
-      }}
-    >
-      <TouchableOpacity
-        style={[styles.shopPill, { borderColor: `${theme.accent}55` }]}
-        activeOpacity={0.85}
-        onPress={onPress}
+    <>
+      {/* Tapping anywhere else on the video collapses the expanded card —
+          rendered only while expanded, behind the tab itself in z-order. */}
+      {expanded && (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={collapse}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
+      )}
+      <Animated.View
+        style={[styles.shopSideTab, { width }]}
         accessibilityRole="button"
-        accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
+        accessibilityLabel={
+          expanded
+            ? `Shop ${tag.productName}, ${formatCents(tag.priceCents)}`
+            : 'Shop this video'
+        }
       >
-        <BlurView intensity={42} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={styles.shopPillThumb}>
-          {tag.imageUri ? (
-            <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-          ) : (
-            <Feather name="shopping-bag" size={13} color="#111111" />
-          )}
-        </View>
-        <Text style={[styles.shopPillName, { maxWidth: windowWidth * 0.6 }]} numberOfLines={1}>
-          {tag.productName}
-        </Text>
-        <Text style={styles.shopPillPrice} numberOfLines={1}>
-          {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
-        </Text>
-        <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.75)" />
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.shopPillShimmer,
-            {
-              opacity: shimmer.interpolate({ inputRange: [0, 0.15, 0.85, 1], outputRange: [0, 0.45, 0.45, 0] }),
-              transform: [{ translateX: shimmer.interpolate({ inputRange: [0, 1], outputRange: [-140, 220] }) }],
-            },
-          ]}
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={0.85}
+          onPress={expanded ? onPress : expand}
         >
-          <LinearGradient
-            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-      </TouchableOpacity>
-    </Animated.View>
+          <Animated.View
+            pointerEvents={expanded ? 'none' : 'auto'}
+            style={[styles.shopSideTabCollapsed, { opacity: collapsedOpacity }]}
+          >
+            <Feather name="shopping-bag" size={11} color={ON_DARK} />
+            <Text style={styles.shopSideTabLabel}>SHOP</Text>
+          </Animated.View>
+          <Animated.View
+            pointerEvents={expanded ? 'auto' : 'none'}
+            style={[
+              styles.shopSideTabExpanded,
+              { opacity: expandedOpacity, transform: [{ translateX: expandedTranslate }] },
+            ]}
+          >
+            <View style={styles.shopSideTabThumb}>
+              {tag.imageUri ? (
+                <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              ) : (
+                <Feather name="shopping-bag" size={13} color="#111111" />
+              )}
+            </View>
+            <View style={styles.shopSideTabText}>
+              <Text style={styles.shopSideTabName} numberOfLines={1}>{tag.productName}</Text>
+              <Text style={styles.shopSideTabPrice} numberOfLines={1}>
+                {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.75)" />
+          </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
+    </>
   );
 }
 
@@ -1343,27 +1380,17 @@ function SpotlightPage({
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTriggered = useRef(false);
-  /** Chrome entrance: the rail + bottom-info block settle in with a soft
-   * rise-and-fade whenever this page becomes the active cell (first mount,
-   * or swiping back to a previously-seen post), instead of appearing
-   * instantly — the small per-item "arrival" beat that makes swiping feel
-   * directed rather than like frames simply being swapped. Inactive cells
-   * hold their chrome fully visible with no motion so nothing pops mid-swipe. */
-  const chromeIn = useRef(new Animated.Value(isActive ? 1 : 0.001)).current;
-  const wasActive = useRef(isActive);
-  React.useEffect(() => {
-    if (isActive && !wasActive.current) {
-      chromeIn.setValue(0.001);
-      Animated.spring(chromeIn, { toValue: 1, useNativeDriver: true, speed: 15, bounciness: 6 }).start();
-    } else if (!isActive) {
-      chromeIn.setValue(1);
-    }
-    wasActive.current = isActive;
-  }, [isActive, chromeIn]);
-  const chromeStyle = {
-    opacity: chromeIn,
-    transform: [{ translateY: chromeIn.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-  };
+  // No entrance animation on the overlay chrome (rail + bottom-info block):
+  // it must move 1:1 with its own page as part of the same cell, exactly
+  // like the video does, with zero opacity/position animation when a cell
+  // becomes active — a previous "rise and fade in" spring keyed off
+  // `isActive` becoming true fired on every single swipe (every cell starts
+  // inactive, becomes active, that transition ran the spring every time),
+  // reading as the whole overlay bouncing in on every swipe instead of
+  // holding sturdy with the page. `chromeStyle` is now a plain, static,
+  // always-settled style — kept as a style object (not removed outright) so
+  // every call site below stays unchanged.
+  const chromeStyle = { opacity: 1 };
   const friendReposts = item.friendReposts ?? [];
   const hasRepostIdentity = engagement?.reposted === true || friendReposts.length > 0;
   const repostLabel = engagement?.reposted
@@ -1535,6 +1562,19 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
+      {/* ─ Shop side tab ─ collapsed against the left edge (mirrors the
+          rail on the right), only when this video has a tagged product.
+          Lives at this top level, not inside the bottom-left info stack —
+          it's a screen-edge affordance, not part of that stack's flow. */}
+      {!!item.productTags?.length && (
+        <ShopSideTab
+          tag={item.productTags[0]}
+          extraCount={Math.max(0, item.productTags.length - 1)}
+          onPress={() => onShopTag(item, item.productTags![0])}
+          isActive={isActive}
+        />
+      )}
+
       {/* ─ Right action rail ─
           Pinned at bottomClearance + RAIL_BOTTOM_GAP, not bare
           bottomClearance: the scrub/progress bar sits right around
@@ -1701,27 +1741,18 @@ function SpotlightPage({
         onFeedback={showToast}
       />
 
-      {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─
+      {/* ─ Bottom-left overlay: creator, caption, sound ─
           Pinned at bottomClearance + CAPTION_BOTTOM_GAP for the same reason
           as the rail above: bare bottomClearance put the sound line's own
           bottom edge right where the scrub/progress bar sits, touching it
           with no gap. CAPTION_BOTTOM_GAP guarantees the required >=12pt of
-          clearance from the sound line down to the bar. */}
+          clearance from the sound line down to the bar. The shop tag used to
+          live at the top of this stack as a pill; it's now the screen-edge
+          ShopSideTab rendered above instead, so this stack starts straight
+          at the repost/creator row with no leftover gap where the pill used
+          to sit — nothing here reserves space for it any more (see
+          bottomInfo/bottomInfoWithRepost's shrunk minHeight below). */}
       <Animated.View style={[styles.bottomInfo, chromeStyle, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]} pointerEvents="box-none">
-        {/* Shop pill lives in this same flex column now (not a separately
-            absolute-positioned sibling keyed off a magic bottom offset) so
-            its gap down to whatever comes next is guaranteed by layout, not
-            by a hardcoded number that only happened to work for one caption
-            length. */}
-        {!!item.productTags?.length && (
-          <View style={styles.shopPillWrap} pointerEvents="box-none">
-            <ShopPill
-              tag={item.productTags[0]}
-              extraCount={Math.max(0, item.productTags.length - 1)}
-              onPress={() => onShopTag(item, item.productTags![0])}
-            />
-          </View>
-        )}
         {hasRepostIdentity && (
           <TouchableOpacity
             style={styles.repostIdentity}
@@ -1989,8 +2020,20 @@ export default function FeedScreen({
   const [cartCount, setCartCount] = useState(0);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [hasUnread, setHasUnread] = useState(false);
-  const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
-  const [feedLoading, setFeedLoading] = useState(true);
+  // Real TikTok never shows a placeholder/skeleton box over the feed. Seed
+  // the very first render from whatever we already have in memory for this
+  // tab (instant on a tab switch within the session) so there is a real post
+  // — poster included — on screen from frame one instead of an empty list
+  // that would otherwise need a loading state to cover. A cold app start has
+  // nothing in memory yet; `hydrateFeedPostsCache` below fills it in from
+  // AsyncStorage a beat later, still well before any skeleton would ever be
+  // justified, and with no placeholder shapes in between either way.
+  const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>(() => (
+    creatorSource && creatorId ? [] : getCachedFeedPosts<SpotlightItem>('for-you') ?? []
+  ));
+  const [feedLoading, setFeedLoading] = useState(() => (
+    creatorSource && creatorId ? true : (getCachedFeedPosts<SpotlightItem>('for-you') ?? []).length === 0
+  ));
   const [feedRefreshing, setFeedRefreshing] = useState(false);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [feedHasMore, setFeedHasMore] = useState(true);
@@ -2081,8 +2124,20 @@ export default function FeedScreen({
     feedHasMoreRef.current = true;
     setFeedHasMore(true);
     setFeedLoadingMore(false);
-    if (initial) setFeedLoading(true);
-    else setFeedRefreshing(true);
+    if (initial) {
+      setFeedLoading(true);
+      // No skeleton ever covers this — instead, show whatever we last saw
+      // for this tab (in memory instantly, or from AsyncStorage a beat
+      // later on a cold start) while the real page loads underneath it.
+      const cachedNow = getCachedFeedPosts<SpotlightItem>(loadKey);
+      if (cachedNow) {
+        setSellerFeedPosts(cachedNow);
+      } else {
+        void hydrateFeedPostsCache<SpotlightItem>(loadKey).then(cached => {
+          if (cached && feedLoadKeyRef.current === loadKey) setSellerFeedPosts(cached);
+        });
+      }
+    } else setFeedRefreshing(true);
     try {
       const page = await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
@@ -2091,6 +2146,7 @@ export default function FeedScreen({
         .map(mapSellerPost)
         .filter((p): p is SpotlightItem => p !== null);
       setSellerFeedPosts(mapped);
+      setCachedFeedPosts(loadKey, mapped);
       feedCursorRef.current = page.cursor;
       feedHasMoreRef.current = page.hasMore;
       setFeedHasMore(page.hasMore);
@@ -2730,6 +2786,19 @@ export default function FeedScreen({
         disableIntervalMomentum
         showsVerticalScrollIndicator={false}
         decelerationRate="fast"
+        // A slow drag-then-release let the list rubber-band past the page
+        // boundary before paging snapped it back — on iOS that's the default
+        // vertical bounce, on Android the default overscroll glow/stretch,
+        // and on web (react-native-web) the equivalent elastic overshoot.
+        // Only the video itself should ever appear to move like that; the
+        // overlay chrome doesn't animate at all (see chromeStyle above), so
+        // that rubber-band snap-back read as the whole page — video and
+        // overlay together — bouncing. Disabling native overscroll here
+        // makes every release, slow or fast, land exactly on the page
+        // boundary with no elastic overshoot to snap back from.
+        bounces={false}
+        alwaysBounceVertical={false}
+        overScrollMode="never"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         onEndReached={loadMoreFeed}
@@ -2947,8 +3016,10 @@ export default function FeedScreen({
               only appears while a live stream is actually mixed into the
               feed, search, activity and cart. */}
           {buyerSearchOpen ? (
+            // Solid fill, no BlurView: a live blur here would re-sample the
+            // playing video behind it every frame, same class of glitch as
+            // the old shop pill's frosted background — see ShopSideTab above.
             <View style={styles.buyerSearchRow}>
-              <BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
               <Feather name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
               <TextInput
                 style={styles.buyerSearchInput}
@@ -3300,28 +3371,38 @@ const styles = StyleSheet.create({
   speedPillText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13 },
   mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
   mediaDotActive: { width: 18, backgroundColor: ON_DARK },
-  // Compact single-line TikTok-Shop-style product anchor pill — a small
-  // tappable tag, not a card overlaying the video. 28pt thumbnail, 8pt
-  // internal padding, a 12pt gap between name and price (via the name's own
-  // marginRight, not a uniform row `gap`, so that gap can differ from the
-  // tighter thumb→name and price→chevron spacing) and the price never
-  // shrinks or truncates.
-  shopPill: {
-    height: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center',
-    borderRadius: RADII.pill, paddingHorizontal: 8, overflow: 'hidden',
-    borderWidth: 1,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25,
-    shadowRadius: 5, elevation: 4,
+  // Shop side tab: collapsed flush against the left screen edge (26pt of a
+  // 28pt-wide tab sticks out), only the two exposed corners rounded so it
+  // reads as attached to the edge rather than floating. Fully solid fill,
+  // no blur/shimmer — see the ShopSideTab component comment above for why.
+  shopSideTab: {
+    position: 'absolute', left: 0, top: '57%', height: 76,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderTopRightRadius: 12, borderBottomRightRadius: 12,
+    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    overflow: 'hidden',
   },
-  shopPillThumb: {
-    width: 28, height: 28, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: ON_DARK, overflow: 'hidden', marginRight: 8,
+  shopSideTabCollapsed: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center', gap: 6,
   },
-  shopPillName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13, flexShrink: 1, marginRight: 12 },
-  // flexShrink: 0 — the price never gives up space to the name; it is
-  // always rendered in full, never truncated.
-  shopPillPrice: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, marginRight: 8, ...TABULAR_NUMS },
-  shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
+  shopSideTabLabel: {
+    color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.5,
+    transform: [{ rotate: '-90deg' }],
+  },
+  shopSideTabExpanded: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, gap: 8,
+  },
+  shopSideTabThumb: {
+    width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ON_DARK, overflow: 'hidden', flexShrink: 0,
+  },
+  shopSideTabText: { flexShrink: 1, flexGrow: 1, gap: 1 },
+  shopSideTabName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
+  shopSideTabPrice: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, ...TABULAR_NUMS },
 
   rail: {
     position: 'absolute', right: 10, width: 52, bottom: 116, alignItems: 'center', gap: 19,
@@ -3352,15 +3433,17 @@ const styles = StyleSheet.create({
 
   // The bottom-left stack's vertical rhythm is one consistent system, set
   // as explicit per-step margins (not a single uniform `gap`, since each
-  // step needs its own value): shop pill -> 12pt -> creator name row ->
-  // 6pt -> caption -> 8pt -> sound line -> (CAPTION_BOTTOM_GAP, on the
-  // container's own `bottom` above) -> progress bar.
+  // step needs its own value): creator name row -> 6pt -> caption -> 8pt ->
+  // sound line -> (CAPTION_BOTTOM_GAP, on the container's own `bottom`
+  // above) -> progress bar. The shop tag no longer starts this stack (it's
+  // the screen-edge ShopSideTab now) — minHeight shrunk by its old
+  // 44pt-tall pill + 12pt gap (56pt) accordingly, so there's no leftover
+  // reserved space where it used to sit.
   bottomInfo: {
-    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 112,
+    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 56,
     justifyContent: 'flex-end',
   },
-  bottomInfoWithRepost: { minHeight: 148 },
-  shopPillWrap: { marginBottom: 12, alignItems: 'flex-start' },
+  bottomInfoWithRepost: { minHeight: 92 },
   repostIdentity: {
     alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -3418,7 +3501,9 @@ const styles = StyleSheet.create({
   liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
   buyerSearchRow: {
     flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: RADII.pill,
-    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+    // Solid fill (bumped from 0.32 now that there's no BlurView underneath
+    // adding its own contrast) instead of a blur-over-video background.
+    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
   buyerSearchInput: {
     flex: 1, height: 44, paddingHorizontal: 10, fontSize: FS.sm, fontFamily: FONT.regular, color: ON_DARK,

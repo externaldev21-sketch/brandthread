@@ -4,11 +4,12 @@ import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/Badge';
+import { EmptyState, IconButton } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
-import { FS } from '@/lib/theme';
+import { FS, FONT, SP, COMP } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
 import { formatCents } from '@/lib/money';
 import type { AdCampaign } from '@/lib/api';
@@ -110,26 +111,20 @@ export default function MarketingScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.headerRow}>
-        <TouchableOpacity
+        <IconButton
+          name="chevron-left"
           onPress={() => router.push('/(tabs)/more' as never)}
-          hitSlop={10}
-          activeOpacity={0.7}
-          style={[styles.backBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
-        >
-          <Feather name="chevron-left" size={20} color={colors.foreground} />
-        </TouchableOpacity>
+          accessibilityLabel="Back"
+        />
         <View style={{ flex: 1 }}>
           <Text style={[styles.pageTitle, { color: colors.foreground }]}>Marketing</Text>
           <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Campaigns, discounts & automation</Text>
         </View>
-        <TouchableOpacity
+        <IconButton
+          name="bar-chart-2"
           onPress={() => router.push('/(tabs)/analytics' as never)}
-          hitSlop={10}
-          activeOpacity={0.7}
-          style={[styles.backBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
-        >
-          <Feather name="bar-chart-2" size={18} color={colors.foreground} />
-        </TouchableOpacity>
+          accessibilityLabel="View analytics"
+        />
       </View>
 
       {/* Stats Row */}
@@ -169,7 +164,16 @@ export default function MarketingScreen() {
       />
       {campaigns.length === 0 ? (
         <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No campaigns yet</Text>
+          <EmptyState
+            compact
+            icon="tv"
+            title="No campaigns yet"
+            description="Create a Meta ad to put your products in front of new buyers."
+            action={{ label: 'Create a campaign', icon: 'plus', onPress: () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/design-campaign' as never);
+            } }}
+          />
         </View>
       ) : (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -205,7 +209,16 @@ export default function MarketingScreen() {
       />
       {discounts.length === 0 ? (
         <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No discount codes yet</Text>
+          <EmptyState
+            compact
+            icon="percent"
+            title="No discount codes yet"
+            description="Codes give buyers a reason to check out now instead of later."
+            action={{ label: 'Create a discount', icon: 'plus', onPress: () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/discounts' as never);
+            } }}
+          />
         </View>
       ) : (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -260,20 +273,19 @@ export default function MarketingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  pageTitle: { fontSize: 24, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs, minHeight: COMP.headerH },
+  pageTitle: { fontSize: FS.xl, fontFamily: FONT.bold, letterSpacing: -0.3, marginBottom: 2 },
+  pageSubtitle: { fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 20 },
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
-  statChip: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 4 },
+  statChip: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 4, minHeight: COMP.minTouchTarget },
   statVal: { fontSize: 16, fontFamily: 'Inter_700Bold' },
   statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
-  klaviyoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 14, marginBottom: 24 },
+  klaviyoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 14, marginBottom: 24, minHeight: COMP.buttonH },
   klaviyoText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
-  emptyCard: { borderRadius: 14, borderWidth: 1, marginBottom: 24, padding: 20, alignItems: 'center' },
+  emptyCard: { borderRadius: 14, borderWidth: 1, marginBottom: 24, overflow: 'hidden' },
   emptyText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  campaignRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  campaignRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, minHeight: COMP.minTouchTarget },
   campaignIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   campaignInfo: { flex: 1, gap: 4 },
   campaignName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },

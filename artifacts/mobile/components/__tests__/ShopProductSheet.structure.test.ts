@@ -43,7 +43,7 @@ describe('Thread shop drawer purchase actions', () => {
     // navigateAndDismiss's doc comment for why the old sequential
     // dismiss-then-push left the sheet's Modal/backdrop stuck on top of
     // Checkout.
-    expect(buyNowHandler).toContain("navigateAndDismiss(() => push('/thread-checkout'");
+    expect(buyNowHandler).toContain("navigateAndDismissInstantly(() => push('/thread-checkout'");
     expect(buyNowHandler).not.toContain('addToCart(');
     expect(buyNowHandler).not.toContain('onCartUpdated');
     expect(cartSource).toContain('return createCheckoutSession(currentCart, true, [buyNowItem])');

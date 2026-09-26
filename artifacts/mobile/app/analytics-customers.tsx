@@ -1,23 +1,27 @@
 /**
  * Customer Analytics — Brandthread Seller App
+ *
+ * Mobbin reference: Stripe Dashboard "Home" (Gross Volume / Payments /
+ * Customers stat row) (https://mobbin.com/screens/f972bbd5-699d-42c3-942e-1cf9f3d25eda)
+ * informed the KPI-list-then-ranked-table structure used here.
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, PURPLE_LIGHT, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, BLUE, BLUE_DIM, GOLD,
-  FONT, FS,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { fmtDate } from '@/lib/format';
 import { formatCents } from '@/lib/money';
 import { getCustomerAnalytics, getFilterState } from '@/services/analyticsService';
-import { CustomerAnalytics, AnalyticsMetric, CustomerCohort, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { CustomerAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { EmptyState } from '@/components/BrandthreadUI';
+import {
+  AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, SectionTitle, StatRow, ProgressBar,
+} from '@/components/analytics/AnalyticsKit';
 
 type TopCustomer = {
   buyerId: string | null;
@@ -30,33 +34,15 @@ type TopCustomer = {
   firstOrderAt: string | null;
 };
 
-function KpiRow({ m, iconName, iconColor }: { m: AnalyticsMetric; iconName: keyof typeof Feather.glyphMap; iconColor: string }) {
-  const colors = useColors();
-  const s = React.useMemo(() => createStyles(colors), [colors]);
-  const upColor = m.trend === 'up' ? SUCCESS : RED;
-  return (
-    <View style={s.kpiRow}>
-      <View style={[s.kpiIcon, { backgroundColor: iconColor + '22' }]}>
-        <Feather name={iconName} size={14} color={iconColor} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={s.kpiLabel}>{m.label}</Text>
-      </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={s.kpiValue}>{m.formatted}</Text>
-        {m.trend && m.trend !== 'flat' && typeof m.changePct === 'number' ? (
-          <Text style={[s.kpiChange, { color: upColor }]}>
-            {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(1)}%
-          </Text>
-        ) : null}
-      </View>
-    </View>
-  );
+function retColor(colors: ReturnType<typeof useColors>, pct: number): string {
+  if (pct === 0) return colors.subtle;
+  if (pct >= 40) return colors.success;
+  if (pct >= 25) return colors.warning;
+  return colors.destructive;
 }
 
 export default function AnalyticsCustomersScreen() {
   const colors = useColors();
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -84,12 +70,7 @@ export default function AnalyticsCustomersScreen() {
       ]);
       if (requestUser.current !== requestedUser) return;
       setData(analytics);
-      if (customerResponse) {
-        setTopCustomers(customerResponse.topCustomers ?? []);
-      } else {
-        setTopCustomers([]);
-        setTopCustomers([]);
-      }
+      setTopCustomers(customerResponse ? (customerResponse.topCustomers ?? []) : []);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
       setData(null); setTopCustomers([]);
@@ -104,90 +85,83 @@ export default function AnalyticsCustomersScreen() {
   }, [authLoaded, userId]); // load reads the current filter
 
   if (loading) {
-    return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
+    return <AnalyticsSkeleton topPad={topPad} kpiCount={0} listRows={4} />;
   }
   return (
     <ScrollView
       style={s.scroll}
       contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={PURPLE} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.pageTitle}>Customer Analytics</Text>
-          <Text style={s.subtitle}>All time</Text>
-        </View>
-      </View>
+      <AnalyticsHeader title="Customer Analytics" subtitle="All time" />
 
       {/* KPIs */}
-      <Text style={s.sectionTitle}>Overview</Text>
-      <View style={s.card}>
+      <SectionTitle>Overview</SectionTitle>
+      <Card>
         {data && <>
-          <KpiRow m={data.totalCustomers}       iconName="users"    iconColor={PURPLE} />
-          <View style={s.divider} />
-          <KpiRow m={data.returningCustomers}   iconName="repeat"   iconColor={BLUE} />
-          <View style={s.divider} />
-          <KpiRow m={data.repeatRate}           iconName="refresh-cw" iconColor={PURPLE} />
-          <View style={s.divider} />
-          <KpiRow m={data.purchaseFrequency}    iconName="shopping-bag" iconColor={BLUE} />
+          <StatRow label={data.totalCustomers.label} value={data.totalCustomers.formatted} icon="users" iconColor={colors.primary} />
+          <CardDivider />
+          <StatRow label={data.returningCustomers.label} value={data.returningCustomers.formatted} changePct={data.returningCustomers.changePct} icon="repeat" iconColor={colors.info} />
+          <CardDivider />
+          <StatRow label={data.repeatRate.label} value={data.repeatRate.formatted} changePct={data.repeatRate.changePct} icon="refresh-cw" iconColor={colors.primary} />
+          <CardDivider />
+          <StatRow label={data.purchaseFrequency.label} value={data.purchaseFrequency.formatted} changePct={data.purchaseFrequency.changePct} icon="shopping-bag" iconColor={colors.info} />
         </>}
-      </View>
+      </Card>
 
       {/* Top customers */}
-      <Text style={s.sectionTitle}>Top Customers</Text>
-      <View style={s.card}>
+      <SectionTitle>Top Customers</SectionTitle>
+      <Card>
         {topCustomers.length === 0 ? (
           <View style={s.customerEmpty}>
-            <Feather name="users" size={22} color={MUTED} />
+            <Feather name="users" size={22} color={colors.mutedForeground} />
             <Text style={s.customerEmptyText}>No customer orders yet</Text>
           </View>
         ) : (
           topCustomers.map((customer, i) => {
-            const rowStyle = [s.customerRow, i > 0 && s.divider];
             const rowKey = customer.customerId ?? customer.buyerId ?? (customer.email || String(i));
             const rowContent = (
               <>
-              <View style={s.customerRank}>
-                <Text style={s.customerRankText}>{i + 1}</Text>
-              </View>
-              <View style={s.customerInfo}>
-                <Text style={s.customerName} numberOfLines={1}>{customer.name}</Text>
-                <Text style={s.customerMeta}>
-                  {customer.orderCount} {customer.orderCount === 1 ? 'order' : 'orders'} · Last order {customer.lastOrderAt ? fmtDate(customer.lastOrderAt) : '—'}
-                </Text>
-              </View>
-              <View style={s.customerSpend}>
-                <Text style={s.customerSpendValue}>{formatCents(customer.totalCents)}</Text>
-                {customer.customerId ? <Feather name="chevron-right" size={16} color={MUTED} /> : null}
-              </View>
+                <View style={s.customerRank}>
+                  <Text style={s.customerRankText}>{i + 1}</Text>
+                </View>
+                <View style={s.customerInfo}>
+                  <Text style={s.customerName} numberOfLines={1}>{customer.name}</Text>
+                  <Text style={s.customerMeta}>
+                    {customer.orderCount} {customer.orderCount === 1 ? 'order' : 'orders'} · Last order {customer.lastOrderAt ? fmtDate(customer.lastOrderAt) : '—'}
+                  </Text>
+                </View>
+                <View style={s.customerSpend}>
+                  <Text style={s.customerSpendValue}>{formatCents(customer.totalCents)}</Text>
+                  {customer.customerId ? <Feather name="chevron-right" size={16} color={colors.mutedForeground} /> : null}
+                </View>
               </>
             );
-            return customer.customerId ? (
-              <TouchableOpacity
-                key={rowKey}
-                style={rowStyle}
-                onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(customer.customerId!)}` as never)}
-                accessibilityRole="button"
-                accessibilityLabel={`View order history for ${customer.name}`}
-              >
-                {rowContent}
-              </TouchableOpacity>
-            ) : (
-              <View key={rowKey} style={rowStyle}>
-                {rowContent}
+            return (
+              <View key={rowKey}>
+                {i > 0 && <CardDivider />}
+                {customer.customerId ? (
+                  <TouchableOpacity
+                    style={s.customerRow}
+                    onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(customer.customerId!)}` as never)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View order history for ${customer.name}`}
+                  >
+                    {rowContent}
+                  </TouchableOpacity>
+                ) : (
+                  <View style={s.customerRow}>{rowContent}</View>
+                )}
               </View>
             );
           })
         )}
-      </View>
+      </Card>
 
       {/* Cohorts */}
-      <Text style={s.sectionTitle}>Cohort Retention</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+      <SectionTitle>Cohort Retention</SectionTitle>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SP.lg }}>
         <View>
           <View style={s.cohortHeaderRow}>
             <Text style={[s.cohortCell, s.cohortLabelCell]}>Cohort</Text>
@@ -199,90 +173,63 @@ export default function AnalyticsCustomersScreen() {
           </View>
           {data?.cohorts.map(c => (
             <View key={c.cohortLabel} style={s.cohortRow}>
-              <Text style={[s.cohortCell, s.cohortLabelCell, { color: FG }]}>{c.cohortLabel}</Text>
+              <Text style={[s.cohortCell, s.cohortLabelCell, { color: colors.foreground }]}>{c.cohortLabel}</Text>
               <Text style={s.cohortCell}>{c.customers}</Text>
-              <Text style={[s.cohortCell, { color: retColor(c.month1RetentionPct) }]}>{c.month1RetentionPct > 0 ? `${c.month1RetentionPct}%` : '—'}</Text>
-              <Text style={[s.cohortCell, { color: retColor(c.month2RetentionPct) }]}>{c.month2RetentionPct > 0 ? `${c.month2RetentionPct}%` : '—'}</Text>
-              <Text style={[s.cohortCell, { color: retColor(c.month3RetentionPct) }]}>{c.month3RetentionPct > 0 ? `${c.month3RetentionPct}%` : '—'}</Text>
-               <Text style={[s.cohortCell, { color: GOLD }]}>{formatCents(c.avgLtvCents)}</Text>
+              <Text style={[s.cohortCell, { color: retColor(colors, c.month1RetentionPct) }]}>{c.month1RetentionPct > 0 ? `${c.month1RetentionPct}%` : '—'}</Text>
+              <Text style={[s.cohortCell, { color: retColor(colors, c.month2RetentionPct) }]}>{c.month2RetentionPct > 0 ? `${c.month2RetentionPct}%` : '—'}</Text>
+              <Text style={[s.cohortCell, { color: retColor(colors, c.month3RetentionPct) }]}>{c.month3RetentionPct > 0 ? `${c.month3RetentionPct}%` : '—'}</Text>
+              <Text style={[s.cohortCell, { color: colors.warning }]}>{formatCents(c.avgLtvCents)}</Text>
             </View>
           ))}
         </View>
       </ScrollView>
 
       {/* Locations */}
-      <Text style={s.sectionTitle}>Top Locations</Text>
-      <View style={s.card}>
+      <SectionTitle>Top Locations</SectionTitle>
+      <Card>
         {data?.topLocations.map((loc, i) => (
-          <View key={loc.location} style={[s.locRow, i > 0 && s.divider]}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.locName}>{loc.location}</Text>
-              <View style={[s.locBar, { marginTop: 4 }]}>
-                <View style={[s.locFill, { width: `${loc.sharePct}%` }]} />
+          <View key={loc.location}>
+            {i > 0 && <CardDivider />}
+            <View style={s.locRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.locName}>{loc.location}</Text>
+                <View style={{ marginTop: 4 }}>
+                  <ProgressBar pct={loc.sharePct} />
+                </View>
               </View>
-            </View>
-            <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
-              <Text style={s.locCount}>{loc.customers.toLocaleString()}</Text>
-              <Text style={s.locShare}>{loc.sharePct.toFixed(1)}%</Text>
+              <View style={{ alignItems: 'flex-end', marginLeft: SP.sm }}>
+                <Text style={s.locCount}>{loc.customers.toLocaleString()}</Text>
+                <Text style={s.locShare}>{loc.sharePct.toFixed(1)}%</Text>
+              </View>
             </View>
           </View>
         ))}
-      </View>
+      </Card>
 
       <View style={{ height: 120 }} />
     </ScrollView>
   );
 }
 
-function retColor(pct: number): string {
-  if (pct === 0) return SUBTLE;
-  if (pct >= 40) return SUCCESS;
-  if (pct >= 25) return ORANGE;
-  return RED;
-}
-
-const createStyles = (colors: ReturnType<typeof useColors>) => {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
-  return StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
-  content:  { paddingHorizontal: 16 },
-  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  header:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
-  backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  pageTitle:{ fontSize: 22, fontFamily: FONT.bold, color: FG },
-  subtitle: { fontSize: 12, fontFamily: FONT.regular, color: MUTED },
-  sectionTitle:{ fontSize: 15, fontFamily: FONT.semibold, color: FG, marginBottom: 10 },
-  card:     { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, marginBottom: 20, overflow: 'hidden' },
-  divider:  { height: 1, backgroundColor: BORDER, marginHorizontal: 16 },
-  kpiRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 10 },
-  kpiIcon:  { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  kpiLabel: { fontSize: 13, fontFamily: FONT.regular, color: MUTED },
-  kpiValue: { fontSize: 15, fontFamily: FONT.semibold, color: FG },
-  kpiChange:{ fontSize: 11, fontFamily: FONT.regular },
-  riskRow:  { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  riskCard: { flex: 1, backgroundColor: CARD, borderRadius: 14, padding: 14, borderWidth: 1, alignItems: 'center', gap: 6 },
-  riskIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  riskValue:{ fontSize: 20, fontFamily: FONT.bold },
-  riskLabel:{ fontSize: 11, fontFamily: FONT.regular, color: MUTED },
-  cohortHeaderRow:{ flexDirection: 'row', backgroundColor: CARD_ELEVATED, borderRadius: 10, marginBottom: 4, padding: 4 },
-  cohortRow:{ flexDirection: 'row', backgroundColor: CARD, borderBottomWidth: 1, borderBottomColor: BORDER, padding: 4 },
-  cohortCell:{ width: 80, textAlign: 'center', fontSize: 12, fontFamily: FONT.regular, color: MUTED, paddingVertical: 8 },
+  content:  { paddingHorizontal: SP.md },
+  cohortHeaderRow:{ flexDirection: 'row', backgroundColor: colors.elevated, borderRadius: RADIUS.sm, marginBottom: 4, padding: 4 },
+  cohortRow:{ flexDirection: 'row', backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border, padding: 4 },
+  cohortCell:{ width: 80, textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, paddingVertical: 8 },
   cohortLabelCell:{ width: 90, textAlign: 'left', fontFamily: FONT.medium },
-  locRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13 },
-  locName:  { fontSize: 13, fontFamily: FONT.semibold, color: FG },
-  locBar:   { height: 4, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' },
-  locFill:  { height: '100%', backgroundColor: PURPLE, borderRadius: 2 },
-  locCount: { fontSize: 13, fontFamily: FONT.semibold, color: FG },
-  locShare: { fontSize: 11, fontFamily: FONT.regular, color: MUTED },
-  customerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 10 },
-  customerRank: { width: 28, height: 28, borderRadius: 14, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  customerRankText: { fontSize: 12, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  locRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 1, minHeight: COMP.minTouchTarget },
+  locName:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
+  locCount: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
+  locShare: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
+  customerRow: { flexDirection: 'row', alignItems: 'center', minHeight: COMP.minTouchTarget, paddingHorizontal: SP.md, paddingVertical: SP.sm + 1, gap: SP.sm },
+  customerRank: { width: 28, height: 28, borderRadius: RADIUS.pill, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  customerRankText: { fontSize: FS.xs, fontFamily: FONT.bold, color: colors.accentForeground },
   customerInfo: { flex: 1, minWidth: 0, gap: 3 },
-  customerName: { fontSize: 13, fontFamily: FONT.semibold, color: FG },
-  customerMeta: { fontSize: 11, fontFamily: FONT.regular, color: MUTED },
+  customerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
+  customerMeta: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
   customerSpend: { alignItems: 'flex-end', gap: 3 },
-  customerSpendValue: { fontSize: 14, fontFamily: FONT.semibold, color: FG },
-  customerEmpty: { minHeight: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, gap: 8 },
-  customerEmptyText: { fontSize: 12, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
-  });
-};
+  customerSpendValue: { fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },
+  customerEmpty: { minHeight: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg, gap: SP.sm },
+  customerEmptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center' },
+});
