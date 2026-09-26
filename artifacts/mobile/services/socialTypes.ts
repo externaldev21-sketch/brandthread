@@ -294,6 +294,7 @@ export interface StoryOverlay {
   text?: string;
   color?: string;
   size?: number;
+  align?: 'left' | 'center' | 'right';
   // mention sticker
   mentionHandle?: string;
   // location sticker

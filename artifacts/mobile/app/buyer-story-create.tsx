@@ -394,7 +394,7 @@ export default function StoryComposer() {
         text,
         color: textDraftColor,
         size: 30,
-        align: textDraftAlign as any,
+        align: textDraftAlign,
       });
     }
     setTextDraft('');
@@ -980,7 +980,7 @@ function StickerTile({ icon, label, onPress, custom }: { icon: keyof typeof Feat
 function renderOverlayContent(ov: StoryOverlay) {
   switch (ov.type) {
     case 'text':
-      return <Text style={{ color: ov.color ?? '#FFF', fontSize: ov.size ?? 28, fontFamily: FONT.bold, textAlign: (ov as any).align ?? 'center' }}>{ov.text}</Text>;
+      return <Text style={{ color: ov.color ?? '#FFF', fontSize: ov.size ?? 28, fontFamily: FONT.bold, textAlign: ov.align ?? 'center' }}>{ov.text}</Text>;
     case 'mention':
       return <View style={styles.pillChip}><Feather name="at-sign" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.mentionHandle}</Text></View>;
     case 'location':
