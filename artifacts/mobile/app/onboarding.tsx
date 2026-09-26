@@ -34,6 +34,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useAuth, useSSO, useSignUp, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -634,6 +635,9 @@ function BuyerAuthStep({
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
+  const appleOAuthFlagEnabled = useFeatureFlag('oauthAppleEnabled');
+  const appleOAuthEnabled = Platform.OS === 'ios' && appleOAuthFlagEnabled;
+  const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
 
   const [phase, setPhase]               = useState<BuyerAuthPhase>('choose');
   const [email, setEmail]               = useState('');
@@ -973,7 +977,7 @@ function BuyerAuthStep({
         {/* Apple row — iOS only. Shown first: App Store guideline 4.8 requires Sign in
             with Apple to be at least as prominent as other third-party social logins
             whenever any are offered. */}
-        {Platform.OS === 'ios' && (
+        {appleOAuthEnabled && (
           <TouchableOpacity
             style={[sba.bigRow, sba.appleRow]}
             onPress={() => handleOAuth(startAppleOAuth, 'Apple')}
@@ -995,26 +999,28 @@ function BuyerAuthStep({
         )}
 
         {/* Google row */}
-        <TouchableOpacity
-          style={sba.bigRow}
-          onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
-          activeOpacity={0.85}
-          disabled={!!oauthLoading || loading}
-        >
-          {oauthLoading === 'Google' ? (
-            <ActivityIndicator color={theme.accentLight} size="small" />
-          ) : (
-            <>
-              <View style={sba.bigRowIcon}>
-                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text>
+        {googleOAuthEnabled && (
+          <TouchableOpacity
+            style={sba.bigRow}
+            onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
+            activeOpacity={0.85}
+            disabled={!!oauthLoading || loading}
+          >
+            {oauthLoading === 'Google' ? (
+              <ActivityIndicator color={theme.accentLight} size="small" />
+            ) : (
+              <>
+                <View style={sba.bigRowIcon}>
+                  <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text>
+                  </View>
                 </View>
-              </View>
-              <Text style={sba.bigRowText}>Continue with Google</Text>
-              <Feather name="chevron-right" size={16} color={MUTED2} />
-            </>
-          )}
-        </TouchableOpacity>
+                <Text style={sba.bigRowText}>Continue with Google</Text>
+                <Feather name="chevron-right" size={16} color={MUTED2} />
+              </>
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* Use email row */}
         <TouchableOpacity
@@ -1072,6 +1078,10 @@ function SharedAuthStep({
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
+  const appleOAuthFlagEnabled = useFeatureFlag('oauthAppleEnabled');
+  const appleOAuthEnabled = Platform.OS === 'ios' && appleOAuthFlagEnabled;
+  const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
+  const showAnyOAuth = appleOAuthEnabled || googleOAuthEnabled;
 
   const [phase, setPhase]             = useState<SharedAuthPhase>('form');
   const [email, setEmail]             = useState('');
@@ -1461,14 +1471,16 @@ function SharedAuthStep({
         </Reveal>
 
         {/* OAuth options below the main CTA */}
-        <View style={ssa.divider}>
-          <View style={ssa.divLine} />
-          <Text style={ssa.divText}>or</Text>
-          <View style={ssa.divLine} />
-        </View>
+        {showAnyOAuth && (
+          <View style={ssa.divider}>
+            <View style={ssa.divLine} />
+            <Text style={ssa.divText}>or</Text>
+            <View style={ssa.divLine} />
+          </View>
+        )}
 
         {/* Apple first — App Store guideline 4.8 prominence requirement. */}
-        {Platform.OS === 'ios' && (
+        {appleOAuthEnabled && (
           <PressableScale
             style={[ssa.oauthBtn, ssa.appleBtn]}
             onPress={() => handleOAuth(startAppleOAuth, 'Apple')}
@@ -1483,18 +1495,20 @@ function SharedAuthStep({
           </PressableScale>
         )}
 
-        <PressableScale
-          style={ssa.oauthBtn}
-          onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
-          accessibilityRole="button"
-          accessibilityLabel="Continue with Google"
-          disabled={!!oauthLoading || loading}
-        >
-          {oauthLoading === 'Google' ? <ActivityIndicator color={theme.text} size="small" /> : <>
-            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: CARD, lineHeight: 14 }}>G</Text></View>
-            <Text style={ssa.oauthText}>Continue with Google</Text>
-          </>}
-        </PressableScale>
+        {googleOAuthEnabled && (
+          <PressableScale
+            style={ssa.oauthBtn}
+            onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
+            disabled={!!oauthLoading || loading}
+          >
+            {oauthLoading === 'Google' ? <ActivityIndicator color={theme.text} size="small" /> : <>
+              <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: CARD, lineHeight: 14 }}>G</Text></View>
+              <Text style={ssa.oauthText}>Continue with Google</Text>
+            </>}
+          </PressableScale>
+        )}
 
       </ScrollView>
     </KeyboardAvoidingView>

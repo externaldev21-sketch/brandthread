@@ -17,6 +17,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Avatar } from '@/components/ui/Avatar';
@@ -47,6 +48,10 @@ export default function SignInScreen() {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
   const isAddAccount = addAccount === '1';
+  const appleOAuthEnabled = useFeatureFlag('oauthAppleEnabled');
+  const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
+  const showAppleOAuth = Platform.OS === 'ios' && appleOAuthEnabled;
+  const showAnyOAuth = showAppleOAuth || googleOAuthEnabled;
 
   // Warm up the browser on Android for faster OAuth sheet presentation
   useEffect(() => {
@@ -353,7 +358,7 @@ export default function SignInScreen() {
           {/* Apple first — solid black button per Apple HIG, iOS only. Shown above
               Google per App Store guideline 4.8: Sign in with Apple must be at
               least as prominent as other third-party social login options. */}
-          {Platform.OS === 'ios' && (
+          {showAppleOAuth && (
             <PressableScale
               style={[s.oauthBtn, s.appleBtn]}
               onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_apple', 'Apple'); }}
@@ -372,28 +377,32 @@ export default function SignInScreen() {
           )}
 
           {/* Google — dark surface with Google logo, per Google brand guidelines */}
-          <PressableScale
-            style={s.oauthBtn}
-            onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_google', 'Google'); }}
-            accessibilityLabel="Continue with Google"
-            disabled={!!oauthLoading || isFetching}
-          >
-            {oauthLoading === 'Google' ? (
-              <ActivityIndicator color={theme.text} size="small" />
-            ) : (
-              <>
-                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: FONT.bold, fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
-                <Text style={s.oauthText}>Continue with Google</Text>
-              </>
-            )}
-          </PressableScale>
+          {googleOAuthEnabled && (
+            <PressableScale
+              style={s.oauthBtn}
+              onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_google', 'Google'); }}
+              accessibilityLabel="Continue with Google"
+              disabled={!!oauthLoading || isFetching}
+            >
+              {oauthLoading === 'Google' ? (
+                <ActivityIndicator color={theme.text} size="small" />
+              ) : (
+                <>
+                  <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: FONT.bold, fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
+                  <Text style={s.oauthText}>Continue with Google</Text>
+                </>
+              )}
+            </PressableScale>
+          )}
 
           {/* Divider */}
-          <View style={s.divider}>
-            <View style={s.divLine} />
-            <Text style={s.divText}>or</Text>
-            <View style={s.divLine} />
-          </View>
+          {showAnyOAuth && (
+            <View style={s.divider}>
+              <View style={s.divLine} />
+              <Text style={s.divText}>or</Text>
+              <View style={s.divLine} />
+            </View>
+          )}
 
           {/* ── Email ──────────────────────────────────────────────────────────── */}
           <View style={s.fieldWrap}>
