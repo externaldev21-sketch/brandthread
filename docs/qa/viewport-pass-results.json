@@ -1,0 +1,76 @@
+[
+  {
+    "role": "buyer",
+    "viewport": "375x667",
+    "root": "/(buyer)",
+    "offscreenButtonCount": 18,
+    "screenshot": "docs/qa/screenshots/viewport-buyer-375x667-_buyer_.png",
+    "errors": [
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "AbortError: The play() request was interrupted by a call to pause(). https://goo.gl/LdLk22",
+      "AbortError: The play() request was interrupted by a call to pause(). https://goo.gl/LdLk22"
+    ]
+  },
+  {
+    "role": "buyer",
+    "viewport": "375x667",
+    "root": "/(buyer)/discover",
+    "offscreenButtonCount": 2,
+    "screenshot": "docs/qa/screenshots/viewport-buyer-375x667-_buyer_discover.png",
+    "errors": []
+  },
+  {
+    "role": "buyer",
+    "viewport": "1440x900",
+    "root": "/(buyer)",
+    "offscreenButtonCount": 18,
+    "screenshot": "docs/qa/screenshots/viewport-buyer-1440x900-_buyer_.png",
+    "errors": [
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found."
+    ]
+  },
+  {
+    "role": "buyer",
+    "viewport": "1440x900",
+    "root": "/(buyer)/discover",
+    "offscreenButtonCount": 2,
+    "screenshot": "docs/qa/screenshots/viewport-buyer-1440x900-_buyer_discover.png",
+    "errors": []
+  },
+  {
+    "role": "seller",
+    "viewport": "375x667",
+    "root": "/(tabs)",
+    "offscreenButtonCount": 0,
+    "screenshot": "docs/qa/screenshots/viewport-seller-375x667-_tabs_.png",
+    "errors": []
+  },
+  {
+    "role": "seller",
+    "viewport": "375x667",
+    "root": "/(tabs)/products",
+    "offscreenButtonCount": 0,
+    "screenshot": "docs/qa/screenshots/viewport-seller-375x667-_tabs_products.png",
+    "errors": []
+  },
+  {
+    "role": "seller",
+    "viewport": "1440x900",
+    "root": "/(tabs)",
+    "offscreenButtonCount": 0,
+    "screenshot": "docs/qa/screenshots/viewport-seller-1440x900-_tabs_.png",
+    "errors": []
+  },
+  {
+    "role": "seller",
+    "viewport": "1440x900",
+    "root": "/(tabs)/products",
+    "offscreenButtonCount": 0,
+    "screenshot": "docs/qa/screenshots/viewport-seller-1440x900-_tabs_products.png",
+    "errors": []
+  }
+]

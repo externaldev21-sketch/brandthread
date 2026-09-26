@@ -9,7 +9,8 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "db:purge-test-data": "tsx ./scripts/purgeTestData.ts"
+    "db:purge-test-data": "tsx ./scripts/purgeTestData.ts",
+    "qa:seed": "tsx ./scripts/seedQaFixtures.ts"
   },
   "dependencies": {
     "@clerk/express": "^2.1.35",

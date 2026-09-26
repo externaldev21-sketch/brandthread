@@ -1,0 +1,1106 @@
+[
+  {
+    "route": "/cart",
+    "file": "/(buyer)/cart.tsx"
+  },
+  {
+    "route": "/(buyer)/cart",
+    "file": "/(buyer)/cart.tsx"
+  },
+  {
+    "route": "/discover-feed",
+    "file": "/(buyer)/discover-feed.tsx"
+  },
+  {
+    "route": "/(buyer)/discover-feed",
+    "file": "/(buyer)/discover-feed.tsx"
+  },
+  {
+    "route": "/discover",
+    "file": "/(buyer)/discover.tsx"
+  },
+  {
+    "route": "/(buyer)/discover",
+    "file": "/(buyer)/discover.tsx"
+  },
+  {
+    "route": "/edit-profile",
+    "file": "/(buyer)/edit-profile.tsx"
+  },
+  {
+    "route": "/(buyer)/edit-profile",
+    "file": "/(buyer)/edit-profile.tsx"
+  },
+  {
+    "route": "/feed",
+    "file": "/(buyer)/feed.tsx"
+  },
+  {
+    "route": "/(buyer)/feed",
+    "file": "/(buyer)/feed.tsx"
+  },
+  {
+    "route": "/following",
+    "file": "/(buyer)/following.tsx"
+  },
+  {
+    "route": "/(buyer)/following",
+    "file": "/(buyer)/following.tsx"
+  },
+  {
+    "route": "/friends",
+    "file": "/(buyer)/friends.tsx"
+  },
+  {
+    "route": "/(buyer)/friends",
+    "file": "/(buyer)/friends.tsx"
+  },
+  {
+    "route": "/inbox",
+    "file": "/(buyer)/inbox.tsx"
+  },
+  {
+    "route": "/(buyer)/inbox",
+    "file": "/(buyer)/inbox.tsx"
+  },
+  {
+    "route": "/",
+    "file": "/(buyer)/index.tsx"
+  },
+  {
+    "route": "/(buyer)",
+    "file": "/(buyer)/index.tsx"
+  },
+  {
+    "route": "/orders",
+    "file": "/(buyer)/orders.tsx"
+  },
+  {
+    "route": "/(buyer)/orders",
+    "file": "/(buyer)/orders.tsx"
+  },
+  {
+    "route": "/profile",
+    "file": "/(buyer)/profile.tsx"
+  },
+  {
+    "route": "/(buyer)/profile",
+    "file": "/(buyer)/profile.tsx"
+  },
+  {
+    "route": "/search",
+    "file": "/(buyer)/search.tsx"
+  },
+  {
+    "route": "/(buyer)/search",
+    "file": "/(buyer)/search.tsx"
+  },
+  {
+    "route": "/analytics",
+    "file": "/(tabs)/analytics.tsx"
+  },
+  {
+    "route": "/(tabs)/analytics",
+    "file": "/(tabs)/analytics.tsx"
+  },
+  {
+    "route": "/(tabs)/feed",
+    "file": "/(tabs)/feed.tsx"
+  },
+  {
+    "route": "/(tabs)/following",
+    "file": "/(tabs)/following.tsx"
+  },
+  {
+    "route": "/(tabs)",
+    "file": "/(tabs)/index.tsx"
+  },
+  {
+    "route": "/marketing",
+    "file": "/(tabs)/marketing.tsx"
+  },
+  {
+    "route": "/(tabs)/marketing",
+    "file": "/(tabs)/marketing.tsx"
+  },
+  {
+    "route": "/more",
+    "file": "/(tabs)/more.tsx"
+  },
+  {
+    "route": "/(tabs)/more",
+    "file": "/(tabs)/more.tsx"
+  },
+  {
+    "route": "/(tabs)/orders",
+    "file": "/(tabs)/orders.tsx"
+  },
+  {
+    "route": "/products",
+    "file": "/(tabs)/products.tsx"
+  },
+  {
+    "route": "/(tabs)/products",
+    "file": "/(tabs)/products.tsx"
+  },
+  {
+    "route": "/(tabs)/profile",
+    "file": "/(tabs)/profile.tsx"
+  },
+  {
+    "route": "/studio",
+    "file": "/(tabs)/studio.tsx"
+  },
+  {
+    "route": "/(tabs)/studio",
+    "file": "/(tabs)/studio.tsx"
+  },
+  {
+    "route": "/account-switcher",
+    "file": "/account-switcher.tsx"
+  },
+  {
+    "route": "/account-type-settings",
+    "file": "/account-type-settings.tsx"
+  },
+  {
+    "route": "/account-type",
+    "file": "/account-type.tsx"
+  },
+  {
+    "route": "/activity-center",
+    "file": "/activity-center.tsx"
+  },
+  {
+    "route": "/add-product",
+    "file": "/add-product.tsx"
+  },
+  {
+    "route": "/admin-reports",
+    "file": "/admin-reports.tsx"
+  },
+  {
+    "route": "/ai-assistant",
+    "file": "/ai-assistant.tsx"
+  },
+  {
+    "route": "/ai-brain",
+    "file": "/ai-brain.tsx"
+  },
+  {
+    "route": "/ai-brand-memory",
+    "file": "/ai-brand-memory.tsx"
+  },
+  {
+    "route": "/ai-mockup-chat",
+    "file": "/ai-mockup-chat.tsx"
+  },
+  {
+    "route": "/ai-photography-chat",
+    "file": "/ai-photography-chat.tsx"
+  },
+  {
+    "route": "/ai-settings",
+    "file": "/ai-settings.tsx"
+  },
+  {
+    "route": "/ai-studio",
+    "file": "/ai-studio.tsx"
+  },
+  {
+    "route": "/analytics-content",
+    "file": "/analytics-content.tsx"
+  },
+  {
+    "route": "/analytics-customers",
+    "file": "/analytics-customers.tsx"
+  },
+  {
+    "route": "/analytics-inventory",
+    "file": "/analytics-inventory.tsx"
+  },
+  {
+    "route": "/analytics-marketing",
+    "file": "/analytics-marketing.tsx"
+  },
+  {
+    "route": "/analytics-production",
+    "file": "/analytics-production.tsx"
+  },
+  {
+    "route": "/analytics-products",
+    "file": "/analytics-products.tsx"
+  },
+  {
+    "route": "/analytics-profit",
+    "file": "/analytics-profit.tsx"
+  },
+  {
+    "route": "/analytics-sales",
+    "file": "/analytics-sales.tsx"
+  },
+  {
+    "route": "/analytics-store",
+    "file": "/analytics-store.tsx"
+  },
+  {
+    "route": "/app-icon",
+    "file": "/app-icon.tsx"
+  },
+  {
+    "route": "/app-theme",
+    "file": "/app-theme.tsx"
+  },
+  {
+    "route": "/automation",
+    "file": "/automation.tsx"
+  },
+  {
+    "route": "/bg-removal",
+    "file": "/bg-removal.tsx"
+  },
+  {
+    "route": "/billing",
+    "file": "/billing.tsx"
+  },
+  {
+    "route": "/biometric-unlock",
+    "file": "/biometric-unlock.tsx"
+  },
+  {
+    "route": "/boost",
+    "file": "/boost.tsx"
+  },
+  {
+    "route": "/brand",
+    "file": "/brand.tsx"
+  },
+  {
+    "route": "/buyer-account-center",
+    "file": "/buyer-account-center.tsx"
+  },
+  {
+    "route": "/buyer-account-control",
+    "file": "/buyer-account-control.tsx"
+  },
+  {
+    "route": "/buyer-addresses",
+    "file": "/buyer-addresses.tsx"
+  },
+  {
+    "route": "/buyer-archive",
+    "file": "/buyer-archive.tsx"
+  },
+  {
+    "route": "/buyer-blocked",
+    "file": "/buyer-blocked.tsx"
+  },
+  {
+    "route": "/buyer-checkout",
+    "file": "/buyer-checkout.tsx"
+  },
+  {
+    "route": "/buyer-close-friends",
+    "file": "/buyer-close-friends.tsx"
+  },
+  {
+    "route": "/buyer-collection",
+    "file": "/buyer-collection.tsx"
+  },
+  {
+    "route": "/buyer-conversation",
+    "file": "/buyer-conversation.tsx"
+  },
+  {
+    "route": "/buyer-download-data",
+    "file": "/buyer-download-data.tsx"
+  },
+  {
+    "route": "/buyer-drop-detail",
+    "file": "/buyer-drop-detail.tsx"
+  },
+  {
+    "route": "/buyer-drops",
+    "file": "/buyer-drops.tsx"
+  },
+  {
+    "route": "/buyer-friend-requests",
+    "file": "/buyer-friend-requests.tsx"
+  },
+  {
+    "route": "/buyer-highlights-manager",
+    "file": "/buyer-highlights-manager.tsx"
+  },
+  {
+    "route": "/buyer-invite",
+    "file": "/buyer-invite.tsx"
+  },
+  {
+    "route": "/buyer-live",
+    "file": "/buyer-live.tsx"
+  },
+  {
+    "route": "/buyer-login-activity",
+    "file": "/buyer-login-activity.tsx"
+  },
+  {
+    "route": "/buyer-muted",
+    "file": "/buyer-muted.tsx"
+  },
+  {
+    "route": "/buyer-notifications",
+    "file": "/buyer-notifications.tsx"
+  },
+  {
+    "route": "/buyer-order-detail",
+    "file": "/buyer-order-detail.tsx"
+  },
+  {
+    "route": "/buyer-other-profile",
+    "file": "/buyer-other-profile.tsx"
+  },
+  {
+    "route": "/buyer-payment-methods",
+    "file": "/buyer-payment-methods.tsx"
+  },
+  {
+    "route": "/buyer-personal-details",
+    "file": "/buyer-personal-details.tsx"
+  },
+  {
+    "route": "/buyer-post-comments",
+    "file": "/buyer-post-comments.tsx"
+  },
+  {
+    "route": "/buyer-post-viewer",
+    "file": "/buyer-post-viewer.tsx"
+  },
+  {
+    "route": "/buyer-privacy-settings",
+    "file": "/buyer-privacy-settings.tsx"
+  },
+  {
+    "route": "/buyer-problem-report",
+    "file": "/buyer-problem-report.tsx"
+  },
+  {
+    "route": "/buyer-product-detail",
+    "file": "/buyer-product-detail.tsx"
+  },
+  {
+    "route": "/buyer-qr-code",
+    "file": "/buyer-qr-code.tsx"
+  },
+  {
+    "route": "/buyer-refund-request",
+    "file": "/buyer-refund-request.tsx"
+  },
+  {
+    "route": "/buyer-report",
+    "file": "/buyer-report.tsx"
+  },
+  {
+    "route": "/buyer-restricted",
+    "file": "/buyer-restricted.tsx"
+  },
+  {
+    "route": "/buyer-return-request",
+    "file": "/buyer-return-request.tsx"
+  },
+  {
+    "route": "/buyer-saved",
+    "file": "/buyer-saved.tsx"
+  },
+  {
+    "route": "/buyer-security",
+    "file": "/buyer-security.tsx"
+  },
+  {
+    "route": "/buyer-settings-detail",
+    "file": "/buyer-settings-detail.tsx"
+  },
+  {
+    "route": "/buyer-settings",
+    "file": "/buyer-settings.tsx"
+  },
+  {
+    "route": "/buyer-story-create",
+    "file": "/buyer-story-create.tsx"
+  },
+  {
+    "route": "/buyer-story-viewer",
+    "file": "/buyer-story-viewer.tsx"
+  },
+  {
+    "route": "/buyer-your-activity",
+    "file": "/buyer-your-activity.tsx"
+  },
+  {
+    "route": "/c/d76d149c-3b3b-4f44-9779-f8e25ca13264",
+    "file": "/c/[collectionId].tsx"
+  },
+  {
+    "route": "/call-screen",
+    "file": "/call-screen.tsx"
+  },
+  {
+    "route": "/camera-capture",
+    "file": "/camera-capture.tsx"
+  },
+  {
+    "route": "/checkout",
+    "file": "/checkout.tsx"
+  },
+  {
+    "route": "/community-chat",
+    "file": "/community-chat.tsx"
+  },
+  {
+    "route": "/community-guidelines",
+    "file": "/community-guidelines.tsx"
+  },
+  {
+    "route": "/community",
+    "file": "/community.tsx"
+  },
+  {
+    "route": "/connections",
+    "file": "/connections.tsx"
+  },
+  {
+    "route": "/content",
+    "file": "/content.tsx"
+  },
+  {
+    "route": "/create-post",
+    "file": "/create-post.tsx"
+  },
+  {
+    "route": "/customer-accounts",
+    "file": "/customer-accounts.tsx"
+  },
+  {
+    "route": "/customer-events",
+    "file": "/customer-events.tsx"
+  },
+  {
+    "route": "/customer-orders",
+    "file": "/customer-orders.tsx"
+  },
+  {
+    "route": "/customer-privacy",
+    "file": "/customer-privacy.tsx"
+  },
+  {
+    "route": "/customers",
+    "file": "/customers.tsx"
+  },
+  {
+    "route": "/delete-account",
+    "file": "/delete-account.tsx"
+  },
+  {
+    "route": "/design-ai-photoshoot",
+    "file": "/design-ai-photoshoot.tsx"
+  },
+  {
+    "route": "/design-bg-removal",
+    "file": "/design-bg-removal.tsx"
+  },
+  {
+    "route": "/design-bg-replace",
+    "file": "/design-bg-replace.tsx"
+  },
+  {
+    "route": "/design-brand-assets",
+    "file": "/design-brand-assets.tsx"
+  },
+  {
+    "route": "/design-campaign",
+    "file": "/design-campaign.tsx"
+  },
+  {
+    "route": "/design-canvas",
+    "file": "/design-canvas.tsx"
+  },
+  {
+    "route": "/design-export",
+    "file": "/design-export.tsx"
+  },
+  {
+    "route": "/design-garment",
+    "file": "/design-garment.tsx"
+  },
+  {
+    "route": "/design-mockup-preview",
+    "file": "/design-mockup-preview.tsx"
+  },
+  {
+    "route": "/design-mockup-to-model",
+    "file": "/design-mockup-to-model.tsx"
+  },
+  {
+    "route": "/design-project",
+    "file": "/design-project.tsx"
+  },
+  {
+    "route": "/design-prompt-edit",
+    "file": "/design-prompt-edit.tsx"
+  },
+  {
+    "route": "/design-templates",
+    "file": "/design-templates.tsx"
+  },
+  {
+    "route": "/design-text-to-design",
+    "file": "/design-text-to-design.tsx"
+  },
+  {
+    "route": "/design-upload-sketch",
+    "file": "/design-upload-sketch.tsx"
+  },
+  {
+    "route": "/design-versions",
+    "file": "/design-versions.tsx"
+  },
+  {
+    "route": "/design",
+    "file": "/design.tsx"
+  },
+  {
+    "route": "/discounts",
+    "file": "/discounts.tsx"
+  },
+  {
+    "route": "/dispute-detail",
+    "file": "/dispute-detail.tsx"
+  },
+  {
+    "route": "/drafts",
+    "file": "/drafts.tsx"
+  },
+  {
+    "route": "/drops/d76d149c-3b3b-4f44-9779-f8e25ca13264",
+    "file": "/drops/[dropId].tsx"
+  },
+  {
+    "route": "/finance",
+    "file": "/finance.tsx"
+  },
+  {
+    "route": "/forgot-password",
+    "file": "/forgot-password.tsx"
+  },
+  {
+    "route": "/freelancer-apply",
+    "file": "/freelancer-apply.tsx"
+  },
+  {
+    "route": "/freelancer-jobs",
+    "file": "/freelancer-jobs.tsx"
+  },
+  {
+    "route": "/freelancer-profile",
+    "file": "/freelancer-profile.tsx"
+  },
+  {
+    "route": "/fulfill-batch",
+    "file": "/fulfill-batch.tsx"
+  },
+  {
+    "route": "/fulfill-order",
+    "file": "/fulfill-order.tsx"
+  },
+  {
+    "route": "/general-settings",
+    "file": "/general-settings.tsx"
+  },
+  {
+    "route": "/help",
+    "file": "/help.tsx"
+  },
+  {
+    "route": "/integrations",
+    "file": "/integrations/index.tsx"
+  },
+  {
+    "route": "/integrations/klaviyo",
+    "file": "/integrations/klaviyo.tsx"
+  },
+  {
+    "route": "/integrations/shopify-fulfillment",
+    "file": "/integrations/shopify-fulfillment.tsx"
+  },
+  {
+    "route": "/inventory-adjust",
+    "file": "/inventory-adjust.tsx"
+  },
+  {
+    "route": "/inventory-count",
+    "file": "/inventory-count.tsx"
+  },
+  {
+    "route": "/inventory-detail",
+    "file": "/inventory-detail.tsx"
+  },
+  {
+    "route": "/inventory-incoming",
+    "file": "/inventory-incoming.tsx"
+  },
+  {
+    "route": "/inventory-location",
+    "file": "/inventory-location.tsx"
+  },
+  {
+    "route": "/inventory-transfer",
+    "file": "/inventory-transfer.tsx"
+  },
+  {
+    "route": "/inventory",
+    "file": "/inventory.tsx"
+  },
+  {
+    "route": "/invite-manufacturer",
+    "file": "/invite-manufacturer.tsx"
+  },
+  {
+    "route": "/ip-report",
+    "file": "/ip-report.tsx"
+  },
+  {
+    "route": "/languages",
+    "file": "/languages.tsx"
+  },
+  {
+    "route": "/lifestyle-images",
+    "file": "/lifestyle-images.tsx"
+  },
+  {
+    "route": "/locations",
+    "file": "/locations.tsx"
+  },
+  {
+    "route": "/login-activity",
+    "file": "/login-activity.tsx"
+  },
+  {
+    "route": "/login-methods",
+    "file": "/login-methods.tsx"
+  },
+  {
+    "route": "/loyalty",
+    "file": "/loyalty.tsx"
+  },
+  {
+    "route": "/manufacturer-compare",
+    "file": "/manufacturer-compare.tsx"
+  },
+  {
+    "route": "/manufacturer-hub",
+    "file": "/manufacturer-hub.tsx"
+  },
+  {
+    "route": "/manufacturer-messages",
+    "file": "/manufacturer-messages.tsx"
+  },
+  {
+    "route": "/manufacturer-onboard",
+    "file": "/manufacturer-onboard.tsx"
+  },
+  {
+    "route": "/manufacturer-product",
+    "file": "/manufacturer-product.tsx"
+  },
+  {
+    "route": "/manufacturer-profile",
+    "file": "/manufacturer-profile.tsx"
+  },
+  {
+    "route": "/manufacturer",
+    "file": "/manufacturer.tsx"
+  },
+  {
+    "route": "/meta-ads-connect",
+    "file": "/meta-ads-connect.tsx"
+  },
+  {
+    "route": "/meta-ads-manage",
+    "file": "/meta-ads-manage.tsx"
+  },
+  {
+    "route": "/meta-ads-setup",
+    "file": "/meta-ads-setup.tsx"
+  },
+  {
+    "route": "/metafields",
+    "file": "/metafields.tsx"
+  },
+  {
+    "route": "/mobile-app-builder",
+    "file": "/mobile-app-builder.tsx"
+  },
+  {
+    "route": "/muted-words",
+    "file": "/muted-words.tsx"
+  },
+  {
+    "route": "/navigation-isolation-probe",
+    "file": "/navigation-isolation-probe.tsx"
+  },
+  {
+    "route": "/notifications-settings",
+    "file": "/notifications-settings.tsx"
+  },
+  {
+    "route": "/onboarding",
+    "file": "/onboarding.tsx"
+  },
+  {
+    "route": "/order-detail",
+    "file": "/order-detail.tsx"
+  },
+  {
+    "route": "/payments",
+    "file": "/payments.tsx"
+  },
+  {
+    "route": "/payouts",
+    "file": "/payouts.tsx"
+  },
+  {
+    "route": "/plans",
+    "file": "/plans.tsx"
+  },
+  {
+    "route": "/post-analytics",
+    "file": "/post-analytics.tsx"
+  },
+  {
+    "route": "/privacy",
+    "file": "/privacy.tsx"
+  },
+  {
+    "route": "/product-bundle-edit",
+    "file": "/product-bundle-edit.tsx"
+  },
+  {
+    "route": "/product-bundles",
+    "file": "/product-bundles.tsx"
+  },
+  {
+    "route": "/product-detail",
+    "file": "/product-detail.tsx"
+  },
+  {
+    "route": "/product-editor",
+    "file": "/product-editor.tsx"
+  },
+  {
+    "route": "/product-import",
+    "file": "/product-import.tsx"
+  },
+  {
+    "route": "/product-size-chart",
+    "file": "/product-size-chart.tsx"
+  },
+  {
+    "route": "/product-store",
+    "file": "/product-store.tsx"
+  },
+  {
+    "route": "/production-detail",
+    "file": "/production-detail.tsx"
+  },
+  {
+    "route": "/profile-products",
+    "file": "/profile-products.tsx"
+  },
+  {
+    "route": "/profile-videos",
+    "file": "/profile-videos.tsx"
+  },
+  {
+    "route": "/push-notifications",
+    "file": "/push-notifications.tsx"
+  },
+  {
+    "route": "/quote-compare",
+    "file": "/quote-compare.tsx"
+  },
+  {
+    "route": "/quote-detail",
+    "file": "/quote-detail.tsx"
+  },
+  {
+    "route": "/quote-request",
+    "file": "/quote-request.tsx"
+  },
+  {
+    "route": "/refund-detail",
+    "file": "/refund-detail.tsx"
+  },
+  {
+    "route": "/request-sample",
+    "file": "/request-sample.tsx"
+  },
+  {
+    "route": "/return-detail",
+    "file": "/return-detail.tsx"
+  },
+  {
+    "route": "/return-request",
+    "file": "/return-request.tsx"
+  },
+  {
+    "route": "/rfq-compare",
+    "file": "/rfq-compare.tsx"
+  },
+  {
+    "route": "/rfq-list",
+    "file": "/rfq-list.tsx"
+  },
+  {
+    "route": "/rfq-post",
+    "file": "/rfq-post.tsx"
+  },
+  {
+    "route": "/roles",
+    "file": "/roles.tsx"
+  },
+  {
+    "route": "/sample-detail",
+    "file": "/sample-detail.tsx"
+  },
+  {
+    "route": "/security",
+    "file": "/security.tsx"
+  },
+  {
+    "route": "/seller-conversation",
+    "file": "/seller-conversation.tsx"
+  },
+  {
+    "route": "/seller-data-export",
+    "file": "/seller-data-export.tsx"
+  },
+  {
+    "route": "/seller-drop-create",
+    "file": "/seller-drop-create.tsx"
+  },
+  {
+    "route": "/seller-drop-preview",
+    "file": "/seller-drop-preview.tsx"
+  },
+  {
+    "route": "/seller-drops",
+    "file": "/seller-drops.tsx"
+  },
+  {
+    "route": "/seller-go-live",
+    "file": "/seller-go-live.tsx"
+  },
+  {
+    "route": "/seller-inbox",
+    "file": "/seller-inbox.tsx"
+  },
+  {
+    "route": "/seller-live",
+    "file": "/seller-live.tsx"
+  },
+  {
+    "route": "/seller-profile",
+    "file": "/seller-profile.tsx"
+  },
+  {
+    "route": "/seller-reviews",
+    "file": "/seller-reviews.tsx"
+  },
+  {
+    "route": "/seller-settings",
+    "file": "/seller-settings.tsx"
+  },
+  {
+    "route": "/seller-verification",
+    "file": "/seller-verification.tsx"
+  },
+  {
+    "route": "/settings",
+    "file": "/settings.tsx"
+  },
+  {
+    "route": "/setup",
+    "file": "/setup.tsx"
+  },
+  {
+    "route": "/share-profile",
+    "file": "/share-profile.tsx"
+  },
+  {
+    "route": "/share-store",
+    "file": "/share-store.tsx"
+  },
+  {
+    "route": "/shipping-delivery",
+    "file": "/shipping-delivery.tsx"
+  },
+  {
+    "route": "/shipping-label",
+    "file": "/shipping-label.tsx"
+  },
+  {
+    "route": "/shipping",
+    "file": "/shipping.tsx"
+  },
+  {
+    "route": "/shopify-import",
+    "file": "/shopify-import.tsx"
+  },
+  {
+    "route": "/shopping-preferences",
+    "file": "/shopping-preferences.tsx"
+  },
+  {
+    "route": "/sign-in",
+    "file": "/sign-in.tsx"
+  },
+  {
+    "route": "/splash",
+    "file": "/splash.tsx"
+  },
+  {
+    "route": "/store-ai-improve",
+    "file": "/store-ai-improve.tsx"
+  },
+  {
+    "route": "/store-builder",
+    "file": "/store-builder.tsx"
+  },
+  {
+    "route": "/store-collections",
+    "file": "/store-collections.tsx"
+  },
+  {
+    "route": "/store-domain",
+    "file": "/store-domain.tsx"
+  },
+  {
+    "route": "/store-editor",
+    "file": "/store-editor.tsx"
+  },
+  {
+    "route": "/store-from-logo",
+    "file": "/store-from-logo.tsx"
+  },
+  {
+    "route": "/store-from-moodboard",
+    "file": "/store-from-moodboard.tsx"
+  },
+  {
+    "route": "/store-from-social",
+    "file": "/store-from-social.tsx"
+  },
+  {
+    "route": "/store-generate",
+    "file": "/store-generate.tsx"
+  },
+  {
+    "route": "/store-generating",
+    "file": "/store-generating.tsx"
+  },
+  {
+    "route": "/store-nav",
+    "file": "/store-nav.tsx"
+  },
+  {
+    "route": "/store-pages",
+    "file": "/store-pages.tsx"
+  },
+  {
+    "route": "/store-policies",
+    "file": "/store-policies.tsx"
+  },
+  {
+    "route": "/store-preview",
+    "file": "/store-preview.tsx"
+  },
+  {
+    "route": "/store-publish",
+    "file": "/store-publish.tsx"
+  },
+  {
+    "route": "/store-sections",
+    "file": "/store-sections.tsx"
+  },
+  {
+    "route": "/store-seo",
+    "file": "/store-seo.tsx"
+  },
+  {
+    "route": "/store-settings",
+    "file": "/store-settings.tsx"
+  },
+  {
+    "route": "/store-theme-picker",
+    "file": "/store-theme-picker.tsx"
+  },
+  {
+    "route": "/store-versions",
+    "file": "/store-versions.tsx"
+  },
+  {
+    "route": "/store/product/d76d149c-3b3b-4f44-9779-f8e25ca13264",
+    "file": "/store/product/[productId].tsx"
+  },
+  {
+    "route": "/subscription",
+    "file": "/subscription.tsx"
+  },
+  {
+    "route": "/taxes-duties",
+    "file": "/taxes-duties.tsx"
+  },
+  {
+    "route": "/team-invite",
+    "file": "/team-invite.tsx"
+  },
+  {
+    "route": "/team",
+    "file": "/team.tsx"
+  },
+  {
+    "route": "/tech-pack-generator",
+    "file": "/tech-pack-generator.tsx"
+  },
+  {
+    "route": "/terms",
+    "file": "/terms.tsx"
+  },
+  {
+    "route": "/thread-cash",
+    "file": "/thread-cash.tsx"
+  },
+  {
+    "route": "/thread-checkout",
+    "file": "/thread-checkout.tsx"
+  },
+  {
+    "route": "/thread-explainer",
+    "file": "/thread-explainer.tsx"
+  },
+  {
+    "route": "/thread-product-detail",
+    "file": "/thread-product-detail.tsx"
+  },
+  {
+    "route": "/u/qa-seed-seller-1",
+    "file": "/u/[username].tsx"
+  },
+  {
+    "route": "/users",
+    "file": "/users.tsx"
+  },
+  {
+    "route": "/vacation-mode",
+    "file": "/vacation-mode.tsx"
+  }
+]

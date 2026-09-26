@@ -1,0 +1,649 @@
+[
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/(buyer)",
+    "reachedFrom": "start",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found."
+    ],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [
+      {
+        "type": "offscreen",
+        "label": "$325.00",
+        "rect": {
+          "x": 16,
+          "y": 1454,
+          "w": 101,
+          "h": 34
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "MV",
+        "rect": {
+          "x": 338,
+          "y": 1298,
+          "w": 40,
+          "h": 40
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 1355,
+          "w": 48,
+          "h": 38
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 1408,
+          "w": 48,
+          "h": 36
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 1459,
+          "w": 48,
+          "h": 38
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 1512,
+          "w": 48,
+          "h": 37
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 1564,
+          "w": 48,
+          "h": 36
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Maison Vela",
+        "rect": {
+          "x": 16,
+          "y": 1502,
+          "w": 290,
+          "h": 28
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Chrome Room · Vela Studios",
+        "rect": {
+          "x": 16,
+          "y": 1584,
+          "w": 290,
+          "h": 16
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "$560.00",
+        "rect": {
+          "x": 16,
+          "y": 2298,
+          "w": 101,
+          "h": 34
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "SR",
+        "rect": {
+          "x": 338,
+          "y": 2142,
+          "w": 40,
+          "h": 40
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 2199,
+          "w": 48,
+          "h": 38
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 2252,
+          "w": 48,
+          "h": 36
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 2303,
+          "w": 48,
+          "h": 38
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 2356,
+          "w": 48,
+          "h": 37
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 2408,
+          "w": 48,
+          "h": 36
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Saint Rue",
+        "rect": {
+          "x": 16,
+          "y": 2346,
+          "w": 290,
+          "h": 28
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Concrete Waltz · Saint Rue",
+        "rect": {
+          "x": 16,
+          "y": 2428,
+          "w": 290,
+          "h": 16
+        }
+      }
+    ],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-1-_buyer_.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Shop Sculpted Wool Coat, $480.00",
+      "View Atelier Noire's profile",
+      "Like, 0 likes",
+      "Comments, 0"
+    ],
+    "interactiveElementCount": 50
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/(buyer)/discover",
+    "reachedFrom": "start",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [
+      {
+        "type": "offscreen",
+        "label": "For You, full screenSwipe through products one at a time",
+        "rect": {
+          "x": 16,
+          "y": 1060,
+          "w": 358,
+          "h": 68
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "See all",
+        "rect": {
+          "x": 286,
+          "y": 1547,
+          "w": 88,
+          "h": 36
+        }
+      }
+    ],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-2-_buyer_discover.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Open full-screen For You feed",
+      "See all, Drops"
+    ],
+    "interactiveElementCount": 19
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/(buyer)/inbox",
+    "reachedFrom": "start",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-3-_buyer_inbox.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Search conversations",
+      "buyer-bottom-tab-bar"
+    ],
+    "interactiveElementCount": 20
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/(buyer)/search",
+    "reachedFrom": "start",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [
+      {
+        "type": "offscreen",
+        "label": "Browse trending brands and drops",
+        "rect": {
+          "x": 0,
+          "y": 1353,
+          "w": 390,
+          "h": 52
+        }
+      }
+    ],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-4-_buyer_search.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Search is empty",
+      "Browse trending brands and drops",
+      "buyer-bottom-tab-bar"
+    ],
+    "interactiveElementCount": 21
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/(buyer)/profile",
+    "reachedFrom": "start",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [
+      {
+        "type": "offscreen",
+        "label": "Post your first video",
+        "rect": {
+          "x": 32,
+          "y": 909,
+          "w": 326,
+          "h": 52
+        }
+      }
+    ],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-5-_buyer_profile.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "0 Posts"
+    ],
+    "interactiveElementCount": 36
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/inbox",
+    "reachedFrom": "/(buyer)/discover -> click \"buyer-bottom-tab-bar\"",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-6-_inbox.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Search conversations",
+      "buyer-bottom-tab-bar"
+    ],
+    "interactiveElementCount": 20
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/",
+    "reachedFrom": "/(buyer)/discover -> click \"Home tab\"",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found."
+    ],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [
+      {
+        "type": "offscreen",
+        "label": "$325.00",
+        "rect": {
+          "x": 16,
+          "y": 1454,
+          "w": 101,
+          "h": 34
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "MV",
+        "rect": {
+          "x": 338,
+          "y": 1298,
+          "w": 40,
+          "h": 40
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 1355,
+          "w": 48,
+          "h": 38
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 1408,
+          "w": 48,
+          "h": 36
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 1459,
+          "w": 48,
+          "h": 38
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 1512,
+          "w": 48,
+          "h": 37
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 1564,
+          "w": 48,
+          "h": 36
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Maison Vela",
+        "rect": {
+          "x": 16,
+          "y": 1502,
+          "w": 290,
+          "h": 28
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Chrome Room · Vela Studios",
+        "rect": {
+          "x": 16,
+          "y": 1584,
+          "w": 290,
+          "h": 16
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "$560.00",
+        "rect": {
+          "x": 16,
+          "y": 2298,
+          "w": 101,
+          "h": 34
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "SR",
+        "rect": {
+          "x": 338,
+          "y": 2142,
+          "w": 40,
+          "h": 40
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 2199,
+          "w": 48,
+          "h": 38
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 2252,
+          "w": 48,
+          "h": 36
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 2303,
+          "w": 48,
+          "h": 38
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 2356,
+          "w": 48,
+          "h": 37
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 334,
+          "y": 2408,
+          "w": 48,
+          "h": 36
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Saint Rue",
+        "rect": {
+          "x": 16,
+          "y": 2346,
+          "w": 290,
+          "h": 28
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Concrete Waltz · Saint Rue",
+        "rect": {
+          "x": 16,
+          "y": 2428,
+          "w": 290,
+          "h": 16
+        }
+      }
+    ],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-7-_.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Shop Sculpted Wool Coat, $480.00",
+      "View Atelier Noire's profile",
+      "Like, 0 likes",
+      "Comments, 0"
+    ],
+    "interactiveElementCount": 50
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/connections?type=followers",
+    "reachedFrom": "/(buyer)/profile -> click \"buyer-profile\"",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": true,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-8-_connections_type_followers.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Go back"
+    ],
+    "interactiveElementCount": 12
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/buyer-story-create",
+    "reachedFrom": "/(buyer)/profile -> click \"Create a story\"",
+    "navError": null,
+    "consoleErrors": [
+      "Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. #F7F7FA",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-9-_buyer_story_create.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Close",
+      "Share story"
+    ],
+    "interactiveElementCount": 32
+  }
+]
