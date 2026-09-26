@@ -58,19 +58,15 @@ describe('buyer Home feed behind the bar', () => {
     // line all key off one shared number with no gap between them.
     expect(feed).toContain('? buyerBarInset\n    : Math.max(previewBottomInset, 8) + 14;');
     expect(feed).toContain('immersive={isBuyerSurface}');
-    // The shop tag anchors to bare bottomClearance (it sits well above the
-    // scrub bar regardless). The rail and caption block anchor to
-    // bottomClearance *plus* their own extra gap constants instead — bare
-    // bottomClearance is where the scrub/progress bar itself sits, so both
-    // used to end up touching/overlapping it with zero gap.
-    expect(feed).toContain('styles.rail, chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }');
-    expect(feed).toContain('{ bottom: bottomClearance + CAPTION_BOTTOM_GAP }]} pointerEvents="box-none"');
-    // The shop trigger is a collapsed side tab on the left screen edge (see
-    // ShopSideTab), not part of the bottom-left flex column at all any more.
-    expect(feed).toContain('function ShopSideTab(');
-    expect(feed).toContain("shopSideTab: {\n    position: 'absolute', left: 0,");
-    expect(feed).not.toContain('bottom: bottomClearance + (hasRepostIdentity ? 158 : 122)');
-    expect(feed).toContain('const RAIL_BOTTOM_GAP = 22;');
+    // Rail and caption block (which carries the shop pill in its own flow,
+    // rather than a separately-positioned overlay) — see
+    // components/buyer-feed/RightActionRail.tsx and CaptionBlock.tsx, wired
+    // from app/(tabs)/feed.tsx. Each anchors to bottomClearance *plus* its
+    // own extra gap constant, not bare bottomClearance: that's where the
+    // scrub/progress bar itself sits, so bare bottomClearance on both used
+    // to put the rail's last item and the caption's sound line touching it.
+    expect(feed).toContain('<RightActionRail\n        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}');
+    expect(feed).toContain('<CaptionBlock\n        style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}');    expect(feed).toContain('const RAIL_BOTTOM_GAP = 22;');
     expect(feed).toContain('const CAPTION_BOTTOM_GAP = 18;');
     // The scrub line sits exactly at the seam where the sharp video is
     // clipped and the blurred tab-bar strip begins — no offset gap.

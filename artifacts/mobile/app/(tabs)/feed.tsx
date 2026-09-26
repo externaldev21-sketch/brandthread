@@ -71,13 +71,16 @@ import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
+import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { CaptionBlock } from '@/components/buyer-feed/CaptionBlock';
+import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
+import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -1208,159 +1211,13 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
   );
 }
 
-// ─── Shop side tab — a collapsed tab flush against the left screen edge ─────
-// (the right edge is the action rail) that glides out into a full card on
-// tap, rather than an always-visible price pill sitting over the video.
-// Fully solid/flat (no BlurView/backdrop-filter, no shimmer): the earlier
-// pill's frosted-glass background re-sampled the moving video behind it
-// every frame during a swipe, which read as a shimmer/glitch — this has no
-// live-sampling background at all, only a fixed solid fill. Collapsed by
-// default with zero mount/entrance animation (only a user tap ever starts
-// the expand/collapse spring), and force-collapses (no animation skipped —
-// this one transition is allowed since it's a direct response to the cell
-// leaving, matching "collapses back on swiping to the next video" in spec)
-// when the cell stops being active, so it never carries an expanded state
-// into a swipe.
-const SHOP_TAB_COLLAPSE_MS = 4000;
-
-function ShopSideTab({
-  tag, extraCount, onPress, isActive,
-}: {
-  tag: SpotlightProductTag;
-  extraCount: number;
-  onPress: () => void;
-  isActive: boolean;
-}) {
-  const { width: windowWidth } = useWindowDimensions();
-  const [expanded, setExpanded] = useState(false);
-  const anim = useRef(new Animated.Value(0)).current;
-  const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Once the expand/collapse spring settles, `expandedTranslate` below is
-  // sitting at its identity value (0) but the Animated.View's `transform`
-  // key would otherwise stay in place forever — on react-native-web that
-  // pins the expanded card's product name/price to a permanent compositing
-  // layer, which softens the text if that layer's box lands on a fractional
-  // device pixel. Dropped once settled instead. See lib/animationUtils.ts.
-  const settled = useSettled();
-
-  const clearCollapseTimer = useCallback(() => {
-    if (collapseTimer.current) {
-      clearTimeout(collapseTimer.current);
-      collapseTimer.current = null;
-    }
-  }, []);
-
-  const collapse = useCallback(() => {
-    clearCollapseTimer();
-    setExpanded(false);
-    settled.run(Animated.spring(anim, { toValue: 0, useNativeDriver: false, speed: 18, bounciness: 0 }));
-  }, [anim, clearCollapseTimer, settled]);
-
-  const expand = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setExpanded(true);
-    settled.run(Animated.spring(anim, { toValue: 1, useNativeDriver: false, speed: 18, bounciness: 0 }));
-    clearCollapseTimer();
-    collapseTimer.current = setTimeout(collapse, SHOP_TAB_COLLAPSE_MS);
-  }, [anim, clearCollapseTimer, collapse, settled]);
-
-  useEffect(() => {
-    if (!isActive) collapse();
-    // Only reacting to the cell becoming inactive — becoming active must
-    // never itself start an animation (see the module comment above).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive]);
-
-  useEffect(() => () => clearCollapseTimer(), [clearCollapseTimer]);
-
-  // A sleek, narrow strip when expanded — max ~62% of screen width, not a
-  // big card — sized off the live window width so it holds at 375/390/430.
-  const expandedWidth = Math.round(windowWidth * 0.62);
-  const width = anim.interpolate({ inputRange: [0, 1], outputRange: [28, expandedWidth] });
-  const collapsedOpacity = anim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [1, 0, 0] });
-  const expandedOpacity = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 0, 1] });
-  const expandedTranslate = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [8, 8, 0] });
-
-  return (
-    <>
-      {/* Tapping anywhere else on the video collapses the expanded card —
-          rendered only while expanded, behind the tab itself in z-order. */}
-      {expanded && (
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={collapse}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        />
-      )}
-      <Animated.View
-        style={[styles.shopSideTab, { width }]}
-        accessibilityRole="button"
-        accessibilityLabel={
-          expanded
-            ? `Shop ${tag.productName}, ${formatCents(tag.priceCents)}`
-            : 'Shop this video'
-        }
-      >
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={0.85}
-          onPress={expanded ? onPress : expand}
-          testID="shop-tag-pill"
-        >
-          <Animated.View
-            pointerEvents={expanded ? 'none' : 'auto'}
-            style={[styles.shopSideTabCollapsed, { opacity: collapsedOpacity }]}
-          >
-            {/* Icon + label are laid out and rotated together as ONE unit,
-                not rotated separately: rotating only the Text keeps its
-                pre-rotation (unrotated) box for layout purposes, so
-                anything positioned relative to that stale box — like the
-                icon above it in a flex column — lands using the wrong
-                effective width/height once the text is actually rotated,
-                which is what put the bag icon on top of the "P". Laid out
-                here as a plain horizontal row (label, then icon) and
-                rotated as a whole: a -90deg turn maps "left" to the
-                bottom and "right" to the top, so the label (left) reads
-                bottom-to-top exactly as before and the icon (right) ends
-                up above it, with real layout-computed spacing between
-                them instead of a stale gap. */}
-            <View style={styles.shopSideTabCollapsedStack}>
-              <Text style={styles.shopSideTabLabel}>SHOP</Text>
-              <Feather name="shopping-bag" size={11} color={ON_DARK} />
-            </View>
-          </Animated.View>
-          <Animated.View
-            pointerEvents={expanded ? 'auto' : 'none'}
-            style={[
-              styles.shopSideTabExpanded,
-              { opacity: expandedOpacity },
-              !settled.value && { transform: [{ translateX: expandedTranslate }] },
-            ]}
-          >
-            <View style={styles.shopSideTabThumb}>
-              {tag.imageUri ? (
-                <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-              ) : (
-                <Feather name="shopping-bag" size={11} color="#111111" />
-              )}
-            </View>
-            {/* Name and price share one line so the whole card reads as a
-                sleek, narrow strip at ~44pt tall rather than a two-line
-                card — the name truncates first (flexShrink), the price
-                never does (flexShrink: 0, its own Text so numberOfLines on
-                the name can't cut it off too). */}
-            <Text style={styles.shopSideTabName} numberOfLines={1}>{tag.productName}</Text>
-            <Text style={styles.shopSideTabPrice} numberOfLines={1}>
-              {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
-            </Text>
-            <Feather name="chevron-right" size={12} color="rgba(255,255,255,0.75)" />
-          </Animated.View>
-        </TouchableOpacity>
-      </Animated.View>
-    </>
-  );
-}
+// The old inline ShopPill/right-rail/caption-block/top-bar JSX previously
+// defined in this file has been rebuilt as its own component tree under
+// components/buyer-feed/ (ShopSideTab, RightActionRail, CaptionBlock,
+// FeedTopBar, LongPressMenu) — see the imports above. This file keeps the
+// video player logic and gesture handling (SpotlightPage, VideoVisual,
+// ScrubProgressBar) and the data/engagement hooks, and wires the new
+// presentational components to them below.
 
 function SpotlightPage({
   item, isActive, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound,
@@ -1405,6 +1262,8 @@ function SpotlightPage({
   const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+  /** Long-press context menu: "2x speed" / "Not interested" / "Report". */
+  const [menuOpen, setMenuOpen] = useState(false);
   const { showToast } = useFeedToast();
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -1547,7 +1406,10 @@ function SpotlightPage({
           native does) — which silently zeroed out the whole video area
           (390x0) while the separately-sized blurred mirror strip kept
           rendering, producing an all-black screen with nothing playing. */}
-      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
+      <Pressable
+        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setMenuOpen(true); }}
+        delayLongPress={550}
+        onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
         <View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>
           {item.contentType === 'video'
             ? (
@@ -1603,10 +1465,11 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
-      {/* ─ Shop side tab ─ collapsed against the left edge (mirrors the
-          rail on the right), only when this video has a tagged product.
-          Lives at this top level, not inside the bottom-left info stack —
-          it's a screen-edge affordance, not part of that stack's flow. */}
+      {/* ─ Shop side tab (components/buyer-feed/ShopSideTab) ─ collapsed
+          against the left edge (mirrors the rail on the right), only when
+          this video has a tagged product. Lives at this top level, not
+          inside CaptionBlock — it's a screen-edge affordance, not part of
+          that stack's flow. */}
       {!!item.productTags?.length && (
         <ShopSideTab
           tag={item.productTags[0]}
@@ -1616,160 +1479,36 @@ function SpotlightPage({
         />
       )}
 
-      {/* ─ Right action rail ─
-          Pinned at bottomClearance + RAIL_BOTTOM_GAP, not bare
-          bottomClearance: the scrub/progress bar sits right around
-          bottomClearance too (see ScrubProgressBar's `bottom - 13` math
-          below), so anchoring the rail there put its last item (share)
-          directly touching the bar with zero gap. RAIL_BOTTOM_GAP clears
-          the bar's own height/hit-area with the required >=16pt to spare. */}
-      <Animated.View style={[styles.rail, chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}>
-        {/* Avatar + follow badge */}
-        <View style={styles.railAvatarWrap}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onOpenCreator(item);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`View ${item.creator}'s profile`}
-          >
-            <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
-              <Text style={styles.railAvatarText}>{item.initials}</Text>
-            </View>
-          </TouchableOpacity>
-          {!(engagement?.following) && (
-            <EngagementButton
-              icon="plus"
-              iconSize={11}
-              active={false}
-              accessibilityLabel={`Follow ${item.creator}`}
-              style={[styles.railFollowBadge, { backgroundColor: item.accentColor }]}
-              onPress={async () => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                await onFollow(item.id);
-              }}
-              testID={`follow-btn-${item.id}`}
-            />
-          )}
-        </View>
-
-        {/* Like — a ring echoes outward from behind the icon on every tap
-            that likes the post (not just the double-tap burst on the video
-            itself), so the rail control has its own moment of feedback. */}
-        <View style={styles.railLikeWrap} pointerEvents="box-none">
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.railLikeRing,
-              {
-                opacity: likeRing.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.55, 0] }),
-                transform: [{ scale: likeRing.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.9] }) }],
-              },
-            ]}
-          />
-          <EngagementButton
-            icon="heart"
-            solidIcon="heart"
-            iconSize={30}
-            count={formatCount(engagement?.likes ?? 0)}
-            active={engagement?.liked ?? false}
-            activeColor="#EF4444"
-            inactiveColor={ON_DARK}
-            accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${formatCount(engagement?.likes ?? 0)} likes`}
-            accessibilityState={{ checked: engagement?.liked ?? false }}
-            scaleAnim={heartScale}
-            style={styles.railActionContent}
-            onPress={async () => {
-              bumpHeart();
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              await onLike(item.id);
-            }}
-            hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-            testID={`like-btn-${item.id}`}
-          />
-        </View>
-
-        {/* Comments — not async, opens navigation. `commentCountDelta` bumps
-            this the instant a comment is posted in the comments sheet (a
-            separate routed screen), so the rail updates immediately instead
-            of waiting for the feed to refetch this post. */}
-        <TouchableOpacity
-          style={styles.railBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          onPress={() => onOpenComments(item.id)}
-          accessibilityRole="button"
-          accessibilityLabel={`Comments, ${formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}`}
-        >
-          <FontAwesome name="commenting" size={30} color={ON_DARK} />
-          <Text style={styles.railCount}>{formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}</Text>
-        </TouchableOpacity>
-
-        {/* Repost */}
-        <EngagementButton
-          icon="repeat"
-          solidIcon="retweet"
-          iconSize={30}
-          count={formatCount(engagement?.reposts ?? 0)}
-          active={engagement?.reposted ?? false}
-          activeColor={theme.accent}
-          inactiveColor={ON_DARK}
-          accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${formatCount(engagement?.reposts ?? 0)} reposts`}
-          accessibilityState={{ checked: engagement?.reposted ?? false }}
-          style={styles.railActionContent}
-          rotateAnim={repostSpin}
-          scaleAnim={repostScale}
-          onPress={async () => {
-            spinRepost();
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            await onRepost(item.id);
-          }}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          testID={`repost-btn-${item.id}`}
-        />
-
-        {/* Save */}
-        <EngagementButton
-          icon="bookmark"
-          solidIcon="bookmark"
-          iconSize={30}
-          count={formatCount(engagement?.saves ?? item.saves)}
-          active={engagement?.saved ?? false}
-          activeColor={GOLD}
-          inactiveColor={ON_DARK}
-          accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${formatCount(engagement?.saves ?? item.saves)} saves`}
-          accessibilityState={{ checked: engagement?.saved ?? false }}
-          style={styles.railActionContent}
-          translateYAnim={saveDrop}
-          scaleAnim={saveScale}
-          onPress={async () => {
-            dropSave();
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            await onSave(item.id);
-          }}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          testID={`save-btn-${item.id}`}
-        />
-
-        {/* Share */}
-        <TouchableOpacity
-          style={styles.railBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="Share post"
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShareOpen(true);
-          }}
-        >
-          <FontAwesome name="share" size={30} color={ON_DARK} />
-          <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
-        </TouchableOpacity>
-
-      </Animated.View>
+      {/* ─ Right action rail (components/buyer-feed/RightActionRail) ─
+          bottom: bottomClearance + RAIL_BOTTOM_GAP, not bare bottomClearance
+          — see the RAIL_BOTTOM_GAP/CAPTION_BOTTOM_GAP comment above. */}
+      <RightActionRail
+        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}
+        creator={item.creator}
+        avatarColor={item.avatarColor}
+        initials={item.initials}
+        accentColor={item.accentColor}
+        engagement={engagement}
+        commentsCount={(item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta}
+        shares={item.shares}
+        saves={item.saves}
+        soundOn={soundOn}
+        onToggleSound={onToggleSound}
+        onOpenCreator={() => { onOpenCreator(item); }}
+        onFollow={() => onFollow(item.id)}
+        onLike={async () => { bumpHeart(); await onLike(item.id); }}
+        onOpenComments={() => onOpenComments(item.id)}
+        onRepost={async () => { spinRepost(); await onRepost(item.id); }}
+        onSave={async () => { dropSave(); await onSave(item.id); }}
+        onShare={() => setShareOpen(true)}
+        heartScale={heartScale}
+        likeRing={likeRing}
+        repostSpin={repostSpin}
+        repostScale={repostScale}
+        saveDrop={saveDrop}
+        saveScale={saveScale}
+        testIdBase={item.id}
+      />
 
       <ThreadShareSheet
         visible={shareOpen}
@@ -1785,98 +1524,39 @@ function SpotlightPage({
         onFeedback={showToast}
       />
 
-      {/* ─ Bottom-left overlay: creator, caption, sound ─
-          Pinned at bottomClearance + CAPTION_BOTTOM_GAP for the same reason
-          as the rail above: bare bottomClearance put the sound line's own
-          bottom edge right where the scrub/progress bar sits, touching it
-          with no gap. CAPTION_BOTTOM_GAP guarantees the required >=12pt of
-          clearance from the sound line down to the bar. The shop tag used to
-          live at the top of this stack as a pill; it's now the screen-edge
-          ShopSideTab rendered above instead, so this stack starts straight
-          at the repost/creator row with no leftover gap where the pill used
-          to sit — nothing here reserves space for it any more (see
-          bottomInfo/bottomInfoWithRepost's shrunk minHeight below). */}
-      <Animated.View style={[styles.bottomInfo, chromeStyle, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]} pointerEvents="box-none">
-        {hasRepostIdentity && (
-          <TouchableOpacity
-            style={styles.repostIdentity}
-            activeOpacity={friendReposts.length > 0 ? 0.8 : 1}
-            disabled={friendReposts.length === 0}
-            onPress={() => {
-              const friend = friendReposts[0];
-              // buyer-other-profile reads `userId` — the old `id` param opened a blank profile.
-              if (friend) router.push(profileHref({ userId: friend.userId, accountType: 'buyer', name: friend.displayName }) as never);
-            }}
-            accessibilityRole={friendReposts.length > 0 ? 'button' : 'text'}
-            accessibilityLabel={repostLabel}
-          >
-            <View style={styles.repostAvatarStack}>
-              {friendReposts.slice(0, 3).map((friend, index) => (
-                <View
-                  key={friend.userId}
-                  style={[styles.repostAvatar, { marginLeft: index === 0 ? 0 : -7, zIndex: 3 - index }]}
-                >
-                  {friend.avatarUrl ? (
-                    <CachedImage source={{ uri: friend.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                  ) : (
-                    <View style={[StyleSheet.absoluteFill, styles.repostAvatarFallback]}>
-                      <Text style={styles.repostAvatarInitials}>
-                        {friend.displayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              ))}
-              {friendReposts.length === 0 && (
-                <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
-                  <Feather name="user" size={13} color={ON_DARK} />
-                </View>
-              )}
-            </View>
-            <Text style={styles.repostIdentityText} numberOfLines={1}>{repostLabel}</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onOpenCreator(item);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${item.creator}'s profile`}
-        >
-          <View style={styles.creatorRow}>
-            <Text style={styles.creatorName} numberOfLines={1}>{item.creator}</Text>
-            {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
-          </View>
-        </TouchableOpacity>
+      <LongPressMenu
+        visible={menuOpen}
+        speedActive={speedActive}
+        onToggleSpeed={() => setSpeedActive(v => !v)}
+        onNotInterested={() => onNotInterested(item.id)}
+        onReport={() => router.push(`/buyer-report?targetType=post&targetId=${encodeURIComponent(item.id)}&targetLabel=Post` as never)}
+        onClose={() => setMenuOpen(false)}
+      />
 
-        <Pressable
-          onPress={() => item.caption.length > 86 && setCaptionExpanded(v => !v)}
-          accessibilityRole={item.caption.length > 86 ? 'button' : 'text'}
-          accessibilityLabel={item.caption.length > 86 ? (captionExpanded ? 'Collapse caption' : 'Expand caption') : undefined}
-          hitSlop={{ top: 4, bottom: 4 }}
-        >
-          <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
-            {item.caption}
-            {item.caption.length > 86 && (
-              <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
-            )}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.soundRow}
-          onPress={onToggleSound}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
-          accessibilityState={{ checked: soundOn }}
-        >
-           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={11} color={`${ON_DARK}CC`} />
-          <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
-        </Pressable>
-      </Animated.View>
+      {/* ─ Bottom-left overlay: creator, caption, sound (components/buyer-feed/CaptionBlock) ─
+          bottom: bottomClearance + CAPTION_BOTTOM_GAP, not bare
+          bottomClearance — same reason as the rail above. The shop tag is
+          the ShopSideTab rendered above instead of a CaptionBlock slot. */}
+      <CaptionBlock
+        style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}
+        creator={item.creator}
+        verified={!!item.verified}
+        caption={item.caption}
+        sound={item.sound}
+        soundOn={soundOn}
+        onToggleSound={onToggleSound}
+        friendReposts={friendReposts}
+        hasRepostIdentity={hasRepostIdentity}
+        repostLabel={repostLabel}
+        onOpenRepostIdentity={() => {
+          const friend = friendReposts[0];
+          // buyer-other-profile reads `userId` — the old `id` param opened a blank profile.
+          if (friend) router.push(profileHref({ userId: friend.userId, accountType: 'buyer', name: friend.displayName }) as never);
+        }}
+        captionExpanded={captionExpanded}
+        onToggleCaptionExpanded={() => setCaptionExpanded(v => !v)}
+        onOpenCreator={() => onOpenCreator(item)}
+      />
     </View>
   );
 }
@@ -2691,16 +2371,22 @@ export default function FeedScreen({
     return () => { cancelled = true; };
   }, [sellerFeedPosts]);
 
-  /** Top-bar LIVE button: jumps the feed to the nearest active live stream
-   * card already mixed into displayItems, ahead of the current position
-   * when one exists downstream, otherwise the closest one behind it. */
+  /** Top-bar LIVE button: when a live stream card is already mixed into
+   * this feed, jumps to the nearest one (ahead of the current position when
+   * one exists downstream, otherwise the closest one behind it). Otherwise
+   * — the common case — it's a real navigation entry point into the
+   * dedicated live feed (a vertical swipe pager of live streams) at `/live`.
+   */
   function jumpToNearestLive() {
     const indices: number[] = [];
     displayItems.forEach((it, i) => { if ((it as any)._isLive) indices.push(i); });
-    if (!indices.length) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (!indices.length) {
+      router.push('/live' as never);
+      return;
+    }
     const ahead = indices.find(i => i > activeIndex);
     const target = ahead ?? indices[indices.length - 1];
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     feedListRef.current?.scrollToIndex({ index: target, animated: true });
   }
 
@@ -2983,10 +2669,14 @@ export default function FeedScreen({
           they stay put while the video underneath swipes past. Standard
           TikTok-style small gradients only — a short one at the very top
           (behind the top bar) and a short one at the very bottom (behind the
-          caption/rail and the tab bar). Nothing here is a translucent panel:
-          both are capped low enough that they never reach up into the
-          middle of the right action rail, which previously read as a washed-
-          out band over the comment/repost/save/share icons. */}
+          caption). Both are capped low enough that they never reach up into
+          the middle of the right action rail. The bottom scrim also stops
+          short of the rail's own column (right: 76 instead of full-width) —
+          it used to run edge to edge, which put its bottom, most-opaque
+          band directly over the repost/save/share icons and made only the
+          bottom half of the rail look faded/grey next to the untouched
+          heart/comment above it, even though every icon is the same solid
+          white. The rail needs zero scrim under it, not just a lighter one. */}
       {isBuyerSurface && (
         <>
           <LinearGradient
@@ -2999,7 +2689,7 @@ export default function FeedScreen({
             pointerEvents="none"
             colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.22)', 'rgba(0,0,0,0.58)']}
             locations={[0, 0.45, 1]}
-            style={[styles.bottomScrim, { height: bottomClearance + 130 }]}
+            style={[styles.bottomScrim, { height: bottomClearance + 130, right: 76 }]}
           />
         </>
       )}
