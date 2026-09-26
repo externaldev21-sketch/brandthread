@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight, hapticWarning } from '@/lib/haptics';
@@ -45,13 +46,25 @@ export interface ButtonProps {
   testID?: string;
 }
 
-/** Shared press-in/out feel: settle to PRESS_SCALE over PRESS_DURATION_MS, never below 1 at rest. */
+/**
+ * Shared press-in/out feel: a firm 0.97 scale settle plus a fill/opacity
+ * shift on the same layer (never a separate translucent circle/pill and
+ * never an outer ring — see tests/no-translucent-chip-highlight.test.ts and
+ * tests/no-outer-focus-ring.test.ts).
+ */
 function usePressScale() {
   const scale = React.useRef(new Animated.Value(1)).current;
+  const pressed = React.useRef(new Animated.Value(0)).current;
   const nativeDriver = Platform.OS !== 'web';
-  const onPressIn = () => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start();
-  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start();
-  return { scale, onPressIn, onPressOut };
+  const onPressIn = () => {
+    Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start();
+    Animated.timing(pressed, { toValue: 1, duration: 90, useNativeDriver: nativeDriver }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start();
+    Animated.timing(pressed, { toValue: 0, duration: 140, useNativeDriver: nativeDriver }).start();
+  };
+  return { scale, pressed, onPressIn, onPressOut };
 }
 
 export function Button({
@@ -60,7 +73,7 @@ export function Button({
 }: ButtonProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
-  const { scale, onPressIn, onPressOut } = usePressScale();
+  const { scale, pressed, onPressIn, onPressOut } = usePressScale();
   const isDisabled = disabled || loading;
   const height = size === 'small' ? COMP.buttonHSm : COMP.buttonH;
 
@@ -81,6 +94,12 @@ export function Button({
   })();
 
   const isFilled = variant === 'primary' || variant === 'destructive';
+  // Filled buttons darken on press; outline/ghost buttons pick up a faint
+  // theme-tinted fill. Never a separate translucent circle/pill layer, and
+  // no android_ripple — the ripple's spreading-circle wash is exactly the
+  // "translucent circle highlight" look the owner asked to remove.
+  const pressOverlayColor = isFilled ? '#00000026' : `${theme.accent}1F`;
+  const overlayOpacity = pressed.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   return (
     <Pressable
@@ -94,7 +113,7 @@ export function Button({
       onPressOut={onPressOut}
       testID={testID}
       style={[fullWidth && styles.fullWidth]}
-      android_ripple={{ color: `${palette.foreground}33`, borderless: false }}
+      android_ripple={{ color: isFilled ? '#00000026' : `${theme.accent}2E`, borderless: false }}
     >
       <Animated.View
         style={[
@@ -102,11 +121,23 @@ export function Button({
           { height, borderRadius: RADII.pill, transform: [{ scale }] },
           isFilled ? { backgroundColor: variantStyle.bg } : { backgroundColor: 'transparent' },
           variant === 'secondary' && { borderWidth: 1, borderColor: variantStyle.border },
+          isFilled && !isDisabled && styles.raisedShadow,
           fullWidth && styles.fullWidth,
           isDisabled && !isFilled && { opacity: 0.5 },
           style,
         ]}
       >
+        <View style={[StyleSheet.absoluteFill, { borderRadius: RADII.pill, overflow: 'hidden' }]} pointerEvents="none">
+          {isFilled && !isDisabled && (
+            <LinearGradient
+              colors={['#FFFFFF3D', '#FFFFFF00']}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 0.6 }}
+            />
+          )}
+          <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: pressOverlayColor, opacity: overlayOpacity }]} />
+        </View>
         {loading ? (
           <ActivityIndicator color={variantStyle.fg} size="small" />
         ) : (
@@ -160,6 +191,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.xs,
     paddingHorizontal: SPACING.xl,
+  },
+  raisedShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    elevation: 6,
   },
   fullWidth: { width: '100%' },
   label: { fontFamily: FONT.semibold, letterSpacing: 0.1 },

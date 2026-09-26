@@ -39,7 +39,7 @@ export function Chip({ label, selected, onPress, count, disabled, testID, icon, 
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
   const nativeDriver = Platform.OS !== 'web';
-  const contentColor = selected ? theme.accentLight : palette.mutedForeground;
+  const contentColor = selected ? theme.onAccent : palette.mutedForeground;
 
   return (
     <Pressable
@@ -57,7 +57,7 @@ export function Chip({ label, selected, onPress, count, disabled, testID, icon, 
           styles.chip,
           {
             borderRadius: RADII.pill,
-            backgroundColor: selected ? theme.accentDim : palette.card,
+            backgroundColor: selected ? theme.accent : palette.card,
             borderColor: selected ? theme.accent : palette.border,
             opacity: disabled ? 0.5 : 1,
             transform: [{ scale }],
@@ -69,7 +69,7 @@ export function Chip({ label, selected, onPress, count, disabled, testID, icon, 
           {label}
         </Text>
         {count !== undefined && (
-          <View style={[styles.count, { backgroundColor: selected ? theme.accentDim : 'rgba(255,255,255,0.08)' }]}>
+          <View style={[styles.count, { backgroundColor: selected ? `${theme.onAccent}26` : 'rgba(255,255,255,0.08)' }]}>
             <Text style={[TYPE_SCALE.caption, { color: contentColor }]}>{count}</Text>
           </View>
         )}
