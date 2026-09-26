@@ -489,6 +489,13 @@ export default function ProductsScreen() {
     'out-of-stock': { icon: 'x-circle', message: 'Nothing is out of stock right now.' },
   };
 
+  // Belt-and-suspenders alongside contentContainerStyle's paddingBottom below:
+  // FlashList's web renderer doesn't always honor a large contentContainerStyle
+  // bottom padding, letting the last row sit under the floating tab bar — a
+  // real DOM footer of that height guarantees the scrollable area actually
+  // extends past the bar.
+  const ListFooter = useMemo(() => <View style={{ height: tabBar.occupiedHeight }} />, [tabBar.occupiedHeight]);
+
   const ListEmpty = useMemo(() => {
     const copy = emptyCopy[filter] ?? emptyCopy.all;
     return (
@@ -616,6 +623,7 @@ export default function ProductsScreen() {
           numColumns={gridColumns}
           key={`cols-${gridColumns}`}
           ListHeaderComponent={ListHeader}
+          ListFooterComponent={ListFooter}
           ListEmptyComponent={ListEmpty}
           contentContainerStyle={{ paddingHorizontal: gridGutter - gridGap / 2, paddingBottom: tabBar.occupiedHeight + SP.xl }}
           showsVerticalScrollIndicator={false}

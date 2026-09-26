@@ -1009,6 +1009,16 @@ export default function OrdersScreen() {
   const keyExtractor = useCallback((row: OrderListItem) => row.key, []);
   const getItemType = useCallback((row: OrderListItem) => row.type, []);
 
+  // Belt-and-suspenders alongside contentContainerStyle's paddingBottom below:
+  // FlashList's web renderer doesn't always honor a large contentContainerStyle
+  // bottom padding, letting the last row sit under the floating tab bar — a
+  // real DOM footer of that height guarantees the scrollable area actually
+  // extends past the bar.
+  const ListFooterComponent = useCallback(
+    () => <View style={{ height: tabBarMetrics.occupiedHeight }} />,
+    [tabBarMetrics.occupiedHeight],
+  );
+
   const ListHeaderComponent = useCallback(() => (
     <View style={s.listHeader}>
       {(loadError || updatesPaused) && (
@@ -1163,6 +1173,7 @@ export default function OrdersScreen() {
           renderItem={renderItem}
           extraData={selectedIdSet}
           ListHeaderComponent={ListHeaderComponent}
+          ListFooterComponent={ListFooterComponent}
           ListEmptyComponent={ListEmptyComponent}
           contentContainerStyle={[
             s.listContent,

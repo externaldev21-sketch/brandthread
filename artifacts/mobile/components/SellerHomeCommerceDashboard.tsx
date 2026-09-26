@@ -504,17 +504,20 @@ export default function SellerHomeCommerceDashboard({
 
   const metricAggregate = useMemo(() => {
     if (!data) return { current: 0, previous: 0 };
+    // A response with no `previous` bucket (a brand-new store, or a partial
+    // payload) must not crash the dashboard — treat it as a zeroed prior period.
+    const previous = data.previous ?? { totalCents: 0, orderCount: 0, visitorCount: 0 };
     switch (metric) {
-      case 'sales': return { current: data.totalCents, previous: data.previous.totalCents };
-      case 'orders': return { current: data.orderCount, previous: data.previous.orderCount };
-      case 'visitors': return { current: data.visitorCount, previous: data.previous.visitorCount };
+      case 'sales': return { current: data.totalCents, previous: previous.totalCents };
+      case 'orders': return { current: data.orderCount, previous: previous.orderCount };
+      case 'visitors': return { current: data.visitorCount, previous: previous.visitorCount };
       case 'conversion': return {
         current: data.visitorCount > 0 ? (data.orderCount / data.visitorCount) * 100 : 0,
-        previous: data.previous.visitorCount > 0 ? (data.previous.orderCount / data.previous.visitorCount) * 100 : 0,
+        previous: previous.visitorCount > 0 ? (previous.orderCount / previous.visitorCount) * 100 : 0,
       };
       case 'aov': return {
         current: data.orderCount > 0 ? Math.round(data.totalCents / data.orderCount) : 0,
-        previous: data.previous.orderCount > 0 ? Math.round(data.previous.totalCents / data.previous.orderCount) : 0,
+        previous: previous.orderCount > 0 ? Math.round(previous.totalCents / previous.orderCount) : 0,
       };
       default: return { current: 0, previous: 0 };
     }
@@ -538,15 +541,16 @@ export default function SellerHomeCommerceDashboard({
   };
 
   const tiles: SellerDashboardStatTileData[] = data ? (['orders', 'visitors', 'conversion', 'aov'] as MetricKey[]).map((key) => {
-    const agg = key === 'orders' ? { current: data.orderCount, previous: data.previous.orderCount }
-      : key === 'visitors' ? { current: data.visitorCount, previous: data.previous.visitorCount }
+    const tilesPrevious = data.previous ?? { totalCents: 0, orderCount: 0, visitorCount: 0 };
+    const agg = key === 'orders' ? { current: data.orderCount, previous: tilesPrevious.orderCount }
+      : key === 'visitors' ? { current: data.visitorCount, previous: tilesPrevious.visitorCount }
       : key === 'conversion' ? {
         current: data.visitorCount > 0 ? (data.orderCount / data.visitorCount) * 100 : 0,
-        previous: data.previous.visitorCount > 0 ? (data.previous.orderCount / data.previous.visitorCount) * 100 : 0,
+        previous: tilesPrevious.visitorCount > 0 ? (tilesPrevious.orderCount / tilesPrevious.visitorCount) * 100 : 0,
       }
       : {
         current: data.orderCount > 0 ? Math.round(data.totalCents / data.orderCount) : 0,
-        previous: data.previous.orderCount > 0 ? Math.round(data.previous.totalCents / data.previous.orderCount) : 0,
+        previous: tilesPrevious.orderCount > 0 ? Math.round(tilesPrevious.totalCents / tilesPrevious.orderCount) : 0,
       };
     const delta = compactDelta(agg.current, agg.previous);
     return {
