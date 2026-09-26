@@ -29,7 +29,8 @@ describe('Shop trigger — collapsed edge tab, no blur/shimmer', () => {
     expect(shopTab).toContain('styles.thumb');
     expect(shopTab).not.toContain('<BlurView');
     expect(shopTab).not.toContain('LinearGradient');
-    expect(shopTab).not.toContain('styles.shimmer');    expect(feed).not.toContain('mediaTagName');
+    expect(shopTab).not.toContain('styles.shimmer');
+    expect(feed).not.toContain('mediaTagName');
   });
 
   it('shows the real product thumbnail when available, falling back to a bag icon', () => {

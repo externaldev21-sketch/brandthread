@@ -21,6 +21,7 @@ import { EngagementButton } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
 import { FONT, GOLD, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
+import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 
 export interface RailEngagement {
   liked?: boolean;
@@ -33,7 +34,7 @@ export interface RailEngagement {
 }
 
 export function RightActionRail({
-  creator, avatarColor, initials, accentColor,
+  creator, hostId, avatarColor, initials, accentColor,
   engagement, commentsCount, shares, saves,
   soundOn, onToggleSound,
   onOpenCreator, onFollow, onLike, onOpenComments, onRepost, onSave, onShare,
@@ -41,6 +42,9 @@ export function RightActionRail({
   style, testIdBase,
 }: {
   creator: string;
+  /** The video's host/seller id — used to show a live ring around the
+   *  avatar (see LiveHostRing) when that seller is currently live. */
+  hostId?: string;
   avatarColor: string;
   initials: string;
   accentColor: string;
@@ -88,9 +92,11 @@ export function RightActionRail({
           accessibilityRole="button"
           accessibilityLabel={`View ${creator}'s profile`}
         >
-          <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          <LiveHostRing hostId={hostId} size={44} showTag={!!engagement?.following}>
+            <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+          </LiveHostRing>
         </TouchableOpacity>
         {!engagement?.following && (
           <EngagementButton

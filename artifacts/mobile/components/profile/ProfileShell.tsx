@@ -46,6 +46,8 @@ import { PROFILE_GRID_GAP, SHOP_PILL_HEIGHT, useProfileLayout } from './profileL
 import { computeEmptyArea } from './profileEmptyStates';
 import { ProfileEmptyAreaContext } from './ProfileEmptyAreaContext';
 import { loadBuyerSettings } from '@/lib/buyerSettings';
+import { LiveAvatarRing } from '@/components/live/LiveAvatarRing';
+import { useLiveStreamForHost, useOpenLive } from '@/lib/live/useLiveDirectory';
 /** Compact sticky header height below the status bar. */
 const COMPACT_BAR = 64;
 
@@ -73,6 +75,11 @@ export interface ProfileShellProps<T> {
     accessibilityLabel?: string;
     /** Small corner badge on the avatar (e.g. "plus" to add a story). */
     badgeIcon?: keyof typeof Feather.glyphMap;
+    /**
+     * This profile's user id for the LIVE ring: while they are live, the
+     * avatar wears a red LIVE ring and tapping it opens their stream.
+     */
+    liveHostId?: string | null;
   };
   hero: { videoUri?: string | null; posterUri?: string | null };
   /** Owner-only cover-video affordance ("Add cover video" / "Edit cover"), shown in the hero. */
@@ -124,6 +131,8 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const liveStreamId = useLiveStreamForHost(isOwnProfile ? null : avatar?.liveHostId);
+  const openLive = useOpenLive();
   const layout = useProfileLayout();
   const { heroHeight, columnWidth } = layout;
 
@@ -286,7 +295,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     floatingReserve,
   });
 
-  const avatarNode = (
+  const avatarBody = (
     <View style={[styles.avatarRing, avatar?.ring && { borderColor: theme.accent }]}>
       <View style={styles.avatar}>
         {identity.avatarUrl ? (
@@ -302,6 +311,18 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       ) : null}
     </View>
   );
+  // LIVE: red ring + tag around the avatar, and the avatar opens the stream.
+  const avatarNode = (
+    <LiveAvatarRing live={!!liveStreamId} size={AVATAR + 8} testID={liveStreamId ? 'profile-live-ring' : undefined}>
+      {avatarBody}
+    </LiveAvatarRing>
+  );
+  const avatarPress = liveStreamId
+    ? () => openLive({ streamId: liveStreamId, hostId: avatar?.liveHostId })
+    : avatar?.onPress;
+  const avatarPressLabel = liveStreamId
+    ? `${identity.name} is live. Watch now`
+    : avatar?.accessibilityLabel ?? `${identity.name} avatar`;
 
   const header = (
     <View>
@@ -331,11 +352,11 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
             { opacity: identityOpacity, transform: [{ translateY: identityLift }, { scale: identityScale }] },
           ]}
         >
-          {avatar?.onPress ? (
+          {avatarPress ? (
             <PressableScale
-              onPress={avatar.onPress}
+              onPress={avatarPress}
               accessibilityRole="button"
-              accessibilityLabel={avatar.accessibilityLabel ?? `${identity.name} avatar`}
+              accessibilityLabel={avatarPressLabel}
               testID="profile-avatar"
               style={styles.avatarPress}
             >

@@ -223,7 +223,9 @@ router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 
 // ─── Live shopping ─────────────────────────────────────────────────────────────
 import liveRouter from "./live";
-router.use("/live",                      tc, requirePlan("pro"), liveRouter);
+// Watching is open to every signed-in user; the host-only routes inside
+// (start / end / products) apply requirePlan("pro") themselves.
+router.use("/live",                      tc, liveRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
 router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);

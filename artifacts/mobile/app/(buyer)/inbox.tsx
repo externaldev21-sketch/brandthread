@@ -27,6 +27,7 @@ import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSw
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 import { FollowerAvatarCard } from '@/components/inbox/FollowerAvatarCard';
 import { Button } from '@/components/ui/Button';
+import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import {
@@ -709,12 +710,18 @@ export default function InboxScreen() {
                 <View style={[s.avatar60, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
                   <BrandthreadLogo size={30} />
                 </View>
-              ) : participant.avatarUri ? (
-                <Image source={{ uri: participant.avatarUri }} style={s.avatar60} testID={`inbox-avatar-image-${conv.id}`} />
               ) : (
-                <View style={[s.avatar60, { backgroundColor: participant.color }]}>
-                  <Text style={s.avatarInitials}>{participant.initials}</Text>
-                </View>
+                // LIVE ring while this person is streaming; tapping the
+                // ringed avatar opens their live instead of the thread.
+                <LiveHostRing hostId={participant.userId} hostName={participant.name} size={60} pressToWatch>
+                  {participant.avatarUri ? (
+                    <Image source={{ uri: participant.avatarUri }} style={s.avatar60} testID={`inbox-avatar-image-${conv.id}`} />
+                  ) : (
+                    <View style={[s.avatar60, { backgroundColor: participant.color }]}>
+                      <Text style={s.avatarInitials}>{participant.initials}</Text>
+                    </View>
+                  )}
+                </LiveHostRing>
               )}
               {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent, borderColor: theme.background }]} />}
               {participant.isOnline && (
@@ -967,12 +974,18 @@ export default function InboxScreen() {
                     <View style={[s.activeRailAvatar, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
                       <BrandthreadLogo size={26} />
                     </View>
-                  ) : participant.avatarUri ? (
-                    <Image source={{ uri: participant.avatarUri }} style={s.activeRailAvatar} />
                   ) : (
-                    <View style={[s.activeRailAvatar, { backgroundColor: participant.color }]}>
-                      <Text style={s.activeRailInitials}>{participant.initials}</Text>
-                    </View>
+                    // Ring drawn on the avatar edge: this horizontal
+                    // ScrollView clips anything outside the 64pt avatar.
+                    <LiveHostRing hostId={participant.userId} hostName={participant.name} size={64} ringGap={-2} pressToWatch>
+                      {participant.avatarUri ? (
+                        <Image source={{ uri: participant.avatarUri }} style={s.activeRailAvatar} />
+                      ) : (
+                        <View style={[s.activeRailAvatar, { backgroundColor: participant.color }]}>
+                          <Text style={s.activeRailInitials}>{participant.initials}</Text>
+                        </View>
+                      )}
+                    </LiveHostRing>
                   )}
                   <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>{railDisplayName(participant.name)}</Text>
                 </PressableScale>
