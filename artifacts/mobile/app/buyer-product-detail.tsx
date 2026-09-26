@@ -39,7 +39,7 @@ import {
 } from '@/lib/theme';
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
-import { Button, IconButton, Chip, QuantityStepper, BottomSheet } from '@/components/ui';
+import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -148,9 +148,6 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtPrice = formatCents;
-// Shared look for the icon buttons floating over the hero image (back/cart),
-// used with IconButton's `variant="plain"` so the translucent scrim shows.
-const overlayIconBtnStyle = { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADII.pill, borderWidth: 0 } as const;
 const GALLERY_WIDTH = Dimensions.get('window').width;
 const GALLERY_HEIGHT = Math.min(520, Math.max(430, GALLERY_WIDTH * 1.22));
 
@@ -668,9 +665,7 @@ export default function BuyerProductDetailScreen() {
             name="arrow-left"
             onPress={leaveProduct}
             accessibilityLabel="Back"
-            color={ON_DARK}
-            variant="plain"
-            style={overlayIconBtnStyle}
+            variant="filled"
           />
         </View>
       </View>
@@ -695,9 +690,7 @@ export default function BuyerProductDetailScreen() {
             name="arrow-left"
             onPress={leaveProduct}
             accessibilityLabel="Back"
-            color={ON_DARK}
-            variant="plain"
-            style={overlayIconBtnStyle}
+            variant="filled"
           />
         </View>
       </View>
@@ -877,15 +870,15 @@ export default function BuyerProductDetailScreen() {
         {/* Immersive product gallery */}
         <View style={s.imageArea}>
           <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} />
-          {/* Back button */}
+          {/* Back button — frosted glass chrome over the full-bleed gallery,
+              per the design system's GlassPanel/IconButton glass convention
+              (replaces a flat rgba(0,0,0,0.6) scrim with a real frost). */}
           <View style={[s.backBtnWrap, { top: insets.top + SP.sm }]}>
             <IconButton
               name="arrow-left"
               onPress={leaveProduct}
               accessibilityLabel="Back to previous screen"
-              color={ON_DARK}
-              variant="plain"
-              style={overlayIconBtnStyle}
+              variant="glass"
             />
           </View>
           {/* Cart button */}
@@ -895,9 +888,7 @@ export default function BuyerProductDetailScreen() {
               onPress={() => router.push('/(buyer)/cart' as never)}
               accessibilityLabel="Open cart"
               accessibilityHint="View items in your cart"
-              color={ON_DARK}
-              variant="plain"
-              style={overlayIconBtnStyle}
+              variant="glass"
             />
           </View>
         </View>
@@ -1588,8 +1579,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   imageArea: { height: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   imagePlaceholderText: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.lg },
-  // Positioning wrappers only — the translucent pill look and hit area now
-  // come from the shared IconButton (variant="plain" + overlayIconBtnStyle).
+  // Positioning wrappers only — the frosted-glass look and hit area come
+  // from the shared IconButton's `variant="glass"`.
   backBtnWrap: { position: 'absolute', left: SP.md },
   cartBtnWrap: { position: 'absolute', right: SP.md },
   body: { paddingVertical: SP.md },

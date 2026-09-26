@@ -617,7 +617,7 @@ function DiscoverHero({
           <Text style={dh.counterChipText}>{activeIndex + 1}/{items.length}</Text>
         </View>
         <Text style={dh.title} numberOfLines={1}>Just Dropped</Text>
-        <Pressable onPress={onShopAll} style={dh.shopAllPill} accessibilityRole="button" accessibilityLabel="Shop all">
+        <Pressable onPress={onShopAll} style={dh.shopAllPill} accessibilityRole="button" accessibilityLabel="Shop all" hitSlop={8}>
           <Text style={dh.shopAllText}>Shop all</Text>
         </Pressable>
       </View>
