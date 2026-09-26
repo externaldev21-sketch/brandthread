@@ -600,12 +600,12 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       accessibilityLabel={count !== undefined ? `${label}, ${count}` : label}
       accessibilityState={{ selected: active }}
-      style={[fcS.chip, { backgroundColor: palette.card, borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accentDim, borderColor: theme.accent + '88' }]]}
+      style={[fcS.chip, { backgroundColor: palette.card, borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accent, borderColor: theme.accent }]]}
     >
-      <Text style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.accentLight }]]}>{label}</Text>
+      <Text style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.onAccent }]]}>{label}</Text>
       {count !== undefined && (
-        <View style={[fcS.count, active && [fcS.activeCount, { backgroundColor: theme.accentDim }]]}>
-          <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.accentLight }]]}>{count}</Text>
+        <View style={[fcS.count, active && [fcS.activeCount, { backgroundColor: `${theme.onAccent}26` }]]}>
+          <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.onAccent }]]}>{count}</Text>
         </View>
       )}
     </PressableScale>
