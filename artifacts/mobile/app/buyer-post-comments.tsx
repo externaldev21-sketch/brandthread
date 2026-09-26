@@ -22,7 +22,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  View, Text, FlatList, TextInput, Modal, Pressable,
+  View, Text, FlatList, TextInput, Modal, Pressable, PanResponder,
   KeyboardAvoidingView, Platform, StyleSheet, Animated, Keyboard, useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -45,8 +45,11 @@ import { useApi } from '@/lib/api';
 import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
 import type { ThreadComment } from '@/lib/safetyTypes';
 import { hapticSelection, hapticLight, hapticSuccess, hapticError, hapticDestructiveConfirm } from '@/lib/haptics';
+import { bumpCommentCount } from '@/lib/commentCountBus';
+import { buildPreviewComments } from '@/lib/previewComments';
 
 const MAX_COMMENT_LENGTH = 1000;
+const QUICK_EMOJI = ['🔥', '😍', '👏', '😂'];
 
 /**
  * Matches the server's UUID check in post-comments.ts. Preview/demo posts
@@ -57,13 +60,34 @@ const MAX_COMMENT_LENGTH = 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A flattened list row: roots followed by their replies. */
-type Row = ThreadComment & { isReply: boolean; parentAuthorName?: string };
+type Row = ThreadComment & { isReply: boolean; parentAuthorName?: string; creatorLiked?: boolean };
 
 function flatten(roots: ThreadComment[]): Row[] {
   return roots.flatMap((root) => [
     { ...root, isReply: false },
     ...root.replies.map((reply) => ({ ...reply, isReply: true, parentAuthorName: root.author.name })),
   ]);
+}
+
+/**
+ * Preview posts (ids that fail the server's UUID check) have no backing
+ * server row, so their seeded/posted-to comment state lives only here,
+ * keyed by postId, for the life of the app session — reopening the sheet
+ * for the same preview post shows whatever was seeded plus anything posted
+ * to it earlier in the session, instead of reseeding fresh every time.
+ */
+const previewCommentsCache = new Map<string, Row[]>();
+
+/** A synthetic row standing in for a collapsed (or expanded) reply thread. */
+interface ViewRepliesRow {
+  _viewReplies: true;
+  rootId: string;
+  count: number;
+  expanded: boolean;
+}
+
+function isViewRepliesRow(row: Row | ViewRepliesRow): row is ViewRepliesRow {
+  return '_viewReplies' in row;
 }
 
 // ─── Comment skeleton row ─────────────────────────────────────────────────────
@@ -160,6 +184,13 @@ function CommentRow({
 
         <Text style={[s.commentText, comment.pendingReview && s.commentTextHeld]}>{comment.body}</Text>
 
+        {comment.creatorLiked && !isCreator ? (
+          <View style={s.creatorLikedBadge}>
+            <Feather name="heart" size={9} color={theme.accent} />
+            <Text style={[s.creatorLikedText, { color: theme.accent }]}>Creator liked</Text>
+          </View>
+        ) : null}
+
         {comment.pendingReview ? (
           <View style={s.reviewPill}>
             <Feather name="eye-off" size={11} color={theme.warning} />
@@ -203,6 +234,28 @@ function CommentRow({
           )}
         </PressableScale>
       )}
+    </PressableScale>
+  );
+}
+
+// ─── View/hide replies toggle ──────────────────────────────────────────────────
+// Reply threads start collapsed under their root comment (TikTok/Reels
+// pattern) — this row expands or re-collapses them on tap.
+
+function ViewRepliesButton({ count, expanded, onToggle }: { count: number; expanded: boolean; onToggle: () => void }) {
+  const { theme } = useAppTheme();
+  const s = makeStyles(theme);
+  return (
+    <PressableScale
+      style={s.viewRepliesRow}
+      onPress={() => { hapticLight(); onToggle(); }}
+      accessibilityRole="button"
+      accessibilityLabel={expanded ? 'Hide replies' : `View ${count} ${count === 1 ? 'reply' : 'replies'}`}
+    >
+      <View style={s.viewRepliesLine} />
+      <Text style={s.viewRepliesText}>
+        {expanded ? 'Hide replies' : `View ${count} ${count === 1 ? 'reply' : 'replies'}`}
+      </Text>
     </PressableScale>
   );
 }
@@ -382,7 +435,8 @@ export default function BuyerPostCommentsScreen() {
   /**
    * Sheet grows with the keyboard instead of the keyboard eating into a
    * fixed-height sheet (which used to squeeze the comment list and composer
-   * down to almost nothing). The base is 58% of the screen; it can grow up
+   * down to almost nothing). The base is ~65% of the screen (TikTok/Reels
+   * proportion — enough of the video stays visible above it); it can grow up
    * to 92% as the keyboard rises, and `KeyboardAvoidingView`'s own
    * padding/height behavior below shifts content back above the keyboard,
    * so the visible list area stays roughly constant instead of collapsing.
@@ -395,9 +449,34 @@ export default function BuyerPostCommentsScreen() {
     const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
-  const sheetBaseHeight = windowHeight * 0.58;
+  const sheetBaseHeight = windowHeight * 0.65;
   const sheetMaxHeight = windowHeight * 0.92;
   const sheetHeight = Math.min(sheetBaseHeight + keyboardHeight, sheetMaxHeight);
+
+  // Drag-to-dismiss: the sheet follows the finger via `dragY` and springs
+  // back to 0 (no overshoot — matches the app's low-bounce spring standard
+  // used elsewhere, e.g. the feed's shop tab) when released above the
+  // dismiss threshold, or all the way closed (navigating back) once past it.
+  const dragY = useRef(new Animated.Value(0)).current;
+  const DISMISS_THRESHOLD = 120;
+  const dragResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_evt, gesture) => gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderMove: (_evt, gesture) => {
+        if (gesture.dy > 0) dragY.setValue(gesture.dy);
+      },
+      onPanResponderRelease: (_evt, gesture) => {
+        if (gesture.dy > DISMISS_THRESHOLD || gesture.vy > 1.2) {
+          Animated.timing(dragY, { toValue: windowHeight, duration: 180, useNativeDriver: true }).start(() => router.back());
+        } else {
+          Animated.spring(dragY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(dragY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
+      },
+    }),
+  ).current;
   const params = useLocalSearchParams<{
     postId: string;
     postAuthorId?: string;
@@ -452,6 +531,8 @@ export default function BuyerPostCommentsScreen() {
   const myAvatar = user?.hasImage ? user.imageUrl : null;
 
   const [comments, setComments] = useState<Row[]>([]);
+  /** Root comment ids whose reply thread is expanded (collapsed by default). */
+  const [expandedRoots, setExpandedRoots] = useState<Set<string>>(new Set());
   const [meta, setMeta] = useState({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, nextCursor: null as string | null });
   const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Row | null>(null);
@@ -478,14 +559,32 @@ export default function BuyerPostCommentsScreen() {
     setTimeout(() => setToast((current) => (current === message ? null : current)), 2600);
   }, []);
 
+  /**
+   * Every write to `comments` for a preview post also mirrors into
+   * `previewCommentsCache`, so a comment posted this session survives
+   * closing and reopening the sheet for the same preview post (there's no
+   * server row to persist it otherwise).
+   */
+  const setCommentsSynced = useCallback((updater: Row[] | ((prev: Row[]) => Row[])) => {
+    setComments(prev => {
+      const next = typeof updater === 'function' ? (updater as (p: Row[]) => Row[])(prev) : updater;
+      if (isPreviewPost) previewCommentsCache.set(postId, next);
+      return next;
+    });
+  }, [isPreviewPost, postId]);
+
   const load = useCallback(async () => {
     if (!postId) { setLoading(false); return; }
     if (!UUID_RE.test(postId)) {
-      // Preview/demo content has no server-side post to fetch comments for.
-      // This is not a deletion, so it never shows the "no longer available"
-      // error — just a quiet, non-alarming empty state with a locked composer.
-      setComments([]);
-      setMeta({ hiddenByMutedWords: 0, commentsDisabled: true, canComment: false, nextCursor: null });
+      // Preview/demo content has no backing server post, but it still gets
+      // a real comments experience: 8-15 seeded comments (persisted for the
+      // session in previewCommentsCache) and a fully working composer that
+      // appends locally, instead of the old locked, empty dead-end state.
+      const cached = previewCommentsCache.get(postId);
+      const seeded = cached ?? flatten(buildPreviewComments(postId, params.postAuthorName || 'the creator'));
+      if (!cached) previewCommentsCache.set(postId, seeded);
+      setComments(seeded);
+      setMeta({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, nextCursor: null });
       setFetchError(null);
       hasLoadedOnce.current = true;
       setLoading(false);
@@ -511,7 +610,7 @@ export default function BuyerPostCommentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api, postId]);
+  }, [api, postId, params.postAuthorName]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -538,14 +637,15 @@ export default function BuyerPostCommentsScreen() {
     const liked = !comment.likedByMe;
     hapticSelection();
     // Optimistic update
-    setComments(prev => prev.map(c => c.id === comment.id
+    setCommentsSynced(prev => prev.map(c => c.id === comment.id
       ? { ...c, likedByMe: liked, likesCount: Math.max(0, c.likesCount + (liked ? 1 : -1)) }
       : c));
+    if (isPreviewPost) return; // Local-only — nothing to confirm against a server.
     try {
       const result = await api.comments.like(postId, comment.id, liked);
-      setComments(prev => prev.map(c => c.id === comment.id ? { ...c, likedByMe: result.liked, likesCount: result.likesCount } : c));
+      setCommentsSynced(prev => prev.map(c => c.id === comment.id ? { ...c, likedByMe: result.liked, likesCount: result.likesCount } : c));
     } catch {
-      setComments(prev => prev.map(c => c.id === comment.id ? { ...c, likedByMe: comment.likedByMe, likesCount: comment.likesCount } : c));
+      setCommentsSynced(prev => prev.map(c => c.id === comment.id ? { ...c, likedByMe: comment.likedByMe, likesCount: comment.likesCount } : c));
     }
   };
 
@@ -583,10 +683,19 @@ export default function BuyerPostCommentsScreen() {
   };
 
   const handleDelete = async (comment: Row) => {
+    if (isPreviewPost) {
+      // Local-only — nothing on a server to delete.
+      setActionsFor(null);
+      setCommentsSynced(prev => prev.filter(c => c.id !== comment.id && c.parentId !== comment.id));
+      bumpCommentCount(postId, -1);
+      showToast('Comment deleted');
+      return;
+    }
     try {
       await api.comments.remove(postId, comment.id);
       setActionsFor(null);
-      setComments(prev => prev.filter(c => c.id !== comment.id && c.parentId !== comment.id));
+      setCommentsSynced(prev => prev.filter(c => c.id !== comment.id && c.parentId !== comment.id));
+      bumpCommentCount(postId, -1);
       showToast('Comment deleted');
     } catch (error) {
       setActionsFor(null);
@@ -620,15 +729,35 @@ export default function BuyerPostCommentsScreen() {
       isReply: !!parent,
       parentAuthorName: parent?.author.name,
     };
-    setComments(prev => {
+    setCommentsSynced(prev => {
       if (!parent) return [optimistic, ...prev];
       const index = prev.findIndex(c => c.id === (parent.parentId ?? parent.id));
       const next = [...prev];
       next.splice(index + 1, 0, optimistic);
       return next;
     });
+    // A reply posted to a currently-collapsed thread must be visible right
+    // away, not hidden behind "View replies" until the user happens to tap it.
+    if (parent) {
+      const rootId = parent.parentId ?? parent.id;
+      setExpandedRoots(prev => (prev.has(rootId) ? prev : new Set(prev).add(rootId)));
+    }
     setInputText('');
     setReplyingTo(null);
+
+    if (isPreviewPost) {
+      // Local-only: no server round trip, the optimistic comment IS the
+      // final comment — just drop its tmp_ id so it isn't mistaken for
+      // still-in-flight, and bump the rail's count immediately.
+      const finalized: Row = { ...optimistic, id: `preview-comment-${postId}-posted-${Date.now()}` };
+      setCommentsSynced(prev => prev.map(c => (c.id === optimistic.id ? finalized : c)));
+      bumpCommentCount(postId, 1);
+      hapticSuccess();
+      setJustSent(true);
+      setTimeout(() => setJustSent(false), 900);
+      setSending(false);
+      return;
+    }
 
     try {
       const created = await postComment(text, parent ? (parent.parentId ?? parent.id) : null);
@@ -637,14 +766,15 @@ export default function BuyerPostCommentsScreen() {
       }
       // Successful post: remove the optimistic item and reload to get the
       // authoritative comment from the server with the real ID and count.
-      setComments(prev => prev.filter(c => c.id !== optimistic.id));
+      setCommentsSynced(prev => prev.filter(c => c.id !== optimistic.id));
       await load();
+      bumpCommentCount(postId, 1);
       hapticSuccess();
       setJustSent(true);
       setTimeout(() => setJustSent(false), 900);
     } catch (error) {
       // Remove optimistic item, keep the draft for editing, show inline error
-      setComments(prev => prev.filter(c => c.id !== optimistic.id));
+      setCommentsSynced(prev => prev.filter(c => c.id !== optimistic.id));
       setInputText(text);
       setReplyingTo(parent);
       const code = apiErrorCode(error);
@@ -665,10 +795,53 @@ export default function BuyerPostCommentsScreen() {
     [comments],
   );
 
+  /**
+   * Reply threads render collapsed by default (TikTok/Reels pattern): each
+   * root is followed either by its replies (if its id is in `expandedRoots`)
+   * or by a single "View N replies" row standing in for them.
+   */
+  const visibleRows = useMemo(() => {
+    const out: (Row | ViewRepliesRow)[] = [];
+    let i = 0;
+    while (i < comments.length) {
+      const row = comments[i];
+      if (row.isReply) { i += 1; continue; } // orphaned reply — shouldn't happen, skip defensively
+      out.push(row);
+      let j = i + 1;
+      const replies: Row[] = [];
+      while (j < comments.length && comments[j].isReply && comments[j].parentId === row.id) {
+        replies.push(comments[j]);
+        j += 1;
+      }
+      if (replies.length > 0) {
+        const expanded = expandedRoots.has(row.id);
+        if (expanded) out.push(...replies);
+        out.push({ _viewReplies: true, rootId: row.id, count: replies.length, expanded });
+      }
+      i = j;
+    }
+    return out;
+  }, [comments, expandedRoots]);
+
+  const toggleReplies = useCallback((rootId: string) => {
+    setExpandedRoots(prev => {
+      const next = new Set(prev);
+      if (next.has(rootId)) next.delete(rootId); else next.add(rootId);
+      return next;
+    });
+  }, []);
+
   const composerLocked = meta.commentsDisabled || !meta.canComment;
 
   return (
     <View style={s.overlay}>
+      {/* The video plays at its exact normal size/position, completely
+          untouched — no scale, no translate, no crop, no dim scrim. Real
+          TikTok: the sheet simply slides up and covers the lower portion of
+          the video from the bottom; the video itself never changes.
+          contentFit="contain" (not "cover") guarantees this screen's own
+          backdrop copy of the clip can never appear more cropped/zoomed
+          than however the feed itself was already framing it. */}
       {mediaUri ? (
         postType === 'video' ? (
           <>
@@ -676,7 +849,7 @@ export default function BuyerPostCommentsScreen() {
               <CachedImage
                 source={{ uri: posterUri }}
                 style={s.mediaBackdrop}
-                contentFit="cover"
+                contentFit="contain"
                 testID="comments-video-poster"
               />
             ) : null}
@@ -684,17 +857,16 @@ export default function BuyerPostCommentsScreen() {
               <VideoView
                 player={mediaPlayer}
                 style={[s.mediaBackdrop, posterUri && !videoPlaying && { opacity: 0 }]}
-                contentFit="cover"
+                contentFit="contain"
                 nativeControls={false}
                 testID="comments-video-preview"
               />
             )}
           </>
         ) : (
-          <CachedImage source={{ uri: mediaUri }} style={s.mediaBackdrop} contentFit="cover" />
+          <CachedImage source={{ uri: mediaUri }} style={s.mediaBackdrop} contentFit="contain" />
         )
       ) : null}
-      <View style={s.mediaScrim} pointerEvents="none" />
       <PressableScale
         style={s.backdrop}
         activeOpacity={1}
@@ -702,34 +874,41 @@ export default function BuyerPostCommentsScreen() {
         accessibilityRole="button"
         accessibilityLabel="Close comments"
       />
-      <KeyboardAvoidingView
-        style={[s.sheet, { height: sheetHeight }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-        testID="comments-sheet"
-      >
-        <View style={s.header}>
-          <View style={s.headerSide} />
-          <Text style={s.headerTitle}>
-            {loading ? 'Comments' : `${realCount} comment${realCount === 1 ? '' : 's'}`}
-          </Text>
-          <PressableScale
-            style={s.headerSide}
-            onPress={() => { hapticLight(); router.back(); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel="Close comments"
-          >
-            <Feather name="x" size={22} color={FG} />
-          </PressableScale>
-        </View>
+      <Animated.View style={[s.sheet, { height: sheetHeight, transform: [{ translateY: dragY }] }]}>
+        <KeyboardAvoidingView
+          style={s.sheetInner}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+          testID="comments-sheet"
+        >
+          {/* Drag-to-dismiss handle — dragging down from here (not from the
+              comment list, so it never fights list scrolling) springs the
+              sheet back if released early, or slides it fully closed. */}
+          <View style={s.dragHandleArea} {...dragResponder.panHandlers}>
+            <View style={s.dragHandle} />
+          </View>
+          <View style={s.header}>
+            <View style={s.headerSide} />
+            <Text style={s.headerTitle}>
+              {loading ? 'Comments' : `${realCount} comment${realCount === 1 ? '' : 's'}`}
+            </Text>
+            <PressableScale
+              style={s.headerSide}
+              onPress={() => { hapticLight(); router.back(); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Close comments"
+            >
+              <Feather name="x" size={22} color={FG} />
+            </PressableScale>
+          </View>
 
-        <FlatList
-          ref={listRef}
-          data={loading ? [] : comments}
-          keyExtractor={comment => comment.id}
-          showsVerticalScrollIndicator={false}
-          keyboardDismissMode="interactive"
+          <FlatList
+            ref={listRef}
+            data={loading ? [] : visibleRows}
+            keyExtractor={row => (isViewRepliesRow(row) ? `view-replies-${row.rootId}` : row.id)}
+            showsVerticalScrollIndicator={false}
+            keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={s.listContent}
           ListHeaderComponent={() => (
@@ -739,23 +918,25 @@ export default function BuyerPostCommentsScreen() {
             </>
           )}
           renderItem={({ item }) => (
-            <CommentRow
-              comment={item}
-              postAuthorId={postAuthorId}
-              onLike={handleLike}
-              onReply={handleReply}
-              onMore={setActionsFor}
-            />
+            isViewRepliesRow(item) ? (
+              <ViewRepliesButton count={item.count} expanded={item.expanded} onToggle={() => toggleReplies(item.rootId)} />
+            ) : (
+              <CommentRow
+                comment={item}
+                postAuthorId={postAuthorId}
+                onLike={handleLike}
+                onReply={handleReply}
+                onMore={setActionsFor}
+              />
+            )
           )}
           ListEmptyComponent={
             !loading && !fetchError
               ? (
                 <EmptyState
                   icon="message-circle"
-                  title={isPreviewPost ? 'Preview content' : meta.commentsDisabled ? 'Comments are off' : 'Start the conversation'}
-                  description={isPreviewPost
-                    ? 'Comments aren’t available on preview posts.'
-                    : meta.commentsDisabled ? 'The creator turned off comments for this post.' : 'Be the first to comment.'}
+                  title={meta.commentsDisabled ? 'Comments are off' : 'Start the conversation'}
+                  description={meta.commentsDisabled ? 'The creator turned off comments for this post.' : 'Be the first to comment.'}
                   compact
                 />
               )
@@ -834,6 +1015,23 @@ export default function BuyerPostCommentsScreen() {
             </View>
           ) : (
             <>
+              <View style={s.emojiRow}>
+                {QUICK_EMOJI.map(emoji => (
+                  <PressableScale
+                    key={emoji}
+                    style={s.emojiBtn}
+                    onPress={() => {
+                      hapticLight();
+                      setInputText(value => `${value}${emoji}`);
+                      inputRef.current?.focus();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${emoji}`}
+                  >
+                    <Text style={s.emojiText}>{emoji}</Text>
+                  </PressableScale>
+                ))}
+              </View>
               <View style={s.inputRow}>
                 <Avatar uri={myAvatar} initials={myInitials} />
                 <View style={s.inputShell}>
@@ -875,7 +1073,8 @@ export default function BuyerPostCommentsScreen() {
             </>
           )}
         </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </Animated.View>
 
       <CommentActionsSheet
         comment={actionsFor}
@@ -898,10 +1097,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     backgroundColor: 'transparent',
   },
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  // Full-size, in its normal position — the sheet slides over it, it never
-  // shrinks or relocates into a corner.
-  mediaBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  mediaScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.35)' }, // theme-exempt: dark scrim over media backdrop
+  // Full-size, in its normal position, completely untouched — no scale, no
+  // translate, no crop, and (per the owner's explicit correction) no dim
+  // scrim either. The sheet simply slides up and covers the lower portion
+  // of the video from the bottom; the video underneath never changes.
+  mediaBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: '#000' },
   sheet: {
     overflow: 'hidden',
     backgroundColor: CARD,
@@ -911,6 +1111,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     borderBottomWidth: 0,
     borderColor: BORDER,
   },
+  sheetInner: { flex: 1 },
+
+  dragHandleArea: { alignItems: 'center', paddingTop: 8, paddingBottom: 4 },
+  dragHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -951,12 +1155,20 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     borderWidth: 1, borderColor: theme.warning + '55', backgroundColor: theme.warning + '14',
   },
   reviewPillText: { color: theme.warning, fontFamily: FONT.medium, fontSize: 11 },
+  creatorLikedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
+  creatorLikedText: { fontFamily: FONT.semibold, fontSize: 11 },
   commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 5 },
   replyBtn: { paddingVertical: 2, paddingRight: SP.xs },
   moreBtn: { paddingVertical: 2, paddingHorizontal: 2 },
   commentLike: { width: 38, minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 2 },
   actionLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
   replyLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED },
+  viewRepliesRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingLeft: SP.md + 48, paddingVertical: 8, minHeight: 32,
+  },
+  viewRepliesLine: { width: 24, height: 1, backgroundColor: BORDER },
+  viewRepliesText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED },
 
   toast: {
     position: 'absolute', alignSelf: 'center', bottom: 150,
@@ -991,6 +1203,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   replyingName: { fontFamily: FONT.semibold },
   lockedComposer: { minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingVertical: SP.sm },
   lockedText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
+  emojiRow: { flexDirection: 'row', gap: 6, paddingBottom: 8 },
+  emojiBtn: {
+    width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: CARD_ELEVATED,
+  },
+  emojiText: { fontSize: 17 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 },
   inputShell: {
     flex: 1, minHeight: 42, maxHeight: 96, flexDirection: 'row', alignItems: 'center',

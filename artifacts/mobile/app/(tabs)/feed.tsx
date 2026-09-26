@@ -58,6 +58,7 @@ import { FeedGestureGuide } from '@/components/FeedGestureGuide';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
 import { getCachedFeedPosts, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
+import { useCommentCountDelta } from '@/lib/commentCountBus';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
 import {
@@ -1353,6 +1354,7 @@ function SpotlightPage({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { push } = useThreadPull();
+  const commentCountDelta = useCommentCountDelta(item.id);
   // The creator player (no tab bar) always plays edge to edge like Buyer Home.
   const immersive = immersiveProp || !hasTabBar;
   const [paused, setPaused] = useState(false);
@@ -1650,17 +1652,20 @@ function SpotlightPage({
           />
         </View>
 
-        {/* Comments — not async, opens navigation */}
+        {/* Comments — not async, opens navigation. `commentCountDelta` bumps
+            this the instant a comment is posted in the comments sheet (a
+            separate routed screen), so the rail updates immediately instead
+            of waiting for the feed to refetch this post. */}
         <TouchableOpacity
           style={styles.railBtn}
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => onOpenComments(item.id)}
           accessibilityRole="button"
-          accessibilityLabel={`Comments, ${formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}`}
+          accessibilityLabel={`Comments, ${formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}`}
         >
           <FontAwesome name="commenting" size={24} color={ON_DARK} />
-          <Text style={styles.railCount}>{formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}</Text>
+          <Text style={styles.railCount}>{formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}</Text>
         </TouchableOpacity>
 
         {/* Repost */}

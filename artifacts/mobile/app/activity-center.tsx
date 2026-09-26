@@ -42,6 +42,7 @@ import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ThemedRefreshControl } from '@/components/ui';
@@ -748,15 +749,26 @@ export default function ActivityCenterScreen({ inBuyerTab = false }: { inBuyerTa
 
   return (
     <View style={styles.container}>
-      <ScreenHeader
-        title="Activity"
-        showBack={!inBuyerTab}
-        actions={hasUnread ? [{
-          icon: 'check-circle',
-          onPress: () => { void handleMarkAll(); },
-          accessibilityLabel: 'Mark all activity as read',
-        }] : []}
-      />
+      {inBuyerTab ? (
+        <TabPageHeader
+          title="Activity"
+          actions={hasUnread ? [{
+            name: 'check-circle',
+            onPress: () => { void handleMarkAll(); },
+            accessibilityLabel: 'Mark all activity as read',
+          }] : []}
+        />
+      ) : (
+        <ScreenHeader
+          title="Activity"
+          showBack
+          actions={hasUnread ? [{
+            icon: 'check-circle',
+            onPress: () => { void handleMarkAll(); },
+            accessibilityLabel: 'Mark all activity as read',
+          }] : []}
+        />
+      )}
 
       {status === 'loading' ? (
         <SkeletonRows styles={styles} />

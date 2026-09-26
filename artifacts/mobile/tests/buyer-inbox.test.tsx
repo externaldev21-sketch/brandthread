@@ -174,6 +174,23 @@ vi.mock('@/components/layout', () => ({
   ListSkeleton: () => React.createElement('View', { testID: 'inbox-skeleton' }),
 }));
 
+vi.mock('@/components/layout/TabPageHeader', () => ({
+  TabPageHeader: ({ title, actions }: { title: string; actions?: Array<{ accessibilityLabel: string; onPress: () => void; testID?: string }> }) =>
+    React.createElement(
+      'View',
+      { testID: 'tab-page-header' },
+      React.createElement('Text', {}, title),
+      ...(actions ?? []).map((action) =>
+        React.createElement('TouchableOpacity', {
+          key: action.accessibilityLabel,
+          testID: action.testID,
+          accessibilityLabel: action.accessibilityLabel,
+          onPress: action.onPress,
+        }),
+      ),
+    ),
+}));
+
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
