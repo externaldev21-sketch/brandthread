@@ -30,6 +30,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { BuyerOrderView, cancellationReasonLabel, OrderStatus, TrackingStatus } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
@@ -735,14 +736,7 @@ export default function BuyerOrderDetailScreen() {
           <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.base, marginTop: SP.md, textAlign: 'center' }}>
             Could not load order details
           </Text>
-          <TouchableOpacity
-            style={{ marginTop: SP.md, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm }}
-            onPress={handlePullRefresh}
-            accessibilityRole="button"
-            accessibilityLabel="Retry"
-          >
-            <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Retry</Text>
-          </TouchableOpacity>
+          <Button label="Retry" variant="secondary" size="small" style={{ marginTop: SP.md }} onPress={handlePullRefresh} />
         </View>
       </BrandthreadScreen>
     );

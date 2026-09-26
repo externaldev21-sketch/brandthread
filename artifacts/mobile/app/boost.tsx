@@ -54,6 +54,7 @@ import {
 } from '@/services/boostService';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { Header } from '@/components/layout';
+import { Button } from '@/components/ui/Button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -914,9 +915,7 @@ export default function BoostScreen() {
               <Text style={s.emptyBody}>
                 Your session may have expired. Sign in again to load your eligible posts.
               </Text>
-              <TouchableOpacity style={s.retryBtn} onPress={loadTargets} accessibilityRole="button">
-                <Text style={s.retryBtnText}>Retry</Text>
-              </TouchableOpacity>
+              <Button label="Retry" variant="secondary" size="small" onPress={loadTargets} style={s.retryBtn} />
             </View>
           ) : targets.length === 0 ? (
             <View style={s.emptyState}>
@@ -925,13 +924,7 @@ export default function BoostScreen() {
               <Text style={s.emptyBody}>
                 Publish a video or a slideshow with 2+ images, then come back to Promote.
               </Text>
-              <TouchableOpacity
-                style={s.retryBtn}
-                onPress={() => router.push('/create-post')}
-                accessibilityRole="button"
-              >
-                <Text style={s.retryBtnText}>Create a Post</Text>
-              </TouchableOpacity>
+              <Button label="Create a Post" variant="secondary" size="small" onPress={() => router.push('/create-post')} style={s.retryBtn} />
             </View>
           ) : (
             <View style={s.grid}>
@@ -1103,14 +1096,7 @@ export default function BoostScreen() {
             </View>
           )}
 
-          <TouchableOpacity
-            style={[s.primaryBtn, { marginTop: SP.xl, width: '100%' }]}
-            onPress={() => router.back()}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-          >
-            <Text style={s.primaryBtnText}>Done</Text>
-          </TouchableOpacity>
+          <Button label="Done" variant="primary" fullWidth style={{ marginTop: SP.xl }} onPress={() => router.back()} />
         </ScrollView>
       </View>
     );
@@ -1212,8 +1198,7 @@ const s = StyleSheet.create({
   emptyState:    { alignItems: 'center', paddingVertical: SP.xl * 1.5, gap: SP.sm },
   emptyTitle:    { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
   emptyBody:     { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 20 },
-  retryBtn:      { marginTop: SP.sm, paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.pill, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: PURPLE_LIGHT },
-  retryBtnText:  { fontFamily: FONT.semibold, fontSize: FS.sm, color: PURPLE_LIGHT },
+  retryBtn:      { marginTop: SP.sm },
 
   // Selected target banner
   targetBanner: {

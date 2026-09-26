@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { deriveCardState, formatMoney, orderTypeLabel, trackingUrl } from '@workspace/manufacturer-flow';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, MUTED, ORANGE, RADIUS, RED, SP, SUBTLE, SUCCESS } from '@/lib/theme';
@@ -116,9 +117,7 @@ export default function OrderCardBubble({
               }
               if (action.kind === 'decline') {
                 return (
-                  <TouchableOpacity key="decline" style={styles.secondary} onPress={decline} disabled={busy !== null || paying} testID={`button-decline-${order.id}`}>
-                    {busy === 'decline' ? <ActivityIndicator size="small" color={MUTED} /> : <Text style={styles.secondaryText}>Decline</Text>}
-                  </TouchableOpacity>
+                  <Button key="decline" label="Decline" variant="secondary" size="compact" loading={busy === 'decline'} disabled={busy !== null || paying} onPress={decline} testID={`button-decline-${order.id}`} />
                 );
               }
               if (action.kind === 'track' && link) {

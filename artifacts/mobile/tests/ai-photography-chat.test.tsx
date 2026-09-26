@@ -20,7 +20,7 @@ const {
 }));
 
 vi.mock('react-native', () => {
-  const React = require('react') as typeof import('react');
+  const React = require('react');
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
@@ -48,12 +48,23 @@ vi.mock('react-native', () => {
     Image: nativeComponent('Image'),
     KeyboardAvoidingView: nativeComponent('KeyboardAvoidingView'),
     Platform: { OS: 'web' },
+    Pressable: nativeComponent('Pressable'),
     ScrollView: nativeComponent('ScrollView'),
     StyleSheet: { create: (styles: unknown) => styles },
     Text: nativeComponent('Text'),
     TextInput: nativeComponent('TextInput'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} setValue() {} interpolate() { return 0; } },
+      View: nativeComponent('Animated.View'),
+      Text: nativeComponent('Animated.Text'),
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      spring: () => ({ start: (cb?: () => void) => cb?.() }),
+      parallel: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
   };
 });
 
@@ -64,6 +75,10 @@ vi.mock('@expo/vector-icons', () => ({
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(),
   ImpactFeedbackStyle: { Light: 'light' },
+}));
+
+vi.mock('expo-linear-gradient', () => ({
+  LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
 }));
 
 vi.mock('expo-image-picker', () => ({
@@ -111,6 +126,20 @@ vi.mock('@/hooks/useColors', () => ({
 
 vi.mock('@/contexts/FeatureFlagContext', () => ({
   useFeatureFlag: () => featureFlagState.outfitSwap,
+}));
+
+// The shared Button component (components/ui/Button.tsx) pulls in the real
+// AppThemeContext (Clerk, AsyncStorage, the API client) at module load time
+// otherwise — none of which are available in this unit-test environment.
+vi.mock('@/contexts/AppThemeContext', () => ({
+  useAppTheme: () => ({
+    theme: {
+      accent: '#C7CDD5',
+      onAccent: '#000000',
+      accentLight: '#C7CDD5',
+      accentDim: '#34383E',
+    },
+  }),
 }));
 
 import AIPhotographyChatScreen from '@/app/ai-photography-chat';

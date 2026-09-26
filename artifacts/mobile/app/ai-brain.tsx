@@ -33,6 +33,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
@@ -158,27 +159,8 @@ function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
 
       {status === 'pending' && (
         <View style={styles.actionBtns}>
-          <TouchableOpacity
-            style={styles.actionApplyWrap}
-            onPress={() => onApply(msg.id)}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={[colors.primary, colors.accentForeground]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.actionApplyGrad}
-            >
-              <Text style={styles.actionApplyText}>Apply</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionDismissBtn}
-            onPress={() => onDismiss(msg.id)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.actionDismissText}>Dismiss</Text>
-          </TouchableOpacity>
+          <Button label="Apply" variant="primary" size="compact" style={styles.actionBtnFlex} onPress={() => onApply(msg.id)} />
+          <Button label="Dismiss" variant="secondary" size="compact" style={styles.actionBtnFlex} onPress={() => onDismiss(msg.id)} />
         </View>
       )}
 
@@ -1184,37 +1166,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     gap: 8,
     marginTop: 12,
   },
-  actionApplyWrap: {
-    flex: 1,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  actionApplyGrad: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  actionApplyText: {
-    color: colors.primaryForeground,
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-  },
-  actionDismissBtn: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  actionDismissText: {
-    color: colors.mutedForeground,
-    fontSize: FS.sm,
-    fontFamily: FONT.medium,
-  },
+  actionBtnFlex: { flex: 1 },
   actionAppliedRow: {
     flexDirection: 'row',
     alignItems: 'center',

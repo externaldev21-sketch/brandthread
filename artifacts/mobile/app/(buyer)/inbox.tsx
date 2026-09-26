@@ -25,6 +25,7 @@ import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 import { FollowerAvatarCard } from '@/components/inbox/FollowerAvatarCard';
+import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
@@ -801,26 +802,25 @@ export default function InboxScreen() {
             {previewText(conv.lastMessage, 'Sent you a message')}
           </Text>
           <View style={s.requestActions}>
-            <PressableScale
-              style={[s.requestAcceptBtn, { backgroundColor: theme.accent }, isLoadingAction && s.requestBtnDisabled]}
+            <Button
+              label="Accept"
+              variant="primary"
+              size="compact"
+              style={s.requestActionBtn}
+              loading={isLoadingAction}
+              disabled={isLoadingAction}
               onPress={() => acceptRequest(conv)}
-              disabled={isLoadingAction}
-              activeOpacity={0.8}
-              rippleEnabled={NO_RIPPLE}
               testID={`inbox-request-accept-${conv.id}`}
-            >
-              <Text style={[s.requestAcceptText, { color: theme.onAccent }]}>Accept</Text>
-            </PressableScale>
-            <PressableScale
-              style={[s.requestDeclineBtn, { borderColor: theme.border, backgroundColor: theme.card }, isLoadingAction && s.requestBtnDisabled]}
-              onPress={() => declineRequest(conv)}
+            />
+            <Button
+              label="Decline"
+              variant="secondary"
+              size="compact"
+              style={s.requestActionBtn}
               disabled={isLoadingAction}
-              activeOpacity={0.8}
-              rippleEnabled={NO_RIPPLE}
+              onPress={() => declineRequest(conv)}
               testID={`inbox-request-decline-${conv.id}`}
-            >
-              <Text style={[s.requestDeclineText, { color: theme.muted }]}>Decline</Text>
-            </PressableScale>
+            />
           </View>
         </View>
       </View>
@@ -1217,33 +1217,8 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     gap: SP.sm,
     marginTop: SP.sm,
   },
-  requestAcceptBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 40,
-    paddingVertical: SP.xs,
-    borderRadius: RADIUS.md,
-  },
-  requestAcceptText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-  },
-  requestDeclineBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 40,
-    paddingVertical: SP.xs,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-  },
-  requestDeclineText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-  },
-  requestBtnDisabled: {
-    opacity: 0.5,
+  requestActionBtn: {
+    minWidth: 88,
   },
 
   // Conversation row — roomier, no per-row hairline (rhythm from spacing,
