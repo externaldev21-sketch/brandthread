@@ -7,19 +7,21 @@
  * the same `bottomClearance` the caption block and tab bar use, so it never
  * overlaps the tab bar at any viewport.
  *
- * Icon size (~24-25pt) and vertical rhythm (~19pt gaps between action items)
- * match this repo's existing rail, cross-checked against Mobbin's TikTok For
- * You screens gathered for this rebuild (avatar ~44-48pt with a small
- * bottom-anchored follow badge, action icons visually ~28pt including their
- * label, evenly spaced down the right edge) — see the PR description.
+ * Sizing/placement (34pt icons, 44pt avatar/action-column width) ported
+ * from dev PR #129 (TikTok-exact feed sizing), which supersedes the
+ * earlier PR #88 sizing this rail shipped with. Icon drop shadows are from
+ * PR #122 (rail icon shadows) — see `railIconShadow` below and
+ * `EngagementButton`'s own `iconShadow` style, applied to every
+ * EngagementButton-driven icon here (like/repost/save/follow).
  */
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import React from 'react';
+import { Animated, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
-import { FONT, GOLD, ON_DARK } from '@/lib/theme';
+import { FONT, FS, GOLD, ON_DARK } from '@/lib/theme';
+import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 
@@ -36,7 +38,6 @@ export interface RailEngagement {
 export function RightActionRail({
   creator, hostId, avatarColor, initials, accentColor,
   engagement, commentsCount, shares, saves,
-  soundOn, onToggleSound,
   onOpenCreator, onFollow, onLike, onOpenComments, onRepost, onSave, onShare,
   heartScale, likeRing, repostSpin, repostScale, saveDrop, saveScale,
   style, testIdBase,
@@ -52,8 +53,6 @@ export function RightActionRail({
   commentsCount: number;
   shares: number;
   saves: number;
-  soundOn: boolean;
-  onToggleSound: () => void;
   onOpenCreator: () => void;
   onFollow: () => Promise<void> | void;
   onLike: () => Promise<void> | void;
@@ -70,19 +69,6 @@ export function RightActionRail({
   style?: any;
   testIdBase: string;
 }) {
-  const discSpin = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    let loop: Animated.CompositeAnimation | null = null;
-    if (soundOn) {
-      discSpin.setValue(0);
-      loop = Animated.loop(
-        Animated.timing(discSpin, { toValue: 1, duration: 3200, easing: Easing.linear, useNativeDriver: true }),
-      );
-      loop.start();
-    }
-    return () => { loop?.stop(); };
-  }, [soundOn, discSpin]);
-
   return (
     <Animated.View style={[styles.rail, style]}>
       <View style={styles.avatarWrap}>
@@ -125,7 +111,7 @@ export function RightActionRail({
         <EngagementButton
           icon="heart"
           solidIcon="heart"
-          iconSize={25}
+          iconSize={34}
           count={formatCount(engagement?.likes ?? 0)}
           active={engagement?.liked ?? false}
           activeColor="#EF4444"
@@ -148,14 +134,14 @@ export function RightActionRail({
         accessibilityRole="button"
         accessibilityLabel={`Comments, ${formatCount(commentsCount)}`}
       >
-        <FontAwesome name="commenting" size={24} color={ON_DARK} />
+        <FontAwesome name="commenting" size={34} color={ON_DARK} style={styles.iconShadow} />
         <Text style={styles.count}>{formatCount(commentsCount)}</Text>
       </TouchableOpacity>
 
       <EngagementButton
         icon="repeat"
         solidIcon="retweet"
-        iconSize={25}
+        iconSize={34}
         count={formatCount(engagement?.reposts ?? 0)}
         active={engagement?.reposted ?? false}
         activeColor={accentColor}
@@ -173,7 +159,7 @@ export function RightActionRail({
       <EngagementButton
         icon="bookmark"
         solidIcon="bookmark"
-        iconSize={24}
+        iconSize={34}
         count={formatCount(engagement?.saves ?? saves)}
         active={engagement?.saved ?? false}
         activeColor={GOLD}
@@ -196,28 +182,8 @@ export function RightActionRail({
         accessibilityLabel="Share post"
         onPress={onShare}
       >
-        <FontAwesome name="share" size={24} color={ON_DARK} />
+        <FontAwesome name="share" size={34} color={ON_DARK} style={styles.iconShadow} />
         <Text style={styles.count}>{formatCount(shares)}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.discBtn}
-        activeOpacity={0.75}
-        onPress={onToggleSound}
-        hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-        accessibilityRole="button"
-        accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
-        accessibilityState={{ checked: soundOn }}
-        testID={`sound-disc-${testIdBase}`}
-      >
-        <Animated.View
-          style={[
-            styles.disc,
-            { transform: [{ rotate: discSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] },
-          ]}
-        >
-          <View style={styles.discCenter} />
-        </Animated.View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -225,38 +191,37 @@ export function RightActionRail({
 
 const styles = StyleSheet.create({
   rail: {
-    position: 'absolute', right: 10, width: 52, alignItems: 'center', gap: 19,
+    position: 'absolute', right: 8, width: 44, alignItems: 'center', gap: 14,
   },
-  avatarWrap: { alignItems: 'center', marginBottom: 3 },
+  avatarWrap: { alignItems: 'center', marginBottom: 2 },
   avatar: {
     width: 44, height: 44, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: ON_DARK,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
   },
-  avatarText: { fontSize: 13, fontFamily: FONT.bold, color: ON_DARK },
+  avatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
   followBadge: {
-    position: 'absolute', bottom: -8, width: 20, height: 20, borderRadius: RADII.pill,
+    position: 'absolute', bottom: -7, width: 18, height: 18, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
-  btn: { width: 48, alignItems: 'center', gap: 3 },
-  actionContent: { width: 48, alignItems: 'center', gap: 3 },
-  likeWrap: { width: 48, alignItems: 'center', justifyContent: 'center' },
+  btn: { width: 44, alignItems: 'center', gap: 4 },
+  actionContent: { width: 44, alignItems: 'center', gap: 4 },
+  likeWrap: { width: 44, alignItems: 'center', justifyContent: 'center' },
   likeRing: {
-    position: 'absolute', top: 4, width: 34, height: 34, borderRadius: RADII.pill,
+    position: 'absolute', top: 2, width: 42, height: 42, borderRadius: RADII.pill,
     borderWidth: 2, borderColor: '#EF4444',
   },
   count: {
-    fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: ON_DARK,
+    fontSize: 12, lineHeight: 14, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
-  // Spinning sound disc — a small vinyl-record affordance under the share
-  // button, TikTok's music-disc pattern, doubling as the sound on/off toggle.
-  discBtn: { width: 48, alignItems: 'center', justifyContent: 'center' },
-  disc: {
-    width: 30, height: 30, borderRadius: 15, backgroundColor: '#171717',
-    borderWidth: 2, borderColor: ON_DARK, alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3,
+  // Same shadow as `count` above, applied to the rail's two plain icons
+  // (comment, share — the EngagementButton-driven icons get the matching
+  // `iconShadow` style inside EngagementButton.tsx itself). Without it,
+  // comment and share's outline-ish glyph strokes wash out against bright
+  // footage even at full white/opacity 1. (PR #122.)
+  iconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
-  discCenter: { width: 8, height: 8, borderRadius: 4, backgroundColor: ON_DARK },
 });

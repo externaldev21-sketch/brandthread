@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, queryPersister } from '@/lib/queryClient';
+import { warmBuyerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,7 +13,7 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-native';
+import { InteractionManager, Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SystemUI from 'expo-system-ui';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -753,6 +754,9 @@ function ServiceConfigurer() {
         // hydrate identity into whichever account happens to be active then.
         if (prevUserIdRef.current !== newUserId) return;
         if (profile.accountType !== 'buyer') return;
+        InteractionManager.runAfterInteractions(() => {
+          warmBuyerTabs(queryClient, api, newUserId);
+        });
         return hydrateMyProfileFromAccount({
           userId: newUserId,
           name: profile.displayName || profile.name,

@@ -110,7 +110,7 @@ const THREAD_PAGE_SIZE = 30;
 // of them used to do. These two constants are that clearance:
 //   - RAIL_BOTTOM_GAP: >=16pt from the rail's last item to the bar's top.
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
-const RAIL_BOTTOM_GAP = 22;
+const RAIL_BOTTOM_GAP = 16;
 
 // Top chrome rhythm — measured from TikTok's For You feed (Mobbin refs cited
 // in the PR): a thin search affordance raised as high as the safe area
@@ -122,7 +122,7 @@ const TOP_TABS_ROW_HEIGHT = 34;
 // no more real pages behind it, so scrolling never dead-ends or shows an
 // end card — see the `canLoopFeed`/`displayItems` comment below.
 const FEED_LOOP_REPEAT = 6;
-const CAPTION_BOTTOM_GAP = 18;
+const CAPTION_BOTTOM_GAP = 12;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
 // The sentinel is the first element in displayItems when buyerMode=true.
@@ -1219,9 +1219,11 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
 // The old inline ShopPill/right-rail/caption-block/top-bar JSX previously
 // defined in this file has been rebuilt as its own component tree under
 // components/buyer-feed/ (ShopSideTab, RightActionRail, CaptionBlock,
-// FeedTopBar, LongPressMenu) — see the imports above. This file keeps the
+// FeedTopBar, LongPressMenu) — see the imports above. ShopSideTab and
+// RightActionRail's *content* were updated to match dev PR #129's
+// TikTok-exact sizing/placement (see those files); this file keeps the
 // video player logic and gesture handling (SpotlightPage, VideoVisual,
-// ScrubProgressBar) and the data/engagement hooks, and wires the new
+// ScrubProgressBar) and the data/engagement hooks, and wires the
 // presentational components to them below.
 
 function SpotlightPage({
@@ -1486,7 +1488,10 @@ function SpotlightPage({
 
       {/* ─ Right action rail (components/buyer-feed/RightActionRail) ─
           bottom: bottomClearance + RAIL_BOTTOM_GAP, not bare bottomClearance
-          — see the RAIL_BOTTOM_GAP/CAPTION_BOTTOM_GAP comment above. */}
+          — see the RAIL_BOTTOM_GAP/CAPTION_BOTTOM_GAP comment above. Sizing
+          ported from dev PR #129; icon shadows from PR #122. Sound toggle
+          lives in the caption block (CaptionBlock's sound row) instead of a
+          rail-mounted disc — matches dev's #129 rail exactly. */}
       <RightActionRail
         style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}
         creator={item.creator}
@@ -1498,8 +1503,6 @@ function SpotlightPage({
         commentsCount={(item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta}
         shares={item.shares}
         saves={item.saves}
-        soundOn={soundOn}
-        onToggleSound={onToggleSound}
         onOpenCreator={() => { onOpenCreator(item); }}
         onFollow={() => onFollow(item.id)}
         onLike={async () => { bumpHeart(); await onLike(item.id); }}
@@ -3073,77 +3076,6 @@ const styles = StyleSheet.create({
   speedPillText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13 },
   mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
   mediaDotActive: { width: 18, backgroundColor: ON_DARK },
-  // Shop side tab: collapsed flush against the left screen edge (26pt of a
-  // 28pt-wide tab sticks out), only the two exposed corners rounded so it
-  // reads as attached to the edge rather than floating. Fully solid fill,
-  // no blur/shimmer — see the ShopSideTab component comment above for why.
-  shopSideTab: {
-    position: 'absolute', left: 0, top: '57%', height: 76,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderTopRightRadius: 12, borderBottomRightRadius: 12,
-    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    overflow: 'hidden',
-  },
-  shopSideTabCollapsed: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  // A plain horizontal row (label, then icon) — normal, unrotated layout —
-  // rotated as a whole once it's already sized. Centering this on both axes
-  // keeps it centered in the tab regardless of its rotated bounding box.
-  shopSideTabCollapsedStack: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    transform: [{ rotate: '-90deg' }],
-  },
-  shopSideTabLabel: {
-    color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.5,
-  },
-  // A sleek, narrow strip — 44pt tall (roughly the same visual height
-  // family as the collapsed tab, not a noticeably taller card), name and
-  // price sharing one line so it never needs two rows of text.
-  shopSideTabExpanded: {
-    position: 'absolute', top: 16, left: 0, right: 0, height: 44,
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 8, paddingVertical: 6, gap: 8,
-  },
-  shopSideTabThumb: {
-    width: 32, height: 32, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: ON_DARK, overflow: 'hidden', flexShrink: 0,
-  },
-  shopSideTabName: { flexShrink: 1, color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
-  shopSideTabPrice: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, ...TABULAR_NUMS },
-
-  // Placement measured from TikTok's For You feed (Mobbin refs in the PR):
-  // right inset ~10-12pt, ~30-32pt icons, 14-18pt rhythm between items.
-  rail: {
-    position: 'absolute', right: 12, width: 48, bottom: 116, alignItems: 'center', gap: 16,
-  },
-  railAvatarWrap: { alignItems: 'center', marginBottom: 2 },
-  railAvatar: {
-    width: 36, height: 36, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: ON_DARK,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
-  },
-  railAvatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
-  railFollowBadge: {
-    position: 'absolute', bottom: -7, width: 18, height: 18, borderRadius: RADII.pill,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
-  },
-  railBtn: { width: 44, alignItems: 'center', gap: 4 },
-  railActionContent: { width: 44, alignItems: 'center', gap: 4 },
-  railLikeWrap: { width: 44, alignItems: 'center', justifyContent: 'center' },
-  railLikeRing: {
-    position: 'absolute', top: 2, width: 38, height: 38, borderRadius: RADII.pill,
-    borderWidth: 2, borderColor: '#EF4444',
-  },
-  railCount: {
-    fontSize: 12, lineHeight: 14, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-  },
-
   // The bottom-left stack's vertical rhythm is one consistent system, set
   // as explicit per-step margins (not a single uniform `gap`, since each
   // step needs its own value): creator name row -> 6pt -> caption -> 8pt ->
@@ -3154,9 +3086,11 @@ const styles = StyleSheet.create({
   // reserved space where it used to sit.
   // Left inset tightened to match TikTok; right inset + maxWidth both cap
   // the block so it stops well before the action rail and stays narrow
-  // enough (~75%) that the video shows through around it.
+  // enough (~75%) that the video shows through around it. `bottom` matches
+  // CAPTION_BOTTOM_GAP's ~12pt TikTok clearance above the tab bar/progress
+  // line (see the module-level comment on CAPTION_BOTTOM_GAP).
   bottomInfo: {
-    position: 'absolute', left: 12, right: 78, maxWidth: '75%', bottom: 26, minHeight: 56,
+    position: 'absolute', left: 12, right: 68, maxWidth: '75%', bottom: 14, minHeight: 56,
     justifyContent: 'flex-end',
   },
   bottomInfoWithRepost: { minHeight: 92 },
@@ -3183,15 +3117,15 @@ const styles = StyleSheet.create({
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
   creatorRow: { minHeight: 26, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
   creatorName: {
-    fontSize: 16, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    fontSize: 15, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   soundRow: {
-    height: 20, flexDirection: 'row', alignItems: 'center', gap: 5,
+    height: 22, flexDirection: 'row', alignItems: 'center', gap: 5,
     alignSelf: 'flex-start', paddingHorizontal: 8, borderRadius: RADII.pill,
     backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
-  soundText: { fontSize: 11, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
+  soundText: { fontSize: 13, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
 
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 10, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },

@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
-import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale } from '@/components/BrandthreadUI';
+import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth } from '@clerk/expo';
@@ -17,21 +17,22 @@ import { FONT, FS, SP, RADIUS, ICON, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
-  subscribeSocial, getNotifications, markNotificationRead,
+  subscribeSocial,
   searchProfiles, createOrGetConversation, muteUser, MY_USER_ID,
   getFriendSuggestions,
 } from '@/services/socialService';
-import type { Conversation, Notification, ProfileSearchResult, AccountType } from '@/services/socialTypes';
+import type { Conversation, ProfileSearchResult, AccountType } from '@/services/socialTypes';
+import { getSuggestedPeople, dismissSuggestedPerson, type SuggestedPerson } from '@/services/activityService';
+import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
-import { FollowerAvatarCard } from '@/components/inbox/FollowerAvatarCard';
 import { Button } from '@/components/ui/Button';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import {
-  isPreviewInboxEnabled, getPreviewConversations, getPreviewNotifications,
+  isPreviewInboxEnabled, getPreviewConversations,
   subscribePreviewTyping,
 } from '@/lib/previewInbox';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
@@ -43,103 +44,84 @@ import { TabPageHeader } from '@/components/layout/TabPageHeader';
 // and pill controls. Scale/opacity press feedback is unaffected.
 const NO_RIPPLE = false;
 
-// ─── Messages / Follows / Requests segmented control ───────────────────────
+// ─── Inbox / Requests pill row (Threads-style chips, replaces the old
+// underline-tab segmented control) ──────────────────────────────────────────
 
-type InboxTab = 'follows' | 'messages' | 'requests';
+type InboxTab = 'inbox' | 'requests';
 
-function SegmentedTabs({
-  value, onChange, counts, theme, gutter,
+function InboxPillRow({
+  value, onChange, requestsCount, theme, gutter, onFilterPress,
 }: {
   value: InboxTab;
   onChange: (tab: InboxTab) => void;
-  counts: Record<InboxTab, number>;
+  requestsCount: number;
   theme: ReturnType<typeof useAppTheme>['theme'];
   gutter: number;
+  onFilterPress: () => void;
 }) {
-  const tabs: { key: InboxTab; label: string }[] = [
-    { key: 'follows', label: 'Follows' },
-    { key: 'messages', label: 'Messages' },
-    { key: 'requests', label: 'Requests' },
+  const pills: { key: InboxTab; label: string; count?: number }[] = [
+    { key: 'inbox', label: 'Inbox' },
+    { key: 'requests', label: 'Requests', count: requestsCount },
   ];
   return (
-    <View style={[tabS.row, { paddingHorizontal: gutter, borderBottomColor: theme.border }]}>
-      {tabs.map(tab => (
-        <SegmentedTab
-          key={tab.key}
-          label={tab.label}
-          count={counts[tab.key]}
-          active={value === tab.key}
-          onPress={() => onChange(tab.key)}
-          theme={theme}
-          testID={`inbox-tab-${tab.key}`}
-        />
-      ))}
-    </View>
-  );
-}
-
-function SegmentedTab({
-  label, count, active, onPress, theme, testID,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  onPress: () => void;
-  theme: ReturnType<typeof useAppTheme>['theme'];
-  testID: string;
-}) {
-  // The underline should span the label (+ its count badge, if any) as one
-  // centered unit, not the full width of this tab's 1/3-of-the-row column —
-  // measure that unit's actual rendered width so the underline always
-  // matches it exactly, at any label length or viewport width.
-  const [unitWidth, setUnitWidth] = useState(0);
-  return (
-    // PressableScale only forwards a style OBJECT to its inner Animated.View,
-    // not to the outer Pressable itself (it only passes style through to the
-    // Pressable when style is a function) — so `flex: 1` on tabS.tab never
-    // reached this row's direct flex child, and the three tabs hugged their
-    // own text and packed to the left with no gap instead of splitting the
-    // row evenly. This flex:1 wrapper is the row's actual flex child;
-    // PressableScale's unstyled Pressable then stretches to fill it (Yoga's
-    // default cross-axis alignItems: 'stretch').
-    <View style={tabS.tabWrap}>
+    <View style={[pillS.row, { paddingHorizontal: gutter }]}>
       <PressableScale
-        style={tabS.tab}
-        onPress={onPress}
+        style={[pillS.iconPill, { borderColor: theme.border }]}
+        onPress={onFilterPress}
         rippleEnabled={NO_RIPPLE}
-        activeOpacity={0.7}
-        accessibilityRole="tab"
-        accessibilityState={{ selected: active }}
-        testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel="Filter messages"
+        testID="inbox-filter-pill"
       >
-        <View
-          style={tabS.tabLabelRow}
-          onLayout={(e) => setUnitWidth(e.nativeEvent.layout.width)}
-        >
-          <Text style={[tabS.tabLabel, { color: active ? theme.text : theme.muted, fontFamily: active ? FONT.bold : FONT.semibold }]}>
-            {label}
-          </Text>
-          {count > 0 && (
-            <View style={[tabS.tabCountPill, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
-              <Text style={[tabS.tabCountText, { color: active ? theme.onAccent : theme.muted }]}>{count > 99 ? '99+' : count}</Text>
-            </View>
-          )}
-        </View>
-        <View style={[tabS.tabUnderline, active && unitWidth > 0 && { backgroundColor: theme.text, width: unitWidth }]} />
+        <Feather name="sliders" size={15} color={theme.text} />
       </PressableScale>
+      {pills.map(pill => {
+        const active = value === pill.key;
+        return (
+          <PressableScale
+            key={pill.key}
+            style={[
+              pillS.pill,
+              active
+                ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
+                : { backgroundColor: 'transparent', borderColor: theme.border },
+            ]}
+            onPress={() => onChange(pill.key)}
+            rippleEnabled={NO_RIPPLE}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            testID={`inbox-tab-${pill.key}`}
+          >
+            <Text style={[pillS.pillLabel, { color: active ? theme.text : theme.muted }]}>
+              {pill.label}
+            </Text>
+            {!!pill.count && pill.count > 0 && (
+              <View style={[pillS.pillCount, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
+                <Text style={[pillS.pillCountText, { color: active ? theme.onAccent : theme.muted }]}>
+                  {pill.count > 99 ? '99+' : pill.count}
+                </Text>
+              </View>
+            )}
+          </PressableScale>
+        );
+      })}
     </View>
   );
 }
 
-const tabS = StyleSheet.create({
-  row: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: SP.md },
-  tabWrap: { flex: 1 },
-  tab: { alignItems: 'center', paddingBottom: SP.sm, gap: SP.sm },
-  tabLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  tabLabel: { fontSize: FS.sm, letterSpacing: 0.2 },
-  tabCountPill: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  tabCountText: { fontSize: 10, fontFamily: FONT.bold },
-  tabUnderline: { height: 2, width: '60%', borderRadius: 1, backgroundColor: 'transparent' },
+const pillS = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
+  iconPill: {
+    width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    height: 36, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+  },
+  pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
+  pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  pillCountText: { fontSize: 10, fontFamily: FONT.bold },
 });
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
@@ -233,11 +215,14 @@ export default function InboxScreen() {
   const accountRef = useRef(userId);
   accountRef.current = userId;
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  // Real content on the very first frame, not a skeleton: seed from whatever
+  // `warmBuyerTabs` (or a previous visit this session) already cached for
+  // this tab. A cold start with nothing cached yet falls back to the
+  // skeleton exactly as before.
+  const cachedInbox = getCachedTabData<{ conversations: Conversation[] }>('inbox');
+  const [conversations, setConversations] = useState<Conversation[]>(cachedInbox?.conversations ?? []);
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
-  const [messagingId, setMessagingId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedInbox);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [composeVisible, setComposeVisible] = useState(false);
@@ -256,9 +241,19 @@ export default function InboxScreen() {
   const [messagesSearchQuery, setMessagesSearchQuery] = useState('');
   const [messagesSearchFocused, setMessagesSearchFocused] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<InboxTab>('messages');
+  const [activeTab, setActiveTab] = useState<InboxTab>('inbox');
   const [typingConvId, setTypingConvId] = useState<string | null>(null);
   const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // "Suggested" section (Instagram/Threads-style people-to-message list) —
+  // reuses the real /api/social/suggested endpoint that already backs the
+  // Activity screen's suggestions, rather than the still-stubbed
+  // getFriendSuggestions() used only for the compose sheet's default
+  // directory. Loaded once per mount/account, independent of the compose
+  // sheet so it can show up under the Inbox pill without opening compose.
+  const [suggestedPeople, setSuggestedPeople] = useState<SuggestedPerson[]>([]);
+  const [suggestedLoading, setSuggestedLoading] = useState(true);
+  const [messagingSuggestedId, setMessagingSuggestedId] = useState<string | null>(null);
 
   // Preview-only: simulate a transient "typing…" row for one seeded thread
   // (see lib/previewInbox.ts) — a no-op outside the dev/preview environment.
@@ -283,28 +278,25 @@ export default function InboxScreen() {
       // yet". Real accounts always have a userId and never hit this branch.
       if (isPreviewInboxEnabled()) {
         setConversations(getPreviewConversations());
-        setNotifications(getPreviewNotifications());
         setLoading(false);
         return;
       }
       setConversations([]);
-      setNotifications([]);
       setLoading(false);
       return;
     }
     setLoadError(false);
     try {
-      const [convs, notifs] = await Promise.all([getConversations(), getNotifications()]);
+      const convs = await getConversations();
       if (accountRef.current !== userId) return;
       // Dev/preview only, and only when the real API genuinely has nothing to
       // show (see lib/previewInbox.ts) — never for a real signed-in account,
       // never when the API returned real rows, and dead code in production.
-      if (isPreviewInboxEnabled() && convs.length === 0 && notifs.length === 0) {
+      if (isPreviewInboxEnabled() && convs.length === 0) {
         setConversations(getPreviewConversations());
-        setNotifications(getPreviewNotifications());
       } else {
         setConversations(convs);
-        setNotifications(notifs);
+        setCachedTabData('inbox', { conversations: convs });
       }
     } catch {
       // A real, reachable backend failing is a real error. In dev/preview
@@ -314,14 +306,32 @@ export default function InboxScreen() {
       if (isPreviewInboxEnabled()) {
         setLoadError(false);
         setConversations(getPreviewConversations());
-        setNotifications(getPreviewNotifications());
       } else {
         setLoadError(true);
         setConversations([]);
-        setNotifications([]);
       }
     } finally {
       setLoading(false);
+    }
+  }, [userId]);
+
+  // Load the "Suggested" people-to-message list once per account, and again
+  // whenever the social pub/sub fires (e.g. after a follow/unfollow changes
+  // who counts as a suggestion).
+  const loadSuggested = useCallback(async () => {
+    if (!userId) {
+      setSuggestedPeople([]);
+      setSuggestedLoading(false);
+      return;
+    }
+    try {
+      const rows = await getSuggestedPeople(8);
+      if (accountRef.current !== userId) return;
+      setSuggestedPeople(rows);
+    } catch {
+      // Non-critical: the Suggested section just stays empty on failure.
+    } finally {
+      setSuggestedLoading(false);
     }
   }, [userId]);
 
@@ -336,12 +346,13 @@ export default function InboxScreen() {
 
   useFocusEffect(useCallback(() => {
     loadData();
-  }, [loadData]));
+    loadSuggested();
+  }, [loadData, loadSuggested]));
 
   useEffect(() => {
-    const unsub = subscribeSocial(() => { loadData(); });
+    const unsub = subscribeSocial(() => { loadData(); loadSuggested(); });
     return unsub;
-  }, [loadData]);
+  }, [loadData, loadSuggested]);
 
   // ── Filter logic ────────────────────────────────────────────────────────────
 
@@ -366,8 +377,6 @@ export default function InboxScreen() {
     .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
 
   const requestConvs = conversations.filter(conv => conv.isRequest === true && !conv.isArchived);
-  const followNotifications = notifications.filter(notif => notif.type === 'new_follower' && !notif.isMuted);
-  const unreadFollowCount = followNotifications.filter(notif => !notif.isRead).length;
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -387,7 +396,7 @@ export default function InboxScreen() {
       // Refresh conversation list
       const convs = await getConversations();
       setConversations(convs);
-      setActiveTab('messages');
+      setActiveTab('inbox');
       // Open the accepted conversation
       markConversationRead(conv.id);
       router.push(`/buyer-conversation?id=${conv.id}` as never);
@@ -609,41 +618,22 @@ export default function InboxScreen() {
     }
   }
 
-  function openFollow(notif: Notification) {
+  // Message a person from the "Suggested" section (Threads/Instagram-style
+  // people-to-message list) — same createOrGetConversation + navigate
+  // pattern as startConversationWith in the compose sheet.
+  async function messageSuggested(person: SuggestedPerson) {
+    if (messagingSuggestedId) return;
     hapticPrimaryAction();
-    if (!notif.isRead) {
-      markNotificationRead(notif.id);
-      setNotifications(prev => prev.map(item =>
-        item.id === notif.id ? { ...item, isRead: true } : item
-      ));
-    }
-    if (notif.targetId) {
-      router.push({
-        pathname: '/buyer-other-profile' as any,
-        params: {
-          userId: notif.targetId,
-          name: notif.actorName ?? '',
-          handle: notif.actorHandle ?? '',
-          initials: notif.actorInitials ?? '',
-          color: notif.actorColor ?? '',
-        },
-      });
-    }
-  }
-
-  async function messageFollower(notif: Notification) {
-    if (!notif.targetId || messagingId) return;
-    hapticPrimaryAction();
-    setMessagingId(notif.id);
+    setMessagingSuggestedId(person.userId);
     try {
       const conv = await createOrGetConversation({
         type: 'buyer_to_buyer',
         participant: {
-          userId: notif.targetId,
-          name: notif.actorName ?? 'this person',
-          handle: notif.actorName ?? '',
-          initials: notif.actorInitials ?? '?',
-          color: notif.actorColor ?? theme.cardElevated,
+          userId: person.userId,
+          name: person.name,
+          handle: person.handle,
+          initials: person.initials,
+          color: person.color,
           accountType: 'buyer',
         },
       });
@@ -651,8 +641,21 @@ export default function InboxScreen() {
     } catch {
       Alert.alert('Could not start conversation', 'Check your connection and try again.');
     } finally {
-      setMessagingId(null);
+      setMessagingSuggestedId(null);
     }
+  }
+
+  function dismissSuggested(person: SuggestedPerson) {
+    hapticDestructiveConfirm();
+    // Optimistic, local-first removal — a real dismiss endpoint exists
+    // (activityService.dismissSuggestedPerson), so tell the backend too, but
+    // don't block or roll back the UI on a failed request.
+    setSuggestedPeople(prev => prev.filter(p => p.userId !== person.userId));
+    dismissSuggestedPerson(person.userId).catch(() => {});
+  }
+
+  function openFilterMenu() {
+    Alert.alert('Filter messages', 'Coming soon.');
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -831,6 +834,9 @@ export default function InboxScreen() {
   }
 
   function renderEmptyState() {
+    // Only reached for the search-no-matches and load-error cases — the
+    // true zero-conversations empty state is the hand-rolled Threads-style
+    // treatment below (renderInboxEmptyState).
     if (messagesSearchLower && !loadError) {
       return (
         <EmptyState
@@ -842,50 +848,93 @@ export default function InboxScreen() {
     }
     return (
       <EmptyState
-        icon={loadError ? 'alert-circle' : 'message-circle'}
-        title={loadError ? 'Could not load your inbox' : 'No messages yet'}
-        description={loadError ? 'Pull to refresh and try again.' : 'Start a conversation with someone in your network'}
-        action={!loadError ? { label: 'New message', onPress: openCompose } : undefined}
+        icon="alert-circle"
+        title="Could not load your inbox"
+        description="Pull to refresh and try again."
       />
+    );
+  }
+
+  // Threads-style empty inbox: centered circular dark badge + envelope icon,
+  // bold headline, gray subtitle, full-width filled "Send a message" button.
+  function renderInboxEmptyState() {
+    return (
+      <View style={s.inboxEmptyWrap}>
+        <View style={[s.inboxEmptyBadge, { backgroundColor: theme.cardElevated }]}>
+          <Feather name="mail" size={30} color={theme.text} />
+        </View>
+        <Text style={[s.inboxEmptyTitle, { color: theme.text }]}>Keep it real in DMs</Text>
+        <Text style={[s.inboxEmptySubtitle, { color: theme.muted }]}>
+          Send a message to someone in your network
+        </Text>
+        <PrimaryButton
+          label="Send a message"
+          onPress={openCompose}
+          style={s.inboxEmptyButton}
+          small
+        />
+      </View>
+    );
+  }
+
+  // "Suggested" section — people to message, from the real
+  // /api/social/suggested endpoint (activityService.getSuggestedPeople).
+  // Rendered as the empty state's trailing content, and again as a list
+  // footer once there are conversations (Threads/IG show it mainly in the
+  // empty state; showing it as a low-risk trailing section too surfaces it
+  // without displacing the conversation list).
+  function renderSuggestedSection() {
+    if (suggestedLoading || suggestedPeople.length === 0) return null;
+    return (
+      <View style={s.suggestedSection} testID="inbox-suggested-section">
+        <Text style={[s.composeSectionTitleLoose, { color: theme.muted }]}>Suggested</Text>
+        {suggestedPeople.map(person => (
+          <View key={person.userId} style={s.suggestedRow} testID={`inbox-suggested-${person.userId}`}>
+            {person.avatarUrl ? (
+              <Image source={{ uri: person.avatarUrl }} style={s.suggestedAvatar} />
+            ) : (
+              <View style={[s.suggestedAvatar, { backgroundColor: person.color }]}>
+                <Text style={s.avatarInitials}>{person.initials}</Text>
+              </View>
+            )}
+            <View style={s.convCenter}>
+              <Text style={[s.convName, { color: theme.text, fontFamily: FONT.semibold }]} numberOfLines={1}>
+                {person.name}
+              </Text>
+              <Text style={[s.suggestedReason, { color: theme.muted }]} numberOfLines={1}>
+                {person.reason}
+              </Text>
+            </View>
+            <View style={s.suggestedActions}>
+              <PrimaryButton
+                label="Message"
+                onPress={() => messageSuggested(person)}
+                small
+                loading={messagingSuggestedId === person.userId}
+                disabled={!!messagingSuggestedId}
+                style={s.suggestedMessageBtn}
+              />
+              <PressableScale
+                onPress={() => dismissSuggested(person)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Dismiss suggestion for ${person.name}`}
+                testID={`inbox-suggested-dismiss-${person.userId}`}
+              >
+                <Feather name="x" size={16} color={theme.subtle} />
+              </PressableScale>
+            </View>
+          </View>
+        ))}
+      </View>
     );
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   // Instagram-Notes-style slim avatar rail: the small set of people the buyer
-  // is actively talking to, restyled from the same FollowerAvatarCard-sized
-  // "who to message" concept but sized down into a compact circle-only strip
-  // (the Follows tab below keeps the roomier card treatment with an inline
-  // "Message" button for brand-new followers, which is a different job).
+  // is actively talking to.
   const activeRail = filteredConvs.slice(0, 10);
-
-  const followsTabContent = (
-    <ScrollView
-      contentContainerStyle={[s.followsTabContent, { paddingBottom: barInset + SP.md, paddingHorizontal: gutter }]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
-    >
-      {followNotifications.length === 0 ? (
-        <EmptyState icon="user-plus" title="No new followers" description="You'll see people who follow you here" />
-      ) : (
-        <View style={s.followsGrid}>
-          {followNotifications.map(notif => (
-            <FollowerAvatarCard
-              key={notif.id}
-              name={notif.actorName ?? notif.title}
-              initials={notif.actorInitials ?? '?'}
-              color={notif.actorColor ?? theme.cardElevated}
-              unread={!notif.isRead}
-              busy={messagingId === notif.id}
-              onPress={() => openFollow(notif)}
-              onMessage={() => messageFollower(notif)}
-              testID={`inbox-follower-card-${notif.id}`}
-            />
-          ))}
-        </View>
-      )}
-    </ScrollView>
-  );
 
   const requestsTabContent = (
     <ScrollView
@@ -917,7 +966,10 @@ export default function InboxScreen() {
           <View
             style={[
               s.searchRow,
-              { borderColor: messagesSearchFocused ? theme.accent : theme.border, backgroundColor: theme.cardElevated },
+              {
+                backgroundColor: theme.cardElevated,
+                borderColor: messagesSearchFocused ? theme.border : 'transparent',
+              },
             ]}
           >
             <Feather name="search" size={16} color={theme.muted} />
@@ -925,7 +977,7 @@ export default function InboxScreen() {
               style={[s.searchInput, { color: theme.text }]}
               value={messagesSearchQuery}
               onChangeText={setMessagesSearchQuery}
-              placeholder="Search conversations"
+              placeholder="Search"
               placeholderTextColor={theme.muted}
               autoCorrect={false}
               onFocus={() => setMessagesSearchFocused(true)}
@@ -995,14 +1047,15 @@ export default function InboxScreen() {
         </AnimatedEntrance>
       )}
 
-      {/* Follows / Messages / Requests segmented control */}
+      {/* Inbox / Requests pill row */}
       {!loading && (
-        <SegmentedTabs
+        <InboxPillRow
           value={activeTab}
           onChange={setActiveTab}
-          counts={{ follows: unreadFollowCount, messages: 0, requests: requestConvs.length }}
+          requestsCount={requestConvs.length}
           theme={theme}
           gutter={gutter}
+          onFilterPress={openFilterMenu}
         />
       )}
 
@@ -1011,8 +1064,6 @@ export default function InboxScreen() {
         <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md, paddingHorizontal: gutter }]}>
           <ListSkeleton rows={6} />
         </View>
-      ) : activeTab === 'follows' ? (
-        followsTabContent
       ) : activeTab === 'requests' ? (
         requestsTabContent
       ) : filteredConvs.length === 0 ? (
@@ -1022,7 +1073,10 @@ export default function InboxScreen() {
           contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
         >
-          <View style={{ paddingHorizontal: gutter }}>{renderEmptyState()}</View>
+          <View style={{ paddingHorizontal: gutter }}>
+            {messagesSearchLower || loadError ? renderEmptyState() : renderInboxEmptyState()}
+            {!messagesSearchLower && !loadError && renderSuggestedSection()}
+          </View>
         </ScrollView>
       ) : (
         <View style={s.listSurface}>
@@ -1036,6 +1090,7 @@ export default function InboxScreen() {
             keyboardShouldPersistTaps="handled"
             refreshing={refreshing}
             onRefresh={handleRefresh}
+            ListFooterComponent={!messagesSearchLower ? renderSuggestedSection : undefined}
           />
         </View>
       )}
@@ -1179,9 +1234,74 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   activeRailInitials: { fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
   activeRailName: { fontSize: 11, fontFamily: FONT.medium, width: 72, textAlign: 'center' },
 
-  // Follows tab
-  followsTabContent: { flexGrow: 1 },
-  followsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.md },
+  // Threads-style empty inbox (centered badge + headline + full-width button)
+  inboxEmptyWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: SP.xxl,
+    paddingBottom: SP.lg,
+    gap: SP.sm,
+  },
+  inboxEmptyBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SP.sm,
+  },
+  inboxEmptyTitle: {
+    fontSize: FS.lg,
+    fontFamily: FONT.bold,
+    textAlign: 'center',
+  },
+  inboxEmptySubtitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    textAlign: 'center',
+    maxWidth: 300,
+    marginBottom: SP.md,
+  },
+  inboxEmptyButton: {
+    width: '100%',
+  },
+
+  // "Suggested" section (people to message) — below the conversation list,
+  // or trailing the empty state, when on the Inbox pill.
+  suggestedSection: { marginTop: SP.lg },
+  composeSectionTitleLoose: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: SP.sm,
+  },
+  suggestedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SP.sm,
+    gap: SP.md,
+  },
+  suggestedAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestedReason: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    marginTop: 2,
+  },
+  suggestedActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+  },
+  suggestedMessageBtn: {
+    minWidth: 84,
+  },
 
   // Official / AI-agent row treatment (Brandthread Agent — see the
   // isOfficial comment on Conversation in services/socialTypes.ts)
@@ -1264,9 +1384,9 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     gap: 8,
     marginBottom: SP.md,
     paddingHorizontal: SP.md,
-    height: 46,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
+    height: 44,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   searchInput: {
     flex: 1,

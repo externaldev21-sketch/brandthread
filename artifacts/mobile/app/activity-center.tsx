@@ -25,6 +25,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  ScrollView,
   SectionList,
   StyleSheet,
   Text,
@@ -88,6 +89,102 @@ const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and 
 type Styles = ReturnType<typeof makeStyles>;
 type ListSection = ActivitySection<ActivityRow> & { data: ActivityRow[] };
 
+// ─── Filter chips ───────────────────────────────────────────────────────────
+// A horizontally scrolling row of pill chips below the header, mirroring
+// Threads' Activity tab. Selection is component state only (not persisted).
+
+type ActivityChipKey = 'all' | 'follows' | 'likes' | 'comments' | 'thread_cash' | 'orders';
+
+const ACTIVITY_CHIPS: { key: ActivityChipKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'follows', label: 'Follows' },
+  { key: 'likes', label: 'Likes' },
+  { key: 'comments', label: 'Comments' },
+  { key: 'thread_cash', label: 'Thread Cash' },
+  { key: 'orders', label: 'Orders' },
+];
+
+const FOLLOW_ROW_TYPES = new Set(['new_follower']);
+const LIKE_ROW_TYPES = new Set(['post_like', 'story_like']);
+const COMMENT_ROW_TYPES = new Set(['post_comment', 'comment_reply', 'mention']);
+const THREAD_CASH_ROW_TYPES = new Set(['thread_cash_received']);
+
+/** Which social item types belong to a given chip; `null` = no type filter (All). */
+function chipTypeFilter(chip: ActivityChipKey): ReadonlySet<string> | null {
+  switch (chip) {
+    case 'follows': return FOLLOW_ROW_TYPES;
+    case 'likes': return LIKE_ROW_TYPES;
+    case 'comments': return COMMENT_ROW_TYPES;
+    case 'thread_cash': return THREAD_CASH_ROW_TYPES;
+    default: return null;
+  }
+}
+
+function ActivityFilterChips({ selected, onSelect, styles }: {
+  selected: ActivityChipKey;
+  onSelect: (key: ActivityChipKey) => void;
+  styles: Styles;
+}) {
+  const { theme } = useAppTheme();
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.chipScroll}
+      contentContainerStyle={styles.chipScrollContent}
+    >
+      {ACTIVITY_CHIPS.map((chip) => {
+        const isSelected = chip.key === selected;
+        return (
+          <PressableScale
+            key={chip.key}
+            style={[
+              styles.chip,
+              isSelected
+                ? { backgroundColor: theme.cardElevated, borderColor: theme.border }
+                : { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.15)' },
+            ]}
+            onPress={() => onSelect(chip.key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSelected }}
+            accessibilityLabel={chip.label}
+          >
+            <Text style={[styles.chipText, { color: isSelected ? theme.text : theme.muted }]} numberOfLines={1}>
+              {chip.label}
+            </Text>
+          </PressableScale>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+// ─── Activity type badge ────────────────────────────────────────────────────
+// Small badge over the bottom-right of a row's avatar showing what kind of
+// activity it is (mirrors the unread/online dot pattern used on inbox rows).
+
+function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }) {
+  const { theme } = useAppTheme();
+  if (row.type === 'thread_cash_received') {
+    return (
+      <View style={styles.typeBadgeBill}>
+        <ThreadCashBill width={20} />
+      </View>
+    );
+  }
+  let icon: string | null = null;
+  let color = theme.accentLight;
+  if (FOLLOW_ROW_TYPES.has(row.type)) icon = 'user-plus';
+  else if (LIKE_ROW_TYPES.has(row.type)) { icon = 'heart'; color = theme.error; }
+  else if (COMMENT_ROW_TYPES.has(row.type)) icon = 'message-circle';
+  if (!icon) return null;
+  return (
+    <View style={styles.typeBadge}>
+      <Feather name={icon as any} size={10} color={color} />
+    </View>
+  );
+}
+
 // ─── Avatars ──────────────────────────────────────────────────────────────────
 
 /**
@@ -145,6 +242,7 @@ function AvatarPair({ actors, hidden, styles, ring }: {
     return (
       <View style={styles.leading}>
         <Avatar actor={first} size={44} styles={styles} />
+        <ActivityTypeBadge row={row} styles={styles} />
       </View>
     );
   }
@@ -163,6 +261,7 @@ function AvatarPair({ actors, hidden, styles, ring }: {
           </Text>
         </View>
       )}
+      <ActivityTypeBadge row={row} styles={styles} />
     </View>
   );
 }
@@ -197,13 +296,13 @@ const ActivityRowView = React.memo(function ActivityRowView({
   const detail = activityDetail(row);
   const followBack = isFollowBackRow(row);
   // A follow row for a single person always shows a real Follow back /
-  // Following state instead of a generic icon — even once it's mutual (cta
-  // cleared), "Following" reads better than a bare person icon.
+  // Following control instead of a generic icon — even once it's mutual
+  // (cta cleared), "Following" reads better than a bare person icon. (PR
+  // #118.)
   const isSingleFollowRow = row.type === 'new_follower' && row.actorCount === 1 && !!row.targetId;
   const alreadyFollowing = isSingleFollowRow && !followBack;
-  // The coin mark already carries the "$" glyph, so the trailing label is
-  // just the number (no redundant second "$").
-  const cashAmount = row.type === 'thread_cash_received' ? row.body?.match(/^\$([\d,.]+)/)?.[1] : null;
+  const showFollowControl = followBack || isSingleFollowRow;
+  const rowBackground = unread ? theme.card : theme.background;
   const sentence = parts.map((p) => p.text).join('');
 
   return (
@@ -214,21 +313,15 @@ const ActivityRowView = React.memo(function ActivityRowView({
       onAction={() => onDismiss(row)}
       accessibilityLabel="Dismiss activity"
     >
-      <View style={styles.row}>
+      <View style={[styles.row, { backgroundColor: rowBackground }]}>
         {/*
-          The Follow back / Following button is a real interactive control
-          (components/ui/Button), so it must be a sibling of the row's own
-          tap target rather than nested inside it — two interactive
-          `accessibilityRole="button"` elements one inside the other render
-          as invalid nested <button> HTML on web.
-
-          PressableScale only forwards a plain style object to its INNER
-          Animated.View, never to the outer Pressable/<button> itself (see
-          its own implementation) — so the shrink-to-fit-the-row constraint
-          has to live on a wrapping plain View instead, or the unconstrained
-          <button> renders at its content width and overflows the screen.
+          The Follow back / Following control is a real interactive element,
+          so it must be a sibling of the row's own tap target rather than
+          nested inside it — two interactive `accessibilityRole="button"`
+          elements one inside the other render as invalid nested <button>
+          HTML on web. (Fix from PR #118, re-applied here on top of PR
+          #123's row layout/styling — see `tapArea` below.)
         */}
-        <View style={styles.tapAreaWrap}>
         <PressableScale
           style={styles.tapArea}
           onPress={() => onPress(row)}
@@ -236,12 +329,12 @@ const ActivityRowView = React.memo(function ActivityRowView({
           accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
         >
           {row.actors.length > 0 ? (
-            <ActivityAvatarStack row={row} styles={styles} ring={theme.background} />
+            <ActivityAvatarStack row={row} styles={styles} ring={rowBackground} />
           ) : (
             <View style={styles.leading}>
               <View style={styles.iconCircle}>
                 {row.type === 'thread_cash_received' ? (
-                  <ThreadCashBill width={ICON.md} />
+                  <ThreadCashBill width={32} />
                 ) : (
                   <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
                 )}
@@ -252,53 +345,63 @@ const ActivityRowView = React.memo(function ActivityRowView({
           <View style={styles.center}>
             <Text style={styles.message} numberOfLines={3}>
               {parts.map((part, index) => (
-                <Text key={index} style={part.bold || unread ? styles.messageBold : undefined}>{part.text}</Text>
+                <Text key={index} style={part.bold ? styles.messageBold : undefined}>{part.text}</Text>
               ))}
-              <Text style={styles.time}>
-                {'  '}
-                {unread && <Text style={{ color: theme.accent }}>{'• '}</Text>}
-                {relativeTime(row.createdAt, now, { compact: true })}
-              </Text>
+              <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
             </Text>
             {detail ? <Text style={styles.detail} numberOfLines={2}>{detail}</Text> : null}
           </View>
 
-          {/* Follows never show a generic icon box — a single follower gets
-              the real Follow back / Following button (rendered as a sibling
-              below); a merged multi-follower row shows nothing trailing. */}
-          {row.type === 'new_follower' ? null : row.type === 'thread_cash_received' ? (
-            <View style={styles.cashTrailing}>
-              <ThreadCashBill width={18} />
-              {cashAmount ? <Text style={styles.cashAmount} numberOfLines={1}>{cashAmount}</Text> : null}
-            </View>
-          ) : row.targetImageUrl ? (
-            <View style={styles.thumbClip}>
-              <CachedImage
-                source={{ uri: row.targetImageUrl }}
-                style={styles.thumb}
-                recyclingKey={row.key}
-                accessibilityIgnoresInvertColors
-              />
-            </View>
+          {/* Follows never show a generic thumbnail — a single follower gets
+              the real Follow back / Following control (rendered as a
+              sibling below, not nested here); a merged multi-follower row
+              shows nothing trailing. */}
+          {showFollowControl ? null : row.targetImageUrl ? (
+            <CachedImage
+              source={{ uri: row.targetImageUrl }}
+              style={styles.thumb}
+              recyclingKey={row.key}
+              accessibilityIgnoresInvertColors
+            />
           ) : row.actors.length > 0 ? (
             <View style={styles.thumbFallback}>
-              <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
+              {row.type === 'thread_cash_received' ? (
+                <ThreadCashBill width={28} />
+              ) : (
+                <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
+              )}
             </View>
           ) : null}
         </PressableScale>
-        </View>
 
-        {isSingleFollowRow && (
-          <Button
-            label={alreadyFollowing || followState === 'done' ? 'Following' : 'Follow back'}
-            variant={alreadyFollowing || followState === 'done' ? 'secondary' : 'primary'}
-            size="compact"
-            loading={followState === 'pending'}
+        {showFollowControl && (
+          <PressableScale
+            style={[
+              styles.followBtn,
+              alreadyFollowing || followState === 'done'
+                ? { backgroundColor: 'transparent', borderColor: theme.border }
+                : { backgroundColor: theme.accent, borderColor: theme.accent },
+            ]}
             disabled={alreadyFollowing || followState !== 'idle'}
             onPress={() => onFollowBack(row)}
+            accessibilityRole="button"
             accessibilityLabel={alreadyFollowing || followState === 'done' ? 'Following' : `Follow back ${row.actors[0]?.name ?? ''}`}
-          />
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            {followState === 'pending' ? (
+              <ActivityIndicator size="small" color={theme.onAccent} />
+            ) : (
+              <Text
+                style={[styles.followText, { color: alreadyFollowing || followState === 'done' ? theme.text : theme.onAccent }]}
+                numberOfLines={1}
+              >
+                {alreadyFollowing || followState === 'done' ? 'Following' : 'Follow back'}
+              </Text>
+            )}
+          </PressableScale>
         )}
+
+        {unread && <View style={styles.unreadDot} />}
       </View>
     </SwipeActionRow>
   );
@@ -478,6 +581,8 @@ export default function ActivityCenterScreen() {
   const [now, setNow] = useState(() => Date.now());
   const [suggested, setSuggested] = useState<SuggestedPerson[]>([]);
   const [suggestedFollowState, setSuggestedFollowState] = useState<Record<string, 'pending' | 'done'>>({});
+  // Chip filter — component state only, not persisted across app restarts.
+  const [chip, setChip] = useState<ActivityChipKey>('all');
 
   const requestId = useRef(0);
   const itemsRef = useRef<ActivityItem[]>([]);
@@ -601,11 +706,25 @@ export default function ActivityCenterScreen() {
     () => newFollowersSummary(items.map((item) => (sessionNew.has(item.id) ? { ...item, isRead: false } : item))),
     [items, sessionNew],
   );
+  // The "Orders" chip shows only the summary row; the summary rows for
+  // follows/orders only make sense under "All" or their own chip.
+  const showFollowSummary = chip === 'all' || chip === 'follows';
+  const showOrderSummary = chip === 'all' || chip === 'orders';
+
+  // Client-side filtering of the already-loaded page for chips other than
+  // "All" — pagination (loadMore/hasMore) keeps working against the
+  // unfiltered `items`/`socialItems`, this only narrows what's displayed.
+  const filteredSocialItems = useMemo(() => {
+    if (chip === 'orders') return [];
+    const typeFilter = chipTypeFilter(chip);
+    if (!typeFilter) return socialItems;
+    return socialItems.filter((item) => typeFilter.has(item.type));
+  }, [socialItems, chip]);
 
   const sections: ListSection[] = useMemo(() => buildActivitySections(
-    socialItems.map((item) => (sessionNew.has(item.id) ? { ...item, isRead: false } : item)),
+    filteredSocialItems.map((item) => (sessionNew.has(item.id) ? { ...item, isRead: false } : item)),
     new Date(now),
-  ).map((section) => ({ ...section, data: section.items })), [socialItems, sessionNew, now]);
+  ).map((section) => ({ ...section, data: section.items })), [filteredSocialItems, sessionNew, now]);
 
   const hasUnread = items.some((item) => !item.isRead);
 
@@ -751,10 +870,10 @@ export default function ActivityCenterScreen() {
 
   const listHeader = (
     <>
-      {followSummary && (
+      {showFollowSummary && followSummary && (
         <NewFollowersRow summary={followSummary} styles={styles} onPress={handleNewFollowersPress} />
       )}
-      {orderSummary && (
+      {showOrderSummary && orderSummary && (
         <OrdersRow count={orderSummary.count} hasUnread={orderSummary.hasUnread} styles={styles} onPress={handleOrdersPress} />
       )}
     </>
@@ -789,6 +908,8 @@ export default function ActivityCenterScreen() {
         }] : []}
       />
 
+      <ActivityFilterChips selected={chip} onSelect={setChip} styles={styles} />
+
       {status === 'loading' ? (
         <SkeletonRows styles={styles} />
       ) : status === 'error' ? (
@@ -807,6 +928,7 @@ export default function ActivityCenterScreen() {
           keyExtractor={(row) => row.key}
           renderItem={renderItem}
           renderSectionHeader={renderSectionHeader}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
           stickySectionHeadersEnabled={false}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
@@ -853,6 +975,26 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   listContentEmpty: {
     flexGrow: 1,
   },
+  chipScroll: {
+    flexGrow: 0,
+  },
+  chipScrollContent: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    gap: SP.sm,
+  },
+  chip: {
+    height: 36,
+    paddingHorizontal: SP.md,
+    borderRadius: RADIUS.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipText: {
+    fontFamily: FONT.semibold,
+    fontSize: FS.base,
+  },
   sectionHeader: {
     paddingHorizontal: SP.md,
     paddingTop: SP.lg - 4,
@@ -871,27 +1013,53 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     gap: SP.sm + 4,
     paddingHorizontal: SP.md,
-    paddingVertical: SP.sm + 2,
-    minHeight: 64,
-    backgroundColor: theme.background,
+    paddingVertical: SP.md,
+    minHeight: 68,
   },
-  // The shrink-to-fit-the-row constraint lives here, not on `tapArea` — see
-  // the comment at its call site (PressableScale forwards a plain style
-  // object only to its inner Animated.View, never to the outer <button>).
-  tapAreaWrap: {
-    flex: 1,
-    flexBasis: 0,
-    flexShrink: 1,
-    minWidth: 0,
-  },
+  // The Follow back / Following control renders as a sibling of this
+  // PressableScale, not nested inside it (see the ActivityRowView call
+  // site) — `tapArea` just needs to take the remaining row width so the
+  // control still lands flush against the row's trailing edge.
   tapArea: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm + 4,
   },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.borderSubtle,
+    marginLeft: 44 + SP.sm + 4,
+  },
   leading: {
     width: 44,
     height: 44,
+  },
+  typeBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.cardElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeBadgeBill: {
+    position: 'absolute',
+    right: -6,
+    bottom: -4,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+    borderRadius: RADIUS.xs,
+    backgroundColor: theme.cardElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar: {
     alignItems: 'center',
@@ -979,35 +1147,44 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     lineHeight: 18,
   },
 
-  thumbClip: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.xs,
-    overflow: 'hidden',
-  },
   thumb: {
     width: 44,
     height: 44,
+    borderRadius: RADIUS.xs,
+    backgroundColor: theme.cardElevated,
   },
   thumbFallback: {
     width: 44,
     height: 44,
     borderRadius: RADIUS.xs,
-    backgroundColor: theme.cardElevated,
+    backgroundColor: theme.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.borderSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cashTrailing: {
-    flexDirection: 'row',
+  followBtn: {
+    minWidth: 96,
+    height: 36,
+    paddingHorizontal: SP.sm + 4,
+    borderRadius: 12,
+    borderWidth: 1,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: SP.sm,
-    paddingVertical: SP.xs,
+    justifyContent: 'center',
   },
-  cashAmount: {
-    color: theme.text,
+  followText: {
     fontFamily: FONT.semibold,
-    fontSize: FS.sm,
+    fontSize: FS.base,
+  },
+  unreadDot: {
+    position: 'absolute',
+    left: 6,
+    top: '50%',
+    marginTop: -3,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.accent,
   },
   skeletonWrap: {
     paddingHorizontal: SP.md,

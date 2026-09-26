@@ -169,6 +169,12 @@ vi.mock('@/components/BrandthreadUI', () => ({
         )
         : null,
     ),
+  PrimaryButton: ({ label, onPress, disabled, loading, testID }: { label: string; onPress: () => void; disabled?: boolean; loading?: boolean; testID?: string }) =>
+    React.createElement(
+      'TouchableOpacity',
+      { testID: testID ?? `primary-button-${label}`, onPress, disabled: !!disabled || !!loading },
+      React.createElement('Text', {}, label),
+    ),
 }));
 
 vi.mock('@/components/layout', () => ({
@@ -274,6 +280,14 @@ vi.mock('@/services/socialService', () => ({
   getFriendSuggestions: vi.fn().mockResolvedValue([]),
   muteUser: muteUserMock,
   MY_USER_ID: 'me',
+}));
+
+// "Suggested" section data (Inbox pill) — a separate service module from the
+// conversations/notifications one above; stubbed empty by default so it
+// doesn't add noise to assertions that aren't about it.
+vi.mock('@/services/activityService', () => ({
+  getSuggestedPeople: vi.fn().mockResolvedValue([]),
+  dismissSuggestedPerson: vi.fn().mockResolvedValue(undefined),
 }));
 
 import InboxScreen from '@/app/(buyer)/inbox';
@@ -459,8 +473,8 @@ describe('buyer inbox', () => {
     });
 
     expect(renderer!.root.findAllByProps({ testID: 'inbox-skeleton' }, { deep: false })).toHaveLength(0);
-    expect(textContent(renderer!)).toContain('No messages yet');
-    const cta = renderer!.root.findByProps({ testID: 'empty-state-action' });
+    expect(textContent(renderer!)).toContain('Keep it real in DMs');
+    const cta = renderer!.root.findByProps({ testID: 'primary-button-Send a message' });
     expect(cta).toBeTruthy();
 
     await act(async () => {

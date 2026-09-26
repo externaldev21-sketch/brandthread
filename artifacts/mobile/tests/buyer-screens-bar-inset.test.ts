@@ -65,9 +65,18 @@ describe('buyer Home feed behind the bar', () => {
     // own extra gap constant, not bare bottomClearance: that's where the
     // scrub/progress bar itself sits, so bare bottomClearance on both used
     // to put the rail's last item and the caption's sound line touching it.
+    // Gap values (16/12) and the rail/shop-tab sizing itself come from dev
+    // PR #129 (TikTok-exact feed sizing) — see the RightActionRail.tsx and
+    // ShopSideTab.tsx component files, ported from that PR's inline JSX.
     expect(feed).toContain('<RightActionRail\n        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}');
-    expect(feed).toContain('<CaptionBlock\n        style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}');    expect(feed).toContain('const RAIL_BOTTOM_GAP = 22;');
-    expect(feed).toContain('const CAPTION_BOTTOM_GAP = 18;');
+    expect(feed).toContain('<CaptionBlock\n        style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}');
+    expect(feed).toContain('const RAIL_BOTTOM_GAP = 16;');
+    expect(feed).toContain('const CAPTION_BOTTOM_GAP = 12;');
+    // The shop trigger is a collapsed side tab on the left screen edge (see
+    // components/buyer-feed/ShopSideTab.tsx), not part of the bottom-left
+    // flex column at all.
+    expect(feed).toContain('<ShopSideTab');
+    expect(feed).not.toContain('bottom: bottomClearance + (hasRepostIdentity ? 158 : 122)');
     // The scrub line sits exactly at the seam where the sharp video is
     // clipped and the blurred tab-bar strip begins — no offset gap.
     expect(feed).toContain('progressBottom={immersive ? bottomClearance : undefined}');
