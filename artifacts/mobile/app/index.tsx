@@ -25,6 +25,10 @@ export default function Index() {
       : DEV_BYPASS_ROLE;
     if (!effectivePreviewRole) return;
     const redirect = setTimeout(() => {
+      // Expo web may mount the index briefly while hydrating a deep link.
+      // Do not replace /inbox, /activity, or another preview screen with Home.
+      if (Platform.OS === 'web' && typeof window !== 'undefined'
+        && window.location.pathname.replace(/\/+$/, '') !== '') return;
       router.replace((effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
     }, 50);
     return () => clearTimeout(redirect);

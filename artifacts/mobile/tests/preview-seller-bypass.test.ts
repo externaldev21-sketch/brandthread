@@ -16,6 +16,7 @@ describe('development app preview routing', () => {
     expect(indexSource).toContain("const effectivePreviewRole = Platform.OS === 'web'");
     expect(indexSource).toContain('? getDevWebPreviewRole()');
     expect(indexSource).toContain(': DEV_BYPASS_ROLE;');
+    expect(indexSource).toContain("window.location.pathname.replace(/\\/+$/, '') !== ''");
     expect(indexSource).toContain("effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/'");
     expect(indexSource).toContain(
       "previewRole === 'buyer' ? '/(buyer)' : '/(tabs)'",
