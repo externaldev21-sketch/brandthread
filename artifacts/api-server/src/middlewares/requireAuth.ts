@@ -6,8 +6,32 @@ import { eq } from "drizzle-orm";
 import { getEffectiveEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, type SellerPlanId } from "../lib/planCatalogue";
 
+/**
+ * QA-crawl-only auth bypass.
+ *
+ * Real Clerk session verification requires network access to Clerk plus a
+ * real publishable/secret key pair, neither of which exists in an offline
+ * sandbox used for the automated QA crawl harness (see
+ * docs/qa/full-crawl-report.md, "Harness" section). This lets that harness
+ * impersonate a seeded buyer/seller by clerkId via a request header, and does
+ * nothing unless BOTH conditions hold:
+ *   - NODE_ENV !== "production"
+ *   - ENABLE_QA_AUTH_BYPASS === "true" (never set in a deployed environment)
+ * Mirrors the existing ALLOW_TEST_SUBSCRIPTION_BYPASS pattern below.
+ */
+const ALLOW_QA_AUTH_BYPASS =
+  process.env.NODE_ENV !== "production" && process.env.ENABLE_QA_AUTH_BYPASS === "true";
+
+function qaBypassUserId(req: Request): string | null {
+  if (!ALLOW_QA_AUTH_BYPASS) return null;
+  const header = req.headers["x-qa-user-id"];
+  const value = Array.isArray(header) ? header[0] : header;
+  return value || null;
+}
+
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const { userId } = getAuth(req);
+  const bypassUserId = qaBypassUserId(req);
+  const userId = bypassUserId ?? getAuth(req).userId;
   if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -67,7 +91,7 @@ const ALLOW_TEST_SUBSCRIPTION_BYPASS =
  */
 export function requirePlan(minPlan: SellerPlanId) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const { userId: actorUserId } = getAuth(req);
+    const actorUserId = qaBypassUserId(req) ?? getAuth(req).userId;
     if (!actorUserId) {
       res.status(401).json({ error: "Unauthorized" });
       return;
