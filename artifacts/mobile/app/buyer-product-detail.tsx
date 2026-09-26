@@ -859,15 +859,20 @@ export default function BuyerProductDetailScreen() {
         {/* Immersive product gallery */}
         <View style={s.imageArea}>
           <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} />
-          {/* Back button — frosted glass chrome over the full-bleed gallery,
-              per the design system's GlassPanel/IconButton glass convention
-              (replaces a flat rgba(0,0,0,0.6) scrim with a real frost). */}
+          {/* Back button — solid dark chrome over the full-bleed gallery. A
+              BlurView-based "glass" variant re-samples whatever sits behind
+              it every frame; on a swipeable gallery that reads as the same
+              shimmer/glitch PR #109 killed on the video feed, so this uses
+              the same solid rgba(0,0,0,0.6) scrim pattern that PR used over
+              other media chrome, not a frosted blur. */}
           <View style={[s.backBtnWrap, { top: insets.top + SP.sm }]}>
             <IconButton
               name="arrow-left"
               onPress={leaveProduct}
               accessibilityLabel="Back to previous screen"
-              variant="glass"
+              variant="plain"
+              color="#FFFFFF"
+              style={s.mediaChromeBtn}
             />
           </View>
           {/* Cart button */}
@@ -877,7 +882,9 @@ export default function BuyerProductDetailScreen() {
               onPress={() => router.push('/(buyer)/cart' as never)}
               accessibilityLabel="Open cart"
               accessibilityHint="View items in your cart"
-              variant="glass"
+              variant="plain"
+              color="#FFFFFF"
+              style={s.mediaChromeBtn}
             />
           </View>
         </View>
@@ -1535,10 +1542,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   imageArea: { height: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   imagePlaceholderText: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.lg },
-  // Positioning wrappers only — the frosted-glass look and hit area come
-  // from the shared IconButton's `variant="glass"`.
+  // Positioning wrappers only — the solid dark chrome and hit area come
+  // from `mediaChromeBtn` below on a `variant="plain"` IconButton (no blur
+  // over the swipeable gallery — see the comment where these render).
   backBtnWrap: { position: 'absolute', left: SP.md },
   cartBtnWrap: { position: 'absolute', right: SP.md },
+  mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CYAN_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
