@@ -59,6 +59,7 @@ import { RevenueCatProvider } from '@/lib/revenueCat';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
 import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
 import { UndoToastProvider } from '@/components/BrandthreadUI';
+import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
@@ -1275,11 +1276,13 @@ export default function RootLayout() {
                     <RevenueCatProvider>
                       <FeatureFlagProvider>
                         <UndoToastProvider>
-                          <RuntimeThemeShell>
-                            <ThreadPullProvider>
-                              <RootLayoutNav />
-                            </ThreadPullProvider>
-                          </RuntimeThemeShell>
+                          <CelebrationHost>
+                            <RuntimeThemeShell>
+                              <ThreadPullProvider>
+                                <RootLayoutNav />
+                              </ThreadPullProvider>
+                            </RuntimeThemeShell>
+                          </CelebrationHost>
                         </UndoToastProvider>
                       </FeatureFlagProvider>
                     </RevenueCatProvider>

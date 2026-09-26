@@ -36,6 +36,8 @@ import { useAuth } from '@clerk/expo';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
+import { ThreadCashCoin } from '@/components/thread-cash/ThreadCashBill';
 import { formatCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
 import UploadRing from '@/components/chat/UploadRing';
@@ -210,6 +212,7 @@ export default function BuyerConversationScreen() {
   // this screen's session; a fresh message fetch elsewhere will show the
   // original status again until the server exposes a live lookup.
   const [threadCashOverrides, setThreadCashOverrides] = useState<Record<string, ThreadCashTransferStatus>>({});
+  const celebrateThreadCash = useCelebrateThreadCash();
   // Whether the other participant and I are mutual follows, purely to drive
   // the Thread Cash entry point's enabled/disabled affordance in the
   // composer — null while unknown/loading. The server independently
@@ -783,6 +786,7 @@ export default function BuyerConversationScreen() {
             try {
               await api.threadCash.claim({ transferId });
               setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
+              celebrateThreadCash({ amount: amountCents, from: displayName });
             } catch (e: any) {
               Alert.alert('Could not claim', e?.message ?? 'Please try again.');
               throw e;
@@ -828,11 +832,15 @@ export default function BuyerConversationScreen() {
           activeOpacity={deepLink ? 0.7 : 1}
           onPress={() => { if (deepLink) router.push(deepLink as never); }}
         >
-          <Feather
-            name={cardKind === 'thread_cash' ? 'dollar-sign' : cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
-            size={ICON.sm}
-            color={theme.accent}
-          />
+          {cardKind === 'thread_cash' ? (
+            <ThreadCashCoin size={ICON.sm} />
+          ) : (
+            <Feather
+              name={cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
+              size={ICON.sm}
+              color={theme.accent}
+            />
+          )}
           <View style={{ flex: 1, marginLeft: SP.sm }}>
             {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
             {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={2}>{att.subtitle}</Text> : null}
