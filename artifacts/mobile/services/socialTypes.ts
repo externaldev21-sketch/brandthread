@@ -262,12 +262,26 @@ export interface Conversation {
 export type StoryMediaType = 'photo' | 'video' | 'text';
 export type StoryReplyPermission = 'everyone' | 'friends' | 'off';
 
-/** Overlay placed on top of a story slide (link, gif, positioned text) */
+/** Overlay placed on top of a story slide (link, gif, positioned text, or a sticker). */
+export type StoryOverlayType =
+  | 'link' | 'gif' | 'text'
+  | 'mention' | 'location' | 'time' | 'poll' | 'question'
+  | 'product' | 'shop' | 'threadcash';
+
+export interface StoryPollOption {
+  label: string;
+  votes: number;
+}
+
 export interface StoryOverlay {
   id: string;
-  type: 'link' | 'gif' | 'text';
+  type: StoryOverlayType;
   x: number;
   y: number;
+  /** Rotation in degrees, applied around the overlay's center. Defaults to 0. */
+  rotation?: number;
+  /** Uniform scale factor applied on top of `size`/`fontSize`. Defaults to 1. */
+  scale?: number;
   // link fields
   linkUrl?: string;
   linkText?: string;
@@ -279,6 +293,23 @@ export interface StoryOverlay {
   text?: string;
   color?: string;
   size?: number;
+  // mention sticker
+  mentionHandle?: string;
+  // location sticker
+  locationLabel?: string;
+  // question sticker (answers are not yet persisted server-side — UI-only)
+  questionPrompt?: string;
+  // poll sticker (results are not yet persisted server-side — UI-only)
+  pollQuestion?: string;
+  pollOptions?: StoryPollOption[];
+  // product-tag sticker (sellers, or buyers tagging a saved product)
+  productId?: string;
+  productName?: string;
+  productImageUri?: string;
+  productPriceCents?: number;
+  // shop-link sticker (sellers)
+  shopUrl?: string;
+  shopLabel?: string;
 }
 
 export interface StoryMedia {
