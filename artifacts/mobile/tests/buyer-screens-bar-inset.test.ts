@@ -38,13 +38,22 @@ describe('buyer Home feed behind the bar', () => {
 
   it('plays edge to edge and starts every overlay above the bar', () => {
     expect(feed).toContain('const isBuyerSurface = buyerMode || showFashionPreview;');
-    expect(feed).toContain('? buyerBarInset + 6');
+    // bottomClearance is exactly the tab bar's own zone now (no added
+    // padding) so the sharp video, the blurred tab-bar strip and the scrub
+    // line all key off one shared number with no gap between them.
+    expect(feed).toContain('? buyerBarInset\n    : Math.max(previewBottomInset, 8) + 14;');
     expect(feed).toContain('immersive={isBuyerSurface}');
     // Rail, caption and shop tag all anchor to the same clearance.
-    expect(feed).toContain('styles.rail, { bottom: bottomClearance }');
+    expect(feed).toContain('styles.rail, chromeStyle, { bottom: bottomClearance }');
     expect(feed).toContain('{ bottom: bottomClearance }]} pointerEvents="box-none"');
-    expect(feed).toContain('bottom: bottomClearance + (hasRepostIdentity ? 148 : 112)');
-    expect(feed).toContain('progressBottom={immersive ? bottomClearance - 10 : undefined}');
+    expect(feed).toContain('bottom: bottomClearance + (hasRepostIdentity ? 158 : 122)');
+    // The scrub line sits exactly at the seam where the sharp video is
+    // clipped and the blurred tab-bar strip begins — no offset gap.
+    expect(feed).toContain('progressBottom={immersive ? bottomClearance : undefined}');
+    // The blurred strip only shows where there's an actual floating tab bar
+    // to blend into (hasTabBar) — the creator-profile-videos player reuses
+    // this same component without one.
+    expect(feed).toContain('bottomStripHeight={immersive && hasTabBar ? bottomClearance : 0}');
   });
 
   it('fills the screen only when that crops little, and letterboxes otherwise', () => {

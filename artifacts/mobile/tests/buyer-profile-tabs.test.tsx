@@ -83,6 +83,7 @@ vi.mock('react-native', () => {
       View: nativeComponent('Animated.View'),
       event: () => () => {},
       timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      spring: () => ({ start: (cb?: () => void) => cb?.() }),
       sequence: () => ({ start: (cb?: () => void) => cb?.() }),
       loop: () => ({ start: () => {}, stop: () => {} }),
     },

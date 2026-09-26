@@ -165,7 +165,9 @@ export const products = pgTable('products', {
   removalKind: text('removal_kind'),
   images: json('images').$type<string[]>().notNull().default([]),
   tags: json('tags').$type<string[]>().notNull().default([]),
-  styleTags:             json('style_tags').$type<string[]>().notNull().default([]),
+  // jsonb, not json: migration 088 GIN-indexes this with jsonb_path_ops for
+  // For You style-match candidate generation, which only jsonb supports.
+  styleTags:             jsonb('style_tags').$type<string[]>().notNull().default([]),
   // ── Pre-order / demand gauging ───────────────────────────────────────────
   isPreOrder:            boolean('is_pre_order').notNull().default(false),
   preOrderClosingDate:   timestamp('pre_order_closing_date'),
@@ -382,6 +384,15 @@ export const orders = pgTable('orders', {
   sellerNetCents: integer('seller_net_cents').notNull().default(0),
   refundedCents: integer('refunded_cents').notNull().default(0),
   platformFeeRefundedCents: integer('platform_fee_refunded_cents').notNull().default(0),
+  // Thread Cash spent on this order (platform-funded, tracked separately from
+  // discountAmountCents above since the seller is still paid in full for this
+  // portion — see lib/threadCash/wallet.ts). Refunded/cancelled orders return
+  // this amount to the buyer's Thread Cash balance exactly once.
+  threadCashAppliedCents: integer('thread_cash_applied_cents').notNull().default(0),
+  // The platform-funded supplemental transfer that topped the seller up to
+  // the full item price (destination charges only). A full refund reverses
+  // exactly this transfer in addition to the buyer's card refund.
+  stripeThreadCashTransferId: text('stripe_thread_cash_transfer_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -441,7 +452,9 @@ export const posts = pgTable('posts', {
   aspectRatio: text('aspect_ratio').notNull().default('9:16'),
   caption: text('caption'),
   hashtags: json('hashtags').$type<string[]>().notNull().default([]),
-  styleTags: json('style_tags').$type<string[]>().notNull().default([]),
+  // jsonb, not json: migration 088 GIN-indexes this with jsonb_path_ops for
+  // For You style-match candidate generation, which only jsonb supports.
+  styleTags: jsonb('style_tags').$type<string[]>().notNull().default([]),
   sound: json('sound').$type<{
     soundId: string;
     soundTitle: string;
@@ -543,6 +556,12 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // order creation by the paid-order webhook (see lib/discounts.ts).
   discountCodeId: text('discount_code_id'),
   discountCodeAmountCents: integer('discount_code_amount_cents').notNull().default(0),
+  // Optional Thread Cash redemption reserved for this Stripe Checkout Session.
+  // Platform-funded (unlike loyalty/discount code above): it discounts the
+  // buyer's Stripe charge only — it must never reduce platformFeeCents /
+  // processingFeeEstimateCents below, which stay computed on the full price.
+  threadCashToken: text('thread_cash_token'),
+  threadCashDiscountCents: integer('thread_cash_discount_cents').notNull().default(0),
   // Money decisions fixed when the Stripe session was created.
   chargeModel: text('charge_model'),        // 'destination' | 'held'
   dropId: uuid('drop_id'),                  // server-derived from the products
@@ -1763,7 +1782,9 @@ export const notificationBatchQueue = pgTable('notification_batch_queue', {
   // Running count of collapsed events and a rolling sample of actor names,
   // used to compose the eventual "X and 4 others liked your item" copy.
   count:        integer('count').notNull().default(1),
-  actorNames:   json('actor_names').notNull().default([]).$type<string[]>(),
+  // jsonb, not json: lib/push.ts's enqueueBatchedNotification uses
+  // jsonb_array_length()/|| on this column, which only jsonb supports.
+  actorNames:   jsonb('actor_names').notNull().default([]).$type<string[]>(),
   cta:          text('cta'),
   firstEventAt: timestamp('first_event_at').defaultNow().notNull(),
   lastEventAt:  timestamp('last_event_at').defaultNow().notNull(),

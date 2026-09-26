@@ -63,6 +63,23 @@ compositions:
 
 Icons throughout use `@expo/vector-icons` `Feather`.
 
+### `components/ui` (Phase 1 barrel)
+
+Newer, Phase 1 primitives live in `artifacts/mobile/components/ui` and export
+from its `index.ts` barrel: `Button`, `Card`, `Chip`, `SegmentedControl`,
+`ListRow`, `Avatar`, `QuantityStepper`, `BottomSheet`, `Snackbar`, `Skeleton`,
+`ErrorState`, `IconButton` (with a `variant="glass"` frosted mode for chrome
+over full-bleed photo/gradient content), and the motion primitives
+(`HeartToggle`, `FollowMorphButton`, `CountUpNumber`).
+
+- **`GlassPanel`** (added for the buyer Discover redesign): a frosted,
+  monochrome glass surface — the "glass info card" language used for stat
+  strips and floating chrome over gradients/photos (e.g. Discover's hero
+  "Best price / Sold / Want" card). Same lazy `expo-blur` require as
+  `IconButton`'s glass variant. Use this instead of a one-off `BlurView` +
+  tint composition whenever a screen needs glass chrome over full-bleed
+  content.
+
 ## Manufacturer Hub conventions
 
 - Entry point: `artifacts/mobile/app/manufacturer-hub.tsx`, gated behind the
@@ -75,6 +92,61 @@ Icons throughout use `@expo/vector-icons` `Feather`.
 - New sourcing surfaces (product catalog, RFQ, quote comparison, saved/compare
   suppliers) should extend these files, matching existing tab and card
   patterns, rather than introducing a parallel design language.
+
+## Buyer Threads Home feed chrome (`app/(tabs)/feed.tsx`, buyer mode)
+
+The full-screen, TikTok/Reels-style video feed (`app/(buyer)/feed.tsx` renders
+this with `buyerMode`) is immersive: video plays edge to edge behind a
+floating tab bar rather than inside a normal screen body. Its chrome follows
+patterns worth reusing anywhere else builds a similar full-bleed media
+surface:
+
+- **One shared bottom clearance.** `bottomClearance` is computed once from
+  `useBuyerTabBarInset()` with no extra padding added, and everything at the
+  bottom of the screen keys off that exact same number: the rail, the
+  bottom-left creator/caption block, the shop CTA, the blurred tab-bar strip
+  (`bottomStripHeight`) and the scrub line (`progressBottom`). Keeping every
+  one of those on the same value is what makes the sharp video, the blurred
+  strip and the thin scrub line meet at one seam with no gap or double
+  padding — don't reintroduce a per-element fudge factor here.
+- **Live blurred strip, not a generic overlay.** The band behind the floating
+  tab bar (`styles.bottomBlurStrip`) is a second `VideoView` mirroring the
+  *same* player as the sharp video above it, cropped to just that strip and
+  blurred/darkened — so it always shows that post's actual current frame,
+  not a flat tint. A blurred poster frame sits behind the mirror so there's
+  never a black flash before the first frame decodes. Android can't sample a
+  video surface through `BlurView`, so it falls back to a denser flat dark
+  tint there only — an accepted platform limit, not a bug to "fix" by adding
+  a generic blur everywhere.
+- **Real scrubbing, not a passive bar.** `ScrubProgressBar` drags the actual
+  `player.currentTime` live via `PanResponder`; while dragging it thickens
+  (3pt → 7pt), shows a round thumb and a "current / total" time bubble, and
+  ticks a light haptic (`hapticSelection`) every ~3% of the drag. It pauses
+  the player itself for the duration of the drag and resumes on release
+  unless the post was already paused another way (`externallyPaused`) — it
+  never touches the parent's own `paused`/`holdPaused` state, so the
+  unrelated tap-and-hold-to-pause gesture on the video is untouched.
+- **Chrome entrance, not an instant swap.** Per-cell chrome (`ShopPill`,
+  the rail, the bottom-left block) fades and rises in with a spring
+  (`chromeStyle` off `chromeIn`) the moment a cell becomes the active page,
+  instead of simply appearing — the per-item "arrival" beat that makes
+  swiping feel directed. It runs once per activation, not on every render.
+- **Shop CTA is a merch card, not a bare pill.** `ShopPill` composes a thumb,
+  an eyebrow label, the product name, price and a chevron inside a glass
+  card with an accent-colored edge and a slow shimmer sweep, with its own
+  spring pop-in — the "elegantly integrated" shop affordance rather than a
+  floating badge. Reuse this shape (thumb + eyebrow + name/price + chevron)
+  for any other in-media merchandising trigger.
+- **Layered legibility scrims.** A full-width top/bottom gradient pair plus a
+  second, narrower gradient focused only behind the caption column
+  (`bottomFocusScrim`) give the text real contrast without darkening the
+  whole frame evenly — prefer this two-layer "spotlight" approach over one
+  flat wash when text sits over unpredictable media.
+- **`SegmentedControl`'s `variant="glass"`** (in
+  `components/ui/SegmentedControl.tsx`) is the general-purpose translucent,
+  blurred, gliding-indicator tab strip for sitting directly on photo/video
+  content — reuse it instead of a bespoke switcher anywhere else needs
+  tabs over media.
 
 ## Manufacturer web portal
 

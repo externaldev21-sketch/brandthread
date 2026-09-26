@@ -12,7 +12,7 @@
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
 import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions } from "@workspace/db";
-import { eq, and, or, ilike, ne, inArray, sql, gt, desc, count, isNull } from "drizzle-orm";
+import { eq, and, or, ilike, ne, inArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
@@ -29,6 +29,22 @@ import {
 } from "../lib/safety";
 import { actorFieldsFromProfile } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+
+// Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
+// search endpoint so people search behaves consistently with product/brand
+// search (near-miss spellings still match, exact substrings still win).
+const PEOPLE_SIMILARITY_THRESHOLD = 0.25;
+
+/** SQL predicate: substring match OR trigram-similarity match (typo tolerance). */
+function fuzzyMatch(column: any, term: string, pattern: string) {
+  return sql`(${ilike(column, pattern)} OR similarity(${column}, ${term}) > ${PEOPLE_SIMILARITY_THRESHOLD})`;
+}
+
+/** Best-of(substring exactness, trigram similarity) — used to rank people-search relevance. */
+function relevanceScore(column: any, term: string) {
+  return sql<number>`GREATEST(similarity(${column}, ${term}), CASE WHEN ${column} ILIKE ${"%" + term + "%"} THEN 0.999 ELSE 0 END)`;
+}
 
 const router = Router();
 router.use(requireAuth);
@@ -583,7 +599,11 @@ router.get("/search", async (req, res) => {
   const limit = Math.min(parseInt((req.query.limit as string) || "20", 10), 50);
   if (q.length < 1) { res.json([]); return; }
 
-  const pattern = `%${q}%`;
+  const term = normalizeSearchTerm(q);
+  if (term.length < 2) { res.json([]); return; }
+  const pattern = containsSearchPattern(term);
+  const nameCol = sql`COALESCE(${users.displayName}, ${users.name}, ${users.username}, '')`;
+  const relevance = relevanceScore(nameCol, term);
   const rows = await db.select().from(users)
     .where(
       and(
@@ -593,12 +613,13 @@ router.get("/search", async (req, res) => {
         isNull(users.deletedAt),
         notBlockedWith(myId, users.clerkId),
         or(
-          ilike(users.name,        pattern),
-          ilike(users.displayName, pattern),
-          ilike(users.username,    pattern),
+          fuzzyMatch(users.name,        term, pattern),
+          fuzzyMatch(users.displayName, term, pattern),
+          fuzzyMatch(users.username,    term, pattern),
         )
       )
     )
+    .orderBy(desc(relevance), asc(users.clerkId))
     .limit(limit);
 
   if (!rows.length) { res.json([]); return; }

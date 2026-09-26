@@ -62,6 +62,7 @@ vi.mock("react-native", () => {
       ScrollView: AnimatedScrollView,
       event: () => () => {},
       timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      spring: () => ({ start: (cb?: () => void) => cb?.() }),
     },
     Image: nativeComponent("Image"),
     KeyboardAvoidingView: nativeComponent("KeyboardAvoidingView"),

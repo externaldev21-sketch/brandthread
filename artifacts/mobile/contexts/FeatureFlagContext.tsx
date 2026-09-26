@@ -17,12 +17,14 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   boosts: true,
   manufacturerHub: true,
   threadCash: true,
-  // OFF until checkout can fund the discount without changing seller payout
-  // (see docs/payments/thread-cash-checkout-todo.md).
+  // OFF until an operator reviews the sign-off checklist and flips it on
+  // server-side (see docs/payments/thread-cash-checkout-todo.md) — the
+  // money flow itself is implemented and tested.
   threadCashCheckoutDiscount: false,
-  // OFF until Dev confirms with a lawyer that peer-to-peer Thread Cash
-  // transfer doesn't trigger money-transmitter / App Store rules.
-  threadCashSend: false,
+  // ON by default server-side (mutual-follow required, still a server-side
+  // kill switch) — this fallback only covers the brief window before the
+  // real flags load.
+  threadCashSend: true,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';

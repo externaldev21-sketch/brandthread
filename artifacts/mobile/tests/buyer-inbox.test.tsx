@@ -69,6 +69,26 @@ vi.mock('react-native', () => ({
     parallel: () => ({ start: (cb?: () => void) => cb?.() }),
   },
   PanResponder: { create: () => ({ panHandlers: {} }) },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
+  SectionList: (props: { sections: Array<{ title: string; data: unknown[] }>; renderItem: (info: { item: unknown }) => React.ReactNode; renderSectionHeader?: (info: { section: { title: string } }) => React.ReactNode; keyExtractor?: (item: unknown, index: number) => string }) =>
+    React.createElement(
+      'SectionList',
+      props,
+      props.sections.map((section, sIndex) =>
+        React.createElement(
+          React.Fragment,
+          { key: `section-${sIndex}` },
+          props.renderSectionHeader ? props.renderSectionHeader({ section }) : null,
+          section.data.map((item, index) =>
+            React.createElement(
+              React.Fragment,
+              { key: props.keyExtractor ? props.keyExtractor(item, index) : String(index) },
+              props.renderItem({ item }),
+            ),
+          ),
+        ),
+      ),
+    ),
 }));
 
 vi.mock('@expo/vector-icons', () => ({
@@ -133,6 +153,7 @@ vi.mock('@/components/BrandthreadUI', () => ({
   SheetHandle: () => React.createElement('View', { testID: 'inbox-compose-sheet-handle' }),
   PressableScale: ({ children, ...rest }: any) =>
     React.createElement('Pressable', rest, typeof children === 'function' ? children({ pressed: false }) : children),
+  AnimatedEntrance: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, {}, children),
   EmptyState: ({ title, description, action }: { title: string; description?: string; action?: { label: string; onPress: () => void } }) =>
     React.createElement(
       'View',
