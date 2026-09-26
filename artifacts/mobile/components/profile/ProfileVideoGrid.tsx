@@ -131,7 +131,7 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
             )}
             <LinearGradient
               pointerEvents="none"
-              colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.62)']} // theme-exempt: legibility scrim over media
+              colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.72)']} // theme-exempt: legibility scrim over media
               style={styles.scrim}
             />
             {item.kind !== 'video' ? (
@@ -151,11 +151,11 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
             ) : null}
             {metric ? (
               <View style={styles.metric} pointerEvents="none">
-                <Feather name={metric.icon} size={11} color="#FFFFFF" /* theme-exempt: over media */ />
+                <Feather name={metric.icon} size={15} color="#FFFFFF" /* theme-exempt: over media */ />
                 <Text style={styles.metricText}>{metric.value}</Text>
               </View>
             ) : null}
-            <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.xs} theme={theme} />
+            <InteractionLayer state={state as { pressed: boolean }} radius={0} theme={theme} />
           </>
         )}
       </PressableScale>
@@ -168,17 +168,18 @@ export function ProfileGridSkeleton({ columns, width, height, rows = 2 }: { colu
   return (
     <View style={styles.skeletonGrid} accessibilityLabel="Loading videos" accessible>
       {Array.from({ length: columns * rows }).map((_, index) => (
-        <SkeletonBlock key={index} width={width} height={height} radius={RADIUS.xs} />
+        <SkeletonBlock key={index} width={width} height={height} radius={0} />
       ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tile: { borderRadius: RADIUS.xs, overflow: 'hidden', minHeight: 0 },
+  // Square-cornered, hairline-gapped: the grid reads as one wall of video.
+  tile: { borderRadius: 0, overflow: 'hidden', minHeight: 0 },
   placeholder: { alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: SP.sm },
   placeholderCaption: { fontFamily: FONT.medium, fontSize: FS.xs, textAlign: 'center', lineHeight: 15 },
-  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '38%' },
+  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '50%' },
   kindBadge: {
     position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11,
     backgroundColor: 'rgba(0,0,0,0.45)', // theme-exempt: scrim over media
@@ -194,11 +195,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 1,
   },
   statusText: { fontFamily: FONT.semibold, fontSize: 10, lineHeight: 13 },
-  metric: { position: 'absolute', left: 7, bottom: 7, flexDirection: 'row', alignItems: 'center', gap: 3 },
+  metric: { position: 'absolute', left: 8, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
   metricText: {
     color: '#FFFFFF', // theme-exempt: over media
-    fontFamily: FONT.bold, fontSize: FS.xs, lineHeight: 14,
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+    fontFamily: FONT.bold, fontSize: FS.base, lineHeight: 18, letterSpacing: -0.2, fontVariant: ['tabular-nums'],
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: PROFILE_GRID_GAP },
 });

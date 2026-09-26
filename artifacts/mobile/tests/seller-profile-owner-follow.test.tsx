@@ -47,6 +47,7 @@ vi.mock("react-native", () => {
     _value: number;
     constructor(value: number) { this._value = value; }
     interpolate() { return this._value; }
+    setValue(value: number) { this._value = value; }
   }
   function MockPressable(props: Record<string, unknown>) {
     const { children, ...rest } = props;
@@ -64,6 +65,7 @@ vi.mock("react-native", () => {
       View: nativeComponent("Animated.View"),
       ScrollView: nativeComponent("Animated.ScrollView"),
       event: () => () => {},
+      spring: () => ({ start: () => {} }),
     },
     Dimensions: { get: () => ({ width: 375, height: 800 }) },
     Image: nativeComponent("Image"),

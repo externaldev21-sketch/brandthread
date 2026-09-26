@@ -219,6 +219,27 @@ vi.mock('@/components/orders/OrderStatusTimeline', () => ({
   OrderStatusTimeline: ({ status }: { status: string }) => React.createElement('Text', null, `timeline:${status}`),
 }));
 
+// The profile grid's empty state is the shared layout EmptyState.
+vi.mock('@/components/layout/EmptyState', () => {
+  const ReactActual = require('react') as typeof import('react');
+  return {
+    EmptyState: ({ title, message, actionLabel, onAction, testID }: { title?: string; message: string; actionLabel?: string; onAction?: () => void; testID?: string }) =>
+      ReactActual.createElement(
+        'View',
+        { testID },
+        title ? ReactActual.createElement('Text', null, title) : null,
+        ReactActual.createElement('Text', null, message),
+        actionLabel && onAction
+          ? ReactActual.createElement(
+            'TouchableOpacity',
+            { testID: 'empty-state-action', onPress: onAction },
+            ReactActual.createElement('Text', null, actionLabel),
+          )
+          : null,
+      ),
+  };
+});
+
 vi.mock('@/components/layout', () => {
   const ReactActual = require('react') as typeof import('react');
   return {
@@ -238,7 +259,15 @@ vi.mock('@/components/layout', () => {
 // transform outside a Metro/RN runtime, and this test doesn't exercise the
 // share sheet's own UI, so it's stubbed out entirely.
 vi.mock('@/components/ShareProfileSheet', () => ({
-  ShareProfileSheet: () => null,
+  ShareProfileSheet: ({ visible, identity }: { visible: boolean; identity?: { accountType?: string } }) => (
+    visible ? require('react').createElement('View', { testID: 'share-profile-sheet', accountType: identity?.accountType }) : null
+  ),
+}));
+
+const { threadCashFlag } = vi.hoisted(() => ({ threadCashFlag: { on: false } }));
+vi.mock('@/contexts/FeatureFlagContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/contexts/FeatureFlagContext')>()),
+  useFeatureFlag: (key: string) => (key === 'threadCash' ? threadCashFlag.on : false),
 }));
 
 vi.mock('@/components/BrandthreadUI', () => {
@@ -425,6 +454,35 @@ describe('buyer profile tabs', () => {
     expect(editProfileBtns.length).toBeGreaterThan(0);
     await act(async () => { editProfileBtns[0].props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
+  });
+
+  it('opens the real share sheet (QR, copy link, native share) from Share profile', async () => {
+    renderer = await renderScreen();
+    expect(renderer.root.findAll((node) => node.props.testID === 'share-profile-sheet')).toHaveLength(0);
+    const shareBtn = renderer.root.findAll(
+      node => (node.type as unknown) === 'Pressable'
+        && typeof node.props.onPress === 'function'
+        && textContent(node.props.children).includes('Share profile'),
+    )[0];
+    expect(shareBtn).toBeTruthy();
+    await act(async () => { shareBtn.props.onPress(); });
+    expect(renderer.root.findAll((node) => node.props.testID === 'share-profile-sheet').length).toBeGreaterThan(0);
+  });
+
+  it('shows the compact Thread Cash chip on your own profile only when the flag is on, opening the wallet', async () => {
+    threadCashFlag.on = false;
+    renderer = await renderScreen();
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-wallet-chip')).toHaveLength(0);
+    await act(async () => { renderer?.unmount(); });
+
+    threadCashFlag.on = true;
+    renderer = await renderScreen();
+    const chip = renderer.root.findAll((node) => node.props.testID === 'profile-wallet-chip')[0];
+    expect(chip.props.accessibilityLabel).toBe('Thread Cash wallet, $0.00');
+    routerMock.push.mockReset();
+    await act(async () => { chip.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/thread-cash');
+    threadCashFlag.on = false;
   });
 
   it('shows a My Orders card for the latest active order, with a working See all link', async () => {

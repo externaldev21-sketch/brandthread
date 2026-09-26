@@ -12,10 +12,10 @@ import { BREAKPOINT, GRID_MAX_WIDTH } from '@/lib/theme';
  */
 export const WEB_SHELL_BREAKPOINT_MIRROR = 700;
 export const PROFILE_WEB_COLUMN = 640;
-/** Gap between 9:16 grid tiles. */
-export const PROFILE_GRID_GAP = 2;
-/** Floating "Shop N products" pill height (list reserves room for it). */
-export const SHOP_PILL_HEIGHT = 52;
+/** Hairline gap between 9:16 grid tiles — the grid reads as one wall of video. */
+export const PROFILE_GRID_GAP = 1;
+/** Floating "Shop N products" CTA height (list reserves room for it). */
+export const SHOP_PILL_HEIGHT = 60;
 
 export interface ProfileLayout {
   /** Width of the profile column (the viewport on phones). */
@@ -42,8 +42,9 @@ export function computeProfileLayout(width: number, height: number, os: string):
   const gridColumns = isTablet ? (width > height ? 5 : 4) : 3;
   const tileWidth = Math.floor((columnWidth - PROFILE_GRID_GAP * (gridColumns - 1)) / gridColumns);
   const tileHeight = Math.round((tileWidth * 16) / 9);
-  // The hero is a proportion of the screen height so a 375×667 phone still
-  // shows the identity block above the fold, clamped for tablets/desktop.
-  const heroHeight = Math.round(Math.min(480, Math.max(280, height * 0.46)));
+  // A dominant, full-bleed hero (~62% of the screen). The name/avatar are set
+  // *inside* its bottom edge, so even a 375×667 phone shows identity and the
+  // stats row above the fold; clamped for tablets/desktop.
+  const heroHeight = Math.round(Math.min(640, Math.max(360, height * 0.62)));
   return { columnWidth, isDesktopWeb, gridColumns, tileWidth, tileHeight, heroHeight, windowHeight: height };
 }
