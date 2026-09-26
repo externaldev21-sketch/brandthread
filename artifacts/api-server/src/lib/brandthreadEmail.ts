@@ -3,7 +3,7 @@ import path from "node:path";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { logger } from "./logger";
 
-const DEFAULT_FROM = "Brandthread <hello@brandthread.app>";
+const DEFAULT_FROM = "Brandthread <no-reply@brandthread.app>";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const RESEND_CONNECTOR_NAME = "resend";
 

@@ -14,7 +14,7 @@ import { Resend } from "resend";
 import { logger } from "./logger";
 import { renderBrandthreadEmail } from "./brandthreadEmail";
 
-const DEFAULT_FROM = "Brandthread <hello@brandthread.app>";
+const DEFAULT_FROM = "Brandthread <no-reply@brandthread.app>";
 
 let cachedClient: Resend | null = null;
 let cachedApiKey: string | undefined;
