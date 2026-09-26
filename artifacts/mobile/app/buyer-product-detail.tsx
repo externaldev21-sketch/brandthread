@@ -45,6 +45,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
+import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import {
   messageSellerAboutProductHref, profileHref, profileVideosHref,
 } from '@/lib/profileNavigation';
@@ -495,9 +496,6 @@ export default function BuyerProductDetailScreen() {
   const [sellerPaymentReason, setSellerPaymentReason] = useState<string | null>(null);
   const [sellerVacationMessage, setSellerVacationMessage] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [productReviews, setProductReviews] = useState<any[]>([]);
-  const [avgRating, setAvgRating] = useState(0);
-  const [reviewCount, setReviewCount] = useState(0);
   // Track whether options were touched at least once (for required-option feedback)
   const [optionsTouched, setOptionsTouched] = useState(false);
   // Track added-to-bag confirmation to show a banner (auto-clears after 2s)
@@ -602,20 +600,6 @@ export default function BuyerProductDetailScreen() {
     if (!cartVariant) return;
     setSelections(Object.fromEntries(cartVariant.optionValues.map(value => [value.optionId, value.valueId])));
   }, [product, editVariantId]);
-
-  useEffect(() => {
-    if (!product?.id) return;
-    let cancelled = false;
-    api.reviews.forProduct(product.id)
-      .then((data: any) => {
-        if (cancelled) return;
-        setProductReviews(data.reviews ?? []);
-        setAvgRating(data.avgRating ?? 0);
-        setReviewCount(data.totalCount ?? 0);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [product?.id]);
 
   async function handleRefresh() {
     if (!product?.sellerId) return;
@@ -1149,33 +1133,9 @@ export default function BuyerProductDetailScreen() {
             </>
           )}
 
-          {/* Reviews */}
-          <View style={s.divider} />
-          <Text style={s.reviewsHeader}>Customer Reviews</Text>
-          {reviewCount === 0 ? (
-            <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, marginBottom: SP.md }}>
-              No reviews yet
-            </Text>
-          ) : (
-            <>
-              <View style={s.ratingRow}>
-                <Text style={s.ratingAvg}>{avgRating.toFixed(1)}</Text>
-                <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD }}>
-                  {renderStars(avgRating)}
-                </Text>
-                <Text style={s.ratingCount}>({reviewCount} review{reviewCount !== 1 ? 's' : ''})</Text>
-              </View>
-              {productReviews.slice(0, 5).map((r: any) => (
-                <View key={r.id} style={s.reviewRow}>
-                  <Text style={s.reviewStars}>{renderStars(r.rating)}</Text>
-                  {r.body ? <Text style={s.reviewBody}>{r.body}</Text> : null}
-                  <Text style={s.reviewDate}>
-                    {new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </Text>
-                </View>
-              ))}
-            </>
-          )}
+          {/* Reviews — shared with the Shop sheet so review UI never drifts
+              between the two surfaces. Renders nothing when there are none. */}
+          <ProductReviewsSection productId={product.id} productName={product.name} />
 
           {/* Worn in these videos */}
           <WornInVideos productId={product.id} productName={product.name} />

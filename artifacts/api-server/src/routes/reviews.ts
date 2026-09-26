@@ -30,12 +30,19 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 router.get("/product/:productId", async (req, res) => {
   const { productId } = req.params;
   if (!UUID_RE.test(productId)) return res.json({ reviews: [], avgRating: 0, totalCount: 0 });
-  const rows = await db
-    .select()
-    .from(reviews)
-    .where(eq(reviews.productId, productId))
-    .orderBy(desc(reviews.createdAt))
-    .limit(50);
+  // Joined with the buyer's display name + avatar so the buyer-facing review
+  // card (Shop sheet + PDP) can show "who" alongside the star rating and
+  // text, matching GOAT/SSENSE-style review rows — not just a bare rating.
+  const rows = (await db.execute(sql`
+    SELECT r.*,
+           COALESCE(u.display_name, u.name) AS buyer_name,
+           u.profile_image_url              AS buyer_avatar
+    FROM   reviews r
+    LEFT JOIN users u ON u.clerk_id = r.buyer_id
+    WHERE  r.product_id = ${productId}
+    ORDER  BY r.created_at DESC
+    LIMIT  50
+  `)).rows;
 
   const [agg] = await db
     .select({
@@ -51,6 +58,10 @@ router.get("/product/:productId", async (req, res) => {
     totalCount: Number(agg?.totalCount ?? 0),
   });
 });
+
+// Note: buyer-supplied size/fit-note/photo fields aren't in the reviews
+// schema yet (see docs backlog) — the buyer review card below degrades
+// gracefully (hides those rows) until a migration adds them.
 
 // ─── Public: reviews for a seller ────────────────────────────────────────────
 // Accepts users.clerkId or users.id (UUID) — resolves to canonical clerkId.
