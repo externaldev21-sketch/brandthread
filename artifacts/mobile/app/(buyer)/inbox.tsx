@@ -11,6 +11,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -213,6 +214,9 @@ function railDisplayName(name: string): string {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function InboxScreen() {
+  // Only one of the three page-level containers below (two empty-state
+  // ScrollViews, one FlashList) mounts at a time, so sharing this ref is safe.
+  const scrollResetRef = useScrollReset<any>();
   const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
@@ -1000,6 +1004,7 @@ export default function InboxScreen() {
         requestsTabContent
       ) : filteredConvs.length === 0 ? (
         <ScrollView
+          ref={scrollResetRef}
           style={s.listSurface}
           contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
@@ -1009,6 +1014,7 @@ export default function InboxScreen() {
       ) : (
         <View style={s.listSurface}>
           <FlashList
+            ref={scrollResetRef}
             data={filteredConvs}
             keyExtractor={item => item.id}
             renderItem={renderConvRow}

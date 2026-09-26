@@ -39,7 +39,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -2787,6 +2787,26 @@ export default function FeedScreen({
         }
       }}
     >
+      {feedLoading && (
+        <FeedSkeleton
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
+        />
+      )}
+      {/*
+       * SCROLL-RESET EXCEPTION (see hooks/useScrollReset.ts): this vertical
+       * video FlatList deliberately does NOT use useScrollReset. Its
+       * "comments" UI (`/buyer-post-comments`, see app/_layout.tsx) is a
+       * real pushed modal route, not local component state — so the feed
+       * screen actually loses and regains focus every time comments opens
+       * and closes. Wiring useScrollReset as-is would fire on that refocus
+       * and snap the feed back to its first video (via initialScrollIndex/
+       * scrollToOffset(0)), which would violate the product requirement
+       * that this feed keeps its current video position across a
+       * comments open/close cycle. Left out of the universal migration
+       * pending a design decision on how to distinguish "returning from a
+       * child modal" focus events from "genuine tab-switch-back" focus
+       * events for this screen specifically.
+       */}
       {viewportReady && <FlatList
         ref={feedListRef}
         // The creator player remounts once its videos load so it opens at the tapped one.

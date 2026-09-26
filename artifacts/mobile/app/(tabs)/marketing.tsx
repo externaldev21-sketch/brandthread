@@ -13,6 +13,7 @@ import { FS, FONT, SP, COMP } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
 import { formatCents } from '@/lib/money';
 import type { AdCampaign } from '@/lib/api';
+import { useScrollReset } from '@/hooks/useScrollReset';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -64,6 +65,7 @@ function discountExpiryLabel(d: DiscountCode) {
 }
 
 export default function MarketingScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -103,6 +105,7 @@ export default function MarketingScreen() {
   return (
     <View style={{ flex: 1 }}>
     <ScrollView
+      ref={scrollResetRef}
       style={[styles.container, { backgroundColor: 'transparent' }]}
       contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: bottomPad + 120, paddingHorizontal: 16 }}
       showsVerticalScrollIndicator={false}

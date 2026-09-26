@@ -35,6 +35,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { TYPE_SCALE } from '@/constants/typography';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import {
@@ -127,6 +128,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const { heroHeight, columnWidth } = layout;
 
   const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollResetRef = useScrollReset<any>();
   const [heroOnScreen, setHeroOnScreen] = useState(true);
   const [focused, setFocused] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -395,8 +397,16 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       >
         <ProfileEmptyAreaContext.Provider value={emptyArea.minHeight}>
         <AnimatedFlatList
+          ref={(node: FlatList<T> | null) => {
+            // Two independent mechanisms share this one FlatList instance:
+            // useScrollReset resets to offset 0 on a real route-focus change
+            // (tab-bar nav, push/pop), while `listRef` (below) restores each
+            // in-page tab's own saved scroll offset when the tab changes
+            // locally — they fire on different events and don't conflict.
+            (scrollResetRef as React.MutableRefObject<FlatList<T> | null>).current = node;
+            listRef.current = node;
+          }}
           key={listKey}
-          ref={listRef as unknown as React.Ref<FlatList>}
           data={data}
           renderItem={renderItem}
           keyExtractor={keyExtractor}

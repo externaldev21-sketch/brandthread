@@ -767,6 +767,15 @@ export function ShopProductSheet({
 
         {(phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
           <ScrollView
+            // Without an explicit flex the sheet (maxHeight: '85%',
+            // overflow: 'hidden') sizes this ScrollView to its full content
+            // height instead of bounding it, so on short screens the
+            // content — starting with the square product image — gets
+            // clipped by the sheet's overflow instead of scrolling, and can
+            // visually overlap the sticky Add to Cart/Buy Now bar below.
+            // flex: 1 bounds it to the remaining sheet height so it scrolls
+            // internally instead.
+            style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             bounces={false}

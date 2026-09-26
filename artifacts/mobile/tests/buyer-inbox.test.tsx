@@ -131,6 +131,7 @@ vi.mock('expo-router', () => ({
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
   },
+  useScrollToTop: () => {},
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -172,6 +173,13 @@ vi.mock('@/components/BrandthreadUI', () => ({
 
 vi.mock('@/components/layout', () => ({
   ListSkeleton: () => React.createElement('View', { testID: 'inbox-skeleton' }),
+  Header: ({ title, belowTitle, actions }: any) => React.createElement(
+    'View',
+    { testID: 'inbox-header' },
+    React.createElement('Text', {}, title),
+    belowTitle ?? null,
+    ...(actions ?? []).map((a: any) => React.createElement('View', { key: a.accessibilityLabel, accessibilityLabel: a.accessibilityLabel, onPress: a.onPress })),
+  ),
 }));
 
 vi.mock('@/components/layout/TabPageHeader', () => ({

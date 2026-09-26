@@ -43,3 +43,4 @@ yarn-error.*
 .store-screenshots/
 .onboarding-walkthrough/
 scripts/onboarding-walkthrough/output/
+scratch/

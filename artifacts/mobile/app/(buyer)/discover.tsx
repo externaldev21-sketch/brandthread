@@ -67,6 +67,7 @@ import {
   type CommerceSignalData,
 } from '@/components/CommerceSignal';
 import { SectionError } from '@/components/InlineFeedback';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { Card, HeartToggle, ThemedRefreshControl, GlassPanel } from '@/components/ui';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
@@ -720,7 +721,7 @@ const dh = StyleSheet.create({
     position: 'absolute', bottom: -100, right: -80, width: 320, height: 320, borderRadius: 220, opacity: 0.4,
   },
   topBar: {
-    marginTop: SP.lg,
+    marginTop: SP.lg + SP.md,
     flexDirection: 'row', alignItems: 'center', gap: 10,
   },
   counterChip: {
@@ -769,6 +770,7 @@ const dh = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DiscoverScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const barInset = useBuyerTabBarInset();
   const router    = useRouter();
   const { push }  = useThreadPull();
@@ -974,6 +976,7 @@ export default function DiscoverScreen() {
 
   return (
     <ScrollView
+      ref={scrollResetRef}
       style={{ flex: 1, backgroundColor: theme.background }}
       contentContainerStyle={{ paddingBottom: barInset + SP.md }}
       showsVerticalScrollIndicator={false}
@@ -997,16 +1000,20 @@ export default function DiscoverScreen() {
         </View>
       ) : forYouError ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <SectionError message={forYouError} onRetry={fetchProducts} />
+          <View style={{ paddingTop: SP.md }}>
+            <SectionError message={forYouError} onRetry={fetchProducts} />
+          </View>
         </ResponsiveContainer>
       ) : forYouItems.length === 0 ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <EmptyState
-            icon="package"
-            title="No products available right now"
-            description="New arrivals show up here as sellers add them."
-            action={{ label: 'Search products', onPress: () => router.push('/(buyer)/search' as never) }}
-          />
+          <View style={{ paddingTop: SP.md }}>
+            <EmptyState
+              icon="package"
+              title="No products available right now"
+              description="New arrivals show up here as sellers add them."
+              action={{ label: 'Search products', onPress: () => router.push('/(buyer)/search' as never) }}
+            />
+          </View>
         </ResponsiveContainer>
       ) : (
         <DiscoverHero

@@ -16,6 +16,7 @@ import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerPr
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import { pickProfileImage } from '@/lib/pickProfileImage';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
@@ -90,6 +91,7 @@ function GenderPicker({
 }
 
 export default function BuyerEditProfileScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const navigation = useNavigation();
@@ -401,7 +403,7 @@ export default function BuyerEditProfileScreen() {
           <Text style={[styles.toastText, { color: theme.onAccent }]}>{toast.message}</Text>
         </Animated.View>
 
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
+        <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
           {/* Avatar */}
           <View style={styles.avatarSection}>
             <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={avatarUploading}>
