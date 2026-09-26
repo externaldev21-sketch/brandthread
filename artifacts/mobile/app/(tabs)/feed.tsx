@@ -917,23 +917,7 @@ function ScrubProgressBar({
   );
 }
 
-/** Exported for reuse by the LIVE pager (app/live.tsx). */
-export function VideoVisual({
-  source,
-  isActive,
-  paused,
-  muted = false,
-  posterUri,
-  posterSource,
-  fallbackColor,
-  immersive = false,
-  progressBottom,
-  pageAspect = 9 / 16,
-  rate = 1,
-  pageWidth,
-  pageHeight,
-  bottomStripHeight = 0,
-}: {
+type VideoVisualProps = {
   source: VideoSource;
   isActive: boolean;
   paused: boolean;
@@ -962,7 +946,80 @@ export function VideoVisual({
    * the bar and the bar's icons stay pin-sharp on top.
    */
   bottomStripHeight?: number;
-}) {
+  /** Within one page of the active index — should be decoding/buffered
+   * in the background even while not the active page. Anything further
+   * away gets no live player at all (see `VideoVisual` below). */
+  preload?: boolean;
+};
+
+/**
+ * Caps how many real video players/decoders ever exist at once to the active
+ * page plus its immediate neighbours (≤3), independent of how many rows are
+ * DOM-mounted. On native the FlatList's own windowSize already keeps mounted
+ * rows near that count, but on web the whole (short) preview list is mounted
+ * up front to dodge a react-native-web blank-page bug (see
+ * `verticalPagerListProps`) — every mounted row would otherwise construct its
+ * own `useVideoPlayer`/`<video>` regardless of how far it is from the active
+ * page. Rows outside the active±1 window render a poster-only placeholder
+ * instead (same layout, no player), and the real `<video>` element is
+ * released the moment a page scrolls out of that window.
+ */
+export function VideoVisual(props: VideoVisualProps) {
+  if (props.isActive || props.preload) return <LiveVideoVisual {...props} />;
+  return <PosterOnlyVisual {...props} />;
+}
+
+function PosterOnlyVisual({
+  posterUri,
+  posterSource,
+  fallbackColor,
+  immersive = false,
+  pageAspect = 9 / 16,
+  pageWidth,
+  pageHeight,
+}: VideoVisualProps) {
+  const videoAspect = 9 / 16;
+  const cropFraction = 1 - Math.min(videoAspect, pageAspect) / Math.max(videoAspect, pageAspect);
+  const fit = immersive && cropFraction <= 0.3 ? 'cover' : 'contain';
+  const posterImage = posterSource ?? (posterUri ? { uri: posterUri } : undefined);
+  const clipSize = pageWidth != null && pageHeight != null ? { width: pageWidth, height: pageHeight } : null;
+  return (
+    <View style={[StyleSheet.absoluteFill, clipSize]}>
+      {immersive && fit === 'contain' && posterImage && (
+        <CachedImage
+          source={posterImage}
+          style={[StyleSheet.absoluteFill, styles.letterboxBackdrop]}
+          contentFit="cover"
+          blurRadius={40}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
+      )}
+      {posterImage ? (
+        <CachedImage source={posterImage} style={StyleSheet.absoluteFill} contentFit={fit} />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: fallbackColor ?? '#0a0a0a' }]} pointerEvents="none" />
+      )}
+    </View>
+  );
+}
+
+function LiveVideoVisual({
+  source,
+  isActive,
+  paused,
+  muted = false,
+  posterUri,
+  posterSource,
+  fallbackColor,
+  immersive = false,
+  progressBottom,
+  pageAspect = 9 / 16,
+  rate = 1,
+  pageWidth,
+  pageHeight,
+  bottomStripHeight = 0,
+}: VideoVisualProps) {
   const player = useVideoPlayer(source, p => {
     p.loop = true;
     p.muted = muted;
@@ -1132,11 +1189,15 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
 // ScrubProgressBar) and the data/engagement hooks, and wires the
 // presentational components to them below.
 
-function SpotlightPage({
-  item, isActive, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound,
+function SpotlightPageImpl({
+  item, isActive, preload = false, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound,
 }: {
   item: SpotlightItem;
   isActive: boolean;
+  /** Immediate neighbour of the active page — keep its player warm/buffered
+   * (paused, muted) rather than tearing it down, so the swipe to it is
+   * instant instead of starting a fresh decode. */
+  preload?: boolean;
   pageWidth: number;
   pageHeight: number;
   bottomClearance: number;
@@ -1329,6 +1390,7 @@ function SpotlightPage({
               <VideoVisual
                 source={item.videoSource ?? item.mediaUris[0]}
                 isActive={isActive}
+                preload={preload}
                 paused={paused || holdPaused}
                 rate={speedActive ? 2 : 1}
                 muted={!soundOn}
@@ -1475,6 +1537,46 @@ function SpotlightPage({
     </View>
   );
 }
+
+/**
+ * `engagement` is looked up as `engagements[id] ?? initialEngagement(item)`
+ * at the call site, so any post with no engagement entry yet gets a brand
+ * new object every render of the parent list (e.g. on every like elsewhere
+ * in the feed) even though its actual values haven't changed. A plain
+ * `React.memo` would see that new reference and re-render anyway, so this
+ * compares the engagement fields themselves rather than the object identity.
+ */
+function engagementEqual(a: EngagementState | undefined, b: EngagementState | undefined) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.liked === b.liked && a.likes === b.likes
+    && a.saved === b.saved && a.saves === b.saves
+    && a.reposted === b.reposted && a.reposts === b.reposts
+    && a.following === b.following && a.comments.length === b.comments.length;
+}
+
+const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
+  prev.item === next.item
+  && prev.isActive === next.isActive
+  && prev.preload === next.preload
+  && prev.pageWidth === next.pageWidth
+  && prev.pageHeight === next.pageHeight
+  && prev.bottomClearance === next.bottomClearance
+  && prev.immersive === next.immersive
+  && prev.hasTabBar === next.hasTabBar
+  && prev.soundOn === next.soundOn
+  && engagementEqual(prev.engagement, next.engagement)
+  && prev.onLike === next.onLike
+  && prev.onDoubleTapLike === next.onDoubleTapLike
+  && prev.onSave === next.onSave
+  && prev.onRepost === next.onRepost
+  && prev.onFollow === next.onFollow
+  && prev.onOpenComments === next.onOpenComments
+  && prev.onShopTag === next.onShopTag
+  && prev.onOpenCreator === next.onOpenCreator
+  && prev.onNotInterested === next.onNotInterested
+  && prev.onToggleSound === next.onToggleSound
+));
 
 // CommentsModal replaced by navigation to /buyer-post-comments (see handleOpenComments).
 
@@ -2269,7 +2371,7 @@ export default function FeedScreen({
   // "wearing the LIVE ring" case below, profile/inbox entry points) still
   // opens the specific host's stream via openLive()/the app/live.tsx pager,
   // which PR #134 left untouched.
-  function handleOpenComments(id: string) {
+  const handleOpenComments = useCallback((id: string) => {
     const item = allItems.find(i => i.id === id);
     if (!item || isLiveStreamItem(item) || isJustDroppedItem(item)) return;
     // item.mediaUris[0] is already the fully-resolved, playable URI for both
@@ -2293,9 +2395,9 @@ export default function FeedScreen({
       'postType=' + encodeURIComponent(item.contentType),
     ].join('&');
     router.push(('/buyer-post-comments?' + qs) as never);
-  }
+  }, [allItems, router]);
 
-  function handleShopTag(item: SpotlightItem, tag: SpotlightProductTag) {
+  const handleShopTag = useCallback((item: SpotlightItem, tag: SpotlightProductTag) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const allTags = (item.productTags ?? []).length > 0
       ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number }>)
@@ -2310,7 +2412,7 @@ export default function FeedScreen({
         ? buildPreviewShopProduct(item, tag)
         : undefined,
     });
-  }
+  }, []);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index != null) {
@@ -2480,6 +2582,7 @@ export default function FeedScreen({
             <SpotlightPage
               item={spotlight}
               isActive={contentIndex === activeContentIndex && !showNotifs}
+              preload={Math.abs(contentIndex - activeContentIndex) === 1}
                 pageWidth={pageWidth}
               pageHeight={pageHeight}
               bottomClearance={bottomClearance}

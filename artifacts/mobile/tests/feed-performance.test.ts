@@ -54,4 +54,32 @@ describe('Feed video list virtualization bounds', () => {
   it('shows the poster immediately, swapping to live video once playback starts (instant start)', () => {
     expect(feed).toContain('const showPoster = Boolean(posterSource || posterUri) && !hasStarted;');
   });
+
+  it('caps live decoders to active ± 1 even though web mounts every row', () => {
+    // Web mounts every SpotlightPage row up front (see the test above), but
+    // that must not mean every row also constructs its own player/<video>
+    // element — only the active page and its immediate neighbours (≤3) get
+    // a real `useVideoPlayer`; everything else renders a poster-only cell.
+    expect(feed).toContain('if (props.isActive || props.preload) return <LiveVideoVisual {...props} />;');
+    expect(feed).toContain('return <PosterOnlyVisual {...props} />;');
+    expect(feed).toContain('preload={Math.abs(contentIndex - activeContentIndex) === 1}');
+    const posterOnlyBody = feed.slice(feed.indexOf('function PosterOnlyVisual'), feed.indexOf('function LiveVideoVisual'));
+    expect(posterOnlyBody).not.toContain('useVideoPlayer');
+  });
+
+  it('memoizes SpotlightPage so liking/saving one post does not re-render every mounted row', () => {
+    expect(feed).toContain('const SpotlightPage = React.memo(SpotlightPageImpl,');
+    // The engagement lookup at the call site (`engagements[id] ?? initialEngagement(item)`)
+    // hands every not-yet-engaged row a brand new object each render, so the
+    // comparator must compare its fields rather than trust reference equality.
+    expect(feed).toContain('function engagementEqual(');
+    expect(feed).toContain('engagementEqual(prev.engagement, next.engagement)');
+  });
+
+  it('keeps the engagement/UI callbacks passed into SpotlightPage stable across renders', () => {
+    // Unstable (recreated-every-render) callback props would defeat the
+    // SpotlightPage memoization above regardless of the comparator.
+    expect(feed).toContain('const handleOpenComments = useCallback((id: string) => {');
+    expect(feed).toContain('const handleShopTag = useCallback((item: SpotlightItem, tag: SpotlightProductTag) => {');
+  });
 });
