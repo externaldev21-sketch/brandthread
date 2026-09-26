@@ -48,8 +48,9 @@ import {
   ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
 } from '@/components/chat/ReactionBar';
 import {
-  isPreviewConversationId, getPreviewConversation, getPreviewMessages,
+  isPreviewInboxEnabled, isPreviewConversationId, getPreviewConversation, getPreviewMessages,
 } from '@/lib/previewInbox';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -253,8 +254,13 @@ export default function BuyerConversationScreen() {
 
   const loadData = useCallback(async () => {
     if (!userId) {
-      setConv(null);
-      setMessages([]);
+      const previewId = params.id;
+      const previewConversation =
+        previewId && isBuyerDevPreview() && isPreviewInboxEnabled() && isPreviewConversationId(previewId)
+          ? getPreviewConversation(previewId)
+          : null;
+      setConv(previewConversation);
+      setMessages(previewConversation ? getPreviewMessages(previewConversation.id) : []);
       setIsLoading(false);
       return;
     }

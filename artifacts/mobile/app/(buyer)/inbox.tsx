@@ -32,6 +32,7 @@ import {
   isPreviewInboxEnabled, getPreviewConversations, getPreviewNotifications,
   subscribePreviewTyping,
 } from '@/lib/previewInbox';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
@@ -218,8 +219,11 @@ export default function InboxScreen() {
 
   const loadData = useCallback(async () => {
     if (!userId) {
-      setConversations([]);
-      setNotifications([]);
+      // The unauthenticated web preview has no account to query. Keep the
+      // seeded inbox confined to that preview, never a signed-out real app.
+      const showPreview = isBuyerDevPreview() && isPreviewInboxEnabled();
+      setConversations(showPreview ? getPreviewConversations() : []);
+      setNotifications(showPreview ? getPreviewNotifications() : []);
       setLoading(false);
       return;
     }
