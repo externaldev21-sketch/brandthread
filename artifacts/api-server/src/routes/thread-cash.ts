@@ -20,6 +20,7 @@ import { eq } from "drizzle-orm";
 import { db, threadCashStreaks } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { computeCheckIn, EMPTY_STREAK_STATE, type StreakState } from "../lib/threadCash/streaks";
+import { notifyThreadCashReceived } from "../lib/activityEvents";
 import {
   ThreadCashError,
   cancelThreadCash,
@@ -243,6 +244,12 @@ router.post("/send", async (req, res) => {
       conversationId: typeof conversationId === "string" ? conversationId : null,
       note: typeof note === "string" ? note : null,
       idempotencyKey,
+    });
+    void notifyThreadCashReceived({
+      transferId: transfer.transferId,
+      fromUserId: buyerId,
+      toUserId: recipientId.trim(),
+      amountCents,
     });
     res.json({ ok: true, transferId: transfer.transferId });
   } catch (error) {

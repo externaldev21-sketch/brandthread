@@ -52,7 +52,7 @@ export interface ActivityRow extends ActivityItem {
   extraCount: number;
 }
 
-export type ActivitySectionKey = 'new' | 'today' | 'this_week' | 'earlier';
+export type ActivitySectionKey = 'new' | 'today' | 'this_week' | 'this_month' | 'earlier';
 
 export interface ActivitySection<T = ActivityItem> {
   key: ActivitySectionKey;
@@ -61,12 +61,6 @@ export interface ActivitySection<T = ActivityItem> {
 }
 
 export type ActivityFilter = 'all' | 'orders' | 'social';
-
-export const ACTIVITY_FILTERS: ReadonlyArray<{ key: ActivityFilter; label: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'orders', label: 'Orders' },
-  { key: 'social', label: 'Social' },
-];
 
 export const ACTIVITY_PAGE_SIZE = 30;
 
@@ -108,6 +102,7 @@ const SECTION_TITLES: Record<ActivitySectionKey, string> = {
   new: 'New',
   today: 'Today',
   this_week: 'This week',
+  this_month: 'This month',
   earlier: 'Earlier',
 };
 
@@ -116,12 +111,13 @@ function startOfLocalDay(now: Date): number {
 }
 
 /**
- * Bucket items into New / Today / This week / Earlier.
+ * Bucket items into New / Today / This week / This month / Earlier.
  *
  * Unread items always land in "New", whatever their age. Read items are
  * bucketed by `createdAt` against local calendar days: "Today" since local
- * midnight, "This week" the six days before that, "Earlier" everything older.
- * Input order is preserved inside each section and empty sections are omitted.
+ * midnight, "This week" the six days before that, "This month" the rest of
+ * the last 30 days, "Earlier" everything older. Input order is preserved
+ * inside each section and empty sections are omitted.
  */
 export function groupByRecency<T extends Pick<ActivityItem, 'isRead' | 'createdAt'>>(
   items: readonly T[],
@@ -129,7 +125,10 @@ export function groupByRecency<T extends Pick<ActivityItem, 'isRead' | 'createdA
 ): ActivitySection<T>[] {
   const todayStart = startOfLocalDay(now);
   const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
-  const buckets: Record<ActivitySectionKey, T[]> = { new: [], today: [], this_week: [], earlier: [] };
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29).getTime();
+  const buckets: Record<ActivitySectionKey, T[]> = {
+    new: [], today: [], this_week: [], this_month: [], earlier: [],
+  };
 
   for (const item of items) {
     if (!item.isRead) {
@@ -139,6 +138,7 @@ export function groupByRecency<T extends Pick<ActivityItem, 'isRead' | 'createdA
     const at = new Date(item.createdAt).getTime();
     if (at >= todayStart) buckets.today.push(item);
     else if (at >= weekStart) buckets.this_week.push(item);
+    else if (at >= monthStart) buckets.this_month.push(item);
     else buckets.earlier.push(item);
   }
 
@@ -150,12 +150,14 @@ export function groupByRecency<T extends Pick<ActivityItem, 'isRead' | 'createdA
 // ─── Aggregation ──────────────────────────────────────────────────────────────
 
 /** Types where repeat events read better as one row. Orders/payments never merge. */
-export const AGGREGATED_TYPES: ReadonlySet<string> = new Set(['post_like', 'post_comment', 'new_follower']);
+export const AGGREGATED_TYPES: ReadonlySet<string> = new Set([
+  'post_like', 'post_comment', 'new_follower', 'story_like', 'repost',
+]);
 
 /**
- * Merge key for an item, or null when it never merges. Likes and comments
- * merge per post. Each follow targets a different follower, so follows merge
- * by type alone.
+ * Merge key for an item, or null when it never merges. Likes, comments and
+ * reposts merge per post/story. Each follow targets a different follower, so
+ * follows merge by type alone.
  */
 function aggregationKey(item: ActivityItem): string | null {
   if (!AGGREGATED_TYPES.has(item.type)) return null;
@@ -276,7 +278,7 @@ export function activityMessage(row: ActivityRow): MessagePart[] {
 export function activityDetail(row: ActivityRow): string | null {
   // Merged comment rows would show only the newest excerpt; keep them tidy.
   if (row.type === 'post_comment' && row.ids.length > 1) return null;
-  if (row.type === 'post_like' || row.type === 'new_follower') return null;
+  if (row.type === 'post_like' || row.type === 'new_follower' || row.type === 'story_like' || row.type === 'repost') return null;
   const body = row.body?.trim();
   if (!body) return null;
   if (row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention') {
@@ -309,11 +311,14 @@ export function matchesFilter(item: Pick<ActivityItem, 'category' | 'type'>, fil
 /** Feather icon used when a row has no actor avatar or thumbnail. */
 export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): string {
   switch (item.type) {
-    case 'post_like': return 'heart';
+    case 'post_like':
+    case 'story_like': return 'heart';
     case 'post_comment':
     case 'comment_reply': return 'message-circle';
     case 'mention': return 'at-sign';
     case 'new_follower': return 'user-plus';
+    case 'repost': return 'repeat';
+    case 'thread_cash_received': return 'dollar-sign';
     case 'price_drop': return 'trending-down';
     case 'back_in_stock':
     case 'waitlist_restock':
@@ -328,8 +333,6 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'order_delivered': return 'package';
     case 'order_cancelled': return 'x-circle';
     case 'order_exception': return 'alert-triangle';
-    case 'thread_cash_received': return 'dollar-sign';
-    case 'agent_nudge': return 'zap';
     default:
       break;
   }
@@ -380,6 +383,10 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention'
         ? `/buyer-post-comments?postId=${q(id)}`
         : `/buyer-post-viewer?postId=${q(id)}`;
+    case 'story':
+      return id ? `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}` : null;
+    case 'thread_cash_transfer':
+      return '/thread-cash';
     case 'product':
       return id ? `/buyer-product-detail?productId=${q(id)}` : null;
     case 'user': {
@@ -405,6 +412,37 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
   }
   if (row.type.startsWith('order_')) return role === 'seller' ? '/(tabs)/orders' : '/(buyer)/orders';
   return null;
+}
+
+// ─── New followers summary ────────────────────────────────────────────────────
+
+export interface NewFollowersSummary {
+  /** Distinct followers, newest first, capped for the stacked-avatar row. */
+  actors: ActivityActor[];
+  count: number;
+  hasUnread: boolean;
+}
+
+/** The compact "New followers" row at the top of Activity, or null when there are none. */
+export function newFollowersSummary(items: readonly ActivityItem[]): NewFollowersSummary | null {
+  const rows = items.filter((item) => item.type === 'new_follower' && !item.isMuted);
+  if (rows.length === 0) return null;
+  const seen = new Set<string>();
+  const actors: ActivityActor[] = [];
+  for (const item of rows) {
+    if (!item.actorName && !item.actorId) continue;
+    const key = item.actorId || item.actorName!;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const name = item.actorName || 'Someone';
+    actors.push({
+      id: item.actorId,
+      name,
+      initials: item.actorInitials || name.slice(0, 2).toUpperCase(),
+      color: item.actorColor,
+    });
+  }
+  return { actors, count: actors.length, hasUnread: rows.some((item) => !item.isRead) };
 }
 
 // ─── Read state ───────────────────────────────────────────────────────────────

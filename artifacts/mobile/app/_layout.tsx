@@ -1096,7 +1096,18 @@ function RootLayoutNav() {
         <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
         <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="thread-checkout"       options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
+        {/*
+          slide_from_bottom (not 'none'): Buy now from the Shop sheet needs a
+          full-screen cover that slides up over BOTH the feed and the sheet in
+          one motion — the sheet is removed the instant this push starts (see
+          ShopProductSheet.handleBuyNow), so there is never a frame where the
+          incoming Checkout and the outgoing sheet are both visible/animating
+          at once. 'none' previously left this route with no transition of
+          its own, which is what let the sheet's own trailing dismiss
+          animation become the only visible motion, reading as Checkout
+          appearing underneath a still-open sheet.
+        */}
+        <Stack.Screen name="thread-checkout"       options={{ headerShown: false, animation: 'slide_from_bottom', gestureEnabled: false }} />
         <Stack.Screen name="buyer-return-request"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-refund-request"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-problem-report"  options={{ headerShown: false, animation: 'ios_from_right' }} />

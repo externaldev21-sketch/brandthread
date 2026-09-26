@@ -83,7 +83,6 @@ import {
 } from '@/lib/checkoutReadiness';
 import { CheckoutSkeleton, HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { AddressAutocompleteInput } from '@/components/AddressAutocompleteInput';
-import { SheetRise } from '@/components/motion/SheetRise';
 import { StickyFooter } from '@/components/layout';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
@@ -110,8 +109,16 @@ export interface VerifiedOrder {
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
+/**
+ * A flat section: no background, no border box, no radius — just vertical
+ * padding and a bottom hairline (GOAT Order Review pattern: plain page,
+ * sections separated only by full-width hairline dividers and spacing).
+ * Horizontal inset comes from the screen's own ScrollView padding, not from
+ * this section, so content runs edge-to-edge within the page's margins
+ * instead of sitting in a smaller inset box.
+ */
 function Card({ children, style }: { children: React.ReactNode; style?: any }) {
-  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
+  const { theme } = useThemeAliases();
   const s = makeStyles(theme);
   return <View style={[s.card, style]}>{children}</View>;
 }
@@ -145,157 +152,32 @@ function Input({
   );
 }
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
+// ─── Checkout summary card ────────────────────────────────────────────────────
 
-function Progress({ step }: { step: CheckoutStep }) {
-  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
+/**
+ * Product summary card — always visible at the top of the single-screen
+ * checkout (GOAT Order Review / Luma pattern): photo + name + size/variant +
+ * qty, one card per line item.
+ */
+function CheckoutSummaryView({ session }: { session: CheckoutSession }) {
+  const { theme, CARD_ELEVATED, MUTED, SUBTLE } = useThemeAliases();
   const s = makeStyles(theme);
-  const index = Math.max(0, STEPS.indexOf(step));
-  return (
-    <View style={s.progress}>
-      {STEPS.slice(0, 3).map((item, i) => (
-        <View key={item} style={[s.progressSegment, i <= index && s.progressSegmentActive]} />
-      ))}
-    </View>
-  );
-}
-
-// ─── Guided section accordion ─────────────────────────────────────────────────
-
-type GuidedCheckoutSection = 'information' | 'delivery' | 'review';
-
-function GuidedSection({
-  title, summary, expanded, complete, onPress, children,
-}: {
-  title: string; summary: string; expanded: boolean; complete: boolean;
-  onPress: () => void; children: React.ReactNode;
-}) {
-  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
-  const s = makeStyles(theme);
-  return (
-    <View style={s.guidedSection}>
-      <TouchableOpacity
-        style={s.guidedHeader}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}
-        accessibilityLabel={`${title}. ${summary}`}
-      >
-        <View style={[s.guidedStatus, complete && s.guidedStatusComplete]}>
-          <Feather name={complete ? 'check' : 'circle'} size={14} color={complete ? BG : MUTED} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.guidedTitle}>{title}</Text>
-          <Text style={s.guidedSummary} numberOfLines={1}>{summary}</Text>
-        </View>
-        <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={19} color={MUTED} />
-      </TouchableOpacity>
-      {expanded && <View style={s.guidedBody}>{children}</View>}
-    </View>
-  );
-}
-
-// ─── Receipt bottom sheet ─────────────────────────────────────────────────────
-
-function ReceiptSheet({
-  session, visible, onClose,
-}: {
-  session: CheckoutSession; visible: boolean; onClose: () => void;
-}) {
-  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
-  const s = makeStyles(theme);
-  const insets = useSafeAreaInsets();
-  if (!visible) return null;
-  return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
-      <TouchableOpacity style={s.sheetBackdrop} activeOpacity={1} onPress={onClose} accessibilityLabel="Close receipt" />
-      <SheetRise style={[s.sheetContainer, { paddingBottom: insets.bottom + SP.md }]}>
-        <View style={s.sheetHandle} />
-        <View style={s.sheetHeaderRow}>
-          <Text style={s.sheetTitle}>Order summary</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Close">
-            <Feather name="x" size={20} color={FG} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {session.deliveryGroups.flatMap(g => g.items).map(item => (
-            <View key={item.id} style={s.receiptItemRow}>
-              {item.imageUri ? (
-                <Image source={{ uri: item.imageUri }} style={s.receiptThumb} resizeMode="cover" />
-              ) : (
-                <View style={[s.receiptThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
-                  <Feather name="image" size={18} color={SUBTLE} />
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={s.receiptItemName} numberOfLines={2}>{item.productName}</Text>
-                <Text style={s.receiptItemVariant}>{item.variantTitle}</Text>
-                {item.quantity > 1 && <Text style={s.receiptItemVariant}>Qty {item.quantity}</Text>}
-              </View>
-              <Text style={s.receiptItemPrice}>{money(item.priceCents * item.quantity)}</Text>
-            </View>
-          ))}
-
-          <View style={s.divider} />
-          <View style={s.line}>
-            <Text style={s.muted}>Subtotal</Text>
-            <Text style={s.lineName}>{money(session.summary.subtotalCents)}</Text>
-          </View>
-          {session.summary.discountTotalCents > 0 && (
-            <View style={s.line}>
-              <Text style={s.muted}>Discount</Text>
-              <Text style={[s.lineName, { color: SUCCESS }]}>−{money(session.summary.discountTotalCents)}</Text>
-            </View>
-          )}
-          <View style={s.line}>
-            <Text style={s.muted}>Shipping</Text>
-            <Text style={s.lineName}>
-              {session.summary.shippingTotalCents === 0 ? (
-                <Text style={{ color: SUCCESS }}>Free</Text>
-              ) : money(session.summary.shippingTotalCents)}
-            </Text>
-          </View>
-          <View style={s.line}>
-            <Text style={s.muted}>Tax</Text>
-            <Text style={s.lineName}>{money(session.summary.taxTotalCents)}</Text>
-          </View>
-          <View style={s.divider} />
-          <View style={s.line}>
-            <Text style={s.total}>Total</Text>
-            <Text style={s.total}>{money(session.summary.totalCents)}</Text>
-          </View>
-          <Text style={[s.muted, { fontSize: FS.xs, textAlign: 'center', marginTop: SP.sm, lineHeight: 18 }]}>
-            Final amount confirmed by Stripe Checkout. Tax calculated at payment.
-          </Text>
-        </ScrollView>
-      </SheetRise>
-    </Modal>
-  );
-}
-
-// ─── Checkout Summary (Depop-pattern compact rows) ────────────────────────────
-
-function CheckoutSummaryView({
-  session, onTapSummary, onTapShipping, onTapAddress,
-}: {
-  session: CheckoutSession;
-  onTapSummary: () => void;
-  onTapShipping: () => void;
-  onTapAddress: () => void;
-}) {
-  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
-  const s = makeStyles(theme);
-  const addr = session.shippingAddress;
-  const addressLine = addr
-    ? `${addr.line1}, ${addr.city}`
-    : 'Add new address';
 
   return (
     <Card>
-      {/* Item rows */}
       {session.deliveryGroups.flatMap(g => g.items).map(item => (
         <View key={item.id} style={s.summaryItemRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.summaryItemName} numberOfLines={2}>{item.productName}</Text>
+            <Text style={s.summaryItemVariant}>{item.variantTitle}{item.quantity > 1 ? ` · Qty ${item.quantity}` : ''}</Text>
+            {item.isPreOrder && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                <Feather name="clock" size={10} color={theme.secondary} />
+                <Text style={[s.summaryItemVariant, { color: theme.secondary }]}>Pre-order</Text>
+              </View>
+            )}
+            <Text style={s.summaryItemPrice}>{money(item.priceCents * item.quantity)}</Text>
+          </View>
           {item.imageUri ? (
             <Image source={{ uri: item.imageUri }} style={s.summaryThumb} resizeMode="cover" />
           ) : (
@@ -303,81 +185,74 @@ function CheckoutSummaryView({
               <Feather name="image" size={14} color={SUBTLE} />
             </View>
           )}
-          <View style={{ flex: 1 }}>
-            <Text style={s.summaryItemName} numberOfLines={2}>{item.productName}</Text>
-            <Text style={s.summaryItemVariant}>{item.variantTitle}</Text>
-            {item.isPreOrder && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                <Feather name="clock" size={10} color={theme.secondary} />
-                <Text style={[s.summaryItemVariant, { color: theme.secondary }]}>Pre-order</Text>
-              </View>
-            )}
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={s.summaryItemPrice}>{money(item.priceCents * item.quantity)}</Text>
-            {item.quantity > 1 && <Text style={s.summaryItemVariant}>×{item.quantity}</Text>}
-          </View>
         </View>
       ))}
+    </Card>
+  );
+}
 
-      <View style={s.divider} />
+/**
+ * Order total — a single collapsed row that expands to the full
+ * subtotal/shipping/tax/discount/Thread Cash breakdown in place (no sheet),
+ * per the Luma / American Airlines "review & pay" pattern.
+ */
+function OrderTotalCard({
+  session, expanded, onToggle,
+}: {
+  session: CheckoutSession;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const { theme, MUTED, SUCCESS } = useThemeAliases();
+  const s = makeStyles(theme);
+  const threadCashCents = session.threadCashRedemption?.discountCents ?? 0;
 
-      {/* Tappable summary total row */}
+  return (
+    <Card>
       <TouchableOpacity
-        style={s.summaryTotalRow}
-        onPress={onTapSummary}
+        style={s.totalRow}
+        onPress={onToggle}
         accessibilityRole="button"
-        accessibilityLabel={`Total ${money(session.summary.totalCents)}. Tap to view receipt breakdown.`}
+        accessibilityState={{ expanded }}
+        accessibilityLabel={`Total ${money(session.summary.totalCents)}. ${expanded ? 'Collapse' : 'View'} price breakdown.`}
       >
-        <View style={{ flex: 1 }}>
-          <Text style={s.summaryTotalLabel}>Total: {money(session.summary.totalCents)}</Text>
-          {session.summary.shippingTotalCents === 0 && (
-            <Text style={s.freeShippingLabel}>Free shipping</Text>
+        <Text style={s.totalRowLabel}>Total</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={s.totalRowValue}>{money(session.summary.totalCents)}</Text>
+          <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={MUTED} />
+        </View>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={s.totalBreakdown}>
+          <View style={s.line}>
+            <Text style={s.muted}>Subtotal</Text>
+            <Text style={s.lineName}>{money(session.summary.subtotalCents)}</Text>
+          </View>
+          <View style={s.line}>
+            <Text style={s.muted}>Shipping</Text>
+            <Text style={s.lineName}>
+              {session.summary.shippingTotalCents === 0 ? 'Free' : money(session.summary.shippingTotalCents)}
+            </Text>
+          </View>
+          <View style={s.line}>
+            <Text style={s.muted}>Tax</Text>
+            <Text style={s.lineName}>{session.summary.taxTotalCents > 0 ? money(session.summary.taxTotalCents) : 'Calculated at payment'}</Text>
+          </View>
+          {session.summary.discountTotalCents > 0 && (
+            <View style={s.line}>
+              <Text style={s.muted}>Discount</Text>
+              <Text style={[s.lineName, { color: SUCCESS }]}>−{money(session.summary.discountTotalCents)}</Text>
+            </View>
+          )}
+          {threadCashCents > 0 && (
+            <View style={s.line}>
+              <Text style={s.muted}>Thread Cash</Text>
+              <Text style={[s.lineName, { color: SUCCESS }]}>−{money(threadCashCents)}</Text>
+            </View>
           )}
         </View>
-        <Feather name="chevron-right" size={18} color={MUTED} />
-      </TouchableOpacity>
-
-      <View style={s.divider} />
-
-      {/* Editable shipping method */}
-      <TouchableOpacity
-        style={s.summaryEditRow}
-        onPress={onTapShipping}
-        accessibilityRole="button"
-        accessibilityLabel="Change shipping method"
-      >
-        <Feather name="truck" size={15} color={MUTED} />
-        <View style={{ flex: 1 }}>
-          <Text style={s.summaryEditLabel}>Shipping</Text>
-          {session.deliveryGroups.map(g => {
-            const m = g.availableMethods.find(x => x.id === g.selectedMethodId);
-            return m ? (
-              <Text key={g.sellerId} style={s.summaryEditValue} numberOfLines={1}>
-                {m.service} · {money(m.priceCents)}
-              </Text>
-            ) : (
-              <Text key={g.sellerId} style={[s.summaryEditValue, { color: ORANGE }]}>Choose shipping</Text>
-            );
-          })}
-        </View>
-        <Feather name="chevron-right" size={16} color={MUTED} />
-      </TouchableOpacity>
-
-      {/* Editable Ships to */}
-      <TouchableOpacity
-        style={s.summaryEditRow}
-        onPress={onTapAddress}
-        accessibilityRole="button"
-        accessibilityLabel="Change shipping address"
-      >
-        <Feather name="map-pin" size={15} color={MUTED} />
-        <View style={{ flex: 1 }}>
-          <Text style={s.summaryEditLabel}>Ships to</Text>
-          <Text style={s.summaryEditValue} numberOfLines={1}>{addressLine}</Text>
-        </View>
-        <Feather name="chevron-right" size={16} color={MUTED} />
-      </TouchableOpacity>
+      )}
     </Card>
   );
 }
@@ -544,7 +419,8 @@ function AddressEditor({
               <HapticSwitch
                 value={address.saveAddress !== false}
                 onValueChange={v => onAddress({ ...address, saveAddress: v })}
-                trackColor={{ true: PURPLE }}
+                trackColor={{ false: theme.borderSubtle, true: PURPLE }}
+                thumbColor={theme.onAccent}
               />
             </View>
             {address.saveAddress !== false && (
@@ -649,84 +525,48 @@ function Information({
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   const { isSignedIn } = useAuth();
-  const PURPLE = theme.accent;
-  const PURPLE_LIGHT = theme.accentLight;
   const [addrModalVisible, setAddrModalVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
   return (
     <>
+      {/* Guest checkout: a single underlined email field. Signed-in buyers
+          already have a verified email on file, and phone is collected in
+          the address sheet's confirm step below, so no contact card is shown —
+          keeps the screen to one section per real decision (Mobbin: GOAT,
+          Shop app, American Airlines all skip a standalone contact card for
+          logged-in buyers). */}
       {!isSignedIn && (
         <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Feather name="info" size={16} color={PURPLE} />
-        <Text style={[s.sectionTitle, { marginBottom: 0 }]}>Guest checkout</Text>
-          </View>
-          <Text style={s.muted}>Your email is used for receipts. Your address is used for this order only.</Text>
+          <Text style={s.sectionTitle}>Contact</Text>
+          <TextInput
+            value={contact.email ?? ''}
+            onChangeText={v => onContact({ ...contact, email: v })}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            placeholder="Email"
+            placeholderTextColor={SUBTLE}
+            accessibilityLabel="Email"
+            style={s.underlineInput}
+          />
         </Card>
       )}
 
       <Card>
-        <Text style={s.sectionTitle}>Contact</Text>
-        <Input
-          label="Email"
-          value={contact.email ?? ''}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          onChange={v => onContact({ ...contact, email: v })}
-        />
-        <Input
-          label="Phone"
-          value={contact.phone ?? ''}
-          keyboardType="phone-pad"
-          onChange={v => onContact({ ...contact, phone: v })}
-        />
-        <View style={s.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.toggleTitle}>Order updates</Text>
-            <Text style={s.muted}>Email updates about your order</Text>
+        <TouchableOpacity
+          style={s.listRow}
+          onPress={() => setAddrModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel={address.line1 ? 'Change shipping address' : 'Add shipping address'}
+        >
+          <Text style={s.listRowLabel}>Ship to</Text>
+          <View style={s.listRowValue}>
+            <Text style={s.listRowValueText} numberOfLines={1}>
+              {address.line1 ? `${address.line1}, ${address.city}` : 'Add address'}
+            </Text>
+            <Feather name="chevron-right" size={18} color={MUTED} />
           </View>
-          <HapticSwitch
-            value={contact.orderUpdates !== 'none'}
-            onValueChange={v => onContact({ ...contact, orderUpdates: v ? 'email' : 'none' })}
-            trackColor={{ true: PURPLE }}
-          />
-        </View>
-      </Card>
-
-      <Card>
-        <Text style={s.sectionTitle}>Shipping address</Text>
-
-        {/* Address summary row — tapping opens the two-step modal */}
-        {address.line1 ? (
-          <View style={{ marginBottom: SP.sm }}>
-            <Text style={s.muted}>{address.line1}{address.line2 ? `, ${address.line2}` : ''}</Text>
-            <Text style={s.muted}>{address.city}, {address.state} {address.postalCode}</Text>
-            <Text style={s.muted}>{address.country}</Text>
-            {(address.firstName || address.lastName) && (
-              <Text style={s.muted}>{address.firstName} {address.lastName}</Text>
-            )}
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm }}
-              onPress={() => setAddrModalVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Edit shipping address"
-            >
-              <Feather name="edit-2" size={13} color={PURPLE_LIGHT} />
-              <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm }}>Edit address</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={s.addNewAddressBtn}
-            onPress={() => setAddrModalVisible(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Add shipping address"
-          >
-            <Feather name="plus" size={16} color={PURPLE_LIGHT} />
-            <Text style={[s.addNewAddressText, { color: PURPLE_LIGHT }]}>Add new address</Text>
-          </TouchableOpacity>
-        )}
+        </TouchableOpacity>
 
         {/* Address editor modal */}
         <Modal
@@ -773,58 +613,84 @@ function Delivery({
   onApply: (code: string) => Promise<void>;
   onRemove: (code: string) => void;
 }) {
-  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
+  const { theme, MUTED, SUBTLE, RED } = useThemeAliases();
   const s = makeStyles(theme);
   const PURPLE = theme.accent;
   const PURPLE_LIGHT = theme.accentLight;
-  const PURPLE_DIM = theme.accentDim;
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
   const [showPromo, setShowPromo] = useState(session.discounts.length > 0);
   const [code, setCode] = useState('');
   const [applying, setApplying] = useState(false);
 
   return (
     <>
-      {session.deliveryGroups.map(group => (
-        <Card key={group.sellerId}>
-          <Text style={s.sectionTitle}>Delivery from {group.sellerName}</Text>
-          {group.availableMethods.map(method => (
+      {session.deliveryGroups.map(group => {
+        const selectedMethod = group.availableMethods.find(m => m.id === group.selectedMethodId);
+        const expanded = expandedGroupId === group.sellerId;
+        return (
+          <Card key={group.sellerId}>
             <TouchableOpacity
-              key={method.id}
-              style={[s.method, group.selectedMethodId === method.id && { backgroundColor: PURPLE_DIM }]}
-              onPress={() => onSelect(group.sellerId, method.id)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: group.selectedMethodId === method.id }}
-              accessibilityLabel={`${method.service}, ${method.estimatedDelivery}, ${money(method.priceCents)}`}
+              style={s.listRow}
+              onPress={() => setExpandedGroupId(expanded ? null : group.sellerId)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded }}
+              accessibilityLabel="Delivery options"
             >
-              <View style={[s.radio, group.selectedMethodId === method.id && { borderColor: PURPLE, backgroundColor: PURPLE }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.methodTitle}>{method.service}</Text>
-                <Text style={s.muted}>{method.estimatedDelivery}</Text>
-              </View>
-              <Text style={[s.methodTitle, method.priceCents === 0 && { color: SUCCESS }]}>
-                {method.priceCents === 0 ? 'Free' : money(method.priceCents)}
+              <Text style={s.listRowLabel}>
+                {session.deliveryGroups.length > 1 ? `Delivery from ${group.sellerName}` : 'Delivery'}
               </Text>
+              <View style={s.listRowValue}>
+                <Text style={s.listRowValueText} numberOfLines={1}>
+                  {selectedMethod
+                    ? `${selectedMethod.priceCents === 0 ? 'Free' : money(selectedMethod.priceCents)} · ${selectedMethod.estimatedDelivery}`
+                    : 'Choose delivery'}
+                </Text>
+                <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={MUTED} />
+              </View>
             </TouchableOpacity>
-          ))}
-        </Card>
-      ))}
+            {expanded && (
+              <View style={{ marginTop: SP.sm, gap: SP.md }}>
+                {group.availableMethods.map(method => {
+                  const selected = group.selectedMethodId === method.id;
+                  return (
+                    <TouchableOpacity
+                      key={method.id}
+                      style={s.methodRow}
+                      onPress={() => onSelect(group.sellerId, method.id)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`${method.service}, ${method.estimatedDelivery}, ${money(method.priceCents)}`}
+                    >
+                      <View style={[s.radio, selected && { borderColor: PURPLE, backgroundColor: PURPLE }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.methodTitle}>{method.service}</Text>
+                        <Text style={s.muted}>{method.estimatedDelivery}</Text>
+                      </View>
+                      <Text style={s.methodTitle}>
+                        {method.priceCents === 0 ? 'Free' : money(method.priceCents)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </Card>
+        );
+      })}
 
       <Card>
         <TouchableOpacity
-          style={s.promoToggle}
+          style={s.listRow}
           onPress={() => setShowPromo(v => !v)}
           accessibilityRole="button"
-          accessibilityLabel="Have a promo code?"
+          accessibilityLabel="Promo code"
           accessibilityState={{ expanded: showPromo }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
-            <Feather name="tag" size={16} color={PURPLE_LIGHT} />
-            <Text style={s.sectionTitle}>Have a promo code?</Text>
-          </View>
+          <Text style={s.listRowLabel}>Promo code</Text>
           <Feather name={showPromo ? 'chevron-up' : 'chevron-down'} size={18} color={MUTED} />
         </TouchableOpacity>
         {showPromo && (
-          <>
+          <View style={{ marginTop: SP.sm }}>
             <View style={s.promoRow}>
               <TextInput
                 value={code}
@@ -833,10 +699,10 @@ function Delivery({
                 placeholder="Enter code"
                 placeholderTextColor={SUBTLE}
                 accessibilityLabel="Promo code"
-                style={[s.input, { flex: 1, marginBottom: 0 }]}
+                style={[s.underlineInput, { flex: 1, marginBottom: 0 }]}
               />
               <TouchableOpacity
-                style={[s.applyButton, { backgroundColor: PURPLE_DIM }]}
+                style={s.applyButton}
                 disabled={applying || !code.trim()}
                 onPress={async () => {
                   setApplying(true);
@@ -848,7 +714,7 @@ function Delivery({
                 accessibilityLabel="Apply promo code"
                 accessibilityState={{ disabled: applying || !code.trim(), busy: applying }}
               >
-                <Text style={[s.applyText, { color: PURPLE_LIGHT }]}>{applying ? '…' : 'Apply'}</Text>
+                <Text style={[s.applyText, { color: PURPLE_LIGHT, opacity: applying || !code.trim() ? 0.5 : 1 }]}>{applying ? '…' : 'Apply'}</Text>
               </TouchableOpacity>
             </View>
             {session.discounts.map(discount => (
@@ -865,7 +731,7 @@ function Delivery({
                 </TouchableOpacity>
               </View>
             ))}
-          </>
+          </View>
         )}
       </Card>
     </>
@@ -880,87 +746,57 @@ function Review({
   session: CheckoutSession;
   onAck: (key: string, checked: boolean) => void;
 }) {
-  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
+  const { theme, MUTED } = useThemeAliases();
   const s = makeStyles(theme);
   const { isSignedIn } = useAuth();
   const PURPLE = theme.accent;
-  const PURPLE_LIGHT = theme.accentLight;
-  const PURPLE_DIM = theme.accentDim;
-  const CYAN = theme.secondary;
-  const addr = session.shippingAddress;
+  const [paymentExpanded, setPaymentExpanded] = useState(false);
 
   return (
     <>
-      <Card>
-        <Text style={s.sectionTitle}>Review your order</Text>
-        {addr && (
-          <Text style={s.address}>
-            {addr.firstName} {addr.lastName}{'\n'}
-            {addr.line1}{'\n'}
-            {addr.city}, {addr.state} {addr.postalCode}
-          </Text>
-        )}
-        {session.deliveryGroups.flatMap(g => g.items).map(item => (
-          <View key={item.id} style={s.line}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.lineName}>{item.productName}</Text>
-              <Text style={s.muted}>{item.variantTitle} · Qty {item.quantity}</Text>
-            </View>
-            <Text style={s.lineName}>{money(item.priceCents * item.quantity)}</Text>
-          </View>
-        ))}
-        <View style={s.divider} />
-        <View style={s.line}>
-          <Text style={s.muted}>Subtotal</Text>
-          <Text style={s.lineName}>{money(session.summary.subtotalCents)}</Text>
-        </View>
-        {session.summary.discountTotalCents > 0 && (
-          <View style={s.line}>
-            <Text style={s.muted}>Discount</Text>
-            <Text style={[s.lineName, { color: SUCCESS }]}>−{money(session.summary.discountTotalCents)}</Text>
-          </View>
-        )}
-        <View style={s.line}>
-          <Text style={s.muted}>Shipping</Text>
-          <Text style={[s.lineName, session.summary.shippingTotalCents === 0 && { color: SUCCESS }]}>
-            {session.summary.shippingTotalCents === 0 ? 'Free' : money(session.summary.shippingTotalCents)}
-          </Text>
-        </View>
-        <View style={s.line}>
-          <Text style={s.muted}>Tax</Text>
-          <Text style={s.lineName}>Calculated at payment</Text>
-        </View>
-        <View style={s.divider} />
-        <View style={s.line}>
-          <Text style={s.total}>Estimated total</Text>
-          <Text style={s.total}>{money(session.summary.totalCents)}</Text>
-        </View>
-      </Card>
-
       {session.deliveryGroups.length > 1 && (
-        <View style={s.multiSeller}>
-          <Feather name="layers" size={16} color={CYAN} />
-          <Text style={[s.multiSellerText, { color: CYAN }]}>
+        <View style={s.multiSellerRow}>
+          <Feather name="layers" size={15} color={MUTED} />
+          <Text style={s.multiSellerText}>
             Your cart contains items from {session.deliveryGroups.length} sellers. You'll complete a separate secure Stripe payment for each seller.
           </Text>
         </View>
       )}
 
       <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
-          <Feather name="lock" size={17} color={PURPLE_LIGHT} />
-          <View style={{ flex: 1 }}>
-            <Text style={s.sectionTitle}>Pay securely with Stripe</Text>
-            <Text style={s.muted}>
-              You'll enter your payment details in Stripe Checkout. Brandthread never collects card numbers.
-            </Text>
+        <TouchableOpacity
+          style={s.listRow}
+          onPress={() => setPaymentExpanded(v => !v)}
+          accessibilityRole="button"
+          accessibilityLabel="Payment"
+          accessibilityState={{ expanded: paymentExpanded }}
+        >
+          <Text style={s.listRowLabel}>Payment</Text>
+          <View style={s.listRowValue}>
+            <Text style={s.listRowValueText}>Apple Pay</Text>
+            <Feather name={paymentExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={MUTED} />
           </View>
-        </View>
-        <Text style={[s.muted, { marginTop: SP.sm }]}>
-          {isSignedIn
-            ? 'Cards saved from earlier purchases will appear automatically in Stripe Checkout.'
-            : 'Your payment details stay with Stripe and are not saved to a Brandthread account.'}
-        </Text>
+        </TouchableOpacity>
+        {paymentExpanded && (
+          <View style={{ marginTop: SP.sm, gap: SP.sm }}>
+            <View style={s.paymentRow}>
+              <Feather name="smartphone" size={15} color={theme.text} />
+              <Text style={s.paymentRowText}>Apple Pay · Google Pay</Text>
+            </View>
+            <View style={s.paymentRow}>
+              <Feather name="credit-card" size={15} color={theme.text} />
+              <Text style={s.paymentRowText}>
+                {isSignedIn ? 'Saved cards, or add a new card' : 'Card — add at payment'}
+              </Text>
+            </View>
+            <View style={[s.paymentRow, { marginBottom: 0 }]}>
+              <Feather name="lock" size={13} color={MUTED} />
+              <Text style={[s.muted, { flex: 1 }]}>
+                You'll finish payment securely in Stripe Checkout. Brandthread never sees or stores your card number.
+              </Text>
+            </View>
+          </View>
+        )}
       </Card>
 
       {session.acknowledgments.map(ack => (
@@ -1185,46 +1021,46 @@ function Confirmation({
         />
       ) : (
         <View style={{ marginTop: SP.xl, width: '100%', gap: SP.sm }}>
-          {/* Message seller + View purchase — mirroring Depop Thank you screen */}
+          <View style={{ flexDirection: 'row', gap: SP.sm }}>
+            {/*
+              "Track order" is ONLY enabled when we have a verified server order ID.
+              If orderId is absent (still finalizing / webhook not yet received),
+              this button stays disabled — never falls back to orderNumber for routing.
+            */}
+            <Button
+              label="Track order"
+              icon="package"
+              variant="primary"
+              disabled={!firstVerified?.id}
+              onPress={handleViewPurchase}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Keep shopping"
+              variant="secondary"
+              onPress={() => router.replace('/(buyer)/discover' as never)}
+              style={{ flex: 1 }}
+            />
+          </View>
+
           {firstGroup && (
-            <View style={{ flexDirection: 'row', gap: SP.sm }}>
-              <Button
-                label="Message seller"
-                icon="message-circle"
-                variant="secondary"
-                onPress={handleMessageSeller}
-                style={{ flex: 1 }}
-              />
-              {/*
-                "View purchase" is ONLY rendered when we have a verified server order ID.
-                If orderId is absent (still finalizing / webhook not yet received),
-                this button stays hidden — never falls back to orderNumber for routing.
-              */}
-              {firstVerified?.id && (
-                <Button
-                  label="View purchase"
-                  icon="package"
-                  variant="secondary"
-                  onPress={handleViewPurchase}
-                  style={{ flex: 1 }}
-                />
-              )}
-            </View>
+            <Button
+              label="Message seller"
+              icon="message-circle"
+              variant="tertiary"
+              onPress={handleMessageSeller}
+              fullWidth
+            />
           )}
 
           {!isSignedIn && (
             <Button
               label="Create an account"
+              variant="secondary"
               onPress={() => router.replace('/sign-in' as never)}
               fullWidth
             />
           )}
-          <Button
-            label="Continue shopping"
-            variant="secondary"
-            onPress={() => router.replace('/(buyer)/discover' as never)}
-            fullWidth
-          />
         </View>
       )}
     </View>
@@ -1272,8 +1108,7 @@ export default function BuyerCheckoutScreen() {
    */
   const [verifiedOrders, setVerifiedOrders] = useState<VerifiedOrder[]>([]);
   const [pendingSessionIds, setPendingSessionIds] = useState<string[]>([]);
-  const [expandedSection, setExpandedSection] = useState<GuidedCheckoutSection>('information');
-  const [receiptVisible, setReceiptVisible] = useState(false);
+  const [orderSummaryExpanded, setOrderSummaryExpanded] = useState(false);
   /**
    * In-memory map: sellerId → verified server order ID.
    * Populated as each Stripe session is verified so we can skip already-paid groups
@@ -1303,7 +1138,6 @@ export default function BuyerCheckoutScreen() {
       setSession(next);
       setContact(restoredContact);
       setAddress(restoredAddress);
-      setExpandedSection(firstIncomplete);
 
       // Restore paid state — only entries with a verified orderId are considered confirmed.
       // Entries with only orderNumber (legacy sessions) are treated as pending until
@@ -1424,44 +1258,27 @@ export default function BuyerCheckoutScreen() {
     }
   };
 
-  const handleContinue = async () => {
-    if (current.step === 'information') {
-      if (!validateInformation() || !await validateServerCart()) return;
-      await persist({ ...current, contact: contact as CheckoutContact, shippingAddress: address as CheckoutAddress, step: 'delivery' });
-      setExpandedSection('delivery');
+  /**
+   * Single "Place order" action for the one-screen checkout — every section
+   * is always visible, so instead of stepping through information → delivery
+   * → review one screen at a time, this runs the same validation chain
+   * handleContinue used to run per-step, then pays. No payment logic below
+   * this point changes; only the number of taps to reach it does.
+   */
+  const handlePlaceOrder = async () => {
+    if (!validateInformation()) return;
+    if (current.deliveryGroups.some(g => !g.selectedMethodId)) {
+      Alert.alert('Choose delivery', 'Select a delivery option for every seller before paying.');
       return;
     }
-    if (current.step === 'delivery') {
-      if (current.deliveryGroups.some(g => !g.selectedMethodId)) {
-        Alert.alert('Choose delivery', 'Select a delivery option for every seller before reviewing your order.');
-        return;
-      }
-      if (!await validateServerCart()) return;
-      await persist({ ...current, step: 'review' });
-      setExpandedSection('review');
+    const blockingSection = getCheckoutBlockingSection(contact, address, current);
+    if (blockingSection === 'acknowledgments') {
+      Alert.alert('Acknowledgment required', 'Please accept the required policies before paying.');
       return;
     }
-    if (current.step === 'review') {
-      const blockingSection = getCheckoutBlockingSection(contact, address, current);
-      if (blockingSection === 'information') {
-        setExpandedSection('information');
-        validateInformation();
-        return;
-      }
-      if (blockingSection === 'delivery') {
-        setExpandedSection('delivery');
-        Alert.alert('Choose delivery', 'Select a delivery option for every seller before paying.');
-        return;
-      }
-      if (blockingSection === 'acknowledgments' || !await validateServerCart()) {
-        if (blockingSection === 'acknowledgments') {
-          setExpandedSection('review');
-          Alert.alert('Acknowledgment required', 'Please accept the required policies before paying.');
-        }
-        return;
-      }
-      await pay();
-    }
+    if (!await validateServerCart()) return;
+    await persist({ ...current, contact: contact as CheckoutContact, shippingAddress: address as CheckoutAddress, step: 'review' });
+    await pay();
   };
 
   const pay = async () => {
@@ -1695,30 +1512,23 @@ export default function BuyerCheckoutScreen() {
 
   if (loading || !session) return <CheckoutSkeleton />;
 
-  const informationComplete = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email ?? '')
-    && !!address.firstName && !!address.lastName && !!address.line1 && !!address.city
-    && !!address.state && (address.postalCode ?? '').trim().length >= 3 && !!address.country;
-  const deliveryComplete = current.deliveryGroups.every(g => !!g.selectedMethodId);
-  const reviewComplete = current.acknowledgments.every(ack => !ack.required || ack.acknowledged);
-
-  const ctaLabel = current.step === 'review'
-    ? canRetryPayment ? 'Try a different card' : 'Continue to payment'
-    : 'Continue';
+  const ctaLabel = canRetryPayment ? 'Try a different card' : 'Place order';
+  const isConfirmation = current.step === 'confirmation';
 
   return (
     <KeyboardAvoidingView style={s.root} behavior="padding" keyboardVerticalOffset={0}>
-      {/* Header */}
-      {current.step !== 'confirmation' && (
+      {/* Header — title below the safe area, close/back at the leading edge. No
+          step progress bar: every section below renders on one screen. */}
+      {!isConfirmation && (
         <View style={[s.header, { paddingTop: insets.top + SP.xs }]}>
           <IconButton
-            name="chevron-left"
+            name={usesThreadPull ? 'x' : 'chevron-left'}
             variant="plain"
             onPress={leaveCheckout}
-            accessibilityLabel="Back"
+            accessibilityLabel={usesThreadPull ? 'Close checkout' : 'Back'}
           />
           <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={s.stepLabel}>Secure checkout</Text>
-            <Progress step={current.step} />
+            <Text style={s.headerTitle}>Checkout</Text>
           </View>
           <View style={s.back} />
         </View>
@@ -1727,115 +1537,90 @@ export default function BuyerCheckoutScreen() {
       <ScrollView
         contentContainerStyle={{
           padding: SP.md,
-          paddingBottom: insets.bottom + (current.step === 'confirmation' ? 30 : 105),
+          paddingBottom: insets.bottom + (isConfirmation ? 30 : 120),
         }}
         keyboardShouldPersistTaps="handled"
       >
-        {current.step !== 'confirmation' && (
+        {!isConfirmation && (
           <>
-            {/* Compact summary view always visible at top (Depop pattern) */}
-            {current.step === 'review' && (
-              <CheckoutSummaryView
-                session={current}
-                onTapSummary={() => setReceiptVisible(true)}
-                onTapShipping={() => setExpandedSection('delivery')}
-                onTapAddress={() => setExpandedSection('information')}
-              />
-            )}
+            {/* Product summary — photo, name, brand, size, qty, price */}
+            <CheckoutSummaryView session={current} />
 
-            <GuidedSection
-              title="Contact & shipping address"
-              summary={informationComplete
-                ? `${contact.email} · ${address.city}, ${address.state}`
-                : 'Add your contact and delivery address'}
-              expanded={expandedSection === 'information'}
-              complete={informationComplete}
-              onPress={() => setExpandedSection('information')}
-            >
-              <Information
-                contact={contact}
-                address={address}
-                onContact={setContact}
-                onAddress={setAddress}
-                savedAddresses={savedAddresses}
-                onSelectAddress={handleSelectAddress}
-              />
-            </GuidedSection>
+            <Information
+              contact={contact}
+              address={address}
+              onContact={setContact}
+              onAddress={setAddress}
+              savedAddresses={savedAddresses}
+              onSelectAddress={handleSelectAddress}
+            />
 
-            <GuidedSection
-              title="Delivery & promo"
-              summary={deliveryComplete
-                ? `${current.deliveryGroups.length} delivery choice${current.deliveryGroups.length === 1 ? '' : 's'} selected`
-                : 'Choose delivery and add a promo code'}
-              expanded={expandedSection === 'delivery'}
-              complete={deliveryComplete}
-              onPress={() => setExpandedSection('delivery')}
-            >
-              <Delivery
-                session={current}
-                onSelect={(sellerId, methodId) =>
-                  void persist({
-                    ...current,
-                    deliveryGroups: current.deliveryGroups.map(g =>
-                      g.sellerId === sellerId ? { ...g, selectedMethodId: methodId } : g,
-                    ),
-                  })
-                }
-                onApply={async code => {
-                  const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts);
-                  await persist({ ...current, discounts: [...current.discounts.filter(d => d.code !== discount.code), discount] });
-                }}
-                onRemove={code =>
-                  void removeDiscount(code, current.discounts).then(discounts =>
-                    persist({ ...current, discounts }),
-                  )
-                }
-              />
-            </GuidedSection>
+            <Delivery
+              session={current}
+              onSelect={(sellerId, methodId) =>
+                void persist({
+                  ...current,
+                  deliveryGroups: current.deliveryGroups.map(g =>
+                    g.sellerId === sellerId ? { ...g, selectedMethodId: methodId } : g,
+                  ),
+                })
+              }
+              onApply={async code => {
+                const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts);
+                await persist({ ...current, discounts: [...current.discounts.filter(d => d.code !== discount.code), discount] });
+              }}
+              onRemove={code =>
+                void removeDiscount(code, current.discounts).then(discounts =>
+                  persist({ ...current, discounts }),
+                )
+              }
+            />
 
             {/* THREAD CASH HOOK POINT: same self-contained card cart.tsx uses,
                 gated behind the same OFF-by-default 'threadCashCheckoutDiscount'
                 flag. See components/thread-cash/UseThreadCashCard.tsx and
                 docs/payments/thread-cash-checkout-todo.md — no checkout money
-                logic is touched here. */}
-            {isSignedIn && current.deliveryGroups.length === 1 && threadCashCheckoutEnabled && (
+                logic is touched here. When the flag is off the row still shows,
+                disabled, with an explanation, rather than disappearing. */}
+            {isSignedIn && current.deliveryGroups.length === 1 && (
               <UseThreadCashCard
+                flat
                 maxDiscountCents={Math.max(0, current.summary.subtotalCents + current.summary.shippingTotalCents - 1)}
                 redemption={current.threadCashRedemption ?? null}
+                disabledReason={threadCashCheckoutEnabled ? undefined : 'Coming soon — not yet available at checkout'}
                 onApply={(redemption) => void persist({ ...current, threadCashRedemption: redemption })}
                 onRemove={() => void persist({ ...current, threadCashRedemption: undefined })}
               />
             )}
 
-            <GuidedSection
-              title="Review & policies"
-              summary={`${money(current.summary.totalCents)} · Stripe secure payment`}
-              expanded={expandedSection === 'review'}
-              complete={reviewComplete}
-              onPress={() => setExpandedSection('review')}
-            >
-              <Review
-                session={current}
-                onAck={(key, checked) =>
-                  void persist({
-                    ...current,
-                    acknowledgments: current.acknowledgments.map(ack =>
-                      ack.key === key ? { ...ack, acknowledged: checked } : ack,
-                    ),
-                  })
-                }
-              />
-            </GuidedSection>
+            <Review
+              session={current}
+              onAck={(key, checked) =>
+                void persist({
+                  ...current,
+                  acknowledgments: current.acknowledgments.map(ack =>
+                    ack.key === key ? { ...ack, acknowledged: checked } : ack,
+                  ),
+                })
+              }
+            />
 
-            {/* Buyer protection — shown right before the buyer pays. */}
+            <OrderTotalCard
+              session={current}
+              expanded={orderSummaryExpanded}
+              onToggle={() => setOrderSummaryExpanded(v => !v)}
+            />
+
+            {/* Buyer protection — a plain line (shield + status), not a card,
+                to match the rest of this flat page. */}
             <BuyerProtectionNote
+              flat
               preorder={current.deliveryGroups.some(group => group.items.some(item => item.isPreOrder))}
-              style={{ marginTop: SP.md }}
             />
           </>
         )}
 
-        {current.step === 'confirmation' && (
+        {isConfirmation && (
           <Confirmation
             session={current}
             verifiedOrders={verifiedOrders}
@@ -1868,26 +1653,21 @@ export default function BuyerCheckoutScreen() {
         )}
       </ScrollView>
 
-      {/* Persistent Pay securely CTA — hidden on confirmation */}
-      {current.step !== 'confirmation' && (
+      {/* Sticky bottom bar — running total + one full-width primary CTA. */}
+      {!isConfirmation && (
         <StickyFooter style={s.bottom}>
+          <View style={s.stickyTotalRow}>
+            <Text style={s.stickyTotalLabel}>Total</Text>
+            <Text style={s.stickyTotalValue}>{money(current.summary.totalCents)}</Text>
+          </View>
           <Button
             label={ctaLabel}
-            icon={current.step === 'review' ? 'lock' : undefined}
+            icon="lock"
             loading={placing}
             fullWidth
-            onPress={() => void (canRetryPayment ? retryPayment() : handleContinue())}
+            onPress={() => void (canRetryPayment ? retryPayment() : handlePlaceOrder())}
           />
         </StickyFooter>
-      )}
-
-      {/* Receipt bottom sheet */}
-      {session && (
-        <ReceiptSheet
-          session={current}
-          visible={receiptVisible}
-          onClose={() => setReceiptVisible(false)}
-        />
       )}
     </KeyboardAvoidingView>
   );
@@ -1927,17 +1707,50 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
       paddingHorizontal: SP.md, paddingBottom: SP.sm,
     },
     back: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, justifyContent: 'center', alignItems: 'center' },
-    stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 5 },
-    progress: { flexDirection: 'row', gap: 4, width: 120 },
-    progressSegment: { height: 4, flex: 1, borderRadius: RADII.pill, backgroundColor: CARD_ELEVATED },
-    progressSegmentActive: { backgroundColor: PURPLE },
+    headerTitle: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
 
-    // Card
+    // Flat section — no background/border/radius, just a bottom hairline.
+    // Horizontal inset comes from the screen's own ScrollView padding.
     card: {
-      backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1,
-      borderColor: BORDER, padding: SP.md, marginBottom: SP.md,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
+      paddingVertical: SP.md,
     },
-    sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG, marginBottom: SP.sm },
+    // Section labels are small caps (GOAT Order Review pattern), not bold
+    // full-size titles — they're a caption above a row, not a heading.
+    sectionTitle: {
+      fontFamily: FONT.bold, fontSize: FS.xs, color: MUTED, marginBottom: SP.sm,
+      textTransform: 'uppercase', letterSpacing: 0.8,
+    },
+
+    // Tappable summary row — "Ship to   Add address  ›" / "Delivery   Free · 5-7 days  ›"
+    listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28, gap: SP.md },
+    listRowLabel: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
+    listRowValue: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+    listRowValueText: { fontFamily: FONT.regular, fontSize: FS.base, color: MUTED, flexShrink: 1, textAlign: 'right' },
+
+    // Delivery method row (expanded) — no box, just radio + text + price
+    methodRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+
+    // Payment section rows (expanded)
+    paymentRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+    paymentRowText: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm },
+
+    // Underlined field — guest email, promo code. No box, no background.
+    underlineInput: {
+      borderBottomWidth: 1, borderBottomColor: BORDER, paddingVertical: 10,
+      color: FG, fontFamily: FONT.regular, fontSize: FS.base,
+    },
+
+    // Collapsible order total
+    totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    totalRowLabel: { ...TYPE.subheading, color: FG },
+    totalRowValue: { ...TYPE.subheading, fontFamily: FONT.bold, color: FG, ...TABULAR_NUMS },
+    totalBreakdown: { marginTop: SP.md, paddingTop: SP.md, borderTopWidth: 1, borderTopColor: BORDER, gap: 2 },
+
+    // Sticky bottom bar
+    stickyTotalRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SP.sm },
+    stickyTotalLabel: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
+    stickyTotalValue: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl, ...TABULAR_NUMS },
 
     // Input fields
     field: { marginBottom: SP.sm },
@@ -2013,7 +1826,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     // Promo code
     promoToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     promoRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginTop: SP.sm },
-    applyButton: { borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 13 },
+    applyButton: { paddingHorizontal: 4, paddingVertical: 13 },
     applyText: { fontFamily: FONT.bold, fontSize: FS.sm },
     discountRow: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, marginTop: SP.sm },
     discountText: { flex: 1, color: SUCCESS, fontFamily: FONT.regular, fontSize: FS.sm },
@@ -2025,8 +1838,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     lineName: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: FG },
     divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
     total: { ...TYPE.subheading, color: FG },
-    multiSeller: { flexDirection: 'row', gap: SP.sm, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
-    multiSellerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+    multiSellerRow: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
+    multiSellerText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
     ack: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', minHeight: COMP.minTouchTarget, marginBottom: SP.sm },
     checkbox: { width: 20, height: 20, borderRadius: RADII.chip, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
     ackText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },

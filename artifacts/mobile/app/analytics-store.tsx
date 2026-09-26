@@ -1,60 +1,42 @@
 /**
  * Store Analytics — Brandthread Seller App
+ *
+ * Mobbin reference: eBay "Performance" traffic-tile-then-funnel layout
+ * (https://mobbin.com/screens/14328f90-76c9-44b6-8675-f0c534c2fba7) informed the
+ * scrollable traffic/conversion KPI tiles above the funnel and section list.
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, PURPLE_LIGHT, SUCCESS, SUCCESS_DIM, ORANGE, RED, BLUE, GOLD,
-  FONT, FS,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getStoreAnalytics, getFilterState } from '@/services/analyticsService';
-import { StoreAnalytics, StoreFunnelStep, StoreSectionAnalytics, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { StoreAnalytics, StoreFunnelStep, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
+import {
+  AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
+  ProgressBar, SectionTitle, StatTileRow,
+} from '@/components/analytics/AnalyticsKit';
 
-function KpiCard({ m, icon, color }: { m: AnalyticsMetric; icon: keyof typeof Feather.glyphMap; color: string }) {
+function FunnelStepRow({ step, isLast }: { step: StoreFunnelStep; isLast: boolean }) {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
-  const up = m.trend === 'up';
-  return (
-    <View style={s.kpiCard}>
-      <View style={[s.kpiIconWrap, { backgroundColor: color + '22' }]}>
-        <Feather name={icon} size={14} color={color} />
-      </View>
-      <Text style={s.kpiValue}>{m.formatted}</Text>
-      <Text style={s.kpiLabel} numberOfLines={1}>{m.label}</Text>
-      <Text style={[s.kpiChange, { color: m.trend === 'flat' ? MUTED : up ? SUCCESS : RED }]}>
-        {(m.changePct ?? 0) > 0 ? '+' : ''}{m.changePct?.toFixed(1) ?? '—'}%
-      </Text>
-    </View>
-  );
-}
-
-function FunnelStep({ step, isLast }: { step: StoreFunnelStep; isLast: boolean }) {
-  const colors = useColors();
-  const s = React.useMemo(() => createStyles(colors), [colors]);
-  const router = useRouter();
   const pct = step.conversionPct;
-  const barColor = pct >= 50 ? SUCCESS : pct >= 20 ? ORANGE : RED;
-
+  const barColor = pct >= 50 ? colors.success : pct >= 20 ? colors.warning : colors.destructive;
   return (
     <View style={s.funnelStep}>
       <View style={s.funnelLeft}>
         <Text style={s.funnelLabel}>{step.label}</Text>
-        <View style={s.funnelBarWrap}>
-          <View style={[s.funnelBarFill, { width: `${step.conversionPct}%`, backgroundColor: barColor }]} />
-        </View>
+        <ProgressBar pct={step.conversionPct} color={barColor} />
       </View>
       <View style={s.funnelRight}>
         <Text style={s.funnelCount}>{step.count.toLocaleString()}</Text>
         {!isLast && (
-          <Text style={[s.funnelDrop, { color: step.dropOffPct > 60 ? RED : step.dropOffPct > 30 ? ORANGE : MUTED }]}>
+          <Text style={[s.funnelDrop, { color: step.dropOffPct > 60 ? colors.destructive : step.dropOffPct > 30 ? colors.warning : colors.mutedForeground }]}>
             ↓ {step.dropOffPct.toFixed(0)}% drop
           </Text>
         )}
@@ -65,7 +47,6 @@ function FunnelStep({ step, isLast }: { step: StoreFunnelStep; isLast: boolean }
 
 export default function AnalyticsStoreScreen() {
   const colors = useColors();
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -102,100 +83,97 @@ export default function AnalyticsStoreScreen() {
   }, [authLoaded, userId]); // load reads the current filter
 
   if (loading) {
-    return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
+    return <AnalyticsSkeleton topPad={topPad} kpiCount={3} listRows={4} />;
   }
   return (
     <ScrollView
       style={s.scroll}
       contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={PURPLE} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.pageTitle}>Store Analytics</Text>
-          <Text style={s.subtitle}>{filter?.dateRange.label ?? '30 days'}</Text>
-        </View>
-        <TouchableOpacity onPress={() => { Haptics.selectionAsync(); router.push('/store-builder' as never); }} style={[s.storeBtn, { backgroundColor: PURPLE_DIM, borderColor: PURPLE }]}>
-          <Text style={[s.storeBtnText, { color: PURPLE_LIGHT }]}>Edit Store</Text>
-        </TouchableOpacity>
-      </View>
+      <AnalyticsHeader
+        title="Store Analytics"
+        subtitle={filter?.dateRange.label ?? '30 days'}
+        right={<HeaderPillButton label="Edit Store" onPress={() => { Haptics.selectionAsync(); router.push('/store-builder' as never); }} />}
+      />
 
       {!data ? (
         <EmptyState
           icon="bar-chart-2"
           title="Store insights are on the way"
           description="We'll show traffic and conversion once visitors start browsing your store."
-          style={{ marginTop: 24 }}
+          style={{ marginTop: SP.lg }}
         />
       ) : (
         <>
           {/* KPI grid */}
-          <Text style={s.sectionTitle}>Traffic</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 10, flexDirection: 'row', paddingRight: 16 }}>
-            {[
-              { m: data.visitors,          icon: 'users'    as const, color: PURPLE },
-              { m: data.uniqueVisitors,     icon: 'user'     as const, color: BLUE   },
-              { m: data.sessions,           icon: 'activity' as const, color: CYAN },
-              { m: data.productPageViews,   icon: 'eye'      as const, color: GOLD   },
-              { m: data.returningVisitors,  icon: 'repeat'   as const, color: SUCCESS },
-              { m: data.mobileTrafficPct,   icon: 'smartphone' as const, color: ORANGE },
-            ].map(item => <KpiCard key={item.m.key} {...item} />)}
-          </ScrollView>
+          <SectionTitle>Traffic</SectionTitle>
+          <StatTileRow
+            scroll
+            items={[
+              { key: 'visitors', label: data.visitors.label, value: data.visitors.formatted, changePct: data.visitors.changePct },
+              { key: 'unique', label: data.uniqueVisitors.label, value: data.uniqueVisitors.formatted, changePct: data.uniqueVisitors.changePct },
+              { key: 'sessions', label: data.sessions.label, value: data.sessions.formatted, changePct: data.sessions.changePct },
+              { key: 'views', label: data.productPageViews.label, value: data.productPageViews.formatted, changePct: data.productPageViews.changePct },
+              { key: 'returning', label: data.returningVisitors.label, value: data.returningVisitors.formatted, changePct: data.returningVisitors.changePct },
+              { key: 'mobile', label: data.mobileTrafficPct.label, value: data.mobileTrafficPct.formatted, changePct: data.mobileTrafficPct.changePct },
+            ]}
+          />
 
           {/* Conversion KPIs */}
-          <Text style={s.sectionTitle}>Conversion</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 10, flexDirection: 'row', paddingRight: 16 }}>
-            {[
-              { m: data.addToCartRate,      icon: 'shopping-cart' as const, color: PURPLE },
-              { m: data.checkoutStartRate,  icon: 'credit-card'   as const, color: GOLD   },
-              { m: data.purchaseConversion, icon: 'check-circle'  as const, color: SUCCESS },
-              { m: data.avgSessionDuration, icon: 'clock'         as const, color: BLUE   },
-            ].map(item => <KpiCard key={item.m.key} {...item} />)}
-          </ScrollView>
+          <SectionTitle>Conversion</SectionTitle>
+          <StatTileRow
+            scroll
+            items={[
+              { key: 'atc', label: data.addToCartRate.label, value: data.addToCartRate.formatted, changePct: data.addToCartRate.changePct },
+              { key: 'checkout', label: data.checkoutStartRate.label, value: data.checkoutStartRate.formatted, changePct: data.checkoutStartRate.changePct },
+              { key: 'purchase', label: data.purchaseConversion.label, value: data.purchaseConversion.formatted, changePct: data.purchaseConversion.changePct },
+              { key: 'duration', label: data.avgSessionDuration.label, value: data.avgSessionDuration.formatted, changePct: data.avgSessionDuration.changePct },
+            ]}
+          />
 
           {/* Funnel */}
-          <Text style={s.sectionTitle}>Conversion Funnel</Text>
-          <View style={s.card}>
+          <SectionTitle>Conversion Funnel</SectionTitle>
+          <Card>
             {data.funnel.map((step, i) => (
               <View key={step.label}>
-                {i > 0 && <View style={s.divider} />}
-                <FunnelStep step={step} isLast={i === (data.funnel.length - 1)} />
+                {i > 0 && <CardDivider />}
+                <FunnelStepRow step={step} isLast={i === (data.funnel.length - 1)} />
               </View>
             ))}
-          </View>
+          </Card>
 
           {/* Store sections */}
-          <Text style={s.sectionTitle}>Store Section Performance</Text>
-          <View style={s.card}>
+          <SectionTitle>Store Section Performance</SectionTitle>
+          <Card>
             {data.sections.map((sec, i) => (
-              <TouchableOpacity
-                key={sec.sectionKey}
-                onPress={() => { Haptics.selectionAsync(); router.push('/store-sections' as never); }}
-                style={[s.secRow, i > 0 && s.divider]}
-                activeOpacity={0.8}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={s.secLabel}>{sec.label}</Text>
-                  <View style={s.secMeta}>
-                    <Text style={s.secStat}>{sec.views.toLocaleString()} views</Text>
-                    <Text style={s.dotSep}>·</Text>
-                    <Text style={s.secStat}>{sec.clicks.toLocaleString()} clicks</Text>
-                    <Text style={s.dotSep}>·</Text>
-                    <Text style={[s.secStat, { color: sec.ctr > 20 ? SUCCESS : sec.ctr > 10 ? ORANGE : RED }]}>{sec.ctr.toFixed(1)}% CTR</Text>
+              <View key={sec.sectionKey}>
+                {i > 0 && <CardDivider />}
+                <TouchableOpacity
+                  onPress={() => { Haptics.selectionAsync(); router.push('/store-sections' as never); }}
+                  style={s.secRow}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.secLabel}>{sec.label}</Text>
+                    <View style={s.secMeta}>
+                      <Text style={s.secStat}>{sec.views.toLocaleString()} views</Text>
+                      <Text style={s.dotSep}>·</Text>
+                      <Text style={s.secStat}>{sec.clicks.toLocaleString()} clicks</Text>
+                      <Text style={s.dotSep}>·</Text>
+                      <Text style={[s.secStat, { color: sec.ctr > 20 ? colors.success : sec.ctr > 10 ? colors.warning : colors.destructive }]}>{sec.ctr.toFixed(1)}% CTR</Text>
+                    </View>
                   </View>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={s.secPurchases}>{sec.purchasesInfluenced}</Text>
-                  <Text style={s.secPurchasesLabel}>purchases</Text>
-                </View>
-                <Feather name="chevron-right" size={14} color={SUBTLE} style={{ marginLeft: 8 }} />
-              </TouchableOpacity>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={s.secPurchases}>{sec.purchasesInfluenced}</Text>
+                    <Text style={s.secPurchasesLabel}>purchases</Text>
+                  </View>
+                  <Feather name="chevron-right" size={14} color={colors.subtle} style={{ marginLeft: SP.sm }} />
+                </TouchableOpacity>
+              </View>
             ))}
-          </View>
+          </Card>
         </>
       )}
 
@@ -204,40 +182,20 @@ export default function AnalyticsStoreScreen() {
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
-  return StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
-  content:  { paddingHorizontal: 16 },
-  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  header:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
-  backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  pageTitle:{ fontSize: 22, fontFamily: FONT.bold, color: FG },
-  subtitle: { fontSize: 12, fontFamily: FONT.regular, color: MUTED },
-  storeBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  storeBtnText:{ fontSize: 12, fontFamily: FONT.semibold },
-  sectionTitle:{ fontSize: 15, fontFamily: FONT.semibold, color: FG, marginBottom: 10 },
-  card:     { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, marginBottom: 20, overflow: 'hidden' },
-  divider:  { height: 1, backgroundColor: BORDER, marginHorizontal: 16 },
-  kpiCard:  { width: 110, backgroundColor: CARD, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: BORDER, gap: 4 },
-  kpiIconWrap:{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  kpiValue: { fontSize: 18, fontFamily: FONT.bold, color: FG },
-  kpiLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  kpiChange:{ fontSize: FS.xs, fontFamily: FONT.medium },
-  funnelStep:{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  content:  { paddingHorizontal: SP.md },
+  funnelStep:{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 3, minHeight: COMP.minTouchTarget },
   funnelLeft:{ flex: 1, gap: 6 },
-  funnelLabel:{ fontSize: 13, fontFamily: FONT.medium, color: FG },
-  funnelBarWrap:{ height: 6, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden' },
-  funnelBarFill:{ height: '100%', borderRadius: 3 },
-  funnelRight:{ alignItems: 'flex-end', marginLeft: 12, minWidth: 60 },
-  funnelCount:{ fontSize: 15, fontFamily: FONT.bold, color: FG },
-  funnelDrop:{ fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
-  secRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
-  secLabel: { fontSize: 13, fontFamily: FONT.semibold, color: FG, marginBottom: 4 },
+  funnelLabel:{ fontSize: FS.sm, fontFamily: FONT.medium, color: colors.foreground },
+  funnelRight:{ alignItems: 'flex-end', marginLeft: SP.sm, minWidth: 60 },
+  funnelCount:{ fontSize: FS.base, fontFamily: FONT.bold, color: colors.foreground },
+  funnelDrop:{ fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  secRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 3, minHeight: COMP.minTouchTarget },
+  secLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground, marginBottom: 4 },
   secMeta:  { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  secStat:  { fontSize: 11, fontFamily: FONT.regular, color: MUTED },
-  dotSep:   { fontSize: 11, color: SUBTLE },
-  secPurchases:{ fontSize: 15, fontFamily: FONT.bold, color: SUCCESS },
-  secPurchasesLabel:{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  });
-};
+  secStat:  { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
+  dotSep:   { fontSize: FS.xs, color: colors.subtle },
+  secPurchases:{ fontSize: FS.base, fontFamily: FONT.bold, color: colors.success },
+  secPurchasesLabel:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
+});
