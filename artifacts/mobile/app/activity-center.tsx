@@ -214,7 +214,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
       onAction={() => onDismiss(row)}
       accessibilityLabel="Dismiss activity"
     >
-      <View style={[styles.row, { backgroundColor: rowBackground }]}>
+      <View style={styles.row}>
         {/*
           The Follow back / Following button is a real interactive control
           (components/ui/Button), so it must be a sibling of the row's own
@@ -299,8 +299,6 @@ const ActivityRowView = React.memo(function ActivityRowView({
             accessibilityLabel={alreadyFollowing || followState === 'done' ? 'Following' : `Follow back ${row.actors[0]?.name ?? ''}`}
           />
         )}
-
-        {unread && <View style={styles.unreadDot} />}
       </View>
     </SwipeActionRow>
   );
