@@ -209,6 +209,10 @@ vi.mock('@/components/safety/DmSafety', () => ({
 
 vi.mock('@/lib/money', () => ({ formatCents: (cents: number) => `$${(cents / 100).toFixed(2)}` }));
 
+vi.mock('@/components/branding/BrandthreadLogo', () => ({
+  default: () => React.createElement('BrandthreadLogo'),
+}));
+
 vi.mock('@/lib/mediaLibraryAdapter', () => ({ saveImageToMediaLibrary: vi.fn().mockResolvedValue('saved') }));
 
 vi.mock('@/lib/api', () => ({ useApi: () => apiMock }));

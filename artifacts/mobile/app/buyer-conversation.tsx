@@ -9,6 +9,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -203,6 +205,10 @@ export default function BuyerConversationScreen() {
   }>();
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
+  // Per-message-id scroll refs/widths for the quick-reply chip rows, so an
+  // overflowing row can open pre-scrolled to its right (most relevant) end.
+  const quickReplyScrollRefs = useRef<Record<string, ScrollView | null>>({});
+  const quickReplyScrollWidths = useRef<Record<string, number>>({});
   const api = useApi();
   const { userId } = useAuth();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
@@ -452,8 +458,13 @@ export default function BuyerConversationScreen() {
   // omitted rather than fabricating an "online"/"typing…" state from nothing.
   const isAgentConv = !!conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID;
   const statusLine = isAgentConv
-    ? (agentTyping ? 'typing…' : 'Official Brandthread AI')
+    ? (agentTyping ? 'typing…' : 'Online · AI')
     : statusLineFor(participant);
+  // react-native-web doesn't fill in a real top safe-area inset (no notch/
+  // dynamic-island polyfill), so insets.top reads 0 on web and the header
+  // clipped under the dynamic island in a device-frame screenshot — same
+  // fix already applied to app/(buyer)/discover.tsx and inbox.tsx.
+  const headerTopPad = Platform.OS === 'web' ? 67 : insets.top;
 
   // Show "View store" button for any seller conversation (resolved or pre-created)
   const convType = conv?.type ?? params.type ?? '';
@@ -770,85 +781,9 @@ export default function BuyerConversationScreen() {
         </PressableScale>
       );
     }
-    if (att.type === 'thread_cash') {
-      const transferId = att.meta?.transferId ?? '';
-      const senderId = att.meta?.senderId ?? '';
-      const amountCents = Number(att.meta?.amountCents ?? 0);
-      const status = threadCashOverrides[transferId] ?? ((att.meta?.status as ThreadCashTransferStatus) ?? 'pending');
-      return (
-        <ThreadCashMessageCard
-          amountCents={amountCents}
-          note={att.meta?.note || null}
-          status={status}
-          isRecipient={senderId !== myId}
-          isSender={senderId === myId}
-          onClaim={async () => {
-            try {
-              await api.threadCash.claim({ transferId });
-              setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
-              celebrateThreadCash({ amount: amountCents, from: displayName });
-            } catch (e: any) {
-              Alert.alert('Could not claim', e?.message ?? 'Please try again.');
-              throw e;
-            }
-          }}
-          onCancel={senderId === myId ? async () => {
-            try {
-              await api.threadCash.cancel({ transferId });
-              setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
-            } catch (e: any) {
-              Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
-              throw e;
-            }
-          } : undefined}
-        />
-      );
-    }
-    if (att.type === 'quick_replies') {
-      const options = parseQuickReplies(att.meta?.optionsJson);
-      return (
-        <View style={s.quickReplyRow}>
-          {options.map((opt) => (
-            <PressableScale rippleEnabled={false}
-              key={opt.label}
-              style={[s.quickReplyChip, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}
-              activeOpacity={0.7}
-              onPress={() => sendQuickReply(opt)}
-              accessibilityRole="button"
-              accessibilityLabel={opt.label}
-            >
-              <Text style={[s.quickReplyChipText, { color: theme.text }]}>{opt.label}</Text>
-            </PressableScale>
-          ))}
-        </View>
-      );
-    }
-    if (att.type === 'agent_card') {
-      const deepLink = att.meta?.deepLink;
-      const cardKind = att.meta?.cardKind;
-      return (
-        <PressableScale rippleEnabled={false}
-          style={s.attachCard}
-          activeOpacity={deepLink ? 0.7 : 1}
-          onPress={() => { if (deepLink) router.push(deepLink as never); }}
-        >
-          {cardKind === 'thread_cash' ? (
-            <ThreadCashCoin size={ICON.sm} />
-          ) : (
-            <Feather
-              name={cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
-              size={ICON.sm}
-              color={theme.accent}
-            />
-          )}
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
-            {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={2}>{att.subtitle}</Text> : null}
-          </View>
-          {deepLink && <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />}
-        </PressableScale>
-      );
-    }
+    // 'thread_cash', 'quick_replies' and 'agent_card' are handled in
+    // renderItem() before this function is ever called for them — they're
+    // standalone rows, not content that belongs inside a chat bubble.
     // Default: product / order / post / profile card
     return (
       <PressableScale rippleEnabled={false}
@@ -1171,14 +1106,150 @@ export default function BuyerConversationScreen() {
 
     const isRead = msg.status === 'read' || !!msg.readAt;
 
+    // Quick replies and a Thread Cash send are their own standalone rows —
+    // not chat text, so they never get the colored/padded bubble treatment
+    // (a gray "bubble around" a button row or a payment card just reads as
+    // ugly, cramped chrome). Handled before the normal bubble render below.
+    if (msg.attachment?.type === 'quick_replies') {
+      const options = parseQuickReplies(msg.attachment.meta?.optionsJson);
+      return (
+        <View style={[s.quickReplyOuterRow, { marginTop: isFirstInGroup ? 12 : 2 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.quickReplyScrollContent}
+            // Right-aligned like iMessage/Instagram suggested replies:
+            // `justifyContent: 'flex-end'` alone only right-aligns a row
+            // that already fits without scrolling — when the chips overflow
+            // (the one-scroll-row fallback), open already scrolled to the
+            // end so the row still reads right-anchored on first paint.
+            onContentSizeChange={(contentWidth) => {
+              const viewportWidth = quickReplyScrollWidths.current[msg.id] ?? 0;
+              if (contentWidth > viewportWidth) {
+                quickReplyScrollRefs.current[msg.id]?.scrollToEnd({ animated: false });
+              }
+            }}
+            onLayout={(e) => { quickReplyScrollWidths.current[msg.id] = e.nativeEvent.layout.width; }}
+            ref={(ref) => { quickReplyScrollRefs.current[msg.id] = ref; }}
+          >
+            {options.map((opt) => (
+              <View key={opt.label} style={s.quickReplyChipWrap}>
+                <Chip label={opt.label} selected={false} onPress={() => sendQuickReply(opt)} testID={`quick-reply-${opt.label}`} />
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    // An agent info/deep-link card (e.g. "How Thread Cash works") is the
+    // same "full-width card, coin-in-circle icon, bold title, subtitle,
+    // chevron" treatment, standalone — not squeezed into the bubble along
+    // with whatever text follows it in the same message.
+    if (msg.attachment?.type === 'agent_card') {
+      const att = msg.attachment;
+      const deepLink = att.meta?.deepLink;
+      const cardKind = att.meta?.cardKind;
+      return (
+        <View style={{ marginTop: isFirstInGroup ? 12 : 2, paddingHorizontal: SP.md }}>
+          <PressableScale rippleEnabled={false}
+            style={[s.agentCardOuter, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
+            activeOpacity={deepLink ? 0.7 : 1}
+            onPress={() => { if (deepLink) router.push(deepLink as never); }}
+          >
+            <View style={[s.agentCardIconCircle, { backgroundColor: theme.accentDim }]}>
+              {cardKind === 'thread_cash' ? (
+                <ThreadCashCoin size={18} />
+              ) : (
+                <Feather
+                  name={cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
+                  size={18}
+                  color={theme.accent}
+                />
+              )}
+            </View>
+            <View style={{ flex: 1, marginLeft: SP.sm }}>
+              {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
+              {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={2}>{att.subtitle}</Text> : null}
+            </View>
+            {deepLink && <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />}
+          </PressableScale>
+          {msg.text ? (
+            <View style={{ flexDirection: 'row', justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: 4 }}>
+              <View style={{ maxWidth: BUBBLE_MAX }}>
+                <View style={[s.bubble, { backgroundColor: isOwn ? theme.accent : theme.cardElevated, alignSelf: isOwn ? 'flex-end' : 'flex-start' }]}>
+                  <Text style={[s.msgText, { color: isOwn ? theme.onAccent : theme.text }]}>{msg.text}</Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      );
+    }
+
+    if (msg.attachment?.type === 'thread_cash') {
+      const transferId = msg.attachment.meta?.transferId ?? '';
+      const senderId = msg.attachment.meta?.senderId ?? '';
+      const amountCents = Number(msg.attachment.meta?.amountCents ?? 0);
+      const status = threadCashOverrides[transferId] ?? ((msg.attachment.meta?.status as ThreadCashTransferStatus) ?? 'pending');
+      return (
+        <View style={{ marginTop: isFirstInGroup ? 12 : 2, paddingHorizontal: SP.md }}>
+          <ThreadCashMessageCard
+            amountCents={amountCents}
+            note={msg.attachment.meta?.note || null}
+            status={status}
+            isRecipient={senderId !== myId}
+            isSender={senderId === myId}
+            onClaim={async () => {
+              try {
+                await api.threadCash.claim({ transferId });
+                setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
+                celebrateThreadCash({ amount: amountCents, from: displayName });
+              } catch (e: any) {
+                Alert.alert('Could not claim', e?.message ?? 'Please try again.');
+                throw e;
+              }
+            }}
+            onCancel={senderId === myId ? async () => {
+              try {
+                await api.threadCash.cancel({ transferId });
+                setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
+              } catch (e: any) {
+                Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
+                throw e;
+              }
+            } : undefined}
+          />
+          {/* A free-text note sent alongside the transfer renders as its own
+              ordinary chat bubble underneath the card, never merged into it. */}
+          {msg.text ? (
+            <View style={{ flexDirection: 'row', justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: 4 }}>
+              <View style={{ maxWidth: BUBBLE_MAX }}>
+                <View style={[s.bubble, { backgroundColor: isOwn ? theme.accent : theme.cardElevated, alignSelf: isOwn ? 'flex-end' : 'flex-start' }]}>
+                  <Text style={[s.msgText, { color: isOwn ? theme.onAccent : theme.text }]}>{msg.text}</Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      );
+    }
+
     return (
       <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? 12 : 2 }]}>
-        {/* Other-user avatar — only on the last bubble of a run */}
+        {/* Other-user avatar — only on the last bubble of a run, vertically
+            aligned with it (s.msgOuter is alignItems: 'flex-end'). */}
         {!isOwn && (
           isLastInGroup ? (
-            <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
-              <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
-            </View>
+            isAgentConv ? (
+              <View style={[s.msgAvatar, s.msgAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                <BrandthreadLogo size={16} />
+              </View>
+            ) : (
+              <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
+                <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+              </View>
+            )
           ) : <View style={s.msgAvatarSpacer} />
         )}
 
@@ -1323,7 +1394,7 @@ export default function BuyerConversationScreen() {
       {/* Plain flat header — no card, no pill, no background decoration.
           Sits directly on the theme background with a hairline border
           underneath instead of a floating "glass" card. */}
-      <View style={[s.headerWrap, { paddingTop: insets.top + SP.xs }]}>
+      <View style={[s.headerWrap, { paddingTop: headerTopPad + SP.xs }]}>
         <PressableScale rippleEnabled={false}
           onPress={() => { hapticPrimaryAction(); router.back(); }}
           style={s.roundBtn}
@@ -1345,9 +1416,15 @@ export default function BuyerConversationScreen() {
         >
           {participant && (
             <View style={s.headerAvatarWrap} testID="conversation-avatar">
-              <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
-              </View>
+              {isAgentConv ? (
+                <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  <BrandthreadLogo size={18} />
+                </View>
+              ) : (
+                <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
+                  <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                </View>
+              )}
               {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
             </View>
           )}
@@ -1371,19 +1448,19 @@ export default function BuyerConversationScreen() {
           </View>
         </PressableScale>
 
-        {conv && (
-          <>
-            <PressableScale rippleEnabled={false}
-              style={s.roundBtn}
-              onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              testID="conversation-call-voice"
-              accessibilityRole="button"
-              accessibilityLabel="Voice call"
-            >
-              <Feather name="phone" size={ICON.sm} color={theme.muted} />
-            </PressableScale>
-          </>
+        {/* An AI account can't take a call — no voice/video icons for it,
+            just the info icon below. */}
+        {conv && !isAgentConv && (
+          <PressableScale rippleEnabled={false}
+            style={s.roundBtn}
+            onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            testID="conversation-call-voice"
+            accessibilityRole="button"
+            accessibilityLabel="Voice call"
+          >
+            <Feather name="phone" size={ICON.sm} color={theme.muted} />
+          </PressableScale>
         )}
         <PressableScale rippleEnabled={false}
           style={s.roundBtn}
@@ -1391,9 +1468,9 @@ export default function BuyerConversationScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           testID="conversation-options"
           accessibilityRole="button"
-          accessibilityLabel="More options"
+          accessibilityLabel={isAgentConv ? 'About Brandthread Agent' : 'More options'}
         >
-          <Feather name="more-horizontal" size={ICON.sm} color={theme.muted} />
+          <Feather name={isAgentConv ? 'info' : 'more-horizontal'} size={ICON.sm} color={theme.muted} />
         </PressableScale>
       </View>
 
@@ -1556,7 +1633,7 @@ export default function BuyerConversationScreen() {
               </PressableScale>
             </View>
           )}
-          <View style={[s.inputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
+          <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
             {/* Attach — photos, video, Thread Cash (Apple-Cash-style), and
                 (for seller chats) products/posts. A single plain "+" — no
                 filled blob — matching the restraint of iMessage/Snapchat. */}
@@ -1720,7 +1797,7 @@ export default function BuyerConversationScreen() {
           </View>
         </View>
       ) : (
-        <View style={[s.inputRow, s.disabledInputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
+        <View style={[s.inputRow, s.disabledInputRow, { paddingBottom: insets.bottom + SP.sm }]}>
           <Text style={s.disabledInputText}>Messaging disabled</Text>
         </View>
       )}
@@ -2077,12 +2154,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   headerAvatarWrap: { position: 'relative' },
   headerAvatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerAvatarOfficial: { borderWidth: 1 },
   headerAvatarInitials: {
     fontSize: FS.sm,
     fontFamily: FONT.bold,
@@ -2216,6 +2294,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginRight: SP.sm,
     marginBottom: 2,
   },
+  msgAvatarOfficial: { borderWidth: 1 },
   msgAvatarSpacer: {
     width: 30,
     marginRight: SP.sm,
@@ -2274,21 +2353,26 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     padding: SP.sm,
     marginBottom: SP.xs,
   },
-  quickReplyRow: {
+  // A standalone agent info/deep-link card — full width, coin/icon-in-a-
+  // circle, bold title, subtitle, chevron. Same row shape as the Thread Cash
+  // payment card below.
+  agentCardOuter: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+    borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.sm, width: '100%',
+  },
+  agentCardIconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  // Quick replies: standalone chips below the last bubble, right-aligned
+  // like iMessage/Instagram suggested replies — never inside a bubble.
+  quickReplyOuterRow: {
+    paddingHorizontal: SP.md,
+  },
+  quickReplyScrollContent: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SP.xs,
-    marginTop: SP.xs,
+    justifyContent: 'flex-end',
+    flexGrow: 1,
   },
-  quickReplyChip: {
-    borderWidth: 1,
-    borderRadius: RADIUS.pill,
-    paddingVertical: 6,
-    paddingHorizontal: SP.sm,
-  },
-  quickReplyChipText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
+  quickReplyChipWrap: {
+    marginLeft: SP.xs,
   },
   attachTitle: {
     fontSize: FS.sm,
@@ -2422,6 +2506,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderColor: theme.border,
     paddingLeft: SP.sm,
     paddingRight: SP.xs,
+    gap: SP.sm,
     minHeight: COMPOSER_CONTROL + SP.xs,
   },
   textInput: {
