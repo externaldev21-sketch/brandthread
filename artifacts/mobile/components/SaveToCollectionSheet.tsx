@@ -52,7 +52,9 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
-  const { modalVisible, sheetStyle, backdropStyle, panGesture } = useSheetTransition(visible, onClose);
+  const {
+    modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout,
+  } = useSheetTransition(visible, onClose);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,7 +116,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
         </TouchableWithoutFeedback>
       </ReanimatedAnimated.View>
       <GestureDetector gesture={panGesture}>
-      <ReanimatedAnimated.View testID="save-to-collection-sheet" style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }, sheetStyle]}>
+      <ReanimatedAnimated.View testID="save-to-collection-sheet" onLayout={onSheetLayout} style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }, sheetStyle]}>
         <View style={styles.handle} />
         <View style={styles.header}>
           <Text style={styles.title}>Save to…</Text>
