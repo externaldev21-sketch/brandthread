@@ -295,6 +295,7 @@ vi.mock('@/lib/legalConsent', () => ({
 }));
 
 vi.mock('@/components/branding/BrandthreadLogo', () => ({ default: () => null }));
+vi.mock('@/components/branding/GoogleGlyph', () => ({ default: () => null }));
 
 // app/onboarding.tsx imports ONBOARDING_KEY/ONBOARDING_OWNER_KEY from
 // './_layout' — real app/_layout.tsx pulls in the entire app shell (query
