@@ -41,7 +41,7 @@ import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatProfileCount } from '@/services/profileService';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
-  InteractionLayer, ProfileButton, ProfileGlassButton, type ProfileStat, type ProfileTab,
+  InteractionLayer, ProfileGlassButton, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
@@ -539,6 +539,13 @@ export default function ProfileScreen() {
 
   const extras = (
     <>
+      {/* ── Stories & highlights stay next to the profile details ── */}
+      <ProfileStoriesRow
+        items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor }))}
+        onNew={handleHighlightPress}
+        onPressItem={handleHighlightPress}
+      />
+
       {/* ── My Orders — always-visible way back to order history ── */}
       {featuredOrder ? (
         <View style={styles.inset}>
@@ -580,12 +587,6 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
-      {/* ── Stories & highlights ── */}
-      <ProfileStoriesRow
-        items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor }))}
-        onNew={handleHighlightPress}
-        onPressItem={handleHighlightPress}
-      />
     </>
   );
 
@@ -637,23 +638,6 @@ export default function ProfileScreen() {
         )}
         stats={stats}
         statsLoading={loading}
-        actions={(
-          <>
-            <View style={styles.actionRow}>
-              <ProfileButton label="Edit profile" icon="edit-3" variant="primary" onPress={() => router.push('/(buyer)/edit-profile')} />
-              <ProfileButton
-                label="Share profile"
-                icon="share-2"
-                onPress={handleShareProfile}
-                accessibilityHint="Opens your shareable profile link and QR code"
-              />
-            </View>
-            <View style={styles.actionRow}>
-              <ProfileButton label="Messages" icon="send" onPress={() => router.push('/(buyer)/inbox' as never)} />
-              <ProfileButton label="Friends" icon="users" onPress={() => router.push('/(buyer)/friends' as any)} />
-            </View>
-          </>
-        )}
         extras={extras}
         tabs={{ items: TAB_ITEMS, active: activeTab, onChange: handleTabPress }}
         data={loading ? [] : rows}
@@ -683,6 +667,7 @@ export default function ProfileScreen() {
         <Text style={[sheetStyles.sheetTitle, { color: theme.muted }]}>Profile</Text>
         <SheetRow icon="edit-3" label="Edit profile" onPress={() => { setMenuOpen(false); router.push('/(buyer)/edit-profile'); }} />
         <SheetRow icon="share-2" label="Share profile" onPress={handleShareProfile} />
+        <SheetRow icon="send" label="Messages" onPress={() => { setMenuOpen(false); router.push('/(buyer)/inbox' as never); }} />
         <SheetRow icon="users" label="Friends" onPress={() => { setMenuOpen(false); router.push('/(buyer)/friends' as any); }} />
         <SheetRow icon="star" label="Close friends" onPress={() => { setMenuOpen(false); router.push('/buyer-close-friends' as any); }} />
         <SheetRow icon="archive" label="Archive" onPress={() => { setMenuOpen(false); router.push('/buyer-archive' as any); }} />
@@ -734,7 +719,6 @@ function makeStyles(theme: AppThemePreset) {
     root: { flex: 1, backgroundColor: theme.background },
     errorRoot: { flex: 1, backgroundColor: theme.background, justifyContent: 'center' },
     inset: { paddingHorizontal: SP.md },
-    actionRow: { flexDirection: 'row', gap: SP.sm },
 
     switcher: {
       flexDirection: 'row', alignItems: 'center', gap: SP.xs, maxWidth: 220,

@@ -33,12 +33,13 @@ import {
   useAudioRecorder,
 } from 'expo-audio';
 import { useAuth } from '@clerk/expo';
-import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
+import { apiErrorMessage, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
 import ChatWallpaper from '@/components/chat/ChatWallpaper';
+import { ConversationSettingsSheet } from '@/components/chat/ConversationSettingsSheet';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaViewer from '@/components/chat/MediaViewer';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -224,6 +225,7 @@ export default function BuyerConversationScreen() {
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
   const [conv, setConv] = useState<Conversation | null>(null);
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -1028,53 +1030,6 @@ export default function BuyerConversationScreen() {
     }
   }
 
-  // ── Header options ──────────────────────────────────────────────────────────
-
-  function openOptions() {
-    if (!participant) return;
-    Alert.alert('Options', undefined, [
-      {
-        text: 'Archive conversation',
-        onPress: async () => {
-          const { archiveConversation } = await import('@/services/socialService');
-          if (conv) await archiveConversation(conv.id);
-          router.back();
-        },
-      },
-      messaging.blockedByMe
-        ? {
-            text: `Unblock ${participant.name}`,
-            onPress: async () => {
-              if (await confirmUnblock({ userId: participant.userId, name: participant.name }, api.social.unblock)) {
-                setMessaging((current) => ({ ...current, blockedByMe: false }));
-              }
-            },
-          }
-        : {
-            text: `Block ${participant.name}`,
-            style: 'destructive' as const,
-            onPress: async () => {
-              if (await confirmBlock({ userId: participant.userId, name: participant.name }, api.social.block)) {
-                setMessaging((current) => ({ ...current, blockedByMe: true }));
-              }
-            },
-          },
-      {
-        text: `Report ${participant.name}`,
-        onPress: () => {
-          router.push(reportHref({
-            targetType: 'profile',
-            targetId: participant.userId,
-            label: participant.name,
-            ownerId: participant.userId,
-            ownerName: participant.name,
-          }) as never);
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }
-
   // ── Message long press → reaction bar + actions sheet ───────────────────────
 
   function closeMessageSheet() {
@@ -1388,10 +1343,11 @@ export default function BuyerConversationScreen() {
           )}
           <PressableScale rippleEnabled={false}
             style={s.roundBtn}
-            onPress={() => { hapticPrimaryAction(); openOptions(); }}
+            onPress={() => { hapticPrimaryAction(); setSettingsVisible(true); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel="More options"
+            accessibilityLabel="Conversation settings"
+            testID="conversation-settings"
           >
             <Feather name="more-horizontal" size={ICON.sm} color={theme.muted} />
           </PressableScale>
@@ -1921,6 +1877,31 @@ export default function BuyerConversationScreen() {
       </Modal>
 
       <MediaViewer visible={viewerUri != null} uri={viewerUri} onClose={() => setViewerUri(null)} />
+
+      {conv && participant && (
+        <ConversationSettingsSheet
+          visible={settingsVisible}
+          onClose={() => setSettingsVisible(false)}
+          conversationId={conv.id}
+          counterpart={{ userId: participant.userId, name: participant.name }}
+          isMuted={!!conv.isMuted}
+          blockedByMe={messaging.blockedByMe}
+          onMutedChange={(muted) => setConv((current) => current ? { ...current, isMuted: muted } : current)}
+          onBlockedChange={(blocked) => setMessaging((current) => ({ ...current, blockedByMe: blocked }))}
+          onArchive={async () => {
+            const { archiveConversation } = await import('@/services/socialService');
+            await archiveConversation(conv.id);
+            router.back();
+          }}
+          onReport={() => router.push(reportHref({
+            targetType: 'profile',
+            targetId: participant.userId,
+            label: participant.name,
+            ownerId: participant.userId,
+            ownerName: participant.name,
+          }) as never)}
+        />
+      )}
 
       <Snackbar
         visible={copiedToast}

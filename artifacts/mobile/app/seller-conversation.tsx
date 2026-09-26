@@ -28,12 +28,13 @@ import {
 } from 'expo-audio';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
-import { confirmUnblock } from '@/lib/safety';
+import { confirmUnblock, reportHref } from '@/lib/safety';
 import {
-  BlockedComposer, openConversationOptions, openMessageOptions, REMOVED_MESSAGE_TEXT,
+  BlockedComposer, openMessageOptions, REMOVED_MESSAGE_TEXT,
   type DmMessagingState,
 } from '@/components/safety/DmSafety';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { ConversationSettingsSheet } from '@/components/chat/ConversationSettingsSheet';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ interface Participant {
 }
 interface ConvView {
   id: string; type: string; participants: Participant[];
+  isMuted?: boolean;
   contextOrderId?: string; contextOrderNumber?: string; contextOrderStatus?: string;
   contextProductId?: string; contextProductName?: string;
 }
@@ -145,6 +147,7 @@ export default function SellerConversationScreen() {
   const requestGenerationRef = useRef<number | null>(null);
 
   const [conv, setConv] = useState<ConvView | null>(null);
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -651,16 +654,11 @@ export default function SellerConversationScreen() {
         {other ? (
           <PressableScale
             style={s.headerCallBtn}
-            onPress={() => { hapticPrimaryAction(); openConversationOptions({
-              router,
-              social: api.social,
-              counterpart: { userId: other.userId, name: other.name },
-              messaging,
-              onChange: setMessaging,
-            }); }}
+            onPress={() => { hapticPrimaryAction(); setSettingsVisible(true); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel="Conversation options"
+            accessibilityLabel="Conversation settings"
+            testID="seller-conversation-settings"
           >
             <Feather name="more-horizontal" size={ICON.md} color={FG} />
           </PressableScale>
@@ -950,6 +948,22 @@ export default function SellerConversationScreen() {
           )}
         </SheetRise>
       </Modal>
+      {conv && other && (
+        <ConversationSettingsSheet
+          visible={settingsVisible}
+          onClose={() => setSettingsVisible(false)}
+          conversationId={conv.id}
+          counterpart={{ userId: other.userId, name: other.name }}
+          isMuted={!!conv.isMuted}
+          blockedByMe={messaging.blockedByMe}
+          onMutedChange={(muted) => setConv((current) => current ? { ...current, isMuted: muted } : current)}
+          onBlockedChange={(blocked) => setMessaging((current) => ({ ...current, blockedByMe: blocked }))}
+          onReport={() => router.push(reportHref({
+            targetType: 'profile', targetId: other.userId, label: other.name,
+            ownerId: other.userId, ownerName: other.name,
+          }) as never)}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }

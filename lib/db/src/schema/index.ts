@@ -806,6 +806,7 @@ export const conversationParticipants = pgTable('conversation_participants', {
   accountType:    text('account_type').notNull().default('buyer'),
   unreadCount:    integer('unread_count').notNull().default(0),
   lastReadAt:     timestamp('last_read_at'),
+  isMuted:        boolean('is_muted').notNull().default(false),
   joinedAt:       timestamp('joined_at').defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.conversationId, table.userId] }),

@@ -1379,6 +1379,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     conversations: {
       list:    () => quietGet<any[]>('/api/conversations'),
       get:     (id: string) => get<any>(`/api/conversations/${encodeURIComponent(id)}`),
+      mute:    (id: string, muted: boolean) =>
+        patch<{ muted: boolean }>(`/api/conversations/${encodeURIComponent(id)}/mute`, { muted }),
       /** Create a new conversation or return the existing one between the same two participants. */
       createOrGet: (body: {
         type: string;

@@ -221,6 +221,7 @@ export interface Message {
 }
 
 export interface Conversation {
+  isMuted?: boolean;
   id: string;
   type: ConversationType;
   participants: ConversationParticipant[];

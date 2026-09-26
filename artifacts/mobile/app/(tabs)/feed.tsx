@@ -2941,7 +2941,7 @@ export default function FeedScreen({
                   hitSlop={{ top: 5, bottom: 5, left: 4, right: 5 }}
                 >
                   <View style={styles.liveJumpDot} />
-                  <Text style={styles.liveJumpText}>LIVE</Text>
+                    {windowWidth >= 360 && <Text style={styles.liveJumpText}>LIVE</Text>}
                 </TouchableOpacity>
               )}
             </View>
@@ -2963,7 +2963,6 @@ export default function FeedScreen({
             </View>
 
             <View style={styles.buyerTopCluster}>
-              <ActivityBellButton color={ON_DARK} size={20} style={styles.buyerTopBtnCompact} badgeBorderColor={BG} />
               <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtnCompact, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
                 style={styles.buyerTopBtnCompact}
@@ -3322,7 +3321,12 @@ const styles = StyleSheet.create({
   // buyer Threads Home top row above which needs to fit more controls.
   buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   buyerTopCluster: { flexDirection: 'row', alignItems: 'center', gap: 0 },
-  buyerTabSwitcherWrap: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  // Center the tabs against the screen, not the space left between shortcuts.
+  // The optional LIVE chip makes the left side wider than the cart side.
+  buyerTabSwitcherWrap: {
+    position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
+  },
   buyerCartBadge: { top: 3, right: 1 },
   liveJumpBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36,
@@ -3332,11 +3336,11 @@ const styles = StyleSheet.create({
   liveJumpDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
   liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
   buyerSearchRow: {
-    height: 36, marginBottom: 6, borderRadius: RADII.input,
+    height: 32, marginBottom: 6, borderRadius: RADII.input,
     backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
   buyerSearchInput: {
-    flex: 1, height: 36, paddingHorizontal: 12, paddingVertical: 0,
+    flex: 1, height: 32, paddingHorizontal: 12, paddingVertical: 0,
     fontSize: FS.sm, fontFamily: FONT.regular, color: ON_DARK,
   },
   topAvatarBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },

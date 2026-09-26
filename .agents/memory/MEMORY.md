@@ -64,6 +64,7 @@
 - [Tax reporting boundaries](tax-reporting-boundaries.md) — annual gross uses successful-payment UTC year; preserve Stripe tax, gross, and final destination without inferring compliance.
 - [Notification response deduplication](notification-response-deduplication.md) — warm listeners and cold-start recovery can surface the same Expo response; dedupe navigation by request identifier.
 - [Notification measurement integrity](notification-measurement-integrity.md) — Expo tickets are provider results, not receipts; client events need stable IDs and an account-scoped durable outbox.
+- [Conversation mute semantics](conversation-mute-semantics.md) — muting one conversation suppresses its push alerts only, not unread messages or the in-app notification feed.
 - [Post-merge setup timeout](post-merge-timeout.md) — allow five minutes for cold or forced pnpm relinks before migrations and the API build.
 - [OpenAPI integer validation](openapi-integer-validation.md) — generated validators may accept fractions for integer fields; enforce integer semantics at sensitive server boundaries.
 - [Social relationship locking](social-relationship-locking.md) — pairwise follow/block mutations share one unordered-user lock; block checks happen inside the locked transaction.
