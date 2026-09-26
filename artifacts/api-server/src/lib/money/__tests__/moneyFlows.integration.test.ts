@@ -28,10 +28,14 @@ vi.mock("../../../middlewares/requireAuth", () => ({
     next();
   },
 }));
-vi.mock("../../../middlewares/requireRole", () => ({
-  teamContext: () => (_req: unknown, _res: unknown, next: () => void) => next(),
-  requireRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
-}));
+vi.mock("../../../middlewares/requireRole", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../middlewares/requireRole")>();
+  return {
+    ...actual,
+    teamContext: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+    requireRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  };
+});
 
 import { db, drops, orderRefunds, orderReleases, orders, productVariants, sampleOrders } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";

@@ -1242,10 +1242,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             clientIdempotencyKey?: string;
             /** One-time rewards token created by /api/loyalty/redeem. */
             loyaltyToken?: string;
-            /** THREAD CASH HOOK POINT: one-time token from /api/thread-cash/redeem.
-             *  The server currently rejects any request that includes this (see
-             *  routes/buyer.ts) until the checkout money flow can fund it without
-             *  changing seller payout — see docs/payments/thread-cash-checkout-todo.md. */
+            /** One-time token from /api/thread-cash/redeem. Discounts the card
+             *  charge only (never a full payment method) — see
+             *  docs/payments/thread-cash-checkout-todo.md. In-stock (destination
+             *  charge) checkouts only; the server rejects it for preorders. */
             threadCashToken?: string;
             /** Seller discount code, validated fresh server-side and applied to this charge. */
             discountCode?: string;
@@ -1492,6 +1492,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             category: string; imageUri: string | null; color: string; initials: string;
           }>;
         }>(`/api/public/search/suggested?limit=${encodeURIComponent(String(limit))}`),
+      /** "Search by category" tiles for the empty state — one representative image per top category. */
+      categories: (limit = 8) =>
+        get<{
+          categories: Array<{ category: string; productCount: number; imageUri: string | null; color: string }>;
+        }>(`/api/public/search/categories?limit=${encodeURIComponent(String(limit))}`),
     },
     reviews: {
       /** List reviews for a product (public). Returns { reviews, avgRating, totalCount }. */
@@ -2547,12 +2552,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<ThreadCashCheckInResult>('/api/thread-cash/check-in', body),
       history: (limit = 50) =>
         get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
-      redeem: (body: { amountCents: number }) =>
+      redeem: (body: { amountCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body),
-      send: (body: { recipientId: string; conversationId?: string; amountCents: number }) =>
+      send: (body: { recipientId: string; conversationId?: string; note?: string; amountCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; transferId: string }>('/api/thread-cash/send', body),
       claim: (body: { transferId: string }) =>
         post<{ ok: boolean; amountCents: number }>('/api/thread-cash/claim', body),
+      cancel: (body: { transferId: string }) =>
+        post<{ ok: boolean }>('/api/thread-cash/cancel', body),
     },
     /** Public trending feed — no auth required. */
     publicTrending: {

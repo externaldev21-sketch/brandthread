@@ -559,7 +559,7 @@ router.get("/search", async (req, res): Promise<void> => {
     // Do not SQL-limit joined variants: first collapse each product to its
     // lowest price, then filter/sort products, and only then apply the limit.
     const productPrice = sql<number>`min(${productVariants.priceCents})`;
-    const [sellers, prods] = await Promise.all([
+    const [sellers, prods, videoPosts] = await Promise.all([
       db.select({
         clerkId:     users.clerkId,
         displayName: users.displayName,
@@ -607,6 +607,34 @@ router.get("/search", async (req, res): Promise<void> => {
           minPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) >= ${minPriceCents}`,
           maxPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) <= ${maxPriceCents}`,
         )),
+
+      // Videos — matched by caption or by a tagged product's name, same
+      // typo-tolerant relevance as products/brands above. Kept unfiltered by
+      // category/size/brand/price (those are product-only filters).
+      db.select({
+        id:        posts.id,
+        caption:   posts.caption,
+        mediaUrl:  posts.mediaUrl,
+        thumbnailUrl: posts.thumbnailUrl,
+        authorId:  posts.userId,
+        createdAt: posts.createdAt,
+        relevance: relevanceScore(sql`COALESCE(${posts.caption}, '')`, term),
+      }).from(posts)
+        .where(and(
+          eq(posts.mediaType, "video"),
+          publicPostCondition(),
+          or(
+            fuzzyMatch(posts.caption, term, pattern),
+            sql`EXISTS (
+              SELECT 1 FROM post_tagged_products ptp
+              JOIN products pr ON pr.id = ptp.product_id
+              WHERE ptp.post_id = ${posts.id}
+                AND (pr.name ILIKE ${pattern} OR similarity(pr.name, ${term}) > ${SIMILARITY_THRESHOLD})
+            )`,
+          ),
+        ))
+        .orderBy(desc(relevanceScore(sql`COALESCE(${posts.caption}, '')`, term)), desc(posts.createdAt))
+        .limit(20),
     ]);
 
     // Fetch seller display names for product results
@@ -619,6 +647,36 @@ router.get("/search", async (req, res): Promise<void> => {
         .where(inArray(users.clerkId, sellerIds));
       sellerRows.forEach((s) => sellerMap.set(s.clerkId, s.brandName ?? s.displayName ?? "Brand"));
     }
+
+    // Author + like-count lookups for matched videos.
+    const videoAuthorIds = [...new Set(videoPosts.map((v) => v.authorId))];
+    const videoAuthorMap = new Map<string, { name: string; handle: string; avatarUrl: string | null }>();
+    if (videoAuthorIds.length > 0) {
+      const authorRows = await db
+        .select({
+          clerkId: users.clerkId, displayName: users.displayName, brandName: users.brandName,
+          username: users.username, name: users.name,
+          profileImageUrl: users.profileImageUrl, avatarUrl: users.avatarUrl,
+        })
+        .from(users)
+        .where(inArray(users.clerkId, videoAuthorIds));
+      authorRows.forEach((a) => {
+        const name = a.brandName ?? a.displayName ?? a.name ?? "Member";
+        videoAuthorMap.set(a.clerkId, {
+          name,
+          handle: a.username ? `@${a.username}` : `@${name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20)}`,
+          avatarUrl: a.profileImageUrl ?? a.avatarUrl ?? null,
+        });
+      });
+    }
+    const videoPostIds = videoPosts.map((v) => v.id);
+    const videoLikeCounts = videoPostIds.length > 0
+      ? await db.select({ postId: interactions.postId, cnt: count() })
+          .from(interactions)
+          .where(and(inArray(interactions.postId, videoPostIds), eq(interactions.type, "like")))
+          .groupBy(interactions.postId)
+      : [];
+    const videoLikesByPost = new Map(videoLikeCounts.map((r) => [r.postId, Number(r.cnt)]));
 
     // Colour helpers (deterministic, no DB column)
     const PALETTE = ["#8B5CF6", "#0891B2", "#0F766E", "#B45309", "#1D4ED8", "#BE185D", "#065F46"];
@@ -682,6 +740,31 @@ router.get("/search", async (req, res): Promise<void> => {
         color:     hashColor(p.ownerId),
         initials:  mkInitials(brandName),
         productId: p.id,
+      });
+    }
+
+    // Videos, best relevance first — a separate slice from products/brands so
+    // the client can render a dedicated "Videos" tab (kind: 'video').
+    const sortedVideos = [...videoPosts].sort((a, b) => Number(b.relevance) - Number(a.relevance) || b.createdAt.getTime() - a.createdAt.getTime());
+    for (const v of sortedVideos) {
+      if (seen.has(v.id)) continue;
+      seen.add(v.id);
+      const author = videoAuthorMap.get(v.authorId) ?? { name: "Member", handle: "@member", avatarUrl: null };
+      results.push({
+        id:            v.id,
+        kind:          "video",
+        postId:        v.id,
+        caption:       v.caption,
+        thumbnailUrl:  v.thumbnailUrl ?? null,
+        videoUrl:      v.mediaUrl,
+        authorId:      v.authorId,
+        authorName:    author.name,
+        authorHandle:  author.handle,
+        authorAvatarUrl: author.avatarUrl,
+        color:         hashColor(v.authorId),
+        initials:      mkInitials(author.name),
+        likesCount:    videoLikesByPost.get(v.id) ?? 0,
+        createdAt:     v.createdAt,
       });
     }
 
@@ -895,6 +978,62 @@ router.get("/search/suggested", async (req, res) => {
   }
 });
 
+// ─── GET /api/public/search/categories — "Search by category" tiles (empty state) ─
+// One representative image per active product category — the most recently
+// listed active product in that category, falling back to a hashed color
+// swatch when no product in the category has an image yet.
+router.get("/search/categories", async (req, res) => {
+  try {
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 8);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({ error: "limit must be at least 1" }); return;
+    }
+    const lim = Math.min(parsedLimit, 20);
+    const viewerId = optionalViewerId(req);
+
+    const topCategories = await db
+      .select({ category: products.category, count: count() })
+      .from(products)
+      .where(and(eq(products.status, "active"), isNull(products.deletedAt)))
+      .groupBy(products.category)
+      .orderBy(desc(count()))
+      .limit(lim);
+
+    const PALETTE = ["#8B5CF6", "#0891B2", "#0F766E", "#B45309", "#1D4ED8", "#BE185D", "#065F46"];
+    const hashColor = (str: string) => {
+      let h = 0;
+      for (const c of str) h = (h * 31 + c.charCodeAt(0)) & 0xffffff;
+      return PALETTE[Math.abs(h) % PALETTE.length];
+    };
+
+    const categories = await Promise.all(topCategories.map(async (c) => {
+      const [product] = await db
+        .select({ id: products.id, images: products.images, ownerId: products.ownerId })
+        .from(products)
+        .where(and(
+          eq(products.category, c.category),
+          eq(products.status, "active"),
+          isNull(products.deletedAt),
+          notBlockedWith(viewerId, products.ownerId),
+          sql`jsonb_array_length(to_jsonb(${products.images})) > 0`,
+        ))
+        .orderBy(desc(products.createdAt))
+        .limit(1);
+      return {
+        category: c.category,
+        productCount: Number(c.count ?? 0),
+        imageUri: Array.isArray(product?.images) ? (product.images.find((i): i is string => typeof i === "string") ?? null) : null,
+        color: hashColor(c.category),
+      };
+    }));
+
+    res.json({ categories });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch search categories");
+    res.status(500).json({ error: "Failed to fetch search categories" });
+  }
+});
+
 // ─── GET /api/public/brands/discover — newest active sellers to follow ────────
 // Unauthenticated, lightweight "browse brands" list used by buyer onboarding's
 // Brands-to-follow step (there is no full search term at that point, so the
@@ -1034,6 +1173,23 @@ router.get("/sellers/:sellerId", async (req, res) => {
       .where(and(eq(posts.userId, canonicalClerkId), publicPostCondition())),
   ]);
 
+  // Attach variants to each product — mirrors the /products list enrichment so
+  // callers (e.g. the buyer Discover "From brands you follow" rail) can read a
+  // real current price instead of guessing from a bare product row.
+  const sellerProductIds = sellerProducts.map((p) => p.id);
+  const sellerVariants = sellerProductIds.length > 0
+    ? await db.select().from(productVariants).where(inArray(productVariants.productId, sellerProductIds))
+    : [];
+  const sellerVariantsByProduct: Record<string, typeof sellerVariants> = {};
+  for (const v of sellerVariants) {
+    if (!sellerVariantsByProduct[v.productId]) sellerVariantsByProduct[v.productId] = [];
+    sellerVariantsByProduct[v.productId].push(v);
+  }
+  const sellerProductsWithVariants = sellerProducts.map((p) => ({
+    ...p,
+    variants: sellerVariantsByProduct[p.id] ?? [],
+  }));
+
   // Attach tagged products per post
   const postIds = sellerPosts.map((p) => p.id);
   const tagsByPost = new Map<string, any[]>();
@@ -1081,7 +1237,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       productsCount: Number(activeProductsCount),
       videosCount: Number(publicPostsCount),
     },
-    products: sellerProducts,
+    products: sellerProductsWithVariants,
     posts: sellerPosts.map((p) => ({
       ...p,
       taggedProducts: tagsByPost.get(p.id) ?? [],
