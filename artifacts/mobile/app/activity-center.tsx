@@ -414,7 +414,11 @@ function SuggestedForYouSection({ people, followStates, styles, onFollow, onDism
   if (people.length === 0) return null;
   return (
     <View style={styles.suggestedSection}>
-      <Text style={styles.sectionTitle} accessibilityRole="header">Suggested for you</Text>
+      {/* This section's own row (below) sets its own paddingHorizontal, so
+          the title needs its own gutter here rather than reusing the shared
+          `sectionHeader` wrapper — without it the title sat flush against
+          the screen edges (no left/right gutter) and could clip. */}
+      <Text style={[styles.sectionTitle, styles.suggestedTitle]} accessibilityRole="header" numberOfLines={1} ellipsizeMode="tail">Suggested for you</Text>
       {people.map((person) => (
         <SuggestedRow
           key={person.userId}
@@ -715,7 +719,7 @@ export default function ActivityCenterScreen() {
 
   const renderSectionHeader = useCallback(({ section }: { section: ListSection }) => (
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle} accessibilityRole="header">{section.title}</Text>
+      <Text style={styles.sectionTitle} accessibilityRole="header" numberOfLines={1} ellipsizeMode="tail">{section.title}</Text>
     </View>
   ), [styles]);
 
@@ -1003,6 +1007,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   suggestedSection: {
     marginTop: SP.md,
     paddingTop: SP.sm,
+  },
+  suggestedTitle: {
+    paddingHorizontal: SP.md,
+    marginBottom: SP.xs,
   },
   suggestedRow: {
     flexDirection: 'row',

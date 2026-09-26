@@ -9,7 +9,7 @@
  * the stat-row-above-chart hierarchy and the muted axis labels.
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GRID_MAX_WIDTH, FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -87,7 +87,7 @@ export default function AnalyticsScreen() {
   const api = useApi();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = insets.top;
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const scrollResetRef = useScrollReset<ScrollView>();
 

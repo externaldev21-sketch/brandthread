@@ -318,7 +318,7 @@ export default function EditProfileScreen() {
     showToast('Link copied');
   }
 
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
+  const topPad = insets.top;
   const username = fields.username.replace(/^@/, '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
 
   return (

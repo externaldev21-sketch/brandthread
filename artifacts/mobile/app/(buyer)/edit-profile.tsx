@@ -282,7 +282,7 @@ export default function BuyerEditProfileScreen() {
     router.back();
   }
 
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
+  const topPad = insets.top;
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof CoreFields, string>> = {};

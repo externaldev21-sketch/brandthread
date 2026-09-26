@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,7 +48,7 @@ export default function AnalyticsCustomersScreen() {
   const router = useRouter();
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = insets.top;
 
   const [data,       setData]       = useState<CustomerAnalytics | null>(null);
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
