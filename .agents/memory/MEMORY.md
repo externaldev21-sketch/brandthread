@@ -74,6 +74,7 @@
 - [External object deletion](external-object-deletion.md) — commit ownership deletion and durable cleanup intent together; delete storage later only after rechecking live references.
 - [Seller cash-out safety](seller-cashout-safety.md) — cash-outs bind exact confirmed funds, account, bank, and durable provider reference; ambiguous old attempts fail closed.
 - [Create Post interaction](create-post-interaction.md) — use a TikTok-like media-first flow with a full-screen editor and compact final details, adapted to Brandthread.
+- [Profile video square](profile-video-square.md) — the square beside the buyer edit-profile photo edits the existing silent, looping cover video, not a second video identity.
 - [Persistent seller navigation](persistent-seller-navigation.md) — the seller tab bar is app-shell navigation and remains visible on every signed-in seller route.
 - [Reference-app adaptation](reference-app-adaptation.md) — audit reference archives for useful micro-interactions as well as major flows; adapt them without replacing Brandthread’s layout.
 - [Canonical buyer checkout](canonical-buyer-checkout.md) — every buyer purchase source uses one Brandthread checkout, confirmation, purchase-detail, and rating journey.
