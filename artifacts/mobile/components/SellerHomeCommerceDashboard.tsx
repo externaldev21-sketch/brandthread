@@ -53,6 +53,14 @@ import {
   type RecentOrderSummary,
   type TopProductSummary,
 } from '@/lib/sellerDashboardStats';
+// Reused (not reimplemented) so the "orders to ship" tile can never drift
+// from what the Orders screen itself counts as unfulfilled — see item 31 /
+// docs/qa/full-crawl-report.md #7: this tile used to read a separately
+// server-computed `toFulfill` figure (status IN pending/processing AND
+// paid), while Orders' own "Unfulfilled" filter/count uses a different rule
+// (order status only, via `FULFILLMENT_MAP`), so the two disagreed.
+import { apiRowToOrder } from '@/app/(tabs)/orders';
+import { filterOrders } from '@/services/orderService';
 import { DASHBOARD_RANGES, SellerDashboardChart, type SellerDashboardRange } from '@/components/SellerDashboardChart';
 import { SellerDashboardStatGrid, type SellerDashboardStatTileData } from '@/components/SellerDashboardStatGrid';
 import { SellerDashboardActionNeeded } from '@/components/SellerDashboardActionNeeded';
@@ -173,7 +181,7 @@ export default function SellerHomeCommerceDashboard({
   const [topProducts, setTopProducts] = useState<TopProductSummary[] | null>(null);
   const [recentOrders, setRecentOrders] = useState<RecentOrderSummary[] | null>(null);
   const [everSoldCount, setEverSoldCount] = useState<number | null>(null);
-  const [actionInputs, setActionInputs] = useState<{ unreadMessages: number; lowStockCount: number; returns: number } | null>(null);
+  const [actionInputs, setActionInputs] = useState<{ unreadMessages: number; lowStockCount: number; returns: number; toShip: number } | null>(null);
   const [secondaryError, setSecondaryError] = useState(false);
 
   useEffect(() => subscribeStoreContext(() => {
@@ -257,7 +265,7 @@ export default function SellerHomeCommerceDashboard({
       setTopProducts([]);
       setRecentOrders([]);
       setEverSoldCount(0);
-      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0 });
+      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: 0 });
       return;
     }
     setSecondaryError(false);
@@ -285,10 +293,14 @@ export default function SellerHomeCommerceDashboard({
 
       setEverSoldCount(orders.length);
       setRecentOrders(orders.slice(0, 5).map(normalizeRecentOrder));
+      // Same normalizer + same filter Orders' "Unfulfilled" chip uses, over
+      // this same fetched list — the tile and the screen can't disagree.
+      const toShip = filterOrders(orders.map(apiRowToOrder), 'unfulfilled').length;
       setActionInputs({
         unreadMessages: hub.unreadMessages,
         lowStockCount: inv.lowStockCount,
         returns: countOrderReturns(orders),
+        toShip,
       });
 
       const top = Array.isArray(productAnalytics)
@@ -488,8 +500,8 @@ export default function SellerHomeCommerceDashboard({
 
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
   const newSeller = everSoldCount !== null && isNewSeller(everSoldCount);
-  const actionCounts: DashboardActionCounts | null = actionInputs && data ? {
-    toShip: data.toFulfill,
+  const actionCounts: DashboardActionCounts | null = actionInputs ? {
+    toShip: actionInputs.toShip,
     toAnswer: actionInputs.unreadMessages,
     lowStock: actionInputs.lowStockCount,
     returns: actionInputs.returns,
