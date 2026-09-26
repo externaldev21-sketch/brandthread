@@ -10,10 +10,10 @@ this pass.
 | Severity | Count |
 |---|---|
 | Critical | 0 |
-| High | 5 |
-| Medium | 4 |
-| Low | 4 |
-| **Total** | **13** |
+| High | 8 |
+| Medium | 5 |
+| Low | 7 |
+| **Total** | **20** |
 
 | Section | Issues found |
 |---|---|
@@ -21,14 +21,31 @@ this pass.
 | Seller | 5 |
 | Guest / Web | 1 (+ 1 harness limitation, not counted as a product bug) |
 | Static dead-link analysis | 1 |
+| Full-route crawl, this pass (buyer + seller, shared/systemic) | 7 |
 
-Coverage actually achieved in this pass: **9 buyer routes** and **10 seller
-routes** were crawled breadth-first (via real clicks, not just static links)
-at 390×844, plus a lighter 2-tab-root spot-check at 375×667 and 1440×900 for
-both roles. The guest/signed-out role could not be crawled beyond the boot
-screen — see "Harness → Known limitations" for why. The app has on the order
-of 260 route files in total, so this is a first, partial pass, not exhaustive
-coverage. See "Harness" for how to extend it.
+Coverage achieved in this pass (a full re-run superseding the original
+9-buyer/10-seller partial sample above): **261/261 buyer-eligible routes**
+and **252/252 seller-eligible routes** were crawled breadth-first via real
+clicks — that is, every route in the app's route table (276 total route
+files) that is reachable for each role, at full click-depth (390×844), plus
+a second full pass at each of two more viewports (375×667 and 1440×900) in
+`QA_LITE` mode (navigation + screenshot + the same automated checks, minus
+per-element click/toggle/form testing, to keep wall-clock time reasonable).
+So: **3 viewports × 2 roles, full route coverage at each**, 1,539 total
+page-visits recorded. `QA_CLICK_BUDGET` was reduced from 25 to **6** for this
+run specifically to make a ~276-route-per-role crawl finish in bounded
+wall-clock time (each page still takes ~30–40s once navigation, the 8.5s
+still-spinning re-check, and per-page DOM heuristics are included) — this is
+an explicit, documented time-boxing tradeoff: a lower click budget means
+fewer of each page's interactive elements get click-tested for "dead click"
+candidates, so some per-page candidates may be under-counted versus a full
+budget-25 run, though the navigation/console/network/loading/text/header
+checks below ran on every single route regardless of click budget. The
+guest/signed-out role was **not** included in this run's scope and remains
+blocked beyond the boot screen exactly as characterized in pass 2 (see
+"Guest / Web" below and "Known limitations" — the Clerk-network-mock
+investigation from that pass was not repeated, per this pass's explicit
+scope).
 
 ---
 
@@ -260,6 +277,200 @@ unchanged) — the dev merge did not introduce or fix any static dead links.
 
 ---
 
+## Full-route crawl findings (this pass — buyer + seller, all ~276 routes, 3 viewports)
+
+This pass ran the harness's BFS crawler to full route coverage (see
+"Coverage achieved" above) instead of pass 2's partial 9/10-route sample.
+The findings below are new since pass 2, deduped and grouped by root cause
+where the same pattern recurred across many screens, per screen where the
+nature/severity genuinely differed.
+
+14. **Every single page load in this pass (1,539/1,539 page-visits, both
+    roles, all 3 viewports) throws a client/server hydration-mismatch error**
+    ("Hydration failed because the server rendered HTML didn't match the
+    client... this tree will be regenerated on the client"), with
+    `throwOnHydrationMismatch` appearing in the JS call stack.
+    What happened: this is 100% reproducible — it fires on the very first
+    page of every crawl run (including the buyer home feed, `/(buyer)`) and
+    on every route after it, with no exception found.
+    Expected: a well-behaved SSR/CSR app should not hit a hydration mismatch
+    on literally every route; even though React's own message says the tree
+    "will be regenerated on the client" (i.e. this is designed to be
+    recoverable, not fatal), triggering it universally points to a
+    structural cause (e.g. a top-level provider or layout component reading
+    `window`/`Date.now()`/locale-dependent formatting before hydration)
+    rather than a per-screen bug.
+    Severity: **Medium** — flagged as a candidate needing a maintainer's
+    confirmation of real-user impact, because (a) it's not certain whether
+    the specific "throw" behavior seen here (rather than a silent
+    dev-console warning) is a dev-build-only artifact or would also occur in
+    a production build, and (b) React's hydration-mismatch recovery is
+    designed to self-heal the visible tree. See the harness note directly
+    below for why this could not be visually confirmed either way this pass.
+    Screenshot: `docs/qa/screenshots/buyer-iphone-390x844-1-_buyer_.png`
+    (see caveat: this screenshot, like literally every other screenshot
+    taken this pass, shows Expo's accumulating dev error overlay rather than
+    the underlying page — see "Known limitations").
+
+15. **~80 distinct routes per role (out of 261 buyer / 252 seller) get stuck
+    on an unresolved loading indicator that never clears, even after an
+    extra 8.5s wait** — this is the same pattern as pass-2 findings #2
+    (buyer followers list) and #8 (seller Activity Center), now confirmed at
+    much larger scale by the full-route crawl: **82 unique buyer routes**
+    and **79 unique seller routes** (79 of which are the identical route
+    names for both roles) never clear an `aria-busy="true"`/
+    `role="progressbar"` element from the DOM. Affected screens are
+    overwhelmingly secondary "management tool" surfaces rather than core
+    shopping/selling flows: analytics (`/analytics-sales`,
+    `/analytics-inventory`, `/analytics-marketing`, and 7 more
+    `/analytics-*` screens), store/growth settings (`/billing`,
+    `/subscription`, `/discounts`, `/loyalty`, `/meta-ads-connect`,
+    `/meta-ads-manage`, `/meta-ads-setup`, `/shopify-import`,
+    `/store-builder`, `/store-from-logo`, `/store-from-moodboard`,
+    `/store-policies`, `/store-preview`, `/store-publish`), inventory/orders
+    admin (`/inventory`, `/inventory-count`, `/inventory-detail`,
+    `/inventory-incoming`, `/order-detail`, `/fulfill-order`,
+    `/return-request`, `/product-bundles`, `/customer-orders`, `/customers`,
+    `/payouts`), account/security settings (`/general-settings`,
+    `/languages`, `/locations`, `/login-activity`, `/login-methods`,
+    `/notifications-settings`, `/delete-account`, `/vacation-mode`,
+    `/muted-words`, `/team`, `/users`, `/metafields`), manufacturer/freelancer
+    tools (`/manufacturer-compare`, `/manufacturer-messages`,
+    `/manufacturer-profile`, `/invite-manufacturer`, `/rfq-post`,
+    `/freelancer-apply`, `/freelancer-jobs`, `/freelancer-profile`), and a
+    handful of other screens (`/community`, `/thread-cash`,
+    `/admin-reports`, `/share-profile`, `/share-store`, `/shipping`,
+    `/shipping-delivery`, `/setup`, `/integrations` (+2 sub-pages),
+    `/buyer-*` variants). Buyer-only additions: `/edit-profile`, `/boost`,
+    `/design-campaign`.
+    Expected: same as pass-2 #2/#8 — either the seeded data/endpoint should
+    resolve within a couple of seconds, or the screen should show an empty
+    state / error message instead of spinning forever.
+    Likely cause (not confirmed, and plausibly more than one cause across
+    this many screens): some of these (the manufacturer-\* routes) are
+    plausibly hitting the 6 `getAuth(req)`-direct route handlers already
+    documented as **not** covered by the QA auth bypass (pass-2 "Known
+    limitations"); most of the rest look like settings/analytics/growth-tool
+    screens whose backing endpoints may not exist yet or aren't wired to
+    resolve their loading state on error — this needs a maintainer to
+    triage per-endpoint, ideally starting with `/billing`, `/team`, and the
+    `/analytics-*` family since those are core seller-facing surfaces.
+    Severity: **High** — supersedes and generalizes pass-2 #2 and #8; a
+    screen that spins forever with no error/empty state is a real,
+    user-visible defect regardless of root cause, and at this scale (roughly
+    a third of the app's total route surface) it's a systemic gap, not
+    scattered one-offs.
+    Screenshot: `docs/qa/screenshots/buyer-iphone-390x844-51-_billing.png`
+    (see the same overlay caveat as #14 — the DOM-level
+    `aria-busy`/`role="progressbar"` check that flags this finding is
+    independent of the screenshot and is unaffected by that issue, but the
+    screenshot itself cannot be used to visually confirm what's rendered
+    underneath).
+
+16. **`/design-garment` crashes with an unhandled `TypeError` and is caught by
+    the app's own error boundary.**
+    Screens: `/design-garment` (both roles, all 3 viewports — 6 page-visits,
+    all identical failure) and `/c/d76d149c-3b3b-4f44-9779-f8e25ca13264` (see
+    #17 below — a different root cause with the same "looks like an error
+    boundary" symptom).
+    What happened: console/page errors show `TypeError: Cannot read
+    properties of undefined (reading 'views')` thrown from
+    `DesignGarmentScreen`, then caught and re-rendered as `"[Brandthread
+    error boundary] Cannot read properties of undefined (reading 'views')"`.
+    Expected: the design-garment flow should not crash outright; something
+    in its initial state/props (a `views` field, likely on a
+    garment/design/product object) is assumed present but is `undefined` for
+    the seeded QA data.
+    Severity: **High** — a real, unhandled crash on a named feature screen,
+    not a heuristic candidate.
+    Screenshot: `docs/qa/screenshots/buyer-iphone-390x844-118-_design_garment.png`
+    (subject to the same overlay caveat as #14/#15 for the visual, but the
+    error-boundary text and the thrown `TypeError` were read directly from
+    the page's own console/error output, independent of the screenshot).
+
+17. **Public collection and public profile routes are blocked by CORS,
+    breaking the public/shareable-link experience for both roles.**
+    Screens: `/c/d76d149c-3b3b-4f44-9779-f8e25ca13264` (public collection
+    share link) and `/u/qa-seed-seller-1` (public profile share link) — both
+    roles, all 3 viewports (12 page-visits total, all failing the same way).
+    What happened: the browser blocks the app's own fetch to
+    `GET http://localhost:5050/api/public/collections/<id>` and
+    `GET http://localhost:5050/api/v1/public/profiles/<username>` with
+    *"has been blocked by CORS policy: No 'Access-Control-Allow-Origin'
+    header is present on the requested resource"* — these two public-facing
+    endpoints don't send a CORS header allowing the web app's own origin, so
+    the request fails before the app ever sees a response, and the screen
+    renders as broken/empty (flagged by the harness's error-boundary-looking
+    heuristic).
+    Expected: a route whose entire purpose is to be a public, shareable link
+    (no auth required) should not depend on the web client and API being
+    same-origin — it needs a proper CORS policy (or must be served
+    same-origin via a reverse proxy in every real deployment topology).
+    Severity: **High** — this specifically breaks the "share a collection" /
+    "share a profile" feature, which by definition is meant to be opened by
+    third parties (not necessarily on the same origin as the api-server).
+    Screenshot: `docs/qa/screenshots/buyer-iphone-390x844-95-_c_d76d149c_3b3b_4f44_9779_f8e25ca13264.png`
+    (same overlay caveat as above for the pixels; the CORS error itself was
+    read directly from the browser's own console message).
+
+18. **`/buyer-checkout` has no back-navigation target ("dead end" candidate)
+    for either role.**
+    What happened: a dev-only React Navigation warning fires on this screen:
+    *"The action 'GO_BACK' was not handled by any navigator. Is there any
+    screen to go back to?"*
+    Expected/caveat: this is a development-only warning (won't appear in a
+    production build per its own text), and it's plausible the checkout flow
+    intentionally has no back target by design (e.g. it's meant to be
+    entered only via a specific in-flow button, not deep-linked). Flagging
+    as a **candidate** dead-end for manual confirmation of whether real users
+    can reach this screen in a state where pressing back does something
+    unexpected (stuck, or falls through to an unrelated screen).
+    Severity: **Low (candidate)**.
+
+19. **Invalid DOM nesting warnings on 3 screens: a `<button>` nested inside
+    another `<button>`, and a bare text node as a direct child of a `View`.**
+    Screens: `/inventory-transfer` (buyer and seller) and the seller
+    Dashboard `/(tabs)` home screen.
+    What happened: React logs *"In HTML, %s cannot be a descendant of
+    <%s>... <button> button"* and *"Unexpected text node: . A text node
+    cannot be a child of a `<View>`."*
+    Expected: neither is valid markup; nested interactive controls are also
+    an accessibility concern (nested buttons have undefined/inconsistent
+    click-target behavior across browsers).
+    Severity: **Low** — dev-only console warnings, no crash or visible
+    breakage observed, but worth a markup cleanup.
+
+20. **Broader-crawl heuristic candidates at full route coverage: 46
+    route/role combinations with a "dead click" candidate, 63 pages with
+    truncated-text candidates, and 168 pages with offscreen-element
+    candidates.**
+    These are the same three heuristics already caveated in pass 2 (a click
+    that produces no URL/body-text change; `scrollWidth`/`clientWidth`
+    truncation; bounding-box-outside-viewport), now run across the full
+    route set instead of a 9/10-route sample, so the counts are much larger
+    but the **false-positive risk is exactly the same as already documented**
+    — a sheet/menu that opens without changing `document.body.innerText`, or
+    a virtualized/off-canvas list item, will trip these heuristics without
+    being a real bug. Not itemized screen-by-screen here given the volume;
+    the full per-route detail is in `docs/qa/crawl-results-merged.json`
+    (`candidateDeadClicks`, `truncatedTextSamples`, `offscreenElements`
+    fields) for anyone doing a follow-up manual pass.
+    Severity: **Low (candidate)** — consistent with pass-2's #3, #6, #9,
+    #10, #11 candidates, just at greater volume.
+
+**Not new problems, reconfirmed clean at full coverage:** zero real
+api-server (`:5050`) 4xx/5xx responses across all 1,539 page-visits (all
+`networkErrors` are the same already-documented dev-server-sidecar/sandbox
+noise — `symbolicate`, `error-overlay-meta`, WebSocket HMR, and blocked
+external image hosts); zero unclosable sheets; zero harness-reported
+back-navigation dead ends (the `backNav.isDeadEnd` check, distinct from
+finding #18's console warning); zero tab-bar/scroll overlaps; and of the 116
+pages with a testable form, **zero** submitted an invalid entry with no
+visible validation message — every form that was reached showed a validation
+message on invalid submit.
+
+---
+
 ## Harness
 
 ### How to rerun it
@@ -362,28 +573,99 @@ narrowly scoped to be inert everywhere except this exact use case**:
 
 ### Known limitations / gaps (honest accounting)
 
-- **Guest role**: could not be crawled beyond the boot screen (see above).
-  Zero guest screens were exercised. This is the single biggest coverage
-  gap.
-- **Coverage breadth**: 9 buyer + 10 seller routes were crawled this pass,
-  out of ~260 route files in `artifacts/mobile/app/`. `CLICK_BUDGET_PER_PAGE`
-  (default 8, used 5–6 here) caps how many of a page's interactive elements
-  get click-tested, and `--max-pages` caps total pages per role, both purely
-  for wall-clock time in this sandbox. Raise both for a deeper run.
-- **Viewports**: only 390×844 got the full click-based BFS. 375×667 and
-  1440×900 only got a 2-tab-root screenshot spot-check per role
-  (`viewport-*` screenshots) — extending the full BFS to all 3 viewports is
-  the natural next step and the crawler already accepts `--viewport`.
-- **Forms**: not filled with valid/invalid data in this pass — the crawler
-  discovers and screenshots forms (e.g. the Add Product wizard) but doesn't
-  submit them. This is the most significant functional gap versus the
-  original ask; `page.fill()`-based form-filling would need per-form field
-  heuristics (label text → input) to be generic enough to reuse everywhere.
-- **Toggles/switches, pull-to-refresh, native deep links
-  (`brandthread://...`)**: not exercised. The custom URL scheme is
-  `brandthread` (see `app.json`); a follow-up pass should grep
-  `Linking.openURL`/scheme usage and drive them the same way the crawler
-  drives web routes.
+- **Guest role**: could not be crawled beyond the boot screen (see above),
+  **confirmed still true as of this pass** — this pass's scope was buyer and
+  seller only (per the explicit run plan), and the guest-blocking issue and
+  the Clerk-network-mock investigation documented above are unchanged from
+  pass 2; they were not re-attempted here. This remains the single biggest
+  coverage gap.
+- **Coverage breadth — resolved in this pass**: this pass crawled **all**
+  role-eligible routes (261/261 buyer, 252/252 seller, out of 276 total
+  route files) via the full click-based BFS at 390×844, not the 9/10-route
+  partial sample from pass 1. `QA_CLICK_BUDGET` (formerly
+  `CLICK_BUDGET_PER_PAGE`) was deliberately lowered from 25 to **6** to keep
+  a ~276-route-per-role run inside a few hours of wall-clock time — this is
+  a real, documented tradeoff: fewer of each page's interactive elements get
+  click-tested per page, so per-page "candidate dead click" counts (finding
+  #20 above) are a lower bound, not a ceiling, versus a higher-budget run.
+  The non-click checks (navigation, console/network capture, still-spinning,
+  text/header/layout heuristics, forms) are unaffected by the click budget
+  and ran on every route.
+- **Viewports — resolved in this pass**: all 3 viewports (390×844, 375×667,
+  1440×900) now got full route coverage, not just a 2-tab-root spot-check.
+  375×667 and 1440×900 ran in `QA_LITE` mode (navigation + screenshot + the
+  same automated checks, but skipping per-element click/toggle/form testing)
+  specifically to keep the added viewport passes fast; 390×844 alone got the
+  full click-based BFS with toggle/form testing.
+- **Forms — resolved in this pass**: the crawler now fills and submits a
+  valid-data pass and an invalid-data pass per discovered form (116 forms
+  reached this pass); all 116 showed a visible validation message on the
+  invalid submit (see "Full-route crawl findings" above) — no forms-with-
+  no-validation finding this pass.
+- **Toggles/switches**: now exercised (33 pages had a toggle to test), but a
+  meaningful fraction of those clicks **timed out** rather than succeeding
+  or failing cleanly — this is very plausibly the same root cause as the
+  screenshot-overlay issue immediately below (the accumulating dev error
+  overlay sits on top of the page and can intercept/block pointer-event
+  delivery to the real toggle control underneath it), not a distinct product
+  bug; flagged here rather than as a numbered finding since it couldn't be
+  disambiguated from that harness issue in the time available.
+- **Pull-to-refresh and native deep links (`brandthread://...`)**: still not
+  exercised. The custom URL scheme is `brandthread` (see `app.json`); a
+  follow-up pass should grep `Linking.openURL`/scheme usage and drive them
+  the same way the crawler drives web routes.
+- **New this pass — every screenshot is obscured by an accumulating,
+  never-dismissed dev error overlay.** As documented in finding #14, this
+  pass's build/serve triggers a hydration-mismatch error on literally every
+  page load, and Expo's dev "LogBox"/error-overlay UI (the same one visible
+  in a local `expo start` session) renders on top of the real page and is
+  never dismissed by the crawler — worse, it visibly **accumulates** across
+  a crawl session (e.g. "1/1" on the first page of a run, "3/3" by the third
+  page), meaning **every single screenshot taken by this pass, across all 6
+  result files, shows this overlay instead of the underlying screen**. This
+  was not the case in pass 2 (whose screenshots do show real app content, as
+  referenced by its findings). Practical effect: screenshots collected this
+  pass are **not usable evidence of what a given route actually renders** —
+  every finding above that cites a screenshot from this pass is relying on
+  DOM-level checks (console/page error text, `aria-busy`/`role="progressbar"`
+  element counts, `document.body.innerText`) rather than the screenshot
+  pixels for its evidence, precisely because of this. It's unconfirmed
+  whether this is specific to how this pass's static build/serve step was
+  invoked (e.g. a dev-mode build instead of a production export) versus pass
+  2's — that's the first thing to check in a follow-up pass, since a
+  production Expo web export should not ship this overlay at all.
+- **"Slow screens (>1s)" threshold is not meaningful in this environment.**
+  Every single one of the 1,539 page-visits this pass exceeded the
+  harness's 1-second `slow` threshold (typical load time ~1.35–1.5s
+  regardless of route), so "slow" cannot currently distinguish a genuinely
+  slow screen from this environment's fixed per-navigation overhead
+  (hydration + the dev overlay above + the local static-file server, none of
+  which reflect a production CDN-served deployment). No per-page "slow
+  screen" findings are reported above for this reason; the threshold would
+  need recalibrating (e.g. relative to a per-run median, not a fixed 1000ms)
+  to be useful here.
+- **Container restart mid-run, recovered cleanly.** This pass's container
+  restarted partway through (after the buyer-390×844 and seller-390×844
+  full-BFS stages had already completed and their result files were safely
+  on disk). The stack (Postgres, api-server, static file server) was
+  rebuilt, and only the remaining 4 `QA_LITE` viewport passes were re-run
+  against the existing result files (`QA_FRESH_RESULTS=1` per stage, so nothing
+  already-completed was silently merged with stale data) — no data loss, no
+  manual result-file surgery needed. This is a good real-world data point for
+  the crash/stall-recovery philosophy already built into `crawl.mjs`, even
+  though the restart was at the container level, not a browser/context crash
+  within a single crawl.
+- **Intermittent Chromium/CDP crashes.** Earlier in this pass's history, the
+  crawler process hit repeated Chromium/CDP-level crashes (browser or
+  context objects dying mid-crawl) — the harness fix validated at the start
+  of this pass (a per-page watchdog plus crash-recovery in `crawl.mjs`,
+  committed separately as "qa: harness fix -- handle browser/context crashes
+  without killing the whole crawl run") mitigates this: a crashed
+  browser/context is now detected and recreated rather than taking down the
+  whole run. Treat this as a known quirk of this specific sandboxed headless
+  Chromium environment (not seen as a product bug) that a sufficiently long
+  crawl should expect to hit at least once, and plan for via this mitigation
+  rather than assuming it won't recur.
 - **"Dead click" detection is a heuristic**, not a ground truth: it flags
   "no URL change and no `document.body.innerText` change," which will
   false-positive on anything that opens a native-style sheet/menu without
