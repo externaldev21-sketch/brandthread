@@ -58,14 +58,17 @@ params already in the codebase for exactly this purpose.
 ## Verification
 
 - `pnpm typecheck` — clean.
-- `pnpm test` (vitest) — 2844/2844 individual tests pass, including all 17 in
-  `onboarding.identity.test.ts` / `onboarding.ux.test.ts`. Four suite files
-  (`tests/onboarding-flow-e2e.test.tsx`, `tests/buyer-conversation-chat-redesign.test.tsx`,
+- `pnpm test` (vitest) — 2850/2850 individual tests pass, including all 17 in
+  `onboarding.identity.test.ts` / `onboarding.ux.test.ts` and all 6 in
+  `onboarding-flow-e2e.test.tsx`. That suite initially crashed on merge because
+  it renders the real, unmocked `onboarding.tsx` and didn't yet mock the new
+  `GoogleGlyph` import (a real `react-native-svg` module, unparseable under the
+  test's node environment) — fixed by adding the same minimal default-export
+  stub already used for `BrandthreadLogo`. Three unrelated suites
+  (`tests/buyer-conversation-chat-redesign.test.tsx`,
   `tests/buyer-search-redesign.test.tsx`, `tests/buyer-product-detail-payment.test.tsx`)
-  fail to *load* in this sandbox with `expo-modules-core`/`expo-blur` native-module
-  resolution errors and a pre-existing syntax error, unrelated to any file
-  touched here (none import `CookieConsentContext`, `GoogleGlyph`,
-  `sign-in.tsx`, `onboarding.tsx` or `account-type.tsx`) — reproducible on a
-  clean checkout before any of these edits.
+  still fail to *load* in this sandbox with a pre-existing `expo-modules-core`/
+  `expo-blur` native-module resolution error — reproducible on a clean
+  `origin/dev` checkout before any of these edits, unrelated to this cluster.
 - Manual pass across all 12 themes on `seller-settings.tsx` (already
   theme-driven; spot-checked monochrome, purple, olive, maroon).
