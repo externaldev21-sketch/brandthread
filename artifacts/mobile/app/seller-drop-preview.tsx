@@ -10,7 +10,7 @@
  * this against buyer-drop-detail.tsx's rendering.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +19,7 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ON_DARK, ON_DARK_MUTED, RADIUS, SP } from '@/lib/theme';
 import { computeCountdownParts } from '@/lib/dropCountdown';
+import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
 
 const { width: W } = Dimensions.get('window');
 const HERO_H = Math.max(420, Math.min(540, W * 1.2));
@@ -74,8 +75,14 @@ export default function SellerDropPreview() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
-        <ActivityIndicator color={theme.accent} size="large" />
+      <View style={{ flex: 1, backgroundColor: theme.background }}>
+        <LoadingSkeleton height={HERO_H} style={{ borderRadius: 0 }} />
+        <View style={{ padding: SP.md, gap: 10 }}>
+          <LoadingSkeleton height={16} style={{ width: 100 }} />
+          <View style={styles.grid}>
+            {[0, 1].map(i => <LoadingSkeleton key={i} height={(W - SP.md * 2 - 10) * 0.68 + 40} style={{ width: (W - SP.md * 2 - 10) / 2 }} />)}
+          </View>
+        </View>
       </View>
     );
   }
@@ -146,7 +153,12 @@ export default function SellerDropPreview() {
             ))}
           </View>
           {products.length === 0 && (
-            <Text style={{ color: theme.muted, fontSize: FS.sm }}>No products assigned to this drop yet.</Text>
+            <EmptyState
+              compact
+              icon="package"
+              title="No products yet"
+              description="Assign products to this drop from the edit screen so buyers have something to shop."
+            />
           )}
         </View>
       </ScrollView>

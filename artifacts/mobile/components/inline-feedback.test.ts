@@ -243,9 +243,12 @@ describe('buyer-post-comments — continuous video preview', () => {
     expect(comments).toContain("if (mediaUri && postType === 'video') mediaPlayer.play()");
     expect(comments).toContain('return () => mediaPlayer.pause()');
     expect(comments).toContain('testID="comments-video-preview"');
-    // Full-size, edge-to-edge — matching its normal position in the feed —
-    // not shrunk/letterboxed into a corner behind the comments sheet.
-    expect(comments).toMatch(/<VideoView[\s\S]*?contentFit="cover"[\s\S]*?testID="comments-video-preview"/);
+    // Full-size, edge-to-edge, completely untouched — not shrunk/scaled/
+    // cropped into a corner behind the comments sheet. `contain` (not
+    // `cover`) so this screen's own backdrop copy of the clip can never
+    // appear more zoomed/cropped than however the feed was already framing
+    // it — see tests/comments-sheet-overhaul.test.ts for the fuller writeup.
+    expect(comments).toMatch(/<VideoView[\s\S]*?contentFit="contain"[\s\S]*?testID="comments-video-preview"/);
   });
 });
 

@@ -1,44 +1,33 @@
 /**
  * Production Analytics — Brandthread Seller App
+ *
+ * Mobbin reference: eBay "Performance" KPI-tile strip + Shopify "Analytics"
+ * gauge/progress framing (https://mobbin.com/screens/14328f90-76c9-44b6-8675-f0c534c2fba7,
+ * https://mobbin.com/screens/6122bfe2-f660-4354-8c46-545ed12c96ba) informed the
+ * scrollable KPI tile row and the on-time completion gauge.
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, PURPLE_LIGHT, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, BLUE, GOLD,
-  FONT, FS,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductionAnalytics, getFilterState } from '@/services/analyticsService';
-import { ProductionAnalytics, ManufacturerAnalyticsRow, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { ProductionAnalytics, ManufacturerAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
-
-function KpiTile({ m, color }: { m: AnalyticsMetric; color: string }) {
-  const colors = useColors();
-  const s = React.useMemo(() => createStyles(colors), [colors]);
-  const up = m.trend === 'up';
-  return (
-    <View style={s.kpiTile}>
-      <Text style={[s.kpiValue, { color }]}>{m.formatted}</Text>
-      <Text style={s.kpiLabel} numberOfLines={2}>{m.label}</Text>
-      <Text style={[s.kpiChange, { color: m.trend === 'flat' ? MUTED : up ? SUCCESS : RED }]}>
-        {(m.changePct ?? 0) > 0 ? '+' : ''}{m.changePct?.toFixed(1) ?? '—'}%
-      </Text>
-    </View>
-  );
-}
+import {
+  AnalyticsHeader, AnalyticsSkeleton, HeaderPillButton, ProgressBar, SectionTitle, StatTileRow,
+} from '@/components/analytics/AnalyticsKit';
 
 function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const onTimeColor = mfr.delayRate <= 10 ? SUCCESS : mfr.delayRate <= 20 ? ORANGE : RED;
-  const qcColor     = mfr.qualityIssueRate <= 2 ? SUCCESS : mfr.qualityIssueRate <= 4 ? ORANGE : RED;
+  const onTimeColor = mfr.delayRate <= 10 ? colors.success : mfr.delayRate <= 20 ? colors.warning : colors.destructive;
+  const qcColor     = mfr.qualityIssueRate <= 2 ? colors.success : mfr.qualityIssueRate <= 4 ? colors.warning : colors.destructive;
   return (
     <TouchableOpacity
       onPress={() => { Haptics.selectionAsync(); router.push(`/manufacturer-profile?id=${mfr.manufacturerId}` as never); }}
@@ -72,18 +61,18 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
           <Text style={s.mfrStatLabel}>QC pass</Text>
         </View>
         <View style={s.mfrStat}>
-          <Text style={[s.mfrStatValue, { color: mfr.sampleApprovalRate >= 90 ? SUCCESS : ORANGE }]}>{mfr.sampleApprovalRate}%</Text>
+          <Text style={[s.mfrStatValue, { color: mfr.sampleApprovalRate >= 90 ? colors.success : colors.warning }]}>{mfr.sampleApprovalRate}%</Text>
           <Text style={s.mfrStatLabel}>Sample ok</Text>
         </View>
       </View>
       {mfr.delayRate > 10 && (
         <View style={s.mfrWarning}>
-          <Feather name="alert-triangle" size={12} color={ORANGE} />
+          <Feather name="alert-triangle" size={12} color={colors.warning} />
           <Text style={s.mfrWarningText}>Higher-than-target delay rate</Text>
         </View>
       )}
       <View style={s.mfrFooter}>
-        <Feather name="chevron-right" size={14} color={SUBTLE} />
+        <Feather name="chevron-right" size={14} color={colors.subtle} />
       </View>
     </TouchableOpacity>
   );
@@ -91,7 +80,6 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
 
 export default function AnalyticsProductionScreen() {
   const colors = useColors();
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -128,90 +116,73 @@ export default function AnalyticsProductionScreen() {
   }, [authLoaded, userId]); // load reads the current filter
 
   if (loading) {
-    return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
+    return <AnalyticsSkeleton topPad={topPad} kpiCount={3} listRows={3} />;
   }
   return (
     <ScrollView
       style={s.scroll}
       contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={PURPLE} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.pageTitle}>Production Analytics</Text>
-          <Text style={s.subtitle}>{filter?.dateRange.label ?? '30 days'}</Text>
-        </View>
-        <TouchableOpacity onPress={() => router.push('/manufacturer-hub' as never)} style={s.mfrBtn}>
-          <Text style={s.mfrBtnText}>Mfr. Hub</Text>
-        </TouchableOpacity>
-      </View>
+      <AnalyticsHeader
+        title="Production Analytics"
+        subtitle={filter?.dateRange.label ?? '30 days'}
+        right={<HeaderPillButton label="Mfr. Hub" onPress={() => router.push('/manufacturer-hub' as never)} />}
+      />
 
       {!data ? (
-        <EmptyState
-          icon="tool"
-          title="Production insights are on the way"
-          description="Production stats will show once you run a job."
-          style={{ marginTop: 24 }}
-        />
+        <EmptyState icon="tool" title="Production insights are on the way" description="Production stats will show once you run a job." style={{ marginTop: SP.lg }} />
       ) : (
-      <>
-      {/* KPI tiles */}
-      <Text style={s.sectionTitle}>Production Overview</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 10, flexDirection: 'row', paddingRight: 16 }}>
-        {[
-          { m: data.activeJobs,              color: PURPLE  },
-          { m: data.unitsInProduction,       color: BLUE    },
-          { m: data.productionValue,         color: GOLD    },
-          { m: data.avgLeadTimeDays,         color: MUTED   },
-          { m: data.avgSampleTimeDays,       color: MUTED   },
-          { m: data.onTimeCompletionRate,    color: SUCCESS },
-          { m: data.delayedJobs,            color: RED     },
-          { m: data.qcFailureRate,          color: ORANGE  },
-          { m: data.avgUnitCost,            color: FG      },
-        ].map(item => <KpiTile key={item.m.key} m={item.m} color={item.color} />)}
-      </ScrollView>
+        <>
+          {/* KPI tiles */}
+          <SectionTitle>Production Overview</SectionTitle>
+          <StatTileRow
+            scroll
+            items={[
+              { key: 'active', label: data.activeJobs.label, value: data.activeJobs.formatted },
+              { key: 'units', label: data.unitsInProduction.label, value: data.unitsInProduction.formatted },
+              { key: 'value', label: data.productionValue.label, value: data.productionValue.formatted },
+              { key: 'lead', label: data.avgLeadTimeDays.label, value: data.avgLeadTimeDays.formatted },
+              { key: 'sample', label: data.avgSampleTimeDays.label, value: data.avgSampleTimeDays.formatted },
+              { key: 'ontime', label: data.onTimeCompletionRate.label, value: data.onTimeCompletionRate.formatted },
+              { key: 'delayed', label: data.delayedJobs.label, value: data.delayedJobs.formatted },
+              { key: 'qc', label: data.qcFailureRate.label, value: data.qcFailureRate.formatted },
+              { key: 'unitcost', label: data.avgUnitCost.label, value: data.avgUnitCost.formatted },
+            ]}
+          />
 
-      {/* On-time gauge */}
-      <View style={s.gaugeCard}>
-        <View style={s.gaugeHeader}>
-          <Text style={s.gaugeTitle}>On-Time Completion</Text>
-          <Text style={[s.gaugeValue, { color: data.onTimeCompletionRate.value >= 80 ? SUCCESS : ORANGE }]}>
-            {data.onTimeCompletionRate.formatted}
-          </Text>
-        </View>
-        <View style={s.gaugeBar}>
-          <View style={[s.gaugeFill, {
-            width: `${data.onTimeCompletionRate.value}%`,
-            backgroundColor: data.onTimeCompletionRate.value >= 80 ? SUCCESS : ORANGE,
-          }]} />
-        </View>
-        {data.delayedJobs.value > 0 && (
-          <View style={s.gaugeWarning}>
-            <Feather name="alert-circle" size={12} color={RED} />
-            <Text style={s.gaugeWarningText}>{data.delayedJobs.value} job{data.delayedJobs.value !== 1 ? 's' : ''} delayed</Text>
+          {/* On-time gauge */}
+          <View style={s.gaugeCard}>
+            <View style={s.gaugeHeader}>
+              <Text style={s.gaugeTitle}>On-Time Completion</Text>
+              <Text style={[s.gaugeValue, { color: data.onTimeCompletionRate.value >= 80 ? colors.success : colors.warning }]}>
+                {data.onTimeCompletionRate.formatted}
+              </Text>
+            </View>
+            <ProgressBar
+              pct={data.onTimeCompletionRate.value}
+              color={data.onTimeCompletionRate.value >= 80 ? colors.success : colors.warning}
+              height={10}
+            />
+            {data.delayedJobs.value > 0 && (
+              <View style={s.gaugeWarning}>
+                <Feather name="alert-circle" size={12} color={colors.destructive} />
+                <Text style={s.gaugeWarningText}>{data.delayedJobs.value} job{data.delayedJobs.value !== 1 ? 's' : ''} delayed</Text>
+              </View>
+            )}
           </View>
-        )}
-      </View>
 
-      {/* Manufacturer performance */}
-      <Text style={s.sectionTitle}>Manufacturer Performance</Text>
-      <Text style={s.disclaimer}>Calculated only from your recorded production activity.</Text>
-      {data.manufacturers.length === 0 ? (
-        <EmptyState
-          icon="tool"
-          title="No production data"
-          description="Production performance will appear after working with manufacturers."
-        />
-      ) : (
-        <View style={{ gap: 12 }}>
-          {data.manufacturers.map(mfr => <ManufacturerCard key={mfr.manufacturerId} mfr={mfr} />)}
-        </View>
-      )}
-      </>
+          {/* Manufacturer performance */}
+          <SectionTitle note="Calculated only from your recorded production activity.">Manufacturer Performance</SectionTitle>
+          {data.manufacturers.length === 0 ? (
+            <EmptyState icon="tool" title="No production data" description="Production performance will appear after working with manufacturers." />
+          ) : (
+            <View style={{ gap: SP.sm }}>
+              {data.manufacturers.map(mfr => <ManufacturerCard key={mfr.manufacturerId} mfr={mfr} />)}
+            </View>
+          )}
+        </>
       )}
 
       <View style={{ height: 120 }} />
@@ -219,48 +190,27 @@ export default function AnalyticsProductionScreen() {
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
-  return StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
-  content:  { paddingHorizontal: 16 },
-  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  header:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
-  backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  pageTitle:{ fontSize: 22, fontFamily: FONT.bold, color: FG },
-  subtitle: { fontSize: 12, fontFamily: FONT.regular, color: MUTED },
-  mfrBtn:   { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: PURPLE },
-  mfrBtnText:{ fontSize: 12, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
-  sectionTitle:{ fontSize: 15, fontFamily: FONT.semibold, color: FG, marginBottom: 8 },
-  disclaimer:{ fontSize: 11, fontFamily: FONT.regular, color: SUBTLE, marginBottom: 14 },
-  kpiTile:  { width: 110, backgroundColor: CARD, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: BORDER, gap: 4 },
-  kpiValue: { fontSize: 18, fontFamily: FONT.bold },
-  kpiLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  kpiChange:{ fontSize: FS.xs, fontFamily: FONT.medium },
-  gaugeCard:{ backgroundColor: CARD_ELEVATED, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: BORDER, marginBottom: 20 },
-  gaugeHeader:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  gaugeTitle:{ fontSize: 14, fontFamily: FONT.semibold, color: FG },
-  gaugeValue:{ fontSize: 22, fontFamily: FONT.bold },
-  gaugeBar: { height: 10, backgroundColor: BORDER, borderRadius: 5, overflow: 'hidden' },
-  gaugeFill:{ height: '100%', borderRadius: 5 },
-  gaugeWarning:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
-  gaugeWarningText:{ fontSize: 12, fontFamily: FONT.medium, color: RED },
-  mfrCard:  { backgroundColor: CARD, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: BORDER, marginBottom: 12 },
-  mfrHeader:{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  mfrAvatar:{ width: 40, height: 40, borderRadius: 12, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  mfrName:  { fontSize: 14, fontFamily: FONT.bold, color: FG },
-  mfrSub:   { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  mfrSpend: { fontSize: 14, fontFamily: FONT.bold, color: FG },
-  mfrUnitCost:{ fontSize: 11, fontFamily: FONT.regular, color: MUTED },
-  mfrStats: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 12 },
+  content:  { paddingHorizontal: SP.md },
+  gaugeCard:{ backgroundColor: colors.elevated, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg },
+  gaugeHeader:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SP.sm },
+  gaugeTitle:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },
+  gaugeValue:{ fontSize: FS.xl, fontFamily: FONT.bold },
+  gaugeWarning:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm },
+  gaugeWarningText:{ fontSize: FS.sm, fontFamily: FONT.medium, color: colors.destructive },
+  mfrCard:  { backgroundColor: colors.card, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: colors.border, marginBottom: SP.sm, minHeight: COMP.minTouchTarget },
+  mfrHeader:{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm + 2 },
+  mfrAvatar:{ width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  mfrName:  { fontSize: FS.sm, fontFamily: FONT.bold, color: colors.foreground },
+  mfrSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
+  mfrSpend: { fontSize: FS.sm, fontFamily: FONT.bold, color: colors.foreground },
+  mfrUnitCost:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
+  mfrStats: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: SP.sm },
   mfrStat:  { flex: 1, alignItems: 'center', gap: 3 },
-  mfrStatValue:{ fontSize: 15, fontFamily: FONT.bold, color: FG },
-  mfrStatLabel:{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  mfrWarning:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: BORDER },
-  mfrWarningText:{ fontSize: 11, fontFamily: FONT.regular, color: SUBTLE },
+  mfrStatValue:{ fontSize: FS.base, fontFamily: FONT.bold, color: colors.foreground },
+  mfrStatLabel:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
+  mfrWarning:{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  mfrWarningText:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle },
   mfrFooter:{ alignItems: 'flex-end', marginTop: 4 },
-  emptyState:{ alignItems: 'center', paddingVertical: 48, gap: 12 },
-  emptyTitle:{ fontSize: 16, fontFamily: FONT.semibold, color: FG },
-  emptyBody:{ fontSize: 13, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', paddingHorizontal: 24 },
-  });
-};
+});
