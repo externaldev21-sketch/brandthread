@@ -32,22 +32,22 @@ import { BUYER_TAB_SLOT_COUNT, useBuyerTabBarMetrics } from './buyerTabBarMetric
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 // ─── Navigation contract ──────────────────────────────────────────────────────
-// Capsule: Home · Discover · Inbox · Search. Separate circle: Profile, which
+// Capsule: Home · Discover · Inbox · Activity. Separate circle: Profile, which
 // becomes Close while search is open. Home never leaves the capsule.
 // The bar is icon-only; labels are kept for accessibility.
 
 export const BUYER_TAB_ITEMS: readonly {
-  route: 'index' | 'discover' | 'inbox' | 'search';
+  route: 'index' | 'discover' | 'inbox' | 'activity';
   label: string;
   icon: BuyerNavIconName;
 }[] = [
   { route: 'index', label: 'Home', icon: 'home' },
   { route: 'discover', label: 'Discover', icon: 'discover' },
   { route: 'inbox', label: 'Inbox', icon: 'inbox' },
-  { route: 'search', label: 'Search', icon: 'search' },
+  { route: 'activity', label: 'Activity', icon: 'activity' },
 ] as const;
 
-type Slot = 'index' | 'discover' | 'inbox' | 'search' | 'profile';
+type Slot = 'index' | 'discover' | 'inbox' | 'activity' | 'profile';
 
 /** Which bar control lights up for each buyer route, including hidden ones. */
 export const BUYER_ROUTE_SLOT: Record<string, Slot> = {
@@ -57,7 +57,7 @@ export const BUYER_ROUTE_SLOT: Record<string, Slot> = {
   cart: 'index',
   discover: 'discover',
   inbox: 'inbox',
-  search: 'search',
+  activity: 'activity',
   profile: 'profile',
   orders: 'profile',
   following: 'profile',
@@ -345,7 +345,7 @@ export function BuyerTabBar({
             return (
               <Animated.View
                 key={item.route}
-                style={item.route === 'search' ? searchSlotStyle : coveredSlotStyle}
+                style={item.route === 'activity' ? searchSlotStyle : coveredSlotStyle}
               >
                 {slot}
               </Animated.View>

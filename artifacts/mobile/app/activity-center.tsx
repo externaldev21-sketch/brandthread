@@ -36,6 +36,7 @@ import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Chip, ThemedRefreshControl } from '@/components/ui';
@@ -280,10 +281,11 @@ function SkeletonRows({ styles }: { styles: Styles }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function ActivityCenterScreen() {
+export default function ActivityCenterScreen({ inBuyerTab = false }: { inBuyerTab?: boolean }) {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const tabBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { role } = useRole();
   const api = useApi();
@@ -483,6 +485,7 @@ export default function ActivityCenterScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title="Activity"
+        showBack={!inBuyerTab}
         actions={hasUnread ? [{
           icon: 'check-circle',
           onPress: () => { void handleMarkAll(); },
@@ -548,7 +551,7 @@ export default function ActivityCenterScreen() {
           ) : null}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: insets.bottom + SP.xl },
+            { paddingBottom: inBuyerTab ? tabBarInset + SP.xl : insets.bottom + SP.xl },
             sections.length === 0 && styles.listContentEmpty,
           ]}
           showsVerticalScrollIndicator={false}

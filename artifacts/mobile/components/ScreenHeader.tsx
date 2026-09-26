@@ -17,6 +17,8 @@ export interface ScreenHeaderAction {
 
 interface ScreenHeaderProps {
   title: string;
+  /** Top-level tab screens have no back destination. */
+  showBack?: boolean;
   subtitle?: string;
   rightElement?: React.ReactNode;
   /** Extra icon-button actions rendered right of `rightElement` (back/action slots). */
@@ -49,7 +51,7 @@ interface ScreenHeaderProps {
 const MAX_HEADER_ACTIONS = 2;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push',
+  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push', showBack = true,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -75,7 +77,7 @@ export function ScreenHeader({
   return (
     <View style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }]}>
       <View style={styles.container}>
-        <PressableScale
+        {showBack ? <PressableScale
           onPress={() => (onBack ? onBack() : router.back())}
           style={[styles.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
           accessibilityRole="button"
@@ -84,7 +86,7 @@ export function ScreenHeader({
           testID={backTestID}
         >
           <Feather name={variant === 'modal' ? 'x' : 'arrow-left'} size={ICON.md} color={colors.foreground} />
-        </PressableScale>
+        </PressableScale> : <View style={{ width: COMP.iconBtn }} />}
 
         <View style={styles.titleBlock}>
           {scrollY ? (

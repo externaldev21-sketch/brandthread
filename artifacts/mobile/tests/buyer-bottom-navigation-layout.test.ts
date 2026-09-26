@@ -10,21 +10,24 @@ const parts = read('components/tab-bar/TabBarParts.tsx');
 const sellerBar = read('components/SellerGlobalTabBar.tsx');
 const searchContext = read('contexts/BuyerSearchContext.tsx');
 const search = read('app/(buyer)/search.tsx');
+const activity = read('app/(buyer)/activity.tsx');
 const profile = read('app/(buyer)/profile.tsx');
 const feed = read('app/(tabs)/feed.tsx');
 
 const tabItemsBlock = bar.slice(bar.indexOf('export const BUYER_TAB_ITEMS'), bar.indexOf('type Slot'));
 
 describe('buyer navigation contract', () => {
-  it('renders Home · Discover · Inbox · Search in the capsule and Profile in a separate circle', () => {
+  it('renders Home · Discover · Inbox · Activity in the capsule and Profile in a separate circle', () => {
     expect(layout).toContain('<BuyerTabBar {...props} inboxBadgeCount={inboxBadgeCount} />');
-    for (const route of ['index', 'discover', 'inbox', 'search', 'profile']) {
+    for (const route of ['index', 'discover', 'inbox', 'activity', 'profile']) {
       expect(layout).toContain(`name="${route}"`);
     }
     expect(tabItemsBlock).toContain("{ route: 'index', label: 'Home', icon: 'home' }");
     expect(tabItemsBlock).toContain("{ route: 'discover', label: 'Discover', icon: 'discover' }");
     expect(tabItemsBlock).toContain("{ route: 'inbox', label: 'Inbox', icon: 'inbox' }");
-    expect(tabItemsBlock).toContain("{ route: 'search', label: 'Search', icon: 'search' }");
+    expect(tabItemsBlock).toContain("{ route: 'activity', label: 'Activity', icon: 'activity' }");
+    expect(activity).toContain('<ActivityCenterScreen inBuyerTab />');
+    expect(layout).toContain('name="search" options={{ title: \'Search\', href: null }}');
     expect(tabItemsBlock).not.toContain('profile');
     expect(bar).toContain('testID="buyer-bottom-tab-bar"');
     expect(bar).toContain("testID={searchActive ? 'buyer-search-close' : 'buyer-tab-profile'}");

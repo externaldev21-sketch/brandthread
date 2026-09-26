@@ -15,7 +15,7 @@ import { CheckInSheet } from '@/components/thread-cash/CheckInSheet';
 import type { ThreadCashCheckInResult } from '@/lib/threadCashTypes';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
-// Floating capsule: Home · Discover · Inbox · Search, plus a separate Profile
+// Floating capsule: Home · Discover · Inbox · Activity, plus a separate Profile
 // circle that turns into Close while search is open. The bar is drawn over the
 // scenes, so every screen pads its content with useBuyerTabBarInset().
 // Friends, Cart, Orders, Following and Edit Profile are routes in this
@@ -74,10 +74,11 @@ function BuyerTabLayout() {
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarAccessibilityLabel: 'Home tab' }} />
       <Tabs.Screen name="discover" options={{ title: 'Discover', tabBarAccessibilityLabel: 'Discover tab' }} />
       <Tabs.Screen name="inbox" options={{ title: 'Inbox', tabBarAccessibilityLabel: 'Inbox tab' }} />
-      <Tabs.Screen name="search" options={{ title: 'Search', tabBarAccessibilityLabel: 'Search tab' }} />
+      <Tabs.Screen name="activity" options={{ title: 'Activity', tabBarAccessibilityLabel: 'Activity tab' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarAccessibilityLabel: 'Profile tab' }} />
 
       {/* No slot of their own — reached from Home, Profile or Inbox. */}
+      <Tabs.Screen name="search" options={{ title: 'Search', href: null }} />
       <Tabs.Screen name="friends" options={{ title: 'Friends', href: null }} />
       <Tabs.Screen name="cart" options={{ title: 'Cart', href: null }} />
       <Tabs.Screen name="orders" options={{ title: 'Orders', href: null }} />
