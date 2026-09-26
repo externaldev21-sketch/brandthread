@@ -19,7 +19,7 @@ import {
   SCREEN_BG, CARD_GLASS, BORDER, FG, MUTED, SUBTLE, SUCCESS, RED,
   FONT, FS, SURFACE, GRID_MAX_WIDTH,
 } from '@/lib/theme';
-import { ResponsiveContainer } from '@/components/layout';
+import { Header, ResponsiveContainer } from '@/components/layout';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
@@ -343,10 +343,12 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
+      <Header title="Analytics" subtitle="Last 7 days" largeTitle showBack={false} />
       <ScrollView
         ref={scrollResetRef}
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingTop: topPad + 12 }]}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -357,10 +359,6 @@ export default function AnalyticsScreen() {
         }
       >
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <Text style={styles.pageTitle}>Analytics</Text>
-        <Text style={styles.rangeLabel}>Last 7 days</Text>
-
         {/* ── Summary stats ──────────────────────────────────────────────── */}
         <View style={styles.statsRow}>
           <StatCard label="Visits" value={summary.visits.toLocaleString()} changePct={summary.visitsChangePct} colors={colors} />
@@ -391,8 +389,6 @@ const styles = StyleSheet.create({
   loadWrap:     { flex: 1, backgroundColor: SCREEN_BG, alignItems: 'center', justifyContent: 'center', gap: 16 },
   loadText:     { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
 
-  pageTitle:    { fontSize: 28, fontFamily: FONT.bold, color: FG, marginBottom: 4 },
-  rangeLabel:   { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, marginBottom: 16 },
 
   // Segmented
   segmented:    { flexDirection: 'row', backgroundColor: SURFACE, borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 3, marginBottom: 14 },

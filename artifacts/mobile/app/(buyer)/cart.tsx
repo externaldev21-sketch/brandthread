@@ -14,9 +14,8 @@ import {
   View, Text, ScrollView, StyleSheet, Image,
   ActivityIndicator, Alert, TextInput,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { StickyFooter } from '@/components/layout';
+import { Header, StickyFooter } from '@/components/layout';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -39,7 +38,7 @@ import {
 } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import {
-  BrandthreadHeader, EmptyState, BrandedLoader, PressableScale, useUndoToast,
+  EmptyState, BrandedLoader, PressableScale, useUndoToast,
 } from '@/components/BrandthreadUI';
 import { InlineError } from '@/components/InlineFeedback';
 import {
@@ -503,7 +502,6 @@ export default function CartScreen() {
   const barInset = useBuyerTabBarInset();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeScreenStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { push } = useThreadPull();
   const api = useApi();
@@ -847,22 +845,23 @@ export default function CartScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Header — full-cart totals stay visible at the top too, not just the footer.
-          Same BrandthreadHeader treatment used by Orders/Following so the tab-reachable
-          buyer screens read as one shell. */}
-      <View style={{ paddingTop: insets.top }}>
-        <BrandthreadHeader
-          title="Cart"
-          rightElement={hasItems ? (
-            <View style={s.headerRight}>
-              <View style={[s.headerBadge, { backgroundColor: theme.accent }]}>
-                <Text style={[s.headerBadgeText, { color: theme.onAccent }]}>{cart.items.reduce((s, i) => s + i.quantity, 0)}</Text>
-              </View>
-              <Text style={s.headerSubtotal}>{fmtPrice(summary.subtotalCents)}</Text>
+      {/* Shared page header — identical large-title size/weight/offset to every other
+          tab-root page. Full-cart totals stay visible at the top too, not just the
+          footer, via belowTitle since the count badge + subtotal aren't a simple
+          icon action. */}
+      <Header
+        title="Cart"
+        largeTitle
+        showBack={false}
+        belowTitle={hasItems ? (
+          <View style={s.headerRight}>
+            <View style={[s.headerBadge, { backgroundColor: theme.accent }]}>
+              <Text style={[s.headerBadgeText, { color: theme.onAccent }]}>{cart.items.reduce((s, i) => s + i.quantity, 0)}</Text>
             </View>
-          ) : undefined}
-        />
-      </View>
+            <Text style={s.headerSubtotal}>{fmtPrice(summary.subtotalCents)}</Text>
+          </View>
+        ) : undefined}
+      />
 
       {!hasItems && !hasSaved && !loadError ? (
         <EmptyState

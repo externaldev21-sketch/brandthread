@@ -5,13 +5,13 @@ import {
   Alert, StyleSheet, Dimensions, Share,
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale, FeedSkeleton, EmptyState } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import { IconButton, Snackbar, ErrorState } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -193,7 +193,6 @@ export default function FriendsScreen() {
   const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const palette = useColors();
-  const insets  = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router  = useRouter();
   const api     = useApi();
@@ -527,35 +526,22 @@ export default function FriendsScreen() {
 
   return (
     <View style={[s.container, { backgroundColor: palette.background }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SPACING.md }]}>
-        <IconButton
-          name="plus"
-          variant="plain"
-          size={ICON.lg}
-          color={palette.mutedForeground}
-          accessibilityLabel="Create post"
-          onPress={() => router.push('/create-post?accountType=buyer' as never)}
-        />
-
-        <Text style={[TYPE_SCALE.headline, s.headerTitle, { color: palette.foreground }]}>Friends</Text>
-
-        <View>
-          <IconButton
-            name="user-plus"
-            variant="plain"
-            size={ICON.lg}
-            color={palette.mutedForeground}
-            accessibilityLabel="Friend requests"
-            onPress={() => router.push('/buyer-friend-requests' as never)}
-          />
-          {pendingCount > 0 && (
-            <View pointerEvents="none" style={[s.badge, { backgroundColor: theme.accent }]}>
-              <Text style={[TYPE_SCALE.caption, s.badgeText, { color: theme.onAccent }]}>{pendingCount}</Text>
-            </View>
-          )}
-        </View>
-      </View>
+      {/* Shared page header — identical large-title size/weight/offset to every other
+          tab-root page. The pending-requests count moves into the action's
+          accessibility label since Header's actions don't support a badge overlay. */}
+      <Header
+        title="Friends"
+        largeTitle
+        showBack={false}
+        actions={[
+          { icon: 'plus', onPress: () => router.push('/create-post?accountType=buyer' as never), accessibilityLabel: 'Create post' },
+          {
+            icon: 'user-plus',
+            onPress: () => router.push('/buyer-friend-requests' as never),
+            accessibilityLabel: pendingCount > 0 ? `Friend requests, ${pendingCount} pending` : 'Friend requests',
+          },
+        ]}
+      />
 
       {loadError && feedPosts.length === 0 && !loading ? (
         <ErrorState message="Couldn't load activity. Pull to refresh." onRetry={loadData} />
@@ -592,31 +578,6 @@ export default function FriendsScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.md,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-  },
-
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -6,
-    minWidth: 16,
-    height: 16,
-    borderRadius: RADII.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  badgeText: {},
 
   storiesScroll: {
     paddingHorizontal: SPACING.md,

@@ -9,13 +9,13 @@ import {
   View, Text, StyleSheet, ScrollView,
   FlatList,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
@@ -191,7 +191,6 @@ export default function FollowingScreen() {
   const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const palette = useColors();
-  const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const api = useApi();
@@ -250,13 +249,8 @@ export default function FollowingScreen() {
 
   return (
     <View style={[s.container, { backgroundColor: palette.background }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SPACING.md, borderBottomColor: palette.border }]}>
-        <View>
-          <Text style={[TYPE_SCALE.title1, s.headerTitle, { color: palette.foreground }]}>Following</Text>
-          <Text style={[TYPE_SCALE.footnote, s.headerSub, { color: palette.mutedForeground }]}>{subtitle}</Text>
-        </View>
-      </View>
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
+      <Header title="Following" subtitle={subtitle} largeTitle showBack={false} />
 
       {/* Brand avatars row — only shown when real drops exist */}
       {avatarBrands.length > 0 && (
@@ -330,12 +324,6 @@ export default function FollowingScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm + 2, borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerTitle: { letterSpacing: -0.6 },
-  headerSub:   { marginTop: 2 },
 
   avatarsRow:    { borderBottomWidth: StyleSheet.hairlineWidth },
   avatarsScroll: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, gap: SPACING.md - 2 },

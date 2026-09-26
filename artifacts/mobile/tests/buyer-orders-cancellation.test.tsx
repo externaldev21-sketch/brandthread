@@ -38,7 +38,7 @@ vi.mock('react-native', () => {
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
     Animated: {
-      Value: class { constructor(_v?: number) {} },
+      Value: class { _value: number; constructor(v?: number) { this._value = v ?? 0; } setValue(v: number) { this._value = v; } interpolate() { return this._value; } },
       View: nativeComponent('Animated.View'),
       event: () => () => {},
       timing: () => ({ start: (cb?: () => void) => cb?.() }),

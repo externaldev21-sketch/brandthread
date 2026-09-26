@@ -19,10 +19,10 @@ import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS, ICON, GRAD_DARK_FADE } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadHeader, FilterChip,
+  BrandthreadScreen, FilterChip,
   StatusBadge, EmptyState,
 } from '@/components/BrandthreadUI';
-import { SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
+import { Header, SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
@@ -347,8 +347,9 @@ export default function BuyerOrdersScreen() {
   const visibleLoading = loading || !ownsRenderedOrders;
 
   return (
-    <BrandthreadScreen noSafeBottom>
-      <BrandthreadHeader title="My Orders" />
+    <BrandthreadScreen noSafeBottom noSafeTop>
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
+      <Header title="My Orders" largeTitle showBack={false} />
 
       {/* Filter chips — horizontal scroll with a trailing fade so the last
           chip reads as scrollable instead of abruptly clipped. */}
