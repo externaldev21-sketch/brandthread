@@ -23,6 +23,7 @@ import { ResponsiveContainer } from '@/components/layout';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import {
   getSalesAnalytics, getFilterState, saveFilterState,
 } from '@/services/analyticsService';
@@ -256,6 +257,7 @@ function StatCard({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function AnalyticsScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const colors = useColors();
   const api = useApi();
   const { userId } = useAuth();
@@ -342,6 +344,7 @@ export default function AnalyticsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
+        ref={scrollResetRef}
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingTop: topPad + 12 }]}
         showsVerticalScrollIndicator={false}

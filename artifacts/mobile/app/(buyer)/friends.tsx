@@ -18,6 +18,7 @@ import {
   ICON, FONT,
 } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
@@ -189,6 +190,7 @@ function PostCard({
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function FriendsScreen() {
+  const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const palette = useColors();
   const insets  = useSafeAreaInsets();
@@ -559,6 +561,7 @@ export default function FriendsScreen() {
         <ErrorState message="Couldn't load activity. Pull to refresh." onRetry={loadData} />
       ) : (
         <FlatList
+          ref={scrollResetRef}
           data={feedPosts}
           keyExtractor={p => p.id}
           showsVerticalScrollIndicator={false}

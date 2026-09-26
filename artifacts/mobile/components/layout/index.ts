@@ -1,4 +1,6 @@
 export { Header, useHeaderScrollY } from './Header';
+export { ScreenScroll } from './Screen';
+export type { ScreenScrollProps } from './Screen';
 export type { HeaderAction } from './Header';
 export { ResponsiveContainer } from './ResponsiveContainer';
 export { StickyFooter } from './StickyFooter';

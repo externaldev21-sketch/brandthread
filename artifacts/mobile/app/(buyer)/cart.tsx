@@ -28,6 +28,7 @@ import {
 import {
   Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
 } from '@/services/cartTypes';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
@@ -498,6 +499,7 @@ const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CartScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const barInset = useBuyerTabBarInset();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeScreenStyles(theme), [theme]);
@@ -899,6 +901,7 @@ export default function CartScreen() {
             </PressableScale>
           )}
           <ScrollView
+            ref={scrollResetRef}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <ThemedRefreshControl

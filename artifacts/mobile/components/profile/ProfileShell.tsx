@@ -34,6 +34,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import {
   ProfileChip, ProfileSectionLabel, ProfileStatsRow, ProfileTabs,
@@ -111,6 +112,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const { heroHeight, columnWidth } = layout;
 
   const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollResetRef = useScrollReset<any>();
   const [heroOnScreen, setHeroOnScreen] = useState(true);
   const [focused, setFocused] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -266,6 +268,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     <View style={[styles.root]} testID={testID}>
       <View style={[styles.column, { width: columnWidth }]}>
         <AnimatedFlatList
+          ref={scrollResetRef}
           key={listKey}
           data={data}
           renderItem={renderItem}

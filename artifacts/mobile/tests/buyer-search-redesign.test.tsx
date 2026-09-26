@@ -117,6 +117,10 @@ vi.mock('@expo/vector-icons', () => ({
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => routerMock,
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    const ReactActual = require('react') as typeof import('react');
+    ReactActual.useEffect(callback, [callback]);
+  },
 }));
 
 vi.mock('expo-haptics', () => ({

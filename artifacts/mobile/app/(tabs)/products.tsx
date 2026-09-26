@@ -18,6 +18,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, SearchBar, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
 import { IconButton } from '@/components/ui/IconButton';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
@@ -262,6 +263,7 @@ function SortModal({
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProductsScreen() {
+  const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & Record<string, string>;
   const s = React.useMemo(() => createStyles(theme), [theme]);
@@ -607,6 +609,7 @@ export default function ProductsScreen() {
         </View>
       ) : (
         <FlashList
+          ref={scrollResetRef}
           data={sortedProducts}
           keyExtractor={keyExtractor}
           renderItem={renderProduct}

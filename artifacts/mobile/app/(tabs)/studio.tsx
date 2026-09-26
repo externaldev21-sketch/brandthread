@@ -18,6 +18,7 @@ import { getProjects } from '@/services/designService';
 import { DesignProject, PROJECT_TYPE_LABELS, PROJECT_STATUS_LABELS } from '@/services/designTypes';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader, EmptyState, NewFeatureBadge, StatusBadge, LockBadge } from '@/components/BrandthreadUI';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED, GROWTH_STUDIO_TOOLS, type GrowthTool, type GrowthToolId } from '@/lib/growthTools';
 
@@ -105,6 +106,7 @@ const TEMPLATES = [
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function StudioScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const router   = useRouter();
@@ -190,7 +192,7 @@ export default function StudioScreen() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={[s.root, { paddingTop: insets.top, backgroundColor: theme.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+      <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
         {/* ── HEADER ── */}
         <View style={s.header}>
