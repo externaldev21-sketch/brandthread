@@ -1083,13 +1083,18 @@ function VideoVisual({
     player.playbackRate = rate;
   }, [player, rate]);
 
-  // The playable frame stops just above the floating tab bar instead of
-  // playing sharp underneath it. A second mirror of the same player (cheap —
-  // it shares the already-decoding video, no extra decode) shows only the
-  // bottom slice of the same frame in that strip, blurred and darkened, so it
-  // reads as a soft continuation rather than a hard cut or missing content.
-  const showBottomStrip = immersive && fit === 'cover' && bottomStripHeight > 0 && pageWidth != null && pageHeight != null;
-  const sharpClipStyle = showBottomStrip ? { bottom: bottomStripHeight, overflow: 'hidden' as const } : null;
+  // The video now always plays full-bleed, edge to edge, including behind
+  // the floating tab bar — a separate blurred "mirror" copy of the clip used
+  // to sit in a strip behind the bar instead, but on web the blur can't
+  // reliably sample the live <video> element and the mirror's own offset
+  // math didn't line up with the real frame there, so it showed as a washed-
+  // out, mis-aligned lighter band across the bottom of the video instead of
+  // a clean continuation of it. A plain dark gradient (rendered once, fixed,
+  // above the whole feed list — see the "Legibility scrims" block in
+  // FeedScreen) gives the bar the same contrast without duplicating any
+  // video content.
+  void bottomStripHeight;
+  const sharpClipStyle = null;
 
   // Explicit size on the sharp-clip wrapper itself rather than trusting it
   // to inherit height from an ancestor: on web, absoluteFill inside a
@@ -1140,45 +1145,6 @@ function VideoVisual({
           </View>
         )}
       </View>
-      {showBottomStrip && (
-        <View pointerEvents="none" style={[styles.bottomBlurStrip, { height: bottomStripHeight }]}>
-          {/* The poster frame sits underneath the mirrored live player so the
-              strip is never a hard black flash before this clip's first
-              frame has decoded (e.g. right after a swipe lands on it) — it's
-              covered the instant the mirror below has something to show. */}
-          {posterImage && (
-            <CachedImage
-              source={posterImage}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-            />
-          )}
-          <View style={{ position: 'absolute', left: 0, width: pageWidth!, height: pageHeight!, top: -(pageHeight! - bottomStripHeight) }}>
-            <VideoView
-              player={player}
-              style={[StyleSheet.absoluteFill, styles.videoFill]}
-              contentFit="cover"
-              nativeControls={false}
-            />
-          </View>
-          {/* iOS/web can sample the live video through a real blur; Android's
-              blur can't sample video surfaces (see TabBarGlass), so it falls
-              back to a denser dark tint instead of redrawing every frame. */}
-          {Platform.OS !== 'android' && (
-            <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
-          )}
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.82)' : 'rgba(0,0,0,0.38)' },
-            ]}
-          />
-          {/* A hairline seam at the top of the strip gives the floating tab
-              bar a defined edge to sit on, instead of the blur/darken simply
-              fading the video away with no boundary. */}
-          <View style={styles.bottomBlurStripSeam} pointerEvents="none" />
-        </View>
-      )}
       {progressBottom != null && isActive && (
         <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} externallyPaused={paused} />
       )}
@@ -1266,25 +1232,19 @@ function ShopPill({
         accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
       >
         <BlurView intensity={42} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={[styles.shopPillAccentEdge, { backgroundColor: theme.accent }]} />
         <View style={styles.shopPillThumb}>
           {tag.imageUri ? (
             <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
-            <Feather name="shopping-bag" size={15} color="#111111" />
+            <Feather name="shopping-bag" size={11} color="#111111" />
           )}
         </View>
-        <View style={styles.shopPillTextCol}>
-          <Text style={styles.shopPillEyebrow}>SHOP THE LOOK</Text>
-          <View style={styles.shopPillNameRow}>
-            <Text style={styles.shopPillName} numberOfLines={1}>{tag.productName}</Text>
-            <Text style={styles.shopPillDot}>·</Text>
-            <Text style={styles.shopPillPrice} numberOfLines={1}>
-              {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
-            </Text>
-          </View>
-        </View>
-        <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.75)" />
+        <Text style={styles.shopPillName} numberOfLines={1}>{tag.productName}</Text>
+        <Text style={styles.shopPillDot}>·</Text>
+        <Text style={styles.shopPillPrice} numberOfLines={1}>
+          {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
+        </Text>
+        <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.75)" />
         <Animated.View
           pointerEvents="none"
           style={[
@@ -2693,10 +2653,17 @@ export default function FeedScreen({
         // Bounds how many video players ever exist at once: the active
         // page plus roughly the next/previous 2 stay mounted (poster-first,
         // so they start instantly the moment they become active) — the
-        // rest are unmounted rather than left decoding off-screen.
-        initialNumToRender={3}
-        maxToRenderPerBatch={2}
-        windowSize={5}
+        // rest are unmounted rather than left decoding off-screen. On web,
+        // react-native-web's VirtualizedList batches renders off scroll
+        // events rather than native's more reliable cell-recycling timers;
+        // a low initialNumToRender/windowSize there let fast/paginated
+        // swiping through the feed outrun the render batches, landing on
+        // pages that were never mounted at all (a blank page) after only a
+        // handful of swipes. Web renders the whole (small, ~10-item) preview
+        // feed up front instead of virtualizing it away.
+        initialNumToRender={Platform.OS === 'web' ? displayItems.length : 3}
+        maxToRenderPerBatch={Platform.OS === 'web' ? displayItems.length : 2}
+        windowSize={Platform.OS === 'web' ? 21 : 5}
         removeClippedSubviews={Platform.OS !== 'web'}
         getItemLayout={(_, index) => ({ length: pageHeight, offset: pageHeight * index, index })}
         refreshControl={
@@ -2749,9 +2716,23 @@ export default function FeedScreen({
             <View style={styles.feedFooter}>
               <ActivityIndicator size="small" color={MUTED} />
             </View>
-          ) : !feedHasMore && sellerFeedPosts.length > 0 ? (
-            <View style={styles.feedFooter}>
+          ) : (!feedHasMore && sellerFeedPosts.length > 0) || (isBuyerSurface && !isCreatorFeed) ? (
+            // Buyer preview/live feeds have a fixed set of videos with no
+            // real pagination behind them — without an explicit end card
+            // here, swiping past the last one used to just run out of
+            // rendered content and show blank space. This always renders
+            // right after the last item so the feed never dead-ends blank.
+            <View style={[styles.feedFooter, { width: pageWidth, height: pageHeight }]}>
+              <Feather name="check-circle" size={28} color={MUTED} />
               <Text style={styles.feedFooterText}>You're all caught up</Text>
+              <TouchableOpacity
+                onPress={() => feedListRef.current?.scrollToIndex({ index: buyerOffset, animated: true })}
+                style={styles.creatorRetry}
+                accessibilityRole="button"
+                accessibilityLabel="Back to the top"
+              >
+                <Text style={styles.creatorRetryText}>Back to the top</Text>
+              </TouchableOpacity>
             </View>
           ) : null
         }
@@ -2822,35 +2803,26 @@ export default function FeedScreen({
       />}
 
       {/* ─ Legibility scrims: fixed overlay above the list (not per-cell), so
-          they stay put while the video underneath swipes past. ─ */}
+          they stay put while the video underneath swipes past. Standard
+          TikTok-style small gradients only — a short one at the very top
+          (behind the top bar) and a short one at the very bottom (behind the
+          caption/rail and the tab bar). Nothing here is a translucent panel:
+          both are capped low enough that they never reach up into the
+          middle of the right action rail, which previously read as a washed-
+          out band over the comment/repost/save/share icons. */}
       {isBuyerSurface && (
         <>
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.14)', 'rgba(0,0,0,0)']}
-            locations={[0, 0.55, 1]}
-            style={[styles.topScrim, { height: insets.top + 130 }]}
-          />
-          {/* Full-width base scrim — a longer, gentler falloff than before so
-              the transition from clean video to legible text reads as one
-              continuous gradient instead of a hard "curtain" appearing low
-              in the frame. */}
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.34)', 'rgba(0,0,0,0.7)']}
-            locations={[0, 0.3, 0.62, 1]}
-            style={[styles.bottomScrim, { height: bottomClearance + 300 }]}
-          />
-          {/* Focused scrim: a second, tighter gradient sitting only behind
-              the creator/caption column, so that text block reads with real
-              contrast against any frame while the right rail and the video
-              elsewhere stay comparatively clean and bright — the layered
-              "spotlight" read premium feeds use instead of one flat wash. */}
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.52)']}
+            colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']}
             locations={[0, 1]}
-            style={[styles.bottomFocusScrim, { height: bottomClearance + 190, width: Math.min(windowWidth * 0.82, 340) }]}
+            style={[styles.topScrim, { height: insets.top + 90 }]}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.22)', 'rgba(0,0,0,0.58)']}
+            locations={[0, 0.45, 1]}
+            style={[styles.bottomScrim, { height: bottomClearance + 130 }]}
           />
         </>
       )}
@@ -2980,9 +2952,7 @@ export default function FeedScreen({
 
             <View style={styles.buyerTabSwitcherWrap} pointerEvents="box-none">
               <SegmentedControl
-                variant="glass"
-                size="compact"
-                style={{ minWidth: 176, maxWidth: 220, width: '100%' }}
+                variant="underline"
                 testID="buyer-home-tabs"
                 options={[
                   { id: 'following', label: 'Following' },
@@ -3230,14 +3200,8 @@ const styles = StyleSheet.create({
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   videoFill: { width: '100%', height: '100%' },
   letterboxBackdrop: { opacity: 0.55 },
-  bottomBlurStrip: { position: 'absolute', left: 0, right: 0, bottom: 0, overflow: 'hidden' },
-  bottomBlurStripSeam: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-  },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  bottomFocusScrim: { position: 'absolute', bottom: 0, left: 0 },
   progressHitArea: {
     position: 'absolute', left: 16, right: 16, height: 28, justifyContent: 'center',
   },
@@ -3271,27 +3235,24 @@ const styles = StyleSheet.create({
   mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
   mediaDotActive: { width: 18, backgroundColor: ON_DARK },
   mediaTags: { position: 'absolute', left: 16, right: 86, alignItems: 'flex-start' },
+  // Compact single-line TikTok-Shop-style product anchor pill — roughly half
+  // the height/width of the old two-line merch card it replaces, so it reads
+  // as a small tappable tag rather than a card overlaying the video.
   shopPill: {
-    minHeight: 52, maxWidth: 260, flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderRadius: RADII.card, paddingLeft: 7, paddingRight: 12, paddingVertical: 7, overflow: 'hidden',
+    height: 26, maxWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: RADII.pill, paddingLeft: 3, paddingRight: 8, overflow: 'hidden',
     borderWidth: 1,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3,
-    shadowRadius: 8, elevation: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25,
+    shadowRadius: 5, elevation: 4,
   },
-  shopPillAccentEdge: { position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: 2 },
   shopPillThumb: {
-    width: 38, height: 38, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: ON_DARK, overflow: 'hidden', marginLeft: 3,
+    width: 20, height: 20, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ON_DARK, overflow: 'hidden',
   },
-  shopPillTextCol: { flexShrink: 1, gap: 1 },
-  shopPillEyebrow: {
-    color: 'rgba(255,255,255,0.62)', fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1.1,
-  },
-  shopPillNameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5, maxWidth: 170 },
-  shopPillName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12.5, flexShrink: 1 },
-  shopPillDot: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
-  shopPillPrice: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 12.5, ...TABULAR_NUMS },
-  shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 60 },
+  shopPillName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 11, flexShrink: 1, maxWidth: 68 },
+  shopPillDot: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
+  shopPillPrice: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
+  shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
 
   rail: {
     position: 'absolute', right: 10, width: 52, bottom: 116, alignItems: 'center', gap: 19,
@@ -3487,7 +3448,7 @@ const styles = StyleSheet.create({
 
   notifRow: { fontSize: 13.5, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
   feedFooter: {
-    width: '100%', height: 72, alignItems: 'center', justifyContent: 'center',
+    width: '100%', height: 72, alignItems: 'center', justifyContent: 'center', gap: 10,
     backgroundColor: '#000000',
   },
   feedFooterText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
