@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated, Platform, useWindowDimensions, type ViewProps } from 'react-native';
+import { useSettled } from '@/lib/animationUtils';
 
 /**
  * Bottom-sheet entrance for `<Modal transparent animationType="fade">`.
@@ -21,6 +22,12 @@ export function SheetRise({ style, children, ...rest }: ViewProps & { children?:
   const { height } = useWindowDimensions();
   const distance = Math.min(460, Math.max(240, height * 0.5));
   const progress = useRef(new Animated.Value(0)).current;
+  // Once the rise has settled at rest, this stops rendering an Animated.View
+  // with an identity `transform: [{ translateY: 0 }]` — which react-native-web
+  // would otherwise leave in place forever as a `matrix(1,0,0,1,0,0)`
+  // compositing layer, softening the sheet's text if that layer's box lands
+  // on a fractional device pixel. See lib/animationUtils.ts.
+  const settled = useSettled();
 
   useEffect(() => {
     let cancelled = false;
@@ -28,25 +35,29 @@ export function SheetRise({ style, children, ...rest }: ViewProps & { children?:
       if (cancelled) return;
       if (reduceMotion) {
         progress.setValue(1);
+        settled.settleImmediately();
         return;
       }
-      Animated.spring(progress, {
-        toValue: 1,
-        speed: 13,
-        bounciness: 5,
-        useNativeDriver: Platform.OS !== 'web',
-      }).start();
+      settled.run(
+        Animated.spring(progress, {
+          toValue: 1,
+          speed: 13,
+          bounciness: 5,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      );
     };
     AccessibilityInfo.isReduceMotionEnabled?.()
       .then(run)
       .catch(() => run(false)) ?? run(false);
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progress]);
 
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [distance, 0] });
 
   return (
-    <Animated.View {...rest} style={[style, { transform: [{ translateY }] }]}>
+    <Animated.View {...rest} style={[style, !settled.value && { transform: [{ translateY }] }]}>
       {children}
     </Animated.View>
   );

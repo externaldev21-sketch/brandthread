@@ -15,6 +15,7 @@ import Animated, {
   Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming,
 } from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
+import { identityOrNone } from '@/lib/animationUtils';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
@@ -50,7 +51,12 @@ export function BottomSheet({ visible, onClose, children, testID }: BottomSheetP
   }, [visible, backdropOpacity, translateY]);
 
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+  // `identityOrNone` drops the `transform` key entirely once the sheet is
+  // fully open (translateY back at 0) instead of leaving an identity
+  // `[{ translateY: 0 }]` — on web that would otherwise permanently force
+  // this View onto its own compositing layer, softening the sheet's text if
+  // that layer doesn't land on a whole device pixel. See lib/animationUtils.ts.
+  const sheetStyle = useAnimatedStyle(() => ({ transform: identityOrNone([{ translateY: translateY.value }]) }));
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} testID={testID}>

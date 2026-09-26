@@ -35,7 +35,7 @@ import { useApi } from '@/lib/api';
 import {
   BG, SCREEN_BG, SURFACE, CARD, OVERLAY,
   BORDER, BORDER_SUBTLE,
-  FG, MUTED, SUBTLE, ON_DARK,
+  FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
   SUCCESS, RED, GOLD,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
@@ -1249,6 +1249,14 @@ function ShopPill({
         accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
       >
         <BlurView intensity={42} tint="dark" style={StyleSheet.absoluteFill} />
+        {/* Solid scrim between the blur and the pill's text — without it,
+            shopPillName/shopPillPrice render directly on top of the raw
+            blurred video with nothing darkening it, so legibility (and the
+            text's own crispness) rode entirely on how bright the frame
+            behind it happened to be. Matches the tint layer every other
+            BlurView-behind-content spot in this app already pairs with its
+            blur (e.g. components/ui/GlassPanel.tsx, CreateButton.tsx). */}
+        <View style={[StyleSheet.absoluteFill, styles.shopPillScrim]} pointerEvents="none" />
         <View style={styles.shopPillThumb}>
           {tag.imageUri ? (
             <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
@@ -3298,6 +3306,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25,
     shadowRadius: 5, elevation: 4,
   },
+  shopPillScrim: { backgroundColor: 'rgba(10,10,11,0.45)' },
   shopPillThumb: {
     width: 28, height: 28, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
     backgroundColor: ON_DARK, overflow: 'hidden', marginRight: 8,
@@ -3431,8 +3440,12 @@ const styles = StyleSheet.create({
   creatorRetryText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
   feedTabs: { alignSelf: 'center', flexDirection: 'row', gap: 22, marginTop: 0, paddingBottom: 1 },
   feedTab: { paddingHorizontal: 4, paddingVertical: 3, alignItems: 'center' },
-  feedTabText: { color: ON_DARK, opacity: 0.6, fontFamily: FONT.semibold, fontSize: FS.xs },
-  feedTabTextActive: { color: ON_DARK, opacity: 1 },
+  // A solid, pre-blended color (ON_DARK_MUTED) instead of `color: ON_DARK,
+  // opacity: 0.6` — an unfocused tab's own opacity was making its text
+  // subpixel-antialias against whatever's behind it rather than rendering as
+  // one solid, crisp color.
+  feedTabText: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs },
+  feedTabTextActive: { color: ON_DARK },
   feedTabUnderline: { height: 2, width: 22, borderRadius: 2, marginTop: 3 },
 
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

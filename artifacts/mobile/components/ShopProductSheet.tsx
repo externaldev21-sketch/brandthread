@@ -33,6 +33,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
 import { formatCents } from '@/lib/money';
+import { useSettled } from '@/lib/animationUtils';
 import {
   BG, CARD, CARD_ELEVATED, SURFACE,
   BORDER, BORDER_SUBTLE,
@@ -304,18 +305,28 @@ export function ShopProductSheet({
   // Slide-up animation
   const slideY = useRef(new Animated.Value(400)).current;
   const cartFlyProgress = useRef(new Animated.Value(0)).current;
+  // Tracks whether slideY has settled at rest (0). While unsettled the sheet
+  // renders with its Animated `transform`; once settled it drops that style
+  // key entirely, so react-native-web doesn't leave the sheet — and every
+  // text node inside it — pinned to a permanent `matrix(1,0,0,1,0,0)`
+  // compositing layer at rest. See lib/animationUtils.ts.
+  const slideSettled = useSettled();
 
   useEffect(() => {
     if (!shouldAnimateCartSuccess(reduceMotion)) {
       slideY.setValue(0);
+      slideSettled.settleImmediately();
       return;
     }
-    Animated.spring(slideY, {
-      toValue: 0,
-      useNativeDriver: true,
-      speed: 18,
-      bounciness: 3,
-    }).start();
+    slideSettled.run(
+      Animated.spring(slideY, {
+        toValue: 0,
+        useNativeDriver: true,
+        speed: 18,
+        bounciness: 3,
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reduceMotion, slideY]);
 
   useEffect(() => () => {
@@ -328,6 +339,8 @@ export function ShopProductSheet({
       cb?.();
       return;
     }
+    // Not tracked via `slideSettled` — the sheet is leaving the screen, not
+    // settling at rest, so there's no blur concern to avoid here.
     Animated.timing(slideY, {
       toValue: 500,
       duration: 220,
@@ -399,13 +412,16 @@ export function ShopProductSheet({
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
       onPanResponderMove: (_, g) => {
-        if (g.dy > 0) slideY.setValue(g.dy);
+        if (g.dy > 0) {
+          slideSettled.unsettle();
+          slideY.setValue(g.dy);
+        }
       },
       onPanResponderRelease: (_, g) => {
         if (g.dy > 80 || g.vy > 0.8) {
           dismissSheet(onClose);
         } else {
-          Animated.spring(slideY, { toValue: 0, useNativeDriver: true, speed: 20 }).start();
+          slideSettled.run(Animated.spring(slideY, { toValue: 0, useNativeDriver: true, speed: 20 }));
         }
       },
     }),
@@ -610,8 +626,7 @@ export function ShopProductSheet({
           backgroundColor: theme.surface,
           borderColor: theme.border,
           paddingBottom: insets.bottom + 8,
-          transform: [{ translateY: slideY }],
-        }]}
+        }, !slideSettled.value && { transform: [{ translateY: slideY }] }]}
         {...panResponder.panHandlers}
       >
         {/* ─ Handle ─ */}

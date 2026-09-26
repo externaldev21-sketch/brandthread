@@ -444,7 +444,10 @@ function makeStyles(theme: AppThemePreset) {
       textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 12, // theme-exempt: legibility over media
     },
     handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.sm },
-    handle: { fontFamily: FONT.semibold, fontSize: FS.md, color: theme.text, opacity: 0.86 },
+    // Solid `theme.muted` (as `handleSoft` right below already uses) instead
+    // of `color: theme.text, opacity: 0.86` — text opacity anti-aliases
+    // against whatever's behind it instead of rendering as one solid color.
+    handle: { fontFamily: FONT.semibold, fontSize: FS.md, color: theme.muted },
     handleSoft: { fontFamily: FONT.medium, fontSize: FS.md, color: theme.muted },
 
     meta: { paddingHorizontal: SP.md, paddingTop: SP.xs, paddingBottom: SP.md, gap: SP.xs },
