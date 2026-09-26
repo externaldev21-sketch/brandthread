@@ -18,9 +18,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
-import { SuccessCheck } from '@/components/ui/SuccessCheck';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
@@ -72,9 +72,15 @@ export function OrderSuccessSheet({
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const checkScale = useRef(new Animated.Value(0)).current;
 
   // Rows revealed in sequence: headline, product, divider+details, map, buttons.
   const stagger = useStagger(5, 75);
+
+  useEffect(() => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Animated.spring(checkScale, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 10 }).start();
+  }, [checkScale]);
 
   const heading = order.itemCount > 1
     ? `${order.itemCount} items from ${order.brandName}`
@@ -102,9 +108,11 @@ export function OrderSuccessSheet({
           <Feather name="x" size={16} color={theme.text} />
         </TouchableOpacity>
 
-        <View style={s.checkWrap}>
-          <SuccessCheck size={76} iconSize={38} />
-        </View>
+        <Animated.View style={[s.checkWrap, { transform: [{ scale: checkScale }] }]}>
+          <View style={[s.checkCircle, { backgroundColor: theme.accent }]}>
+            <Feather name="check" size={38} color={theme.onAccent} />
+          </View>
+        </Animated.View>
 
         <Animated.Text style={[s.eyebrow, { color: theme.muted }, stagger[0]]}>Order placed!</Animated.Text>
 
@@ -156,17 +164,17 @@ export function OrderSuccessSheet({
             style={[s.primaryBtn, { backgroundColor: theme.accent }]}
             onPress={() => onTrackOrder(order.orderId)}
             accessibilityRole="button"
-            accessibilityLabel="View order"
+            accessibilityLabel="Track order"
           >
-            <Text style={[s.primaryBtnText, { color: theme.onAccent }]}>View Order</Text>
+            <Text style={[s.primaryBtnText, { color: theme.onAccent }]}>Track Order</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.secondaryBtn, { backgroundColor: theme.cardElevated }]}
             onPress={onContinue}
             accessibilityRole="button"
-            accessibilityLabel="Continue shopping"
+            accessibilityLabel="Continue"
           >
-            <Text style={[s.secondaryBtnText, { color: theme.text }]}>Continue Shopping</Text>
+            <Text style={[s.secondaryBtnText, { color: theme.text }]}>Continue</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -185,6 +193,7 @@ const s = StyleSheet.create({
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 4 },
   closeBtn: { position: 'absolute', top: SP.md, right: SP.md, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
   checkWrap: { alignItems: 'center', marginTop: SP.lg, marginBottom: SP.sm },
+  checkCircle: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
   eyebrow: { textAlign: 'center', fontSize: FS.sm, fontFamily: FONT.medium },
   productRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 6, paddingHorizontal: SP.md },
   thumb: { width: 40, height: 40, borderRadius: RADIUS.sm },
