@@ -5,6 +5,7 @@
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Share } from 'react-native';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -968,9 +969,9 @@ export default function OrdersScreen() {
   }, [orders, ordersOwnerId, userId]);
 
   const handleMoreMenu = useCallback(() => {
-    Alert.alert('Orders', 'Choose an action', [
+    showActionSheet('Orders', 'Choose an action', [
       { text: 'Export CSV', onPress: handleExportCsv },
-      { text: 'Bulk Actions', onPress: () => Alert.alert('Bulk', 'Long-press orders to select.') },
+      { text: 'Bulk Actions', onPress: () => showActionSheet('Bulk', 'Long-press orders to select.', [{ text: 'OK' }]) },
       { text: 'Refresh', onPress: onRefresh },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -1145,22 +1146,35 @@ export default function OrdersScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Status pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.pillsRow}
-        >
-          {FILTERS.map(({ key, label }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              active={activeFilter === key}
-              onPress={() => setActiveFilter(key)}
-              count={key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined}
-            />
-          ))}
-        </ScrollView>
+        {/* Status pills — a plain horizontal ScrollView with no edge fade
+            reads as if it ends abruptly at the viewport edge, hiding that
+            "Archived" (and sometimes "Open") are scrolled off to the right
+            (docs/qa/full-crawl-report.md: "status filter chips cut off at
+            the right edge"). A trailing gradient signals there's more. */}
+        <View style={s.pillsRowWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.pillsRow}
+          >
+            {FILTERS.map(({ key, label }) => (
+              <FilterChip
+                key={key}
+                label={label}
+                active={activeFilter === key}
+                onPress={() => setActiveFilter(key)}
+                count={key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined}
+              />
+            ))}
+          </ScrollView>
+          <LinearGradient
+            pointerEvents="none"
+            colors={['transparent', BG]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={s.pillsRowFade}
+          />
+        </View>
       </View>
 
       {/* ── Order list (section list for date groups) ── */}
@@ -1344,6 +1358,8 @@ const createStyles = (theme: any) => {
     paddingTop: 2,
     gap: SP.xs,
   },
+  pillsRowWrap: { position: 'relative' },
+  pillsRowFade: { position: 'absolute', top: 0, right: 0, bottom: SP.sm, width: 28 },
 
   // List header
   listHeader: {
