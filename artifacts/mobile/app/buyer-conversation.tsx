@@ -38,7 +38,6 @@ import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSa
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
-import ChatWallpaper from '@/components/chat/ChatWallpaper';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaViewer from '@/components/chat/MediaViewer';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -281,7 +280,14 @@ export default function BuyerConversationScreen() {
   // ── Load conversation + messages ────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
-    if (!userId) {
+    // The dev-web ?bt_preview=buyer bypass never signs in through Clerk (see
+    // lib/devPreview.ts / the buyer inbox's own identical guard), so
+    // `userId` is null here in that mode — check for a seeded preview
+    // conversation id BEFORE the real-account `userId` guard below, or the
+    // whole preview thread (and its Thread Cash flow) is unreachable no
+    // matter what. Real accounts always have a userId and never hit this
+    // branch either way.
+    if (!userId && !(params.id && isPreviewConversationId(params.id))) {
       setConv(null);
       setMessages([]);
       setIsLoading(false);
@@ -459,8 +465,15 @@ export default function BuyerConversationScreen() {
   // follow. This is an affordance check only; see the state's own comment.
   useEffect(() => {
     let cancelled = false;
-    if (!threadCashSendEnabled || !sellerUserId || isPreviewConversationId(conv?.id ?? '')) {
+    if (!threadCashSendEnabled || !sellerUserId) {
       setThreadCashMutual(null);
+      return;
+    }
+    // Preview conversations have no real backend to check against — the
+    // whole Thread Cash flow must be clickable end-to-end there, so treat
+    // them as an already-confirmed mutual follow.
+    if (isPreviewConversationId(conv?.id ?? '')) {
+      setThreadCashMutual(true);
       return;
     }
     api.social.status(sellerUserId)
@@ -468,9 +481,10 @@ export default function BuyerConversationScreen() {
       .catch(() => { if (!cancelled) setThreadCashMutual(false); });
     return () => { cancelled = true; };
   }, [threadCashSendEnabled, sellerUserId, conv?.id, api]);
-  const threadCashDisabledReason = threadCashMutual === false
-    ? `Follow each other to send Thread Cash${participant?.name ? ` with ${participant.name}` : ''}.`
-    : 'Checking Thread Cash eligibility…';
+  // UI-only: this must never surface a "checking…" string. While the check
+  // is still pending (threadCashMutual === null) a tap is a silent no-op —
+  // only a confirmed non-mutual-follow result shows an explainer.
+  const threadCashDisabledReason = `You can send Thread Cash to people who follow you back`;
 
   // ── Load seller products for attachment picker ───────────────────────────────
 
@@ -1150,7 +1164,7 @@ export default function BuyerConversationScreen() {
     const isRead = msg.status === 'read' || !!msg.readAt;
 
     return (
-      <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? SP.sm : 0 }]}>
+      <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? 12 : 2 }]}>
         {/* Other-user avatar — only on the last bubble of a run */}
         {!isOwn && (
           isLastInGroup ? (
@@ -1175,10 +1189,10 @@ export default function BuyerConversationScreen() {
               s.bubble,
               {
                 backgroundColor: isOwn ? theme.accent : theme.cardElevated,
-                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.xl,
-                borderTopRightRadius: (isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.xl,
-                borderBottomRightRadius: isOwn ? (isLastInGroup ? 6 : RADIUS.xl) : RADIUS.xl,
-                borderBottomLeftRadius: !isOwn ? (isLastInGroup ? 6 : RADIUS.xl) : RADIUS.xl,
+                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.lg,
+                borderTopRightRadius: (isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.lg,
+                borderBottomRightRadius: isOwn ? (isLastInGroup ? 6 : RADIUS.lg) : RADIUS.lg,
+                borderBottomLeftRadius: !isOwn ? (isLastInGroup ? 6 : RADIUS.lg) : RADIUS.lg,
                 alignSelf: isOwn ? 'flex-end' : 'flex-start',
                 shadowColor: theme.shadowColor,
                 shadowOffset: { width: 0, height: 2 },
@@ -1298,30 +1312,38 @@ export default function BuyerConversationScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      <ChatWallpaper />
+      {/* Plain flat header — no card, no pill, no background decoration.
+          Sits directly on the theme background with a hairline border
+          underneath instead of a floating "glass" card. */}
+      <View style={[s.headerWrap, { paddingTop: insets.top + SP.xs }]}>
+        <PressableScale rippleEnabled={false}
+          onPress={() => { hapticPrimaryAction(); router.back(); }}
+          style={s.roundBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          testID="conversation-back"
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+        </PressableScale>
 
-      {/* Floating glass header */}
-      <View style={[s.headerWrap, { paddingTop: insets.top + SP.sm }]}>
-        <View style={s.headerPill}>
-          <PressableScale rippleEnabled={false}
-            onPress={() => { hapticPrimaryAction(); router.back(); }}
-            style={s.roundBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            testID="conversation-back"
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-          </PressableScale>
-
-          <PressableScale rippleEnabled={false}
-            style={s.headerCenter}
-            activeOpacity={participant ? 0.7 : 1}
-            disabled={!participant}
-            onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
-            accessibilityRole="button"
-            accessibilityLabel={`View ${displayName}'s profile`}
-          >
+        <PressableScale rippleEnabled={false}
+          style={s.headerCenter}
+          activeOpacity={participant ? 0.7 : 1}
+          disabled={!participant}
+          onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${displayName}'s profile`}
+        >
+          {participant && (
+            <View style={s.headerAvatarWrap} testID="conversation-avatar">
+              <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
+                <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+              </View>
+              {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
+            </View>
+          )}
+          <View style={s.headerTextCol}>
             <View style={s.headerNameRow}>
               <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
               {isAgentConv && (
@@ -1338,58 +1360,33 @@ export default function BuyerConversationScreen() {
                 {statusLine}
               </Text>
             ) : null}
-          </PressableScale>
+          </View>
+        </PressableScale>
 
-          {participant && (
+        {conv && (
+          <>
             <PressableScale rippleEnabled={false}
-              onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
-              testID="conversation-avatar"
+              style={s.roundBtn}
+              onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="conversation-call-voice"
               accessibilityRole="button"
-              accessibilityLabel={`View ${displayName}'s profile`}
+              accessibilityLabel="Voice call"
             >
-              <View style={s.headerAvatarWrap}>
-                <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                  <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
-                </View>
-                {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
-              </View>
+              <Feather name="phone" size={ICON.sm} color={theme.muted} />
             </PressableScale>
-          )}
-
-          {conv && (
-            <>
-              <PressableScale rippleEnabled={false}
-                style={s.roundBtn}
-                onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                testID="conversation-call-voice"
-                accessibilityRole="button"
-                accessibilityLabel="Voice call"
-              >
-                <Feather name="phone" size={ICON.sm} color={theme.muted} />
-              </PressableScale>
-              <PressableScale rippleEnabled={false}
-                style={s.roundBtn}
-                onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                testID="conversation-call-video"
-                accessibilityRole="button"
-                accessibilityLabel="Video call"
-              >
-                <Feather name="video" size={ICON.sm} color={theme.muted} />
-              </PressableScale>
-            </>
-          )}
-          <PressableScale rippleEnabled={false}
-            style={s.roundBtn}
-            onPress={() => { hapticPrimaryAction(); openOptions(); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel="More options"
-          >
-            <Feather name="more-horizontal" size={ICON.sm} color={theme.muted} />
-          </PressableScale>
-        </View>
+          </>
+        )}
+        <PressableScale rippleEnabled={false}
+          style={s.roundBtn}
+          onPress={() => { hapticPrimaryAction(); openOptions(); }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          testID="conversation-options"
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+        >
+          <Feather name="more-horizontal" size={ICON.sm} color={theme.muted} />
+        </PressableScale>
       </View>
 
       {/* Order context card */}
@@ -1596,20 +1593,22 @@ export default function BuyerConversationScreen() {
               {threadCashSendEnabled && sellerUserId ? (
                 <ThreadCashAttachButton
                   recipientId={sellerUserId}
+                  recipientName={participant?.name}
+                  recipientHandle={participant?.handle}
                   conversationId={conv?.id ?? ''}
                   disabled={threadCashMutual !== true}
                   disabledReason={threadCashDisabledReason}
                   renderTrigger={(open) => (
                     <PressableScale rippleEnabled={false}
                       onPress={() => {
-                        // Alert.alert() is a documented no-op on web (RN Web
-                        // ships an empty stub), so the disabled explanation
-                        // is surfaced here via the app's own Snackbar
-                        // instead — visible and consistent on every
-                        // platform, not just native.
-                        if (threadCashMutual !== true) {
+                        // Still checking mutual-follow status — silent no-op.
+                        // Never surface a "checking…" string to the user.
+                        if (threadCashMutual === null) return;
+                        // Confirmed not mutual — the one clean explainer,
+                        // with a Follow action, via the app's own Snackbar
+                        // (Alert.alert() is a documented no-op on RN Web).
+                        if (threadCashMutual === false) {
                           setThreadCashNotice(threadCashDisabledReason);
-                          setTimeout(() => setThreadCashNotice(null), 3000);
                           return;
                         }
                         open();
@@ -1626,19 +1625,41 @@ export default function BuyerConversationScreen() {
                   )}
                   onSent={async ({ transferId, amountCents, note }) => {
                     if (!conv) return;
+                    const attachment: MessageAttachment = {
+                      type: 'thread_cash',
+                      title: 'Thread Cash',
+                      accentColor: theme.accent,
+                      meta: {
+                        transferId,
+                        senderId: myId,
+                        amountCents: String(amountCents),
+                        status: 'pending',
+                        ...(note ? { note } : {}),
+                      },
+                    };
+                    // Preview conversations have no real backend to post
+                    // to — append a local mock message directly, the same
+                    // way the seeded agent-reply flow above does.
+                    if (isPreviewConversationId(conv.id)) {
+                      setMessages((prev) => [...prev, {
+                        id: `local-thread-cash-${transferId}`,
+                        conversationId: conv.id,
+                        fromId: myId,
+                        fromName: 'You',
+                        fromInitials: 'Y',
+                        fromColor: theme.accent,
+                        text: '',
+                        attachment,
+                        reactions: [],
+                        status: 'sent',
+                        ts: Date.now(),
+                        deletedForMe: false,
+                      }]);
+                      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+                      return;
+                    }
                     try {
-                      await sendMessage(conv.id, '', {
-                        type: 'thread_cash',
-                        title: 'Thread Cash',
-                        accentColor: theme.accent,
-                        meta: {
-                          transferId,
-                          senderId: myId,
-                          amountCents: String(amountCents),
-                          status: 'pending',
-                          ...(note ? { note } : {}),
-                        },
-                      });
+                      await sendMessage(conv.id, '', attachment);
                       const msgs = await getMessages(conv.id);
                       setMessages(msgs);
                       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
@@ -1925,6 +1946,21 @@ export default function BuyerConversationScreen() {
       <Snackbar
         visible={threadCashNotice != null}
         message={threadCashNotice ?? ''}
+        actionLabel="Follow"
+        onAction={async () => {
+          setThreadCashNotice(null);
+          if (!sellerUserId) return;
+          try {
+            await api.social.follow(sellerUserId);
+            hapticSuccessAction();
+            setThreadCashMutual(null);
+            const status = await api.social.status(sellerUserId);
+            setThreadCashMutual(status.isMutual);
+          } catch {
+            // Following can still fail (rate limit, blocked, etc.) — the
+            // coin's own disabled state already reflects reality either way.
+          }
+        }}
         onDismiss={() => setThreadCashNotice(null)}
       />
     </KeyboardAvoidingView>
@@ -1973,25 +2009,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Floating glass header
   headerWrap: {
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    zIndex: 5,
-  },
-  headerPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.cardGlass,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: theme.border,
+    backgroundColor: theme.background,
     paddingHorizontal: SP.xs,
-    paddingVertical: SP.xs,
+    paddingBottom: SP.sm,
     gap: 2,
-    shadowColor: theme.shadowColor,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 3,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.border,
+    zIndex: 5,
   },
   roundBtn: {
     width: 36,
@@ -2002,8 +2028,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   headerCenter: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: SP.xs,
+    gap: SP.sm,
+  },
+  headerTextCol: {
+    alignItems: 'center',
   },
   headerNameRow: {
     flexDirection: 'row',
@@ -2186,11 +2218,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: '#FFFFFF',
   },
 
-  // Bubble
+  // Bubble — 12x8pt padding, 18pt corner radius (Mobbin iMessage/Luma refs).
   bubble: {
-    borderRadius: RADIUS.xl,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm + 4,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: 12,
+    paddingVertical: SP.sm,
   },
   bubbleMeta: {
     flexDirection: 'row',
@@ -2226,6 +2258,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   attachCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: 240,
     backgroundColor: theme.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,
@@ -2377,11 +2410,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'flex-end',
     backgroundColor: theme.cardElevated,
     borderRadius: RADIUS.xxl,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.border,
-    paddingLeft: SP.md,
+    paddingLeft: SP.sm,
     paddingRight: SP.xs,
-    minHeight: COMPOSER_CONTROL + SP.xs * 2,
+    minHeight: COMPOSER_CONTROL + SP.xs,
   },
   textInput: {
     flex: 1,
