@@ -31,6 +31,7 @@ import { useRouter } from 'expo-router';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
+import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
 import { formatCents } from '@/lib/money';
 import {
   BG, CARD, CARD_ELEVATED, SURFACE,
@@ -85,6 +86,20 @@ interface ShopProductSheetProps {
   cartTargetRef?: RefObject<View | null>;
   reduceMotion: boolean | null;
 }
+
+// ─── Preview reviews seed ─────────────────────────────────────────────────────
+// Preview catalog products aren't real rows in the reviews table, so they get
+// seeded review data — enough to exercise the average/breakdown/top-reviews
+// UI without a network call.
+const PREVIEW_REVIEWS_SEED: ReviewsSeed = {
+  avgRating: 4.6,
+  totalCount: 128,
+  reviews: [
+    { id: 'preview-review-1', rating: 5, body: 'Runs true to size and the fabric feels even better in person. Fast shipping too.', buyerName: 'Jordan M.', createdAt: new Date(Date.now() - 3 * 86400000).toISOString() },
+    { id: 'preview-review-2', rating: 4, body: 'Great fit, sized up one for a roomier look. Would buy again.', buyerName: 'Priya K.', createdAt: new Date(Date.now() - 9 * 86400000).toISOString() },
+    { id: 'preview-review-3', rating: 5, body: 'Exactly like the video — quality is there.', buyerName: 'Sam R.', createdAt: new Date(Date.now() - 20 * 86400000).toISOString() },
+  ],
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -324,6 +339,26 @@ export function ShopProductSheet({
     dismissSheet(onClose);
   }
 
+  /**
+   * Navigate away from the sheet (Buy now, View cart, View detail, seller
+   * profile, etc). The destination pushes IMMEDIATELY — its own skeleton/
+   * content is already mounted and rendering behind the sheet before the
+   * sheet even starts moving, so there's zero blank frame. The sheet's
+   * existing 220ms slide-down then plays as a reveal over that already-live
+   * screen, and `onClose` unmounts the sheet's Modal (backdrop included)
+   * once it finishes.
+   *
+   * Previously this used `dismissSheet(() => router.push(...))`, which
+   * navigated only once the slide-down finished AND never called `onClose` —
+   * so the sheet's Modal (and its full-screen backdrop) stayed mounted on
+   * top of the destination screen indefinitely. That's what produced the
+   * reported "sheet stays open on top of Checkout" glitch/flash.
+   */
+  function navigateAndDismiss(action: () => void) {
+    action();
+    dismissSheet(onClose);
+  }
+
   function showCartSuccess(newCount: number) {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onCartUpdated?.(newCount);
@@ -527,9 +562,12 @@ export function ShopProductSheet({
     try {
       const cart = await getCart();
       await createBuyNowSession(product, variant, qty, cart);
-      dismissSheet(() => {
-        router.push('/thread-checkout' as never);
-      });
+      // Use the thread-pull push (matches the /thread-checkout route's
+      // `animation: 'none'` registration in app/_layout.tsx, which expects
+      // this hook — not router.push — to be the one driving the transition)
+      // and fire it immediately so Checkout's own skeleton is already
+      // mounted and on-screen before the sheet even starts sliding away.
+      navigateAndDismiss(() => push('/thread-checkout' as never));
     } catch {
       setPhase('ready');
       setVariantError("Couldn't start checkout. Try again.");
@@ -539,7 +577,7 @@ export function ShopProductSheet({
   // View full detail
   function handleViewDetail() {
     if (!activeTag?.productId) return;
-    dismissSheet(() => {
+    navigateAndDismiss(() => {
       push(
         `/thread-product-detail?productId=${encodeURIComponent(activeTag.productId)}&sourcePostId=${encodeURIComponent(selection.postId)}` as never,
       );
@@ -547,9 +585,7 @@ export function ShopProductSheet({
   }
 
   function handleViewCart() {
-    dismissSheet(() => {
-      router.push('/(buyer)/cart' as never);
-    });
+    navigateAndDismiss(() => router.push('/(buyer)/cart' as never));
   }
 
   const accent = theme.accent;
@@ -802,6 +838,12 @@ export function ShopProductSheet({
               <TrustCue icon="truck" label="Fast shipping" />
             </View>
 
+            <ProductReviewsSection
+              productId={product.id}
+              productName={product.name}
+              seed={selection.previewProduct?.id === product.id ? PREVIEW_REVIEWS_SEED : undefined}
+            />
+
             <TouchableOpacity onPress={handleViewDetail} style={ss.viewDetailBtn}>
               <Text style={ss.viewDetailText}>View full product details</Text>
               <Feather name="chevron-right" size={13} color={MUTED} />
@@ -1015,55 +1057,130 @@ function ProductHeader({
   );
 }
 
-// ─── Product image carousel — swipeable, with a 1/N counter ─────────────────
+// ─── Full-screen image viewer — swipeable, tap/swipe-down to dismiss ────────
+
+function FullScreenImageViewer({
+  imageUris, startIndex, onClose,
+}: {
+  imageUris: string[]; startIndex: number; onClose: () => void;
+}) {
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const [index, setIndex] = useState(startIndex);
+  const scrollRef = useRef<ScrollView>(null);
+
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <View style={[ss.fullScreenWrap, { backgroundColor: '#000' }]}>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: startIndex * windowWidth, y: 0 }}
+          onMomentumScrollEnd={e => {
+            const next = Math.round(e.nativeEvent.contentOffset.x / windowWidth);
+            setIndex(Math.max(0, Math.min(imageUris.length - 1, next)));
+          }}
+        >
+          {imageUris.map((uri, i) => (
+            <TouchableOpacity
+              key={`${uri}-${i}`}
+              activeOpacity={1}
+              onPress={onClose}
+              style={{ width: windowWidth, height: windowHeight }}
+              accessibilityRole="button"
+              accessibilityLabel="Close full-screen photo"
+            >
+              <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <TouchableOpacity
+          onPress={onClose}
+          style={ss.fullScreenClose}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Close"
+        >
+          <Feather name="x" size={20} color={ON_DARK} />
+        </TouchableOpacity>
+        {imageUris.length > 1 && (
+          <View style={ss.fullScreenCounter} pointerEvents="none">
+            <Text style={ss.carouselCounterText}>{index + 1}/{imageUris.length}</Text>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Product image carousel — full-bleed 4:5, swipeable, dot indicator ──────
+// Never letterboxed: every frame is `cover`-fit inside a fixed 4:5 window on
+// a dark backdrop, so a differently-shaped seller photo fills the frame
+// (cropped) instead of showing as a boxed-in image on a solid color.
+// Tap opens the full-screen viewer for a closer look.
 
 function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
   const { width: windowWidth } = useWindowDimensions();
   const pageWidth = Math.min(windowWidth, 520);
+  const pageHeight = Math.round(pageWidth * 1.25); // 4:5
   const [index, setIndex] = useState(0);
+  const [fullScreen, setFullScreen] = useState(false);
   const images = imageUris.length > 0 ? imageUris : [''];
 
-  if (images.length === 1) {
-    return (
-      <View style={[ss.carouselWrap, { height: pageWidth }]}>
-        {images[0] ? (
-          <CachedImage source={{ uri: images[0] }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
-            <Feather name="image" size={28} color={SUBTLE} />
-          </View>
-        )}
-      </View>
-    );
-  }
-
   return (
-    <View style={[ss.carouselWrap, { height: pageWidth }]}>
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={e => {
-          const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
-          setIndex(Math.max(0, Math.min(images.length - 1, next)));
-        }}
+    <>
+      <TouchableOpacity
+        activeOpacity={0.95}
+        onPress={() => images[index] && setFullScreen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`Product photo ${index + 1} of ${images.length}. Tap to view full screen.`}
       >
-        {images.map((uri, i) => (
-          <View key={`${uri}-${i}`} style={{ width: pageWidth, height: pageWidth }}>
-            {uri ? (
-              <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
-                <Feather name="image" size={28} color={SUBTLE} />
+        <View style={[ss.carouselWrap, { height: pageHeight }]}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            scrollEnabled={images.length > 1}
+            onMomentumScrollEnd={e => {
+              const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+              setIndex(Math.max(0, Math.min(images.length - 1, next)));
+            }}
+          >
+            {images.map((uri, i) => (
+              <View key={`${uri}-${i}`} style={{ width: pageWidth, height: pageHeight }}>
+                {uri ? (
+                  <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                ) : (
+                  <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
+                    <Feather name="image" size={28} color={SUBTLE} />
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-        ))}
-      </ScrollView>
-      <View style={ss.carouselCounter} pointerEvents="none">
-        <Text style={ss.carouselCounterText}>{index + 1}/{images.length}</Text>
-      </View>
-    </View>
+            ))}
+          </ScrollView>
+          {images.length > 1 && (
+            <View style={ss.carouselCounter} pointerEvents="none">
+              <Text style={ss.carouselCounterText}>{index + 1}/{images.length}</Text>
+            </View>
+          )}
+          {images.length > 1 && (
+            <View style={ss.dotsRow} pointerEvents="none">
+              {images.map((_, i) => (
+                <View key={i} style={[ss.dot, i === index && ss.dotActive]} />
+              ))}
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {fullScreen && (
+        <FullScreenImageViewer
+          imageUris={images.filter(Boolean)}
+          startIndex={index}
+          onClose={() => setFullScreen(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -1258,13 +1375,29 @@ const ss = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: CARD_ELEVATED,
   },
-  carouselWrap: { width: '100%', backgroundColor: CARD_ELEVATED },
+  carouselWrap: { width: '100%', backgroundColor: '#000', overflow: 'hidden' },
   carouselCounter: {
     position: 'absolute', right: 10, bottom: 10,
     paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.pill,
     backgroundColor: 'rgba(0,0,0,0.62)',
   },
   carouselCounterText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11 },
+  dotsRow: {
+    position: 'absolute', left: 0, right: 0, bottom: 12,
+    flexDirection: 'row', justifyContent: 'center', gap: 5,
+  },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.4)' },
+  dotActive: { backgroundColor: '#FFFFFF', width: 14 },
+  fullScreenWrap: { flex: 1 },
+  fullScreenClose: {
+    position: 'absolute', top: 50, right: 16, width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center',
+  },
+  fullScreenCounter: {
+    position: 'absolute', bottom: 40, alignSelf: 'center',
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
   preOrderBadge: {
     position: 'absolute',
     bottom: 6,
