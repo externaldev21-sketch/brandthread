@@ -11,7 +11,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRAD_DARK_FADE } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, SearchBar } from '@/components/BrandthreadUI';
 import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
@@ -1119,22 +1119,32 @@ export default function OrdersScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Status pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.pillsRow}
-        >
-          {FILTERS.map(({ key, label }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              active={activeFilter === key}
-              onPress={() => setActiveFilter(key)}
-              count={key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined}
-            />
-          ))}
-        </ScrollView>
+        {/* Status pills — horizontal scroll with a trailing fade so the last
+            chip reads as scrollable instead of abruptly clipped. */}
+        <View style={{ position: 'relative' }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.pillsRow}
+          >
+            {FILTERS.map(({ key, label }) => (
+              <FilterChip
+                key={key}
+                label={label}
+                active={activeFilter === key}
+                onPress={() => setActiveFilter(key)}
+                count={key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined}
+              />
+            ))}
+          </ScrollView>
+          <LinearGradient
+            pointerEvents="none"
+            colors={GRAD_DARK_FADE}
+            start={{ x: 1, y: 0 }}
+            end={{ x: 0, y: 0 }}
+            style={s.pillsFade}
+          />
+        </View>
       </View>
 
       {/* ── Order list (section list for date groups) ── */}
@@ -1317,6 +1327,13 @@ const createStyles = (theme: any) => {
     paddingBottom: SP.sm,
     paddingTop: 2,
     gap: SP.xs,
+  },
+  pillsFade: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: SP.sm,
+    width: 28,
   },
 
   // List header

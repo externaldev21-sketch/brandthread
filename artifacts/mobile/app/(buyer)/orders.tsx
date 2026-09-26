@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
@@ -15,7 +16,7 @@ import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } 
 import { getBuyerOrdersWithStatus } from '@/services/orderService';
 import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
 import { formatCents } from '@/lib/money';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, GRAD_DARK_FADE } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, FilterChip,
   StatusBadge, EmptyState,
@@ -347,21 +348,31 @@ export default function BuyerOrdersScreen() {
     <BrandthreadScreen noSafeBottom>
       <BrandthreadHeader title="My Orders" />
 
-      {/* Filter chips */}
-      <FlatList
-        horizontal
-        data={FILTER_CHIPS}
-        keyExtractor={i => i.key}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: centeredPadding, gap: 8, paddingBottom: SP.sm }}
-        renderItem={({ item }) => (
-          <FilterChip
-            label={item.label}
-            active={filter === item.key}
-            onPress={() => setFilter(item.key)}
-          />
-        )}
-      />
+      {/* Filter chips — horizontal scroll with a trailing fade so the last
+          chip reads as scrollable instead of abruptly clipped. */}
+      <View style={{ position: 'relative' }}>
+        <FlatList
+          horizontal
+          data={FILTER_CHIPS}
+          keyExtractor={i => i.key}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: centeredPadding, gap: 8, paddingBottom: SP.sm }}
+          renderItem={({ item }) => (
+            <FilterChip
+              label={item.label}
+              active={filter === item.key}
+              onPress={() => setFilter(item.key)}
+            />
+          )}
+        />
+        <LinearGradient
+          pointerEvents="none"
+          colors={GRAD_DARK_FADE}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0, y: 0 }}
+          style={{ position: 'absolute', right: 0, top: 0, bottom: SP.sm, width: 28 }}
+        />
+      </View>
 
       {visibleLoading ? (
         <View style={{ paddingHorizontal: centeredPadding, paddingTop: SP.sm }}>

@@ -158,6 +158,7 @@ vi.mock('@/lib/theme', () => ({
   COMP: { iconBtn: 36 },
   ICON: { xs: 12, sm: 16, md: 20, lg: 24, xl: 32 },
   ANIM: {},
+  GRAD_DARK_FADE: ['rgba(10,10,11,0)', 'rgba(10,10,11,1)'],
 }));
 
 let mockOrdersList: () => Promise<any[]>;

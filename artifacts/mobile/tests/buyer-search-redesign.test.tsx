@@ -197,6 +197,13 @@ vi.mock('react-native-reanimated', () => ({
   useAnimatedStyle: (fn: () => unknown) => fn(),
 }));
 
+// The trending-brands row's trailing fade uses LinearGradient, which calls
+// react-native's processColor internally — not present on this suite's
+// plain react-native mock. Stub it like the other native-only components above.
+vi.mock('expo-linear-gradient', () => ({
+  LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
+}));
+
 vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
   useBuyerTabBarInset: () => 64,
 }));
