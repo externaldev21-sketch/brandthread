@@ -21,6 +21,14 @@ import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import ReanimatedAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
@@ -102,7 +110,7 @@ const THREAD_PAGE_SIZE = 30;
 // of them used to do. These two constants are that clearance:
 //   - RAIL_BOTTOM_GAP: >=16pt from the rail's last item to the bar's top.
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
-const RAIL_BOTTOM_GAP = 22;
+const RAIL_BOTTOM_GAP = 16;
 
 // Top chrome rhythm — measured from TikTok's For You feed (Mobbin refs cited
 // in the PR): a thin search affordance raised as high as the safe area
@@ -114,7 +122,7 @@ const TOP_TABS_ROW_HEIGHT = 34;
 // no more real pages behind it, so scrolling never dead-ends or shows an
 // end card — see the `canLoopFeed`/`displayItems` comment below.
 const FEED_LOOP_REPEAT = 6;
-const CAPTION_BOTTOM_GAP = 18;
+const CAPTION_BOTTOM_GAP = 10;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
 // The sentinel is the first element in displayItems when buyerMode=true.
@@ -1222,6 +1230,12 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
 // into a swipe.
 const SHOP_TAB_COLLAPSE_MS = 4000;
 
+// Expand/collapse runs entirely on the UI thread via Reanimated shared
+// values (no JS-driven Animated.Value): a 220ms timing slide out from the
+// left edge into a thin horizontal strip, not a spring overshoot — "smooth",
+// not bouncy, and identical on web (Reanimated's web runtime) and native.
+const SHOP_TAB_ANIM_MS = 220;
+
 function ShopSideTab({
   tag, extraCount, onPress, isActive,
 }: {
@@ -1232,8 +1246,9 @@ function ShopSideTab({
 }) {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
-  const anim = useRef(new Animated.Value(0)).current;
+  const progress = useSharedValue(0);
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragStartX = useRef(0);
 
   const clearCollapseTimer = useCallback(() => {
     if (collapseTimer.current) {
@@ -1245,16 +1260,30 @@ function ShopSideTab({
   const collapse = useCallback(() => {
     clearCollapseTimer();
     setExpanded(false);
-    Animated.spring(anim, { toValue: 0, useNativeDriver: false, speed: 18, bounciness: 0 }).start();
-  }, [anim, clearCollapseTimer]);
+    progress.value = withTiming(0, { duration: SHOP_TAB_ANIM_MS });
+  }, [progress, clearCollapseTimer]);
 
   const expand = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setExpanded(true);
-    Animated.spring(anim, { toValue: 1, useNativeDriver: false, speed: 18, bounciness: 0 }).start();
+    progress.value = withTiming(1, { duration: SHOP_TAB_ANIM_MS });
     clearCollapseTimer();
     collapseTimer.current = setTimeout(collapse, SHOP_TAB_COLLAPSE_MS);
-  }, [anim, clearCollapseTimer, collapse]);
+  }, [progress, clearCollapseTimer, collapse]);
+
+  // Swipe left anywhere on the expanded strip collapses it (in addition to
+  // tapping outside, below) — a plain PanResponder is enough to recognize
+  // the gesture; the actual collapse animation still runs on Reanimated.
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: (_evt, gesture) => expanded && gesture.dx < -6 && Math.abs(gesture.dy) < 12,
+      onPanResponderGrant: (evt) => { dragStartX.current = evt.nativeEvent.pageX; },
+      onPanResponderRelease: (_evt, gesture) => {
+        if (gesture.dx < -24) collapse();
+      },
+    }),
+  ).current;
 
   useEffect(() => {
     if (!isActive) collapse();
@@ -1265,10 +1294,12 @@ function ShopSideTab({
 
   useEffect(() => () => clearCollapseTimer(), [clearCollapseTimer]);
 
-  // A sleek, narrow strip when expanded — max ~62% of screen width, not a
-  // big card — sized off the live window width so it holds at 375/390/430.
-  const expandedWidth = Math.round(windowWidth * 0.62);
-  const width = anim.interpolate({ inputRange: [0, 1], outputRange: [28, expandedWidth] });
+  // A thin horizontal strip when expanded — max ~70% of screen width, 52-56pt
+  // tall (TikTok's own shop trigger footprint), sized off the live window
+  // width so it holds at 375/390/430.
+  const expandedWidth = Math.min(Math.round(windowWidth * 0.7), 320);
+  const collapsedHeight = 76;
+  const expandedHeight = 54;
   // Clamped, not a bare 57%: on the shortest screens (e.g. 375x667) with a
   // repost-identity chip and a full 2-line caption, the caption block's top
   // edge can rise as high as ~this tab's bottom edge at a bare 57%, closing
@@ -1276,9 +1307,18 @@ function ShopSideTab({
   // short screens — on 390x844+ this is always >= the 57% value, so the tab
   // stays exactly where it was there.
   const tabTop = Math.min(windowHeight * 0.57, windowHeight - 340);
-  const collapsedOpacity = anim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [1, 0, 0] });
-  const expandedOpacity = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 0, 1] });
-  const expandedTranslate = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [8, 8, 0] });
+
+  const containerStyle = useAnimatedStyle(() => ({
+    width: interpolate(progress.value, [0, 1], [28, expandedWidth], Extrapolation.CLAMP),
+    height: interpolate(progress.value, [0, 1], [collapsedHeight, expandedHeight], Extrapolation.CLAMP),
+  }));
+  const collapsedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.2, 1], [1, 0, 0], Extrapolation.CLAMP),
+  }));
+  const expandedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.55, 1], [0, 0, 1], Extrapolation.CLAMP),
+    transform: [{ translateX: interpolate(progress.value, [0, 0.55, 1], [8, 8, 0], Extrapolation.CLAMP) }],
+  }));
 
   return (
     <>
@@ -1292,14 +1332,15 @@ function ShopSideTab({
           importantForAccessibility="no-hide-descendants"
         />
       )}
-      <Animated.View
-        style={[styles.shopSideTab, { width, top: tabTop }]}
+      <ReanimatedAnimated.View
+        style={[styles.shopSideTab, containerStyle, { top: tabTop }]}
         accessibilityRole="button"
         accessibilityLabel={
           expanded
             ? `Shop ${tag.productName}, ${formatCents(tag.priceCents)}`
             : 'Shop this video'
         }
+        {...panResponder.panHandlers}
       >
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
@@ -1307,9 +1348,9 @@ function ShopSideTab({
           onPress={expanded ? onPress : expand}
           testID="shop-tag-pill"
         >
-          <Animated.View
+          <ReanimatedAnimated.View
             pointerEvents={expanded ? 'none' : 'auto'}
-            style={[styles.shopSideTabCollapsed, { opacity: collapsedOpacity }]}
+            style={[styles.shopSideTabCollapsed, collapsedStyle]}
           >
             {/* Icon + label are laid out and rotated together as ONE unit,
                 not rotated separately: rotating only the Text keeps its
@@ -1328,34 +1369,31 @@ function ShopSideTab({
               <Text style={styles.shopSideTabLabel}>SHOP</Text>
               <Feather name="shopping-bag" size={11} color={ON_DARK} />
             </View>
-          </Animated.View>
-          <Animated.View
+          </ReanimatedAnimated.View>
+          <ReanimatedAnimated.View
             pointerEvents={expanded ? 'auto' : 'none'}
-            style={[
-              styles.shopSideTabExpanded,
-              { opacity: expandedOpacity, transform: [{ translateX: expandedTranslate }] },
-            ]}
+            style={[styles.shopSideTabExpanded, expandedStyle]}
           >
             <View style={styles.shopSideTabThumb}>
               {tag.imageUri ? (
                 <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
               ) : (
-                <Feather name="shopping-bag" size={11} color="#111111" />
+                <Feather name="shopping-bag" size={14} color="#111111" />
               )}
             </View>
             {/* Name and price share one line so the whole card reads as a
-                sleek, narrow strip at ~44pt tall rather than a two-line
-                card — the name truncates first (flexShrink), the price
-                never does (flexShrink: 0, its own Text so numberOfLines on
-                the name can't cut it off too). */}
+                sleek, narrow strip rather than a two-line card — the name
+                truncates first (flexShrink), the price never does
+                (flexShrink: 0, its own Text so numberOfLines on the name
+                can't cut it off too). */}
             <Text style={styles.shopSideTabName} numberOfLines={1}>{tag.productName}</Text>
             <Text style={styles.shopSideTabPrice} numberOfLines={1}>
               {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
             </Text>
             <Feather name="chevron-right" size={12} color="rgba(255,255,255,0.75)" />
-          </Animated.View>
+          </ReanimatedAnimated.View>
         </TouchableOpacity>
-      </Animated.View>
+      </ReanimatedAnimated.View>
     </>
   );
 }
@@ -1640,7 +1678,7 @@ function SpotlightPage({
           {!(engagement?.following) && (
             <EngagementButton
               icon="plus"
-              iconSize={11}
+              iconSize={9}
               active={false}
               accessibilityLabel={`Follow ${item.creator}`}
               style={[styles.railFollowBadge, { backgroundColor: item.accentColor }]}
@@ -1670,7 +1708,7 @@ function SpotlightPage({
           <EngagementButton
             icon="heart"
             solidIcon="heart"
-            iconSize={30}
+            iconSize={26}
             count={formatCount(engagement?.likes ?? 0)}
             active={engagement?.liked ?? false}
             activeColor="#EF4444"
@@ -1701,7 +1739,7 @@ function SpotlightPage({
           accessibilityRole="button"
           accessibilityLabel={`Comments, ${formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}`}
         >
-          <FontAwesome name="commenting" size={30} color={ON_DARK} style={styles.railIconShadow} />
+          <FontAwesome name="commenting" size={26} color={ON_DARK} style={styles.railIconShadow} />
           <Text style={styles.railCount}>{formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}</Text>
         </TouchableOpacity>
 
@@ -1709,7 +1747,7 @@ function SpotlightPage({
         <EngagementButton
           icon="repeat"
           solidIcon="retweet"
-          iconSize={30}
+          iconSize={26}
           count={formatCount(engagement?.reposts ?? 0)}
           active={engagement?.reposted ?? false}
           activeColor={theme.accent}
@@ -1732,7 +1770,7 @@ function SpotlightPage({
         <EngagementButton
           icon="bookmark"
           solidIcon="bookmark"
-          iconSize={30}
+          iconSize={26}
           count={formatCount(engagement?.saves ?? item.saves)}
           active={engagement?.saved ?? false}
           activeColor={GOLD}
@@ -1763,7 +1801,7 @@ function SpotlightPage({
             setShareOpen(true);
           }}
         >
-          <FontAwesome name="share" size={30} color={ON_DARK} style={styles.railIconShadow} />
+          <FontAwesome name="share" size={26} color={ON_DARK} style={styles.railIconShadow} />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
@@ -1871,7 +1909,7 @@ function SpotlightPage({
           accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
           accessibilityState={{ checked: soundOn }}
         >
-           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={11} color={`${ON_DARK}CC`} />
+           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={12} color={`${ON_DARK}CC`} />
           <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
         </Pressable>
       </Animated.View>
@@ -3409,47 +3447,49 @@ const styles = StyleSheet.create({
   shopSideTabLabel: {
     color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.5,
   },
-  // A sleek, narrow strip — 44pt tall (roughly the same visual height
-  // family as the collapsed tab, not a noticeably taller card), name and
-  // price sharing one line so it never needs two rows of text.
+  // A sleek, thin horizontal strip — fills the container's animated 54pt
+  // height (see ShopSideTab's expandedHeight), name and price sharing one
+  // line so it never needs two rows of text.
   shopSideTabExpanded: {
-    position: 'absolute', top: 16, left: 0, right: 0, height: 44,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 8, paddingVertical: 6, gap: 8,
   },
   shopSideTabThumb: {
-    width: 32, height: 32, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
+    width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
     backgroundColor: ON_DARK, overflow: 'hidden', flexShrink: 0,
   },
   shopSideTabName: { flexShrink: 1, color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
   shopSideTabPrice: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, ...TABULAR_NUMS },
 
-  // Placement measured from TikTok's For You feed (Mobbin refs in the PR):
-  // right inset ~10-12pt, ~30-32pt icons, 14-18pt rhythm between items.
+  // Corrected pass, smaller than even the pre-#129 numbers per the owner's
+  // explicit direction (SMALLER and TIGHTER than before, so the video
+  // stands out): 38pt avatar, 26pt icon glyphs, 12pt rhythm between items,
+  // 8pt right inset.
   rail: {
-    position: 'absolute', right: 12, width: 48, bottom: 116, alignItems: 'center', gap: 16,
+    position: 'absolute', right: 8, width: 38, bottom: 116, alignItems: 'center', gap: 12,
   },
   railAvatarWrap: { alignItems: 'center', marginBottom: 2 },
   railAvatar: {
-    width: 36, height: 36, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    width: 38, height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: ON_DARK,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
   },
   railAvatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
   railFollowBadge: {
-    position: 'absolute', bottom: -7, width: 18, height: 18, borderRadius: RADII.pill,
+    position: 'absolute', bottom: -6, width: 16, height: 16, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
-  railBtn: { width: 44, alignItems: 'center', gap: 4 },
-  railActionContent: { width: 44, alignItems: 'center', gap: 4 },
-  railLikeWrap: { width: 44, alignItems: 'center', justifyContent: 'center' },
+  railBtn: { width: 38, alignItems: 'center', gap: 2 },
+  railActionContent: { width: 38, alignItems: 'center', gap: 2 },
+  railLikeWrap: { width: 38, alignItems: 'center', justifyContent: 'center' },
   railLikeRing: {
-    position: 'absolute', top: 2, width: 38, height: 38, borderRadius: RADII.pill,
+    position: 'absolute', top: 2, width: 34, height: 34, borderRadius: RADII.pill,
     borderWidth: 2, borderColor: '#EF4444',
   },
   railCount: {
-    fontSize: 12, lineHeight: 14, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
+    fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   // Same shadow as railCount above, applied to the rail's two plain icons
@@ -3471,9 +3511,11 @@ const styles = StyleSheet.create({
   // reserved space where it used to sit.
   // Left inset tightened to match TikTok; right inset + maxWidth both cap
   // the block so it stops well before the action rail and stays narrow
-  // enough (~75%) that the video shows through around it.
+  // enough (~72%) that the video shows through around it. `bottom` matches
+  // CAPTION_BOTTOM_GAP's 10pt clearance above the tab bar/progress line
+  // (see the module-level comment on CAPTION_BOTTOM_GAP).
   bottomInfo: {
-    position: 'absolute', left: 12, right: 78, maxWidth: '75%', bottom: 26, minHeight: 56,
+    position: 'absolute', left: 12, right: 62, maxWidth: '72%', bottom: 12, minHeight: 50,
     justifyContent: 'flex-end',
   },
   bottomInfoWithRepost: { minHeight: 92 },
@@ -3493,22 +3535,22 @@ const styles = StyleSheet.create({
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
-    fontSize: 14, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 8,
-    lineHeight: 19, letterSpacing: 0.1,
+    fontSize: 13, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 7,
+    lineHeight: 17, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
-  creatorRow: { minHeight: 26, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorRow: { minHeight: 22, marginBottom: 5, flexDirection: 'row', alignItems: 'center', gap: 6 },
   creatorName: {
-    fontSize: 16, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    fontSize: 14, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   soundRow: {
     height: 20, flexDirection: 'row', alignItems: 'center', gap: 5,
-    alignSelf: 'flex-start', paddingHorizontal: 8, borderRadius: RADII.pill,
+    alignSelf: 'flex-start', paddingHorizontal: 7, borderRadius: RADII.pill,
     backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
-  soundText: { fontSize: 11, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
+  soundText: { fontSize: 12, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
 
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 10, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },

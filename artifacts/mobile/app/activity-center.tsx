@@ -1,22 +1,26 @@
 /**
- * Activity — one place for everything that happened to you.
+ * Activity — Threads-style: a pill filter row (All/Follows/Likes/Comments/
+ * Thread Cash/Orders) over a single plain-background feed.
  *
  * Buyers see follows/follow-backs, likes on posts/videos/stories/highlights,
  * comments, replies, mentions, reposts, Thread Cash received, order updates
- * (collapsed into one "Orders" row) and, at the bottom, real "Suggested for
- * you" people to follow. Sellers see the same feed plus sales/payouts/
- * inventory alerts. Both read the same per-user notifications feed that
- * powers push notifications (GET /api/buyer/notifications), paged 30 at a
- * time — see lib/activityEvents.ts (api-server) for what writes to it.
+ * and, at the bottom, real "Suggested for you" people to follow. Sellers see
+ * the same feed plus sales/payouts/inventory alerts. Both read the same
+ * per-user notifications feed that powers push notifications (GET
+ * /api/buyer/notifications), paged 30 at a time — see lib/activityEvents.ts
+ * (api-server) for what writes to it. The "All" chip excludes order/payout
+ * items (shopping noise doesn't belong next to likes/follows); the "Orders"
+ * chip shows them as ordinary rows in the same list, no separate summary card.
  *
- * Rows are grouped New / Today / This week / This month / Earlier; repeat
- * likes, comments, reposts and follows merge into one row ("Jay and 12
- * others liked your post"). Unread rows are marked read after they have been
- * on screen for a moment. Swipe a row left to dismiss it. There is no
- * websocket/SSE layer in this codebase, so `watchActivityRealtime` short-
- * polls the tiny /unread-count endpoint while this screen is focused and
- * refetches the first page when something changed — close enough to feel
- * live (~1-2s) without new server infra.
+ * Rows are grouped Today / This week / Earlier (the underlying recency model
+ * has a fifth bucket, unread-regardless-of-age "New", folded into Today
+ * here); repeat likes, comments, reposts and follows merge into one row
+ * ("Jay and 12 others liked your post") with stacked avatars. Unread rows
+ * are marked read after they have been on screen for a moment. Swipe a row
+ * left to dismiss it. There is no websocket/SSE layer in this codebase, so
+ * `watchActivityRealtime` short-polls the tiny /unread-count endpoint while
+ * this screen is focused and refetches the first page when something
+ * changed — close enough to feel live (~1-2s) without new server infra.
  *
  * This is deliberately separate from buyer-notifications.tsx, which remains as
  * the classic notifications list.
@@ -25,6 +29,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   ScrollView,
   SectionList,
   StyleSheet,
@@ -62,13 +67,12 @@ import {
   buildActivitySections,
   createReadTracker,
   isFollowBackRow,
-  newFollowersSummary,
   relativeTime,
   type ActivityActor,
   type ActivityItem,
   type ActivityRow,
   type ActivitySection,
-  type NewFollowersSummary,
+  type ActivitySectionKey,
 } from '@/lib/activity';
 import {
   dismissActivity,
@@ -84,6 +88,8 @@ import { setSellerFollowing } from '@/services/socialService';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 
 const EMPTY_ICON = 'activity' as const;
+/** Width of the in-flow unread-dot gutter that precedes every row's avatar. */
+const ROW_GUTTER_WIDTH = 12;
 const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
 
 type Styles = ReturnType<typeof makeStyles>;
@@ -127,35 +133,42 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
 }) {
   const { theme } = useAppTheme();
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.chipScroll}
-      contentContainerStyle={styles.chipScrollContent}
-    >
-      {ACTIVITY_CHIPS.map((chip) => {
-        const isSelected = chip.key === selected;
-        return (
-          <PressableScale
-            key={chip.key}
-            style={[
-              styles.chip,
-              isSelected
-                ? { backgroundColor: theme.cardElevated, borderColor: theme.border }
-                : { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.15)' },
-            ]}
-            onPress={() => onSelect(chip.key)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: isSelected }}
-            accessibilityLabel={chip.label}
-          >
-            <Text style={[styles.chipText, { color: isSelected ? theme.text : theme.muted }]} numberOfLines={1}>
-              {chip.label}
-            </Text>
-          </PressableScale>
-        );
-      })}
-    </ScrollView>
+    // A plain View wrapper with an explicit height, not just the ScrollView's
+    // own style — a horizontal ScrollView with no non-zero cross-axis height
+    // of its own can collapse to nothing in this screen's flex column,
+    // letting the SectionList below render through/over it. Plain `Pressable`
+    // (not `PressableScale`) here too, so there's no ambiguity about which
+    // element in the tree actually carries the chip's visible style.
+    <View style={styles.chipRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipScrollContent}
+      >
+        {ACTIVITY_CHIPS.map((chip) => {
+          const isSelected = chip.key === selected;
+          return (
+            <Pressable
+              key={chip.key}
+              style={[
+                styles.chip,
+                isSelected
+                  ? { backgroundColor: theme.cardElevated, borderColor: theme.border }
+                  : { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.15)' },
+              ]}
+              onPress={() => onSelect(chip.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
+              accessibilityLabel={chip.label}
+            >
+              <Text style={[styles.chipText, { color: isSelected ? theme.text : theme.muted }]} numberOfLines={1}>
+                {chip.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -279,8 +292,11 @@ const ActivityRowView = React.memo(function ActivityRowView({
   const parts = activityMessage(row);
   const detail = activityDetail(row);
   const followBack = isFollowBackRow(row);
-  const rowBackground = unread ? theme.card : theme.background;
   const sentence = parts.map((p) => p.text).join('');
+  // "$5.00 · tap to view" → "+$5.00": the amount is the whole point of a
+  // Thread Cash row, so it gets its own bold green line instead of reading
+  // like an ordinary detail caption.
+  const cashAmount = row.type === 'thread_cash_received' ? row.body?.match(/\$[\d,.]+/)?.[0] : null;
 
   return (
     <SwipeActionRow
@@ -291,13 +307,22 @@ const ActivityRowView = React.memo(function ActivityRowView({
       accessibilityLabel="Dismiss activity"
     >
       <PressableScale
-        style={[styles.row, { backgroundColor: rowBackground }]}
+        style={styles.row}
         onPress={() => onPress(row)}
         accessibilityRole="button"
         accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
       >
+        {/* In-flow gutter, not an absolutely-positioned dot — RN positions
+            absolute children against the parent's border box, ignoring its
+            padding, which is what put the old dot outside the row's padding
+            (and outside the avatar) entirely. Always rendered so row
+            alignment never shifts between read/unread. */}
+        <View style={styles.unreadGutter}>
+          {unread && <View style={styles.unreadDotSmall} />}
+        </View>
+
         {row.actors.length > 0 ? (
-          <ActivityAvatarStack row={row} styles={styles} ring={rowBackground} />
+          <ActivityAvatarStack row={row} styles={styles} ring={theme.background} />
         ) : (
           <View style={styles.leading}>
             <View style={styles.iconCircle}>
@@ -317,7 +342,11 @@ const ActivityRowView = React.memo(function ActivityRowView({
             ))}
             <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
           </Text>
-          {detail ? <Text style={styles.detail} numberOfLines={2}>{detail}</Text> : null}
+          {cashAmount ? (
+            <Text style={[styles.detail, { color: theme.success, fontFamily: FONT.bold }]}>{`+${cashAmount}`}</Text>
+          ) : detail ? (
+            <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
+          ) : null}
         </View>
 
         {followBack ? (
@@ -361,8 +390,6 @@ const ActivityRowView = React.memo(function ActivityRowView({
             )}
           </View>
         ) : null}
-
-        {unread && <View style={styles.unreadDot} />}
       </PressableScale>
     </SwipeActionRow>
   );
@@ -383,69 +410,6 @@ function SkeletonRows({ styles }: { styles: Styles }) {
         </View>
       ))}
     </View>
-  );
-}
-
-// ─── New followers summary ─────────────────────────────────────────────────
-// A compact row (stacked avatars, "N new followers") above the dated
-// sections — tapping it opens the full followers list. Mirrors Beli's
-// "started following you" row and BeReal's requests row at the top.
-
-function NewFollowersRow({ summary, styles, onPress }: {
-  summary: NewFollowersSummary;
-  styles: Styles;
-  onPress: () => void;
-}) {
-  const { theme } = useAppTheme();
-  const label = summary.count === 1 ? summary.actors[0]?.name ?? 'Someone' : `${summary.count} new followers`;
-  return (
-    <PressableScale style={styles.summaryRow} onPress={onPress} accessibilityRole="button" accessibilityLabel={`New followers: ${label}`}>
-      <View style={styles.summaryStack} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        {summary.actors.slice(0, 3).map((actor, index) => (
-          <View key={actor.id ?? actor.name} style={[styles.summaryAvatarWrap, { left: index * 14, zIndex: 3 - index }]}>
-            <Avatar actor={actor} size={32} styles={styles} ring={theme.background} />
-          </View>
-        ))}
-      </View>
-      <View style={styles.center}>
-        <Text style={styles.message}>
-          <Text style={styles.messageBold}>New followers</Text>
-          {'  '}
-          <Text style={styles.detail}>{label}</Text>
-        </Text>
-      </View>
-      <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
-      {summary.hasUnread && <View style={styles.unreadDot} />}
-    </PressableScale>
-  );
-}
-
-// ─── Orders summary ─────────────────────────────────────────────────────────
-// Order/payout updates never appear individually in the social feed — one
-// row links out to Orders, keeping shopping noise out of the Activity tab.
-
-function OrdersRow({ count, hasUnread, styles, onPress }: {
-  count: number;
-  hasUnread: boolean;
-  styles: Styles;
-  onPress: () => void;
-}) {
-  const { theme } = useAppTheme();
-  return (
-    <PressableScale style={styles.summaryRow} onPress={onPress} accessibilityRole="button" accessibilityLabel={`Orders, ${count} update${count === 1 ? '' : 's'}`}>
-      <View style={[styles.leading, styles.iconCircle]}>
-        <Feather name="package" size={ICON.md} color={theme.accentLight} />
-      </View>
-      <View style={styles.center}>
-        <Text style={styles.message}>
-          <Text style={styles.messageBold}>Orders</Text>
-          {'  '}
-          <Text style={styles.detail}>{count} update{count === 1 ? '' : 's'}</Text>
-        </Text>
-      </View>
-      <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
-      {hasUnread && <View style={styles.unreadDot} />}
-    </PressableScale>
   );
 }
 
@@ -665,38 +629,45 @@ export default function ActivityCenterScreen() {
 
   const readIds = useMemo(() => new Set(items.filter((item) => item.isRead).map((item) => item.id)), [items]);
 
-  // Order updates are collapsed into a single "Orders" summary row instead of
-  // appearing individually — keeps shopping noise out of the social feed.
+  // Order/payout updates stay out of the default "All" feed (shopping noise
+  // doesn't belong next to likes/follows), but the "Orders" chip shows them
+  // as ordinary rows in the same list — no separate summary card.
   const orderItems = useMemo(() => items.filter((item) => activityKind(item) === 'orders'), [items]);
   const socialItems = useMemo(() => items.filter((item) => activityKind(item) !== 'orders'), [items]);
-  const orderSummary = useMemo(() => (orderItems.length === 0 ? null : {
-    count: orderItems.length,
-    hasUnread: orderItems.some((item) => !item.isRead),
-  }), [orderItems]);
 
-  const followSummary: NewFollowersSummary | null = useMemo(
-    () => newFollowersSummary(items.map((item) => (sessionNew.has(item.id) ? { ...item, isRead: false } : item))),
-    [items, sessionNew],
-  );
-  // The "Orders" chip shows only the summary row; the summary rows for
-  // follows/orders only make sense under "All" or their own chip.
-  const showFollowSummary = chip === 'all' || chip === 'follows';
-  const showOrderSummary = chip === 'all' || chip === 'orders';
-
-  // Client-side filtering of the already-loaded page for chips other than
-  // "All" — pagination (loadMore/hasMore) keeps working against the
-  // unfiltered `items`/`socialItems`, this only narrows what's displayed.
-  const filteredSocialItems = useMemo(() => {
-    if (chip === 'orders') return [];
+  // Client-side filtering of the already-loaded page — pagination
+  // (loadMore/hasMore) keeps working against the unfiltered `items`, this
+  // only narrows what's displayed.
+  const filteredItems = useMemo(() => {
+    if (chip === 'orders') return orderItems;
     const typeFilter = chipTypeFilter(chip);
     if (!typeFilter) return socialItems;
     return socialItems.filter((item) => typeFilter.has(item.type));
-  }, [socialItems, chip]);
+  }, [socialItems, orderItems, chip]);
 
-  const sections: ListSection[] = useMemo(() => buildActivitySections(
-    filteredSocialItems.map((item) => (sessionNew.has(item.id) ? { ...item, isRead: false } : item)),
-    new Date(now),
-  ).map((section) => ({ ...section, data: section.items })), [filteredSocialItems, sessionNew, now]);
+  const sections: ListSection[] = useMemo(() => {
+    const raw = buildActivitySections(
+      filteredItems.map((item) => (sessionNew.has(item.id) ? { ...item, isRead: false } : item)),
+      new Date(now),
+    );
+    // Threads only has Today / This week / Earlier — fold the age-agnostic
+    // "New" (unread) bucket into Today, and "This month" into Earlier,
+    // rather than the underlying 5-bucket recency model's own labels.
+    const merged = new Map<'today' | 'this_week' | 'earlier', ActivityRow[]>();
+    const titles: Record<'today' | 'this_week' | 'earlier', string> = {
+      today: 'Today', this_week: 'This week', earlier: 'Earlier',
+    };
+    const targetOf: Record<ActivitySectionKey, 'today' | 'this_week' | 'earlier'> = {
+      new: 'today', today: 'today', this_week: 'this_week', this_month: 'earlier', earlier: 'earlier',
+    };
+    for (const section of raw) {
+      const target = targetOf[section.key];
+      merged.set(target, [...(merged.get(target) ?? []), ...section.items]);
+    }
+    return (['today', 'this_week', 'earlier'] as const)
+      .filter((key) => (merged.get(key)?.length ?? 0) > 0)
+      .map((key) => ({ key, title: titles[key], items: merged.get(key)!, data: merged.get(key)! }));
+  }, [filteredItems, sessionNew, now]);
 
   const hasUnread = items.some((item) => !item.isRead);
 
@@ -776,18 +747,6 @@ export default function ActivityCenterScreen() {
     }
   }, []);
 
-  const handleOrdersPress = useCallback(() => {
-    const ids = orderItems.filter((item) => !item.isRead).map((item) => item.id);
-    if (ids.length > 0) tracker.markNow(ids);
-    router.push((role === 'seller' ? '/(tabs)/orders' : '/(buyer)/orders') as never);
-  }, [orderItems, role, router, tracker]);
-
-  const handleNewFollowersPress = useCallback(() => {
-    const ids = items.filter((item) => item.type === 'new_follower' && !item.isRead).map((item) => item.id);
-    if (ids.length > 0) tracker.markNow(ids);
-    router.push('/connections?type=followers' as never);
-  }, [items, router, tracker]);
-
   const handleSuggestedFollow = useCallback(async (person: SuggestedPerson) => {
     hapticPrimaryAction();
     setSuggestedFollowState((prev) => ({ ...prev, [person.userId]: 'pending' }));
@@ -839,17 +798,6 @@ export default function ActivityCenterScreen() {
     : errorKind === 'server'
       ? "Brandthread couldn't load your activity right now. Try again shortly."
       : "Your activity couldn't load. Check your connection and try again.";
-
-  const listHeader = (
-    <>
-      {showFollowSummary && followSummary && (
-        <NewFollowersRow summary={followSummary} styles={styles} onPress={handleNewFollowersPress} />
-      )}
-      {showOrderSummary && orderSummary && (
-        <OrdersRow count={orderSummary.count} hasUnread={orderSummary.hasUnread} styles={styles} onPress={handleOrdersPress} />
-      )}
-    </>
-  );
 
   const listFooter = (
     <>
@@ -911,7 +859,6 @@ export default function ActivityCenterScreen() {
               onRefresh={() => { void loadFirstPage('refresh'); }}
             />
           )}
-          ListHeaderComponent={listHeader}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
               <EmptyState icon={EMPTY_ICON} message={EMPTY_MESSAGE} />
@@ -946,13 +893,18 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   listContentEmpty: {
     flexGrow: 1,
   },
-  chipScroll: {
-    flexGrow: 0,
+  // Explicit height on the wrapper (not just the ScrollView's own style) so
+  // this row always reserves real vertical space in the screen's flex
+  // column, however the horizontal ScrollView itself sizes on a given
+  // platform — nothing below it can ever render through/over the chips.
+  chipRow: {
+    height: 36 + SP.sm * 2,
   },
   chipScrollContent: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
     gap: SP.sm,
+    alignItems: 'center',
   },
   chip: {
     height: 36,
@@ -986,10 +938,25 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingVertical: SP.md,
     minHeight: 68,
   },
+  // In-flow unread indicator, rendered before the avatar column — see the
+  // comment at its call site for why this replaced an absolutely-positioned
+  // dot (RN ignores parent padding for absolute children, so that dot landed
+  // outside both the row's padding and the avatar).
+  unreadGutter: {
+    width: ROW_GUTTER_WIDTH,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadDotSmall: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.accent,
+  },
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: theme.borderSubtle,
-    marginLeft: 44 + SP.sm + 4,
+    marginLeft: ROW_GUTTER_WIDTH + (SP.sm + 4) + 44 + (SP.sm + 4),
   },
   leading: {
     width: 44,
@@ -1122,17 +1089,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },
-  unreadDot: {
-    position: 'absolute',
-    left: 6,
-    top: '50%',
-    marginTop: -3,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.accent,
-  },
-
   skeletonWrap: {
     paddingHorizontal: SP.md,
     paddingTop: SP.md,
@@ -1150,23 +1106,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   footer: {
     paddingVertical: SP.lg,
-  },
-
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm + 4,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm + 4,
-    minHeight: 60,
-  },
-  summaryStack: {
-    width: 58,
-    height: 32,
-  },
-  summaryAvatarWrap: {
-    position: 'absolute',
-    top: 0,
   },
 
   suggestedSection: {

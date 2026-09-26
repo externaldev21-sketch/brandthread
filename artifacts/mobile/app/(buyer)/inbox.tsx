@@ -22,6 +22,7 @@ import {
 } from '@/services/socialService';
 import type { Conversation, ProfileSearchResult, AccountType } from '@/services/socialTypes';
 import { getSuggestedPeople, dismissSuggestedPerson, type SuggestedPerson } from '@/services/activityService';
+import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
@@ -209,9 +210,14 @@ export default function InboxScreen() {
   const accountRef = useRef(userId);
   accountRef.current = userId;
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  // Real content on the very first frame, not a skeleton: seed from whatever
+  // `warmBuyerTabs` (or a previous visit this session) already cached for
+  // this tab. A cold start with nothing cached yet falls back to the
+  // skeleton exactly as before.
+  const cachedInbox = getCachedTabData<{ conversations: Conversation[] }>('inbox');
+  const [conversations, setConversations] = useState<Conversation[]>(cachedInbox?.conversations ?? []);
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedInbox);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [composeVisible, setComposeVisible] = useState(false);
@@ -285,6 +291,7 @@ export default function InboxScreen() {
         setConversations(getPreviewConversations());
       } else {
         setConversations(convs);
+        setCachedTabData('inbox', { conversations: convs });
       }
     } catch {
       // A real, reachable backend failing is a real error. In dev/preview
