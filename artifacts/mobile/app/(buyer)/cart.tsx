@@ -40,9 +40,8 @@ import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import {
   EmptyState, BrandedLoader, PressableScale, useUndoToast,
 } from '@/components/BrandthreadUI';
-import { InlineError } from '@/components/InlineFeedback';
 import {
-  Button, Card, QuantityStepper, StickyBottomCTA, ThemedRefreshControl,
+  Button, Card, ErrorState, QuantityStepper, StickyBottomCTA, ThemedRefreshControl,
 } from '@/components/ui';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
@@ -876,7 +875,7 @@ export default function CartScreen() {
           style={{ flex: 1 }}
         />
       ) : !hasItems && !hasSaved && loadError ? (
-        <InlineError
+        <ErrorState
           message="Couldn’t load your cart. Check your connection and try again."
           onRetry={() => { setLoading(true); void load(); }}
           style={{ flex: 1, justifyContent: 'center' }}

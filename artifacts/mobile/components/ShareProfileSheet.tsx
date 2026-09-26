@@ -11,7 +11,7 @@ import { FONT, FS, SP, RADIUS, ICON, SUCCESS, RED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { SheetRise } from '@/components/motion/SheetRise';
-import { buildCanonicalProfileUrl, normalizeUsername } from '@/lib/shareProfile';
+import { buildCanonicalProfileUrl, normalizeUsername, shareLinkWithFallback } from '@/lib/shareProfile';
 import {
   captureShareCard, saveCardImageToLibrary, shareCardToInstagramStories,
   type BuyerShareCardData, type SellerShareCardData, type ShareCardVariant, type CardThumbnail,
@@ -197,14 +197,27 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl, buyerExtra, sel
     });
   }, [captureCurrentCard, runAction, showToast]);
 
+  // "More" opens the system share sheet with the profile's real
+  // brandthread.app link. Web uses the Web Share API when the browser has it
+  // and otherwise copies the link (react-native-web's Share.share throws
+  // without navigator.share).
   const handleMore = useCallback(() => {
+    if (!canonicalUrl) return;
     void runAction('more', async () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const imageUri = await captureCurrentCard();
       const { Share } = await import('react-native');
-      await Share.share(Platform.OS === 'ios' ? { url: imageUri } : { message: imageUri });
+      const name = cardData?.kind === 'seller' ? cardData.brandName : cardData?.name;
+      const result = await shareLinkWithFallback({
+        url: canonicalUrl,
+        message: name ? `${name} on Brandthread` : 'Find me on Brandthread',
+        platformOS: Platform.OS,
+        nativeShare: (content) => Share.share(content),
+        webNavigator: typeof navigator !== 'undefined' ? (navigator as any) : null,
+      });
+      if (result === 'copied') showToast('Link copied');
+      else if (result === 'unavailable') showToast("Sharing isn't available here. Use Copy link.", 'error');
     });
-  }, [captureCurrentCard, runAction]);
+  }, [canonicalUrl, cardData, runAction, showToast]);
 
   const onScrollEnd = useCallback((e: { nativeEvent: { contentOffset: { x: number } } }) => {
     const width = 252 + CARD_GAP;

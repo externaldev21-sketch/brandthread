@@ -30,12 +30,15 @@ import {
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
+import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
 
 type RemoteProfile = {
+  coverVideoUrl?: string | null;
+  coverPosterUrl?: string | null;
   userId?: string;
   name: string; username: string | null; displayName: string | null;
   bio: string | null; avatarUrl?: string | null;
@@ -300,6 +303,7 @@ export default function BuyerOtherProfileScreen() {
             followLabel={isFollowedBy ? 'Follow back' : 'Follow'}
             followingLabel={isMutual ? 'Friends' : 'Following'}
             style={styles.followMorphBtn}
+            labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
           />
         </View>
         <ProfileButton
@@ -336,10 +340,13 @@ export default function BuyerOtherProfileScreen() {
         avatar={storyIds.length > 0
           ? { ring: true, onPress: openStories, accessibilityLabel: `View ${displayName}'s story` }
           : undefined}
-        hero={{
-          videoUri: videos.posts.find((post) => post.contentType === 'video')?.mediaUris[0] ?? null,
-          posterUri: gridItems.find((item) => item.posterUri)?.posterUri ?? null,
-        }}
+        // Their cover video (muted, looping, poster first) leads the hero when set.
+        hero={profile?.coverVideoUrl
+          ? { videoUri: profile.coverVideoUrl, posterUri: profile.coverPosterUrl ?? null }
+          : {
+            videoUri: videos.posts.find((post) => post.contentType === 'video')?.mediaUris[0] ?? null,
+            posterUri: gridItems.find((item) => item.posterUri)?.posterUri ?? null,
+          }}
         topLeft={<ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
         topRight={(
           <ProfileGlassButton
@@ -379,7 +386,7 @@ export default function BuyerOtherProfileScreen() {
                 ? 'Unblock to see each other’s posts again.'
                 : videos.restricted
                   ? `Follow each other to see ${displayName}'s posts.`
-                  : 'Posts will appear here.'}
+                  : profileEmptyState('buyer:posts', false).message}
             />
           )
         }
@@ -443,7 +450,7 @@ function makeStyles(theme: AppThemePreset) {
       borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4,
     },
     chipText: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14 },
-    followMorphBtn: { width: '100%', minHeight: 46, borderRadius: RADIUS.md },
+    followMorphBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },
     blockedBanner: {
       flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.sm,
       padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,

@@ -5,6 +5,7 @@ export * from './subscriptionEntitlements';
 export * from './security';
 export * from './money';
 export * from './threadCash';
+export * from './shopifyFulfillment';
 export * from './metaAds';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
@@ -56,6 +57,12 @@ export const users = pgTable('users', {
   subscriptionTrialStartedAt: timestamp('subscription_trial_started_at', { withTimezone: true }),
   subscriptionTrialEndsAt:    timestamp('subscription_trial_ends_at', { withTimezone: true }),
   subscriptionTrialBannerDismissedTrialEnd: text('subscription_trial_banner_dismissed_trial_end'),
+  // Buyer-only "Watching Threads" gesture coach mark on the feed. Stores the
+  // FEED_GESTURES_TIP_VERSION the user has already seen (0 = never shown).
+  // Bumping the client-side version constant shows the tip one more time per
+  // user, then persists the new version — server-side so it survives
+  // reinstalls, new devices and cleared local storage, not just AsyncStorage.
+  feedGesturesTipSeenVersion: integer('feed_gestures_tip_seen_version').notNull().default(0),
   // Trust signals & Stripe Identity verification
   verified:                     boolean('verified').notNull().default(false),
   /** 'unverified' | 'pending' | 'verified' | 'failed' */
@@ -83,6 +90,18 @@ export const users = pgTable('users', {
   // by a later Clerk sync.
   logoUrl:   text('logo_url'),
   bannerUrl: text('banner_url'),
+  // Profile cover video (all account types) — a short, always-muted looping
+  // clip shown in the profile hero. Separate from the avatar. Server-rendered
+  // compressed rendition + poster frame, both public object paths served via
+  // /api/profile/cover-media. `coverVideoUpdatedAt` drives the once-per-24h
+  // change limit (setting AND removing both count as a change).
+  coverVideoUrl:              text('cover_video_url'),
+  coverPosterUrl:             text('cover_poster_url'),
+  coverVideoUpdatedAt:        timestamp('cover_video_updated_at', { withTimezone: true }),
+  coverVideoModerationStatus: text('cover_video_moderation_status').notNull().default('visible'),
+  // First-visit coach mark ("add a cover video") — shown exactly once per
+  // account, server-side so it survives reinstalls and other devices.
+  coverCoachmarkSeenAt:       timestamp('cover_coachmark_seen_at', { withTimezone: true }),
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
   // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
   username: text('username').unique(),

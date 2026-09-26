@@ -53,9 +53,14 @@ export function VariantPickerSheet({
       const p = await getBuyerProduct(productId);
       if (!p) { setError('Product not found.'); return; }
       setProduct(p);
-      const firstAvailable = p.variants.find(v => v.isAvailable);
-      if (firstAvailable) {
-        setSelections(Object.fromEntries(firstAvailable.optionValues.map(ov => [ov.optionId, ov.valueId])));
+      // Only auto-fill when there's exactly one variant — nothing to
+      // actually choose. With more than one, the buyer must explicitly pick
+      // a size/color before "Add to cart" is enabled; pre-selecting the
+      // first available variant let Add to cart succeed with no picker
+      // interaction at all.
+      if (p.variants.length === 1 && p.variants[0].isAvailable) {
+        const only = p.variants[0];
+        setSelections(Object.fromEntries(only.optionValues.map(ov => [ov.optionId, ov.valueId])));
       }
     } catch {
       setError("Couldn't load this product. Tap to retry.");

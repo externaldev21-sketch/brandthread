@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BUYER_PROTECTION_STATUS, BUYER_PROTECTION_TITLE, buyerProtectionLines } from '@/content/buyerProtection';
 import { LEGAL_DOCUMENTS } from '@/content/legal';
-import { computeProfileLayout, PROFILE_WEB_COLUMN } from '@/components/profile/profileGeometry';
+import { computeProfileLayout, PROFILE_GRID_GAP, PROFILE_WEB_COLUMN } from '@/components/profile/profileGeometry';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -99,11 +99,13 @@ describe('profile layout geometry', () => {
       const layout = computeProfileLayout(width, height, 'ios');
       expect(layout.columnWidth).toBe(width);
       expect(layout.gridColumns).toBe(3);
-      expect(layout.tileWidth * 3 + 2 * 2).toBeLessThanOrEqual(width);
+      expect(layout.tileWidth * 3 + PROFILE_GRID_GAP * 2).toBeLessThanOrEqual(width);
       expect(Math.abs(layout.tileHeight / layout.tileWidth - 16 / 9)).toBeLessThan(0.02);
-      // The hero leaves room for the identity block above the fold.
-      expect(layout.heroHeight).toBeLessThan(height * 0.5);
-      expect(layout.heroHeight).toBeGreaterThanOrEqual(280);
+      // A dominant hero that still leaves the stats row above the fold (the
+      // identity block sits inside the hero's bottom edge).
+      expect(layout.heroHeight).toBeGreaterThanOrEqual(height * 0.6);
+      expect(layout.heroHeight).toBeLessThanOrEqual(height * 0.65);
+      expect(layout.heroHeight + 180).toBeLessThan(height);
     }
   });
 

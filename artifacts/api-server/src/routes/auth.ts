@@ -59,6 +59,9 @@ const profileBodySchema = z.object({
 const privacyBodySchema = z.object({
   dmPrivacy: z.enum(["requests", "followers_only"]),
 }).passthrough();
+const feedGesturesTipBodySchema = z.object({
+  version: z.number().int().min(1),
+}).passthrough();
 
 // ─── Username validation ──────────────────────────────────────────────────────
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
@@ -900,6 +903,43 @@ router.patch("/privacy", requireAuth, validateRequest({ body: privacyBodySchema 
 
   res.json({ dmPrivacy: updated?.dmPrivacy ?? "requests" });
 });
+
+// ─── GET /api/auth/feed-gestures-tip ──────────────────────────────────────────
+// Server-side source of truth for the buyer "Watching Threads" gesture coach
+// mark: the version of the tip this user has already seen (0 = never).
+router.get("/feed-gestures-tip", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const [user] = await db
+    .select({ seenVersion: users.feedGesturesTipSeenVersion })
+    .from(users)
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+  res.json({ seenVersion: user?.seenVersion ?? 0 });
+});
+
+// ─── PATCH /api/auth/feed-gestures-tip ────────────────────────────────────────
+// Records that the user has now seen a given version of the tip. Never
+// lowers the stored version (a stale/older client can't un-mark it seen).
+router.patch(
+  "/feed-gestures-tip",
+  requireAuth,
+  validateRequest({ body: feedGesturesTipBodySchema }),
+  async (req, res) => {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const { version } = req.body as { version: number };
+
+    const [updated] = await db
+      .update(users)
+      .set({
+        feedGesturesTipSeenVersion: sql`GREATEST(${users.feedGesturesTipSeenVersion}, ${version})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.clerkId, clerkUserId))
+      .returning({ seenVersion: users.feedGesturesTipSeenVersion });
+
+    res.json({ seenVersion: updated?.seenVersion ?? version });
+  },
+);
 
 // ─── GET /api/auth/me ────────────────────────────────────────────────────────
 router.get("/me", requireAuth, async (req, res) => {

@@ -34,6 +34,9 @@ const {
   authMock: vi.fn(() => ({ isLoaded: true, userId: "buyer-1" })),
 }));
 
+vi.mock("@/components/profile/ProfileCover", async () =>
+  (await import("./helpers/profileCoverMock")).profileCoverMockModule);
+
 vi.mock("react-native", () => {
   const React = require("react") as any;
   const nativeComponent = (name: string) => {
@@ -47,6 +50,7 @@ vi.mock("react-native", () => {
     _value: number;
     constructor(value: number) { this._value = value; }
     interpolate() { return this._value; }
+    setValue(value: number) { this._value = value; }
   }
   function MockPressable(props: Record<string, unknown>) {
     const { children, ...rest } = props;
@@ -64,6 +68,7 @@ vi.mock("react-native", () => {
       View: nativeComponent("Animated.View"),
       ScrollView: nativeComponent("Animated.ScrollView"),
       event: () => () => {},
+      spring: () => ({ start: () => {} }),
     },
     Dimensions: { get: () => ({ width: 375, height: 800 }) },
     Image: nativeComponent("Image"),
@@ -281,6 +286,25 @@ describe("seller-profile.tsx owner vs. non-owner action branch", () => {
     const allText = textContent(renderer.toJSON());
     expect(allText).toContain("Edit profile");
     expect(renderer.root.findAllByProps({ testID: "seller-profile-follow-btn" })).toHaveLength(0);
+  });
+});
+
+describe("seller-profile.tsx cover video", () => {
+  let renderer!: ReactTestRenderer;
+  afterEach(async () => { await act(async () => { renderer?.unmount(); }); });
+
+  it("plays the public profile's cover video (with its poster) in the hero for a visitor, without owner controls", async () => {
+    apiMock.publicSellers.get.mockResolvedValue({
+      profile: { ...sellerProfile, coverVideoUrl: "https://api.test/api/profile/cover-media/uploads/c1", coverPosterUrl: "https://api.test/api/profile/cover-media/uploads/p1" },
+      products: [],
+    });
+    renderer = await renderScreen();
+    const hero = renderer.root.findByProps({ testID: "profile-hero-media" });
+    expect(hero.props.hero).toEqual({
+      videoUri: "https://api.test/api/profile/cover-media/uploads/c1",
+      posterUri: "https://api.test/api/profile/cover-media/uploads/p1",
+    });
+    expect(renderer.root.findAll((node) => node.props.testID === "profile-cover-affordance")).toHaveLength(0);
   });
 });
 

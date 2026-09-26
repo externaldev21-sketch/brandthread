@@ -392,13 +392,23 @@ export function ShopProductSheet({
     if (selection.previewProduct && tag.productId === selection.previewProduct.id) {
       const preview = selection.previewProduct;
       setProduct(preview);
-      const firstVariant = preview.variants.find(candidate => candidate.isAvailable);
-      if (firstVariant) {
-        setSelections(Object.fromEntries(firstVariant.optionValues.map(ov => [ov.optionId, ov.valueId])));
-        setPhase('ready');
-      } else {
+      // Same rule as a real catalog product below: only auto-fill the
+      // selection when there's exactly one variant (nothing to actually
+      // choose). With more than one, the buyer must pick a size/variant
+      // before Add to cart is enabled — preview data must not skip the
+      // picker step that real products require.
+      if (preview.variants.length === 0) {
         setPhase('sold_out');
+        return;
       }
+      if (preview.variants.length === 1) {
+        const only = preview.variants[0];
+        setSelections(Object.fromEntries(only.optionValues.map(ov => [ov.optionId, ov.valueId])));
+        setPhase(only.isAvailable ? 'ready' : 'sold_out');
+        return;
+      }
+      const hasAnyStock = preview.variants.some(v => v.isAvailable);
+      setPhase(hasAnyStock ? 'ready' : 'sold_out');
       return;
     }
     try {
@@ -702,7 +712,8 @@ export function ShopProductSheet({
             {/* Swipeable image gallery */}
             <ProductImageCarousel imageUris={product.imageUris} />
 
-            {/* Product header row */}
+            {/* Product header row — no thumbnail: the carousel above already
+                shows this exact photo full-size directly above it. */}
             <ProductHeader
               product={product}
               variantPrice={variantPrice}
@@ -710,6 +721,7 @@ export function ShopProductSheet({
               hasDiscount={hasDiscount}
               accent={accent}
               onViewDetail={handleViewDetail}
+              showImage={false}
             />
 
             <View style={ss.descriptionSection}>
@@ -933,6 +945,7 @@ function ProductHeader({
   hasDiscount,
   accent,
   onViewDetail,
+  showImage = true,
 }: {
   product: BuyerProduct;
   variantPrice: number;
@@ -940,35 +953,46 @@ function ProductHeader({
   hasDiscount: boolean;
   accent: string;
   onViewDetail?: () => void;
+  /**
+   * Whether to show the small thumbnail. Default true (used standalone, e.g.
+   * sold-out/unavailable phases with no image carousel above it). Pass
+   * false when this header renders directly under ProductImageCarousel,
+   * which already shows the same photo full-size — otherwise a small
+   * thumbnail of the identical image sits flush against the big hero image
+   * right above it with no visual separation, reading as an overlap.
+   */
+  showImage?: boolean;
 }) {
   const imageUri = product.imageUris[0];
 
   return (
     <TouchableOpacity
-      style={ss.productRow}
+      style={[ss.productRow, !showImage && ss.productRowNoImage]}
       onPress={onViewDetail}
       activeOpacity={onViewDetail ? 0.8 : 1}
       accessibilityRole={onViewDetail ? 'button' : 'none'}
       accessibilityLabel={onViewDetail ? `View details for ${product.name}` : undefined}
     >
-      <View style={ss.productImageWrap}>
-        {imageUri ? (
-          <CachedImage
-            source={{ uri: imageUri }}
-            style={ss.productImage}
-            contentFit="cover"
-          />
-        ) : (
-          <View style={[ss.productImage, ss.productImagePlaceholder]}>
-            <Feather name="image" size={22} color={SUBTLE} />
-          </View>
-        )}
-        {product.isPreOrder && (
-          <View style={ss.preOrderBadge}>
-            <Text style={ss.preOrderText}>PRE</Text>
-          </View>
-        )}
-      </View>
+      {showImage && (
+        <View style={ss.productImageWrap}>
+          {imageUri ? (
+            <CachedImage
+              source={{ uri: imageUri }}
+              style={ss.productImage}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={[ss.productImage, ss.productImagePlaceholder]}>
+              <Feather name="image" size={22} color={SUBTLE} />
+            </View>
+          )}
+          {product.isPreOrder && (
+            <View style={ss.preOrderBadge}>
+              <Text style={ss.preOrderText}>PRE</Text>
+            </View>
+          )}
+        </View>
+      )}
       <View style={{ flex: 1, gap: 3 }}>
         <Text style={ss.productName} numberOfLines={2}>{product.name}</Text>
         <View style={ss.priceRow}>
@@ -1216,7 +1240,11 @@ const ss = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
     paddingHorizontal: 16,
+    paddingTop: 14,
     paddingBottom: 14,
+  },
+  productRowNoImage: {
+    paddingTop: 16,
   },
   productImageWrap: { position: 'relative' },
   productImage: {

@@ -4,13 +4,13 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP } from '@/lib/theme';
+import { getInitials } from '@/lib/format';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
@@ -24,8 +24,6 @@ import StripeConnectWarning from '@/components/StripeConnectWarning';
 export default function SellerSettingsScreen() {
   const colors = useColors();
   const s = useMemo(() => makeStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
-  const tabBar = useTabBarMetrics();
   const router = useRouter();
   const api = useApi();
   const { signOut } = useAuth();
@@ -51,7 +49,11 @@ export default function SellerSettingsScreen() {
   }, [api]);
 
   const profileName = user?.fullName || user?.username || 'Your Brandthread store';
-  const profileInitials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || 'BT';
+  // Initials are derived from the exact same `profileName` string shown next
+  // to the avatar (not a separate first/last-name pair that may be blank),
+  // so the avatar and the name text can never disagree.
+  const profileInitials = getInitials(profileName, 'BT');
+  const tabBarInset = useTabBarMetrics(2).occupiedHeight;
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -133,7 +135,7 @@ export default function SellerSettingsScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: tabBar.occupiedHeight + SP.xl }}
+        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: tabBarInset + SP.xl }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >

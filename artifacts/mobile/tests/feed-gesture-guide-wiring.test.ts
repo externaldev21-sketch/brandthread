@@ -12,13 +12,13 @@ const guide = readFileSync(resolve(__dirname, '../components/FeedGestureGuide.ts
 describe('Feed gesture guide wiring', () => {
   it('is checked once per account and only on the buyer surface', () => {
     expect(feed).toContain('if (!isBuyerSurface) return;');
-    expect(feed).toContain('hasSeenFeedGestureGuide(userId)');
+    expect(feed).toContain('hasSeenFeedGestureGuide(userId, api)');
     expect(feed).toContain('{isBuyerSurface && (');
     expect(feed).toContain('<FeedGestureGuide visible={showGestureGuide} onDismiss={dismissGestureGuide} />');
   });
 
-  it('marks itself seen on dismiss so it never shows again for that account', () => {
-    expect(feed).toContain('markFeedGestureGuideSeen(userId)');
+  it('marks itself seen on dismiss so it never shows again for that account — server-side, not just locally', () => {
+    expect(feed).toContain('markFeedGestureGuideSeen(userId, api)');
   });
 });
 

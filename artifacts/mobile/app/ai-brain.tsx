@@ -61,6 +61,7 @@ import {
   undoAction,
 } from '@/services/aiService';
 import { getStoreContext } from '@/lib/api';
+import { isPreviewCatalogEnabled } from '@/lib/previewCatalog';
 import {
   FONT,
   FS,
@@ -768,12 +769,31 @@ export default function AiBrainScreen() {
             confirmed there's no session — never during the brief hydration
             window, which is what previously caused this screen to show a
             false "sign in" prompt for already-signed-in sellers. */}
-        {isAuthLoaded && !isSignedIn ? (
+        {isAuthLoaded && !isSignedIn && !isPreviewCatalogEnabled() ? (
           <View style={styles.signInGate}>
             <Feather name="lock" size={28} color={colors.mutedForeground} />
             <Text style={styles.signInGateTitle}>Sign in to use Brandthread AI</Text>
             <Text style={styles.signInGateBody}>
               Brandthread AI reads your store's live data to answer questions — sign in to start chatting.
+            </Text>
+            <TouchableOpacity
+              style={[styles.signInGateBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/sign-in' as any)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.signInGateBtnText, { color: colors.primaryForeground }]}>Sign in</Text>
+            </TouchableOpacity>
+          </View>
+        ) : isAuthLoaded && !isSignedIn ? (
+          // Preview/dev mode: explorable demo instead of a hard sign-in wall.
+          // Real signed-out production behavior above is unchanged.
+          <View style={styles.signInGate}>
+            <Feather name="cpu" size={28} color={colors.mutedForeground} />
+            <Text style={styles.signInGateTitle}>Brandthread AI — preview</Text>
+            <Text style={styles.signInGateBody}>
+              In the live app, Brandthread AI reads your store's real sales, orders and inventory to answer
+              questions like "What's my best seller this week?" or "Draft a restock reminder for low-stock items."
+              Sign in on a real account to chat with your own data.
             </Text>
             <TouchableOpacity
               style={[styles.signInGateBtn, { backgroundColor: colors.primary }]}

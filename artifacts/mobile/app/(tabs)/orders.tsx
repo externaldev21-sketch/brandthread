@@ -7,7 +7,7 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Share } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -718,13 +718,23 @@ export default function OrdersScreen() {
   const api = useApi();
   const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
 
+  // Deep-link support: /(tabs)/orders?filter=unfulfilled opens pre-filtered
+  // (e.g. from the dashboard's "N orders to ship" row) instead of always
+  // landing on the unfiltered "All" list.
+  const params = useLocalSearchParams<{ filter?: string }>();
+  const initialFilter = ((): OrderListFilter => {
+    const requested = params.filter;
+    const valid: OrderListFilter[] = ['all', 'new', 'unfulfilled', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'cancelled', 'unpaid', 'open', 'archived'];
+    return valid.includes(requested as OrderListFilter) ? (requested as OrderListFilter) : 'all';
+  })();
+
   const [orders, setOrders] = useState<OrderListOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<OrderListFilter>('all');
+  const [activeFilter, setActiveFilter] = useState<OrderListFilter>(initialFilter);
   const [sort, setSort] = useState<OrderSortKey>('newest');
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
@@ -779,6 +789,20 @@ export default function OrdersScreen() {
       }
     }
   }, [api, authLoaded, isSignedIn, userId]);
+
+  // Re-apply the ?filter= deep link every time this screen is focused (not
+  // just on first mount) — the seller tab bar keeps this screen mounted, so
+  // tapping the dashboard's "N orders to ship" row a second time needs to
+  // re-apply the filter even though Orders never unmounted.
+  useFocusEffect(
+    useCallback(() => {
+      const requested = params.filter;
+      const valid: OrderListFilter[] = ['all', 'new', 'unfulfilled', 'processing', 'ready_to_ship', 'shipped', 'delivered', 'cancelled', 'unpaid', 'open', 'archived'];
+      if (requested && valid.includes(requested as OrderListFilter)) {
+        setActiveFilter(requested as OrderListFilter);
+      }
+    }, [params.filter]),
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -1061,11 +1085,13 @@ export default function OrdersScreen() {
       ) : (
         <EmptyState
           icon="shopping-bag"
-          message="Your orders will show up here."
+          message="Your orders will show up here once a buyer checks out."
+          actionLabel="Add your first product"
+          onAction={() => router.push('/add-product' as never)}
         />
       )}
     </View>
-  ), [loadError]);
+  ), [loadError, router]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 

@@ -64,6 +64,7 @@ vi.mock('expo-router', () => ({
   },
   useRouter: () => ({ push: routerPush, back: vi.fn(), replace: vi.fn() }),
   useScrollToTop: () => {},
+  useLocalSearchParams: () => ({}),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
