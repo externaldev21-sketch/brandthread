@@ -64,6 +64,14 @@ export const BUYER_ROUTE_SLOT: Record<string, Slot> = {
   'edit-profile': 'profile',
 };
 
+/**
+ * Routes that are pushed, modal-style screens inside the buyer tab navigator
+ * (kept as Tabs.Screen entries with href: null so the bar stays mounted
+ * behind them for a nice cross-fade, per the layout comment) but that must
+ * not show the floating tab bar over their own content/keyboard/footer.
+ */
+const BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile']);
+
 // Critically damped with clamping: the morph settles in ~350ms and can never
 // overshoot, so the capsule does not bounce when search opens or closes.
 const MORPH_SPRING = { mass: 1, stiffness: 320, damping: 36, overshootClamping: true } as const;
@@ -135,6 +143,7 @@ export function BuyerTabBar({
   // The field stays mounted until the closing animation finishes, then leaves
   // the tree so screen readers and UI tests only ever see one mode.
   const [fieldMounted, setFieldMounted] = useState(searchActive);
+  const [fieldFocused, setFieldFocused] = useState(false);
 
   useEffect(() => {
     const target = searchActive ? 1 : 0;
@@ -264,6 +273,11 @@ export function BuyerTabBar({
 
   const profileFocused = activeSlot === 'profile';
 
+  // Pushed, modal-style screens (Edit profile) never show the floating bar.
+  // This check runs after every hook above so hook order stays stable while
+  // the bar itself mounts/unmounts as the user navigates in and out.
+  if (BUYER_TAB_BAR_HIDDEN_ROUTES.has(activeRoute)) return null;
+
   return (
     <Animated.View
       testID="buyer-bottom-tab-bar"
@@ -352,7 +366,14 @@ export function BuyerTabBar({
               fieldStyle,
             ]}
           >
-            <View style={[StyleSheet.absoluteFill, styles.fieldFill, { borderRadius: fieldHeight / 2 }]} />
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.fieldFill,
+                { borderRadius: fieldHeight / 2 },
+                fieldFocused && { borderColor: theme.accent },
+              ]}
+            />
             <View style={styles.fieldGlyph}>
               <BuyerNavIcon name="search" color={theme.text} size={20} strokeWidth={2} />
             </View>
@@ -373,6 +394,8 @@ export function BuyerTabBar({
                 selectionColor={theme.accent}
                 cursorColor={theme.accent}
                 editable={searchActive}
+                onFocus={() => setFieldFocused(true)}
+                onBlur={() => setFieldFocused(false)}
                 onSubmitEditing={submit}
                 maxFontSizeMultiplier={1.3}
                 testID="buyer-tab-search-input"

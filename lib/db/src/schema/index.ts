@@ -136,6 +136,13 @@ export const users = pgTable('users', {
   // Terms of Service / Community Guidelines / Privacy Policy acceptance.
   termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
   termsVersion: text('terms_version'),
+  // The single official "Brandthread Agent" AI friend account (see
+  // lib/brandthreadAgent.ts in api-server). At most one row may ever have
+  // this set — enforced by a partial unique index in migration 091. Distinct
+  // from `verified`/`verificationStatus`, which are real Stripe identity
+  // verification for sellers. A system account is excluded from seller
+  // search/ranking and cannot be reported (see reports.ts).
+  isSystemAccount: boolean('is_system_account').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -772,6 +779,15 @@ export const conversations = pgTable('conversations', {
   reportCount:        integer('report_count').notNull().default(0),
   deletedAt:          timestamp('deleted_at', { withTimezone: true }),
   retentionUntil:     timestamp('retention_until', { withTimezone: true }),
+  // Brandthread Agent only: set while a reply is being generated so the
+  // client can show a "typing…" row (polled, not push-based — see
+  // brandthreadAgent.ts). Cleared (set to null / left in the past) once the
+  // reply is sent or generation fails.
+  agentTypingUntil:   timestamp('agent_typing_until', { withTimezone: true }),
+  // Brandthread Agent only: last time a *proactive* (not user-initiated)
+  // nudge was sent in this conversation — gates the "at most one nudge every
+  // few days" anti-spam rule in brandthreadAgent.ts.
+  agentLastNudgeAt:   timestamp('agent_last_nudge_at', { withTimezone: true }),
   createdAt:          timestamp('created_at').defaultNow().notNull(),
   updatedAt:          timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -854,6 +870,21 @@ export const messageReactions = pgTable('message_reactions', {
   messageUserUnique: unique('message_reactions_message_user_unique').on(table.messageId, table.userId),
   messageIdx:        index('message_reactions_message_idx').on(table.messageId),
 }));
+
+// ─── Brandthread Agent welcome conversation (idempotency ledger) ──────────────
+// One row per real user, created exactly once the first time the welcome
+// conversation is created (onboarding completion, or the one-time backfill
+// for pre-existing users). The `userId` primary key is what makes both the
+// onboarding hook and the backfill script idempotent under concurrency: a
+// second attempt hits `onConflictDoNothing()` and does nothing, instead of a
+// race between two lookups on `conversation_participants`.
+export const agentConversations = pgTable('agent_conversations', {
+  userId:         text('user_id').primaryKey(),
+  conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  accountType:    text('account_type').notNull(),
+  welcomeSentAt:  timestamp('welcome_sent_at', { withTimezone: true }),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+});
 
 // ─── Saved collections (buyer boards, à la Pinterest) ─────────────────────────
 
