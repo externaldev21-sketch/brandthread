@@ -1210,6 +1210,7 @@ function ShopPill({
   onPress: () => void;
 }) {
   const { theme } = useAppTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const shimmer = useRef(new Animated.Value(0)).current;
   const pop = useRef(new Animated.Value(0)).current;
 
@@ -1248,15 +1249,16 @@ function ShopPill({
           {tag.imageUri ? (
             <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
-            <Feather name="shopping-bag" size={11} color="#111111" />
+            <Feather name="shopping-bag" size={13} color="#111111" />
           )}
         </View>
-        <Text style={styles.shopPillName} numberOfLines={1}>{tag.productName}</Text>
-        <Text style={styles.shopPillDot}>·</Text>
+        <Text style={[styles.shopPillName, { maxWidth: windowWidth * 0.6 }]} numberOfLines={1}>
+          {tag.productName}
+        </Text>
         <Text style={styles.shopPillPrice} numberOfLines={1}>
           {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
         </Text>
-        <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.75)" />
+        <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.75)" />
         <Animated.View
           pointerEvents="none"
           style={[
@@ -1529,17 +1531,6 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
-      {/* ─ Shop CTA — sits above the creator name, integrated as a merch card ─ */}
-      {!!item.productTags?.length && (
-        <Animated.View style={[styles.mediaTags, chromeStyle, { bottom: bottomClearance + (hasRepostIdentity ? 158 : 122) }]} pointerEvents="box-none">
-          <ShopPill
-            tag={item.productTags[0]}
-            extraCount={Math.max(0, item.productTags.length - 1)}
-            onPress={() => onShopTag(item, item.productTags![0])}
-          />
-        </Animated.View>
-      )}
-
       {/* ─ Right action rail ─
           Pinned at bottomClearance + RAIL_BOTTOM_GAP, not bare
           bottomClearance: the scrub/progress bar sits right around
@@ -1713,6 +1704,20 @@ function SpotlightPage({
           with no gap. CAPTION_BOTTOM_GAP guarantees the required >=12pt of
           clearance from the sound line down to the bar. */}
       <Animated.View style={[styles.bottomInfo, chromeStyle, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]} pointerEvents="box-none">
+        {/* Shop pill lives in this same flex column now (not a separately
+            absolute-positioned sibling keyed off a magic bottom offset) so
+            its gap down to whatever comes next is guaranteed by layout, not
+            by a hardcoded number that only happened to work for one caption
+            length. */}
+        {!!item.productTags?.length && (
+          <View style={styles.shopPillWrap} pointerEvents="box-none">
+            <ShopPill
+              tag={item.productTags[0]}
+              extraCount={Math.max(0, item.productTags.length - 1)}
+              onPress={() => onShopTag(item, item.productTags![0])}
+            />
+          </View>
+        )}
         {hasRepostIdentity && (
           <TouchableOpacity
             style={styles.repostIdentity}
@@ -3257,24 +3262,27 @@ const styles = StyleSheet.create({
   speedPillText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13 },
   mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
   mediaDotActive: { width: 18, backgroundColor: ON_DARK },
-  mediaTags: { position: 'absolute', left: 16, right: 86, alignItems: 'flex-start' },
-  // Compact single-line TikTok-Shop-style product anchor pill — roughly half
-  // the height/width of the old two-line merch card it replaces, so it reads
-  // as a small tappable tag rather than a card overlaying the video.
+  // Compact single-line TikTok-Shop-style product anchor pill — a small
+  // tappable tag, not a card overlaying the video. 28pt thumbnail, 8pt
+  // internal padding, a 12pt gap between name and price (via the name's own
+  // marginRight, not a uniform row `gap`, so that gap can differ from the
+  // tighter thumb→name and price→chevron spacing) and the price never
+  // shrinks or truncates.
   shopPill: {
-    height: 26, maxWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderRadius: RADII.pill, paddingLeft: 3, paddingRight: 8, overflow: 'hidden',
+    height: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center',
+    borderRadius: RADII.pill, paddingHorizontal: 8, overflow: 'hidden',
     borderWidth: 1,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25,
     shadowRadius: 5, elevation: 4,
   },
   shopPillThumb: {
-    width: 20, height: 20, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: ON_DARK, overflow: 'hidden',
+    width: 28, height: 28, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ON_DARK, overflow: 'hidden', marginRight: 8,
   },
-  shopPillName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 11, flexShrink: 1, maxWidth: 68 },
-  shopPillDot: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
-  shopPillPrice: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
+  shopPillName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13, flexShrink: 1, marginRight: 12 },
+  // flexShrink: 0 — the price never gives up space to the name; it is
+  // always rendered in full, never truncated.
+  shopPillPrice: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, marginRight: 8, ...TABULAR_NUMS },
   shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
 
   rail: {
@@ -3304,13 +3312,19 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
+  // The bottom-left stack's vertical rhythm is one consistent system, set
+  // as explicit per-step margins (not a single uniform `gap`, since each
+  // step needs its own value): shop pill -> 12pt -> creator name row ->
+  // 6pt -> caption -> 8pt -> sound line -> (CAPTION_BOTTOM_GAP, on the
+  // container's own `bottom` above) -> progress bar.
   bottomInfo: {
     position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 112,
-    justifyContent: 'flex-end', gap: 8,
+    justifyContent: 'flex-end',
   },
   bottomInfoWithRepost: { minHeight: 148 },
+  shopPillWrap: { marginBottom: 12, alignItems: 'flex-start' },
   repostIdentity: {
-    alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32,
+    alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 7,
     paddingHorizontal: 7, paddingVertical: 5,
@@ -3325,12 +3339,12 @@ const styles = StyleSheet.create({
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
-    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK,
+    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 8,
     lineHeight: 20.5, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
-  creatorRow: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorRow: { minHeight: 30, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
   creatorName: {
     fontSize: FS.base + 3, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,

@@ -50,7 +50,12 @@ describe('buyer Home feed behind the bar', () => {
     // used to end up touching/overlapping it with zero gap.
     expect(feed).toContain('styles.rail, chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }');
     expect(feed).toContain('{ bottom: bottomClearance + CAPTION_BOTTOM_GAP }]} pointerEvents="box-none"');
-    expect(feed).toContain('bottom: bottomClearance + (hasRepostIdentity ? 158 : 122)');
+    // The shop pill now lives inside the same bottomInfo flex column as the
+    // rest of the bottom-left stack (a `shopPillWrap` with its own
+    // marginBottom), instead of a separately absolute-positioned sibling
+    // keyed off a magic bottom offset that only matched one caption length.
+    expect(feed).toContain('shopPillWrap: { marginBottom: 12');
+    expect(feed).not.toContain('bottom: bottomClearance + (hasRepostIdentity ? 158 : 122)');
     expect(feed).toContain('const RAIL_BOTTOM_GAP = 22;');
     expect(feed).toContain('const CAPTION_BOTTOM_GAP = 18;');
     // The scrub line sits exactly at the seam where the sharp video is
