@@ -169,15 +169,47 @@ coverage. See "Harness" for how to extend it.
     visible recovery path.
     Screenshot: `docs/qa/screenshots/guest-boot-stuck.png`
 
-    **Harness limitation (not a counted product issue):** guest/signed-out
-    crawling could not be performed at all beyond this boot screen, because
-    this sandbox's outbound network policy blocks the (fake, sandbox-only)
-    Clerk frontend API host outright (`gateway answered 403 to CONNECT`).
-    Since the guest path is real Clerk (unlike buyer/seller, which use the
-    app's own `bt_preview` bypass), there was no way to get past this without
-    either real Clerk network access or building a much heavier Clerk-network
-    mock (intercepting `/v1/client`, `/v1/environment`, etc.), which was out
-    of scope for this pass.
+    **Harness limitation, updated for this pass (still not a counted product
+    issue, but real further effort was put in — the owner specifically asked
+    for it):** this pass built `artifacts/mobile/scripts/qa-crawl/
+    guestClerkMock.mjs`, a `context.route()` interceptor that:
+    1. Serves the real, locally-installed `@clerk/clerk-js` browser bundle
+       (from `node_modules`, exact version the app depends on) in place of
+       the script tag's request to the fake/unreachable frontend-API CDN
+       host, instead of letting that request fail outright.
+    2. Stubs the companion `@clerk/ui@1` bundle clerk-js lazily loads for its
+       prebuilt UI components (also unreachable in-sandbox) with an empty
+       *non-module* script — the first attempt used `export {}`, which
+       actually made things worse: clerk-js injects that bundle as a plain
+       `<script>` tag (not `type="module"`), so `export {}` threw a
+       `SyntaxError` that silently killed the whole load chain.
+
+    Effect: `window.Clerk` now gets constructed (`version` reports `6.31.1`
+    correctly) instead of the script failing to load at all — genuinely
+    further than pass 1, which didn't investigate this at all beyond
+    observing the stuck boot logo. **However, `ClerkLoaded` still never
+    fires.** With an unfiltered `context.route("**/*")` listener running for
+    8+ seconds after those two script loads, **no further network request is
+    ever attempted** — no `GET /v1/client`, no `GET /v1/environment`, and no
+    iframe is created for Clerk's dev-browser handshake either.
+    `window.Clerk.status` stays `"loading"` indefinitely. We were not able to
+    identify, within this pass's time budget, what internal precondition
+    clerk-js@6's `load()` is waiting on before it will even attempt that
+    first call — candidates not ruled out: a config-validation branch
+    (`isSatellite`/`proxyUrl`/`instanceType`) silently bailing out for a
+    synthetic key that doesn't match Clerk's real key-encoding checksum, or a
+    scheduling primitive (e.g. `requestIdleCallback`) that a headless
+    Chromium context never fires the way a real browser tab does.
+
+    **Net result: guest/signed-out crawling still could not be performed
+    beyond the boot screen this pass**, despite a real, documented attempt at
+    the Clerk-network-mock the owner asked for (see "Coverage achieved" and
+    "Known limitations" below for what this means for guest coverage, and
+    `guestClerkMock.mjs`'s own header comment for the fullest technical
+    writeup). The most promising next step for a future pass: instrument
+    clerk-js's own source (unminify it or set breakpoints via
+    `page.pause()`/CDP) to find the exact gating condition, rather than
+    black-box network observation.
 
 ---
 
@@ -218,6 +250,14 @@ cross-referenced against the actual route files under `artifacts/mobile/app/`.
   crawler discovers routes by clicking rather than by reading `<a href>`
   (see Harness).
 
+**Re-verified after merging `origin/dev` for this pass** (which brought in
+thread-cash hardening, notification-batch-queue, profile-cover-video, and
+Shopify-fulfillment work): re-ran the same extraction (**335** distinct
+literal/template navigation call sites this time, up from ~175, reflecting
+the larger codebase) against the current route list. Result: still exactly
+the one dead link above (`/chat/${...}` in `notificationNavigation.ts`,
+unchanged) — the dev merge did not introduce or fix any static dead links.
+
 ---
 
 ## Harness
@@ -248,24 +288,38 @@ NODE_ENV=development ENABLE_QA_AUTH_BYPASS=true ENABLE_TEST_SUBSCRIPTION_BYPASS=
   AI_INTEGRATIONS_OPENAI_API_KEY=fake AI_INTEGRATIONS_OPENAI_BASE_URL=http://localhost:1/fake \
   pnpm run dev
 
-# 5. Start the Expo web build pointed at that api-server
+# 5. Build a STATIC export of the Expo web build and serve it, rather than
+#    running Metro's dev server (`expo start --web`). Pass 1 used Metro and
+#    hit an unbounded-memory OOM after ~17 distinct bundled routes; the
+#    static export has no such problem and is what pass 2 used for the full
+#    ~260-route crawl (see "Known limitations" below for the one thing this
+#    changes: the publishable key gets baked in at build time).
 cd artifacts/mobile
-EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=<same fake pk_test_... key> \
+EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=<any syntactically-valid pk_test_... key> \
   EXPO_PUBLIC_API_BASE_URL=http://localhost:5050 CI=1 \
-  pnpm exec expo start --web --port 8081
+  NODE_OPTIONS=--max-old-space-size=6144 pnpm run build   # -> static-build/
+EXPO_WEB_BUILD_DIR=static-build PORT=8082 node server/serve.js &
 
-# 6. Crawl
-cd artifacts/mobile
-BASE_URL=http://localhost:8081 API_BASE_URL=http://localhost:5050 \
-  pnpm qa:crawl -- --role buyer --max-pages 15 --viewport 390x844
-# (also: --role seller, --role guest; guest needs no bypass and currently
-#  cannot get past the boot screen in a network-restricted sandbox — see
-#  "Known limitations")
+# 6. Generate the static route list (every Expo Router route file, with real
+#    seeded IDs substituted into [param] segments) and crawl every one of
+#    them per role, not just click-discovered ones:
+node scripts/qa-crawl/routeList.mjs --ids scripts/qa-crawl/ids.json \
+  > scripts/qa-crawl/routes.json
+BASE_URL=http://localhost:8082 API_BASE_URL=http://localhost:5050 \
+  QA_RESULTS_PATH=../../docs/qa/results/buyer-390x844.json \
+  pnpm qa:crawl -- --role buyer --max-pages 400 --viewport 390x844 \
+  --routes-file scripts/qa-crawl/routes.json
+# (also: --role seller, --role guest; repeat per viewport, e.g.
+#  --viewport 375x667 / --viewport 1440x900, optionally with QA_LITE=1 for a
+#  faster screenshot/layout-only secondary pass -- see "Coverage achieved.")
 ```
 
 Wired up as `pnpm qa:crawl` in `artifacts/mobile/package.json` (and
 `pnpm qa:crawl` / `pnpm qa:seed` at the repo root, which just delegate via
-`pnpm --filter`).
+`pnpm --filter`). `scripts/qa-crawl/summarize.mjs` merges the per-role/
+viewport result files under `docs/qa/results/` and prints a stats summary
+(slow screens, console/network errors, unclosable sheets, form-validation
+gaps, etc.) to speed up writing up a fresh run.
 
 ### Mock-auth approach
 
