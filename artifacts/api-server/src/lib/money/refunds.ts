@@ -93,6 +93,7 @@ export type LockedOrder = {
   platform_fee_cents: number;
   platform_fee_refunded_cents: number;
   thread_cash_applied_cents: number;
+  stripe_thread_cash_transfer_id: string | null;
   stripe_payment_intent_id: string | null;
   stripe_application_fee_id: string | null;
   created_at: Date;
@@ -106,7 +107,7 @@ async function lockOrder(executor: DbExecutor, orderId: string): Promise<LockedO
   const [order] = rows<LockedOrder>(await executor.execute(sql`
     SELECT id, owner_id, buyer_id, order_number, status, drop_id, charge_model, funds_state,
            total_cents, gross_charged_cents, refunded_cents, platform_fee_cents,
-           platform_fee_refunded_cents, thread_cash_applied_cents,
+           platform_fee_refunded_cents, thread_cash_applied_cents, stripe_thread_cash_transfer_id,
            stripe_payment_intent_id, stripe_application_fee_id, created_at
     FROM orders WHERE id = ${orderId}::uuid FOR UPDATE
   `));
@@ -399,13 +400,39 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
       }
     }
     await options.onSucceeded?.(tx, { order: locked, amountCents: amount, refundId: refund.id });
-    // THREAD CASH HOOK POINT: a full refund/cancellation returns any Thread
-    // Cash the buyer spent on this order. Inert today — nothing yet sets
-    // orders.thread_cash_applied_cents above 0 — but wired here, once, for
-    // every refund path (buyer/seller cancellation, return, oversold, drop
-    // failure) so it needs no further changes once checkout redemption ships.
+    // A full refund/cancellation returns any Thread Cash the buyer spent on
+    // this order, exactly once (idempotent on `refund:<orderId>`), for every
+    // refund path (buyer/seller cancellation, return, oversold, drop
+    // failure).
     if (fullyRefunded && locked.buyer_id && locked.thread_cash_applied_cents > 0) {
       await refundThreadCashSpend(tx, locked.buyer_id, locked.id, locked.thread_cash_applied_cents);
+      // The card portion was already clawed back above (reverse_transfer on
+      // the Stripe refund / release reversal). The platform-funded top-up
+      // that made the seller whole (lib/threadCash/checkoutTopup.ts) is a
+      // SEPARATE transfer, so it needs its own reversal — the seller must
+      // not keep money for an item that was fully refunded.
+      if (destination && locked.stripe_thread_cash_transfer_id) {
+        try {
+          await stripeClient.transfers.createReversal(locked.stripe_thread_cash_transfer_id, {
+            amount: locked.thread_cash_applied_cents,
+            metadata: { brandthreadRefundId: refund.id, orderId: locked.id },
+          }, { idempotencyKey: `order-refund-threadcash-topup/${refund.id}` });
+          await postLedgerTransaction(tx, {
+            idempotencyKey: `thread-cash-redeemed-reversal/${locked.id}`,
+            kind: "thread_cash_seller_topup_reversed",
+            sellerId,
+            orderId: locked.id,
+            stripeObjectId: locked.stripe_thread_cash_transfer_id,
+            memo: "Reversed the platform-funded Thread Cash top-up on a fully refunded order",
+            postings: [
+              { account: "seller_paid_out", partyId: sellerId, amountCents: -locked.thread_cash_applied_cents },
+              { account: "thread_cash_seller_topup", amountCents: locked.thread_cash_applied_cents },
+            ],
+          });
+        } catch (error) {
+          logger.error({ err: error, refundId: refund.id, orderId: locked.id }, "Thread Cash top-up reversal failed; needs review");
+        }
+      }
     }
     if (locked.drop_id) await maybeCompleteDrop(tx, locked.drop_id);
 

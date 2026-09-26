@@ -81,7 +81,12 @@ CREATE INDEX IF NOT EXISTS posts_created_published_idx
   ON posts (created_at DESC)
   WHERE post_status = 'published';
 
--- Style-tag candidate generation filters posts by JSONB containment.
+-- Style-tag candidate generation filters posts by JSONB containment, which
+-- needs jsonb (not json, what these columns were declared as) both for the
+-- containment operators and for the jsonb_path_ops GIN opclass below.
+ALTER TABLE posts ALTER COLUMN style_tags TYPE jsonb USING style_tags::jsonb;
+ALTER TABLE products ALTER COLUMN style_tags TYPE jsonb USING style_tags::jsonb;
+
 CREATE INDEX IF NOT EXISTS posts_style_tags_gin_idx
   ON posts USING GIN (style_tags jsonb_path_ops);
 CREATE INDEX IF NOT EXISTS products_style_tags_gin_idx
