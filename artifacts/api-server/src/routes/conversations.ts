@@ -29,6 +29,7 @@ import { blockRelation, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { isAgentUserId } from "../lib/brandthreadAgent";
 
 const router = Router();
 router.use(requireAuth);
@@ -64,6 +65,11 @@ function buildConversationView(
   lastMessagePreview?: string,
 ) {
   const me = parts.find((p) => p.userId === myUserId);
+  // The Brandthread Agent's conversation is pinned above every other thread
+  // and gets the official-badge + "AI" tag treatment on the client — see the
+  // isPinned/isOfficial comment on Conversation in mobile's socialTypes.ts.
+  const isAgentThread = parts.some((p) => isAgentUserId(p.userId));
+  const agentTypingUntil = (conv as { agentTypingUntil?: Date | null }).agentTypingUntil;
   return {
     id:   conv.id,
     type: conv.type,
@@ -82,6 +88,10 @@ function buildConversationView(
     unreadCount:        me?.unreadCount        ?? 0,
     isFriendshipActive: true,
     isArchived:         false,
+    isPinned:           isAgentThread ? true : undefined,
+    isOfficial:         isAgentThread ? true : undefined,
+    // Polled (no websocket layer) "typing…" signal, agent conversations only.
+    agentTyping:        isAgentThread && !!agentTypingUntil && new Date(agentTypingUntil).getTime() > Date.now(),
     // Use the DB column — true only for follow-based pending requests
     isRequest:          conv.isRequest,
     requestedBy:        conv.requestedBy       ?? undefined,

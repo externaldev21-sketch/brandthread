@@ -16,6 +16,7 @@ import {
   normalizeProfileName,
   preserveExistingEmail,
 } from "../lib/authProfile";
+import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
 
 const router = Router();
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
@@ -631,6 +632,7 @@ router.post(
         return {
           status: 200,
           body: existing,
+          firstCompletion: false,
         } as const;
       }
       if (existing.onboardingComplete) {
@@ -676,7 +678,7 @@ router.post(
         .set({ onboardingComplete: true, updatedAt: new Date() })
         .where(eq(users.clerkId, clerkUserId))
         .returning();
-      return { status: 200, body: updated } as const;
+      return { status: 200, body: updated, firstCompletion: true } as const;
     });
     if (result.status >= 400) {
       (req as any).log?.warn(
@@ -686,6 +688,23 @@ router.post(
         },
         "onboarding completion rejected",
       );
+    }
+    // Brandthread Agent welcome — hooked here (not /auth/sync, which fires
+    // before the user has picked buyer vs seller) so the welcome copy can be
+    // role-specific from the first message. `createWelcomeConversationOnce`
+    // is itself idempotent, so this is safe even if the client retries this
+    // call. Fired after responding: it must never slow down or fail
+    // onboarding completion.
+    if (result.status === 200 && "firstCompletion" in result && result.firstCompletion) {
+      const body = result.body as typeof users.$inferSelect;
+      void createWelcomeConversationOnce(clerkUserId, accountType, {
+        name: body.displayName ?? body.name,
+        handle: body.username ? `@${body.username}` : "",
+        initials: (body.displayName ?? body.name).trim().slice(0, 2).toUpperCase() || "U",
+        color: "#8B5CF6",
+      }).catch((err) => {
+        (req as any).log?.error({ err, clerkUserId }, "Failed to send Brandthread Agent welcome");
+      });
     }
     res.status(result.status).json(result.body);
   },

@@ -23,6 +23,7 @@ import {
   normalizeTargetType,
   resolveReportTarget,
 } from "../lib/reportTargets";
+import { isAgentUserId } from "../lib/brandthreadAgent";
 
 const router = Router();
 router.use(requireAuth);
@@ -73,6 +74,12 @@ router.post("/", rateLimit("report"), async (req, res) => {
     if (!target) return res.status(404).json({ error: "That content is no longer available." });
     if (target.ownerId && target.ownerId === reporterId) {
       return res.status(400).json({ error: "You can't report your own content.", code: "SELF_REPORT" });
+    }
+    // The Brandthread Agent is an official Brandthread system account, not a
+    // member — it cannot be reported as spam/abuse (its messages/profile are
+    // maintained by Brandthread, not moderatable member content).
+    if (target.ownerId && isAgentUserId(target.ownerId)) {
+      return res.status(200).json({ status: "not_reportable", code: "SYSTEM_ACCOUNT_IMMUNE" });
     }
 
     if (targetType === "message") {

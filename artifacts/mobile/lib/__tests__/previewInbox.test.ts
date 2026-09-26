@@ -29,6 +29,7 @@ const REQUIRED_MESSAGE_FIELDS = ['id', 'text', 'ts', 'reactions', 'status', 'del
 
 const VALID_ATTACHMENT_TYPES = new Set([
   'image', 'video', 'voice', 'product', 'post', 'order', 'profile', 'thread_cash',
+  'agent_card', 'quick_replies',
 ]);
 
 describe('previewInboxData — seed matches the real Conversation/Message shapes', () => {
@@ -98,15 +99,18 @@ describe('previewInboxData — seed matches the real Conversation/Message shapes
     }
   });
 
-  it('the Brandthread Agent thread has a welcome message and a Thread Cash explainer card', () => {
+  it('the Brandthread Agent thread has a welcome message, a Thread Cash explainer card, and quick replies', () => {
     const messages = BRANDTHREAD_AGENT_SEED.messages ?? [];
-    expect(messages.length).toBeGreaterThanOrEqual(2);
+    expect(messages.length).toBeGreaterThanOrEqual(3);
     expect(messages[0].text.toLowerCase()).toContain('welcome');
     const explainer = messages.find(m => m.attachment?.title?.toLowerCase().includes('thread cash'));
     expect(explainer).toBeTruthy();
-    // Reuses an existing generic attachment type ('post') rather than
-    // inventing a new one — see the comment in lib/previewInbox.ts.
-    expect(explainer?.attachment?.type).toBe('post');
+    expect(explainer?.attachment?.type).toBe('agent_card');
+    expect(explainer?.attachment?.meta?.deepLink).toBe('/thread-cash');
+    const quickReplies = messages.find(m => m.attachment?.type === 'quick_replies');
+    expect(quickReplies).toBeTruthy();
+    const options = JSON.parse(quickReplies!.attachment!.meta!.optionsJson);
+    expect(options.length).toBeGreaterThan(0);
   });
 
   it('follower seeds carry the fields a real Notification needs', () => {

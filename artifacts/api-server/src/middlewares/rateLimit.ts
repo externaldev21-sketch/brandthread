@@ -13,6 +13,7 @@ export type RateLimitPolicyName =
   | "authenticated-read"
   | "public-read"
   | "messaging"
+  | "agent-chat"
   | "comment"
   | "follow"
   | "report"
@@ -97,6 +98,12 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: scaled(30),
     windowMs: 60_000,
     message: "Too many messages sent. Please wait a moment and try again.",
+  },
+  "agent-chat": {
+    id: "agent-chat",
+    limit: scaled(20),
+    windowMs: 60_000,
+    message: "You're chatting with the Brandthread Agent a lot — give it a minute and try again.",
   },
   comment: {
     id: "comment",

@@ -570,6 +570,7 @@ router.get("/search", async (req, res): Promise<void> => {
       }).from(users).where(
         and(
           eq(users.accountType, "seller"),
+          eq(users.isSystemAccount, false),
           isNull(users.suspendedAt),
           isNull(users.deletedAt),
           notBlockedWith(viewerId, users.clerkId),

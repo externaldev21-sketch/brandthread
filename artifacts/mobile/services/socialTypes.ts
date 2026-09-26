@@ -160,7 +160,12 @@ export interface ConversationParticipant {
 
 export type MessageAttachmentType =
   | 'image' | 'video' | 'voice'
-  | 'product' | 'post' | 'order' | 'profile' | 'thread_cash';
+  | 'product' | 'post' | 'order' | 'profile' | 'thread_cash'
+  // Brandthread Agent only. `agent_card` is a generic deep-linking card
+  // (Thread Cash explainer, product, brand/profile, "Go to Discover" — see
+  // meta.cardKind / meta.deepLink); `quick_replies` renders a row of tappable
+  // reply chips (meta.optionsJson: JSON-encoded {label,value}[]).
+  | 'agent_card' | 'quick_replies';
 
 export interface MessageAttachment {
   type: MessageAttachmentType;
@@ -246,6 +251,10 @@ export interface Conversation {
    *  small "AI" tag instead of an ordinary avatar/initials treatment. */
   isPinned?: boolean;
   isOfficial?: boolean;
+  /** True while the Brandthread Agent is generating a reply in this
+   *  conversation — polled via GET /api/conversations/:id (no websocket
+   *  layer exists for DMs yet). Only ever set for the agent's conversation. */
+  agentTyping?: boolean;
 }
 
 // ─── Story ────────────────────────────────────────────────────────────────────
