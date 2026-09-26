@@ -91,6 +91,55 @@ describe('useScrollReset primitive', () => {
     await act(async () => { renderer.unmount(); });
   });
 
+  it('does NOT reset when an in-page tab switch swaps which list the shared ref points at, but still resets on a real refocus', async () => {
+    const { useScrollReset } = await import('@/hooks/useScrollReset');
+
+    const postsScrollToOffset = vi.fn();
+    const taggedScrollToOffset = vi.fn();
+    let setActiveTab!: (tab: 'posts' | 'tagged') => void;
+
+    function ProfileLikeHarness() {
+      const React = require('react') as typeof import('react');
+      const [activeTab, _setActiveTab] = React.useState<'posts' | 'tagged'>('posts');
+      setActiveTab = _setActiveTab;
+      // The ONE correct pattern: a single hook call at the screen level,
+      // sharing its ref across whichever tab's list is currently attached —
+      // not a fresh useScrollReset() call inside each tab's own component.
+      const listRef = useScrollReset<{ scrollToOffset: (opts: any) => void }>();
+      // Assign synchronously during render (as a host ScrollView/FlatList's
+      // ref attaches during commit, before any passive effect runs).
+      (listRef as React.MutableRefObject<any>).current = activeTab === 'posts'
+        ? { scrollToOffset: postsScrollToOffset }
+        : { scrollToOffset: taggedScrollToOffset };
+      return null;
+    }
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<ProfileLikeHarness />); });
+
+    // Initial mount already reset the (posts) list once.
+    expect(postsScrollToOffset).toHaveBeenCalledTimes(1);
+    postsScrollToOffset.mockClear();
+
+    // Switch the in-page tab (local state only — no navigation, no blur).
+    await act(async () => { setActiveTab('tagged'); });
+
+    expect(postsScrollToOffset).not.toHaveBeenCalled();
+    expect(taggedScrollToOffset).not.toHaveBeenCalled();
+
+    // Switch back to posts — still just local state, still no reset.
+    await act(async () => { setActiveTab('posts'); });
+    expect(postsScrollToOffset).not.toHaveBeenCalled();
+
+    // A real navigation focus event (pushed away and back) must still reset
+    // whichever list is currently attached.
+    await act(async () => { simulateRefocus(); });
+    expect(postsScrollToOffset).toHaveBeenCalledTimes(1);
+    expect(postsScrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
+
+    await act(async () => { renderer.unmount(); });
+  });
+
   it('does nothing when disabled', async () => {
     const { useScrollReset } = await import('@/hooks/useScrollReset');
     const scrollToOffset = vi.fn();
