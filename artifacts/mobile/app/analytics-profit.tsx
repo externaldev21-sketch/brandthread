@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProfitAnalytics, getPayoutAnalytics, getFilterState } from '@/services/analyticsService';
@@ -23,7 +23,7 @@ export default function AnalyticsProfitScreen() {
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = insets.top;
 
   const [profit,     setProfit]     = useState<ProfitAnalytics | null>(null);
   const [payout,     setPayout]     = useState<PayoutAnalytics | null>(null);

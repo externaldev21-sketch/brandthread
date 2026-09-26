@@ -34,6 +34,7 @@ import Animated, {
   type AnimatedStyle,
 } from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
+import { identityOrNone } from '@/lib/animationUtils';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
@@ -49,7 +50,7 @@ export interface SheetTransition {
   modalVisible: boolean;
   /** Animated style for the sheet's translateY — apply to the sheet's outer
    *  `Animated.View`. */
-  sheetStyle: AnimatedStyle<{ transform: { translateY: number }[] }>;
+  sheetStyle: AnimatedStyle<{ transform?: { translateY: number }[] }>;
   /** Animated style for the backdrop's opacity — apply to the backdrop's
    *  `Animated.View`, on the exact same timeline as `sheetStyle`. */
   backdropStyle: AnimatedStyle<{ opacity: number }>;
@@ -112,7 +113,12 @@ export function useSheetTransition(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, reduceMotion]);
 
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+  // `identityOrNone` drops the `transform` key entirely once the sheet is
+  // fully open (translateY back at 0) instead of leaving an identity
+  // `[{ translateY: 0 }]` — on web that would otherwise permanently force
+  // this View onto its own compositing layer, softening the sheet's text if
+  // that layer doesn't land on a whole device pixel. See lib/animationUtils.ts.
+  const sheetStyle = useAnimatedStyle(() => ({ transform: identityOrNone([{ translateY: translateY.value }]) }));
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
 
   // Snap points/content height are never touched mid-gesture: the pan only

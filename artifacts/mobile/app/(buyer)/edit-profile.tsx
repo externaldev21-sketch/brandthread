@@ -10,19 +10,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@clerk/expo';
 import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import { pickProfileImage } from '@/lib/pickProfileImage';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
+import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isBuyerDevPreview } from '@/lib/devPreview';
-import { CoverTrimSheet, useProfileCover, type CoverMedia } from '@/components/profile/ProfileCover';
-import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Prefer not to say', 'Custom'] as const;
 const BIO_MAX = 150;
@@ -93,12 +92,13 @@ function GenderPicker({
 }
 
 export default function BuyerEditProfileScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const navigation = useNavigation();
   const { theme } = useAppTheme();
   const api = useApi();
-  const { getToken, userId } = useAuth();
+  const { getToken } = useAuth();
   // Dev-web preview (?bt_preview=buyer): there is no signed-in Clerk user, so
   // every real network call below 401s. Route those specific calls through a
   // local-only path instead so the whole screen — including username
@@ -121,10 +121,6 @@ export default function BuyerEditProfileScreen() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarProgress, setAvatarProgress] = useState(0);
   const [avatarError, setAvatarError] = useState<string | null>(null);
-  const [serverCover, setServerCover] = useState<CoverMedia>({ videoUrl: null, posterUrl: null });
-  const [previewCoverUri, setPreviewCoverUri] = useState<string | null>(null);
-  const coverFlow = useProfileCover({ own: !preview, cover: serverCover, userId });
-  const cover = preview ? { videoUrl: previewCoverUri, posterUrl: null } : coverFlow.cover;
   const [genderPickerOpen, setGenderPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof CoreFields, string>>>({});
@@ -146,30 +142,6 @@ export default function BuyerEditProfileScreen() {
     }, 2200);
   }
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
-
-  useEffect(() => {
-    if (preview) return;
-    let active = true;
-    api.profileCover.get()
-      .then((saved) => {
-        if (active) setServerCover({ videoUrl: saved.coverVideoUrl, posterUrl: saved.coverPosterUrl });
-      })
-      .catch(() => { /* The empty square remains usable if loading fails. */ });
-    return () => { active = false; };
-  }, [api, preview]);
-
-  async function pickCoverVideo() {
-    if (!preview) {
-      coverFlow.pickFromLibrary();
-      return;
-    }
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'] });
-      if (!result.canceled && result.assets[0]) setPreviewCoverUri(result.assets[0].uri);
-    } catch {
-      showToast("Couldn't open your videos");
-    }
-  }
 
   async function checkUsernameAvailability(raw: string): Promise<boolean> {
     const u = raw.trim().toLowerCase();
@@ -310,7 +282,7 @@ export default function BuyerEditProfileScreen() {
     router.back();
   }
 
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
+  const topPad = insets.top;
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof CoreFields, string>> = {};
@@ -396,8 +368,25 @@ export default function BuyerEditProfileScreen() {
 
   if (!loaded) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={theme.accent} />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={[styles.header, { paddingTop: topPad + 10 }]}>
+          <Feather name="chevron-left" size={24} color={theme.text} onPress={() => router.back()} />
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Edit profile</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={{ alignItems: 'center', paddingTop: SP.lg }}>
+          <SkeletonBlock width={92} height={92} radius={46} />
+          <View style={{ height: SP.sm }} />
+          <SkeletonLine width={120} height={14} />
+        </View>
+        <View style={{ paddingHorizontal: SP.md, paddingTop: SP.xl, gap: SP.lg }}>
+          {[0, 1, 2, 3].map((row) => (
+            <View key={row} style={{ gap: SP.xs }}>
+              <SkeletonLine width={80} height={11} />
+              <SkeletonBlock width="100%" height={44} radius={12} />
+            </View>
+          ))}
+        </View>
       </View>
     );
   }
@@ -432,80 +421,38 @@ export default function BuyerEditProfileScreen() {
           <Text style={[styles.toastText, { color: theme.onAccent }]}>{toast.message}</Text>
         </Animated.View>
 
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
-          {/* Photo and silent, looping profile-cover video */}
-          <View style={styles.mediaRow}>
-            <View style={styles.avatarSection}>
-              <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={avatarUploading} accessibilityRole="button" accessibilityLabel="Change profile photo">
-                <View style={styles.avatarWrap}>
-                  <Avatar uri={avatarUri} name={fields.name} size={96} />
-                  {avatarUploading && (
-                    <View style={styles.avatarOverlay}>
-                      <ActivityIndicator color="#FFF" size="small" />
-                      <Text style={styles.avatarOverlayText}>{avatarProgress}%</Text>
-                    </View>
-                  )}
-                  {!avatarUploading && (
-                    <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-                      <Feather name="camera" size={13} color={theme.onAccent} />
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar} disabled={avatarUploading}>
-                <Text style={[styles.editPhotoLink, { color: theme.accentLight }]}>
-                  {avatarUploading ? `Uploading… ${avatarProgress}%` : 'Change profile photo'}
-                </Text>
-              </TouchableOpacity>
-              {avatarError && (
-                <View style={styles.retryRow}>
-                  <Text style={[styles.errorText, { color: theme.error }]}>{avatarError}</Text>
-                  <TouchableOpacity onPress={pickAvatar}>
-                    <Text style={[styles.retryLink, { color: theme.accentLight }]}>Retry</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-            <View style={styles.avatarSection}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => { void pickCoverVideo(); }}
-                disabled={!!coverFlow.busy}
-                accessibilityRole="button"
-                accessibilityLabel={cover.videoUrl ? 'Change profile video from camera roll' : 'Add profile video from camera roll'}
-                testID="edit-profile-video-square"
-              >
-                <View style={[styles.videoSquare, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-                  {cover.videoUrl ? (
-                    <ProfileHeroMedia videoUri={cover.videoUrl} posterUri={cover.posterUrl} active={!coverFlow.busy} height={96} />
-                  ) : (
-                    <Feather name="film" size={27} color={theme.muted} />
-                  )}
-                  {coverFlow.busy && (
-                    <View style={styles.videoOverlay}>
-                      <ActivityIndicator color="#FFF" size="small" />
-                    </View>
-                  )}
-                  <View style={[styles.videoBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-                    <Feather name="plus" size={14} color={theme.onAccent} />
+        <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
+          {/* Avatar */}
+          <View style={styles.avatarSection}>
+            <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={avatarUploading}>
+              <View style={styles.avatarWrap}>
+                <Avatar uri={avatarUri} name={fields.name} size={96} />
+                {avatarUploading && (
+                  <View style={styles.avatarOverlay}>
+                    <ActivityIndicator color="#FFF" size="small" />
+                    <Text style={styles.avatarOverlayText}>{avatarProgress}%</Text>
                   </View>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => { void pickCoverVideo(); }} disabled={!!coverFlow.busy}>
-                <Text style={[styles.editPhotoLink, { color: theme.accentLight }]}>
-                  {coverFlow.busy ? 'Updating video…' : cover.videoUrl ? 'Change profile video' : 'Add profile video'}
-                </Text>
-              </TouchableOpacity>
-              {!!cover.videoUrl && !coverFlow.busy && (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove profile video"
-                  onPress={() => { if (preview) setPreviewCoverUri(null); else void coverFlow.remove(); }}
-                >
-                  <Text style={[styles.removeVideoLink, { color: theme.muted }]}>Remove video</Text>
+                )}
+                {!avatarUploading && (
+                  <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
+                    <Feather name="camera" size={13} color={theme.onAccent} />
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar} disabled={avatarUploading}>
+              <Text style={[styles.editPhotoLink, { color: theme.accentLight }]}>
+                {avatarUploading ? `Uploading… ${avatarProgress}%` : 'Change profile photo'}
+              </Text>
+            </TouchableOpacity>
+            {avatarError && (
+              <View style={styles.retryRow}>
+                <Text style={[styles.errorText, { color: theme.error }]}>{avatarError}</Text>
+                <TouchableOpacity onPress={pickAvatar}>
+                  <Text style={[styles.retryLink, { color: theme.accentLight }]}>Retry</Text>
                 </TouchableOpacity>
-              )}
-            </View>
+              </View>
+            )}
           </View>
 
           {/* Core fields */}
@@ -697,13 +644,6 @@ export default function BuyerEditProfileScreen() {
           onClose={() => setGenderPickerOpen(false)}
           theme={theme}
         />
-        {!preview && (
-          <CoverTrimSheet
-            source={coverFlow.trimSource}
-            onCancel={coverFlow.cancelTrim}
-            onConfirm={coverFlow.confirmTrim}
-          />
-        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -722,13 +662,8 @@ const styles = StyleSheet.create({
   rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
   rowInput: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', padding: 0, textAlign: 'right' },
   chevronLabel: { fontSize: 13.5, fontFamily: 'Inter_400Regular' },
-  mediaRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 24, paddingVertical: 20, paddingHorizontal: 14 },
-  avatarSection: { alignItems: 'center', gap: 10, minWidth: 130, maxWidth: '46%' },
+  avatarSection: { alignItems: 'center', paddingVertical: 20, gap: 10 },
   avatarWrap: { width: 96, height: 96, borderRadius: 48 },
-  videoSquare: { width: 96, height: 96, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  videoBadge: { position: 'absolute', right: 0, bottom: 0, width: 30, height: 30, borderRadius: 15, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center' },
-  videoOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' },
-  removeVideoLink: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   cameraBadge: {
     position: 'absolute', right: -2, bottom: -2, width: 30, height: 30, borderRadius: 15,
     alignItems: 'center', justifyContent: 'center', borderWidth: 2.5,

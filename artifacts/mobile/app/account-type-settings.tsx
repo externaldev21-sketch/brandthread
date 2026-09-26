@@ -62,8 +62,21 @@ export default function AccountTypeSettingsScreen() {
   }
 
   useEffect(() => {
-    if (authLoaded && isSignedIn) fetchProfile();
+    // Clerk resolving isn't the same as "never resolves" — once auth state is
+    // known, either fetch the real profile or stop showing the spinner. Only
+    // waiting on `isSignedIn` left this screen spinning forever whenever it
+    // was reached without a live Clerk session (e.g. this dev preview).
+    if (!authLoaded) return;
+    if (isSignedIn) fetchProfile();
+    else setLoading(false);
   }, [authLoaded, isSignedIn]);
+
+  useEffect(() => {
+    // Defensive guard: never let this screen spin forever, even if Clerk
+    // itself never finishes hydrating (e.g. a misconfigured/dev environment).
+    const timeout = setTimeout(() => setLoading(false), 4000);
+    return () => clearTimeout(timeout);
+  }, []);
 
   const isDirty = selectedType !== null && selectedType !== currentType;
 
@@ -100,7 +113,7 @@ export default function AccountTypeSettingsScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="Account Type" />
+      <Header title="Account type" />
 
       {loading ? (
         <View style={s.loadingWrap}>

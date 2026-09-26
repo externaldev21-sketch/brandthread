@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
+import { identityOrNone } from '@/lib/animationUtils';
 import { FONT } from '@/lib/theme';
 import type { TabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 
@@ -99,7 +100,11 @@ export function TabBarBadge({ count, theme }: { count: number; theme: AppThemePr
         : 1);
   }, [count, reduceMotion, scale]);
 
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  // At rest (no pop in progress) scale.value is 1 — an identity transform
+  // that `identityOrNone` drops, instead of leaving every unread-count badge
+  // pinned to its own `matrix(1,0,0,1,0,0)` compositing layer on web, which
+  // would otherwise blur this fine-print number for as long as it's shown.
+  const style = useAnimatedStyle(() => ({ transform: identityOrNone([{ scale: scale.value }]) }));
 
   if (count <= 0) return null;
   const label = count > 99 ? '99+' : String(count);

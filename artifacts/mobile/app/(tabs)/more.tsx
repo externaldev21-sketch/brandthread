@@ -17,8 +17,8 @@ import { useUser, useAuth } from '@clerk/expo';
 import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
 import { useApi } from '@/lib/api';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
-import { isSellerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, SP } from '@/lib/theme';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -106,23 +106,17 @@ const SECTIONS: { key: string; title: string; icon: keyof typeof Feather.glyphMa
   { key: 'account',    title: 'Account',        icon: 'user',       items: ACCOUNT_ITEMS },
 ];
 
-function SubscriptionPlanBadge() {
-  const { plan } = useSubscriptionPlan();
-  const label = plan === 'pro' ? 'PRO' : plan === 'growth' ? 'GROWTH' : 'FREE';
-  return <StatusBadge label={label} variant={plan === 'starter' ? 'neutral' : 'purple'} />;
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function MoreScreen() {
-  const { signOut, isLoaded, isSignedIn, userId } = useAuth();
-  const sellerPreview = isSellerDevPreview() && (!isLoaded || !isSignedIn || !userId);
+  const scrollResetRef = useScrollReset<ScrollView>();
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
   const { user } = useUser();
+  const { signOut } = useAuth();
   const api = useApi();
 
   const [setupState, setSetupState]   = useState<SetupState | null>(null);
@@ -131,18 +125,18 @@ export default function MoreScreen() {
     Object.fromEntries(SECTIONS.map(s => [s.key, true])),
   );
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const { plan } = useSubscriptionPlan();
+  const planLabel = plan === 'pro' ? 'PRO' : plan === 'growth' ? 'GROWTH' : 'FREE';
 
   useEffect(() => {
-    if (sellerPreview) return;
     getSetupState().then(setSetupState);
-  }, [sellerPreview]);
+  }, []);
 
   // Refresh unread count whenever this screen is focused
   useFocusEffect(useCallback(() => {
     let cancelled = false;
 
     async function fetchUnread() {
-      if (sellerPreview) return;
       try {
         const list = await api.conversations.list() as Array<{ unreadCount: number; type?: string }>;
         if (cancelled) return;
@@ -157,14 +151,14 @@ export default function MoreScreen() {
 
     fetchUnread();
     return () => { cancelled = true; };
-  }, [api, sellerPreview]));
+  }, [api]));
 
   const percent     = setupState ? completionPercent(setupState) : 0;
-  const firstName   = sellerPreview ? 'Demo Seller' : user?.firstName ?? 'Seller';
+  const firstName   = user?.firstName ?? 'Seller';
   const lastName    = user?.lastName  ?? '';
-  const displayName = sellerPreview ? firstName : lastName ? `${firstName} ${lastName}` : firstName;
-  const email       = sellerPreview ? '' : user?.primaryEmailAddress?.emailAddress ?? '';
-  const avatarLetter = (sellerPreview ? 'D' : user?.firstName?.[0] ?? 'S').toUpperCase();
+  const displayName = lastName ? `${firstName} ${lastName}` : firstName;
+  const email       = user?.primaryEmailAddress?.emailAddress ?? '';
+  const avatarLetter = (user?.firstName?.[0] ?? 'S').toUpperCase();
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
@@ -196,6 +190,7 @@ export default function MoreScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScrollView
+        ref={scrollResetRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -213,9 +208,7 @@ export default function MoreScreen() {
               <Text style={styles.userName} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>
               {!!email && <Text style={styles.userEmail} numberOfLines={1} ellipsizeMode="tail">{email}</Text>}
               <View style={styles.badgeRow}>
-                {sellerPreview
-                  ? <StatusBadge label="FREE" variant="neutral" />
-                  : <SubscriptionPlanBadge />}
+                <StatusBadge label={planLabel} variant={plan === 'starter' ? 'neutral' : 'purple'} />
               </View>
             </View>
           </View>
@@ -296,16 +289,14 @@ export default function MoreScreen() {
           );
         })}
 
-        {/* Sign-out is unavailable in the signed-out seller preview. */}
-        {!sellerPreview && (
-          <View style={styles.signOutWrap}>
-            <SecondaryButton
-              label="Sign out"
-              accent={theme.error}
-              onPress={handleSignOut}
-            />
-          </View>
-        )}
+        {/* SIGN OUT */}
+        <View style={styles.signOutWrap}>
+          <SecondaryButton
+            label="Sign out"
+            accent={theme.error}
+            onPress={handleSignOut}
+          />
+        </View>
       </ScrollView>
     </View>
   );

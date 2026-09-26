@@ -5,6 +5,10 @@
  * Routes:
  *  POST   /api/live/start               seller starts a stream (host token)
  *  GET    /api/live/active              list active streams (for feed mixing)
+ *  GET    /api/live/feed                LIVE pager list: followed first, then viewers
+ *
+ * Viewer routes are open to every signed-in user (buyers watch lives);
+ * only the host routes (start / end / products) require the Pro plan.
  *  GET    /api/live/:id                 stream details (public, for viewer)
  *  POST   /api/live/:id/join            viewer gets token + increments count
  *  POST   /api/live/:id/leave           viewer decrements count
@@ -16,11 +20,15 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { evaluateContent } from "../lib/contentModerator";
 import { optionalViewerId, publishingRestriction } from "../lib/safety";
+import { rankLiveFeed } from "../lib/liveFeed";
 
 const router = Router();
+
+/** Hosting a live is a Pro feature; watching one is not. */
+const hostPlan = requirePlan("pro");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,7 +69,7 @@ function randomChannelName(): string {
 }
 
 // ─── POST /api/live/start ─────────────────────────────────────────────────────
-router.post("/start", requireAuth, async (req, res) => {
+router.post("/start", requireAuth, hostPlan, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { title, description, thumbnailUrl, productTags = [] } = req.body;
 
@@ -132,6 +140,39 @@ router.get("/active", async (_req, res) => {
       LIMIT 20
     `);
     return res.json({ streams: rows.rows });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── GET /api/live/feed ───────────────────────────────────────────────────────
+// The LIVE pager's list: every currently-live stream the viewer may see,
+// followed creators first, then by viewer count (see lib/liveFeed.ts).
+// Signed-out callers get the same list without the followed boost.
+router.get("/feed", async (req, res) => {
+  const viewerId = optionalViewerId(req);
+  try {
+    const rows = await db.execute(sql`
+      SELECT ls.id, ls.seller_id, ls.title, ls.viewer_count, ls.product_tags,
+             ls.thumbnail_url, ls.started_at,
+             u.display_name AS seller_name, u.brand_name, u.avatar_url, u.username,
+             COALESCE(u.verified, false) AS verified,
+             ${viewerId
+               ? sql`EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${viewerId} AND f.following_id = ls.seller_id)`
+               : sql`false`} AS followed
+      FROM live_streams ls
+      LEFT JOIN users u ON u.clerk_id = ls.seller_id
+      WHERE ls.status = 'live'
+        AND (u.suspended_at IS NULL)
+        ${viewerId ? sql`AND NOT EXISTS (
+          SELECT 1 FROM blocks b
+          WHERE (b.blocker_id = ${viewerId} AND b.blocked_id = ls.seller_id)
+             OR (b.blocker_id = ls.seller_id AND b.blocked_id = ${viewerId})
+        )` : sql``}
+      ORDER BY ls.viewer_count DESC
+      LIMIT 200
+    `);
+    return res.json({ streams: rankLiveFeed(rows.rows as any[]) });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
@@ -208,7 +249,7 @@ router.post("/:id/leave", requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/live/:id/end ───────────────────────────────────────────────────
-router.post("/:id/end", requireAuth, async (req, res) => {
+router.post("/:id/end", requireAuth, hostPlan, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
 
   try {
@@ -270,7 +311,7 @@ router.post("/:id/end", requireAuth, async (req, res) => {
 });
 
 // ─── PATCH /api/live/:id/products ────────────────────────────────────────────
-router.patch("/:id/products", requireAuth, async (req, res) => {
+router.patch("/:id/products", requireAuth, hostPlan, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { productTags } = req.body;
   if (!Array.isArray(productTags)) return res.status(400).json({ error: "productTags must be an array" });

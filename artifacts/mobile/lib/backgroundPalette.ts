@@ -16,7 +16,15 @@ export type BackgroundPalette = {
   particleSecondary: string;
 };
 
-function mixHex(foreground: string, background: string, foregroundWeight: number): string {
+/**
+ * Blends two solid hex colors by weight and returns another solid hex —
+ * unlike an `opacity`/`rgba` value, this is safe to use for text color on a
+ * KNOWN solid background (e.g. a flat accent-colored card): it pre-computes
+ * the same visual result as translucency without leaving any alpha
+ * compositing for the renderer to do, which is what causes soft/blurry text
+ * on react-native-web. See components/ui/AppText.tsx's `tone` doc.
+ */
+export function mixHex(foreground: string, background: string, foregroundWeight: number): string {
   const parse = (value: string) => {
     const hex = value.replace('#', '');
     return [

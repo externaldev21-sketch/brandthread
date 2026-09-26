@@ -12,7 +12,7 @@
  * OS Maps app via Linking — see the header comment on the address row below
  * for the react-native-maps upgrade path.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated, Easing, Linking, Platform, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
@@ -22,8 +22,10 @@ import { Button } from '@/components/ui/Button';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
+import { AppText } from '@/components/ui/AppText';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { useSettled } from '@/lib/animationUtils';
 
 export interface OrderSuccessData {
   orderId: string;
@@ -44,23 +46,54 @@ function DetailRow({ icon, label, value }: { icon: React.ComponentProps<typeof F
   return (
     <View style={s.detailRow}>
       <Feather name={icon} size={15} color={theme.muted} style={{ width: 20 }} />
-      <Text style={[s.detailLabel, { color: theme.muted }]}>{label}</Text>
-      <Text style={[s.detailValue, { color: theme.text }]} numberOfLines={1}>{value}</Text>
+      {/* AppText, not a raw Text with an ad hoc color — this is exactly the
+          "fine print" case the shared-Text conventions target (see
+          components/ui/AppText.tsx): a solid muted color instead of a
+          dimmed/opacity one, and a floor under how small the label ever gets. */}
+      <AppText tone="muted" style={s.detailLabel}>{label}</AppText>
+      <AppText tone="default" style={s.detailValue} numberOfLines={1}>{value}</AppText>
     </View>
   );
 }
 
-/** Staggered fade/slide-up reveal — each item's delay offsets from the previous. */
+const STAGGER_DURATION_MS = 320;
+
+/**
+ * Staggered fade/slide-up reveal — each item's delay offsets from the
+ * previous. Returns one style per item PLUS a `settled` flag per item.
+ *
+ * Every reveal here directly wraps order-confirmation text ("Order placed!",
+ * the order heading, detail rows, the map address). Once an item's slide-up
+ * finishes, its `transform: [{ translateY: 0 }]` is still an identity value —
+ * but on react-native-web an `Animated.Text`/`Animated.View` with any
+ * `transform` key, identity or not, is pinned to its own compositing layer
+ * forever, which softens the text inside it if that layer isn't pixel-
+ * aligned. Callers drop the transform once `settled[i]` is true (see below)
+ * instead of leaving it in place after the reveal has finished playing.
+ */
 function useStagger(count: number, stepMs = 70) {
   const values = useRef(Array.from({ length: count }, () => new Animated.Value(0))).current;
+  const [settled, setSettled] = useState<boolean[]>(() => Array(count).fill(false));
   useEffect(() => {
     Animated.stagger(stepMs, values.map(v => Animated.timing(v, {
-      toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      toValue: 1, duration: STAGGER_DURATION_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true,
     }))).start();
+    const timers = values.map((_, i) => setTimeout(() => {
+      setSettled((prev) => {
+        if (prev[i]) return prev;
+        const next = [...prev];
+        next[i] = true;
+        return next;
+      });
+    }, stepMs * i + STAGGER_DURATION_MS + 16));
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values, stepMs]);
-  return values.map(v => ({
+  return values.map((v, i) => ({
     opacity: v,
-    transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+    ...(settled[i] ? null : {
+      transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+    }),
   }));
 }
 
@@ -74,13 +107,15 @@ export function OrderSuccessSheet({
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const checkScale = useRef(new Animated.Value(0)).current;
+  const checkSettled = useSettled();
 
   // Rows revealed in sequence: headline, product, divider+details, map, buttons.
   const stagger = useStagger(5, 75);
 
   useEffect(() => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Animated.spring(checkScale, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 10 }).start();
+    checkSettled.run(Animated.spring(checkScale, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 10 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkScale]);
 
   const heading = order.itemCount > 1
@@ -109,7 +144,7 @@ export function OrderSuccessSheet({
           <Feather name="x" size={16} color={theme.text} />
         </TouchableOpacity>
 
-        <Animated.View style={[s.checkWrap, { transform: [{ scale: checkScale }] }]}>
+        <Animated.View style={[s.checkWrap, !checkSettled.value && { transform: [{ scale: checkScale }] }]}>
           <View style={[s.checkCircle, { backgroundColor: theme.accent }]}>
             <Feather name="check" size={38} color={theme.onAccent} />
           </View>

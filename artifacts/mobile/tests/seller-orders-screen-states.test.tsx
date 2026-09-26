@@ -64,6 +64,7 @@ vi.mock('expo-router', () => ({
     React.useEffect(() => cb(), []); // eslint-disable-line react-hooks/exhaustive-deps
   },
   useRouter: () => ({ push: routerPush, back: vi.fn(), replace: vi.fn() }),
+  useScrollToTop: () => {},
   useLocalSearchParams: () => ({}),
 }));
 
@@ -160,6 +161,7 @@ vi.mock('@/lib/theme', () => ({
   COMP: { iconBtn: 36, buttonH: 52, buttonHSm: 44 },
   ICON: { xs: 12, sm: 16, md: 20, lg: 24, xl: 32 },
   ANIM: {},
+  GRAD_DARK_FADE: ['rgba(10,10,11,0)', 'rgba(10,10,11,1)'],
   BG: '#09090b',
   CARD: '#18181b',
   CARD_GLASS: 'rgba(18, 18, 31, 0.45)',

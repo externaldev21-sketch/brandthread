@@ -117,6 +117,11 @@ vi.mock('@expo/vector-icons', () => ({
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => routerMock,
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    const ReactActual = require('react') as typeof import('react');
+    ReactActual.useEffect(callback, [callback]);
+  },
+  useScrollToTop: () => {},
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -222,7 +227,15 @@ vi.mock('react-native-reanimated', () => ({
     inOut: (fn: unknown) => fn,
     cubic: (t: number) => t,
     linear: (t: number) => t,
+    bezier: (..._points: number[]) => (t: number) => t,
   },
+}));
+
+// The trending-brands row's trailing fade uses LinearGradient, which calls
+// react-native's processColor internally — not present on this suite's
+// plain react-native mock. Stub it like the other native-only components above.
+vi.mock('expo-linear-gradient', () => ({
+  LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
 }));
 
 vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
@@ -233,6 +246,12 @@ vi.mock('@/components/layout', () => ({
   GridSkeleton: () => React.createElement('GridSkeleton', {}),
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => React.createElement('View', {}, children),
   useGridColumns: () => 2,
+  Header: ({ title, subtitle }: any) => React.createElement(
+    'View',
+    { testID: 'search-header' },
+    React.createElement('Text', {}, title),
+    subtitle ? React.createElement('Text', {}, subtitle) : null,
+  ),
 }));
 
 vi.mock('@/components/layout/TabPageHeader', () => ({

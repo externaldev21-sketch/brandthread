@@ -782,14 +782,16 @@ export function SectionHeader({ title, action, style }: SectionHeaderProps) {
   const { theme } = useAppTheme();
   return (
     <View style={[shS.root, style]}>
-      <Text style={shS.title}>{title}</Text>
+      <View style={shS.titleWrap}>
+        <Text style={shS.title} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+      </View>
       {action && (
         <PressableScale
           onPress={action.onPress}
           accessibilityLabel={action.label}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text style={[shS.action, { color: theme.accentLight }]}>{action.label}</Text>
+          <Text style={[shS.action, { color: theme.accentLight }]} numberOfLines={1}>{action.label}</Text>
         </PressableScale>
       )}
     </View>
@@ -799,8 +801,12 @@ export function SectionHeader({ title, action, style }: SectionHeaderProps) {
 const shS = StyleSheet.create({
   root:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: SP.md, marginBottom: SP.sm },
+  // flex:1 + minWidth:0 lets the title shrink and ellipsize instead of
+  // pushing the sibling action off screen — RN/web flexbox items default to
+  // minWidth:auto, which otherwise forces the row wider than the container.
+  titleWrap: { flex: 1, minWidth: 0, marginRight: SP.sm },
   title:  { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  action: { fontSize: FS.sm, fontFamily: FONT.medium },
+  action: { fontSize: FS.sm, fontFamily: FONT.medium, flexShrink: 0 },
 });
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────

@@ -161,8 +161,7 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
 // Gap between the text's own rendered bottom edge and the underline —
 // measured from TikTok: the bar sits tight to the glyph baseline, not below
 // the tab's padded touch target.
-const UNDERLINE_GAP = 4.5;
-// Underline thickness — thin, fully rounded caps.
+const UNDERLINE_GAP = 6;// Underline thickness — thin, fully rounded caps.
 const UNDERLINE_HEIGHT = 2.5;
 
 /**
@@ -199,9 +198,11 @@ function UnderlineTabs({
 
   React.useEffect(() => {
     if (!activeLayout) return;
-    const underlineX = activeLayout.x;
-    const underlineWidth = activeLayout.width;
-    if (!hasMeasuredOnce.current) {
+    // ~40% of the active word's own measured width, centered under it — not
+    // the full word width. Matches the owner's screenshot-measured TikTok
+    // reference for #88 (overriding the earlier full-width spec).
+    const underlineWidth = Math.max(10, activeLayout.width * 0.4);
+    const underlineX = activeLayout.x + (activeLayout.width - underlineWidth) / 2;    if (!hasMeasuredOnce.current) {
       // First measurement (mount / initial layout): snap in place instead of
       // sliding in from x=0, which read as an unintended "wipe" animation.
       x.set(underlineX);

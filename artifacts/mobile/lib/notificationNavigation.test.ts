@@ -55,11 +55,18 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenNthCalledWith(2, '/subscription');
   });
 
-  it('routes a conversation notification to the chat thread', () => {
+  it('routes a buyer_to_buyer conversation notification to the buyer conversation screen', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);
-    handler(targetResponse('msg-1', { targetType: 'conversation', targetId: 'convo-abc' }));
-    expect(router.push).toHaveBeenCalledWith('/chat/convo-abc');
+    handler(targetResponse('msg-1', { targetType: 'conversation', targetId: 'convo-abc', type: 'new_friend_message' }));
+    expect(router.push).toHaveBeenCalledWith('/buyer-conversation?id=convo-abc');
+  });
+
+  it('routes an order-message conversation notification to the seller conversation screen', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('msg-2', { targetType: 'conversation', targetId: 'convo-xyz', type: 'new_order_message' }));
+    expect(router.push).toHaveBeenCalledWith('/seller-conversation?id=convo-xyz');
   });
 
   it('routes a drop-live notification to the buyer drop detail screen', () => {

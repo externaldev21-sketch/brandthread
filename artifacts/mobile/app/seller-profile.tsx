@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
@@ -107,6 +108,9 @@ export default function SellerProfileScreen() {
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
   const layout = useProfileLayout();
+  // Clears the floating buyer tab bar when this screen is reached from the
+  // buyer shell (viewing a brand's public profile); a no-op elsewhere.
+  const barInset = useBuyerTabBarInset();
 
   const [seller, setSeller] = useState<SellerView | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -485,7 +489,7 @@ export default function SellerProfileScreen() {
           verified: seller?.verified,
           roleLabel: 'Seller',
         }}
-        avatar={{ ring: !!seller?.verified }}
+        avatar={{ ring: !!seller?.verified, liveHostId: canonicalSellerId ?? routeSellerId ?? null }}
         // A cover video, when set, leads the hero for every viewer (muted,
         // looping, poster first); otherwise the latest video.
         hero={coverFlow.hasCover
@@ -545,6 +549,7 @@ export default function SellerProfileScreen() {
             onPress={openShop}
           />
         ) : undefined}
+        bottomInset={barInset}
       />
 
       {/* ── Owner post actions (long-press a tile) ── */}

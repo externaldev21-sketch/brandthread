@@ -27,7 +27,10 @@ describe('buyer Thread chrome', () => {
     expect(feed).toContain('const viewportReady = viewportSize.width > 0 && viewportSize.height > 0');
     expect(feed).toContain('{viewportReady && <FlatList');
     expect(feed).toContain('width: pageWidth, height: pageHeight');
-    expect(feed).toContain('length: pageHeight, offset: pageHeight * index');
+    // Uniform page layout lives in the shared pager config the feed spreads.
+    expect(feed).toContain('{...verticalPagerListProps(pageHeight, displayItems.length)}');
+    expect(readFileSync(resolve(process.cwd(), 'lib/feedPager.ts'), 'utf8'))
+      .toContain('length: pageHeight, offset: pageHeight * index');
     expect(feed).not.toContain('snapToInterval={pageHeight}');
     expect(feed).not.toContain("Dimensions.get('window')");
     expect(feed).toContain('contentFit="contain"');

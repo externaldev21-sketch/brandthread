@@ -46,7 +46,7 @@ export default function AIMockupChatScreen() {
   const [loading, setLoading] = useState(false);
   const flatRef = useRef<FlatList>(null);
 
-  const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom;
+  const bottomPad = insets.bottom;
 
   async function sendMessage(text: string) {
     if (!text.trim() || loading) return;

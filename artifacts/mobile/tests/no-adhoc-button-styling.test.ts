@@ -30,7 +30,14 @@ const ACTION_WORDS = [
 ];
 
 /** file path (repo-relative) -> reason it's a confirmed non-offender. */
-const ALLOWLIST: Record<string, string> = {};
+const ALLOWLIST: Record<string, string> = {
+  // Camera-first story composer (PR #124, kept intact per the overnight
+  // integration's merge rules — dev's design wins here). Its "Add"/"Cancel"
+  // shop-link modal buttons are bespoke chrome matching this screen's own
+  // full-bleed camera UI, not the app's card-surface design system that
+  // Button/Chip are built for.
+  'app/buyer-story-create.tsx': 'PR #124 camera-first story composer — bespoke modal chrome, not migrated to the design system',
+};
 
 const TAG_NAMES = ['Pressable', 'TouchableOpacity', 'TouchableHighlight'];
 const OWN_STYLE_RE = /backgroundColor\s*:|borderWidth\s*:|borderColor\s*:|borderRadius\s*:/;

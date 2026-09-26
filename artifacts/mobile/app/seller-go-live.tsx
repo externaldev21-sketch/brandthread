@@ -305,8 +305,16 @@ function SellerGoLiveNativeScreen() {
               </TouchableOpacity>
             </View>
             {productsLoading ? (
-              <View style={s.pickerLoading}>
-                <ActivityIndicator color={FG} />
+              <View style={{ paddingHorizontal: SP.md, gap: SP.sm }}>
+                {[0, 1, 2, 3].map(i => (
+                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm }}>
+                    <View style={[s.pickerRowThumb, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <View style={{ height: 12, width: '55%', borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                      <View style={{ height: 10, width: '25%', borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+                    </View>
+                  </View>
+                ))}
               </View>
             ) : (
               <FlatList
@@ -354,7 +362,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
     topBar:            { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md },
     topRight:          { flexDirection: 'row', gap: 10 },
-    iconBtn:           { width: 40, height: 40, borderRadius: 20, backgroundColor: GLASS, alignItems: 'center', justifyContent: 'center' },
+    iconBtn:           { width: 44, height: 44, borderRadius: 22, backgroundColor: GLASS, alignItems: 'center', justifyContent: 'center' },
 
     bottomGradient:    { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 100 },
     fields:            { paddingHorizontal: SP.md, paddingBottom: SP.md, gap: SP.sm },
@@ -387,7 +395,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
     // Permissions gate
     permRoot:          { flex: 1, backgroundColor: '#000' },
-    closeBtn:          { position: 'absolute', left: SP.md, width: 40, height: 40, borderRadius: 20, backgroundColor: GLASS, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+    closeBtn:          { position: 'absolute', left: SP.md, width: 44, height: 44, borderRadius: 22, backgroundColor: GLASS, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
     permBox:           { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: SP.md },
     permIconWrap:      { width: 68, height: 68, borderRadius: RADIUS.xl, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
     permTitle:         { color: FG, fontSize: FS.md, fontFamily: FONT.bold, textAlign: 'center' },

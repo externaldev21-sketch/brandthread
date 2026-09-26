@@ -161,7 +161,7 @@ export default function StorePoliciesScreen() {
       <View style={[s.root, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { borderBottomColor: BORDER, height: 56 + headerTopInset, paddingTop: headerTopInset }]}>
           <TouchableOpacity onPress={closeEdit} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="x" size={21} color={FG} /></TouchableOpacity>
-          <Text style={[s.headerTitle, { color: FG }]}>{policyMeta.label}</Text>
+          <Text style={[s.headerTitle, { color: FG }]} numberOfLines={1} ellipsizeMode="tail">{policyMeta.label}</Text>
           <Button label="Save" variant="primary" size="compact" loading={saving} onPress={handleSave} />
         </View>
 
@@ -257,7 +257,7 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1 },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FS.base, fontFamily: FONT.bold },
+  headerTitle: { fontSize: FS.base, fontFamily: FONT.bold, flex: 1, flexShrink: 1, textAlign: 'center', marginHorizontal: SP.sm },
   aiBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: SP.md, paddingVertical: 10, borderBottomWidth: 1 },
   aiBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.sm, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
   aiBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },

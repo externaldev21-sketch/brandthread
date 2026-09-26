@@ -21,11 +21,14 @@ import { resolve } from 'node:path';
 
 const PRESSABLE_TAGS = ['Pressable', 'TouchableOpacity', 'TouchableHighlight'];
 
-// Screens/components most likely to render a card-level Pressable with a
-// second pressable (heart/save toggle, bookmark, follow button) inside it.
+// Screens/components in (or adjacent to) the buyer shopping area that render
+// product/result cards with a card-level Pressable — the shape most likely
+// to accidentally nest a second pressable (heart/save toggle, bookmark
+// button, follow button, etc.) inside.
 const FILES_TO_CHECK = [
   'app/(buyer)/discover.tsx',
   'app/(buyer)/search.tsx',
+  'app/buyer-saved.tsx',
   'app/buyer-product-detail.tsx',
   'app/seller-profile.tsx',
   'app/buyer-other-profile.tsx',

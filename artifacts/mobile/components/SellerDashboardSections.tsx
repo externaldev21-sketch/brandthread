@@ -29,7 +29,7 @@ export function SellerDashboardSectionHeader({
   const palette = theme as typeof theme & Record<string, string>;
   return (
     <View style={styles.sectionHeaderRow} testID={`seller-dashboard-section-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <Text style={[styles.sectionHeaderTitle, { color: palette.muted ?? MUTED }]} maxFontSizeMultiplier={2}>{title}</Text>
+      <Text style={[styles.sectionHeaderTitle, { color: palette.muted ?? MUTED }]} maxFontSizeMultiplier={2} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
       {action && onAction ? (
         <TouchableOpacity onPress={onAction} style={styles.sectionHeaderActionButton}>
            <Text style={[styles.sectionHeaderAction, { color: palette.subtle ?? SUBTLE }]} maxFontSizeMultiplier={2}>{action}</Text>

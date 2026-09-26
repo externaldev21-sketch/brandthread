@@ -161,7 +161,7 @@ vi.mock('react-native-reanimated', () => {
     useAnimatedStyle: (fn: () => Record<string, unknown>) => fn(),
     withSpring: (v: unknown) => v,
     withTiming: (v: unknown) => v,
-    Easing: { out: (v: unknown) => v, cubic: () => {} },
+    Easing: { out: (v: unknown) => v, cubic: () => {}, bezier: (..._points: number[]) => (t: number) => t },
   };
 });
 

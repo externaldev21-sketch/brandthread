@@ -32,6 +32,7 @@ import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { buildCanonicalProfileUrl, normalizeUsername } from '@/lib/shareProfile';
+import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -175,9 +176,16 @@ export default function ShareProfileScreen() {
         bounces={false}
       >
         {loading ? (
-          <View style={styles.centeredState}>
-            <ActivityIndicator color={theme.text} />
-            <Text style={styles.loadingText}>Loading profile…</Text>
+          <View style={{ alignItems: 'center', paddingTop: SP.lg, width: '100%' }}>
+            <SkeletonBlock width={252} height={252} radius={RADIUS.lg} />
+            <View style={{ height: SP.md }} />
+            <SkeletonLine width={200} height={14} />
+            <View style={{ height: SP.xs }} />
+            <SkeletonLine width={120} height={12} />
+            <View style={{ height: SP.xl }} />
+            <SkeletonBlock width="100%" height={52} radius={RADIUS.md} />
+            <View style={{ height: SP.sm }} />
+            <SkeletonBlock width="100%" height={52} radius={RADIUS.md} />
           </View>
         ) : error ? (
           <View style={styles.centeredState}>

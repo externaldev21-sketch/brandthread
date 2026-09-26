@@ -32,6 +32,8 @@ import { AppThemeProvider, useAppTheme, peekPersistedTheme } from '@/contexts/Ap
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { AppIconProvider } from '@/contexts/AppIconContext';
 import BootScreen from '@/components/BootScreen';
+import ClerkBootGate from '@/components/ClerkBootGate';
+import { ClerkLoadErrorBoundary } from '@/components/ClerkLoadErrorBoundary';
 import AppIntroSplash from '@/components/splash/AppIntroSplash';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
@@ -69,6 +71,7 @@ import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notific
 import { getDevWebPreviewRole } from '@/lib/devPreview';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
+import { ActionSheetHost } from '@/components/ui/ActionSheet';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
@@ -258,6 +261,8 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // Seller livestream — real full-screen camera/broadcast controls.
   'seller-go-live',
   'seller-live',
+  // LIVE viewer pager — full-bleed video with its own comment bar.
+  'live',
   // Pushed, modal-style profile editor with its own header Save button and
   // scroll footer — the bar has no business floating over its form/photo
   // pickers (screenshots showed it sitting on top of the last row).
@@ -995,6 +1000,7 @@ function RootLayoutNav() {
       <StoreContextBanner />
       <NotificationBanner />
       <NetworkNoticeBanner />
+      <ActionSheetHost />
       <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
       <Stack
@@ -1158,7 +1164,9 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-go-live"  options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="seller-live"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', gestureEnabled: false, contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-live"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="live"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="live-feed"       options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+
         <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1325,19 +1333,21 @@ export default function RootLayout() {
 
   return (
     <AppIntroSplash ready={appReady}>
-      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-        {PREVIEW_ROLE || DEV_BYPASS_ROLE ? (
-          // Development previews render without waiting for Clerk.
-          appTree
-        ) : (
-          <>
-            <ClerkLoading>
-              <BootScreen />
-            </ClerkLoading>
-            <ClerkLoaded>{appTree}</ClerkLoaded>
-          </>
-        )}
-      </ClerkProvider>
+      <ClerkLoadErrorBoundary>
+        <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
+          {PREVIEW_ROLE || DEV_BYPASS_ROLE ? (
+            // Development previews render without waiting for Clerk.
+            appTree
+          ) : (
+            <>
+              <ClerkLoading>
+                <ClerkBootGate />
+              </ClerkLoading>
+              <ClerkLoaded>{appTree}</ClerkLoaded>
+            </>
+          )}
+        </ClerkProvider>
+      </ClerkLoadErrorBoundary>
     </AppIntroSplash>
   );
 }

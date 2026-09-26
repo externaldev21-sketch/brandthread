@@ -23,10 +23,12 @@ export function SectionHeader({ title, action, onAction, colors: colorsProp }: S
   const colors = colorsProp ?? themeColors;
   return (
     <View style={styles.row}>
-      <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
+      <View style={styles.titleWrap}>
+        <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+      </View>
       {action && (
-        <TouchableOpacity onPress={onAction} activeOpacity={0.7}>
-          <Text style={[styles.action, { color: colors.primary }]}>{action}</Text>
+        <TouchableOpacity onPress={onAction} activeOpacity={0.7} style={styles.actionBtn}>
+          <Text style={[styles.action, { color: colors.primary }]} numberOfLines={1}>{action}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -40,6 +42,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.sm,
   },
+  // flex:1 + minWidth:0 lets a long title shrink and ellipsize instead of
+  // forcing the row (and its sibling action) past the screen edge.
+  titleWrap: { flex: 1, minWidth: 0, marginRight: SPACING.sm },
   title: { ...TYPE_SCALE.headline, fontFamily: FONT.semibold },
+  actionBtn: { flexShrink: 0 },
   action: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium },
 });

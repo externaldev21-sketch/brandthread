@@ -47,7 +47,7 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
   const suppressForCapture = __DEV__ && typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('bt_capture') === '1';
   const openPreferences = () => { setAnalytics(consent?.analytics ?? false); setMarketing(consent?.marketing ?? false); setCustomizing(true); };
-  const showNotice = !suppressForCapture && loaded && (!consent || customizing);
+  const showNotice = !suppressForCapture && !suppressForRoute && loaded && (!consent || customizing);
   // The banner is outside the navigation tree. Screens with bottom controls
   // can reserve its actual rendered height without guessing text wrapping.
   const noticeClearance = showNotice && bannerHeight ? tabBarInset + SP.sm + bannerHeight + SP.sm : 0;

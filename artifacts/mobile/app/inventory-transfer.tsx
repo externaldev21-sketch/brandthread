@@ -257,7 +257,7 @@ export default function InventoryTransferScreen() {
             <Feather name="arrow-left" size={ICON.md} color={FG} />
           </TouchableOpacity>
           <View style={styles.headerTitleRow}>
-            <Text style={styles.headerTitle}>{transfer.transferNumber}</Text>
+            <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{transfer.transferNumber}</Text>
             <StatusBadge label={statusLabel(transfer.status)} variant={statusVariant(transfer.status)} />
           </View>
           <View style={{ width: 36 }} />
@@ -828,8 +828,8 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
-  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, flex: 1, justifyContent: 'center' },
+  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3, flexShrink: 1 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, flex: 1, minWidth: 0, justifyContent: 'center' },
   scroll: { flex: 1 },
   scrollContent: { paddingTop: SP.md },
   sectionHeader: { marginTop: SP.md, marginBottom: SP.sm },

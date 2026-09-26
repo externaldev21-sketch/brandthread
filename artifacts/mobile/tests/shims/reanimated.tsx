@@ -55,6 +55,12 @@ export const Easing = {
   cubic: (t: number) => t,
   linear: (t: number) => t,
   ease: (t: number) => t,
+  // PR #132 (shop sheet spring fix) added a module-scope
+  // `Easing.bezier(...)` call in constants/motion.ts, which many otherwise
+  // unrelated suites hit transitively (e.g. via components/ui/Button.tsx).
+  // The exact curve shape is never asserted in tests, so an identity
+  // function is enough — this only needs to exist and be callable.
+  bezier: (..._points: number[]) => (t: number) => t,
 };
 
 function makeComponent(name: string) {

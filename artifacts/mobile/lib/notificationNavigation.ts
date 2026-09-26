@@ -59,7 +59,16 @@ export function createNotificationResponseHandler(
       return;
     }
     if (data?.targetType === 'conversation' && typeof data.targetId === 'string' && data.targetId) {
-      router.push(`/chat/${encodeURIComponent(data.targetId)}`);
+      // There is no `/chat/:id` route — the real 1:1 conversation screens are
+      // `/buyer-conversation` (buyer_to_buyer threads, the common case — see
+      // `notifType` in routes/conversations.ts) and `/seller-conversation`
+      // (order-context threads, notified as `new_order_message`), both keyed
+      // by `?id=`.
+      if (data.type === 'new_order_message') {
+        router.push(`/seller-conversation?id=${encodeURIComponent(data.targetId)}`);
+      } else {
+        router.push(`/buyer-conversation?id=${encodeURIComponent(data.targetId)}`);
+      }
       return;
     }
     if (data?.targetType === 'drop' && typeof data.targetId === 'string' && data.targetId) {

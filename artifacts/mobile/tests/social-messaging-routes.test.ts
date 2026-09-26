@@ -44,9 +44,17 @@ const SOCIAL_MESSAGING_FILES = [
   'components/inbox/InboxSwipeRow.tsx',
 ];
 
+// Routes intentionally pushed to before their screen exists in this repo,
+// because a different concurrent workstream owns building them (e.g. the
+// feed's LIVE button targets a dedicated live-stream pager being built
+// elsewhere) — allowlisted here instead of this repo stubbing a route it
+// doesn't own, which would conflict with that other work landing it for real.
+const EXTERNALLY_OWNED_ROUTES = new Set(['/live']);
+
 /** Matches expo-router group segments, e.g. "/(buyer)/orders" -> "(buyer)/orders". */
 function routeExists(route: string): boolean {
   const [path] = route.split('?');
+  if (EXTERNALLY_OWNED_ROUTES.has(path)) return true;
   const trimmed = path.replace(/^\//, '');
   if (!trimmed) return true; // bare "/" resolves to the root tab layout
   return (

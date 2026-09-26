@@ -9,13 +9,14 @@
  * the stat-row-above-chart hierarchy and the muted axis labels.
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GRID_MAX_WIDTH, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { ResponsiveContainer } from '@/components/layout';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { formatCents } from '@/lib/money';
 import {
   getSalesAnalytics, getFilterState, saveFilterState,
@@ -86,8 +87,9 @@ export default function AnalyticsScreen() {
   const api = useApi();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = insets.top;
   const s = React.useMemo(() => createStyles(colors), [colors]);
+  const scrollResetRef = useScrollReset<ScrollView>();
 
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -169,6 +171,7 @@ export default function AnalyticsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
+        ref={scrollResetRef}
         style={s.scroll}
         contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
         showsVerticalScrollIndicator={false}
