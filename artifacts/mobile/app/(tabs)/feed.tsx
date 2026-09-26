@@ -3251,14 +3251,17 @@ export default function FeedScreen({
                   accessibilityLabel={activeLiveStreams.every(stream => stream.isPreview)
                     ? `View ${activeLiveStreams.length} preview cards`
                     : `Jump to live, ${activeLiveStreams.length} streaming now`}
-                  hitSlop={{ top: 5, bottom: 5, left: 4, right: 5 }}
+                  hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
                 >
-                  <View style={styles.liveJumpDot} />
-                    {windowWidth >= 360 && (
-                      <Text style={styles.liveJumpText}>
-                        {activeLiveStreams.every(stream => stream.isPreview) ? 'PREVIEW' : 'LIVE'}
-                      </Text>
-                    )}
+                  <View style={[
+                    styles.liveJumpDot,
+                    activeLiveStreams.every(stream => stream.isPreview) && styles.liveJumpDotPreview,
+                  ]} />
+                  {windowWidth >= 360 && (
+                    <Text style={styles.liveJumpText}>
+                      {activeLiveStreams.every(stream => stream.isPreview) ? 'PREVIEW' : 'LIVE'}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               )}
             </View>
@@ -3686,12 +3689,13 @@ const styles = StyleSheet.create({
   },
   buyerCartBadge: { top: 3, right: 1 },
   liveJumpBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36,
-    paddingHorizontal: 8, borderRadius: RADII.pill,
-    backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.55)',
+    flexDirection: 'row', alignItems: 'center', gap: 3, height: 26,
+    paddingHorizontal: 7, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(0,0,0,0.24)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
-  liveJumpDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
-  liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
+  liveJumpDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FF3B30' },
+  liveJumpDotPreview: { backgroundColor: ON_DARK },
+  liveJumpText: { fontSize: 9, letterSpacing: 0.4, fontFamily: FONT.bold, color: ON_DARK },
   // Persistent thin search bar — squircle (not a full pill, not sharp),
   // lighter/more transparent fill than a solid pill so it never darkens the
   // video underneath. No blur: a live blur here would re-sample the playing
