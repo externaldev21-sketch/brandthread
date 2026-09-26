@@ -77,6 +77,9 @@ import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
+import { getPreviewCatalog, getPreviewSellers } from '@/lib/previewCatalog';
+import { PREVIEW_FEED_POSTS } from '@/lib/previewFeed';
+import { getPreviewLiveSessions, type PreviewLiveSession } from '@/lib/previewCommerce';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -342,6 +345,22 @@ const FASHION_PREVIEW_VIDEO_SOURCES: VideoSource[] = [
   require('../../assets/videos/fashion_runway_10.mp4'),
 ];
 
+let browserSupportsFashionPreviewH264: boolean | null = null;
+
+function canPlayFashionPreviewSource(source: VideoSource): boolean {
+  if (Platform.OS !== 'web' || !FASHION_PREVIEW_VIDEO_SOURCES.includes(source)) return true;
+  if (typeof document === 'undefined') return true;
+
+  if (browserSupportsFashionPreviewH264 === null) {
+    // These local preview clips are H.264 High Profile, Level 4.0. expo-video's
+    // web player calls HTMLVideoElement.play() without handling its rejected
+    // promise, so don't request playback in browsers that cannot decode them.
+    browserSupportsFashionPreviewH264 =
+      document.createElement('video').canPlayType('video/mp4; codecs="avc1.640028"') !== '';
+  }
+  return browserSupportsFashionPreviewH264;
+}
+
 const FASHION_PREVIEW_VIDEO_URIS = FASHION_PREVIEW_VIDEO_SOURCES.map(
   module => Asset.fromModule(module as number).uri,
 );
@@ -363,7 +382,7 @@ const FASHION_PREVIEW_POSTER_URIS = FASHION_PREVIEW_POSTER_SOURCES.map(
   module => Asset.fromModule(module).uri,
 );
 
-const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
+const FASHION_PREVIEW_BASE_POSTS: SpotlightItem[] = [
   {
     id: 'preview-fashion-01',
     creator: 'Atelier Noire',
@@ -656,6 +675,70 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
   },
 ];
 
+let cachedFashionPreviewPosts: SpotlightItem[] | null = null;
+
+function getFashionPreviewPosts(): SpotlightItem[] {
+  if (cachedFashionPreviewPosts) return cachedFashionPreviewPosts;
+
+  const products = getPreviewCatalog();
+  const sellers = getPreviewSellers();
+  const productById = new Map(products.map(product => [product.id, product]));
+  const sellerById = new Map(sellers.map(seller => [seller.sellerId, seller]));
+
+  cachedFashionPreviewPosts = PREVIEW_FEED_POSTS.map((seed, index): SpotlightItem => {
+    const product = productById.get(seed.productId);
+    if (!product) throw new Error(`Preview feed references missing product ${seed.productId}`);
+    const seller = sellerById.get(product.sellerId);
+    if (!seller) throw new Error(`Preview product references missing seller ${product.sellerId}`);
+
+    const base = FASHION_PREVIEW_BASE_POSTS[index];
+    if (base && (base.id !== seed.id || base.productId !== product.id || base.sellerId !== product.sellerId)) {
+      throw new Error(`Preview feed identity/product mapping changed for ${seed.id}`);
+    }
+
+    const videoIndex = seed.videoIndex;
+    return {
+      ...(base ?? {}),
+      id: seed.id,
+      creator: seller.displayName,
+      handle: seller.handle,
+      avatarColor: seller.color,
+      initials: seller.initials,
+      verified: base?.verified ?? seed.verified === true,
+      mediaUris: [FASHION_PREVIEW_VIDEO_URIS[videoIndex]],
+      videoSource: FASHION_PREVIEW_VIDEO_SOURCES[videoIndex],
+      videoPosterUri: FASHION_PREVIEW_POSTER_URIS[videoIndex],
+      videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[videoIndex],
+      contentType: 'video',
+      caption: base?.caption ?? seed.caption ?? `Preview · ${product.name}`,
+      sound: base?.sound ?? seed.sound ?? `Original Sound · ${seller.displayName}`,
+      productName: product.name,
+      productPrice: formatCents(product.currentPriceCents),
+      productOriginalPrice: product.compareAtPriceCents === null
+        ? null
+        : formatCents(product.compareAtPriceCents),
+      accentColor: seller.color,
+      likes: seed.likes,
+      comments: seed.comments,
+      reposts: seed.reposts,
+      shares: seed.shares,
+      saves: seed.saves,
+      location: base?.location ?? seed.location,
+      productId: product.id,
+      sellerId: product.sellerId,
+      productTags: [{
+        productId: product.id,
+        productName: product.name,
+        priceCents: product.currentPriceCents,
+        imageUri: product.images[0],
+      }],
+      commentsCount: seed.commentsCount,
+    };
+  });
+
+  return cachedFashionPreviewPosts;
+}
+
 // ─── Live Stream feed item ────────────────────────────────────────────────────
 interface LiveStreamFeedItem {
   _isLive: true;
@@ -667,6 +750,32 @@ interface LiveStreamFeedItem {
   title: string;
   viewerCount: number;
   productTags: { productName: string; priceCents: number }[];
+  isPreview?: true;
+}
+
+type LiveSessionRow = Pick<PreviewLiveSession, 'id' | 'title'> & {
+  seller_name?: string;
+  brand_name?: string | null;
+  thumbnail_url?: string | null;
+  viewer_count?: number;
+  product_tags?: { productName: string; priceCents: number }[];
+  is_preview?: true;
+};
+
+function toLiveStreamFeedItem(session: LiveSessionRow): LiveStreamFeedItem {
+  const isPreview = session.is_preview === true;
+  return {
+    _isLive: true,
+    id: `live_${session.id}`,
+    streamId: session.id,
+    sellerName: session.seller_name ?? 'Seller',
+    brandName: session.brand_name ?? null,
+    thumbnailUrl: session.thumbnail_url ?? null,
+    title: session.title,
+    viewerCount: session.viewer_count ?? 0,
+    productTags: Array.isArray(session.product_tags) ? session.product_tags : [],
+    ...(isPreview ? { isPreview: true as const } : {}),
+  };
 }
 
 // ─── "Just dropped from brands you follow" rail ───────────────────────────────
@@ -742,6 +851,7 @@ function JustDroppedRailPage({
 function LiveStreamPage({
   stream,
   onJoin,
+  isPreview = false,
   pageWidth,
   pageHeight,
   bottomClearance = 90,
@@ -749,6 +859,7 @@ function LiveStreamPage({
   bottomClearance?: number;
   stream: LiveStreamFeedItem;
   onJoin: () => void;
+  isPreview?: boolean;
   pageWidth: number;
   pageHeight: number;
 }) {
@@ -777,12 +888,12 @@ function LiveStreamPage({
       <View style={{ position: 'absolute', top: 52, left: 16, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FF3B30', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 }}>
           <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff', opacity: pulseAnim }} />
-          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.4 }}>LIVE</Text>
+          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.4 }}>{isPreview ? 'PREVIEW' : 'LIVE'}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}>
           <Feather name="eye" size={12} color="#fff" />
           <Text style={{ color: '#fff', fontFamily: FONT.semibold, fontSize: 12 }}>
-            {stream.viewerCount > 0 ? stream.viewerCount.toLocaleString() : 'Live now'}
+            {isPreview ? 'Preview only' : stream.viewerCount > 0 ? stream.viewerCount.toLocaleString() : 'Live now'}
           </Text>
         </View>
       </View>
@@ -816,19 +927,20 @@ function LiveStreamPage({
 
         {/* Join button */}
         <TouchableOpacity
-          onPress={onJoin}
+          onPress={isPreview ? undefined : onJoin}
+          disabled={isPreview}
           activeOpacity={0.85}
           style={{ backgroundColor: '#FF3B30', borderRadius: 28, paddingHorizontal: 40, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}
         >
           <Feather name="video" size={18} color="#fff" />
-          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: FS.base }}>Join live stream</Text>
+          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: FS.base }}>{isPreview ? 'Preview only' : 'Join live stream'}</Text>
         </TouchableOpacity>
       </View>
 
       {/* Bottom label */}
       <View style={{ position: 'absolute', bottom: bottomClearance, left: 16, right: 16 }}>
         <Text style={{ color: 'rgba(255,255,255,0.45)', fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center' }}>
-          Tap to join — live shopping is on
+          {isPreview ? 'Preview card · no broadcast to join' : 'Tap to join — live shopping is on'}
         </Text>
       </View>
     </View>
@@ -884,7 +996,7 @@ function formatPlaybackTime(totalSeconds: number): string {
  * a light haptic "tick" fires every ~3% of the scrub so long drags feel
  * textured rather than silent. */
 function ScrubProgressBar({
-  player, progress, bottom, externallyPaused = false,
+  player, progress, bottom, externallyPaused = false, playbackSupported = true,
 }: {
   player: ReturnType<typeof useVideoPlayer>;
   progress: number;
@@ -892,6 +1004,7 @@ function ScrubProgressBar({
   /** True while the post is deliberately paused (tap or hold) — on release,
    * the scrubber leaves it paused instead of resuming playback. */
   externallyPaused?: boolean;
+  playbackSupported?: boolean;
 }) {
   const { theme } = useAppTheme();
   const [dragging, setDragging] = useState(false);
@@ -943,7 +1056,7 @@ function ScrubProgressBar({
           Animated.timing(thickness, { toValue: 3, duration: 150, useNativeDriver: false }),
           Animated.timing(thumbScale, { toValue: 0, duration: 120, useNativeDriver: true }),
         ]).start();
-        if (!externallyPaused) player.play();
+        if (playbackSupported && !externallyPaused) player.play();
       },
       onPanResponderTerminate: () => {
         setDragging(false);
@@ -951,7 +1064,7 @@ function ScrubProgressBar({
           Animated.timing(thickness, { toValue: 3, duration: 150, useNativeDriver: false }),
           Animated.timing(thumbScale, { toValue: 0, duration: 120, useNativeDriver: true }),
         ]).start();
-        if (!externallyPaused) player.play();
+        if (playbackSupported && !externallyPaused) player.play();
       },
     }),
   ).current;
@@ -1053,6 +1166,7 @@ function VideoVisual({
     p.muted = muted;
     if (progressBottom != null) p.timeUpdateEventInterval = 0.25;
   });
+  const playbackSupported = canPlayFashionPreviewSource(source);
   const [hasStarted, setHasStarted] = useState(false);
   // Fill the page when that crops little (a vertical clip on a phone or a
   // portrait iPad); otherwise letterbox so a vertical clip on a landscape
@@ -1097,12 +1211,12 @@ function VideoVisual({
     // sizing bug above — used to leave the player permanently paused with
     // nothing ever re-triggering play() once a real size arrived. Re-running
     // this effect when the page's measured size changes closes that gap.
-    if (isActive && !paused && isScreenFocused && (pageWidth ?? 0) > 0 && (pageHeight ?? 0) > 0) {
+    if (playbackSupported && isActive && !paused && isScreenFocused && (pageWidth ?? 0) > 0 && (pageHeight ?? 0) > 0) {
       player.play();
     } else {
       player.pause();
     }
-  }, [isActive, paused, isScreenFocused, player, pageWidth, pageHeight]);
+  }, [playbackSupported, isActive, paused, isScreenFocused, player, pageWidth, pageHeight]);
   React.useEffect(() => {
     player.playbackRate = rate;
   }, [player, rate]);
@@ -1170,7 +1284,13 @@ function VideoVisual({
         )}
       </View>
       {progressBottom != null && isActive && (
-        <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} externallyPaused={paused} />
+        <ScrubProgressBar
+          player={player}
+          progress={progress}
+          bottom={progressBottom}
+          externallyPaused={paused}
+          playbackSupported={playbackSupported}
+        />
       )}
     </>
   );
@@ -2272,29 +2392,26 @@ export default function FeedScreen({
   // video player never weaves other sellers' streams in)
   useEffect(() => {
     if (isCreatorFeed) return undefined;
+    const getSignedOutBuyerPreviewRows = () => !userId
+      ? getPreviewLiveSessions().map(toLiveStreamFeedItem)
+      : [];
     async function fetchLive() {
       try {
         const data = await (api as any).live.active() as { streams: any[] };
         const rows = Array.isArray(data?.streams) ? data.streams : [];
-        setActiveLiveStreams(rows.map((s: any) => ({
-          _isLive: true as const,
-          id:          `live_${s.id}`,
-          streamId:    s.id,
-          sellerName:  s.seller_name ?? 'Seller',
-          brandName:   s.brand_name ?? null,
-          thumbnailUrl: s.thumbnail_url ?? null,
-          title:       s.title,
-          viewerCount: s.viewer_count ?? 0,
-          productTags: Array.isArray(s.product_tags) ? s.product_tags : [],
-        })));
+        if (rows.length > 0) {
+          setActiveLiveStreams(rows.map((row: LiveSessionRow) => toLiveStreamFeedItem(row)));
+          return;
+        }
+        setActiveLiveStreams(getSignedOutBuyerPreviewRows());
       } catch {
-        setActiveLiveStreams([]);
+        setActiveLiveStreams(getSignedOutBuyerPreviewRows());
       }
     }
     fetchLive();
     const id = setInterval(fetchLive, 30_000);
     return () => clearInterval(id);
-  }, [isCreatorFeed]);
+  }, [isCreatorFeed, userId]);
 
   // "Just dropped from brands you follow" — real drops only: fetch the
   // buyer's follow graph and the platform's currently-live drops, then
@@ -2337,12 +2454,12 @@ export default function FeedScreen({
     });
   }, [sellerFeedPosts]);
 
-  // Development buyer review prepends ten clearly labeled fashion previews.
+  // Development buyer review prepends twenty-five clearly labeled fashion previews.
   // Production and seller feeds remain real published seller posts only.
   // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
   const allItems = useMemo(() => {
     const previewPosts = __DEV__ && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you'
-      ? FASHION_PREVIEW_POSTS
+      ? getFashionPreviewPosts()
       : [];
     const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts];
     // A creator/product-scoped player shows only those videos — no live
@@ -2909,10 +3026,12 @@ export default function FeedScreen({
             return (
               <LiveStreamPage
                 stream={live}
+                isPreview={live.isPreview === true}
                 pageWidth={pageWidth}
                 pageHeight={pageHeight}
                 bottomClearance={bottomClearance}
                 onJoin={() => {
+                  if (live.isPreview) return;
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   router.push(`/buyer-live?streamId=${encodeURIComponent(live.streamId)}` as never);
                 }}
@@ -3084,11 +3203,17 @@ export default function FeedScreen({
                   activeOpacity={0.78}
                   onPress={jumpToNearestLive}
                   accessibilityRole="button"
-                  accessibilityLabel={`Jump to live, ${activeLiveStreams.length} streaming now`}
+                  accessibilityLabel={activeLiveStreams.every(stream => stream.isPreview)
+                    ? `View ${activeLiveStreams.length} preview cards`
+                    : `Jump to live, ${activeLiveStreams.length} streaming now`}
                   hitSlop={{ top: 5, bottom: 5, left: 4, right: 5 }}
                 >
                   <View style={styles.liveJumpDot} />
-                    {windowWidth >= 360 && <Text style={styles.liveJumpText}>LIVE</Text>}
+                    {windowWidth >= 360 && (
+                      <Text style={styles.liveJumpText}>
+                        {activeLiveStreams.every(stream => stream.isPreview) ? 'PREVIEW' : 'LIVE'}
+                      </Text>
+                    )}
                 </TouchableOpacity>
               )}
             </View>

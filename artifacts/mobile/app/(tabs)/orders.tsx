@@ -25,6 +25,7 @@ import { useApi } from '@/hooks/useApi';
 import { useAuth } from '@clerk/expo';
 import { clearBadge } from '@/lib/orderBadgeStore';
 import { formatCents } from '@/lib/money';
+import { getPreviewSellerOrderRows } from '@/lib/previewCommerce';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { isSellerDevPreview } from '@/lib/devPreview';
@@ -76,6 +77,7 @@ type OrderListFilter = OrderFilterKey | 'unpaid' | 'open' | 'archived';
 type OrderListOrder = Order & {
   listItemCount?: number;
   listItemLabel?: string;
+  isPreview?: boolean;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -236,7 +238,8 @@ export function apiRowToOrder(row: any): OrderListOrder {
     shipments: row.trackingNumber ? [{
       id: `ship_${row.id}`, orderId: row.id, fulfillmentGroupId: '',
       carrier: row.carrier ?? undefined, trackingNumber: row.trackingNumber,
-      trackingEvents: [], isDemo: false,
+      trackingStatus: row.trackingStatus,
+      trackingEvents: [], isDemo: row.isPreview === true,
     }] : [],
     labels: [], returns: [], refunds: [], disputes: [], timeline: [], notes: [],
     cancellation: ordStatus === 'cancelled' && cancellationReason ? {
@@ -251,6 +254,7 @@ export function apiRowToOrder(row: any): OrderListOrder {
     currency: 'USD', tags: [],
     listItemCount: Number.isSafeInteger(row.itemCount) && row.itemCount >= 0 ? row.itemCount : undefined,
     listItemLabel: typeof row.dropName === 'string' && row.dropName.trim() ? row.dropName.trim() : undefined,
+    isPreview: row.isPreview === true,
     createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date(row.createdAt).toISOString(),
     updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : new Date(row.updatedAt).toISOString(),
   };
@@ -454,7 +458,7 @@ export function OrderRow({
 
           {/* Quick action — pushed right */}
           <View style={{ flex: 1 }} />
-          {order.status === 'new' && (
+          {order.status === 'new' && !order.isPreview && (
             <Button
               label="Accept"
               icon="check-circle"
@@ -465,7 +469,7 @@ export function OrderRow({
               accessibilityLabel={`Accept order ${order.orderNumber}`}
             />
           )}
-          {order.status === 'processing' && (
+          {order.status === 'processing' && !order.isPreview && (
             <Button
               label="Ready"
               icon="package"
@@ -476,7 +480,7 @@ export function OrderRow({
               accessibilityLabel={`Mark order ${order.orderNumber} ready`}
             />
           )}
-          {order.status === 'ready_to_ship' && (
+          {order.status === 'ready_to_ship' && !order.isPreview && (
             <Button
               label="Ship"
               icon="send"
@@ -487,7 +491,7 @@ export function OrderRow({
               accessibilityLabel={`Ship order ${order.orderNumber}`}
             />
           )}
-          {order.status === 'shipped' && order.shipments[0] && (
+          {order.shipments[0]?.trackingNumber && (
             <View style={s.trackingPill}>
               <Feather name="truck" size={10} color={SUCCESS} />
               <Text style={s.trackingText}>
@@ -796,16 +800,17 @@ export default function OrdersScreen() {
   useFocusEffect(
     useCallback(() => {
       if (sellerPreview) {
-        // The dev-web seller preview is review-only. Keep the real screen chrome
-        // and empty state, but never issue protected requests or retain account data.
+        // The dev-web seller preview is review-only. Show local-only fixture
+        // rows, but never issue protected requests or retain account data.
         generationRef.current += 1;
         if (timerRef.current !== null) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
-        setOrders([]);
+        const previews = getPreviewSellerOrderRows().map(apiRowToOrder);
+        setOrders(previews);
         setOrdersOwnerId(null);
-        setStats(null);
+        setStats(computeStats(previews));
         setLoadError(false);
         setLoading(false);
         setRefreshing(false);
@@ -853,7 +858,9 @@ export default function OrdersScreen() {
 
   // Filtered + sorted list
   const filtered = useMemo(() => {
-    const visibleOrders = !sellerPreview && ordersOwnerId === userId ? orders : [];
+    const visibleOrders = sellerPreview
+      ? ordersOwnerId === null ? orders : []
+      : ordersOwnerId === userId ? orders : [];
     let base = visibleOrders;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -878,7 +885,9 @@ export default function OrdersScreen() {
   const filterCounts = useMemo(() => {
     const map: Partial<Record<OrderListFilter, number>> = {};
     FILTERS.forEach(({ key }) => {
-      const visibleOrders = !sellerPreview && ordersOwnerId === userId ? orders : [];
+      const visibleOrders = sellerPreview
+        ? ordersOwnerId === null ? orders : []
+        : ordersOwnerId === userId ? orders : [];
       const count = filterOrderList(visibleOrders, key).length;
       if (key !== 'all') map[key] = count;
     });

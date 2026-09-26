@@ -15,7 +15,7 @@
  * call fails or returns nothing, per those modules' established contract.
  */
 import { Asset } from 'expo-asset';
-import { isPreviewCatalogEnabled } from './previewCatalog';
+import { getPreviewSellers, isPreviewCatalogEnabled } from './previewCatalog';
 import type { ActivityItem } from './activity';
 
 export function isPreviewActivityEnabled(): boolean {
@@ -40,18 +40,12 @@ function posterUri(index: number): string {
 
 // Same names/ids as previewCatalog.ts's SEED, so a buyer sees one consistent
 // cast of brands across Feed, Discover, Search, Shop and now Activity.
-const PEOPLE = [
-  { userId: 'preview-seller-01', name: 'Atelier Noire', initials: 'AN', color: '#2E2A26' },
-  { userId: 'preview-seller-02', name: 'Maison Vela', initials: 'MV', color: '#7C3AED' },
-  { userId: 'preview-seller-03', name: 'Saint Rue', initials: 'SR', color: '#111827' },
-  { userId: 'preview-seller-04', name: 'Orison', initials: 'OR', color: '#D6D3D1' },
-  { userId: 'preview-seller-05', name: 'Kuro Line', initials: 'KL', color: '#1F2937' },
-  { userId: 'preview-seller-06', name: 'Forme 22', initials: 'F2', color: '#B45309' },
-  { userId: 'preview-seller-07', name: 'Astrae', initials: 'AS', color: '#0EA5E9' },
-  { userId: 'preview-seller-08', name: 'Noma Archive', initials: 'NA', color: '#65A30D' },
-  { userId: 'preview-seller-09', name: 'Echelon', initials: 'EC', color: '#DB2777' },
-  { userId: 'preview-seller-10', name: 'Vale Studio', initials: 'VS', color: '#EA580C' },
-];
+const PEOPLE = getPreviewSellers().map(seller => ({
+  userId: seller.sellerId,
+  name: seller.displayName,
+  initials: seller.initials,
+  color: seller.color,
+}));
 
 function minutesAgo(mins: number): string {
   return new Date(Date.now() - mins * 60_000).toISOString();
@@ -78,6 +72,12 @@ export function getPreviewActivity(): ActivityItem[] {
       targetId: p[4].userId, targetType: 'user', createdAt: minutesAgo(11),
     },
     {
+      id: 'preview-act-follow-new-02', category: 'social', type: 'new_follower',
+      title: `${p[10].name} started following you`, body: '', isRead: false,
+      actorId: p[10].userId, actorName: p[10].name, actorInitials: p[10].initials, actorColor: p[10].color,
+      targetId: p[10].userId, targetType: 'user', cta: 'Follow back', createdAt: minutesAgo(8),
+    },
+    {
       id: 'preview-act-like-group-01', category: 'social', type: 'post_like',
       title: `${p[1].name} liked your post`, body: '', isRead: false,
       actorId: p[1].userId, actorName: p[1].name, actorInitials: p[1].initials, actorColor: p[1].color,
@@ -96,6 +96,18 @@ export function getPreviewActivity(): ActivityItem[] {
       targetId: 'preview-post-01', targetType: 'post', targetImageUrl: posterUri(1), createdAt: minutesAgo(19),
     },
     {
+      id: 'preview-act-like-group-04', category: 'social', type: 'post_like',
+      title: `${p[11].name} liked your post`, body: '', isRead: false,
+      actorId: p[11].userId, actorName: p[11].name, actorInitials: p[11].initials, actorColor: p[11].color,
+      targetId: 'preview-post-01', targetType: 'post', targetImageUrl: posterUri(1), createdAt: minutesAgo(21),
+    },
+    {
+      id: 'preview-act-like-02', category: 'social', type: 'post_like',
+      title: `${p[12].name} liked your outfit reel`, body: '', isRead: false,
+      actorId: p[12].userId, actorName: p[12].name, actorInitials: p[12].initials, actorColor: p[12].color,
+      targetId: 'preview-post-08', targetType: 'post', targetImageUrl: posterUri(2), createdAt: minutesAgo(24),
+    },
+    {
       id: 'preview-act-story-like-01', category: 'social', type: 'story_like',
       title: `${p[3].name} liked your story`, body: '', isRead: false,
       actorId: p[3].userId, actorName: p[3].name, actorInitials: p[3].initials, actorColor: p[3].color,
@@ -106,6 +118,12 @@ export function getPreviewActivity(): ActivityItem[] {
       title: `${p[7].name} sent you Thread Cash`, body: '$5.00 · tap to view', isRead: false,
       actorId: p[7].userId, actorName: p[7].name, actorInitials: p[7].initials, actorColor: p[7].color,
       targetId: 'preview-transfer-01', targetType: 'thread_cash_transfer', createdAt: minutesAgo(28),
+    },
+    {
+      id: 'preview-act-cash-02', category: 'social', type: 'thread_cash_received',
+      title: `${p[13].name} sent you Thread Cash`, body: 'Tap to view your transfer details.', isRead: false,
+      actorId: p[13].userId, actorName: p[13].name, actorInitials: p[13].initials, actorColor: p[13].color,
+      targetId: 'preview-transfer-02', targetType: 'thread_cash_transfer', createdAt: minutesAgo(34),
     },
     // ── Today ────────────────────────────────────────────────────────────
     {
@@ -163,6 +181,12 @@ export function getPreviewActivity(): ActivityItem[] {
       targetId: p[3].userId, targetType: 'user', createdAt: minutesAgo(60 * 24 * 20), cta: undefined,
     },
     {
+      id: 'preview-act-follow-old-02', category: 'social', type: 'new_follower',
+      title: `${p[15].name} started following you`, body: '', isRead: true,
+      actorId: p[15].userId, actorName: p[15].name, actorInitials: p[15].initials, actorColor: p[15].color,
+      targetId: p[15].userId, targetType: 'user', createdAt: minutesAgo(60 * 24 * 26),
+    },
+    {
       id: 'preview-act-like-old-01', category: 'social', type: 'post_like',
       title: `${p[9].name} liked your post`, body: '', isRead: true,
       actorId: p[9].userId, actorName: p[9].name, actorInitials: p[9].initials, actorColor: p[9].color,
@@ -193,6 +217,16 @@ export function getPreviewSuggestedPeople(): PreviewSuggestedPerson[] {
     'New on Brandthread',
     'Followed by Orison',
     'New on Brandthread',
+    'Popular with people you follow',
+    'New collection just landed',
+    'Followed by Maison Vela',
+    'A fresh independent label',
+    'Popular with people you follow',
+    'New on Brandthread',
+    'Recommended for your style',
+    'Followed by Saint Rue',
+    'New collection just landed',
+    'Recommended for your style',
   ];
   cachedSuggestions = PEOPLE.slice(5).map((person, index) => ({
     userId: person.userId,
