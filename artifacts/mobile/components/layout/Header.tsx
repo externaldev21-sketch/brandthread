@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -18,12 +18,32 @@ const LARGE_TITLE_HEIGHT = 96;
 const COLLAPSE_DISTANCE = LARGE_TITLE_HEIGHT - COMPACT_HEIGHT;
 
 /**
+ * Root-page header values — extracted verbatim from Discover's own top bar
+ * (the owner's reference for "the one that looks right"): title size/weight/
+ * letter-spacing, the exact top offset below the safe area, the left gutter,
+ * the row height, and plain (unboxed, unbordered) icon buttons on the right.
+ * Every tab-root page renders through this now, Discover included — it no
+ * longer has a bespoke header, it just IS this component.
+ */
+const ROOT_TITLE_SIZE = 20;
+const ROOT_TITLE_LETTER_SPACING = -0.4;
+const ROOT_TOP_GAP = 12;
+const ROOT_WEB_SAFE_TOP = 67;
+const ROOT_ROW_HEIGHT = 44;
+
+/**
  * One header used on every stack screen: consistent back button + right-side
  * actions everywhere, with an optional large title that collapses into the
  * compact bar as the screen scrolls (pass `scrollY` from the screen's
  * ScrollView/FlatList `onScroll`). Screens that don't want the collapsing
  * large title (e.g. modals, short forms) just omit `scrollY`/`largeTitle`
  * and get the plain compact bar.
+ *
+ * `showBack={false}` + `largeTitle` switches to the root-page header
+ * described above (Discover/Search/Messages/Cart/Orders/…) — a completely
+ * different, simpler layout from the pushed-screen compact bar, not a
+ * variant of it, because the root header never collapses on scroll and
+ * never carries a back button.
  */
 export function Header({
   title,
@@ -44,13 +64,47 @@ export function Header({
   actions?: HeaderAction[];
   scrollY?: Animated.Value;
   transparent?: boolean;
-  /** Extra chrome rendered directly under the large title at the same gutter (search field, filter row) — root pages only. */
+  /** Extra chrome rendered directly under the title at the same gutter (search field, filter row) — root pages only. */
   belowTitle?: React.ReactNode;
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const fallbackScrollY = useRef(new Animated.Value(0)).current;
+
+  const isRoot = !showBack && largeTitle;
+
+  if (isRoot) {
+    const topPad = (Platform.OS === 'web' ? ROOT_WEB_SAFE_TOP : insets.top) + ROOT_TOP_GAP;
+    return (
+      <View style={[rootStyles.wrap, { paddingTop: topPad, backgroundColor: transparent ? 'transparent' : theme.background }]}>
+        <View style={rootStyles.row}>
+          <Text numberOfLines={1} style={[rootStyles.title, { color: theme.text }]}>{title}</Text>
+          {actions.length > 0 && (
+            <View style={rootStyles.actionsRow}>
+              {actions.map((action) => (
+                <TouchableOpacity
+                  key={action.accessibilityLabel}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.accessibilityLabel}
+                  disabled={action.disabled}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={action.onPress}
+                  style={[rootStyles.iconBtn, action.disabled && { opacity: 0.4 }]}
+                >
+                  <Feather name={action.icon} size={ICON.md} color={theme.text} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+        {/* No subtitle unless the page genuinely has one (Discover doesn't) — kept optional for the rare page that needs it. */}
+        {subtitle && <Text numberOfLines={2} style={[rootStyles.subtitle, { color: theme.muted }]}>{subtitle}</Text>}
+        {belowTitle && <View style={rootStyles.belowTitle}>{belowTitle}</View>}
+      </View>
+    );
+  }
+
   const y = scrollY ?? fallbackScrollY;
 
   const compactOpacity = largeTitle
@@ -136,6 +190,46 @@ export function useHeaderScrollY() {
  * default `showBack`. One component, two conventions — see file header.
  */
 export const PageHeader = Header;
+
+const rootStyles = StyleSheet.create({
+  wrap: {
+    width: '100%',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: ROOT_ROW_HEIGHT,
+    paddingHorizontal: GUTTER,
+  },
+  title: {
+    flexShrink: 1,
+    fontFamily: FONT.bold,
+    fontSize: ROOT_TITLE_SIZE,
+    letterSpacing: ROOT_TITLE_LETTER_SPACING,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // Plain — no border, no background box, just the icon at a 44pt touch target.
+  iconBtn: {
+    width: ROOT_ROW_HEIGHT,
+    height: ROOT_ROW_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subtitle: {
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    marginTop: 2,
+    paddingHorizontal: GUTTER,
+  },
+  belowTitle: {
+    paddingHorizontal: GUTTER,
+    paddingTop: SP.sm,
+  },
+});
 
 const styles = StyleSheet.create({
   wrap: {

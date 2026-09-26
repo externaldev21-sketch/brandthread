@@ -34,7 +34,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -42,19 +41,18 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
-import { COMP, FONT, SP, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
+import { FONT, SP, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
-import { CardSkeleton, ListSkeleton, ResponsiveContainer, SkeletonBlock } from '@/components/layout';
+import { CardSkeleton, Header, ListSkeleton, ResponsiveContainer, SkeletonBlock } from '@/components/layout';
 import { LinearGradient } from 'expo-linear-gradient';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { saveItem, removeSavedItem, getSavedItems } from '@/services/socialService';
@@ -69,7 +67,7 @@ import {
 } from '@/components/CommerceSignal';
 import { SectionError } from '@/components/InlineFeedback';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { Card, IconButton, HeartToggle, ThemedRefreshControl, GlassPanel } from '@/components/ui';
+import { Card, HeartToggle, ThemedRefreshControl, GlassPanel } from '@/components/ui';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
@@ -535,16 +533,12 @@ const tr = StyleSheet.create({
 // a glass "Best price / Sold / Want" info card, and horizontal swipe between
 // products with the next one peeking + scaling in from the edge.
 function DiscoverHero({
-  items, theme, topPad, onOpenProduct, onShopAll, onSearch, onNotifications, showNotifications,
+  items, theme, onOpenProduct, onShopAll,
 }: {
   items: ProductCardItem[];
   theme: AppThemePreset;
-  topPad: number;
   onOpenProduct: (item: ProductCardItem) => void;
   onShopAll: () => void;
-  onSearch: () => void;
-  onNotifications: () => void;
-  showNotifications: boolean;
 }) {
   // Measured from the hero's own container, not useWindowDimensions(): on
   // web, WebAppShell clips the app to a centered column (WEB_SHELL_MAX_WIDTH)
@@ -600,17 +594,6 @@ function DiscoverHero({
       {/* Soft glow blobs for depth — theme-tinted, never a new hue */}
       <View pointerEvents="none" style={[dh.glowTop, { backgroundColor: theme.glowGradient[0] }]} />
       <View pointerEvents="none" style={[dh.glowBottom, { backgroundColor: theme.glowGradient[0] }]} />
-
-      {/* ─ Top chrome: wordmark · search/notifications (replaces the old plain header) ─ */}
-      <View style={[dh.wordmarkRow, { paddingTop: topPad + 12, paddingHorizontal: Math.max(SP.md, sideInset) }]}>
-        <Text style={dh.wordmark}>Discover</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <IconButton name="search" variant="glass" onPress={onSearch} accessibilityLabel="Search products and brands" style={dh.glassBtn} />
-          {showNotifications && (
-            <IconButton name="bell" variant="glass" onPress={onNotifications} accessibilityLabel="Notifications" style={dh.glassBtn} />
-          )}
-        </View>
-      </View>
 
       {/* ─ Story bar: counter chip · JUST DROPPED · Shop all pill ─ */}
       <View style={[dh.topBar, { paddingHorizontal: Math.max(SP.md, sideInset) }]}>
@@ -719,16 +702,8 @@ const dh = StyleSheet.create({
   glowBottom: {
     position: 'absolute', bottom: -100, right: -80, width: 320, height: 320, borderRadius: 220, opacity: 0.4,
   },
-  wordmarkRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-  },
-  wordmark: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 20, letterSpacing: -0.4 },
-  // Same 44pt touch target as every other page's header action buttons
-  // (this hero header is a bespoke full-bleed treatment, like the feed and
-  // profile hero, but its icon buttons still match the app-wide size).
-  glassBtn: { width: COMP.iconBtn, height: COMP.iconBtn },
   topBar: {
-    marginTop: SP.lg,
+    marginTop: SP.lg + SP.md,
     flexDirection: 'row', alignItems: 'center', gap: 10,
   },
   counterChip: {
@@ -778,7 +753,6 @@ const dh = StyleSheet.create({
 
 export default function DiscoverScreen() {
   const scrollResetRef = useScrollReset<ScrollView>();
-  const insets    = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router    = useRouter();
   const { push }  = useThreadPull();
@@ -786,7 +760,6 @@ export default function DiscoverScreen() {
   const { theme } = useAppTheme();
   const { isSignedIn } = useAuth();
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const { width: winWidth } = useWindowDimensions();
   const showcaseSkeletonWidth = Math.min(Math.max(winWidth - 54 - GUTTER * 2, 1), 370);
 
@@ -984,33 +957,42 @@ export default function DiscoverScreen() {
   }, [fetchHighDemand, fetchProducts, fetchFollowed, fetchTrending]);
 
   return (
-    <ScrollView
-      ref={scrollResetRef}
-      style={{ flex: 1, backgroundColor: theme.background }}
-      contentContainerStyle={{ paddingBottom: barInset + SP.md }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
-    >
-      {/* ─ Hero — full-bleed "Just Dropped" story, replaces the old plain
-          header + separate hero block. Sourced from the same For You
-          catalogue fetched below (no separate endpoint yet). ─ */}
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      {/* The standard root-page header — same title size/weight/offset/icon
+          style as every other tab-root page, Discover included (it no
+          longer has its own bespoke top bar, it just uses this). */}
+      <Header
+        title="Discover"
+        largeTitle
+        showBack={false}
+        actions={[
+          { icon: 'search', onPress: () => router.push('/(buyer)/search' as never), accessibilityLabel: 'Search products and brands' },
+          ...(isSignedIn ? [{ icon: 'bell' as const, onPress: () => router.push('/(buyer)/inbox' as never), accessibilityLabel: 'Notifications' }] : []),
+        ]}
+      />
+      <ScrollView
+        ref={scrollResetRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: barInset + SP.md }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
+      {/* ─ Hero — full-bleed "Just Dropped" story ─ */}
       {forYouLoading ? (
-        <View style={{ paddingTop: topPad + 12, marginBottom: SP.xl }}>
+        <View style={{ marginBottom: SP.xl }}>
           <SkeletonBlock width="100%" height={520} radius={0} />
         </View>
       ) : forYouError ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <View style={{ paddingTop: topPad + 16 }}>
-            <Text style={[TYPE_SCALE.title1, { color: theme.text, letterSpacing: -0.6, marginBottom: 14 }]}>Discover</Text>
+          <View style={{ paddingTop: SP.md }}>
             <SectionError message={forYouError} onRetry={fetchProducts} />
           </View>
         </ResponsiveContainer>
       ) : forYouItems.length === 0 ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <View style={{ paddingTop: topPad + 16 }}>
-            <Text style={[TYPE_SCALE.title1, { color: theme.text, letterSpacing: -0.6, marginBottom: 14 }]}>Discover</Text>
+          <View style={{ paddingTop: SP.md }}>
             <EmptyState
               icon="package"
               title="No products available right now"
@@ -1023,16 +1005,12 @@ export default function DiscoverScreen() {
         <DiscoverHero
           items={forYouItems.slice(0, 6)}
           theme={theme}
-          topPad={topPad}
           onOpenProduct={(item) => {
             hapticLight();
             const pid = encodeURIComponent(item.productId ?? item.id);
             push((`/thread-product-detail?productId=${pid}&productName=${encodeURIComponent(item.name)}`) as never);
           }}
           onShopAll={() => router.push('/(buyer)/search' as never)}
-          onSearch={() => router.push('/(buyer)/search' as never)}
-          onNotifications={() => router.push('/(buyer)/inbox' as never)}
-          showNotifications={!!isSignedIn}
         />
       )}
 
@@ -1167,7 +1145,8 @@ export default function DiscoverScreen() {
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginTop: SP.xl }}>
         <RecentlyViewedRow />
       </ResponsiveContainer>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
