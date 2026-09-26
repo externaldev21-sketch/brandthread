@@ -1287,6 +1287,7 @@ function ShopSideTab({
           style={StyleSheet.absoluteFill}
           activeOpacity={0.85}
           onPress={expanded ? onPress : expand}
+          testID="shop-tag-pill"
         >
           <Animated.View
             pointerEvents={expanded ? 'none' : 'auto'}

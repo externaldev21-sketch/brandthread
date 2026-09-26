@@ -192,9 +192,37 @@ vi.mock('@/components/search/FilterSheet', () => {
   };
 });
 
+vi.mock('react-native-gesture-handler', () => {
+  function makeChain(): any {
+    const chain: any = {};
+    for (const m of ['onStart', 'onUpdate', 'onEnd', 'onBegin', 'onFinalize', 'enabled']) {
+      chain[m] = () => chain;
+    }
+    return chain;
+  }
+  return {
+    Gesture: { Pan: makeChain },
+    GestureDetector: (props: { children: React.ReactNode }) => props.children,
+  };
+});
+
 vi.mock('react-native-reanimated', () => ({
   default: { View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode) },
   useAnimatedStyle: (fn: () => unknown) => fn(),
+  useSharedValue: (v: unknown) => ({ value: v, get: () => v, set: () => undefined }),
+  withTiming: (v: unknown) => v,
+  withSpring: (v: unknown) => v,
+  runOnJS: (fn: (...args: unknown[]) => void) => fn,
+  // `constants/motion.ts` (pulled in transitively by BottomSheet.tsx) calls
+  // `Easing.out(Easing.cubic)` at module scope, so this mock needs a real-
+  // enough `Easing` even though this suite never exercises sheet motion.
+  Easing: {
+    out: (fn: unknown) => fn,
+    in: (fn: unknown) => fn,
+    inOut: (fn: unknown) => fn,
+    cubic: (t: number) => t,
+    linear: (t: number) => t,
+  },
 }));
 
 vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
