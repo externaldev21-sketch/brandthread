@@ -52,7 +52,7 @@ export interface SheetTransition {
   modalVisible: boolean;
   /** Animated style for the sheet's translateY — apply to the sheet's outer
    *  `Animated.View`. */
-  sheetStyle: AnimatedStyle<{ transform: { translateY: number }[] }>;
+  sheetStyle: AnimatedStyle<{ transform?: { translateY: number }[] }>;
   /** Animated style for the backdrop's opacity — apply to the backdrop's
    *  `Animated.View`, on the exact same timeline as `sheetStyle`. */
   backdropStyle: AnimatedStyle<{ opacity: number }>;
