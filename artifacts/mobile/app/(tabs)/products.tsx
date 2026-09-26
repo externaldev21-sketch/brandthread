@@ -537,7 +537,8 @@ export default function ProductsScreen() {
               size={ICON.md}
               color={FG}
               onPress={() => Alert.alert('Products', 'Choose an action', [
-                { text: 'Import products', onPress: () => router.push('/product-import' as never) },
+                { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
+                { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
                 { text: 'Export products', onPress: () => { void handleExportProducts(); } },
                 { text: 'Cancel', style: 'cancel' },
               ])}

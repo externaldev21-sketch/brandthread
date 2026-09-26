@@ -63,6 +63,7 @@ import {
 } from "../lib/money/escrow";
 import { postLedgerTransaction } from "../lib/money/ledger";
 import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
+import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1027,6 +1028,17 @@ export async function handleCheckoutPaid(
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Order confirmation email delivery failed");
       }
+
+      // Fulfillment via Shopify (opt-in): forward this paid order to the
+      // seller's Shopify store if they've linked products and turned it on.
+      // Fire-and-forget — a failure here never blocks the paid order itself;
+      // forwardOrderToShopifyIfLinked marks its own row 'failed' for retry.
+      setImmediate(() => {
+        forwardOrderToShopifyIfLinked(createdOrderId!).catch((err) => {
+          logger.error({ err, orderId: createdOrderId }, "Shopify order forwarding failed");
+        });
+      });
+
       try {
         await applyThreadCashSellerTopup(stripe, createdOrderId);
       } catch (err) {
