@@ -95,6 +95,12 @@ interface PressableScaleProps extends Omit<PressableProps, 'style'> {
   style?: StyleProp<ViewStyle> | ((state: { pressed: boolean }) => StyleProp<ViewStyle>);
   activeScale?: number;
   activeOpacity?: number;
+  /** Opt out of the Android/web ripple circle while keeping the scale+opacity
+   *  press feel. Defaults to `true` (the existing global behavior) so every
+   *  other call site is unaffected — set `false` on a per-screen basis where
+   *  the ripple reads as an unwanted "translucent grey circle" (e.g. the
+   *  buyer Messages screens). */
+  rippleEnabled?: boolean;
 }
 
 // Press feel shared by every button and card: a quick, firm squish on touch,
@@ -103,7 +109,7 @@ const NATIVE_DRIVER = Platform.OS !== 'web';
 const PRESS_IN_SPRING = { speed: 48, bounciness: 0, useNativeDriver: NATIVE_DRIVER } as const;
 const PRESS_OUT_SPRING = { speed: 14, bounciness: 11, useNativeDriver: NATIVE_DRIVER } as const;
 
-export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.96, activeOpacity = 0.88, ...rest }: PressableScaleProps) {
+export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.96, activeOpacity = 0.88, rippleEnabled = true, ...rest }: PressableScaleProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
   const { theme } = useAppTheme();
@@ -115,7 +121,7 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
       onPress={onPress}
       disabled={disabled}
       hitSlop={hitSlop}
-      android_ripple={{ color: `${theme.accent}2E`, borderless: false }}
+      android_ripple={rippleEnabled ? { color: `${theme.accent}2E`, borderless: false } : undefined}
       onPressIn={(e) => {
         Animated.parallel([
           Animated.spring(scale, { toValue: activeScale, ...PRESS_IN_SPRING }),
@@ -600,12 +606,12 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       accessibilityLabel={count !== undefined ? `${label}, ${count}` : label}
       accessibilityState={{ selected: active }}
-      style={[fcS.chip, { backgroundColor: palette.card, borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accentDim, borderColor: theme.accent + '88' }]]}
+      style={[fcS.chip, { backgroundColor: palette.card, borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accent, borderColor: theme.accent }]]}
     >
-      <Text style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.accentLight }]]}>{label}</Text>
+      <Text style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.onAccent }]]}>{label}</Text>
       {count !== undefined && (
-        <View style={[fcS.count, active && [fcS.activeCount, { backgroundColor: theme.accentDim }]]}>
-          <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.accentLight }]]}>{count}</Text>
+        <View style={[fcS.count, active && [fcS.activeCount, { backgroundColor: `${theme.onAccent}26` }]]}>
+          <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.onAccent }]]}>{count}</Text>
         </View>
       )}
     </PressableScale>

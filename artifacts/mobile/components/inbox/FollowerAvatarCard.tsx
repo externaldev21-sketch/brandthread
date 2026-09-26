@@ -32,7 +32,7 @@ export function FollowerAvatarCard({
   const { theme } = useAppTheme();
   return (
     <View style={styles.wrap}>
-      <PressableScale
+      <PressableScale rippleEnabled={false}
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={name}
@@ -47,7 +47,7 @@ export function FollowerAvatarCard({
         </View>
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{name}</Text>
       </PressableScale>
-      <PressableScale
+      <PressableScale rippleEnabled={false}
         style={[styles.messageBtn, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}
         onPress={onMessage}
         disabled={busy}

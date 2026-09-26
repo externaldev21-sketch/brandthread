@@ -216,6 +216,23 @@ vi.mock('@/lib/api', () => ({
   useApi: () => apiStub,
 }));
 
+// previewInbox.ts (like previewCatalog.ts) imports expo-asset and requires
+// bundled image assets at module scope, neither of which Vitest can
+// transform — mocked out here the same way native modules above are, since
+// __DEV__ is false in this test environment anyway (these are all no-ops).
+vi.mock('@/lib/previewInbox', () => ({
+  isPreviewInboxEnabled: () => false,
+  getPreviewConversations: () => [],
+  getPreviewNotifications: () => [],
+  getPreviewMessages: () => [],
+  isPreviewConversationId: () => false,
+  subscribePreviewTyping: () => () => {},
+}));
+
+vi.mock('@/components/branding/BrandthreadLogo', () => ({
+  default: () => React.createElement('BrandthreadLogo'),
+}));
+
 vi.mock('@/lib/theme', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/theme')>();
   return {
@@ -323,8 +340,14 @@ describe('buyer inbox', () => {
     ]);
     renderer = await renderScreen();
 
-    const unreadName = findTextNodes(renderer).find((n) => n.props.children === 'Alice Unread');
-    const readName = findTextNodes(renderer).find((n) => n.props.children === 'Bob Read');
+    // The redesigned inbox also shows each participant's name (as plain
+    // text) in the Notes-style active-people rail above the list, so scope
+    // the search to the actual conversation row rather than matching the
+    // first "Alice Unread" text node found anywhere on screen.
+    const unreadRow = renderer.root.findByProps({ testID: 'inbox-conversation-unread-thread' });
+    const readRow = renderer.root.findByProps({ testID: 'inbox-conversation-read-thread' });
+    const unreadName = unreadRow.findAllByType('Text' as never).find((n) => n.props.children === 'Alice Unread');
+    const readName = readRow.findAllByType('Text' as never).find((n) => n.props.children === 'Bob Read');
     expect(unreadName).toBeTruthy();
     expect(readName).toBeTruthy();
     expect(fontFamilyOf(unreadName!)).toContain('Test-Bold');

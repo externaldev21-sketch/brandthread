@@ -47,6 +47,9 @@ import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 import {
   ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
 } from '@/components/chat/ReactionBar';
+import {
+  isPreviewConversationId, getPreviewConversation, getPreviewMessages,
+} from '@/lib/previewInbox';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -259,6 +262,19 @@ export default function BuyerConversationScreen() {
       let loadedConv: Conversation | null = null;
       let unreadBeforeRead = 0;
 
+      // Dev/preview only: a seeded thread from lib/previewInbox.ts has no
+      // real backend record, so skip the real API entirely for it rather
+      // than relying on its 404 error path — never taken for a real
+      // conversation id.
+      if (params.id && isPreviewConversationId(params.id)) {
+        loadedConv = getPreviewConversation(params.id);
+        setConv(loadedConv);
+        setMessaging({ blockedByMe: false, unavailable: false });
+        if (loadedConv) setMessages(getPreviewMessages(loadedConv.id));
+        setIsLoading(false);
+        return;
+      }
+
       if (params.id) {
         loadedConv = await getConversation(params.id);
         if (loadedConv) {
@@ -314,7 +330,7 @@ export default function BuyerConversationScreen() {
 
   useEffect(() => {
     const unsub = subscribeSocial(() => {
-      if (conv?.id) {
+      if (conv?.id && !isPreviewConversationId(conv.id)) {
         getMessages(conv.id).then(setMessages);
       }
     });
@@ -325,8 +341,9 @@ export default function BuyerConversationScreen() {
   // reaction or reply added by the other participant only appears once we
   // refetch. Poll at a light cadence while the screen is focused — mirrors
   // the refetch-on-local-change pattern `subscribeSocial` already uses.
+  // Skipped for a seeded preview thread (no real backend to poll).
   useFocusEffect(useCallback(() => {
-    if (!conv?.id) return;
+    if (!conv?.id || isPreviewConversationId(conv.id)) return;
     const interval = setInterval(() => {
       getMessages(conv.id).then(setMessages).catch(() => {});
     }, 12000);
@@ -623,7 +640,7 @@ export default function BuyerConversationScreen() {
       return (
         <View style={s.photoGrid}>
           {uris.slice(0, 4).map((uri, idx) => (
-            <PressableScale
+            <PressableScale rippleEnabled={false}
               key={idx}
               style={[s.photoCell, uris.length === 1 && s.photoCellSingle]}
               activeOpacity={0.9}
@@ -649,7 +666,7 @@ export default function BuyerConversationScreen() {
     }
     if (att.type === 'voice') {
       return (
-        <PressableScale style={s.voiceRow} activeOpacity={0.8}
+        <PressableScale rippleEnabled={false} style={s.voiceRow} activeOpacity={0.8}
           onPress={() => att.uri && handlePlayVoice(att.uri)}>
           <View style={[s.voicePlayBtn, playingVoiceUri === att.uri && s.voicePlayBtnActive]}>
             <Feather name={playingVoiceUri === att.uri ? 'square' : 'play'} size={14} color="#fff" />
@@ -698,7 +715,7 @@ export default function BuyerConversationScreen() {
     }
     // Default: product / order / post / profile card
     return (
-      <PressableScale
+      <PressableScale rippleEnabled={false}
         style={s.attachCard}
         activeOpacity={att.type === 'product' || att.type === 'order' || att.type === 'post' ? 0.7 : 1}
         onPress={() => {
@@ -939,7 +956,7 @@ export default function BuyerConversationScreen() {
 
         <View style={{ maxWidth: BUBBLE_MAX }}>
           {/* Bubble */}
-          <PressableScale
+          <PressableScale rippleEnabled={false}
             testID={`conversation-bubble-${msg.id}`}
             activeOpacity={0.88}
             onPress={(e) => handleBubblePress(msg, e)}
@@ -1003,7 +1020,7 @@ export default function BuyerConversationScreen() {
 
             {/* Failed / retry */}
             {isOwn && msg.status === 'failed' && (
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 onPress={() => conv && retryMessage(conv.id, msg.id)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={s.retryRow}
@@ -1018,7 +1035,7 @@ export default function BuyerConversationScreen() {
           {reactionEntries.length > 0 && (
             <View style={[s.reactionsRow, isOwn ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }]}>
               {reactionEntries.map(([kind, count]) => (
-                <PressableScale
+                <PressableScale rippleEnabled={false}
                   key={kind}
                   style={[
                     s.reactionChip,
@@ -1080,7 +1097,7 @@ export default function BuyerConversationScreen() {
       {/* Floating glass header */}
       <View style={[s.headerWrap, { paddingTop: insets.top + SP.sm }]}>
         <View style={s.headerPill}>
-          <PressableScale
+          <PressableScale rippleEnabled={false}
             onPress={() => { hapticPrimaryAction(); router.back(); }}
             style={s.roundBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1091,7 +1108,7 @@ export default function BuyerConversationScreen() {
             <Feather name="arrow-left" size={ICON.md} color={theme.text} />
           </PressableScale>
 
-          <PressableScale
+          <PressableScale rippleEnabled={false}
             style={s.headerCenter}
             activeOpacity={participant ? 0.7 : 1}
             disabled={!participant}
@@ -1108,7 +1125,7 @@ export default function BuyerConversationScreen() {
           </PressableScale>
 
           {participant && (
-            <PressableScale
+            <PressableScale rippleEnabled={false}
               onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
               testID="conversation-avatar"
               accessibilityRole="button"
@@ -1125,7 +1142,7 @@ export default function BuyerConversationScreen() {
 
           {conv && (
             <>
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 style={s.roundBtn}
                 onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1135,7 +1152,7 @@ export default function BuyerConversationScreen() {
               >
                 <Feather name="phone" size={ICON.sm} color={theme.muted} />
               </PressableScale>
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 style={s.roundBtn}
                 onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1147,7 +1164,7 @@ export default function BuyerConversationScreen() {
               </PressableScale>
             </>
           )}
-          <PressableScale
+          <PressableScale rippleEnabled={false}
             style={s.roundBtn}
             onPress={() => { hapticPrimaryAction(); openOptions(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1161,7 +1178,7 @@ export default function BuyerConversationScreen() {
 
       {/* Order context card */}
       {conv?.type === 'buyer_to_seller_order' && (
-        <PressableScale
+        <PressableScale rippleEnabled={false}
           style={s.orderCard}
           onPress={() => router.push('/(buyer)/orders' as never)}
           activeOpacity={0.8}
@@ -1183,7 +1200,7 @@ export default function BuyerConversationScreen() {
 
       {/* Product context card — shown for seller product conversations */}
       {conv?.type === 'buyer_to_seller_product' && conv.contextProductName && (
-        <PressableScale
+        <PressableScale rippleEnabled={false}
           style={s.orderCard}
           onPress={() => {
             // The product card opens the product; without an id, the store.
@@ -1256,7 +1273,7 @@ export default function BuyerConversationScreen() {
             <Text style={s.replyFromName}>{replyTo.fromName}</Text>
             <Text style={s.replyPreviewText} numberOfLines={1}>{replyTo.text}</Text>
           </View>
-          <PressableScale
+          <PressableScale rippleEnabled={false}
             onPress={() => setReplyTo(null)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -1308,7 +1325,7 @@ export default function BuyerConversationScreen() {
                   {selectedAttachment.title}
                 </Text>
               </View>
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 onPress={() => setSelectedAttachment(null)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
@@ -1320,7 +1337,7 @@ export default function BuyerConversationScreen() {
           )}
           <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
             {/* Attach — photos, video, and (for seller chats) products/posts */}
-            <PressableScale
+            <PressableScale rippleEnabled={false}
               onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
               style={s.roundInputBtn}
               disabled={isUploading || isSending}
@@ -1386,7 +1403,7 @@ export default function BuyerConversationScreen() {
                 pointerEvents={showSendButton ? 'none' : 'auto'}
                 style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
               >
-                <PressableScale
+                <PressableScale rippleEnabled={false}
                   onPressIn={startRecording}
                   onPressOut={stopRecording}
                   disabled={isUploading || isSending}
@@ -1405,7 +1422,7 @@ export default function BuyerConversationScreen() {
                   { opacity: sendOpacity, transform: [{ scale: sendScale }], backgroundColor: canSend ? theme.accent : theme.cardElevated },
                 ]}
               >
-                <PressableScale
+                <PressableScale rippleEnabled={false}
                   onPress={() => { hapticPrimaryAction(); handleSend(); }}
                   disabled={!canSend}
                   style={s.morphFaceInner}
@@ -1433,18 +1450,18 @@ export default function BuyerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowMediaSheet(false)}
       >
-        <PressableScale style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
+        <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
         <SheetRise style={s.mediaSheet}>
           <View style={s.mediaSheetHandle} />
           <Text style={s.mediaSheetTitle}>Add to message</Text>
-          <PressableScale style={s.mediaSheetOption} onPress={handlePickPhoto}>
+          <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickPhoto}>
             <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
             <View>
               <Text style={s.mediaSheetLabel}>Photos</Text>
               <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
             </View>
           </PressableScale>
-          <PressableScale style={s.mediaSheetOption} onPress={handlePickVideo}>
+          <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo}>
             <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
             <View>
               <Text style={s.mediaSheetLabel}>Video clip</Text>
@@ -1452,7 +1469,7 @@ export default function BuyerConversationScreen() {
             </View>
           </PressableScale>
           {isSellerConv && (
-            <PressableScale style={s.mediaSheetOption} onPress={openAttachmentPicker}>
+            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={openAttachmentPicker}>
               <View style={s.mediaSheetIcon}><Feather name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
               <View>
                 <Text style={s.mediaSheetLabel}>Product or post</Text>
@@ -1477,7 +1494,7 @@ export default function BuyerConversationScreen() {
                 <Text style={s.pickerTitle}>Attach to message</Text>
                 <Text style={s.pickerSubtitle}>Choose from {displayName}'s store</Text>
               </View>
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 onPress={() => setShowAttachmentPicker(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
@@ -1485,7 +1502,7 @@ export default function BuyerConversationScreen() {
               </PressableScale>
             </View>
             <View style={s.attachmentTabs}>
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('product')}
               >
@@ -1494,7 +1511,7 @@ export default function BuyerConversationScreen() {
                   Products
                 </Text>
               </PressableScale>
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'post' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('post')}
               >
@@ -1527,7 +1544,7 @@ export default function BuyerConversationScreen() {
                       .filter((price) => price > 0);
                     const lowestPriceCents = prices.length > 0 ? Math.min(...prices) : null;
                     return (
-                      <PressableScale
+                      <PressableScale rippleEnabled={false}
                         key={product.id}
                         style={s.productOption}
                         onPress={() => pickProduct(product)}
@@ -1571,7 +1588,7 @@ export default function BuyerConversationScreen() {
                   keyboardShouldPersistTaps="handled"
                 >
                   {sellerPosts.map((post) => (
-                    <PressableScale
+                    <PressableScale rippleEnabled={false}
                       key={post.id}
                       style={s.productOption}
                       onPress={() => pickPost(post)}
@@ -1609,7 +1626,7 @@ export default function BuyerConversationScreen() {
         animationType="fade"
         onRequestClose={closeMessageSheet}
       >
-        <PressableScale style={s.modalBackdrop} activeOpacity={1} onPress={closeMessageSheet} />
+        <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={closeMessageSheet} />
         <SheetRise style={s.reactionSheet}>
           <View style={s.mediaSheetHandle} />
           <ReactionChipsRow
@@ -1621,21 +1638,21 @@ export default function BuyerConversationScreen() {
             }}
           />
           <View style={s.sheetDivider} />
-          <PressableScale style={s.sheetAction} onPress={sheetReply}>
+          <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetReply}>
             <Feather name="corner-up-left" size={ICON.sm} color={theme.text} />
             <Text style={s.sheetActionText}>Reply</Text>
           </PressableScale>
-          <PressableScale style={s.sheetAction} onPress={sheetCopy}>
+          <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetCopy}>
             <Feather name="copy" size={ICON.sm} color={theme.text} />
             <Text style={s.sheetActionText}>Copy</Text>
           </PressableScale>
           {isOwnSheetMsg ? (
-            <PressableScale style={s.sheetAction} onPress={sheetDelete}>
+            <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetDelete}>
               <Feather name="trash-2" size={ICON.sm} color={theme.error} />
               <Text style={[s.sheetActionText, { color: theme.error }]}>Delete for me</Text>
             </PressableScale>
           ) : (
-            <PressableScale style={s.sheetAction} onPress={sheetReport}>
+            <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetReport}>
               <Feather name="flag" size={ICON.sm} color={theme.error} />
               <Text style={[s.sheetActionText, { color: theme.error }]}>Report message</Text>
             </PressableScale>
