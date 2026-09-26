@@ -27,11 +27,9 @@ import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
   type AnimatedStyle,
 } from 'react-native-reanimated';
@@ -41,7 +39,7 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
 import {
-  FADE_MS, SHEET_CLOSE_EASING, SHEET_CLOSE_MS, SHEET_OFFSCREEN_Y, SHEET_SPRING,
+  SHEET_CLOSE_MS, SHEET_EASING, SHEET_OFFSCREEN_Y, SHEET_OPEN_MS,
 } from '@/constants/motion';
 import { useIsWebShell, WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 
@@ -88,8 +86,8 @@ export function useSheetTransition(
         backdropOpacity.set(1);
         return;
       }
-      backdropOpacity.set(withTiming(1, { duration: FADE_MS, easing: Easing.out(Easing.cubic) }));
-      translateY.set(withSpring(0, SHEET_SPRING));
+      backdropOpacity.set(withTiming(1, { duration: SHEET_OPEN_MS, easing: SHEET_EASING }));
+      translateY.set(withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING }));
       return;
     }
     // Closing: keep the Modal mounted until the transform finishes — this is
@@ -102,9 +100,9 @@ export function useSheetTransition(
       onClosedRef.current();
       return;
     }
-    backdropOpacity.set(withTiming(0, { duration: SHEET_CLOSE_MS, easing: SHEET_CLOSE_EASING }));
+    backdropOpacity.set(withTiming(0, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }));
     translateY.set(
-      withTiming(closeDistance, { duration: SHEET_CLOSE_MS, easing: SHEET_CLOSE_EASING }, finished => {
+      withTiming(closeDistance, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }, finished => {
         'worklet';
         if (finished) {
           runOnJS(setModalVisible)(false);
@@ -138,9 +136,9 @@ export function useSheetTransition(
     .onEnd(e => {
       const shouldClose = e.translationY > 80 || e.velocityY > 800;
       if (shouldClose) {
-        backdropOpacity.set(withTiming(0, { duration: SHEET_CLOSE_MS, easing: SHEET_CLOSE_EASING }));
+        backdropOpacity.set(withTiming(0, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }));
         translateY.set(
-          withTiming(closeDistance, { duration: SHEET_CLOSE_MS, easing: SHEET_CLOSE_EASING }, finished => {
+          withTiming(closeDistance, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }, finished => {
             'worklet';
             if (finished) {
               runOnJS(setModalVisible)(false);
@@ -149,7 +147,7 @@ export function useSheetTransition(
           }),
         );
       } else {
-        translateY.set(withSpring(0, SHEET_SPRING));
+        translateY.set(withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING }));
       }
     });
 

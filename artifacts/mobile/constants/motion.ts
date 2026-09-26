@@ -13,23 +13,36 @@ import { Easing } from 'react-native-reanimated';
 export const PRESS_SCALE = 0.97;
 export const PRESS_DURATION_MS = 120;
 
-/** Sheets (BottomSheet, action sheets) spring in with this feel. */
-export const SHEET_SPRING = { damping: 20, stiffness: 220 } as const;
-
-/** Shared close timeline for every bottom sheet (`useSheetTransition`,
- *  `components/ui/BottomSheet.tsx`): a single, monotonic ease-out slide —
- *  never a spring — so the close never overshoots or pauses mid-flight.
- *  220-260ms band per the app's motion guidelines. */
-export const SHEET_CLOSE_MS = 240;
-export const SHEET_CLOSE_EASING = Easing.out(Easing.cubic);
+/** Shared open/close timeline for every bottom sheet (`useSheetTransition`,
+ *  `components/ui/BottomSheet.tsx`, `SheetRise`, and any bespoke sheet) —
+ *  the iOS sheet curve, `withTiming` only, never a spring: opening or
+ *  closing on a spring reads as a bounce/oscillate-then-settle, which is
+ *  exactly the "pops out, overshoots, settles" motion this replaced. Every
+ *  sheet in the app shares this one constant so they all open/close
+ *  identically. The bezier points are exported separately too, for the rare
+ *  sheet (`SheetRise`) still on RN's own `Animated` rather than Reanimated —
+ *  RN's `Easing.bezier` takes the same four points but isn't the same
+ *  function as Reanimated's. */
+export const SHEET_EASING_BEZIER = [0.32, 0.72, 0, 1] as const;
+export const SHEET_EASING = Easing.bezier(...SHEET_EASING_BEZIER);
+export const SHEET_OPEN_MS = 260;
+export const SHEET_CLOSE_MS = 200;
+export const SHEET_TIMING = {
+  openMs: SHEET_OPEN_MS,
+  closeMs: SHEET_CLOSE_MS,
+  easing: SHEET_EASING,
+} as const;
+/** @deprecated kept only for the close-timeline name used by older call
+ *  sites; identical to `SHEET_EASING`. */
+export const SHEET_CLOSE_EASING = SHEET_EASING;
 /** How far below the sheet's resting position it travels when closed —
  *  comfortably past any device's bottom inset so it's fully offscreen. */
 export const SHEET_OFFSCREEN_Y = 500;
 
 /** Sliding tab/segment indicators (e.g. the feed's top tab underline): a
  *  near-critically-damped spring (damping ratio ~1.1) so it glides to rest
- *  with no visible bounce/overshoot, unlike SHEET_SPRING (ratio ~0.67, tuned
- *  for a springier sheet entrance rather than a precise indicator). */
+ *  with no visible bounce/overshoot — sheets no longer use a spring at all
+ *  (see SHEET_TIMING above), this one is unrelated to sheet motion. */
 export const TAB_INDICATOR_SPRING = { damping: 30, stiffness: 260, mass: 0.7 } as const;
 
 /** Screen push transition (Stack navigator). */
@@ -43,7 +56,7 @@ export const FADE_MS = 180;
 export const MOTION = {
   pressScale: PRESS_SCALE,
   pressDurationMs: PRESS_DURATION_MS,
-  sheetSpring: SHEET_SPRING,
+  sheetTiming: SHEET_TIMING,
   screenPushMs: SCREEN_PUSH_MS,
   screenPushEasingBezier: SCREEN_PUSH_EASING_BEZIER,
   fadeMs: FADE_MS,
