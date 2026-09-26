@@ -6,6 +6,7 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -13,6 +14,12 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import type { ThreadCashCheckInResult } from '@/lib/threadCashTypes';
+
+const RING_SIZE = 84;
+const RING_STROKE = 5;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export function CheckInSheet({
   visible,
@@ -27,31 +34,69 @@ export function CheckInSheet({
   const { theme } = useAppTheme();
   const scale = useRef(new Animated.Value(0.9)).current;
   const todayScale = useRef(new Animated.Value(0)).current;
+  const ringProgress = useRef(new Animated.Value(0)).current;
+
+  const streakBonusDays = result?.streak.streakBonusDays ?? 7;
+  const dayInCycle = result?.streak.dayInCycle ?? 0;
 
   useEffect(() => {
     if (!visible) return;
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     scale.setValue(0.9);
     todayScale.setValue(0);
+    ringProgress.setValue(0);
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 7 }).start();
     Animated.sequence([
       Animated.delay(200),
-      Animated.spring(todayScale, { toValue: 1, useNativeDriver: true, friction: 5 }),
+      Animated.parallel([
+        Animated.spring(todayScale, { toValue: 1, useNativeDriver: true, friction: 5 }),
+        Animated.timing(ringProgress, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ]),
     ]).start();
-  }, [visible, scale, todayScale]);
+  }, [visible, scale, todayScale, ringProgress]);
 
   if (!visible || !result) return null;
 
-  const streakBonusDays = result.streak.streakBonusDays ?? 7;
-  const dayInCycle = result.streak.dayInCycle;
   const totalEarned = result.earnedCents + result.streakBonusCents;
+  const ringFraction = streakBonusDays > 0 ? Math.min(1, dayInCycle / streakBonusDays) : 0;
+  const ringDashoffset = ringProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [RING_CIRCUMFERENCE, RING_CIRCUMFERENCE * (1 - ringFraction)],
+  });
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={[styles.backdrop, { paddingBottom: insets.bottom }]}>
         <Animated.View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, transform: [{ scale }] }]}>
-          <View style={[styles.flame, { backgroundColor: theme.accentDim }]}>
-            <Feather name="zap" size={28} color={theme.accent} />
+          <View style={styles.ringWrap}>
+            <Svg
+              width={RING_SIZE}
+              height={RING_SIZE}
+              style={[StyleSheet.absoluteFill, { transform: [{ rotate: '-90deg' }] }]}
+            >
+              <Circle
+                cx={RING_SIZE / 2}
+                cy={RING_SIZE / 2}
+                r={RING_RADIUS}
+                stroke={theme.borderSubtle}
+                strokeWidth={RING_STROKE}
+                fill="none"
+              />
+              <AnimatedCircle
+                cx={RING_SIZE / 2}
+                cy={RING_SIZE / 2}
+                r={RING_RADIUS}
+                stroke={theme.accent}
+                strokeWidth={RING_STROKE}
+                strokeLinecap="round"
+                fill="none"
+                strokeDasharray={RING_CIRCUMFERENCE}
+                strokeDashoffset={ringDashoffset}
+              />
+            </Svg>
+            <View style={[styles.flame, { backgroundColor: theme.accentDim }]}>
+              <Feather name="zap" size={28} color={theme.accent} />
+            </View>
           </View>
           <Text style={[styles.title, { color: theme.text }]}>
             {result.streakBroken ? 'New streak started!' : `${result.streak.currentStreak}-day streak!`}
@@ -98,7 +143,8 @@ export function CheckInSheet({
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: '#000000A0', alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.lg },
   card: { width: '100%', maxWidth: 360, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.lg, alignItems: 'center' },
-  flame: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
+  ringWrap: { width: RING_SIZE, height: RING_SIZE, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
+  flame: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: FS.lg, fontFamily: FONT.bold },
   earned: { fontSize: FS.xxl, fontFamily: FONT.bold, marginTop: SP.xs },
   bonus: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
