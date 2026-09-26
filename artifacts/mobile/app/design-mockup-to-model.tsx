@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { File, Paths } from 'expo-file-system';
@@ -649,15 +650,15 @@ function ResultCard({
           <Text style={s.resultFailedText}>
             {slot.error ?? 'Generation failed'}
           </Text>
-          <TouchableOpacity
+          <Button
+            label="Retry"
+            icon="refresh-cw"
+            variant="secondary"
+            size="compact"
             style={s.retryBtn}
             onPress={() => onRetry(refIndex)}
             accessibilityLabel={`Retry reference ${refIndex + 1}`}
-            accessibilityRole="button"
-          >
-            <Feather name="refresh-cw" size={ICON.sm} color={PURPLE} />
-            <Text style={s.retryBtnText}>Retry</Text>
-          </TouchableOpacity>
+          />
         </View>
         <View style={s.resultMeta}>
           <Text style={s.resultMetaText}>Reference {refIndex + 1} · Failed</Text>
@@ -1081,20 +1082,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
       lineHeight: 16,
     },
     retryBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SP.xs,
-      paddingHorizontal: SP.md,
-      paddingVertical: SP.xs,
-      borderRadius: RADIUS.pill,
-      borderWidth: 1,
-      borderColor: PURPLE,
       marginTop: SP.xs,
-    },
-    retryBtnText: {
-      fontFamily: FONT.medium,
-      fontSize: FS.xs,
-      color: PURPLE,
     },
     resultMeta: {
       paddingHorizontal: SP.sm,

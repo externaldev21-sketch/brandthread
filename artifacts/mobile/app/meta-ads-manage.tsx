@@ -12,6 +12,7 @@ import {
   ActivityIndicator, RefreshControl, Modal, TextInput, Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useRouter } from 'expo-router';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -220,12 +221,8 @@ export default function MetaAdsManageScreen() {
               />
             </View>
             <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.md }}>
-              <TouchableOpacity style={[s.modalBtn, { borderColor: colors.border }]} onPress={() => setEditingBudget(null)}>
-                <Text style={[s.modalBtnText, { color: colors.mutedForeground }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.modalBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]} onPress={saveBudget} disabled={busyId === editingBudget?.id}>
-                {busyId === editingBudget?.id ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Text style={[s.modalBtnText, { color: theme.onAccent }]}>Save</Text>}
-              </TouchableOpacity>
+              <Button label="Cancel" variant="secondary" style={s.modalBtn} onPress={() => setEditingBudget(null)} />
+              <Button label="Save" variant="primary" style={s.modalBtn} loading={busyId === editingBudget?.id} onPress={saveBudget} />
             </View>
           </View>
         </View>
@@ -334,6 +331,5 @@ const s = StyleSheet.create({
   modalTitle: { fontSize: FS.lg, fontFamily: FONT.bold },
   budgetInputRow: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, marginTop: SP.md, minHeight: 48 },
   budgetInput: { flex: 1, fontSize: FS.lg, fontFamily: FONT.bold, paddingVertical: SP.sm },
-  modalBtn:   { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.md, borderWidth: 1, paddingVertical: SP.sm },
-  modalBtnText: { fontSize: FS.sm, fontFamily: FONT.bold },
+  modalBtn:   { flex: 1 },
 });

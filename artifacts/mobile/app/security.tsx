@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { Button } from '@/components/ui/Button';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FONT } from '@/lib/theme';
@@ -33,9 +34,7 @@ export default function SecurityScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>User activity logs</Text>
             <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>Monitor and review user activities</Text>
           </View>
-          <TouchableOpacity onPress={viewActivityLog} activeOpacity={0.7} style={[styles.viewBtn, { borderColor: colors.border }]}>
-            <Text style={[styles.viewBtnText, { color: colors.foreground }]}>View</Text>
-          </TouchableOpacity>
+          <Button label="View" variant="secondary" size="compact" onPress={viewActivityLog} />
         </View>
       </View>
     </View>
@@ -48,8 +47,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontFamily: FONT.semibold, marginBottom: 4 },
   sectionSubtitle: { fontSize: 13, fontFamily: FONT.regular, lineHeight: 18 },
   rowBetween: { flexDirection: 'row', alignItems: 'center' },
-  viewBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
-  viewBtnText: { fontSize: 13, fontFamily: FONT.medium },
   divider: { height: 8 },
   collabRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   collabName: { fontSize: 14, fontFamily: FONT.medium, flexShrink: 1 },

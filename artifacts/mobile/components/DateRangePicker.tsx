@@ -11,6 +11,7 @@ import {
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -482,20 +483,8 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
             </Text>
           </View>
           <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.cancelBtn, { borderColor: colors.border }]}
-              onPress={onClose}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.cancelText, { color: colors.mutedForeground }]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.applyBtn, { backgroundColor: primary }]}
-              onPress={handleApply}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.applyText}>Apply</Text>
-            </TouchableOpacity>
+            <Button label="Cancel" variant="secondary" size="small" style={styles.flex1} onPress={onClose} />
+            <Button label="Apply" variant="primary" size="small" style={styles.flex1} onPress={handleApply} />
           </View>
         </View>
       </SheetRise>
@@ -575,19 +564,5 @@ const styles = StyleSheet.create({
   rangeLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rangeLabelText: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },
   actions: { flexDirection: 'row', gap: 10 },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  cancelText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  applyBtn: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  applyText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  flex1: { flex: 1 },
 });

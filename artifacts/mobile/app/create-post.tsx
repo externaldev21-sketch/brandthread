@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { FONT, FS } from '@/lib/theme';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { getTaggableProducts } from '@/services/productService';
@@ -395,14 +396,15 @@ function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DateP
           </ScrollView>
 
           {/* Confirm */}
-          <TouchableOpacity
-            style={[dps.confirmBtn, { backgroundColor: PURPLE }]}
+          <Button
+            label="Confirm"
+            variant="primary"
+            fullWidth
+            style={dps.confirmBtn}
             onPress={handleConfirm}
             accessibilityLabel="Confirm schedule"
             testID="confirm-schedule"
-          >
-            <Text style={dps.confirmText}>Confirm</Text>
-          </TouchableOpacity>
+          />
         </SheetRise>
       </View>
     </Modal>
@@ -2589,7 +2591,6 @@ const createDps = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   ampmWrap:  { gap: 8 },
   ampmBtn:   { backgroundColor: CARD, borderRadius: 8, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 9 },
   ampmText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  confirmBtn:{ borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
-  confirmText:{ fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
+  confirmBtn:{ marginTop: 8 },
   });
 };

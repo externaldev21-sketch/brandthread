@@ -10,12 +10,13 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import {
   BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
@@ -360,12 +361,8 @@ export default function BuyerPostViewer() {
               autoFocus
             />
             <View style={s.modalActions}>
-              <TouchableOpacity style={s.modalCancel} onPress={() => setEditOpen(false)}>
-                <Text style={s.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.modalSave} onPress={handleSaveCaption}>
-                <Text style={[s.modalSaveText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save</Text>
-              </TouchableOpacity>
+              <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setEditOpen(false)} />
+              <Button label="Save" variant="primary" style={s.modalActionBtn} onPress={handleSaveCaption} />
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -379,12 +376,8 @@ export default function BuyerPostViewer() {
             <Text style={s.modalTitle}>Delete post?</Text>
             <Text style={s.modalDesc}>This will permanently remove the post from your profile. This cannot be undone.</Text>
             <View style={s.modalActions}>
-              <TouchableOpacity style={s.modalCancel} onPress={() => setDeleteConfirm(false)}>
-                <Text style={s.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.modalSave, { backgroundColor: RED + '22' }]} onPress={handleDelete}>
-                <Text style={[s.modalSaveText, { color: RED }]}>Delete</Text>
-              </TouchableOpacity>
+              <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setDeleteConfirm(false)} />
+              <Button label="Delete" variant="destructive" style={s.modalActionBtn} onPress={handleDelete} />
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -428,9 +421,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   modalDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, lineHeight: 20, marginBottom: SP.md },
   captionInput: { borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.md, padding: SP.md, color: FG, fontFamily: FONT.regular, fontSize: FS.base, minHeight: 100, textAlignVertical: 'top', marginBottom: SP.md },
   modalActions: { flexDirection: 'row', gap: SP.sm },
-  modalCancel: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
-  modalCancelText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
-  modalSave: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: PURPLE, alignItems: 'center' },
-  modalSaveText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
+  modalActionBtn: { flex: 1 },
   });
 };

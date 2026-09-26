@@ -479,14 +479,14 @@ function AddressEditor({
           <Feather name="plus" size={16} color={PURPLE_LIGHT} />
           <Text style={[s.addNewAddressText, { color: PURPLE_LIGHT }]}>Add new address</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.continueBtn, { backgroundColor: PURPLE, marginTop: SP.md }]}
+        <Button
+          label="Continue"
+          variant="primary"
+          fullWidth
+          style={{ marginTop: SP.md }}
           onPress={() => { if (address.id) onDone(); else Alert.alert('Select an address', 'Choose a saved address or add a new one.'); }}
-          accessibilityRole="button"
           accessibilityLabel="Continue with selected address"
-        >
-          <Text style={[s.continueBtnText, { color: theme.onAccent }]}>Continue</Text>
-        </TouchableOpacity>
+        />
       </View>
     );
   }
@@ -557,14 +557,14 @@ function AddressEditor({
           </>
         )}
 
-        <TouchableOpacity
-          style={[s.continueBtn, { backgroundColor: PURPLE, marginTop: SP.md }]}
+        <Button
+          label="Continue"
+          variant="primary"
+          fullWidth
+          style={{ marginTop: SP.md }}
           onPress={handleFieldsContinue}
-          accessibilityRole="button"
           accessibilityLabel="Continue to address confirmation"
-        >
-          <Text style={[s.continueBtnText, { color: theme.onAccent }]}>Continue</Text>
-        </TouchableOpacity>
+        />
       </View>
     );
   }
@@ -629,14 +629,7 @@ function AddressEditor({
         <Text style={[s.useSavedText, { color: PURPLE_LIGHT }]}>Edit address</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[s.continueBtn, { backgroundColor: PURPLE }]}
-        onPress={handlePreviewConfirm}
-        accessibilityRole="button"
-        accessibilityLabel="Confirm and add address"
-      >
-        <Text style={[s.continueBtnText, { color: theme.onAccent }]}>Confirm and add address</Text>
-      </TouchableOpacity>
+      <Button label="Confirm and add address" variant="primary" fullWidth onPress={handlePreviewConfirm} />
     </View>
   );
 }
@@ -2040,8 +2033,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
     // Bottom CTA bar
     bottom: {},
-    continueBtn: { borderRadius: RADIUS.lg, height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-    continueBtnText: { fontFamily: FONT.bold, fontSize: FS.base },
 
     // Error
     error: { flexDirection: 'row', gap: SP.sm, backgroundColor: RED_DIM, padding: SP.md, borderRadius: RADIUS.md },

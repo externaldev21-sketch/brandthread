@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -183,14 +184,7 @@ export default function ShareProfileScreen() {
             <Feather name="wifi-off" size={40} color={theme.muted} />
             <Text style={styles.errorTitle}>Couldn't load profile</Text>
             <Text style={styles.errorDesc}>Check your connection and try again.</Text>
-            <TouchableOpacity
-              style={[styles.actionBtn, { borderColor: theme.accent }]}
-              onPress={loadProfile}
-              accessibilityRole="button"
-              accessibilityLabel="Retry loading profile"
-            >
-              <Text style={[styles.actionBtnText, { color: theme.accent }]}>Retry</Text>
-            </TouchableOpacity>
+            <Button label="Retry" variant="secondary" size="small" style={styles.actionBtn} onPress={loadProfile} accessibilityLabel="Retry loading profile" />
           </View>
         ) : !normalizedUsername ? (
           /* ── No username state ── */
@@ -332,17 +326,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   loadingText: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: SP.sm },
   errorTitle: { fontFamily: FONT.bold, fontSize: FS.md, color: theme.text, textAlign: 'center' },
   errorDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, textAlign: 'center', lineHeight: 19 },
-  actionBtn: {
-    marginTop: SP.sm,
-    paddingHorizontal: SP.lg,
-    paddingVertical: 12,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    minHeight: COMP.buttonHSm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  actionBtn: { marginTop: SP.sm },
 
   noUserIcon: {
     width: 80,

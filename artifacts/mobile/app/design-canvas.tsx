@@ -35,6 +35,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -3761,45 +3762,39 @@ export default function DesignCanvasScreen() {
       {selectedLayer && activeTopTool === 'select' && (
         <View style={styles.selBar}>
           {selectedLayer.type === 'text' && (
-            <TouchableOpacity style={styles.selBtn} onPress={() => {
-              setEditingTextLayerId(selectedLayer.id);
-              setEditingTextValue((selectedLayer.data as DesignTextLayer).content ?? (selectedLayer.data as DesignTextLayer).text ?? '');
-            }}>
-              <Feather name="edit-3" size={12} color={FG} />
-              <Text style={styles.selBtnText}>Edit</Text>
-            </TouchableOpacity>
+            <Button
+              label="Edit"
+              icon="edit-3"
+              variant="secondary"
+              size="compact"
+              onPress={() => {
+                setEditingTextLayerId(selectedLayer.id);
+                setEditingTextValue((selectedLayer.data as DesignTextLayer).content ?? (selectedLayer.data as DesignTextLayer).text ?? '');
+              }}
+            />
           )}
-          <TouchableOpacity style={styles.selBtn} onPress={() => handleDuplicateLayer(selectedLayerId!)}>
-            <Feather name="copy" size={12} color={FG} />
-            <Text style={styles.selBtnText}>Duplicate</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.selBtn} onPress={() => handleMoveLayerUp(selectedLayerId!)}>
-            <Feather name="arrow-up" size={12} color={FG} />
-            <Text style={styles.selBtnText}>Forward</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.selBtn} onPress={() => handleMoveLayerDown(selectedLayerId!)}>
-            <Feather name="arrow-down" size={12} color={FG} />
-            <Text style={styles.selBtnText}>Back</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.selBtn} onPress={() => selectedLayerId && handleDeleteLayer(selectedLayerId)}>
-            <Feather name="trash-2" size={12} color={RED} />
-            <Text style={[styles.selBtnText, { color: RED }]}>Delete</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.selBtn} onPress={() => {
-            if (selectedLayerId) {
-              setLayerOptionsTarget(selectedLayerId);
-              const layer = layers.find(l => l.id === selectedLayerId);
-              if (layer) {
-                setLayerEditOpacity(layer.opacity);
-                const bm = (layer.data as DesignImageLayer).blendMode ?? 'normal';
-                setLayerEditBlend(bm as BlendModeKind);
+          <Button label="Duplicate" icon="copy" variant="secondary" size="compact" onPress={() => handleDuplicateLayer(selectedLayerId!)} />
+          <Button label="Forward" icon="arrow-up" variant="secondary" size="compact" onPress={() => handleMoveLayerUp(selectedLayerId!)} />
+          <Button label="Back" icon="arrow-down" variant="secondary" size="compact" onPress={() => handleMoveLayerDown(selectedLayerId!)} />
+          <Button label="Delete" icon="trash-2" variant="destructive" size="compact" onPress={() => selectedLayerId && handleDeleteLayer(selectedLayerId)} />
+          <Button
+            label="Options"
+            icon="sliders"
+            variant="secondary"
+            size="compact"
+            onPress={() => {
+              if (selectedLayerId) {
+                setLayerOptionsTarget(selectedLayerId);
+                const layer = layers.find(l => l.id === selectedLayerId);
+                if (layer) {
+                  setLayerEditOpacity(layer.opacity);
+                  const bm = (layer.data as DesignImageLayer).blendMode ?? 'normal';
+                  setLayerEditBlend(bm as BlendModeKind);
+                }
+                openSheet('layerOptions');
               }
-              openSheet('layerOptions');
-            }
-          }}>
-            <Feather name="sliders" size={12} color={FG} />
-            <Text style={styles.selBtnText}>Options</Text>
-          </TouchableOpacity>
+            }}
+          />
         </View>
       )}
 
@@ -4120,25 +4115,10 @@ export default function DesignCanvasScreen() {
             )}
 
             <View style={styles.layerActionsRow}>
-              <TouchableOpacity style={styles.layerActionPill} onPress={() => { if (layerOptionsTarget) handleDuplicateLayer(layerOptionsTarget); }}>
-                <Feather name="copy" size={ICON.xs} color={FG} />
-                <Text style={styles.layerActionPillText}>Duplicate</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.layerActionPill} onPress={() => { if (layerOptionsTarget) handleMoveLayerUp(layerOptionsTarget); }}>
-                <Feather name="arrow-up" size={ICON.xs} color={FG} />
-                <Text style={styles.layerActionPillText}>Move Up</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.layerActionPill} onPress={() => { if (layerOptionsTarget) handleMoveLayerDown(layerOptionsTarget); }}>
-                <Feather name="arrow-down" size={ICON.xs} color={FG} />
-                <Text style={styles.layerActionPillText}>Move Down</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.layerActionPill, { borderColor: RED }]}
-                onPress={() => { if (layerOptionsTarget) handleDeleteLayer(layerOptionsTarget); }}
-              >
-                <Feather name="trash-2" size={ICON.xs} color={RED} />
-                <Text style={[styles.layerActionPillText, { color: RED }]}>Delete</Text>
-              </TouchableOpacity>
+              <Button label="Duplicate" icon="copy" variant="secondary" size="compact" onPress={() => { if (layerOptionsTarget) handleDuplicateLayer(layerOptionsTarget); }} />
+              <Button label="Move Up" icon="arrow-up" variant="secondary" size="compact" onPress={() => { if (layerOptionsTarget) handleMoveLayerUp(layerOptionsTarget); }} />
+              <Button label="Move Down" icon="arrow-down" variant="secondary" size="compact" onPress={() => { if (layerOptionsTarget) handleMoveLayerDown(layerOptionsTarget); }} />
+              <Button label="Delete" icon="trash-2" variant="destructive" size="compact" onPress={() => { if (layerOptionsTarget) handleDeleteLayer(layerOptionsTarget); }} />
             </View>
           </SheetRise>
         </TouchableOpacity>
@@ -5470,8 +5450,6 @@ const styles = StyleSheet.create({
   layerActionBtn: { padding: 6 },
 
   layerActionsRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs, marginTop: SP.md },
-  layerActionPill:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: SP.sm, paddingVertical: 8, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
-  layerActionPillText:{ fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
   blendChip:          { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginRight: SP.xs },
   blendChipActive:    { borderColor: BORDER_ACTIVE },
   blendChipText:      { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },

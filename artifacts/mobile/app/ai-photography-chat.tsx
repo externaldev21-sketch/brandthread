@@ -16,6 +16,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/hooks/useApi';
@@ -437,29 +438,17 @@ export default function AIPhotographyChatScreen() {
               />
             )}
             {msg.error && msg.retryGarment && (
-              <TouchableOpacity
-                style={[
-                  styles.retryBtn,
-                  { borderColor: colors.destructive, backgroundColor: colors.background },
-                ]}
-                onPress={() => retryOutfitSwap(msg)}
+              <Button
+                label="Retry"
+                icon="refresh-cw"
+                variant="secondary"
+                size="compact"
+                loading={retryingMessageId === msg.id}
                 disabled={retryingMessageId !== null}
-                activeOpacity={0.8}
-                accessibilityRole="button"
+                onPress={() => retryOutfitSwap(msg)}
+                style={styles.retryBtn}
                 accessibilityLabel={`Retry garment ${msg.garmentIndex ?? ''}`}
-              >
-                {retryingMessageId === msg.id ? (
-                  <View style={styles.retryLoadingRow}>
-                    <View style={[styles.retrySpinner, { borderColor: colors.mutedForeground, borderTopColor: colors.primary }]} />
-                    <Text style={[styles.retryBtnText, { color: colors.mutedForeground }]}>Retrying…</Text>
-                  </View>
-                ) : (
-                  <>
-                    <Feather name="refresh-cw" size={13} color={colors.primary} />
-                    <Text style={[styles.retryBtnText, { color: colors.primary }]}>Retry</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              />
             )}
           </View>
         )}

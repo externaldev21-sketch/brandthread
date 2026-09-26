@@ -25,6 +25,7 @@ import { Header } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { GridSkeleton } from '@/components/layout/Skeleton';
 import { EmptyState, HapticSwitch } from '@/components/BrandthreadUI';
+import { Button } from '@/components/ui/Button';
 import { formatCents } from '@/lib/money';
 import { buildCanonicalCollectionUrl } from '@/lib/shareCollection';
 
@@ -235,18 +236,16 @@ export default function BuyerCollection() {
               returnKeyType="done"
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setRenameOpen(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSave, { backgroundColor: theme.accent, opacity: renameValue.trim() ? 1 : 0.5 }]}
-                onPress={handleRename}
+              <Button label="Cancel" variant="tertiary" size="small" onPress={() => setRenameOpen(false)} />
+              <Button
+                label="Save"
+                variant="primary"
+                size="small"
+                loading={saving}
                 disabled={!renameValue.trim() || saving}
-              >
-                {saving ? <ActivityIndicator color={theme.onAccent} size="small" /> : (
-                  <Text style={[styles.modalSaveText, { color: theme.onAccent }]}>Save</Text>
-                )}
-              </TouchableOpacity>
+                onPress={handleRename}
+                style={styles.modalSave}
+              />
             </View>
           </View>
         </View>
@@ -284,8 +283,5 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     backgroundColor: CARD, paddingHorizontal: SP.md, color: FG, fontSize: FS.base,
   },
   modalActions: { flexDirection: 'row', gap: SP.sm, justifyContent: 'flex-end' },
-  modalCancel: { paddingHorizontal: SP.md, paddingVertical: SP.sm + 2 },
-  modalCancelText: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.base },
-  modalSave: { paddingHorizontal: SP.lg, paddingVertical: SP.sm + 2, borderRadius: RADIUS.md, minWidth: 84, alignItems: 'center' },
-  modalSaveText: { fontFamily: FONT.semibold, fontSize: FS.base },
+  modalSave: { minWidth: 84 },
 });

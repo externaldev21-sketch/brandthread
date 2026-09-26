@@ -20,6 +20,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
@@ -548,12 +549,11 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
       </View>
 
       <View style={s.modeRow}>
-        <TouchableOpacity style={[s.modeButton, s.modeButtonActive]} activeOpacity={0.8}>
-          <Text style={[s.modeText, s.modeTextActive]}>Remove</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.modeButton} onPress={onSelectReplace} activeOpacity={0.8}>
-          <Text style={s.modeText}>Replace</Text>
-        </TouchableOpacity>
+        <SegmentedControl
+          options={[{ id: 'remove', label: 'Remove' }, { id: 'replace', label: 'Replace' }]}
+          selectedId="remove"
+          onChange={(id) => { if (id === 'replace') onSelectReplace(); }}
+        />
       </View>
 
       <ScrollView
@@ -832,11 +832,7 @@ function RecentResultRow({
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM } = theme;
   return StyleSheet.create({
-  modeRow:          { flexDirection: 'row', marginHorizontal: SP.md, marginBottom: SP.sm, padding: 4, gap: 4, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
-  modeButton:       { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.sm },
-  modeButtonActive: { backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  modeText:         { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
-  modeTextActive:   { color: theme.accentLight, fontFamily: FONT.semibold },
+  modeRow:          { marginHorizontal: SP.md, marginBottom: SP.sm },
   root:             { flex: 1 },
   scroll:           { flex: 1 },
   scrollContent:    { padding: SP.md, gap: SP.lg },

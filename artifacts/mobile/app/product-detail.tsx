@@ -9,6 +9,7 @@ import AIBrainFAB from '@/components/AIBrainFAB';
 import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -620,20 +621,8 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
                   )}
                 </View>
                 <View style={vt.variantActions}>
-                  <PressableScale
-                    style={vt.actionBtn}
-                    onPress={goToVariantEditor}
-                  >
-                    <Feather name="edit-2" size={12} color={theme.accentLight} />
-                    <Text style={vt.actionBtnText}>Edit</Text>
-                  </PressableScale>
-                  <PressableScale
-                    style={[vt.actionBtn, { borderColor: RED_DIM }]}
-                    onPress={() => removeVariant(variant)}
-                  >
-                    <Feather name="trash-2" size={12} color={RED} />
-                    <Text style={[vt.actionBtnText, { color: RED }]}>Delete</Text>
-                  </PressableScale>
+                  <Button label="Edit" icon="edit-2" variant="secondary" size="compact" onPress={goToVariantEditor} />
+                  <Button label="Delete" icon="trash-2" variant="destructive" size="compact" onPress={() => removeVariant(variant)} />
                 </View>
               </BrandthreadCard>
             );
@@ -664,9 +653,6 @@ const makeVtStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   stockText:       { fontSize: FS.xs, fontFamily: FONT.semibold },
   incomingText:    { fontSize: FS.xs, fontFamily: FONT.regular, color: BLUE },
   variantActions:  { flexDirection: 'row', gap: SP.sm },
-  actionBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6,
-                     backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  actionBtnText:   { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   });
 };
 
