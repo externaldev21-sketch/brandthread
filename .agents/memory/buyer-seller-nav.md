@@ -14,19 +14,6 @@ Only two account types exist: `buyer` and `seller`. "Both" is removed from `User
 - Routes with no slot (`href: null`): search, friends, cart, orders, following, edit-profile, feed. They stay inside the buyer Tabs so the bar remains on screen.
 - Friends is reached from the Home header (top-left people icon, like the Sora reference) and from the Profile menu.
 
-## Buyer Home header shortcuts
-Keep adjacent top-row actions visually equivalent as compact icons. The live shortcut should read as a little TV/live pictogram, not a text-heavy status pill, including when the signed-out preview would otherwise show “PREVIEW”.
-
-**Why:** The user explicitly rejected both a full-size and a smaller PREVIEW pill because their width and chrome disrupted the balance of the icon row.
-
-**How to apply:** For new Home-header actions, preserve icon-slot parity with Friends and keep any longer state description in the accessibility label rather than visible badge text.
-
-Keep Search beside Cart in the buyer Home top row as a plain magnifier icon identical in slot size and visual weight to Cart, opening an editable field in that row instead of reserving a second header row. Do not duplicate the Activity destination with a bell in this header.
-
-**Why:** The user wanted the extra upper search bar removed and considered the bell redundant because Activity already has its own page. They also rejected the labeled Search pill: the closed state must be an icon, not a button with the word “Search.”
-
-**How to apply:** Preserve a usable search action at phone widths; the Activity tab remains the route for notifications and activity.
-
 The bar is a content-sized capsule (Home · Discover · Inbox · Activity) plus a separate Profile circle. Search stays reachable from other entry points, especially Discover, without occupying a permanent tab slot.
 
 Search is a slide, not a swap: Home never moves or hides. When opened from another entry point, the field grows leftward from the fourth slot's position, the other slots fade beneath it, and the Profile circle morphs into Close. The field unmounts after the reverse animation finishes.
