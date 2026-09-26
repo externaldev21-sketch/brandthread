@@ -34,7 +34,7 @@ import { getTaggableProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { PressableScale, HapticSwitch } from '@/components/BrandthreadUI';
 import { hapticLight, hapticToggle, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
-import { ThreadCashCoin } from '@/components/thread-cash/ThreadCashBill';
+import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
@@ -888,7 +888,7 @@ export default function StoryComposer() {
             <StickerTile
               icon="dollar-sign"
               label="Thread Cash"
-              custom={<ThreadCashCoin size={26} />}
+              custom={<ThreadCashBillIcon size={26} />}
               onPress={() => { addOverlay({ type: 'threadcash', text: 'Thread Cash' }); setStickerSheetOpen(false); }}
             />
           </View>
@@ -1020,7 +1020,7 @@ function renderOverlayContent(ov: StoryOverlay) {
         </View>
       );
     case 'threadcash':
-      return <View style={styles.pillChip}><ThreadCashCoin size={16} /><Text style={styles.pillChipText}>{ov.text}</Text></View>;
+      return <View style={styles.pillChip}><ThreadCashBillIcon size={16} /><Text style={styles.pillChipText}>{ov.text}</Text></View>;
     default:
       return null;
   }

@@ -8,12 +8,21 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { ThreadCashCoin } from './ThreadCashBill';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { ThreadCashBillIcon } from './ThreadCashBill';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
-export function ThreadCashStreakRow({ streak }: { streak: ThreadCashStreakState | null }) {
+export function ThreadCashStreakRow({
+  streak,
+  onPress,
+}: {
+  streak: ThreadCashStreakState | null;
+  /** Opens the Thread Cash wallet screen. */
+  onPress?: () => void;
+}) {
   const { theme } = useAppTheme();
   if (!streak || streak.currentStreak <= 0) return null;
 
@@ -25,12 +34,21 @@ export function ThreadCashStreakRow({ streak }: { streak: ThreadCashStreakState 
   const claimedThroughDay = streak.alreadyCheckedInToday ? dayInCycle : dayInCycle - 1;
 
   return (
-    <View style={styles.wrap}>
+    <PressableScale
+      style={styles.wrap}
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={`Thread Cash streak, ${streak.currentStreak} day${streak.currentStreak === 1 ? '' : 's'}. Open Thread Cash wallet`}
+    >
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>Thread Cash streak</Text>
-        <Text style={[styles.subtitle, { color: theme.muted }]}>
-          {streak.currentStreak} day{streak.currentStreak === 1 ? '' : 's'}
-        </Text>
+        <View style={styles.subtitleRow}>
+          <Text style={[styles.subtitle, { color: theme.muted }]}>
+            {streak.currentStreak} day{streak.currentStreak === 1 ? '' : 's'}
+          </Text>
+          {onPress ? <Feather name="chevron-right" size={ICON.xs} color={theme.muted} /> : null}
+        </View>
       </View>
       <View style={styles.dotsRow} accessibilityLabel={`Day ${dayInCycle} of ${totalDays} in this Thread Cash week`}>
         {Array.from({ length: totalDays }, (_, i) => i + 1).map((day) => {
@@ -46,20 +64,21 @@ export function ThreadCashStreakRow({ streak }: { streak: ThreadCashStreakState 
                 isToday && { borderColor: theme.accent, borderWidth: 2 },
               ]}
             >
-              {claimed ? <ThreadCashCoin size={16} /> : (
+              {claimed ? <ThreadCashBillIcon size={16} /> : (
                 <Text style={[styles.dotText, { color: theme.subtle }]}>{day}</Text>
               )}
             </View>
           );
         })}
       </View>
-    </View>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  header: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SP.xs },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.xs },
+  subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   title: { fontSize: FS.sm, fontFamily: FONT.semibold },
   subtitle: { fontSize: FS.xs, fontFamily: FONT.medium },
   dotsRow: { flexDirection: 'row', gap: SP.xs, justifyContent: 'space-between' },

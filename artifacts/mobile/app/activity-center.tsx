@@ -85,7 +85,7 @@ import {
   type SuggestedPerson,
 } from '@/services/activityService';
 import { setSellerFollowing } from '@/services/socialService';
-import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
+import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 
 const EMPTY_ICON = 'activity' as const;
 /** Width of the in-flow unread-dot gutter that precedes every row's avatar. */
@@ -181,7 +181,7 @@ function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }
   if (row.type === 'thread_cash_received') {
     return (
       <View style={styles.typeBadgeBill}>
-        <ThreadCashBill width={20} />
+        <ThreadCashBillIcon size={20} />
       </View>
     );
   }
@@ -327,7 +327,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
           <View style={styles.leading}>
             <View style={styles.iconCircle}>
               {row.type === 'thread_cash_received' ? (
-                <ThreadCashBill width={32} />
+                <ThreadCashBillIcon size={ICON.md} />
               ) : (
                 <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
               )}
@@ -384,7 +384,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
         ) : row.actors.length > 0 ? (
           <View style={styles.thumbFallback}>
             {row.type === 'thread_cash_received' ? (
-              <ThreadCashBill width={28} />
+              <ThreadCashBillIcon size={ICON.sm} />
             ) : (
               <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
             )}
