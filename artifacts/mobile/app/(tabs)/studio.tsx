@@ -11,13 +11,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { markFeatureOpened, getSetupState } from '@/lib/setupStore';
 import { getProjects } from '@/services/designService';
 import { DesignProject, PROJECT_TYPE_LABELS, PROJECT_STATUS_LABELS } from '@/services/designTypes';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader, EmptyState, NewFeatureBadge, StatusBadge, LockBadge } from '@/components/BrandthreadUI';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED, GROWTH_STUDIO_TOOLS, type GrowthTool, type GrowthToolId } from '@/lib/growthTools';
 
@@ -109,7 +109,6 @@ export default function StudioScreen() {
   const s = useMemo(() => makeStyles(theme), [theme]);
   const router   = useRouter();
   const { userId } = useAuth();
-  const insets   = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
   const cols    = getColumns(windowWidth);
@@ -189,15 +188,16 @@ export default function StudioScreen() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <View style={[s.root, { paddingTop: insets.top, backgroundColor: theme.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-
-        {/* ── HEADER ── */}
-        <View style={s.header}>
-          <View style={s.headerLeft}>
-            <Text style={s.headerTitle}>Studio</Text>
-            <Text style={s.headerSubtitle}>Your creative workspace</Text>
-          </View>
+    <View style={[s.root, { backgroundColor: theme.background }]}>
+      {/* Shared page header — identical large-title size/weight/offset to every other
+          tab-root page. "My Projects" moves into belowTitle since it's a labeled
+          pill button, not a simple icon action. */}
+      <Header
+        title="Studio"
+        subtitle="Your creative workspace"
+        largeTitle
+        showBack={false}
+        belowTitle={(
           <TouchableOpacity
             style={s.myProjectsBtn}
             onPress={() => router.push('/design' as never)}
@@ -206,7 +206,9 @@ export default function StudioScreen() {
             <Feather name="folder" size={14} color={theme.accentLight} />
             <Text style={s.myProjectsBtnText}>My Projects</Text>
           </TouchableOpacity>
-        </View>
+        )}
+      />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
         {/* ── START CREATING GRID ── */}
         <View style={s.sectionHeader}>
@@ -390,29 +392,6 @@ const makeStyles = (theme: any) => {
     paddingBottom: 120,
   },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: H_PAD,
-    paddingTop: SP.sm,
-    paddingBottom: SP.md,
-  },
-  headerLeft: {
-    gap: 2,
-  },
-  headerTitle: {
-    fontSize: FS.xxl,
-    fontFamily: FONT.bold,
-    color: accentLight,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: muted,
-  },
   myProjectsBtn: {
     flexDirection: 'row',
     alignItems: 'center',

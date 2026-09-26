@@ -3,7 +3,7 @@
  * Profile card + search + compact grouped iOS-Settings-style sections.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -16,7 +16,7 @@ import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
 import { SettingsProfileCard, SettingsSearchBar, SettingsSection, SettingsRow, ConfirmSheet } from '@/components/settings/SettingsKit';
-import { IconButton } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 
@@ -50,7 +50,6 @@ export default function SellerSettingsScreen() {
 
   const profileName = user?.fullName || user?.username || 'Your Brandthread store';
   const profileInitials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || 'BT';
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -123,10 +122,13 @@ export default function SellerSettingsScreen() {
 
   return (
     <View style={s.page}>
-      <View style={[s.header, { paddingTop: topPad + 12 }]}>
-        <Text style={s.headerTitle}>Settings</Text>
-        <IconButton name="x" color={colors.foreground} onPress={() => { hapticLight(); router.back(); }} accessibilityLabel="Close settings" />
-      </View>
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
+      <Header
+        title="Settings"
+        largeTitle
+        showBack={false}
+        actions={[{ icon: 'x', onPress: () => { hapticLight(); router.back(); }, accessibilityLabel: 'Close settings' }]}
+      />
 
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + 48 }}
@@ -272,8 +274,6 @@ function AccountScopeSheet({
 function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     page: { flex: 1, backgroundColor: colors.background },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: 20 },
-    headerTitle: { fontSize: 30, fontFamily: FONT.bold, color: colors.foreground },
     version: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 4 },
   });
 }
