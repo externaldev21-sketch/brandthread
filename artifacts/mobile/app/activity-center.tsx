@@ -35,7 +35,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock } from '@/components/layout';
-import { ScreenHeader } from '@/components/ScreenHeader';
+import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Chip, ThemedRefreshControl } from '@/components/ui';
@@ -481,10 +481,10 @@ export default function ActivityCenterScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader
+      <TabPageHeader
         title="Activity"
         actions={hasUnread ? [{
-          icon: 'check-circle',
+          name: 'check-circle',
           onPress: () => { void handleMarkAll(); },
           accessibilityLabel: 'Mark all activity as read',
         }] : []}
