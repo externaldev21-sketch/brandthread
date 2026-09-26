@@ -7,6 +7,7 @@
  * with the current version pinned at the top and full version history below.
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, Image,
   ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform,
@@ -213,7 +214,7 @@ export default function AiDesignChatScreen() {
 
   return (
     <BrandthreadScreen>
-      <BrandthreadHeader title="AI Design" onBack={() => router.back()} />
+      <BrandthreadHeader title="AI Design" onBack={() => goBackOr(router)} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {/* ── Pinned current version ── */}
         {current && (

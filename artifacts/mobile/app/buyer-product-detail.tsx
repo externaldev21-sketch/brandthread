@@ -3,6 +3,7 @@
  * Variant selection, add to cart, buy now.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, RefreshControl,
   Animated, Dimensions, PanResponder,
@@ -476,7 +477,7 @@ export default function BuyerProductDetailScreen() {
   const pathname = usePathname();
   const { push, back } = useThreadPull();
   const usesThreadPull = pathname === '/thread-product-detail';
-  const leaveProduct = () => usesThreadPull ? back() : router.back();
+  const leaveProduct = () => usesThreadPull ? back() : goBackOr(router);
   const insets = useSafeAreaInsets();
   const api    = useApi();
   const { isSignedIn } = useAuth();

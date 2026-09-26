@@ -7,6 +7,7 @@ import { useApi } from '@/hooks/useApi';
 import { BrandthreadHeader, BrandthreadScreen, PrimaryButton, SecondaryButton, PressableScale } from '@/components/BrandthreadUI';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type StoredCase = { listingId: string; caseReference: string; statusToken: string; status: string; submittedAt: string };
 const CASES_KEY = 'bt:ip-cases:v1';
@@ -59,7 +60,7 @@ export default function IpReportScreen() {
     finally { setChecking(null); }
   };
   return <BrandthreadScreen>
-    <BrandthreadHeader title="Report IP infringement" onBack={() => router.back()} />
+    <BrandthreadHeader title="Report IP infringement" onBack={() => goBackOr(router)} />
     <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <Text style={s.legal}>Only a rights holder or an authorized agent may submit this report. By submitting, you certify that you are authorized to act, that the information is accurate, and that you have a good-faith belief the reported listing infringes your copyright, trademark, or other rights. Include the listing, the rights you own or represent, and supporting evidence. Brandthread may request more information, notify the seller, restrict or remove content, or close the case without action. Knowingly false or misleading reports may lead to account action. Questions about an IP case can be sent to support@brandthread.app.</Text>
       <Text style={s.label}>Your full name</Text><TextInput value={name} onChangeText={setName} style={s.input} placeholder="Rights holder or authorized agent" placeholderTextColor={theme.subtle} />

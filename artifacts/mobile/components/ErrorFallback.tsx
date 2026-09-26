@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   Modal,
   Platform,
@@ -94,7 +95,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             <Button
               label="Go back"
               onPress={() => {
-                if (router.canGoBack()) router.back();
+                if (router.canGoBack()) goBackOr(router);
                 else router.replace('/' as never);
               }}
               variant="secondary"

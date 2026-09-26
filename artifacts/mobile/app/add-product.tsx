@@ -39,6 +39,7 @@ import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { validatePhotosStep, validateDetailsStep, validatePricingStep, validateVariantsStep, validateListingForPublish } from '@/lib/listingValidation';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -501,7 +502,7 @@ export default function AddProductScreen() {
       router.replace(SELLER_HOME_ROUTE as never);
       return;
     }
-    router.back();
+    goBackOr(router);
   }
 
   function handleExit() {

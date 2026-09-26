@@ -27,6 +27,7 @@ import { getItemsByProduct, adjustStock } from '@/services/inventoryService';
 import { InventoryItem } from '@/services/inventoryTypes';
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
 import { reportNetworkError } from '@/lib/networkNotice';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -143,7 +144,7 @@ export default function ProductDetailScreen() {
       <View style={[s.root, { paddingTop: insets.top }]}>
         <View style={s.header}>
           <PressableScale
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
             style={s.backBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel="Back"
@@ -170,9 +171,9 @@ export default function ProductDetailScreen() {
     <View style={[s.root, { paddingTop: insets.top }]}>
       {/* ── Fixed Header ── */}
       <View style={s.header}>
-        {/* Fix 3: back button uses router.back() */}
+        {/* Fix 3: back button uses goBackOr(router) */}
         <PressableScale
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
           style={s.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel="Back"

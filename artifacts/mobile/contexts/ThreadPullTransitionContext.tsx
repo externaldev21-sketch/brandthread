@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { useRouter, Href } from 'expo-router';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type ThreadPullContextType = {
   push: (href: Href) => void;
@@ -15,7 +16,7 @@ export function useThreadPull() {
   return ctx ?? {
     push: (href: Href) => router.push(href),
     replace: (href: Href) => router.replace(href),
-    back: () => router.back(),
+    back: () => goBackOr(router),
   };
 }
 
@@ -31,7 +32,7 @@ export function ThreadPullProvider({ children }: { children: React.ReactNode }) 
   }, [router]);
 
   const back = useCallback(() => {
-    if (router.canGoBack()) router.back();
+    if (router.canGoBack()) goBackOr(router);
     else router.replace('/(buyer)/' as any);
   }, [router]);
 

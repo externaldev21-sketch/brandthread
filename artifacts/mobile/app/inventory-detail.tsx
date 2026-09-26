@@ -15,6 +15,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getInventoryItem, getAdjustments, getEvents, getRestockRecommendations, updateThreshold, updateOversellPolicy } from '@/services/inventoryService';
 import { InventoryItem, InventoryAdjustment, InventoryEvent, RestockRecommendation, OversellPolicy } from '@/services/inventoryTypes';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -191,7 +192,7 @@ export default function InventoryDetailScreen() {
           icon="package"
           title="Item not found"
           description="This inventory item could not be loaded."
-          action={{ label: 'Go Back', onPress: () => router.back() }}
+          action={{ label: 'Go Back', onPress: () => goBackOr(router) }}
         />
       </View>
     );
@@ -493,7 +494,7 @@ export default function InventoryDetailScreen() {
       {/* Header */}
       <View style={[d.header, { paddingTop: insets.top + SP.xs }]}>
         <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
           style={d.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >

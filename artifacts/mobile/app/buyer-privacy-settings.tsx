@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, ScrollView, StyleSheet,
 } from 'react-native';
@@ -83,13 +84,13 @@ export default function BuyerPrivacySettings() {
 
   async function handleBack() {
     if (hasChanges) await saveSettings(false);
-    router.back();
+    goBackOr(router);
   }
 
   if (!settings) {
     return (
       <View style={styles.root}>
-        <ScreenHeader title="Privacy" variant="push" onBack={() => router.back()} />
+        <ScreenHeader title="Privacy" variant="push" onBack={() => goBackOr(router)} />
         <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md }}>
           <ListSkeleton rows={7} />
         </ScrollView>

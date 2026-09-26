@@ -14,6 +14,7 @@ import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 function parseCsvLine(line: string): string[] {
   const values: string[] = [];
@@ -147,7 +148,7 @@ export default function ProductImportScreen() {
           {
             text: 'OK',
             onPress: () => {
-              if (result.successCount > 0) router.back();
+              if (result.successCount > 0) goBackOr(router);
             },
           },
         ],
@@ -163,7 +164,7 @@ export default function ProductImportScreen() {
 
   return (
     <View style={s.screen}>
-      <Header title="Import Products" onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }} />
+      <Header title="Import Products" onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

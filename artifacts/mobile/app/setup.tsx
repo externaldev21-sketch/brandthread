@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback, useRef } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Animated, Alert,
@@ -192,7 +193,7 @@ export default function SetupScreen() {
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
           style={s.back}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
@@ -275,7 +276,7 @@ export default function SetupScreen() {
         {/* Save and exit */}
         <SecondaryButton
           label="Save and exit"
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
           style={{ marginTop: SP.lg }}
         />
       </ScrollView>

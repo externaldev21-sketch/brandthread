@@ -6,6 +6,7 @@ import { recordNavigationStart } from '@/lib/perf';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -955,7 +956,7 @@ function RootLayoutNav() {
           style={{ marginTop: 8 }}
           onPress={() => {
             if (router.canGoBack()) {
-              router.back();
+              goBackOr(router);
             } else {
               router.replace('/');
             }

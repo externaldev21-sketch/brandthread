@@ -21,6 +21,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Modal, Pressable, PanResponder,
   KeyboardAvoidingView, Platform, StyleSheet, Animated, Keyboard, useWindowDimensions,
@@ -557,7 +558,7 @@ export default function BuyerPostCommentsScreen() {
       },
       onPanResponderRelease: (_evt, gesture) => {
         if (gesture.dy > DISMISS_THRESHOLD || gesture.vy > 1.2) {
-          Animated.timing(dragY, { toValue: windowHeight, duration: 180, useNativeDriver: true }).start(() => router.back());
+          Animated.timing(dragY, { toValue: windowHeight, duration: 180, useNativeDriver: true }).start(() => goBackOr(router));
         } else {
           Animated.spring(dragY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
         }
@@ -960,7 +961,7 @@ export default function BuyerPostCommentsScreen() {
       <PressableScale
         style={s.backdrop}
         activeOpacity={1}
-        onPress={() => { hapticLight(); router.back(); }}
+        onPress={() => { hapticLight(); goBackOr(router); }}
         accessibilityRole="button"
         accessibilityLabel="Close comments"
       />
@@ -984,7 +985,7 @@ export default function BuyerPostCommentsScreen() {
             </Text>
             <PressableScale
               style={s.headerSide}
-              onPress={() => { hapticLight(); router.back(); }}
+              onPress={() => { hapticLight(); goBackOr(router); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel="Close comments"

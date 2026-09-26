@@ -1,4 +1,23 @@
 import { index, integer, pgTable, text, timestamp, uuid, unique } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+
+/**
+ * Server-issued (Resend-backed) forgot-password codes. The code itself is
+ * never stored — only its SHA-256 hash — and each row is single-use
+ * (`usedAt`) with a 15-minute expiry enforced by the route that writes it.
+ */
+export const passwordResetCodes = pgTable("password_reset_codes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  clerkId: text("clerk_id").notNull(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  emailIdx: index("password_reset_codes_email_idx").on(table.email, table.createdAt),
+  expiresAtIdx: index("password_reset_codes_expires_at_idx").on(table.expiresAt),
+}));
 
 export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   bucketKey: text("bucket_key").primaryKey(),
