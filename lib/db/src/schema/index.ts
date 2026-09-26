@@ -56,6 +56,12 @@ export const users = pgTable('users', {
   subscriptionTrialStartedAt: timestamp('subscription_trial_started_at', { withTimezone: true }),
   subscriptionTrialEndsAt:    timestamp('subscription_trial_ends_at', { withTimezone: true }),
   subscriptionTrialBannerDismissedTrialEnd: text('subscription_trial_banner_dismissed_trial_end'),
+  // Buyer-only "Watching Threads" gesture coach mark on the feed. Stores the
+  // FEED_GESTURES_TIP_VERSION the user has already seen (0 = never shown).
+  // Bumping the client-side version constant shows the tip one more time per
+  // user, then persists the new version — server-side so it survives
+  // reinstalls, new devices and cleared local storage, not just AsyncStorage.
+  feedGesturesTipSeenVersion: integer('feed_gestures_tip_seen_version').notNull().default(0),
   // Trust signals & Stripe Identity verification
   verified:                     boolean('verified').notNull().default(false),
   /** 'unverified' | 'pending' | 'verified' | 'failed' */

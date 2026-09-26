@@ -62,8 +62,12 @@ export { ALL_ITEMS, SECTIONS, DEFAULT_PINNED_IDS } from '@/lib/sellerControlCent
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
-const PIN_TILE_SIZE = 84;
-const PIN_TILE_GAP = 10;
+// Sized so the default 4 pinned tiles fit fully inside a 390pt-wide phone
+// screen (minus the sheet's SP.md side padding) without the last tile being
+// clipped at the edge — the row still scrolls horizontally for up to
+// MAX_PINNED tiles, but the common 4-tile case needs no scrolling at all.
+const PIN_TILE_SIZE = 78;
+const PIN_TILE_GAP = 8;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -559,16 +563,24 @@ export default function SellerStudioRadialMenu({
 
                 <View style={styles.sectionSpacer} />
 
-                {/* ── Grouped sections ── */}
-                {SECTIONS.map((section) => (
-                  <View key={section.key} style={styles.section}>
-                    <View style={styles.sectionTitleRow}>
-                      <Feather name={section.icon as any} size={12} color={theme.subtle} />
-                      <Text style={styles.sectionHeading}>{section.title.toUpperCase()}</Text>
+                {/* ── Grouped sections ──
+                    An item already shown as a Pinned tile above is left out
+                    of its section's list here — otherwise "Add product" /
+                    "Orders" / etc. render twice on the same screen, once
+                    pinned and once in the list below. */}
+                {SECTIONS.map((section) => {
+                  const listItems = section.items.filter((item) => !pinnedIds.includes(item.id));
+                  if (listItems.length === 0) return null;
+                  return (
+                    <View key={section.key} style={styles.section}>
+                      <View style={styles.sectionTitleRow}>
+                        <Feather name={section.icon as any} size={12} color={theme.subtle} />
+                        <Text style={styles.sectionHeading}>{section.title.toUpperCase()}</Text>
+                      </View>
+                      {listItems.map((item) => renderItemRow(item))}
                     </View>
-                    {section.items.map((item) => renderItemRow(item))}
-                  </View>
-                ))}
+                  );
+                })}
               </>
             )}
           </ScrollView>

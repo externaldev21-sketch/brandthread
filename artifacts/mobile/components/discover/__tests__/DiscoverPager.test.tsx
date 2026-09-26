@@ -107,7 +107,13 @@ vi.mock('react-native-reanimated', () => {
   return {
     default: AnimatedDefault,
     FlatList,
-    useSharedValue: (initial: unknown) => ({ value: initial }),
+    useSharedValue: (initial: unknown) => {
+      const box: { value: unknown; set: (v: unknown) => void } = {
+        value: initial,
+        set: (v: unknown) => { box.value = v; },
+      };
+      return box;
+    },
     useAnimatedStyle: (fn: () => Record<string, unknown>) => fn(),
     useAnimatedScrollHandler: (handlers: unknown) => handlers,
     withSpring: (v: unknown) => v,
@@ -116,6 +122,7 @@ vi.mock('react-native-reanimated', () => {
     withSequence: (...v: unknown[]) => v[0],
     interpolate: (value: number, input: number[], output: number[]) => output[1] ?? output[0],
     Extrapolation: { CLAMP: 'clamp' },
+    Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, inOut: (fn: unknown) => fn, ease: (v: number) => v },
   };
 });
 

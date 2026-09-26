@@ -804,19 +804,9 @@ export default function InboxScreen() {
         </View>
       )}
 
-      {/* New message FAB */}
-      {!loading && (
-        <PressableScale
-          style={[s.fab, { bottom: barInset + SP.md, backgroundColor: theme.accent, shadowColor: theme.shadowColor }]}
-          onPress={() => { hapticPrimaryAction(); openCompose(); }}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="New message"
-          testID="inbox-fab-new-message"
-        >
-          <Feather name="edit-3" size={22} color={theme.onAccent} />
-        </PressableScale>
-      )}
+      {/* New message is started from the header pencil icon above — a second
+          floating "New message" FAB was a duplicate of that same action and
+          has been removed (see item 17: no duplicate compose actions). */}
 
       {/* Message requests sheet */}
       <Modal
