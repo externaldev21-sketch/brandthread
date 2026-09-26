@@ -21,6 +21,12 @@ Keep adjacent top-row actions visually equivalent as compact icons. The live sho
 
 **How to apply:** For new Home-header actions, preserve icon-slot parity with Friends and keep any longer state description in the accessibility label rather than visible badge text.
 
+Keep Search beside Cart in the buyer Home top row, opening an editable field in that row instead of reserving a second header row. Do not duplicate the Activity destination with a bell in this header.
+
+**Why:** The user wanted the extra upper search bar removed and considered the bell redundant because Activity already has its own page.
+
+**How to apply:** Preserve a usable search action at phone widths; the Activity tab remains the route for notifications and activity.
+
 The bar is a content-sized capsule (Home · Discover · Inbox · Activity) plus a separate Profile circle. Search stays reachable from other entry points, especially Discover, without occupying a permanent tab slot.
 
 Search is a slide, not a swap: Home never moves or hides. When opened from another entry point, the field grows leftward from the fourth slot's position, the other slots fade beneath it, and the Profile circle morphs into Close. The field unmounts after the reverse animation finishes.

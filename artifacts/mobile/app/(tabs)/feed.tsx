@@ -115,11 +115,7 @@ const THREAD_PAGE_SIZE = 30;
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
 const RAIL_BOTTOM_GAP = 16;
 
-// Top chrome rhythm — measured from TikTok's For You feed (Mobbin refs cited
-// in the PR): a thin search affordance raised as high as the safe area
-// allows, then the Following/Threads tab row snug underneath it.
-const TOP_SEARCH_BAR_HEIGHT = 33;
-const TOP_SEARCH_TO_TABS_GAP = 7;
+// One top row holds the buyer shortcuts, tabs, search and cart.
 const TOP_TABS_ROW_HEIGHT = 34;
 // How many times a feed's content repeats (under unique keys) once it has
 // no more real pages behind it, so scrolling never dead-ends or shows an
@@ -2176,12 +2172,9 @@ export default function FeedScreen({
   const creatorSource = creatorFeed?.source;
   const creatorId = creatorFeed?.id;
   const creatorStartPostId = creatorFeed?.startPostId;
-  // Height of the floating top overlay (search bar/Following/Threads/Cart
-  // row): topBar's own paddingTop, plus the thin search bar, the gap under
-  // it, and the buyerTopRow's height. Single source of truth so
-  // BuyerHighDemandPage's content never renders underneath it (see
-  // styles.topBar / styles.buyerSearchBarThin / styles.buyerTopRow below).
-  const buyerHeaderHeight = previewTopInset + 4 + TOP_SEARCH_BAR_HEIGHT + TOP_SEARCH_TO_TABS_GAP + TOP_TABS_ROW_HEIGHT + 6;
+  // The search affordance now shares the tabs row; keep the first feed card
+  // below that one row rather than reserving space for a removed search row.
+  const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;
   const buyerBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { userId } = useAuth();
@@ -2211,6 +2204,7 @@ export default function FeedScreen({
   const viewportReady = viewportSize.width > 0 && viewportSize.height > 0;
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [buyerSearchOpen, setBuyerSearchOpen] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRepostEducation, setShowRepostEducation] = useState(false);
   const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
@@ -3185,48 +3179,39 @@ export default function FeedScreen({
         </View>
       ) : isBuyerSurface ? (
         <View style={[styles.topBar, { paddingTop: previewTopInset + 4 }]} pointerEvents="box-none">
-          {/* Buyer Threads Home: For You feed chrome — a persistent thin
-              search bar raised as high as the safe area allows, snug above
-              Friends/Drops entry points, a centered "Following | Threads"
-              underline switcher (real SegmentedControl from the shared
-              design system — see components/ui/SegmentedControl.tsx), a
-              LIVE jump-to button that only appears while a live stream is
-              actually mixed into the feed, activity and cart. Placement
-              measured from TikTok's For You feed (Mobbin refs in the PR):
-              squircle search affordance, tight tab row underneath, right-
-              inset cart mirroring the rail's own right inset. Solid fills
-              only, no BlurView: a live blur here would re-sample the
-              playing video behind it every frame, same class of glitch as
-              the old shop pill's frosted background — see ShopSideTab
-              above. */}
-          <View style={styles.buyerSearchBarThin}>
-            <Feather name="search" size={14} color="rgba(255,255,255,0.75)" style={{ marginLeft: 10 }} />
-            <TextInput
-              style={styles.buyerSearchBarThinInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search…"
-              placeholderTextColor="rgba(255,255,255,0.55)"
-              accessibilityLabel="Search feed"
-              returnKeyType="search"
-              onSubmitEditing={() => Keyboard.dismiss()}
-              testID="buyer-home-search-input"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                style={styles.buyerSearchBarThinClear}
-                activeOpacity={0.7}
-                onPress={() => setSearchQuery('')}
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              >
-                <Feather name="x" size={14} color={ON_DARK} />
-              </TouchableOpacity>
-            )}
-          </View>
-
+          {/* Keep the shortcuts, feed tabs, search and cart in one row. Search
+              expands to a real input only while in use, without permanently
+              pushing the tabs or adding another row over the video. */}
           <View style={styles.buyerTopRow}>
+            {buyerSearchOpen ? (
+              <View style={styles.buyerSearchExpanded}>
+                <BuyerNavIcon name="search" color={ON_DARK} size={18} strokeWidth={1.9} />
+                <TextInput
+                  style={styles.buyerSearchExpandedInput}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search the feed…"
+                  placeholderTextColor={SUBTLE}
+                  accessibilityLabel="Search feed"
+                  autoFocus
+                  returnKeyType="search"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  testID="buyer-home-search-input"
+                />
+                <TouchableOpacity
+                  style={styles.buyerSearchClose}
+                  activeOpacity={0.7}
+                  onPress={() => { setSearchQuery(''); setBuyerSearchOpen(false); Keyboard.dismiss(); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close search"
+                  hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                  testID="buyer-home-search-close"
+                >
+                  <Feather name="x" size={16} color={ON_DARK} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+            <>
             <View style={styles.buyerTopCluster}>
               <TouchableOpacity
                 style={styles.buyerTopBtnCompact}
@@ -3277,7 +3262,17 @@ export default function FeedScreen({
             </View>
 
             <View style={styles.buyerTopCluster}>
-              <ActivityBellButton color={ON_DARK} size={20} style={styles.buyerTopBtnCompact} badgeBorderColor={BG} />
+              <TouchableOpacity
+                style={[styles.buyerSearchCompact, windowWidth < 370 && styles.buyerSearchCompactNarrow]}
+                activeOpacity={0.7}
+                onPress={() => setBuyerSearchOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Search feed"
+                testID="buyer-home-search-open"
+              >
+                <BuyerNavIcon name="search" color={ON_DARK} size={18} strokeWidth={1.9} />
+                {windowWidth >= 370 && <Text style={styles.buyerSearchCompactText}>Search</Text>}
+              </TouchableOpacity>
               <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtnCompact, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
                 style={styles.buyerTopBtnCompact}
@@ -3300,6 +3295,8 @@ export default function FeedScreen({
               </TouchableOpacity>
               </Animated.View>
             </View>
+            </>
+            )}
           </View>
         </View>
       ) : (
@@ -3672,28 +3669,28 @@ const styles = StyleSheet.create({
   // buyer Threads Home top row above which needs to fit more controls.
   buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   buyerTopCluster: { flexDirection: 'row', alignItems: 'center', gap: 0 },
-  // Center the tabs against the screen, not the space left between shortcuts.
-  // The optional live-TV icon makes the left side wider than the cart side.
+  // Give the tabs the remaining center space between shortcuts and search/cart.
   buyerTabSwitcherWrap: {
-    position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
+    flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center',
   },
   buyerCartBadge: { top: 3, right: 1 },
-  // Persistent thin search bar — squircle (not a full pill, not sharp),
-  // lighter/more transparent fill than a solid pill so it never darkens the
-  // video underneath. No blur: a live blur here would re-sample the playing
-  // video every frame (same class of glitch as the old shop pill).
-  buyerSearchBarThin: {
-    flexDirection: 'row', alignItems: 'center', height: TOP_SEARCH_BAR_HEIGHT,
-    borderRadius: 10, marginBottom: TOP_SEARCH_TO_TABS_GAP,
+  buyerSearchCompact: {
+    width: 68, height: 32, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 4, borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
   },
-  buyerSearchBarThinInput: {
-    flex: 1, height: '100%', paddingHorizontal: 8, fontSize: 13, fontFamily: FONT.regular, color: ON_DARK,
+  buyerSearchCompactNarrow: { width: 33 },
+  buyerSearchCompactText: { fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK },
+  buyerSearchExpanded: {
+    flex: 1, height: 34, flexDirection: 'row', alignItems: 'center', paddingLeft: 10,
+    borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.82)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
   },
-  buyerSearchBarThinClear: {
-    width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 4,
+  buyerSearchExpandedInput: {
+    flex: 1, height: '100%', paddingHorizontal: 8,
+    fontSize: FS.sm, fontFamily: FONT.regular, color: ON_DARK,
   },
+  buyerSearchClose: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   topAvatarBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   topAvatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },

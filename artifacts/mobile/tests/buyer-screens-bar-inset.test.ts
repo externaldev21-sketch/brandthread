@@ -51,6 +51,17 @@ describe('screens behind the floating buyer bar', () => {
 describe('buyer Home feed behind the bar', () => {
   const feed = read('app/(tabs)/feed.tsx');
 
+  it('keeps search in the header row in place of the activity bell', () => {
+    const buyerHeader = feed.split(') : isBuyerSurface ? (')[1]
+      ?.split('      <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]}')[0];
+    expect(buyerHeader).toContain('testID="buyer-home-search-open"');
+    expect(buyerHeader).toContain('testID="buyer-home-search-input"');
+    expect(buyerHeader).toContain('<BuyerNavIcon name="search"');
+    expect(buyerHeader).not.toContain('ActivityBellButton');
+    expect(feed).not.toContain('styles.buyerSearchBarThin');
+    expect(feed).toContain('const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;');
+  });
+
   it('keeps the live shortcut in the same icon slot as Friends, not a wide preview pill', () => {
     const icon = read('components/buyer-nav/BuyerNavIcon.tsx');
     expect(feed).toContain('<BuyerNavIcon name="live-tv" color={ON_DARK} size={24} strokeWidth={1.9} />');
