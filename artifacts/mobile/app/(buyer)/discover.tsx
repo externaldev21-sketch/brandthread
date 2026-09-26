@@ -1063,23 +1063,6 @@ export default function DiscoverScreen() {
         <EditorialSectionHead kicker="Just for you" title="For You" sub="Products from across the platform" theme={theme} />
       </ResponsiveContainer>
 
-      {/* ─ Entry point into the full-screen, swipeable Discover pager ─ */}
-      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.md }}>
-        <Card
-          onPress={() => push('/(buyer)/discover-feed' as never)}
-          accessibilityLabel="Open full-screen For You feed"
-          style={fy.banner}
-        >
-          <View style={[fy.bannerIcon, { backgroundColor: theme.accentDim }]}>
-            <Feather name="zap" size={18} color={theme.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]}>For You, full screen</Text>
-            <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]}>Swipe through products one at a time</Text>
-          </View>
-          <Feather name="chevron-right" size={18} color={theme.muted} />
-        </Card>
-      </ResponsiveContainer>
       {forYouLoading ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
           <CardSkeleton width={showcaseSkeletonWidth} />
@@ -1164,10 +1147,3 @@ export default function DiscoverScreen() {
     </ScrollView>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const fy = StyleSheet.create({
-  banner:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
-  bannerIcon: { width: 40, height: 40, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center' },
-});
