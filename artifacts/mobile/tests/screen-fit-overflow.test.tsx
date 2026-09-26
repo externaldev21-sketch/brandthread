@@ -153,14 +153,24 @@ describe('Activity screen "Suggested for you" section (the reported clipping bug
     // The title reuses the shared `sectionTitle` style (no horizontal
     // padding of its own) but sits in a section whose *rows* set their own
     // paddingHorizontal independently — so the title needs an explicit
-    // gutter or it renders flush against both screen edges. Root cause of
-    // the reported clipping.
+    // gutter (on itself or its wrapping header row) or it renders flush
+    // against both screen edges. Root cause of the reported clipping.
+    //
+    // PR #123's Activity rebuild puts this gutter on the title's wrapping
+    // `suggestedHeaderRow`, not on `suggestedTitle` itself (the earlier fix
+    // put it directly on the title style) — either placement fixes the same
+    // clipping bug, so this checks the whole chain rather than one specific
+    // style key.
     expect(line).toContain('suggestedTitle');
     const suggestedTitleStyle = source.slice(
       source.indexOf('suggestedTitle: {'),
       source.indexOf('}', source.indexOf('suggestedTitle: {')),
     );
-    expect(suggestedTitleStyle).toContain('paddingHorizontal');
+    const suggestedHeaderRowStyle = source.slice(
+      source.indexOf('suggestedHeaderRow: {'),
+      source.indexOf('}', source.indexOf('suggestedHeaderRow: {')),
+    );
+    expect(suggestedTitleStyle + suggestedHeaderRowStyle).toContain('paddingHorizontal');
   });
 
   it('gives every other section header title numberOfLines too', () => {

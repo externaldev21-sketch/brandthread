@@ -177,6 +177,19 @@ vi.mock('@/components/BrandthreadUI', () => ({
     ),
 }));
 
+// `tabDataCache` is a module-level in-memory Map (see lib/tabDataCache.ts —
+// PR #128's instant-tab prefetch), so without this mock, whichever test in
+// this file resolves conversations first permanently seeds it for every
+// later test in the same process, making the inbox skip its loading
+// skeleton entirely (`loading` starts `false` whenever a cache hit exists).
+// A plain no-op mock keeps every test's `loading` starting state
+// independent of run order.
+vi.mock('@/lib/tabDataCache', () => ({
+  getCachedTabData: () => undefined,
+  setCachedTabData: () => {},
+  hydrateTabData: async () => undefined,
+}));
+
 vi.mock('@/components/layout', () => ({
   ListSkeleton: () => React.createElement('View', { testID: 'inbox-skeleton' }),
   Header: ({ title, belowTitle, actions }: any) => React.createElement(
