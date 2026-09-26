@@ -20,6 +20,11 @@ const MAX_CLIP_BYTES = 80 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 240 * 1024 * 1024;
 const MAX_CLIPS = 12;
 const MAX_TOTAL_DURATION_SECONDS = 600;
+// Composed output resolution — 1080p vertical, matching the quality the
+// Threads feed now expects; this used to render at 720x1280, which visibly
+// under-delivered next to a native 1080x1920 source clip in the feed.
+const OUTPUT_W = 1080;
+const OUTPUT_H = 1920;
 const COMPOSED_PREVIEW_TTL_SECONDS = 60 * 60;
 const OBJECT_PATH_RE = /^\/objects\/uploads\/[A-Za-z0-9._/-]+$/;
 
@@ -264,7 +269,7 @@ function fontPathForStyle(style: string, regularFont: string, boldFont: string):
 /**
  * Build the drawtext filter fragment for a single overlay.
  * Uses textfile= to prevent any shell/FFmpeg filter injection.
- * Positions are normalized (0–1) and scaled to output dimensions (720×1280).
+ * Positions are normalized (0–1) and scaled to output dimensions (1080×1920).
  */
 function buildDrawtextFilter(
   overlay: ValidatedOverlay,
@@ -272,8 +277,8 @@ function buildDrawtextFilter(
   outputDuration: number,
   fontPath: string,
 ): string {
-  const VW = 720;
-  const VH = 1280;
+  const VW = OUTPUT_W;
+  const VH = OUTPUT_H;
 
   // Convert hex color to FFmpeg format (0xRRGGBB)
   const hexRaw = overlay.color.replace("#", "");
@@ -451,7 +456,7 @@ router.post("/compose-video", requireAuth, async (req, res) => {
         ? ",eq=saturation=1.12:contrast=1.04:brightness=0.02"
         : clips[index].filter === "cool" ? ",colorbalance=bs=.08"
           : clips[index].filter === "mono" ? ",hue=s=0" : "";
-      return `[${index}:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30${color},setpts=PTS/${speed}[v${index}]`;
+      return `[${index}:v]scale=${OUTPUT_W}:${OUTPUT_H}:force_original_aspect_ratio=decrease,pad=${OUTPUT_W}:${OUTPUT_H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30${color},setpts=PTS/${speed}[v${index}]`;
     });
     const audioFilters = inputs.map((_, index) => {
       const speed = validSpeed(clips[index].speed) ? clips[index].speed : 1;
@@ -507,7 +512,8 @@ router.post("/compose-video", requireAuth, async (req, res) => {
       "-filter_complex", filter,
       "-map", finalVideoLabel,
       "-map", "[outa]",
-      "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+      "-c:v", "libx264", "-profile:v", "high", "-level:v", "4.0", "-pix_fmt", "yuv420p",
+      "-preset", "veryfast", "-crf", "20", "-maxrate", "8.5M", "-bufsize", "16M",
       "-c:a", "aac", "-movflags", "+faststart", output,
     ], { timeout: 180_000, maxBuffer: 8 * 1024 * 1024 });
 
