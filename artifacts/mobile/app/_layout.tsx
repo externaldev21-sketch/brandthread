@@ -1136,6 +1136,7 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-go-live"  options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="seller-live"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', gestureEnabled: false, contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-live"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="live-feed"       options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'ios_from_right' }} />
