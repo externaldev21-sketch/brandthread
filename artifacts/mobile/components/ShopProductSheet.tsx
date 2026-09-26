@@ -1062,6 +1062,8 @@ function FullScreenImageViewer({
 }: {
   imageUris: string[]; startIndex: number; onClose: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const ss = useMemo(() => makeSheetStyles(theme), [theme]);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [index, setIndex] = useState(startIndex);
   const scrollRef = useRef<ScrollView>(null);
