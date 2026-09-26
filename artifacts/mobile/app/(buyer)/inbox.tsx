@@ -60,42 +60,79 @@ function SegmentedTabs({
   ];
   return (
     <View style={[tabS.row, { paddingHorizontal: gutter, borderBottomColor: theme.border }]}>
-      {tabs.map(tab => {
-        const active = value === tab.key;
-        const count = counts[tab.key];
-        return (
-          <PressableScale
-            key={tab.key}
-            style={tabS.tab}
-            onPress={() => onChange(tab.key)}
-            rippleEnabled={NO_RIPPLE}
-            activeOpacity={0.7}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            testID={`inbox-tab-${tab.key}`}
-          >
-            <View style={tabS.tabLabelRow}>
-              <Text style={[tabS.tabLabel, { color: active ? theme.text : theme.muted, fontFamily: active ? FONT.bold : FONT.semibold }]}>
-                {tab.label}
-              </Text>
-              {count > 0 && (
-                <View style={[tabS.tabCountPill, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
-                  <Text style={[tabS.tabCountText, { color: active ? theme.onAccent : theme.muted }]}>{count > 99 ? '99+' : count}</Text>
-                </View>
-              )}
+      {tabs.map(tab => (
+        <SegmentedTab
+          key={tab.key}
+          label={tab.label}
+          count={counts[tab.key]}
+          active={value === tab.key}
+          onPress={() => onChange(tab.key)}
+          theme={theme}
+          testID={`inbox-tab-${tab.key}`}
+        />
+      ))}
+    </View>
+  );
+}
+
+function SegmentedTab({
+  label, count, active, onPress, theme, testID,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onPress: () => void;
+  theme: ReturnType<typeof useAppTheme>['theme'];
+  testID: string;
+}) {
+  // The underline should span the label (+ its count badge, if any) as one
+  // centered unit, not the full width of this tab's 1/3-of-the-row column —
+  // measure that unit's actual rendered width so the underline always
+  // matches it exactly, at any label length or viewport width.
+  const [unitWidth, setUnitWidth] = useState(0);
+  return (
+    // PressableScale only forwards a style OBJECT to its inner Animated.View,
+    // not to the outer Pressable itself (it only passes style through to the
+    // Pressable when style is a function) — so `flex: 1` on tabS.tab never
+    // reached this row's direct flex child, and the three tabs hugged their
+    // own text and packed to the left with no gap instead of splitting the
+    // row evenly. This flex:1 wrapper is the row's actual flex child;
+    // PressableScale's unstyled Pressable then stretches to fill it (Yoga's
+    // default cross-axis alignItems: 'stretch').
+    <View style={tabS.tabWrap}>
+      <PressableScale
+        style={tabS.tab}
+        onPress={onPress}
+        rippleEnabled={NO_RIPPLE}
+        activeOpacity={0.7}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active }}
+        testID={testID}
+      >
+        <View
+          style={tabS.tabLabelRow}
+          onLayout={(e) => setUnitWidth(e.nativeEvent.layout.width)}
+        >
+          <Text style={[tabS.tabLabel, { color: active ? theme.text : theme.muted, fontFamily: active ? FONT.bold : FONT.semibold }]}>
+            {label}
+          </Text>
+          {count > 0 && (
+            <View style={[tabS.tabCountPill, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
+              <Text style={[tabS.tabCountText, { color: active ? theme.onAccent : theme.muted }]}>{count > 99 ? '99+' : count}</Text>
             </View>
-            <View style={[tabS.tabUnderline, active && { backgroundColor: theme.text }]} />
-          </PressableScale>
-        );
-      })}
+          )}
+        </View>
+        <View style={[tabS.tabUnderline, active && unitWidth > 0 && { backgroundColor: theme.text, width: unitWidth }]} />
+      </PressableScale>
     </View>
   );
 }
 
 const tabS = StyleSheet.create({
   row: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: SP.md },
-  tab: { flex: 1, alignItems: 'center', paddingBottom: SP.sm, gap: SP.sm },
-  tabLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tabWrap: { flex: 1 },
+  tab: { alignItems: 'center', paddingBottom: SP.sm, gap: SP.sm },
+  tabLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   tabLabel: { fontSize: FS.sm, letterSpacing: 0.2 },
   tabCountPill: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   tabCountText: { fontSize: 10, fontFamily: FONT.bold },
@@ -159,6 +196,19 @@ function previewText(lastMessage: string | undefined, fallback: string): string 
   return lastMessage?.trim() || fallback;
 }
 
+// Active-people rail names must read on one line at a 64pt-avatar column
+// width without mid-word ellipsis ("Atelier No…"): prefer the full name when
+// it's short enough to plausibly fit, otherwise fall back to just its first
+// word ("Atelier Noire" → "Atelier", "Brandthread Agent" → "Brandthread"),
+// and only let numberOfLines={1} ellipsize as a last resort for a single
+// word that's still too long on its own.
+const RAIL_NAME_MAX_CHARS = 11;
+function railDisplayName(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed.length <= RAIL_NAME_MAX_CHARS) return trimmed;
+  return trimmed.split(/\s+/)[0] ?? trimmed;
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function InboxScreen() {
@@ -167,6 +217,14 @@ export default function InboxScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
+  // react-native-web doesn't fill in a real top safe-area inset (no notch/
+  // dynamic-island polyfill), so `insets.top` reads 0 on web and the header
+  // clipped under the dynamic island in a device-frame screenshot. Same
+  // fixed value Discover already uses for this (app/(buyer)/discover.tsx's
+  // `topPad`) — the buyer-wide header standardization (shared PageHeader)
+  // another session is landing should absorb this; keep it isolated here so
+  // that swap is a one-line change.
+  const topPad = Platform.OS === 'web' ? 67 : insets.top;
   // The buyer tab shell already centers route content in a max-width column
   // on wide/web viewports, so this only needs the ordinary phone gutter —
   // an extra centered-padding calculation here would double up with that
@@ -218,6 +276,18 @@ export default function InboxScreen() {
 
   const loadData = useCallback(async () => {
     if (!userId) {
+      // The dev-web ?bt_preview=buyer bypass never signs in through Clerk
+      // (see lib/devPreview.ts / boost.tsx's isSellerDevPreview pattern), so
+      // `userId` is null here in that mode — without this check the seeded
+      // preview inbox was unreachable no matter what getConversations()
+      // would have returned, and every preview load showed "No messages
+      // yet". Real accounts always have a userId and never hit this branch.
+      if (isPreviewInboxEnabled()) {
+        setConversations(getPreviewConversations());
+        setNotifications(getPreviewNotifications());
+        setLoading(false);
+        return;
+      }
       setConversations([]);
       setNotifications([]);
       setLoading(false);
@@ -830,7 +900,7 @@ export default function InboxScreen() {
   return (
     <View style={[s.root, { backgroundColor: SCREEN_BG }]}>
       {/* Header — big bold large-title style, no back arrow */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm, paddingHorizontal: gutter }]}>
+      <View style={[s.header, { paddingTop: topPad + SP.sm, paddingHorizontal: gutter }]}>
         <Text style={[s.headerTitle, { color: theme.text }]}>Messages</Text>
         <IconButton
           name="edit-3"
@@ -898,7 +968,7 @@ export default function InboxScreen() {
                 >
                   {conv.isOfficial ? (
                     <View style={[s.activeRailAvatar, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                      <BrandthreadLogo size={22} />
+                      <BrandthreadLogo size={26} />
                     </View>
                   ) : participant.avatarUri ? (
                     <Image source={{ uri: participant.avatarUri }} style={s.activeRailAvatar} />
@@ -907,7 +977,7 @@ export default function InboxScreen() {
                       <Text style={s.activeRailInitials}>{participant.initials}</Text>
                     </View>
                   )}
-                  <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>{participant.name}</Text>
+                  <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>{railDisplayName(participant.name)}</Text>
                 </PressableScale>
               );
             })}
@@ -1106,12 +1176,12 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
 
   // Instagram-Notes-style active-people rail (below search, above the tabs)
   activeRail: { marginBottom: SP.md },
-  activeRailItem: { width: 64, alignItems: 'center', gap: 6 },
+  activeRailItem: { width: 72, alignItems: 'center', gap: 6 },
   activeRailAvatar: {
-    width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
+    width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center',
   },
-  activeRailInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#FFFFFF' },
-  activeRailName: { fontSize: 11, fontFamily: FONT.medium, maxWidth: 64 },
+  activeRailInitials: { fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
+  activeRailName: { fontSize: 11, fontFamily: FONT.medium, width: 72, textAlign: 'center' },
 
   // Follows tab
   followsTabContent: { flexGrow: 1 },
