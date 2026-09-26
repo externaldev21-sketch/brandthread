@@ -44,9 +44,7 @@ import { useUser } from '@clerk/expo';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
-import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { TabPageHeader } from '@/components/layout/TabPageHeader';
+import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/components/layout';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -298,6 +296,25 @@ const ActivityRowView = React.memo(function ActivityRowView({
     ]);
   };
 
+  // Trailing thumbnail (post/story image) vs the Follow control are mutually
+  // exclusive, but both must render through the SAME sibling slot at the
+  // `row` level — never nested inside `tapArea` — so every row's trailing
+  // item lands on the identical right edge regardless of which one it is.
+  const trailingThumb = showFollowControl || row.type === 'thread_cash_received'
+    ? null
+    : row.targetImageUrl ? (
+      <CachedImage
+        source={{ uri: row.targetImageUrl }}
+        style={styles.thumb}
+        recyclingKey={row.key}
+        accessibilityIgnoresInvertColors
+      />
+    ) : row.actors.length > 0 ? (
+      <View style={styles.thumbFallback}>
+        <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
+      </View>
+    ) : null;
+
   return (
     <View style={styles.row}>
       {/*
@@ -308,8 +325,14 @@ const ActivityRowView = React.memo(function ActivityRowView({
         HTML on web (PR #118, re-applied here on top of this row's Threads
         redesign). Long-press for Dismiss lives on the tap target, not a
         swipe action — see the removed `SwipeActionRow` note above.
+        Plain `Pressable`, not `PressableScale`: PressableScale only forwards
+        an object/array `style` prop to its *inner* Animated.View, not the
+        outer Pressable it renders — so `tapArea`'s `flex: 1` never reached
+        the actual flex child of `row`, and text/thumbnails overflowed the
+        screen edge instead of sharing the row's width. Plain Pressable has
+        no such split, so the flex sizing below now applies for real.
       */}
-      <PressableScale
+      <Pressable
         style={styles.tapArea}
         onPress={() => onPress(row)}
         onLongPress={longPress}
@@ -343,28 +366,9 @@ const ActivityRowView = React.memo(function ActivityRowView({
             <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
           ) : null}
         </View>
+      </Pressable>
 
-        {/* Follows never show a generic thumbnail — a single follower gets
-            the real Follow back / Following control (rendered as a sibling
-            below, not nested here); a merged multi-follower row shows
-            nothing trailing. Thread Cash rows show nothing trailing either
-            — the bill badge on the avatar plus the green amount above
-            already say everything the row needs. */}
-        {showFollowControl || row.type === 'thread_cash_received' ? null : row.targetImageUrl ? (
-          <CachedImage
-            source={{ uri: row.targetImageUrl }}
-            style={styles.thumb}
-            recyclingKey={row.key}
-            accessibilityIgnoresInvertColors
-          />
-        ) : row.actors.length > 0 ? (
-          <View style={styles.thumbFallback}>
-            <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
-          </View>
-        ) : null}
-      </PressableScale>
-
-      {showFollowControl && (
+      {showFollowControl ? (
         <PressableScale
           style={[
             styles.followBtn,
@@ -389,7 +393,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
             </Text>
           )}
         </PressableScale>
-      )}
+      ) : trailingThumb}
     </View>
   );
 });
@@ -493,10 +497,16 @@ function SuggestedForYouSection({ people, followStates, styles, onFollow, onDism
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function ActivityCenterScreen({ inBuyerTab = false }: { inBuyerTab?: boolean }) {
+export default function ActivityCenterScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const screenPadding = useScreenPadding({ withTabBarInset: inBuyerTab });
+  // The floating tab bar is rendered above this screen even though it's a
+  // pushed stack route, not a buyer-tab route itself — confirmed live: the
+  // last row was sitting under it. `useBuyerTabBarInset()` is a pure
+  // geometry calculation (window size + safe-area insets), not dependent on
+  // actually being mounted inside the Tabs navigator, so this is safe to
+  // call here.
+  const screenPadding = useScreenPadding();
   const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>();
   const router = useRouter();
   const { role } = useRole();
@@ -818,27 +828,17 @@ export default function ActivityCenterScreen({ inBuyerTab = false }: { inBuyerTa
 
   return (
     <View style={styles.container}>
-      {inBuyerTab ? (
-        <TabPageHeader
-          title="Activity"
-          actions={hasUnread ? [{
-            name: 'check-circle',
-            onPress: () => { void handleMarkAll(); },
-            accessibilityLabel: 'Mark all activity as read',
-          }] : []}
-        />
-      ) : (
-        <ScreenHeader
-          title="Activity"
-          showBack
-          actions={hasUnread ? [{
-            icon: 'check-circle',
-            onPress: () => { void handleMarkAll(); },
-            accessibilityLabel: 'Mark all activity as read',
-          }] : []}
-        />
-      )}
-      <ActivityFilterChips selected={chip} onSelect={setChip} styles={styles} />
+      <PageHeader
+        title="Activity"
+        showBack={false}
+        largeTitle
+        actions={hasUnread ? [{
+          icon: 'check-circle',
+          onPress: () => { void handleMarkAll(); },
+          accessibilityLabel: 'Mark all activity as read',
+        }] : []}
+        belowTitle={<ActivityFilterChips selected={chip} onSelect={setChip} styles={styles} />}
+      />
 
       {status === 'loading' ? (
         <SkeletonRows styles={styles} />
@@ -909,11 +909,22 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // this row always reserves real vertical space in the screen's flex
   // column, however the horizontal ScrollView itself sizes on a given
   // platform — nothing below it can ever render through/over the chips.
-  // Rendered below the tab or stack header, before the list starts.
+  // Rendered inside PageHeader's `belowTitle` slot, which applies the
+  // screen's horizontal gutter to a non-scrolling wrapper — that insets the
+  // ScrollView's own bounding box, but doesn't reliably reach all the way to
+  // where its *scrollable content* starts on every platform. The standard
+  // edge-to-edge-scroller fix: cancel belowTitle's gutter with a matching
+  // negative margin so this ScrollView's box spans the full screen width
+  // (so "All" can still scroll fully off the left edge once you've scrolled
+  // right, and the last chip isn't artificially clipped early), then apply
+  // the real 16pt inset via the content container itself, which a
+  // ScrollView always honors for where its content begins.
   chipRow: {
     height: 36 + SP.sm,
+    marginHorizontal: -SP.md,
   },
   chipScrollContent: {
+    paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
     gap: SP.sm,
     alignItems: 'center',
@@ -944,6 +955,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
 
   // Avatar starts flush at the row's own 16pt padding — the same gutter as
   // the title and the filter chips. No leading gutter column of any kind.
+  // `overflow: hidden` here is a last-resort backstop — with `tapArea` and
+  // `center` both correctly set to shrink (see their own comments), nothing
+  // should ever need clipping, but a row is never allowed to force the
+  // screen to scroll horizontally no matter what a future change does here.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -951,13 +966,20 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
     minHeight: 68,
+    width: '100%',
+    overflow: 'hidden',
   },
-  // The Follow back / Following control renders as a sibling of this
-  // PressableScale, not nested inside it (see the ActivityRowView call
-  // site) — `tapArea` just needs to take the remaining row width so the
-  // control still lands flush against the row's trailing edge.
+  // The Follow back / Following control (or the trailing thumbnail — see
+  // `trailingThumb` at the call site) renders as a sibling of this
+  // Pressable, not nested inside it, so `tapArea` just needs to take the
+  // remaining row width. `minWidth: 0` is required, not optional: a flex
+  // item's default minimum size is its *content's own unwrapped width*, not
+  // 0 — without this, `center`'s text below refused to shrink past its full
+  // one-line width and pushed the avatar/thumbnail/button off the right
+  // edge of the screen instead of wrapping.
   tapArea: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm + 4,
@@ -1021,6 +1043,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
 
   center: {
     flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   message: {

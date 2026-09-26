@@ -14,10 +14,15 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { LIVE_CHAT_VISIBLE, formatViewerCount } from '@/lib/live/liveOrdering';
 import type { LiveChatMessage, LiveHost, LiveProduct, LiveViewerAvatar } from '@/lib/live/types';
+import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
 import { LIVE_RED } from './LiveAvatarRing';
 
 const ND = Platform.OS !== 'web';
 const GLASS = 'rgba(0,0,0,0.38)';
+/** One consistent rail-icon treatment (point 4): every icon the same size on
+ *  the same translucent circle — no bare icons mixed with disc'd ones. */
+const RAIL_ICON_SIZE = 26;
+const RAIL_ICON_CIRCLE = 40;
 
 // ─── Host pill (top-left) ─────────────────────────────────────────────────────
 
@@ -97,32 +102,53 @@ export function LiveViewerStack({ viewers }: { viewers: LiveViewerAvatar[] }) {
   );
 }
 
+/** The numeric count next to the top-right viewer-avatar stack — distinct
+ *  from the host pill's own LIVE-row count, matching TikTok's top-right
+ *  cluster (avatars, then a count, then close). */
+export function LiveViewerCount({ count }: { count: number }) {
+  return (
+    <View style={styles.viewerCountPill} testID="live-top-viewer-count">
+      <Text style={[styles.viewerCountText, TABULAR_NUMS]}>{formatViewerCount(count)}</Text>
+    </View>
+  );
+}
+
 // ─── Chat (bottom-left) ──────────────────────────────────────────────────────
 
 const FADE = [0.28, 0.5, 0.7, 0.88, 1];
 
+/** System-ish events (someone joined, someone bought) get one consistent
+ *  subtle pill; ordinary chat/host messages get no bubble at all — plain
+ *  white text with a soft shadow directly over the video, TikTok-style. */
 function ChatRow({ msg, opacity }: { msg: LiveChatMessage; opacity: number }) {
   const enter = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(enter, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: ND }).start();
   }, [enter]);
   const translateY = enter.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
-  if (msg.kind === 'join') {
+  const animatedStyle = [styles.chatRow, { opacity: Animated.multiply(enter, opacity), transform: [{ translateY }] }];
+
+  if (msg.kind === 'join' || msg.kind === 'purchase') {
     return (
-      <Animated.View style={[styles.chatRow, { opacity: Animated.multiply(enter, opacity), transform: [{ translateY }] }]}>
-        <Text style={styles.chatJoin} numberOfLines={1}><Text style={styles.chatUserMuted}>{msg.username}</Text> joined</Text>
+      <Animated.View style={animatedStyle}>
+        <View style={styles.eventPill}>
+          <Text style={styles.eventPillText} numberOfLines={1}>
+            {msg.kind === 'purchase' ? '🛍️ ' : ''}
+            <Text style={styles.chatUserMuted}>{msg.username}</Text>
+            {msg.kind === 'purchase' ? ` ${msg.text}` : ' joined'}
+          </Text>
+        </View>
       </Animated.View>
     );
   }
   return (
-    <Animated.View style={[styles.chatRow, { opacity: Animated.multiply(enter, opacity), transform: [{ translateY }] }]}>
-      <View style={[styles.chatBubble, msg.kind === 'purchase' && styles.chatBubblePurchase]}>
-        <Text style={styles.chatText} numberOfLines={3}>
-          {msg.kind === 'purchase' && <Text>🛍️ </Text>}
-          <Text style={styles.chatUser}>{msg.username}</Text>
-          {msg.kind === 'host' && <Text style={styles.chatHostTag}>  HOST</Text>}
-          {'  '}{msg.text}
-        </Text>
+    <Animated.View style={animatedStyle}>
+      <View style={styles.chatLine}>
+        <Text style={styles.chatUser}>{msg.username}</Text>
+        {msg.kind === 'host' && (
+          <View style={styles.hostTag}><Text style={styles.hostTagText}>HOST</Text></View>
+        )}
+        <Text style={styles.chatText} numberOfLines={3}>  {msg.text}</Text>
       </View>
     </Animated.View>
   );
@@ -207,10 +233,10 @@ function RailButton({
 }
 
 export function LiveRail({
-  likeCount, liked, productCount, onLike, onShare, onOpenBag,
+  likeCount, liked, productCount, muted, onLike, onShare, onOpenBag, onToggleSound,
 }: {
-  likeCount: number; liked: boolean; productCount: number;
-  onLike: (e: { x: number; y: number }) => void; onShare: () => void; onOpenBag: () => void;
+  likeCount: number; liked: boolean; productCount: number; muted: boolean;
+  onLike: (e: { x: number; y: number }) => void; onShare: () => void; onOpenBag: () => void; onToggleSound: () => void;
 }) {
   const likeRef = useRef<View>(null);
   const pop = useRef(new Animated.Value(1)).current;
@@ -222,17 +248,23 @@ export function LiveRail({
   };
   return (
     <View style={styles.rail} testID="live-rail">
+      <RailButton
+        testID="live-sound"
+        label={muted ? 'Turn sound on' : 'Mute'}
+        onPress={onToggleSound}
+        icon={<Feather name={muted ? 'volume-x' : 'volume-2'} size={RAIL_ICON_SIZE} color="#fff" />}
+      />
       <View ref={likeRef} collapsable={false}>
         <RailButton
           testID="live-like"
           label={`Like, ${formatViewerCount(likeCount)} likes`}
           count={formatViewerCount(likeCount)}
           onPress={handleLike}
-          icon={<Animated.View style={{ transform: [{ scale: pop }] }}><Ionicons name={liked ? 'heart' : 'heart-outline'} size={27} color="#fff" /></Animated.View>}
+          icon={<Animated.View style={{ transform: [{ scale: pop }] }}><Ionicons name={liked ? 'heart' : 'heart-outline'} size={RAIL_ICON_SIZE} color="#fff" /></Animated.View>}
         />
       </View>
-      <RailButton testID="live-bag" label={`Products in this live, ${productCount}`} onPress={onOpenBag} badge={productCount} icon={<Feather name="shopping-bag" size={23} color="#fff" />} />
-      <RailButton testID="live-share" label="Share this live" onPress={onShare} icon={<Feather name="send" size={22} color="#fff" />} />
+      <RailButton testID="live-bag" label={`Products in this live, ${productCount}`} onPress={onOpenBag} badge={productCount} icon={<Feather name="shopping-bag" size={RAIL_ICON_SIZE} color="#fff" />} />
+      <RailButton testID="live-share" label="Share this live" onPress={onShare} icon={<Feather name="send" size={RAIL_ICON_SIZE} color="#fff" />} />
     </View>
   );
 }
@@ -294,7 +326,16 @@ export const LiveHeartLayer = forwardRef<LiveHeartLayerHandle, { originOffset?: 
 
 // ─── Comment bar (bottom) ────────────────────────────────────────────────────
 
-export function LiveCommentBar({ onSend, disabled }: { onSend: (text: string) => Promise<void> | void; disabled?: boolean }) {
+export function LiveCommentBar({
+  onSend, disabled, onGift, onShare,
+}: {
+  onSend: (text: string) => Promise<void> | void;
+  disabled?: boolean;
+  /** Quick icons to the right of the pill, TikTok-style (gift/Thread Cash,
+   *  share) — omitted has no effect on the pill itself. */
+  onGift?: () => void;
+  onShare?: () => void;
+}) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const submit = async () => {
@@ -305,26 +346,38 @@ export function LiveCommentBar({ onSend, disabled }: { onSend: (text: string) =>
     try { await onSend(t); } catch { setText(t); } finally { setBusy(false); }
   };
   return (
-    // Plain translucent fill, no BlurView: on web an absolutely-positioned
-    // blur layer paints above the (unpositioned) <input> and its
-    // backdrop-filter blurred the typed text and placeholder.
-    <View style={styles.commentPill}>
-      <TextInput
-        value={text}
-        onChangeText={setText}
-        onSubmitEditing={submit}
-        editable={!disabled}
-        placeholder="Add comment..."
-        placeholderTextColor="rgba(255,255,255,0.62)"
-        returnKeyType="send"
-        maxLength={300}
-        style={styles.commentInput}
-        accessibilityLabel="Add a comment to the live chat"
-        testID="live-comment-input"
-      />
-      {text.trim().length > 0 && (
-        <Pressable onPress={submit} style={styles.sendBtn} accessibilityRole="button" accessibilityLabel="Send comment" hitSlop={6}>
-          <Feather name="arrow-up" size={16} color="#000" />
+    <View style={styles.commentRow}>
+      {/* Plain translucent fill, no BlurView: on web an absolutely-positioned
+          blur layer paints above the (unpositioned) <input> and its
+          backdrop-filter blurred the typed text and placeholder. */}
+      <View style={styles.commentPill}>
+        <TextInput
+          value={text}
+          onChangeText={setText}
+          onSubmitEditing={submit}
+          editable={!disabled}
+          placeholder="Add comment..."
+          placeholderTextColor="rgba(255,255,255,0.62)"
+          returnKeyType="send"
+          maxLength={300}
+          style={styles.commentInput}
+          accessibilityLabel="Add a comment to the live chat"
+          testID="live-comment-input"
+        />
+        {text.trim().length > 0 && (
+          <Pressable onPress={submit} style={styles.sendBtn} accessibilityRole="button" accessibilityLabel="Send comment" hitSlop={6}>
+            <Feather name="arrow-up" size={16} color="#000" />
+          </Pressable>
+        )}
+      </View>
+      {onGift && (
+        <Pressable onPress={onGift} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Send Thread Cash" hitSlop={4} testID="live-gift">
+          <ThreadCashBill width={26} />
+        </Pressable>
+      )}
+      {onShare && (
+        <Pressable onPress={onShare} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Share this live" hitSlop={4} testID="live-comment-share">
+          <Feather name="share" size={22} color="#fff" />
         </Pressable>
       )}
     </View>
@@ -355,56 +408,74 @@ const styles = StyleSheet.create({
 
   viewerStack: { flexDirection: 'row', alignItems: 'center' },
   viewerDot: {
-    width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+    width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden',
   },
   viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: 9 },
+  viewerCountPill: { marginLeft: 6 },
+  viewerCountText: { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3 },
 
-  chatList: { gap: 4, justifyContent: 'flex-end' },
+  // Chat: capped at ~70% width so a long line never runs under the right
+  // rail, no bubble on ordinary messages (plain text over video, TikTok
+  // style), and one consistent subtle pill for system/purchase events only.
+  chatList: { gap: 5, justifyContent: 'flex-end', maxWidth: '70%', alignSelf: 'flex-start' },
   chatRow: { alignSelf: 'flex-start', maxWidth: '100%' },
-  chatBubble: { backgroundColor: 'rgba(0,0,0,0.28)', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5 },
-  chatBubblePurchase: { backgroundColor: 'rgba(255,255,255,0.16)' },
-  chatText: { color: 'rgba(255,255,255,0.95)', fontFamily: FONT.regular, fontSize: 13, lineHeight: 17 },
-  chatUser: { color: '#fff', fontFamily: FONT.bold },
-  chatHostTag: { color: '#000', fontFamily: FONT.bold, fontSize: 9, letterSpacing: 0.6, backgroundColor: '#fff' },
-  chatJoin: { color: 'rgba(255,255,255,0.72)', fontFamily: FONT.regular, fontSize: 12, paddingHorizontal: 9 },
-  chatUserMuted: { fontFamily: FONT.semibold, color: 'rgba(255,255,255,0.86)' },
+  chatLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  chatText: {
+    color: '#fff', fontFamily: FONT.regular, fontSize: 13, lineHeight: 17,
+    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  chatUser: {
+    color: '#fff', fontFamily: FONT.semibold, fontSize: 13,
+    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  hostTag: {
+    backgroundColor: '#fff', borderRadius: 3, paddingHorizontal: 4, marginLeft: 6,
+    alignItems: 'center', justifyContent: 'center', height: 14,
+  },
+  hostTagText: { color: '#000', fontFamily: FONT.bold, fontSize: 9, letterSpacing: 0.6 },
+  eventPill: {
+    backgroundColor: 'rgba(0,0,0,0.32)', borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  eventPillText: { color: 'rgba(255,255,255,0.9)', fontFamily: FONT.regular, fontSize: 12 },
+  chatUserMuted: { fontFamily: FONT.semibold, color: '#fff' },
 
   pinned: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, paddingRight: 10,
-    borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.96)',
-    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 10, height: 64, paddingHorizontal: 8, paddingRight: 10,
+    borderRadius: 12, backgroundColor: 'rgba(20,20,20,0.72)',
   },
   pinnedTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
-  pinnedThumb: { width: 46, height: 46, borderRadius: RADIUS.xs, overflow: 'hidden', backgroundColor: '#E9E9EA', alignItems: 'center', justifyContent: 'center' },
-  pinnedEyebrow: { color: '#6B6B70', fontFamily: FONT.bold, fontSize: 9, letterSpacing: 0.8 },
-  pinnedName: { color: '#0A0A0B', fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 1 },
+  pinnedThumb: { width: 48, height: 48, borderRadius: 8, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  pinnedEyebrow: { color: 'rgba(255,255,255,0.65)', fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.6 },
+  pinnedName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 14, marginTop: 1 },
   pinnedPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
-  pinnedPrice: { color: '#0A0A0B', fontFamily: FONT.bold, fontSize: FS.sm },
-  pinnedCompare: { color: '#8E8E93', fontFamily: FONT.regular, fontSize: 11, textDecorationLine: 'line-through' },
-  buyBtn: { height: 34, paddingHorizontal: 18, borderRadius: RADIUS.pill, backgroundColor: '#0A0A0B', alignItems: 'center', justifyContent: 'center' },
-  buyText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.sm },
+  pinnedPrice: { color: '#fff', fontFamily: FONT.bold, fontSize: 14 },
+  pinnedCompare: { color: 'rgba(255,255,255,0.5)', fontFamily: FONT.regular, fontSize: 11, textDecorationLine: 'line-through' },
+  buyBtn: { height: 32, paddingHorizontal: 16, borderRadius: RADIUS.pill, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  buyText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
 
   rail: { alignItems: 'center', gap: 14 },
   railBtn: { alignItems: 'center', minWidth: 44 },
   railIcon: {
-    width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.26)',
+    width: RAIL_ICON_CIRCLE, height: RAIL_ICON_CIRCLE, borderRadius: RAIL_ICON_CIRCLE / 2,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.28)',
   },
   railCount: { color: '#fff', fontFamily: FONT.semibold, fontSize: 11, marginTop: 3, textShadowColor: 'rgba(0,0,0,0.45)', textShadowRadius: 3 },
   railBadge: {
-    position: 'absolute', top: -2, right: -4, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 4,
+    position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
-  railBadgeText: { color: '#000', fontFamily: FONT.bold, fontSize: 10 },
+  railBadgeText: { color: '#000', fontFamily: FONT.bold, fontSize: 9 },
 
+  commentRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
   commentPill: {
-    flex: 1, height: 40, borderRadius: RADIUS.pill, overflow: 'hidden', flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.42)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.24)',
+    flex: 1, height: 36, borderRadius: RADIUS.pill, overflow: 'hidden', flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.42)',
   },
   commentInput: {
-    flex: 1, height: 40, paddingHorizontal: 16, color: '#fff', fontFamily: FONT.regular, fontSize: FS.sm,
+    flex: 1, height: 36, paddingHorizontal: 16, color: '#fff', fontFamily: FONT.regular, fontSize: FS.sm,
     ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
   },
-  sendBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginRight: 5 },
+  sendBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginRight: 4 },
+  quickIconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
 });

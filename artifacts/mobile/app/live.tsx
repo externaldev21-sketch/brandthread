@@ -39,7 +39,7 @@ import { liveShopSelection } from '@/lib/live/liveShop';
 import type { LiveStream } from '@/lib/live/types';
 import {
   LiveChatList, LiveCommentBar, LiveHeartLayer, LiveHostPill, LivePinnedProductCard, LiveRail,
-  LiveViewerStack, type LiveHeartLayerHandle,
+  LiveViewerCount, LiveViewerStack, type LiveHeartLayerHandle,
 } from '@/components/live/LiveOverlays';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { LiveEmptyState } from '@/components/live/LiveEmptyState';
@@ -54,7 +54,7 @@ const ND = Platform.OS !== 'web';
 
 function LivePage({
   stream, rt, isActive, ending, pageWidth, pageHeight, topInset, bottomInset, muted,
-  onClose, onToggleSound, onFollow, onOpenHost, onBuy, onOpenBag, onShare, onLike, onSend, onOpenRtcPlayer,
+  onClose, onToggleSound, onFollow, onOpenHost, onBuy, onOpenBag, onShare, onGift, onLike, onSend, onOpenRtcPlayer,
 }: {
   stream: LiveStream;
   rt: LiveRuntime | undefined;
@@ -72,6 +72,7 @@ function LivePage({
   onBuy: (productId: string) => void;
   onOpenBag: () => void;
   onShare: () => void;
+  onGift: () => void;
   onLike: (x: number, y: number, count?: number) => void;
   onSend: (text: string) => Promise<void>;
   onOpenRtcPlayer: () => void;
@@ -159,8 +160,12 @@ function LivePage({
       <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']} style={[styles.topScrim, { height: topInset + 110 }]} />
       <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.7)']} locations={[0, 0.4, 1]} style={[styles.bottomScrim, { height: bottomInset + 360 }]} />
 
-      {/* Top-left host pill · top-right viewers + close */}
-      <View style={[styles.topRow, { top: topInset + 8 }]} pointerEvents="box-none">
+      {/* Top-left host pill · top-right viewer stack + count + close. Sits at
+          topInset + 6, below the safe area (Dynamic Island on device, and
+          TabPageHeader's 67pt web fallback when insets.top reads 0 in a
+          plain browser preview) — never level with the notch. Mute lives in
+          the right rail now, not crammed into this row. */}
+      <View style={[styles.topRow, { top: topInset + 6 }]} pointerEvents="box-none">
         <LiveHostPill
           host={stream.host}
           viewerCount={viewerCount}
@@ -170,9 +175,7 @@ function LivePage({
         />
         <View style={styles.topRight}>
           <LiveViewerStack viewers={stream.topViewers} />
-          <Pressable onPress={onToggleSound} style={styles.topIcon} accessibilityRole="button" accessibilityLabel={muted ? 'Turn sound on' : 'Mute'} hitSlop={6} testID="live-sound">
-            <Feather name={muted ? 'volume-x' : 'volume-2'} size={17} color="#fff" />
-          </Pressable>
+          <LiveViewerCount count={viewerCount} />
           <Pressable onPress={onClose} style={styles.topIcon} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
             <Feather name="x" size={22} color="#fff" />
           </Pressable>
@@ -186,23 +189,26 @@ function LivePage({
           likeCount={likeCount}
           liked={liked}
           productCount={stream.products.length}
+          muted={muted}
           onLike={({ x, y }) => { setLiked(true); onLike(x, y, 3); }}
           onShare={onShare}
           onOpenBag={onOpenBag}
+          onToggleSound={onToggleSound}
         />
       </View>
 
       {/* Bottom: chat, pinned product, comment bar */}
-      <View style={[styles.bottom, { paddingBottom: bottomInset + 10 }]} pointerEvents="box-none">
+      <View style={[styles.bottom, { paddingBottom: bottomInset + 8 }]} pointerEvents="box-none">
         <View style={styles.chatWrap} pointerEvents="none">
+          {/* Fades only the top edge of the chat list into the scrim behind
+              it — no hard cutoff, no half-cut line on the topmost message. */}
+          <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']} style={styles.chatTopFade} />
           <LiveChatList messages={rt?.chat ?? []} />
         </View>
         {pinned && (
           <LivePinnedProductCard product={pinned} onBuy={() => onBuy(pinned.productId)} onOpenBag={onOpenBag} />
         )}
-        <View style={styles.commentRow}>
-          <LiveCommentBar onSend={onSend} disabled={ending} />
-        </View>
+        <LiveCommentBar onSend={onSend} disabled={ending} onGift={onGift} onShare={onShare} />
       </View>
     </Animated.View>
   );
@@ -268,6 +274,11 @@ export default function LiveScreen() {
     } catch { /* dismissed */ }
   }, []);
 
+  const gift = useCallback(() => {
+    hapticLight();
+    setNotice('Thread Cash gifting is coming soon');
+  }, []);
+
   const buy = useCallback((stream: LiveStream, productId: string) => {
     const sel = liveShopSelection(stream, productId, provider.id === 'preview');
     if (!sel) return;
@@ -286,7 +297,11 @@ export default function LiveScreen() {
   const viewabilityConfig = useRef(VERTICAL_PAGER_VIEWABILITY).current;
 
   const bottomInset = Math.max(insets.bottom, 10);
-  const topInset = Math.max(insets.top, Platform.OS === 'web' ? 10 : 0);
+  // Outside a real device (or a preview frame that emulates one), the browser
+  // never fills in a non-zero `env(safe-area-inset-top)`, so insets.top reads
+  // 0 on web and the host row sat level with the Dynamic Island in a plain
+  // 390x844 preview — same fallback TabPageHeader uses for every tab page.
+  const topInset = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
   const ready = pageWidth > 0 && pageHeight > 0;
 
   return (
@@ -351,6 +366,7 @@ export default function LiveScreen() {
                 onBuy={pid => buy(item, pid)}
                 onOpenBag={() => setBagFor(item)}
                 onShare={() => { void share(item); }}
+                onGift={gift}
                 onLike={(x, y, count) => { heartsRef.current?.burst(x, y, count); pager.like(item.id); }}
                 onSend={async text => {
                   try { await pager.sendChat(text); } catch (e: any) {
@@ -362,9 +378,13 @@ export default function LiveScreen() {
               />
             )}
           />
-          <LiveHeartLayer ref={heartsRef} />
         </KeyboardAvoidingView>
       ) : null}
+
+      {/* Sibling of the pager, not nested inside KeyboardAvoidingView or any
+          per-page `overflow: hidden` container, so a heart burst is never
+          clipped by the keyboard-shrunk view or a page's own bounds. */}
+      {ready && <LiveHeartLayer ref={heartsRef} />}
 
       {bagFor && (
         <LiveProductsSheet
@@ -401,12 +421,15 @@ const styles = StyleSheet.create({
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   topIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   title: {
-    position: 'absolute', left: 14, right: 90, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 12,
+    position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3,
   },
   railWrap: { position: 'absolute', right: 8 },
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 12, gap: 10 },
-  chatWrap: { marginRight: 64, maxHeight: 210, justifyContent: 'flex-end' },
-  commentRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 12, gap: 8 },
+  // LiveChatList itself caps to ~70% width (see LiveOverlays styles.chatList)
+  // so it never runs under the right rail; this wrap just bounds its height
+  // and anchors the top-fade gradient to the same box.
+  chatWrap: { maxHeight: 210, justifyContent: 'flex-end' },
+  chatTopFade: { position: 'absolute', top: 0, left: 0, right: 0, height: 28 },
   emptyClose: { position: 'absolute', right: 10, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,8 +1,12 @@
 /**
  * Dev web preview detection helper.
  *
- * Semantics match the existing PREVIEW_ROLE logic in app/_layout.tsx exactly:
- *   - Inert (returns false) in production builds (__DEV__ === false)
+ * Semantics match the existing PREVIEW_ROLE logic in app/_layout.tsx exactly
+ * (including its `__DEV__ || EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST` OR — the
+ * same env flag scripts/store-screenshots/harness.mjs's `buildPreviewWeb` sets
+ * so an exported, production (__DEV__ === false) preview build can still be
+ * screenshotted with ?bt_preview=buyer|seller):
+ *   - Inert (returns false) in a real production build (neither flag set)
  *   - Inert on native (Platform.OS !== 'web')
  *   - Inert when window is unavailable (SSR / test environments without window)
  *   - ?bt_preview=buyer|seller explicitly selects and persists a preview role
@@ -52,6 +56,8 @@ export function setDevWebPreviewRole(role: PreviewRole): void {
   }
 }
 
+const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
+
 /**
  * Returns true in the dev-web seller preview context. The URL selection takes
  * precedence, then the saved browser-session role, with buyer as the temporary default.
@@ -60,8 +66,8 @@ export function setDevWebPreviewRole(role: PreviewRole): void {
  *   supplied by tests instead of reading window.location.search.
  */
 export function isSellerDevPreview(searchOverride?: string): boolean {
-  // Production builds: never activate
-  if (!__DEV__) return false;
+  // A real production build (neither dev nor the screenshot-export flag): never activate
+  if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return false;
 
   // Native (iOS / Android): never activate
   if (Platform.OS !== 'web') return false;
@@ -73,7 +79,7 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
  * Complements isSellerDevPreview for completeness; used in tests.
  */
 export function isBuyerDevPreview(searchOverride?: string): boolean {
-  if (!__DEV__) return false;
+  if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return false;
   if (Platform.OS !== 'web') return false;
   return getDevWebPreviewRole(searchOverride) === 'buyer';
 }
