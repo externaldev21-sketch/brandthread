@@ -88,3 +88,4 @@
 - [Resend sender domain](resend-sender-domain.md) — brandthread.app was reported verified in Resend; use its domain for default customer mail.
 - [Expo screen layouts and route context](expo-screen-layout-route-context.md) — screenLayout wrappers render outside per-screen route context; pass the route argument explicitly.
 - [Concurrent Git rebase](concurrent-git-rebase.md) — a shared checkout can be rebased by another session; protect the original branch and conflict worktree before aborting.
+- [GitHub design merge priority](github-design-merge-priority.md) — reviewed origin/dev UI files take precedence in sync conflicts; retain nonconflicting local runtime fixes.
