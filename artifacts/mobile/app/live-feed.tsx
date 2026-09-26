@@ -241,15 +241,15 @@ function LiveRoomPage({
       {room.videoSource ? (
         <VideoView
           player={player}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           contentFit="cover"
           nativeControls={false}
           pointerEvents="none"
         />
       ) : room.thumbnailUrl ? (
-        <ExpoImage source={{ uri: room.thumbnailUrl }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+        <ExpoImage source={{ uri: room.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
-        <View style={[StyleSheet.absoluteFillObject, styles.thumbFallback]}>
+        <View style={[StyleSheet.absoluteFill, styles.thumbFallback]}>
           <Feather name="video" size={36} color="rgba(255,255,255,0.4)" />
         </View>
       )}
