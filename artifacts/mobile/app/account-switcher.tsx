@@ -3,27 +3,25 @@
  *
  * Shows every active Clerk session on this device, marks the current session,
  * and lets the user switch, add an existing account, or create a new one.
+ *
+ * Layout reference: Shopify's "Switch account" list (avatar + email + check
+ * on the active row, "Add account" as its own row) — a Mobbin screen cited in
+ * docs/polish/screens/buyer-settings-rebuild.md.
  */
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useSessionList } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { Header } from '@/components/layout';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON, SURFACE, ACCENT, CARD_ELEVATED,
-} from '@/lib/theme';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { SectionHeader } from '@/components/BrandthreadUI';
+import { useColors } from '@/hooks/useColors';
+import { Card, ListRow } from '@/components/ui';
+import { SPACING } from '@/constants/spacing';
+import { TYPE_SCALE } from '@/constants/typography';
+import { FONT } from '@/lib/theme';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -59,6 +57,8 @@ function getEmail(sessionUser: {
 // ─── Screen ─────────────────────────────────────────────────────────────────
 
 export default function AccountSwitcherScreen() {
+  const colors = useColors();
+  const s = React.useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isLoaded: authLoaded, sessionId: activeSessionId } = useAuth();
@@ -78,11 +78,6 @@ export default function AccountSwitcherScreen() {
     }
   }
 
-  function handleBack() {
-    Haptics.selectionAsync();
-    router.back();
-  }
-
   function handleAddExisting() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/sign-in?addAccount=1' as never);
@@ -93,12 +88,16 @@ export default function AccountSwitcherScreen() {
     router.push('/onboarding?addAccount=1' as never);
   }
 
-  // Loading skeleton while Clerk hydrates
-  if (!isLoaded && !authLoaded) {
-    return (
-      <View style={s.root}>
-        <Header title="Accounts" onBack={handleBack} />
+  const loading = !isLoaded && !authLoaded;
 
+  // Only show active sessions (status === 'active' means logged-in)
+  const activeSessions = (sessions ?? []).filter((session) => session.status === 'active');
+
+  return (
+    <View style={s.root}>
+      <ScreenHeader title="Accounts" variant="push" onBack={() => router.back()} />
+
+      {loading ? (
         <View style={s.skeletonContainer}>
           {[0, 1].map((i) => (
             <View key={i} style={s.skeletonRow}>
@@ -110,155 +109,78 @@ export default function AccountSwitcherScreen() {
             </View>
           ))}
         </View>
-      </View>
-    );
-  }
+      ) : (
+        <ScrollView
+          contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + SPACING.xl }]}
+          showsVerticalScrollIndicator={false}
+          alwaysBounceVertical={false}
+        >
+          {/* ── Session list ── */}
+          {activeSessions.length > 0 && (
+            <View style={s.section}>
+              <SectionHeader title="SIGNED-IN ACCOUNTS" />
+              <Card style={s.card}>
+                {activeSessions.map((session, index) => {
+                  const sessionUser = session.user;
+                  if (!sessionUser) return null;
 
-  // Only show active sessions (status === 'active' means logged-in)
-  const activeSessions = (sessions ?? []).filter((s) => s.status === 'active');
+                  const isActive = session.id === activeSessionId;
+                  const isSwitching = switchingId === session.id;
+                  const displayName = getDisplayName(sessionUser);
+                  const email = getEmail(sessionUser);
 
-  return (
-    <View style={s.root}>
-      {/* ── Header ── */}
-      <Header title="Accounts" onBack={handleBack} />
-
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={[
-          s.scrollContent,
-          { paddingBottom: insets.bottom + SP.xl },
-        ]}
-        showsVerticalScrollIndicator={false}
-        alwaysBounceVertical={false}
-      >
-        {/* ── Session list ── */}
-        {activeSessions.length > 0 && (
-          <View style={s.section}>
-            <Text style={s.sectionLabel}>Signed-in accounts</Text>
-            <View style={s.card}>
-              {activeSessions.map((session, index) => {
-                const sessionUser = session.user;
-                if (!sessionUser) return null;
-
-                const isActive = session.id === activeSessionId;
-                const isSwitching = switchingId === session.id;
-                const displayName = getDisplayName(sessionUser);
-                const email = getEmail(sessionUser);
-                const imageUrl = sessionUser.imageUrl;
-                const initials = getInitials(displayName);
-                const isLast = index === activeSessions.length - 1;
-
-                return (
-                  <React.Fragment key={session.id}>
-                    <TouchableOpacity
-                      style={[s.sessionRow, isActive && s.sessionRowActive]}
-                      onPress={() => handleSwitch(session.id)}
-                      activeOpacity={isActive ? 1 : 0.75}
-                      accessibilityRole="button"
-                      accessibilityLabel={
-                        isActive
-                          ? `${displayName}, current account`
-                          : `Switch to ${displayName}`
-                      }
-                      accessibilityState={{ selected: isActive }}
-                      disabled={!!switchingId}
-                    >
-                      {/* Avatar */}
-                      <View style={[s.avatarWrap, isActive && s.avatarWrapActive]}>
-                        {imageUrl ? (
-                          <Image
-                            source={{ uri: imageUrl }}
-                            style={s.avatarImage}
-                            accessibilityLabel={`${displayName} avatar`}
-                          />
-                        ) : (
-                          <View style={s.avatarFallback}>
-                            <Text style={s.avatarInitials}>{initials}</Text>
-                          </View>
-                        )}
-                        {isActive && (
-                          <View style={s.activeDot} accessibilityLabel="Active" />
-                        )}
-                      </View>
-
-                      {/* Name + email */}
-                      <View style={s.sessionInfo}>
-                        <Text style={s.sessionName} numberOfLines={1}>
-                          {displayName}
-                        </Text>
-                        {!!email && (
-                          <Text style={s.sessionEmail} numberOfLines={1}>
-                            {email}
-                          </Text>
-                        )}
-                      </View>
-
-                      {/* Right: active badge OR spinner OR chevron */}
-                      <View style={s.sessionRight}>
-                        {isSwitching ? (
-                          <ActivityIndicator size="small" color={MUTED} />
-                        ) : isActive ? (
-                          <View style={s.activeBadge}>
-                            <Text style={s.activeBadgeText}>Current</Text>
-                          </View>
-                        ) : (
-                          <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
-                        )}
-                      </View>
-                    </TouchableOpacity>
-
-                    {!isLast && <View style={s.divider} />}
-                  </React.Fragment>
-                );
-              })}
+                  return (
+                    <React.Fragment key={session.id}>
+                      <ListRow
+                        avatar={{ uri: sessionUser.imageUrl, name: displayName }}
+                        title={displayName}
+                        subtitle={email || undefined}
+                        disabled={!!switchingId}
+                        onPress={isActive ? undefined : () => handleSwitch(session.id)}
+                        testID={`account-switcher-session-${session.id}`}
+                        right={
+                          isSwitching ? (
+                            <ActivityIndicator size="small" color={colors.mutedForeground} />
+                          ) : isActive ? (
+                            <View style={s.activeBadge}>
+                              <Text style={s.activeBadgeText}>Current</Text>
+                            </View>
+                          ) : (
+                            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+                          )
+                        }
+                      />
+                      {index < activeSessions.length - 1 && <View style={s.divider} />}
+                    </React.Fragment>
+                  );
+                })}
+              </Card>
             </View>
+          )}
+
+          {/* ── Actions ── */}
+          <View style={s.section}>
+            <SectionHeader title="ADD ACCOUNT" />
+            <Card style={s.card}>
+              <ListRow
+                icon="log-in"
+                title="Add existing account"
+                subtitle="Sign in to another Brandthread account"
+                chevron
+                onPress={handleAddExisting}
+              />
+              <View style={s.divider} />
+              <ListRow
+                icon="plus-circle"
+                title="Create new account"
+                subtitle="Start a new brand on Brandthread"
+                chevron
+                onPress={handleCreateNew}
+              />
+            </Card>
           </View>
-        )}
-
-        {/* ── Actions ── */}
-        <View style={s.section}>
-          <Text style={s.sectionLabel}>Add account</Text>
-          <View style={s.card}>
-            {/* Add existing account */}
-            <TouchableOpacity
-              style={s.actionRow}
-              onPress={handleAddExisting}
-              activeOpacity={0.75}
-              accessibilityRole="button"
-              accessibilityLabel="Sign in to an existing account"
-            >
-              <View style={s.actionIconWrap}>
-                <Feather name="log-in" size={18} color={FG} />
-              </View>
-              <View style={s.actionInfo}>
-                <Text style={s.actionTitle}>Add existing account</Text>
-                <Text style={s.actionSubtitle}>Sign in to another Brandthread account</Text>
-              </View>
-              <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
-            </TouchableOpacity>
-
-            <View style={s.divider} />
-
-            {/* Create new account */}
-            <TouchableOpacity
-              style={s.actionRow}
-              onPress={handleCreateNew}
-              activeOpacity={0.75}
-              accessibilityRole="button"
-              accessibilityLabel="Create a new Brandthread account"
-            >
-              <View style={s.actionIconWrap}>
-                <Feather name="plus-circle" size={18} color={FG} />
-              </View>
-              <View style={s.actionInfo}>
-                <Text style={s.actionTitle}>Create new account</Text>
-                <Text style={s.actionSubtitle}>Start a new brand on Brandthread</Text>
-              </View>
-              <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -266,195 +188,60 @@ export default function AccountSwitcherScreen() {
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
 const AVATAR_SIZE = 46;
-const ACTIVE_DOT  = 12;
 
-const s = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: BG,
-  },
+function makeStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.background },
 
-  // Scroll
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: SP.md, paddingTop: SP.lg },
+    scrollContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md },
 
-  // Section
-  section: { marginBottom: SP.lg },
-  sectionLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: SP.sm,
-    paddingHorizontal: 4,
-  },
+    section: { marginBottom: SPACING.xl - 2 },
 
-  // Card container
-  card: {
-    backgroundColor: CARD,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    overflow: 'hidden',
-  },
+    card: { padding: 0, paddingHorizontal: SPACING.md },
+    divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
 
-  // Session row
-  sessionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingVertical: 14,
-    gap: SP.sm,
-  },
-  sessionRowActive: {
-    backgroundColor: CARD_ELEVATED,
-  },
+    activeBadge: {
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    activeBadgeText: {
+      ...TYPE_SCALE.caption,
+      fontFamily: FONT.semibold,
+      color: colors.mutedForeground,
+    },
 
-  // Avatar
-  avatarWrap: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    position: 'relative',
-  },
-  avatarWrapActive: {
-    // subtle ring for active account
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  avatarImage: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-  },
-  avatarFallback: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitials: {
-    fontSize: FS.sm,
-    fontFamily: FONT.bold,
-    color: FG,
-  },
-  activeDot: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: ACTIVE_DOT,
-    height: ACTIVE_DOT,
-    borderRadius: ACTIVE_DOT / 2,
-    backgroundColor: '#10B981', // SUCCESS green — intentional semantic color
-    borderWidth: 2,
-    borderColor: CARD_ELEVATED,
-  },
-
-  // Session info
-  sessionInfo: { flex: 1, gap: 2 },
-  sessionName: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
-  sessionEmail: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-  },
-
-  // Session right
-  sessionRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    minWidth: 64,
-  },
-  activeBadge: {
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  activeBadgeText: {
-    fontSize: 11,
-    fontFamily: FONT.semibold,
-    color: MUTED,
-  },
-
-  // Divider
-  divider: {
-    height: 1,
-    backgroundColor: BORDER,
-    marginHorizontal: SP.md,
-  },
-
-  // Action rows
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingVertical: 14,
-    gap: SP.sm,
-  },
-  actionIconWrap: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: RADIUS.sm,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionInfo: { flex: 1, gap: 2 },
-  actionTitle: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
-  actionSubtitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-  },
-
-  // Loading skeleton
-  skeletonContainer: {
-    marginHorizontal: SP.md,
-    marginTop: SP.lg,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    overflow: 'hidden',
-  },
-  skeletonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SP.md,
-    gap: SP.sm,
-  },
-  skeletonAvatar: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: SURFACE,
-  },
-  skeletonText: { flex: 1, gap: 8 },
-  skeletonLine: {
-    height: 12,
-    borderRadius: RADIUS.xs,
-    backgroundColor: SURFACE,
-    width: '60%',
-  },
-  skeletonLineShort: { width: '40%' },
-});
+    // Loading skeleton
+    skeletonContainer: {
+      marginHorizontal: SPACING.md,
+      marginTop: SPACING.md,
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    skeletonRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: SPACING.md,
+      gap: SPACING.sm,
+    },
+    skeletonAvatar: {
+      width: AVATAR_SIZE,
+      height: AVATAR_SIZE,
+      borderRadius: AVATAR_SIZE / 2,
+      backgroundColor: colors.muted,
+    },
+    skeletonText: { flex: 1, gap: 8 },
+    skeletonLine: {
+      height: 12,
+      borderRadius: 4,
+      backgroundColor: colors.muted,
+      width: '60%',
+    },
+    skeletonLineShort: { width: '40%' },
+  });
+}

@@ -13,6 +13,7 @@ export * from './Card';
 export * from './Avatar';
 export * from './QuantityStepper';
 export * from './BottomSheet';
+export * from './OptionSheet';
 export * from './Snackbar';
 export * from './Skeleton';
 export * from './ErrorState';
