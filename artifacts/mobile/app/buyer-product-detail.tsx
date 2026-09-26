@@ -410,6 +410,11 @@ function OptionPicker({ product, option, selections, onSelect }: {
               label={val.label}
               selected={isSelected}
               disabled={!available}
+              // A leading slash glyph makes "unavailable" a distinct shape,
+              // not just a greyed-out label (Nike / GOAT / UNIQLO size-grid
+              // convention) — see https://mobbin.com/screens/76430e6c-342a-42be-8fce-148ab5d9651e
+              icon={available ? undefined : 'slash'}
+              iconColor={theme.subtle}
               onPress={() => onSelect(option.id, val.id)}
               testID={`option-${option.id}-${val.id}`}
             />
@@ -912,10 +917,10 @@ export default function BuyerProductDetailScreen() {
           {/* Title & Seller */}
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
           <TouchableOpacity style={s.sellerCard} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
-            <View style={s.sellerAvatar}><Text style={s.sellerInitial}>{product.sellerName.charAt(0)}</Text></View>
+            <Avatar name={product.sellerName} size={40} />
             <View style={{ flex: 1 }}>
               <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
-              <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>
+              {!!product.sellerHandle && <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>}
             </View>
             <View style={s.sellerViewStore}>
               <Text style={s.sellerViewStoreText}>View store</Text>
@@ -929,25 +934,16 @@ export default function BuyerProductDetailScreen() {
             variant="secondary"
             size="small"
             accessibilityHint="Opens a chat with the seller about this product"
-            style={{ alignSelf: 'flex-start', marginBottom: SP.sm }}
+            style={{ alignSelf: 'flex-start', marginBottom: SP.md }}
             testID="product-message-seller"
           />
 
-          {/* Buyer protection trust cues */}
-          <View style={s.trustRow}>
-            <View style={s.trustCue}>
-              <Feather name="shield" size={13} color={MUTED} />
-              <Text style={s.trustCueText}>Buyer Protection</Text>
-            </View>
-            <View style={s.trustCue}>
-              <Feather name="lock" size={13} color={MUTED} />
-              <Text style={s.trustCueText}>Secure checkout</Text>
-            </View>
-            <View style={s.trustCue}>
-              <Feather name="refresh-cw" size={13} color={MUTED} />
-              <Text style={s.trustCueText}>Easy returns</Text>
-            </View>
-          </View>
+          {/* Buyer protection — a single glanceable badge + one-line copy
+              (BuyerProtectionNote's `compact` mode), not a wall of trust
+              copy. Reference: Apple Store's compact delivery/protection strip
+              above its sticky CTA — https://mobbin.com/screens/65c853c9-7b34-40c4-af81-67ad778bacac */}
+          <BuyerProtectionNote preorder={product.isPreOrder} compact style={{ marginBottom: SP.md }} />
+
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.md, marginBottom: SP.md }}>
             <TouchableOpacity
               onPress={() => router.push(reportHref({
@@ -1607,15 +1603,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm,
     padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
   },
-  sellerAvatar: { width: 36, height: 36, borderRadius: RADIUS.pill, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  sellerInitial: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT },
   sellerName: { ...TYPE.bodyMedium, color: FG, flexShrink: 1 },
   sellerHandle: { ...TYPE.caption, color: MUTED, flexShrink: 1 },
   sellerViewStore: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   sellerViewStoreText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  trustRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.md, marginBottom: SP.md },
-  trustCue: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  trustCueText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   paymentWarningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',

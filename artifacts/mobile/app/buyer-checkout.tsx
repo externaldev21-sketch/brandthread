@@ -94,7 +94,6 @@ import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STEPS: CheckoutStep[] = ['information', 'delivery', 'review', 'confirmation'];
 const money = formatCents;
 
 /**
@@ -145,52 +144,34 @@ function Input({
   );
 }
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
+// ─── Section card ─────────────────────────────────────────────────────────────
+// GOAT/Shop-app style single-page checkout: every section sits open on one
+// scroll, always visible — no per-step accordion, no progress bar, no
+// "Continue" gate between sections. A small check badge gives the same at-a-
+// glance completeness signal the old accordion's chevron+summary line gave,
+// without hiding the fields behind a tap.
 
-function Progress({ step }: { step: CheckoutStep }) {
-  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
-  const s = makeStyles(theme);
-  const index = Math.max(0, STEPS.indexOf(step));
-  return (
-    <View style={s.progress}>
-      {STEPS.slice(0, 3).map((item, i) => (
-        <View key={item} style={[s.progressSegment, i <= index && s.progressSegmentActive]} />
-      ))}
-    </View>
-  );
-}
-
-// ─── Guided section accordion ─────────────────────────────────────────────────
-
-type GuidedCheckoutSection = 'information' | 'delivery' | 'review';
-
-function GuidedSection({
-  title, summary, expanded, complete, onPress, children,
+function SectionCard({
+  title, icon, complete, children,
 }: {
-  title: string; summary: string; expanded: boolean; complete: boolean;
-  onPress: () => void; children: React.ReactNode;
+  title: string; icon: React.ComponentProps<typeof Feather>['name']; complete: boolean; children: React.ReactNode;
 }) {
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   return (
     <View style={s.guidedSection}>
-      <TouchableOpacity
-        style={s.guidedHeader}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}
-        accessibilityLabel={`${title}. ${summary}`}
-      >
-        <View style={[s.guidedStatus, complete && s.guidedStatusComplete]}>
-          <Feather name={complete ? 'check' : 'circle'} size={14} color={complete ? BG : MUTED} />
+      <View style={s.guidedHeader}>
+        <View style={[s.sectionIcon, { backgroundColor: theme.accentDim }]}>
+          <Feather name={icon} size={15} color={theme.accentLight} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.guidedTitle}>{title}</Text>
-          <Text style={s.guidedSummary} numberOfLines={1}>{summary}</Text>
-        </View>
-        <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={19} color={MUTED} />
-      </TouchableOpacity>
-      {expanded && <View style={s.guidedBody}>{children}</View>}
+        <Text style={[s.guidedTitle, { flex: 1 }]}>{title}</Text>
+        {complete && (
+          <View style={[s.guidedStatus, s.guidedStatusComplete]}>
+            <Feather name="check" size={13} color={BG} />
+          </View>
+        )}
+      </View>
+      <View style={s.guidedBody}>{children}</View>
     </View>
   );
 }
@@ -277,19 +258,13 @@ function ReceiptSheet({
 // ─── Checkout Summary (Depop-pattern compact rows) ────────────────────────────
 
 function CheckoutSummaryView({
-  session, onTapSummary, onTapShipping, onTapAddress,
+  session, onTapSummary,
 }: {
   session: CheckoutSession;
   onTapSummary: () => void;
-  onTapShipping: () => void;
-  onTapAddress: () => void;
 }) {
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
-  const addr = session.shippingAddress;
-  const addressLine = addr
-    ? `${addr.line1}, ${addr.city}`
-    : 'Add new address';
 
   return (
     <Card>
@@ -336,47 +311,6 @@ function CheckoutSummaryView({
           )}
         </View>
         <Feather name="chevron-right" size={18} color={MUTED} />
-      </TouchableOpacity>
-
-      <View style={s.divider} />
-
-      {/* Editable shipping method */}
-      <TouchableOpacity
-        style={s.summaryEditRow}
-        onPress={onTapShipping}
-        accessibilityRole="button"
-        accessibilityLabel="Change shipping method"
-      >
-        <Feather name="truck" size={15} color={MUTED} />
-        <View style={{ flex: 1 }}>
-          <Text style={s.summaryEditLabel}>Shipping</Text>
-          {session.deliveryGroups.map(g => {
-            const m = g.availableMethods.find(x => x.id === g.selectedMethodId);
-            return m ? (
-              <Text key={g.sellerId} style={s.summaryEditValue} numberOfLines={1}>
-                {m.service} · {money(m.priceCents)}
-              </Text>
-            ) : (
-              <Text key={g.sellerId} style={[s.summaryEditValue, { color: ORANGE }]}>Choose shipping</Text>
-            );
-          })}
-        </View>
-        <Feather name="chevron-right" size={16} color={MUTED} />
-      </TouchableOpacity>
-
-      {/* Editable Ships to */}
-      <TouchableOpacity
-        style={s.summaryEditRow}
-        onPress={onTapAddress}
-        accessibilityRole="button"
-        accessibilityLabel="Change shipping address"
-      >
-        <Feather name="map-pin" size={15} color={MUTED} />
-        <View style={{ flex: 1 }}>
-          <Text style={s.summaryEditLabel}>Ships to</Text>
-          <Text style={s.summaryEditValue} numberOfLines={1}>{addressLine}</Text>
-        </View>
-        <Feather name="chevron-right" size={16} color={MUTED} />
       </TouchableOpacity>
     </Card>
   );
@@ -882,10 +816,11 @@ function Delivery({
 // ─── Review section ───────────────────────────────────────────────────────────
 
 function Review({
-  session, onAck,
+  session, onAck, onViewReceipt,
 }: {
   session: CheckoutSession;
   onAck: (key: string, checked: boolean) => void;
+  onViewReceipt: () => void;
 }) {
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
@@ -894,29 +829,11 @@ function Review({
   const PURPLE_LIGHT = theme.accentLight;
   const PURPLE_DIM = theme.accentDim;
   const CYAN = theme.secondary;
-  const addr = session.shippingAddress;
 
   return (
     <>
       <Card>
-        <Text style={s.sectionTitle}>Review your order</Text>
-        {addr && (
-          <Text style={s.address}>
-            {addr.firstName} {addr.lastName}{'\n'}
-            {addr.line1}{'\n'}
-            {addr.city}, {addr.state} {addr.postalCode}
-          </Text>
-        )}
-        {session.deliveryGroups.flatMap(g => g.items).map(item => (
-          <View key={item.id} style={s.line}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.lineName}>{item.productName}</Text>
-              <Text style={s.muted}>{item.variantTitle} · Qty {item.quantity}</Text>
-            </View>
-            <Text style={s.lineName}>{money(item.priceCents * item.quantity)}</Text>
-          </View>
-        ))}
-        <View style={s.divider} />
+        <Text style={s.sectionTitle}>Price breakdown</Text>
         <View style={s.line}>
           <Text style={s.muted}>Subtotal</Text>
           <Text style={s.lineName}>{money(session.summary.subtotalCents)}</Text>
