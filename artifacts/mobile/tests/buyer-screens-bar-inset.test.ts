@@ -57,6 +57,9 @@ describe('buyer Home feed behind the bar', () => {
     expect(buyerHeader).toContain('testID="buyer-home-search-open"');
     expect(buyerHeader).toContain('testID="buyer-home-search-input"');
     expect(buyerHeader).toContain('<BuyerNavIcon name="search"');
+    expect(buyerHeader).toContain('<BuyerNavIcon name="search" color={ON_DARK} size={20} strokeWidth={1.9} />');
+    expect(buyerHeader).not.toContain('buyerSearchCompact');
+    expect(buyerHeader).not.toContain('>Search</Text>');
     expect(buyerHeader).not.toContain('ActivityBellButton');
     expect(feed).not.toContain('styles.buyerSearchBarThin');
     expect(feed).toContain('const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;');

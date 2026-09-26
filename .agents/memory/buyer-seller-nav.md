@@ -21,9 +21,9 @@ Keep adjacent top-row actions visually equivalent as compact icons. The live sho
 
 **How to apply:** For new Home-header actions, preserve icon-slot parity with Friends and keep any longer state description in the accessibility label rather than visible badge text.
 
-Keep Search beside Cart in the buyer Home top row, opening an editable field in that row instead of reserving a second header row. Do not duplicate the Activity destination with a bell in this header.
+Keep Search beside Cart in the buyer Home top row as a plain magnifier icon identical in slot size and visual weight to Cart, opening an editable field in that row instead of reserving a second header row. Do not duplicate the Activity destination with a bell in this header.
 
-**Why:** The user wanted the extra upper search bar removed and considered the bell redundant because Activity already has its own page.
+**Why:** The user wanted the extra upper search bar removed and considered the bell redundant because Activity already has its own page. They also rejected the labeled Search pill: the closed state must be an icon, not a button with the word “Search.”
 
 **How to apply:** Preserve a usable search action at phone widths; the Activity tab remains the route for notifications and activity.
 

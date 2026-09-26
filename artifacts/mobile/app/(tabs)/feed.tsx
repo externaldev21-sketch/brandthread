@@ -3263,15 +3263,14 @@ export default function FeedScreen({
 
             <View style={styles.buyerTopCluster}>
               <TouchableOpacity
-                style={[styles.buyerSearchCompact, windowWidth < 370 && styles.buyerSearchCompactNarrow]}
+                style={styles.buyerTopBtnCompact}
                 activeOpacity={0.7}
                 onPress={() => setBuyerSearchOpen(true)}
                 accessibilityRole="button"
                 accessibilityLabel="Search feed"
                 testID="buyer-home-search-open"
               >
-                <BuyerNavIcon name="search" color={ON_DARK} size={18} strokeWidth={1.9} />
-                {windowWidth >= 370 && <Text style={styles.buyerSearchCompactText}>Search</Text>}
+                <BuyerNavIcon name="search" color={ON_DARK} size={20} strokeWidth={1.9} />
               </TouchableOpacity>
               <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtnCompact, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
@@ -3674,13 +3673,6 @@ const styles = StyleSheet.create({
     flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center',
   },
   buyerCartBadge: { top: 3, right: 1 },
-  buyerSearchCompact: {
-    width: 68, height: 32, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 4, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
-  },
-  buyerSearchCompactNarrow: { width: 33 },
-  buyerSearchCompactText: { fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK },
   buyerSearchExpanded: {
     flex: 1, height: 34, flexDirection: 'row', alignItems: 'center', paddingLeft: 10,
     borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.82)',
