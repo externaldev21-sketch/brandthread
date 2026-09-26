@@ -102,7 +102,7 @@ const THREAD_PAGE_SIZE = 30;
 // caption block's last line (the sound row) both need extra clearance above
 // that same `bottomClearance` anchor, or they end up touching/overlapping
 // the bar — which is exactly what a bare `bottom: bottomClearance` on both
-// of them (passed as `style` to RightActionRail/CaptionBlock) used to do.
+// of them used to do. These two constants are that clearance:
 //   - RAIL_BOTTOM_GAP: >=16pt from the rail's last item to the bar's top.
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
 const RAIL_BOTTOM_GAP = 22;
@@ -1604,6 +1604,26 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
   };
 }
 
+/**
+ * Preview catalog products need a real multi-photo gallery to test the
+ * full-bleed swipeable carousel (product shots + "model photos"), not just
+ * the single video poster frame. Reuse the runway poster set — 3-5 images
+ * per product, cycled by an offset derived from the product id so different
+ * preview products don't all show the same sequence.
+ */
+function buildPreviewGalleryUris(item: SpotlightItem, productId: string): string[] {
+  const pool = FASHION_PREVIEW_POSTER_URIS;
+  if (pool.length === 0) return item.videoPosterUri ? [item.videoPosterUri] : [];
+  let seed = 0;
+  for (let i = 0; i < productId.length; i++) seed = (seed * 31 + productId.charCodeAt(i)) >>> 0;
+  const count = 3 + (seed % 3); // 3-5 images
+  const start = seed % pool.length;
+  const uris = Array.from({ length: count }, (_, i) => pool[(start + i) % pool.length]);
+  // Lead with this post's own poster so the first frame still matches the tag.
+  if (item.videoPosterUri && !uris.includes(item.videoPosterUri)) uris[0] = item.videoPosterUri;
+  return uris;
+}
+
 function buildPreviewShopProduct(
   item: SpotlightItem,
   tag: { productId: string; productName: string; priceCents: number },
@@ -1613,6 +1633,7 @@ function buildPreviewShopProduct(
     id: `${optionId}-${label.toLowerCase()}`,
     label,
   }));
+  const galleryUris = buildPreviewGalleryUris(item, tag.productId);
   return {
     id: tag.productId,
     sellerId: item.sellerId ?? `preview-seller-${item.id}`,
@@ -1621,7 +1642,7 @@ function buildPreviewShopProduct(
     name: tag.productName,
     description: item.caption.replace(/^Preview ·\s*/, ''),
     priceCents: tag.priceCents,
-    imageUris: item.videoPosterUri ? [item.videoPosterUri] : [],
+    imageUris: galleryUris,
     category: 'High Fashion',
     isPreOrder: false,
     cancellationPolicy: 'Preview item — no real order will be placed.',
@@ -2097,11 +2118,14 @@ export default function FeedScreen({
   // Seller mode: if (!buyerMode) — sentinel never enters the array.
   // getItemLayout stays uniform using the measured tab-scene height for all items.
   //
-  // Once there's no more real content to paginate in, the same items repeat
-  // under unique keys instead of ending — no "You're all caught up" card;
-  // scrolling past the last video should feel seamless and never-ending.
-  // Not applied while a search filter is active, or to the single-
-  // creator/product player (a deliberate end there is fine).
+  // Once there's no more real content to paginate in (the fixed preview set,
+  // or a real account that's genuinely reached the end of their feed), the
+  // same items are appended again under unique keys instead of ending —
+  // there is no "You're all caught up" card any more; scrolling past the
+  // last video should feel seamless and never-ending, the way the real app
+  // does, not stop dead or show an end card. Not applied while a search
+  // filter is active (a filtered result set has a real, meaningful end) or
+  // to the single-creator/product player (a deliberate end there is fine).
   const canLoopFeed = !searchQuery.trim() && !feedHasMore && filteredContentItems.length > 1 && !isCreatorFeed;
   const displayItems: FeedItem[] = useMemo(() => {
     const base = filteredContentItems as FeedItem[];
@@ -2464,11 +2488,15 @@ export default function FeedScreen({
         showsVerticalScrollIndicator={false}
         decelerationRate="fast"
         // A slow drag-then-release let the list rubber-band past the page
-        // boundary before paging snapped it back (native bounce on iOS,
-        // overscroll glow on Android, elastic overshoot on web) — the
-        // overlay chrome doesn't animate at all, so that snap-back read as
-        // the whole page bouncing. Disabling native overscroll makes every
-        // release, slow or fast, land exactly on the page boundary.
+        // boundary before paging snapped it back — on iOS that's the default
+        // vertical bounce, on Android the default overscroll glow/stretch,
+        // and on web (react-native-web) the equivalent elastic overshoot.
+        // Only the video itself should ever appear to move like that; the
+        // overlay chrome doesn't animate at all (see chromeStyle above), so
+        // that rubber-band snap-back read as the whole page — video and
+        // overlay together — bouncing. Disabling native overscroll here
+        // makes every release, slow or fast, land exactly on the page
+        // boundary with no elastic overshoot to snap back from.
         bounces={false}
         alwaysBounceVertical={false}
         overScrollMode="never"
@@ -2943,25 +2971,38 @@ const styles = StyleSheet.create({
   speedPillText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13 },
   mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
   mediaDotActive: { width: 18, backgroundColor: ON_DARK },
-  mediaTags: { position: 'absolute', left: 16, right: 86, alignItems: 'flex-start' },
-  // Compact single-line TikTok-Shop-style product anchor pill — roughly half
-  // the height/width of the old two-line merch card it replaces, so it reads
-  // as a small tappable tag rather than a card overlaying the video.
-  shopPill: {
-    height: 26, maxWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderRadius: RADII.pill, paddingLeft: 3, paddingRight: 8, overflow: 'hidden',
-    borderWidth: 1,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25,
-    shadowRadius: 5, elevation: 4,
+  // Shop side tab: collapsed flush against the left screen edge (26pt of a
+  // 28pt-wide tab sticks out), only the two exposed corners rounded so it
+  // reads as attached to the edge rather than floating. Fully solid fill,
+  // no blur/shimmer — see the ShopSideTab component comment above for why.
+  shopSideTab: {
+    position: 'absolute', left: 0, top: '57%', height: 76,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderTopRightRadius: 12, borderBottomRightRadius: 12,
+    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    overflow: 'hidden',
   },
-  shopPillThumb: {
-    width: 20, height: 20, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: ON_DARK, overflow: 'hidden',
+  shopSideTabCollapsed: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center', gap: 6,
   },
-  shopPillName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 11, flexShrink: 1, maxWidth: 68 },
-  shopPillDot: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
-  shopPillPrice: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
-  shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
+  shopSideTabLabel: {
+    color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.5,
+    transform: [{ rotate: '-90deg' }],
+  },
+  shopSideTabExpanded: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, gap: 8,
+  },
+  shopSideTabThumb: {
+    width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ON_DARK, overflow: 'hidden', flexShrink: 0,
+  },
+  shopSideTabText: { flexShrink: 1, flexGrow: 1, gap: 1 },
+  shopSideTabName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
+  shopSideTabPrice: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, ...TABULAR_NUMS },
 
   rail: {
     position: 'absolute', right: 10, width: 52, bottom: 116, alignItems: 'center', gap: 19,
@@ -2990,13 +3031,21 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
+  // The bottom-left stack's vertical rhythm is one consistent system, set
+  // as explicit per-step margins (not a single uniform `gap`, since each
+  // step needs its own value): creator name row -> 6pt -> caption -> 8pt ->
+  // sound line -> (CAPTION_BOTTOM_GAP, on the container's own `bottom`
+  // above) -> progress bar. The shop tag no longer starts this stack (it's
+  // the screen-edge ShopSideTab now) — minHeight shrunk by its old
+  // 44pt-tall pill + 12pt gap (56pt) accordingly, so there's no leftover
+  // reserved space where it used to sit.
   bottomInfo: {
-    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 112,
-    justifyContent: 'flex-end', gap: 10,
+    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 56,
+    justifyContent: 'flex-end',
   },
-  bottomInfoWithRepost: { minHeight: 148 },
+  bottomInfoWithRepost: { minHeight: 92 },
   repostIdentity: {
-    alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32,
+    alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 7,
     paddingHorizontal: 7, paddingVertical: 5,
@@ -3011,12 +3060,12 @@ const styles = StyleSheet.create({
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
-    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK,
+    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 8,
     lineHeight: 20.5, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
-  creatorRow: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorRow: { minHeight: 30, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
   creatorName: {
     fontSize: FS.base + 3, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
@@ -3052,7 +3101,9 @@ const styles = StyleSheet.create({
   liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
   buyerSearchRow: {
     flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: RADII.pill,
-    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+    // Solid fill (bumped from 0.32 now that there's no BlurView underneath
+    // adding its own contrast) instead of a blur-over-video background.
+    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
   buyerSearchInput: {
     flex: 1, height: 44, paddingHorizontal: 10, fontSize: FS.sm, fontFamily: FONT.regular, color: ON_DARK,

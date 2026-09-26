@@ -12,8 +12,7 @@
  * removed — a live blur over playing video re-samples every frame (a
  * visible shimmer/glitch, not a decorative effect), and the always-visible
  * pill made every tagged video look like an ad. It's a collapsed edge tab
- * now, fully solid, no blur/shimmer anywhere.
- */
+ * now, fully solid, no blur/shimmer anywhere. */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -30,8 +29,7 @@ describe('Shop trigger — collapsed edge tab, no blur/shimmer', () => {
     expect(shopTab).toContain('styles.thumb');
     expect(shopTab).not.toContain('<BlurView');
     expect(shopTab).not.toContain('LinearGradient');
-    expect(shopTab).not.toContain('styles.shimmer');
-    expect(feed).not.toContain('mediaTagName');
+    expect(shopTab).not.toContain('styles.shimmer');    expect(feed).not.toContain('mediaTagName');
   });
 
   it('shows the real product thumbnail when available, falling back to a bag icon', () => {

@@ -31,6 +31,7 @@ import { useRouter } from 'expo-router';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
+import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
 import { formatCents } from '@/lib/money';
 import {
   BG, CARD, CARD_ELEVATED, SURFACE,
@@ -84,6 +85,50 @@ interface ShopProductSheetProps {
   onCartUpdated?: (newCount: number) => void;
   cartTargetRef?: RefObject<View | null>;
   reduceMotion: boolean | null;
+}
+
+// ─── Preview reviews seed ─────────────────────────────────────────────────────
+// Preview catalog products aren't real rows in the reviews table, so they get
+// seeded review data — enough to exercise the average/breakdown/top-reviews
+// UI without a network call.
+const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
+
+/**
+ * Built at render time from the previewed product's own photo set (rather
+ * than a module-level constant) so review photos are real, already-loaded
+ * images instead of a made-up asset reference.
+ */
+function buildPreviewReviewsSeed(productPhotos: string[]): ReviewsSeed {
+  const photo = (i: number) => productPhotos.length ? [productPhotos[i % productPhotos.length]] : undefined;
+  return {
+  avgRating: 4.6,
+  totalCount: 128,
+  // A realistic distribution (mostly 5/4★, a few lower) rather than an
+  // arbitrary handful, so the star breakdown bars and fit meter below read
+  // like real aggregate data instead of a token sample.
+  reviews: [
+    { id: 'preview-review-1', rating: 5, body: 'Runs true to size and the fabric feels even better in person. Fast shipping too.', buyerName: 'Jordan M.', createdAt: daysAgo(3), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0, helpfulCount: 12, photos: photo(0) },
+    { id: 'preview-review-2', rating: 4, body: 'Great fit, sized up one for a roomier look. Would buy again.', buyerName: 'Priya K.', createdAt: daysAgo(9), verifiedBuyer: true, sizeBought: 'S', fitNote: 'Runs small', fitScale: -1, helpfulCount: 6 },
+    { id: 'preview-review-3', rating: 5, body: 'Exactly like the video — quality is there.', buyerName: 'Sam R.', createdAt: daysAgo(20), verifiedBuyer: true, sizeBought: 'L', fitNote: 'True to size', fitScale: 0, helpfulCount: 3, photos: productPhotos.length ? [productPhotos[1 % productPhotos.length], productPhotos[2 % productPhotos.length]] : undefined },
+    { id: 'preview-review-4', rating: 5, buyerName: 'Alex T.', createdAt: daysAgo(2), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-5', rating: 5, buyerName: 'Morgan L.', createdAt: daysAgo(5), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-6', rating: 4, buyerName: 'Casey B.', createdAt: daysAgo(7), verifiedBuyer: true, sizeBought: 'L', fitNote: 'Runs large', fitScale: 1 },
+    { id: 'preview-review-7', rating: 5, buyerName: 'Riley P.', createdAt: daysAgo(11), verifiedBuyer: true, sizeBought: 'S', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-8', rating: 5, buyerName: 'Jamie F.', createdAt: daysAgo(14), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-9', rating: 3, buyerName: 'Drew S.', createdAt: daysAgo(16), verifiedBuyer: true, sizeBought: 'M', fitNote: 'Runs small', fitScale: -1 },
+    { id: 'preview-review-10', rating: 5, buyerName: 'Taylor N.', createdAt: daysAgo(18), verifiedBuyer: true, sizeBought: 'L', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-11', rating: 4, buyerName: 'Reese V.', createdAt: daysAgo(22), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-12', rating: 5, buyerName: 'Sage O.', createdAt: daysAgo(25), verifiedBuyer: true, sizeBought: 'S', fitNote: 'Runs small', fitScale: -1 },
+    { id: 'preview-review-13', rating: 5, buyerName: 'Quinn H.', createdAt: daysAgo(27), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-14', rating: 2, buyerName: 'Blair G.', createdAt: daysAgo(30), verifiedBuyer: true, sizeBought: 'L', fitNote: 'Runs large', fitScale: 2 },
+    { id: 'preview-review-15', rating: 5, buyerName: 'Emerson D.', createdAt: daysAgo(33), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-16', rating: 5, buyerName: 'Avery W.', createdAt: daysAgo(36), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-17', rating: 4, buyerName: 'Rowan K.', createdAt: daysAgo(40), verifiedBuyer: true, sizeBought: 'S', fitNote: 'Runs small', fitScale: -1 },
+    { id: 'preview-review-18', rating: 5, buyerName: 'Elliot J.', createdAt: daysAgo(44), verifiedBuyer: true, sizeBought: 'L', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-19', rating: 5, buyerName: 'Hayden R.', createdAt: daysAgo(48), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-20', rating: 4, buyerName: 'Skyler A.', createdAt: daysAgo(52), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+  ],
+  };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -300,7 +345,11 @@ export function ShopProductSheet({
       useNativeDriver: true,
       speed: 18,
       bounciness: 3,
-    }).start();
+      // A bouncy spring settles asymptotically, not at an exact bit-for-bit
+      // 0 — snapping it once "finished" fires keeps the sheet's translateY
+      // (applied to its entire subtree, text included) at a true identity
+      // transform at rest instead of a permanent sub-pixel residual.
+    }).start(() => slideY.setValue(0));
   }, [reduceMotion, slideY]);
 
   useEffect(() => () => {
@@ -322,6 +371,41 @@ export function ShopProductSheet({
 
   function handleClose() {
     dismissSheet(onClose);
+  }
+
+  /**
+   * Navigate away from the sheet (Buy now, View cart, View detail, seller
+   * profile, etc). The destination pushes IMMEDIATELY — its own skeleton/
+   * content is already mounted and rendering behind the sheet before the
+   * sheet even starts moving, so there's zero blank frame. The sheet's
+   * existing 220ms slide-down then plays as a reveal over that already-live
+   * screen, and `onClose` unmounts the sheet's Modal (backdrop included)
+   * once it finishes.
+   *
+   * Previously this used `dismissSheet(() => router.push(...))`, which
+   * navigated only once the slide-down finished AND never called `onClose` —
+   * so the sheet's Modal (and its full-screen backdrop) stayed mounted on
+   * top of the destination screen indefinitely. That's what produced the
+   * reported "sheet stays open on top of Checkout" glitch/flash.
+   */
+  function navigateAndDismiss(action: () => void) {
+    action();
+    dismissSheet(onClose);
+  }
+
+  /**
+   * Same idea as navigateAndDismiss, but for a destination that itself
+   * slides up and fully covers the screen (Checkout via /thread-checkout,
+   * registered with `animation: 'slide_from_bottom'` in app/_layout.tsx).
+   * That incoming screen's own cover animation is the ONLY motion the buyer
+   * should see, so the sheet is torn down instantly and silently underneath
+   * it instead of also playing its own ~220ms slide-down — two competing
+   * animations at once was exactly what read as "Checkout appears under a
+   * still-open sheet" glitch.
+   */
+  function navigateAndDismissInstantly(action: () => void) {
+    action();
+    onClose();
   }
 
   function showCartSuccess(newCount: number) {
@@ -370,7 +454,7 @@ export function ShopProductSheet({
         if (g.dy > 80 || g.vy > 0.8) {
           dismissSheet(onClose);
         } else {
-          Animated.spring(slideY, { toValue: 0, useNativeDriver: true, speed: 20 }).start();
+          Animated.spring(slideY, { toValue: 0, useNativeDriver: true, speed: 20 }).start(() => slideY.setValue(0));
         }
       },
     }),
@@ -527,9 +611,12 @@ export function ShopProductSheet({
     try {
       const cart = await getCart();
       await createBuyNowSession(product, variant, qty, cart);
-      dismissSheet(() => {
-        router.push('/thread-checkout' as never);
-      });
+      // Use the thread-pull push, fired immediately so Checkout's own
+      // skeleton is already mounted before the incoming screen's
+      // slide_from_bottom cover animation starts — and tear the sheet down
+      // instantly (no competing slide-down of its own) since that cover
+      // animation is the only motion this transition needs.
+      navigateAndDismissInstantly(() => push('/thread-checkout' as never));
     } catch {
       setPhase('ready');
       setVariantError("Couldn't start checkout. Try again.");
@@ -539,7 +626,7 @@ export function ShopProductSheet({
   // View full detail
   function handleViewDetail() {
     if (!activeTag?.productId) return;
-    dismissSheet(() => {
+    navigateAndDismiss(() => {
       push(
         `/thread-product-detail?productId=${encodeURIComponent(activeTag.productId)}&sourcePostId=${encodeURIComponent(selection.postId)}` as never,
       );
@@ -547,9 +634,7 @@ export function ShopProductSheet({
   }
 
   function handleViewCart() {
-    dismissSheet(() => {
-      router.push('/(buyer)/cart' as never);
-    });
+    navigateAndDismiss(() => router.push('/(buyer)/cart' as never));
   }
 
   const accent = theme.accent;
@@ -793,6 +878,12 @@ export function ShopProductSheet({
               <TrustCue icon="truck" label="Fast shipping" />
             </View>
 
+            <ProductReviewsSection
+              productId={product.id}
+              productName={product.name}
+              seed={selection.previewProduct?.id === product.id ? buildPreviewReviewsSeed(product.imageUris) : undefined}
+            />
+
             <TouchableOpacity onPress={handleViewDetail} style={ss.viewDetailBtn}>
               <Text style={ss.viewDetailText}>View full product details</Text>
               <Feather name="chevron-right" size={13} color={MUTED} />
@@ -1006,55 +1097,130 @@ function ProductHeader({
   );
 }
 
-// ─── Product image carousel — swipeable, with a 1/N counter ─────────────────
+// ─── Full-screen image viewer — swipeable, tap/swipe-down to dismiss ────────
+
+function FullScreenImageViewer({
+  imageUris, startIndex, onClose,
+}: {
+  imageUris: string[]; startIndex: number; onClose: () => void;
+}) {
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const [index, setIndex] = useState(startIndex);
+  const scrollRef = useRef<ScrollView>(null);
+
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <View style={[ss.fullScreenWrap, { backgroundColor: '#000' }]}>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: startIndex * windowWidth, y: 0 }}
+          onMomentumScrollEnd={e => {
+            const next = Math.round(e.nativeEvent.contentOffset.x / windowWidth);
+            setIndex(Math.max(0, Math.min(imageUris.length - 1, next)));
+          }}
+        >
+          {imageUris.map((uri, i) => (
+            <TouchableOpacity
+              key={`${uri}-${i}`}
+              activeOpacity={1}
+              onPress={onClose}
+              style={{ width: windowWidth, height: windowHeight }}
+              accessibilityRole="button"
+              accessibilityLabel="Close full-screen photo"
+            >
+              <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <TouchableOpacity
+          onPress={onClose}
+          style={ss.fullScreenClose}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Close"
+        >
+          <Feather name="x" size={20} color={ON_DARK} />
+        </TouchableOpacity>
+        {imageUris.length > 1 && (
+          <View style={ss.fullScreenCounter} pointerEvents="none">
+            <Text style={ss.carouselCounterText}>{index + 1}/{imageUris.length}</Text>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Product image carousel — full-bleed 4:5, swipeable, dot indicator ──────
+// Never letterboxed: every frame is `cover`-fit inside a fixed 4:5 window on
+// a dark backdrop, so a differently-shaped seller photo fills the frame
+// (cropped) instead of showing as a boxed-in image on a solid color.
+// Tap opens the full-screen viewer for a closer look.
 
 function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
   const { width: windowWidth } = useWindowDimensions();
   const pageWidth = Math.min(windowWidth, 520);
+  const pageHeight = Math.round(pageWidth * 1.25); // 4:5
   const [index, setIndex] = useState(0);
+  const [fullScreen, setFullScreen] = useState(false);
   const images = imageUris.length > 0 ? imageUris : [''];
 
-  if (images.length === 1) {
-    return (
-      <View style={[ss.carouselWrap, { height: pageWidth }]}>
-        {images[0] ? (
-          <CachedImage source={{ uri: images[0] }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
-            <Feather name="image" size={28} color={SUBTLE} />
-          </View>
-        )}
-      </View>
-    );
-  }
-
   return (
-    <View style={[ss.carouselWrap, { height: pageWidth }]}>
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={e => {
-          const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
-          setIndex(Math.max(0, Math.min(images.length - 1, next)));
-        }}
+    <>
+      <TouchableOpacity
+        activeOpacity={0.95}
+        onPress={() => images[index] && setFullScreen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`Product photo ${index + 1} of ${images.length}. Tap to view full screen.`}
       >
-        {images.map((uri, i) => (
-          <View key={`${uri}-${i}`} style={{ width: pageWidth, height: pageWidth }}>
-            {uri ? (
-              <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
-                <Feather name="image" size={28} color={SUBTLE} />
+        <View style={[ss.carouselWrap, { height: pageHeight }]}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            scrollEnabled={images.length > 1}
+            onMomentumScrollEnd={e => {
+              const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+              setIndex(Math.max(0, Math.min(images.length - 1, next)));
+            }}
+          >
+            {images.map((uri, i) => (
+              <View key={`${uri}-${i}`} style={{ width: pageWidth, height: pageHeight }}>
+                {uri ? (
+                  <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                ) : (
+                  <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
+                    <Feather name="image" size={28} color={SUBTLE} />
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-        ))}
-      </ScrollView>
-      <View style={ss.carouselCounter} pointerEvents="none">
-        <Text style={ss.carouselCounterText}>{index + 1}/{images.length}</Text>
-      </View>
-    </View>
+            ))}
+          </ScrollView>
+          {images.length > 1 && (
+            <View style={ss.carouselCounter} pointerEvents="none">
+              <Text style={ss.carouselCounterText}>{index + 1}/{images.length}</Text>
+            </View>
+          )}
+          {images.length > 1 && (
+            <View style={ss.dotsRow} pointerEvents="none">
+              {images.map((_, i) => (
+                <View key={i} style={[ss.dot, i === index && ss.dotActive]} />
+              ))}
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {fullScreen && (
+        <FullScreenImageViewer
+          imageUris={images.filter(Boolean)}
+          startIndex={index}
+          onClose={() => setFullScreen(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -1249,13 +1415,29 @@ const ss = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: CARD_ELEVATED,
   },
-  carouselWrap: { width: '100%', backgroundColor: CARD_ELEVATED },
+  carouselWrap: { width: '100%', backgroundColor: '#000', overflow: 'hidden' },
   carouselCounter: {
     position: 'absolute', right: 10, bottom: 10,
     paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.pill,
     backgroundColor: 'rgba(0,0,0,0.62)',
   },
   carouselCounterText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11 },
+  dotsRow: {
+    position: 'absolute', left: 0, right: 0, bottom: 12,
+    flexDirection: 'row', justifyContent: 'center', gap: 5,
+  },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.4)' },
+  dotActive: { backgroundColor: '#FFFFFF', width: 14 },
+  fullScreenWrap: { flex: 1 },
+  fullScreenClose: {
+    position: 'absolute', top: 50, right: 16, width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center',
+  },
+  fullScreenCounter: {
+    position: 'absolute', bottom: 40, alignSelf: 'center',
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
   preOrderBadge: {
     position: 'absolute',
     bottom: 6,

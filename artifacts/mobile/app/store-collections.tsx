@@ -7,6 +7,7 @@ import {
   StyleSheet, Alert, Switch, Modal, Image, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header } from '@/components/layout';
@@ -296,14 +297,8 @@ export default function StoreCollectionsScreen() {
                   </View>
                 </View>
                 <View style={styles.colActions}>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => openEdit(item)}>
-                    <Feather name="edit-2" size={ICON.xs} color={PURPLE} />
-                    <Text style={styles.actionBtnText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => handleDelete(item)}>
-                    <Feather name="trash-2" size={ICON.xs} color={RED} />
-                    <Text style={[styles.actionBtnText, { color: RED }]}>Delete</Text>
-                  </TouchableOpacity>
+                  <Button label="Edit" icon="edit-2" variant="secondary" size="compact" onPress={() => openEdit(item)} />
+                  <Button label="Delete" icon="trash-2" variant="destructive" size="compact" onPress={() => handleDelete(item)} />
                 </View>
               </BrandthreadCard>
             )}
@@ -647,26 +642,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   colActions: {
     flexDirection: 'row',
     gap: SP.sm,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: PURPLE_DIM,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 5,
-  },
-  actionBtnDanger: {
-    backgroundColor: RED_DIM,
-    borderColor: RED,
-  },
-  actionBtnText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: PURPLE,
   },
   formContent: {
     paddingHorizontal: SP.md,
