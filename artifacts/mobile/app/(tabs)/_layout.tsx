@@ -37,7 +37,9 @@ export default function TabLayout() {
   const { theme } = useAppTheme();
   return (
     <Tabs
-      detachInactiveScreens
+      // See the buyer tab layout for why this is false: keeps every tab's
+      // native view attached so switching is instant, never a remount.
+      detachInactiveScreens={false}
       tabBar={() => null}
       // A render crash in one tab shows a friendly per-tab fallback instead
       // of taking down the whole app; the root layout's ErrorBoundary is
@@ -46,8 +48,8 @@ export default function TabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
-        // Same tab-switch motion as the buyer side.
-        animation: 'shift',
+        // Same instant tab switch as the buyer side — no transition delay.
+        animation: 'none',
         sceneStyle: { backgroundColor: theme.background },
       }}
     >

@@ -50,7 +50,14 @@ function BuyerTabLayout() {
 
   return (
     <Tabs
-      detachInactiveScreens
+      // false keeps every tab's native view attached to the hierarchy at all
+      // times instead of tearing it down and re-creating it on each revisit.
+      // Combined with freezeOnBlur (state/JS stays mounted too), a tab switch
+      // is a pure "hide this view, show that one" — no remount, no re-layout,
+      // no re-fetch, which is what was producing the ~half-second reload
+      // feeling on every tab tap. The memory cost is 5 always-attached
+      // screens, which is cheap next to eliminating that reload.
+      detachInactiveScreens={false}
       tabBar={(props) => <BuyerTabBar {...props} inboxBadgeCount={inboxBadgeCount} />}
       // A render crash in one tab shows a friendly per-tab fallback instead
       // of taking down the whole app; the root layout's ErrorBoundary is
@@ -59,9 +66,11 @@ function BuyerTabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
-        // Scenes glide a little sideways as they cross-fade, in the direction
-        // of the tab tapped, so switching tabs feels spatial rather than a cut.
-        animation: 'shift',
+        // No transition: the previous tab bar animation ('shift') added a
+        // sideways glide on every tab tap, which is exactly the perceptible
+        // delay the tab bar should never have now that switching is just a
+        // visibility flip between already-mounted, already-fetched screens.
+        animation: 'none',
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
