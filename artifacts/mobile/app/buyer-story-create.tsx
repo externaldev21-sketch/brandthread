@@ -35,7 +35,6 @@ import type { Product } from '@/services/productTypes';
 import { PressableScale, HapticSwitch } from '@/components/BrandthreadUI';
 import { hapticLight, hapticToggle, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -394,7 +393,7 @@ export default function StoryComposer() {
         text,
         color: textDraftColor,
         size: 30,
-        align: textDraftAlign as any,
+        align: textDraftAlign,
       });
     }
     setTextDraft('');
@@ -888,8 +887,7 @@ export default function StoryComposer() {
             <StickerTile
               icon="dollar-sign"
               label="Thread Cash"
-              custom={<ThreadCashBillIcon size={26} />}
-              onPress={() => { addOverlay({ type: 'threadcash', text: 'Thread Cash' }); setStickerSheetOpen(false); }}
+              custom={<ThreadCashBillIcon size={26} />}              onPress={() => { addOverlay({ type: 'threadcash', text: 'Thread Cash' }); setStickerSheetOpen(false); }}
             />
           </View>
         </View>
@@ -980,7 +978,7 @@ function StickerTile({ icon, label, onPress, custom }: { icon: keyof typeof Feat
 function renderOverlayContent(ov: StoryOverlay) {
   switch (ov.type) {
     case 'text':
-      return <Text style={{ color: ov.color ?? '#FFF', fontSize: ov.size ?? 28, fontFamily: FONT.bold, textAlign: (ov as any).align ?? 'center' }}>{ov.text}</Text>;
+      return <Text style={{ color: ov.color ?? '#FFF', fontSize: ov.size ?? 28, fontFamily: FONT.bold, textAlign: ov.align ?? 'center' }}>{ov.text}</Text>;
     case 'mention':
       return <View style={styles.pillChip}><Feather name="at-sign" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.mentionHandle}</Text></View>;
     case 'location':
@@ -1020,8 +1018,7 @@ function renderOverlayContent(ov: StoryOverlay) {
         </View>
       );
     case 'threadcash':
-      return <View style={styles.pillChip}><ThreadCashBillIcon size={16} /><Text style={styles.pillChipText}>{ov.text}</Text></View>;
-    default:
+      return <View style={styles.pillChip}><ThreadCashBillIcon size={16} /><Text style={styles.pillChipText}>{ov.text}</Text></View>;    default:
       return null;
   }
 }

@@ -12,6 +12,9 @@ const searchContext = read('contexts/BuyerSearchContext.tsx');
 const search = read('app/(buyer)/search.tsx');
 const profile = read('app/(buyer)/profile.tsx');
 const feed = read('app/(tabs)/feed.tsx');
+// The feed's top bar (LIVE / Friends / tabs / search) moved into its own
+// component as part of the buyer feed presentation-layer rebuild.
+const feedTopBar = read('components/buyer-feed/FeedTopBar.tsx');
 
 const tabItemsBlock = bar.slice(bar.indexOf('export const BUYER_TAB_ITEMS'), bar.indexOf('type Slot'));
 
@@ -41,7 +44,7 @@ describe('buyer navigation contract', () => {
     expect(layout).toContain("name=\"friends\" options={{ title: 'Friends', href: null }}");
     expect(tabItemsBlock).not.toContain('friends');
     expect(feed).toContain("router.navigate('/(buyer)/friends' as never)");
-    expect(feed).toContain('testID="buyer-home-friends"');
+    expect(feedTopBar).toContain('testID="buyer-home-friends"');
     expect(profile).toContain("'/(buyer)/friends'");
     // Friends, Cart and Orders light up the control they were opened from.
     expect(bar).toContain("friends: 'index'");

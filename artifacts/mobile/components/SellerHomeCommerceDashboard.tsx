@@ -53,9 +53,18 @@ import {
   type RecentOrderSummary,
   type TopProductSummary,
 } from '@/lib/sellerDashboardStats';
+// Reused (not reimplemented) so the "orders to ship" tile can never drift
+// from what the Orders screen itself counts as unfulfilled — see item 31 /
+// docs/qa/full-crawl-report.md #7: this tile used to read a separately
+// server-computed `toFulfill` figure (status IN pending/processing AND
+// paid), while Orders' own "Unfulfilled" filter/count uses a different rule
+// (order status only, via `FULFILLMENT_MAP`), so the two disagreed.
+import { apiRowToOrder } from '@/app/(tabs)/orders';
+import { filterOrders } from '@/services/orderService';
 import { DASHBOARD_RANGES, SellerDashboardChart, type SellerDashboardRange } from '@/components/SellerDashboardChart';
 import { SellerDashboardStatGrid, type SellerDashboardStatTileData } from '@/components/SellerDashboardStatGrid';
 import { SellerDashboardActionNeeded } from '@/components/SellerDashboardActionNeeded';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProducts';
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
@@ -149,6 +158,7 @@ export default function SellerHomeCommerceDashboard({
   const { theme } = useAppTheme();
   const { currentRole, isLoadingRole } = useTeamRole();
   const { isTablet } = useBreakpoint();
+  const scrollResetRef = useScrollReset<ScrollView>();
 
   const [range, setRange] = useState<SellerDashboardRange>('week');
   const [metric, setMetric] = useState<MetricKey>('sales');
@@ -173,7 +183,7 @@ export default function SellerHomeCommerceDashboard({
   const [topProducts, setTopProducts] = useState<TopProductSummary[] | null>(null);
   const [recentOrders, setRecentOrders] = useState<RecentOrderSummary[] | null>(null);
   const [everSoldCount, setEverSoldCount] = useState<number | null>(null);
-  const [actionInputs, setActionInputs] = useState<{ unreadMessages: number; lowStockCount: number; returns: number } | null>(null);
+  const [actionInputs, setActionInputs] = useState<{ unreadMessages: number; lowStockCount: number; returns: number; toShip: number } | null>(null);
   const [secondaryError, setSecondaryError] = useState(false);
 
   useEffect(() => subscribeStoreContext(() => {
@@ -257,7 +267,7 @@ export default function SellerHomeCommerceDashboard({
       setTopProducts([]);
       setRecentOrders([]);
       setEverSoldCount(0);
-      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0 });
+      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: 0 });
       return;
     }
     setSecondaryError(false);
@@ -285,10 +295,14 @@ export default function SellerHomeCommerceDashboard({
 
       setEverSoldCount(orders.length);
       setRecentOrders(orders.slice(0, 5).map(normalizeRecentOrder));
+      // Same normalizer + same filter Orders' "Unfulfilled" chip uses, over
+      // this same fetched list — the tile and the screen can't disagree.
+      const toShip = filterOrders(orders.map(apiRowToOrder), 'unfulfilled').length;
       setActionInputs({
         unreadMessages: hub.unreadMessages,
         lowStockCount: inv.lowStockCount,
         returns: countOrderReturns(orders),
+        toShip,
       });
 
       const top = Array.isArray(productAnalytics)
@@ -488,8 +502,8 @@ export default function SellerHomeCommerceDashboard({
 
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
   const newSeller = everSoldCount !== null && isNewSeller(everSoldCount);
-  const actionCounts: DashboardActionCounts | null = actionInputs && data ? {
-    toShip: data.toFulfill,
+  const actionCounts: DashboardActionCounts | null = actionInputs ? {
+    toShip: actionInputs.toShip,
     toAnswer: actionInputs.unreadMessages,
     lowStock: actionInputs.lowStockCount,
     returns: actionInputs.returns,
@@ -502,17 +516,20 @@ export default function SellerHomeCommerceDashboard({
 
   const metricAggregate = useMemo(() => {
     if (!data) return { current: 0, previous: 0 };
+    // A response with no `previous` bucket (a brand-new store, or a partial
+    // payload) must not crash the dashboard — treat it as a zeroed prior period.
+    const previous = data.previous ?? { totalCents: 0, orderCount: 0, visitorCount: 0 };
     switch (metric) {
-      case 'sales': return { current: data.totalCents, previous: data.previous.totalCents };
-      case 'orders': return { current: data.orderCount, previous: data.previous.orderCount };
-      case 'visitors': return { current: data.visitorCount, previous: data.previous.visitorCount };
+      case 'sales': return { current: data.totalCents, previous: previous.totalCents };
+      case 'orders': return { current: data.orderCount, previous: previous.orderCount };
+      case 'visitors': return { current: data.visitorCount, previous: previous.visitorCount };
       case 'conversion': return {
         current: data.visitorCount > 0 ? (data.orderCount / data.visitorCount) * 100 : 0,
-        previous: data.previous.visitorCount > 0 ? (data.previous.orderCount / data.previous.visitorCount) * 100 : 0,
+        previous: previous.visitorCount > 0 ? (previous.orderCount / previous.visitorCount) * 100 : 0,
       };
       case 'aov': return {
         current: data.orderCount > 0 ? Math.round(data.totalCents / data.orderCount) : 0,
-        previous: data.previous.orderCount > 0 ? Math.round(data.previous.totalCents / data.previous.orderCount) : 0,
+        previous: previous.orderCount > 0 ? Math.round(previous.totalCents / previous.orderCount) : 0,
       };
       default: return { current: 0, previous: 0 };
     }
@@ -536,15 +553,16 @@ export default function SellerHomeCommerceDashboard({
   };
 
   const tiles: SellerDashboardStatTileData[] = data ? (['orders', 'visitors', 'conversion', 'aov'] as MetricKey[]).map((key) => {
-    const agg = key === 'orders' ? { current: data.orderCount, previous: data.previous.orderCount }
-      : key === 'visitors' ? { current: data.visitorCount, previous: data.previous.visitorCount }
+    const tilesPrevious = data.previous ?? { totalCents: 0, orderCount: 0, visitorCount: 0 };
+    const agg = key === 'orders' ? { current: data.orderCount, previous: tilesPrevious.orderCount }
+      : key === 'visitors' ? { current: data.visitorCount, previous: tilesPrevious.visitorCount }
       : key === 'conversion' ? {
         current: data.visitorCount > 0 ? (data.orderCount / data.visitorCount) * 100 : 0,
-        previous: data.previous.visitorCount > 0 ? (data.previous.orderCount / data.previous.visitorCount) * 100 : 0,
+        previous: tilesPrevious.visitorCount > 0 ? (tilesPrevious.orderCount / tilesPrevious.visitorCount) * 100 : 0,
       }
       : {
         current: data.orderCount > 0 ? Math.round(data.totalCents / data.orderCount) : 0,
-        previous: data.previous.orderCount > 0 ? Math.round(data.previous.totalCents / data.previous.orderCount) : 0,
+        previous: tilesPrevious.orderCount > 0 ? Math.round(tilesPrevious.totalCents / tilesPrevious.orderCount) : 0,
       };
     const delta = compactDelta(agg.current, agg.previous);
     return {
@@ -559,10 +577,11 @@ export default function SellerHomeCommerceDashboard({
   return (
     <View style={[styles.root, { backgroundColor: theme.background ?? SCREEN_BG }]}>
       <ScrollView
+        ref={scrollResetRef}
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
         style={styles.scrollView}
-        contentContainerStyle={[styles.scroll, { paddingTop: topInset + SP.sm }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />
@@ -765,15 +784,19 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingBottom: 160 },
   scrollEndMarker: { height: 1 },
 
+  // Matches the shared root-page Header's exact title/row treatment (Discover
+  // is the reference) — this title has to stay inside the scrolling content
+  // rather than move into a fixed <Header>, per the native device contract
+  // in tests/seller-dashboard-native-contract.test.ts that swipes the
+  // ScrollView and checks this exact testID marker's position moves.
   topBar: {
     minHeight: 44,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: SP.sm,
   },
   topBarAction: { width: 44, height: 44, marginRight: -SP.sm },
-  screenTitle: { fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.4 },
+  screenTitle: { fontFamily: FONT.bold, fontSize: 20, letterSpacing: -0.4 },
 
   heroSkeleton: { paddingTop: SP.md },
 

@@ -18,6 +18,7 @@ import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
 import { useApi } from '@/lib/api';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { FONT, FS, SP } from '@/lib/theme';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -108,6 +109,7 @@ const SECTIONS: { key: string; title: string; icon: keyof typeof Feather.glyphMa
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function MoreScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
@@ -188,6 +190,7 @@ export default function MoreScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScrollView
+        ref={scrollResetRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >

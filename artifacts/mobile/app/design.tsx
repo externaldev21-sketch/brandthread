@@ -26,8 +26,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, FlatList, Modal, TextInput,
-  Dimensions, Pressable, Linking, Platform,
-} from 'react-native';
+  Dimensions, Pressable, Linking, } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -145,8 +144,8 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
   }
 
   // Web inset: 67px status bar + 34px home bar
-  const topPad    = Platform.OS === 'web' ? 67  : insets.top;
-  const bottomPad = Platform.OS === 'web' ? 34  : insets.bottom;
+  const topPad    = insets.top;
+  const bottomPad = insets.bottom;
 
   return (
     <Modal
@@ -553,7 +552,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
     { key: 'clipboard', label: 'Clipboard' },
   ];
 
-  const sheetBottom = Platform.OS === 'web' ? 34 : insets.bottom;
+  const sheetBottom = insets.bottom;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="new-canvas-sheet">
@@ -861,7 +860,7 @@ function RenameSheet({ visible, project, onClose, onRenamed }: RenameSheetProps)
     }
   }
 
-  const sheetBottom = Platform.OS === 'web' ? 34 : insets.bottom;
+  const sheetBottom = insets.bottom;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="rename-sheet">
@@ -920,8 +919,8 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
   const [masterLoading, setMasterLoading] = useState(false);
   if (!project) return null;
   const previewSize = Math.min(SCREEN_W - SP.xl * 2, 420);
-  const topInset = Platform.OS === 'web' ? 67 : insets.top;
-  const botInset = Platform.OS === 'web' ? 34 : insets.bottom;
+  const topInset = insets.top;
+  const botInset = insets.bottom;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="preview-modal">
@@ -1196,7 +1195,7 @@ interface SelectionToolbarProps {
 
 function SelectionToolbar({ count, canRename, onRename, onDuplicate, onSoftDelete, onCancel }: SelectionToolbarProps) {
   const insets = useSafeAreaInsets();
-  const botPad = Platform.OS === 'web' ? 34 : insets.bottom;
+  const botPad = insets.bottom;
   return (
     <View style={[tb.bar, { paddingBottom: botPad + SP.sm }]} testID="selection-toolbar">
       <Text style={tb.count}>{count} selected</Text>
@@ -1257,8 +1256,8 @@ export default function DesignGalleryScreen() {
   const [recoveryVisible, setRecoveryVisible]   = useState(false);
 
   // Safe area — web gets hardcoded insets per SKILL.md
-  const topInset = Platform.OS === 'web' ? 67 : insets.top;
-  const botInset = Platform.OS === 'web' ? 34 : insets.bottom;
+  const topInset = insets.top;
+  const botInset = insets.bottom;
 
   // ── Data load ──────────────────────────────────────────────────────────────
 

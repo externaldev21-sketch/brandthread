@@ -9,13 +9,13 @@ import {
   View, Text, StyleSheet, ScrollView,
   FlatList,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { useColors } from '@/hooks/useColors';
@@ -23,6 +23,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
+import { useScrollReset } from '@/hooks/useScrollReset';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,9 +188,9 @@ function DropCardSkeleton() {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function FollowingScreen() {
+  const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const palette = useColors();
-  const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const api = useApi();
@@ -248,13 +249,10 @@ export default function FollowingScreen() {
 
   return (
     <View style={[s.container, { backgroundColor: palette.background }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SPACING.md, borderBottomColor: palette.border }]}>
-        <View>
-          <Text style={[TYPE_SCALE.title1, s.headerTitle, { color: palette.foreground }]}>Following</Text>
-          <Text style={[TYPE_SCALE.footnote, s.headerSub, { color: palette.mutedForeground }]}>{subtitle}</Text>
-        </View>
-      </View>
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page.
+          No subtitle, matching Discover; the status line moved into the body. */}
+      <Header title="Following" largeTitle showBack={false} />
+      <Text style={[TYPE_SCALE.footnote, s.statusLine, { color: palette.mutedForeground }]}>{subtitle}</Text>
 
       {/* Brand avatars row — only shown when real drops exist */}
       {avatarBrands.length > 0 && (
@@ -304,6 +302,7 @@ export default function FollowingScreen() {
         </View>
       ) : (
         <FlatList
+          ref={scrollResetRef}
           data={drops}
           keyExtractor={d => d.id}
           contentContainerStyle={{ padding: SPACING.md, paddingBottom: Math.max(120, barInset + SPACING.md) }}
@@ -327,12 +326,8 @@ export default function FollowingScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm + 2, borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerTitle: { letterSpacing: -0.6 },
-  headerSub:   { marginTop: 2 },
+
+  statusLine: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm },
 
   avatarsRow:    { borderBottomWidth: StyleSheet.hairlineWidth },
   avatarsScroll: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, gap: SPACING.md - 2 },

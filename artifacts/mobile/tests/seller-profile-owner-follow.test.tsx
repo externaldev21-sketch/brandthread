@@ -150,7 +150,7 @@ vi.mock("react-native-reanimated", () => {
       const index = input.indexOf(value);
       return index >= 0 ? output[index] : output[value >= (input[input.length - 1] ?? 1) ? output.length - 1 : 0];
     },
-    Easing: { out: (fn: unknown) => fn, cubic: () => 0 },
+    Easing: { out: (fn: unknown) => fn, cubic: () => 0, bezier: (..._points: number[]) => (t: number) => t },
   };
 });
 

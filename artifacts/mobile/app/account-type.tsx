@@ -108,7 +108,7 @@ export function AccountTypeStep({
                   </View>
                   <View style={styles.cardTitleWrap}>
                     <Text style={[styles.cardKicker, { color: isSelected ? theme.text : theme.subtle }]}>
-                      {c.type === 'buyer' ? 'EXPLORE' : 'CREATE'}
+                      {c.type === 'buyer' ? 'Explore' : 'Create'}
                     </Text>
                     <Text style={styles.cardTitle}>{c.title}</Text>
                   </View>
@@ -193,7 +193,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
 
   bullets:   { flexDirection: 'row', flexWrap: 'wrap', rowGap: SPACE.xs, columnGap: SPACE.md },
   bulletRow: { flexDirection: 'row', alignItems: 'center', gap: 6, width: '46%' },
-  bulletText:{ flex: 1, ...TYPE.label, color: theme.subtle },
+  bulletText:{ flex: 1, ...TYPE.label, color: theme.muted },
 
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,

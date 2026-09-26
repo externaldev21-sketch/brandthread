@@ -19,9 +19,16 @@ export default function Root({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+        {/* viewport-fit=cover lets the page extend under the browser's own
+            notch/status-bar chrome (and, importantly, under a simulated
+            notch in a phone-frame preview like Replit's), which is what
+            makes `env(safe-area-inset-*)` return non-zero values at all.
+            Without it, react-native-safe-area-context's web implementation
+            always reads 0 for insets.top/bottom, so every header rendered
+            on web sits flush at the very top regardless of device frame. */}
         <meta
           name="viewport"
-          content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
+          content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
         />
         {/* Disabled because the root <div id="root"> must fill the screen and
             expo-router's default reset conflicts with scroll-behavior for

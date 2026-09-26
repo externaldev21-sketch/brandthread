@@ -38,7 +38,7 @@ vi.mock('react-native', () => {
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
     Animated: {
-      Value: class { constructor(_v?: number) {} },
+      Value: class { _value: number; constructor(v?: number) { this._value = v ?? 0; } setValue(v: number) { this._value = v; } interpolate() { return this._value; } },
       View: nativeComponent('Animated.View'),
       event: () => () => {},
       timing: () => ({ start: (cb?: () => void) => cb?.() }),
@@ -50,6 +50,13 @@ vi.mock('react-native', () => {
     useWindowDimensions: () => ({ width: 393, height: 852, scale: 3, fontScale: 1 }),
   };
 });
+
+// The filter chip row's trailing fade uses LinearGradient, which calls
+// react-native's processColor internally — not present on this suite's
+// plain react-native mock above. Stub it like the other native-only mocks.
+vi.mock('expo-linear-gradient', () => ({
+  LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
+}));
 
 vi.mock('@clerk/expo', () => ({
   useAuth: () => ({ userId: 'buyer-1' }),
@@ -71,6 +78,7 @@ vi.mock('expo-router', () => ({
     const React = require('react') as typeof import('react');
     React.useEffect(callback, [callback]);
   },
+  useScrollToTop: () => {},
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -121,6 +129,7 @@ vi.mock('@/lib/theme', () => ({
   ORANGE_DIM: '#3F2A00',
   RED: '#F87171',
   RED_DIM: '#3F2020',
+  GRAD_DARK_FADE: ['rgba(10,10,11,0)', 'rgba(10,10,11,1)'],
   FONT: {
     regular: 'System',
     medium: 'System',
