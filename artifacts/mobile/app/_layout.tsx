@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, queryPersister } from '@/lib/queryClient';
+import { recordNavigationStart } from '@/lib/perf';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -45,6 +47,7 @@ import { initInventoryService } from '@/services/inventoryService';
 import { initAnalyticsService } from '@/services/analyticsService';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
+import { WebAppShell } from '@/components/web/WebAppShell';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
@@ -120,7 +123,7 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
           barStyle={palette.statusBarStyle ?? 'light-content'}
           backgroundColor={background}
         />
-        {children}
+        <WebAppShell>{children}</WebAppShell>
       </View>
     </NavigationThemeProvider>
   );
@@ -315,18 +318,17 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 // ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
-// The development web preview defaults to the buyer experience and skips the
-// Clerk/onboarding gates. ?bt_preview=seller remains available for seller review.
-// This is inert on native and in production builds.
-// ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
-// Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
-// Set back to null when you're ready to test real sign-in.
+// Explicitly opt in with ?bt_preview=buyer or ?bt_preview=seller in the URL to
+// skip the Clerk/onboarding gates and jump straight to that dashboard for
+// design review. Without the query param, web behaves like every other
+// platform: real splash -> sign-up -> onboarding. Inert in production builds.
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
-  return v === 'seller' ? 'seller' : 'buyer';
+  if (v !== 'buyer' && v !== 'seller') return null;
+  return v;
 })();
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
@@ -342,8 +344,6 @@ if (DEV_BYPASS_ROLE && Platform.OS !== 'web') {
     ['user_role', DEV_BYPASS_ROLE],
   ]);
 }
-
-const queryClient = new QueryClient();
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
@@ -393,6 +393,11 @@ function AuthGate() {
       clearSocialCache().catch(() => {});
       clearCartCache().catch(() => {});
       setActiveSeller(false);
+      // These onboarding-in-progress flags (see app/onboarding.tsx) are
+      // device-scoped, not per-account, so a half-finished attempt from the
+      // account that just signed out must not leak into the next sign-up on
+      // this device (e.g. a different friend using the same phone/Expo Go).
+      AsyncStorage.multiRemove(['onboarding_pending_flow', 'onboarding_pending_username']).catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, isLoaded]);
@@ -531,7 +536,7 @@ function AuthGate() {
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
       (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
-      ['buyer-product-detail', 'buyer-checkout', 'seller-profile'].includes(segments[0] as string);
+      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
 
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
     const devRole = PREVIEW_ROLE ?? DEV_BYPASS_ROLE;
@@ -748,6 +753,13 @@ function RootLayoutNav() {
     'manufacturer-hub': 'manufacturerHub',
   };
   const feature = gatedRoutes[route];
+  const pathname = segments.join('/');
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    recordNavigationStart(pathname || '/', queryClient);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   useEffect(() => {
     void flushNotificationEvents(api, userId);
@@ -1070,6 +1082,9 @@ function RootLayoutNav() {
         <Stack.Screen name="design-bg-removal"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-bg-replace"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-campaign"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="meta-ads-connect"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="meta-ads-setup"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="meta-ads-manage"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-mockup-preview"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-export"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="design-versions"          options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1155,7 +1170,10 @@ export default function RootLayout() {
   const appTree = (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister: queryPersister, maxAge: 24 * 60 * 60_000 }}
+        >
           <GestureHandlerRootView style={{ flex: 1 }}>
             <CookieConsentProvider>
             <AppThemeProvider>
@@ -1179,7 +1197,7 @@ export default function RootLayout() {
             </AppThemeProvider>
             </CookieConsentProvider>
           </GestureHandlerRootView>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

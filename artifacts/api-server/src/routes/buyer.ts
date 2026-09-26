@@ -17,6 +17,7 @@ import {
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { refundOrder, RefundError } from "../lib/money/refunds";
+import { withItemProductIds } from "../lib/orderItemProducts";
 import {
   bindLoyaltyRedemptionToCheckout,
   LoyaltyRedemptionError,
@@ -1387,10 +1388,10 @@ router.get("/orders/:id", async (req, res) => {
       return;
     }
 
-    const items = await db
+    const items = await withItemProductIds(await db
       .select()
       .from(orderItems)
-      .where(eq(orderItems.orderId, row.id));
+      .where(eq(orderItems.orderId, row.id)));
 
     // Cancellation details are customer-visible only when the order is
     // cancelled and has a reason. Keep the notes behind the same boundary so

@@ -26,6 +26,7 @@ import pushRouter from "./push";
 import aiRouter from "./ai";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
+import profileMediaRouter from "./profile-media";
 import buyerRouter from "./buyer";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter from "./connect";
@@ -40,6 +41,7 @@ import cartDbRouter from "./cart-db";
 import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
 import postsRouter from "./posts";
+import feedRouter from "./feed";
 import reportsRouter from "./reports";
 import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
@@ -69,6 +71,7 @@ import sellerVerificationRouter from "./seller-verification";
 import waitlistRouter from "./waitlist";
 import bundlesRouter from "./bundles";
 import buyerProductsRouter from "./buyer-products";
+import recentlyViewedRouter from "./recently-viewed";
 import sellerLocationsRouter from "./seller-locations";
 import sellerMetafieldsRouter from "./seller-metafields";
 import sellerSettingsExtRouter from "./seller-settings-route";
@@ -81,6 +84,7 @@ import freelancerConnectRouter from "./freelancer-connect";
 import freelancerJobsRouter from "./freelancer-jobs";
 import boostsRouter    from "./boosts";
 import adCampaignsRouter from "./ad-campaigns";
+import metaAdsRouter from "./meta-ads";
 import vacationRouter  from "./vacation";
 import loyaltyRouter   from "./loyalty";
 import threadCashRouter from "./thread-cash";
@@ -97,6 +101,7 @@ const router = Router();
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
 router.use("/public",          publicRouter);
+router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);
@@ -150,6 +155,7 @@ router.use("/ai",              tc, aiRouter);
 router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
 router.use("/buyer/products",            buyerProductsRouter);
+router.use("/buyer/recently-viewed",     recentlyViewedRouter);
 router.use("/buyer/saved",               savedRouter);
 router.use("/buyer/collections",         collectionsRouter);
 router.use("/buyer/cart",                cartDbRouter);
@@ -166,6 +172,7 @@ router.use("/reviews",                   tc, reviewsRouter);
 // ahead of the team-context posts router.
 router.use("/posts",                     postCommentsRouter);
 router.use("/posts",                     tc, postsRouter);
+router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/reports",                   reportsRouter);
 router.use("/moderation",                moderationRouter);
 router.use("/safety",                    safetyRouter);
@@ -209,6 +216,7 @@ router.use("/live",                      tc, requirePlan("pro"), liveRouter);
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
 router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
+router.use("/meta-ads",                  tc, metaAdsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc

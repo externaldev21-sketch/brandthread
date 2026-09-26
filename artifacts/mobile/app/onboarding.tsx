@@ -155,6 +155,7 @@ const SELLER_LOADING_STEPS = ['Mapping your brand workspace', 'Preparing your pr
 const LEGACY_DRAFT_KEY = 'onboarding_draft';
 const DRAFT_KEY_PREFIX = 'onboarding_draft:';
 const PENDING_FLOW_KEY = 'onboarding_pending_flow';
+const PENDING_USERNAME_KEY = 'onboarding_pending_username';
 // Draft version, step index objects and cross-version migration now live in
 // lib/onboardingFlow.ts (imported above) — this file only renders steps.
 
@@ -734,11 +735,12 @@ function BuyerAuthStep({
             const referralQuery = referralCode
               ? `&referralCode=${encodeURIComponent(referralCode)}`
               : '';
-            const url = decorateUrl(`/onboarding?postAuth=1${referralQuery}`);
+            const destination = `/onboarding?postAuth=1${referralQuery}`;
+            const url = decorateUrl(destination);
             if (url.startsWith('http') && typeof window !== 'undefined') {
               window.location.href = url;
             } else {
-              router.replace('/onboarding' as never);
+              router.replace(destination as never);
             }
           },
         });
@@ -1822,6 +1824,14 @@ export default function OnboardingScreen() {
   const [firstName, setFirstName]         = useState('');
   const [lastName, setLastName]           = useState('');
   const [username, setUsername]           = useState('');
+  // The username is chosen on the Auth step, before the Clerk account exists,
+  // so the user-scoped draft (which needs user.id) can't persist it yet. Mirror
+  // it into a device-scoped key immediately so a remount during/after email
+  // verification (e.g. the postAuth web redirect) can't silently drop it.
+  const updateUsername = useCallback((value: string) => {
+    setUsername(value);
+    void AsyncStorage.setItem(PENDING_USERNAME_KEY, value).catch(() => {});
+  }, []);
   const [referralCode, setReferralCode]   = useState(
     typeof referralCodeParam === 'string'
       ? referralCodeParam.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12)
@@ -1903,9 +1913,11 @@ export default function OnboardingScreen() {
         const values = await AsyncStorage.multiGet([
           ...(draftKey ? [draftKey] : []),
           PENDING_FLOW_KEY,
+          PENDING_USERNAME_KEY,
         ]);
         const draftVal = draftKey ? values.find(([key]) => key === draftKey)?.[1] : null;
         const pendingFlow = values.find(([key]) => key === PENDING_FLOW_KEY)?.[1];
+        const pendingUsername = values.find(([key]) => key === PENDING_USERNAME_KEY)?.[1];
 
         if (draftVal) {
           try {
@@ -1933,6 +1945,12 @@ export default function OnboardingScreen() {
               ? pendingFlow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME
               : pendingFlow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH,
           );
+        }
+        // The Auth step's typed username lives only in this component's state
+        // until a Clerk user exists to key the per-user draft. A remount before
+        // then (e.g. the web postAuth redirect) would otherwise lose it silently.
+        if (pendingUsername) {
+          setUsername((current) => current || pendingUsername);
         }
       } catch {
         // Local persistence is optional; a storage issue must not block signup.
@@ -2066,10 +2084,19 @@ export default function OnboardingScreen() {
     if (!selectedFlow) return;
     const initiatedAt = performance.now();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // After AccountType (step 0), go to path-specific Auth (step 1)
-    const next = selectedFlow === 'buyer'
-      ? BUYER_STEP_INDEX.AUTH
-      : SELLER_STEP_INDEX.AUTH;
+    // A session is already active here in two cases: this flow's own sign-up
+    // just verified (isSignedIn flipped true, but a remount lost `flow` and
+    // routed back through AccountType to re-pick it), or a signed-in user is
+    // resuming onboarding they never finished. Neither should ever be sent
+    // back into the Auth/sign-up screen — only a deliberate "add another
+    // account" flow (isAddAccount) still needs it, to create a second,
+    // separate Clerk identity while the first stays signed in.
+    const skipAuth = isSignedIn && !isAddAccount;
+    // After AccountType (step 0), go to path-specific Auth (step 1), unless
+    // already signed in, in which case go straight to the next step (Name).
+    const next = skipAuth
+      ? (selectedFlow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME)
+      : (selectedFlow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH);
     void AsyncStorage.multiSet([
       [PENDING_FLOW_KEY, selectedFlow],
       [ONBOARDING_KEY, 'false'],
@@ -2079,6 +2106,23 @@ export default function OnboardingScreen() {
   }
 
   // ── Finish handlers ─────────────────────────────────────────────────────────
+  // A username can be taken between the Auth step and final submit (another
+  // signup wins the race, or the same handle is reused after a partial retry).
+  // Blindly retrying the save would fail identically forever, so this case is
+  // routed back to the Auth step instead of the generic "try again" alert.
+  function isUsernameTakenError(error: unknown): boolean {
+    return error instanceof ApiError && error.status === 409 && /username/i.test(error.message);
+  }
+
+  function returnToAuthForUsernameConflict(targetStep: number) {
+    setFinishing(false);
+    Alert.alert(
+      'Username taken',
+      'That username was just taken by someone else. Please choose another.',
+      [{ text: 'Choose another', onPress: () => transitionTo(targetStep, -1) }],
+    );
+  }
+
   function logBuyerOnboardingFailure(stage: string, error: unknown, retryAttempt: boolean) {
     const apiError = error instanceof ApiError ? error : null;
     console.error('[buyer-onboarding] save failed', {
@@ -2140,7 +2184,7 @@ export default function OnboardingScreen() {
         ['onboarding_style_interests', JSON.stringify(styleInterests)],
       ]);
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
-      await AsyncStorage.removeItem(PENDING_FLOW_KEY);
+      await AsyncStorage.multiRemove([PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
       // Route to the feed explainer for first-time buyers
       router.replace('/thread-explainer' as never);
@@ -2151,6 +2195,10 @@ export default function OnboardingScreen() {
         error,
         retryAttempt,
       );
+      if (isUsernameTakenError(error)) {
+        returnToAuthForUsernameConflict(BUYER_STEP_INDEX.AUTH);
+        return;
+      }
       if (
         retryAttempt
         && failureStage === 'preferences-or-completion'
@@ -2228,16 +2276,24 @@ export default function OnboardingScreen() {
         ['onboarding_selected_plan', selectedPlanId],
       ]);
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
-      await AsyncStorage.removeItem(PENDING_FLOW_KEY);
+      await AsyncStorage.multiRemove([PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
       api.ai.brandMemoryRebuild().catch(() => {});
       router.replace('/(tabs)/' as never);
-    } catch {
+    } catch (error) {
       setFinishing(false);
+      console.error('[seller-onboarding] save failed', {
+        name: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      if (isUsernameTakenError(error)) {
+        returnToAuthForUsernameConflict(SELLER_STEP_INDEX.AUTH);
+        return;
+      }
       Alert.alert(
         'Setup incomplete',
         "We couldn\u2019t save your brand profile. Check your connection and try again.",
-        [{ text: 'Retry', onPress: finishSeller }],
+        [{ text: 'Retry', onPress: () => { void finishSeller(); } }],
       );
     }
   }
@@ -2246,7 +2302,7 @@ export default function OnboardingScreen() {
   async function devReset() {
     try { if (isSignedIn) await signOut(); } catch {}
     await AsyncStorage.multiRemove([
-      ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', LEGACY_DRAFT_KEY, PENDING_FLOW_KEY,
+      ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', LEGACY_DRAFT_KEY, PENDING_FLOW_KEY, PENDING_USERNAME_KEY,
       ...(user?.id ? [draftKeyForUser(user.id)!] : []),
       'onboarding_first_name', 'onboarding_brand_name',
       'onboarding_style_interests', 'splash_seen',
@@ -2336,7 +2392,7 @@ export default function OnboardingScreen() {
             onAuthComplete={handleAuthComplete}
             onDevClear={devReset}
             username={username}
-            onUsernameChange={setUsername}
+            onUsernameChange={updateUsername}
             referralCode={referralCode}
             onReferralCodeChange={setReferralCode}
             onFirstNamePrefill={setFirstName}
@@ -2434,7 +2490,7 @@ export default function OnboardingScreen() {
             onAuthComplete={handleAuthComplete}
             onDevClear={devReset}
             username={username}
-            onUsernameChange={setUsername}
+            onUsernameChange={updateUsername}
             referralCode={referralCode}
             onReferralCodeChange={setReferralCode}
             onFirstNamePrefill={setFirstName}

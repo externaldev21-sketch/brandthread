@@ -7,8 +7,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput,
   ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Alert, Dimensions,
+  Alert, Dimensions, Share,
 } from 'react-native';
+import * as ExpoLinking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -216,6 +217,22 @@ function BuyerLiveNativeScreen() {
     }
   }
 
+  async function shareStream() {
+    const sellerName: string = stream?.brand_name ?? stream?.seller_name ?? 'this seller';
+    const title = stream?.title ?? `${sellerName} live`;
+    const streamUrl = ExpoLinking.createURL('/buyer-live', {
+      queryParams: { streamId: params.streamId },
+    });
+    try {
+      await Share.share({
+        message: `Watch ${sellerName} live on Brandthread: ${title}\n${streamUrl}`,
+        url: streamUrl,
+      });
+    } catch {
+      // User dismissed the native share sheet — nothing to do.
+    }
+  }
+
   function openStreamOptions() {
     const sellerId: string | undefined = stream?.seller_id;
     const sellerName: string = stream?.brand_name ?? stream?.seller_name ?? 'this seller';
@@ -408,6 +425,13 @@ function BuyerLiveNativeScreen() {
             <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
           </View>
           <IconButton
+            name="share"
+            onPress={shareStream}
+            variant="plain"
+            color="#fff"
+            accessibilityLabel="Share this live stream"
+          />
+          <IconButton
             name="more-horizontal"
             onPress={openStreamOptions}
             variant="plain"
@@ -508,11 +532,12 @@ function BuyerLiveNativeScreen() {
           <View style={s.purchaseHeader}>
             <View style={{ flex: 1 }}>
               <Text style={s.purchaseEyebrow}>Buy without leaving</Text>
-              <Text style={s.purchaseTitle}>{purchaseTag.productName}</Text>
+              <Text style={s.purchaseTitle} numberOfLines={1}>{purchaseTag.productName}</Text>
             </View>
             <PressableScale
               onPress={() => { hapticLight(); setPurchaseTag(null); }}
               style={s.purchaseClose}
+              hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel="Close purchase sheet"
             >

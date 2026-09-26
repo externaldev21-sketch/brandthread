@@ -46,7 +46,7 @@ const CONFIG: Record<string, Config> = {
   media: { title: 'Media quality and data usage', items: s => [{ label: 'Use less cellular data', toggle: 'dataSaver' }, { label: 'Upload at highest quality', toggle: 'highQualityUploads' }, { label: 'Autoplay videos', toggle: 'autoplayVideos' }] },
   appearance: { title: 'Appearance', items: s => [{ label: 'Theme', value: s.theme }, { label: 'Reduce motion', toggle: 'reduceMotion' }] },
   'privacy-center': { title: 'Privacy Center', items: () => [{ label: 'Privacy policy', icon: 'file-text' }, { label: 'How Brandthread uses your data', icon: 'database' }, { label: 'Ad and recommendation controls', icon: 'sliders' }, { label: 'Download your information', icon: 'download' }] },
-  about: { title: 'About Brandthread', items: () => [{ label: 'App version', value: '1.0.0' }, { label: 'Terms of service', icon: 'file-text' }, { label: 'Community guidelines', icon: 'users' }, { label: 'Open-source licenses', icon: 'code' }] },
+  about: { title: 'About Brandthread', items: (_s, router) => [{ label: 'App version', value: '1.0.0' }, { label: 'Terms of service', icon: 'file-text', action: () => router?.push('/terms' as never) }, { label: 'Community guidelines', icon: 'users', action: () => router?.push('/community-guidelines' as never) }, { label: 'Open-source licenses', icon: 'code' }] },
 };
 
 export default function BuyerSettingsDetail() {

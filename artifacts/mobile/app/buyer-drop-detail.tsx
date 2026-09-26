@@ -486,18 +486,18 @@ export default function BuyerDropDetail() {
           )}
 
           <View style={[styles.heroHeader, { paddingTop: insets.top + SP.sm }]}>
-            <TouchableOpacity style={styles.roundButton} onPress={() => router.back()} accessibilityLabel="Go back">
+            <TouchableOpacity style={styles.roundButton} onPress={() => router.back()} hitSlop={4} accessibilityLabel="Go back">
               <Feather name="arrow-left" size={21} color={ON_DARK} />
             </TouchableOpacity>
             <View style={styles.heroBadge}>
               <Text style={styles.heroBadgeText}>{showRecap ? 'DROP ENDED' : (isLive ? 'LIVE DROP' : 'UPCOMING')}</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity style={styles.roundButton} onPress={handleShare} accessibilityLabel="Share this drop">
+              <TouchableOpacity style={styles.roundButton} onPress={handleShare} hitSlop={4} accessibilityLabel="Share this drop">
                 <Feather name="share" size={18} color={ON_DARK} />
               </TouchableOpacity>
               {!showRecap && (
-                <TouchableOpacity style={styles.roundButton} onPress={toggleNotification} accessibilityLabel="Toggle drop alert">
+                <TouchableOpacity style={styles.roundButton} onPress={toggleNotification} hitSlop={4} accessibilityLabel="Toggle drop alert">
                   <Feather name={subscribed ? 'bell-off' : 'bell'} size={19} color={ON_DARK} />
                 </TouchableOpacity>
               )}

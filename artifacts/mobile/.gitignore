@@ -41,3 +41,5 @@ yarn-error.*
 
 .env
 .store-screenshots/
+.onboarding-walkthrough/
+scripts/onboarding-walkthrough/output/

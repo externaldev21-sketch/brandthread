@@ -9,6 +9,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
+const { renderSharePreviewHtml } = require('./sharePreview');
 
 const STATIC_ROOT = path.resolve(
   __dirname,
@@ -42,6 +44,19 @@ function send(res, status, body, contentType = 'text/plain; charset=utf-8') {
   res.end(body);
 }
 
+function sendHtml(res, status, html, acceptEncoding = '') {
+  if (/\bgzip\b/.test(acceptEncoding)) {
+    res.writeHead(status, {
+      'content-type': 'text/html; charset=utf-8',
+      'content-encoding': 'gzip',
+      'vary': 'Accept-Encoding',
+    });
+    res.end(zlib.gzipSync(html));
+    return;
+  }
+  send(res, status, html, 'text/html; charset=utf-8');
+}
+
 function safeFilePath(urlPath) {
   const normalized = path.posix.normalize(`/${urlPath}`).replace(/^\/+/, '');
   const filePath = path.resolve(STATIC_ROOT, normalized);
@@ -51,16 +66,29 @@ function safeFilePath(urlPath) {
   return filePath;
 }
 
-function serveFile(filePath, res) {
+const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.css', '.json', '.svg', '.map']);
+
+function serveFile(filePath, res, acceptEncoding = '') {
   if (!filePath || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     return false;
   }
   const ext = path.extname(filePath).toLowerCase();
-  res.writeHead(200, {
+  const headers = {
     'content-type': MIME_TYPES[ext] || 'application/octet-stream',
     'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
-  });
-  res.end(fs.readFileSync(filePath));
+  };
+  const body = fs.readFileSync(filePath);
+  // Text assets compress well and dominate initial page weight (JS bundles,
+  // the HTML shell); images/fonts are already compressed formats.
+  if (COMPRESSIBLE_EXTS.has(ext) && /\bgzip\b/.test(acceptEncoding)) {
+    headers['content-encoding'] = 'gzip';
+    headers['vary'] = 'Accept-Encoding';
+    res.writeHead(200, headers);
+    res.end(zlib.gzipSync(body));
+    return true;
+  }
+  res.writeHead(200, headers);
+  res.end(body);
   return true;
 }
 
@@ -75,7 +103,7 @@ function canonicalRedirectLocation(req, requestUrl) {
   return `${CANONICAL_ORIGIN}${requestUrl.pathname}${requestUrl.search}`;
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   let pathname;
   let requestUrl;
   try {
@@ -112,12 +140,21 @@ const server = http.createServer((req, res) => {
     send(res, 400, 'Bad Request');
     return;
   }
-  if (serveFile(safeFilePath(requestedPath), res)) return;
+  const acceptEncoding = String(req.headers['accept-encoding'] || '');
+  if (serveFile(safeFilePath(requestedPath), res, acceptEncoding)) return;
 
   // Only browser navigations get the SPA shell. Missing JS/image requests
   // should remain a real 404 instead of returning HTML with status 200.
   const acceptsHtml = String(req.headers.accept || '').includes('text/html');
-  if (acceptsHtml && serveFile(path.join(STATIC_ROOT, 'index.html'), res)) return;
+  if (acceptsHtml) {
+    const shellPath = path.join(STATIC_ROOT, 'index.html');
+    if (fs.existsSync(shellPath)) {
+      const shellHtml = fs.readFileSync(shellPath, 'utf8');
+      const preview = await renderSharePreviewHtml(requestedPath, shellHtml).catch(() => null);
+      sendHtml(res, 200, preview || shellHtml, acceptEncoding);
+      return;
+    }
+  }
 
   send(res, 404, 'Not Found');
 });

@@ -30,7 +30,7 @@ vi.mock("drizzle-orm", () => ({
 
 // A minimal thenable query-builder stand-in supporting whatever chain of
 // join/where/groupBy/orderBy/limit/having calls a route makes; each fresh
-// `db.select()` call consumes the next queued result set.
+// each fresh call to the mocked db's select consumes the next queued result set.
 function chainable(rows: unknown[]) {
   const obj: any = {
     from: () => obj,
@@ -73,6 +73,7 @@ vi.mock("@workspace/db", () => {
     blocks:                table("blocks"),
     mutedWords:            table("mutedWords"),
     reports:               table("reports"),
+    searchLog:             table("searchLog"),
   };
 });
 
@@ -110,6 +111,7 @@ beforeEach(() => {
 describe("search empty-state endpoints", () => {
   it("returns trending categories and brands", async () => {
     state.selectQueue = [
+      [], // loggedTrending (below the minimum, falls back to category/follower approximation)
       [{ category: "apparel", count: 12 }, { category: "accessories", count: 4 }], // topCategories
       [{ sellerId: "seller-1", followerCount: 9 }], // topBrands
       [{ clerkId: "seller-1", displayName: "Seller One", brandName: "Brand One" }], // brandRows
@@ -129,7 +131,7 @@ describe("search empty-state endpoints", () => {
   });
 
   it("returns an empty trending list gracefully when there is no data yet", async () => {
-    state.selectQueue = [[], [], []];
+    state.selectQueue = [[], [], []]; // loggedTrending, topCategories, topBrands (brandRows fetch skipped: no brands)
     const response = await fetch(`${base}/api/public/search/trending`);
     const body = await response.text();
     expect(response.status, body).toBe(200);
@@ -156,5 +158,27 @@ describe("search empty-state endpoints", () => {
     expect(json.brands[0]).toMatchObject({ sellerId: "seller-1", name: "Brand One", followerCount: 20 });
     expect(json.products).toHaveLength(1);
     expect(json.products[0]).toMatchObject({ id: "product-1", name: "New Jacket", brand: "Brand One", imageUri: "img.jpg" });
+  });
+
+  it("returns one representative-image category tile per top category", async () => {
+    state.selectQueue = [
+      [{ category: "apparel", count: 12 }, { category: "accessories", count: 4 }], // topCategories
+      [{ id: "product-1", images: ["apparel.jpg"], ownerId: "seller-1" }], // representative product for "apparel"
+      [], // no active/imaged product yet for "accessories"
+    ];
+
+    const response = await fetch(`${base}/api/public/search/categories?limit=8`);
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    const json = JSON.parse(body);
+    expect(json.categories).toHaveLength(2);
+    expect(json.categories[0]).toMatchObject({ category: "apparel", productCount: 12, imageUri: "apparel.jpg" });
+    expect(json.categories[1]).toMatchObject({ category: "accessories", productCount: 4, imageUri: null });
+    expect(typeof json.categories[0].color).toBe("string");
+  });
+
+  it("rejects a non-positive limit on /search/categories", async () => {
+    const response = await fetch(`${base}/api/public/search/categories?limit=0`);
+    expect(response.status).toBe(400);
   });
 });

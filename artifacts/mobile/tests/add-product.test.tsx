@@ -54,6 +54,32 @@ vi.mock('@/components/ui/Button', () => {
   };
 });
 
+vi.mock('@/components/ui/SuccessSheet', () => {
+  const React = require('react') as typeof import('react');
+  // The real component pulls in BottomSheet -> react-native-reanimated,
+  // which this suite's plain react-native mock doesn't support (no test
+  // here exercises the publish-success sheet's content) — stub it to just
+  // render nothing when hidden and its actions as plain pressables when
+  // visible, so a future test asserting on it can still find them.
+  return {
+    SuccessSheet: ({ visible, title, primaryAction, secondaryAction, testID }: {
+      visible: boolean; title: string;
+      primaryAction: { label: string; onPress: () => void };
+      secondaryAction?: { label: string; onPress: () => void };
+      testID?: string;
+    }) => {
+      if (!visible) return null;
+      return React.createElement('View', { testID }, [
+        React.createElement('Text', { key: 'title' }, title),
+        React.createElement('Button', { key: 'primary', onPress: primaryAction.onPress, accessibilityLabel: primaryAction.label }, primaryAction.label),
+        secondaryAction
+          ? React.createElement('Button', { key: 'secondary', onPress: secondaryAction.onPress, accessibilityLabel: secondaryAction.label }, secondaryAction.label)
+          : null,
+      ]);
+    },
+  };
+});
+
 vi.mock('expo-linear-gradient', () => ({
   LinearGradient: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement('LinearGradient', props, children),
