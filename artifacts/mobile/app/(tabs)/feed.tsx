@@ -1230,7 +1230,7 @@ function ShopSideTab({
   onPress: () => void;
   isActive: boolean;
 }) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1269,6 +1269,13 @@ function ShopSideTab({
   // big card — sized off the live window width so it holds at 375/390/430.
   const expandedWidth = Math.round(windowWidth * 0.62);
   const width = anim.interpolate({ inputRange: [0, 1], outputRange: [28, expandedWidth] });
+  // Clamped, not a bare 57%: on the shortest screens (e.g. 375x667) with a
+  // repost-identity chip and a full 2-line caption, the caption block's top
+  // edge can rise as high as ~this tab's bottom edge at a bare 57%, closing
+  // the gap to nothing. windowHeight - 340 only overrides the 57% on those
+  // short screens — on 390x844+ this is always >= the 57% value, so the tab
+  // stays exactly where it was there.
+  const tabTop = Math.min(windowHeight * 0.57, windowHeight - 340);
   const collapsedOpacity = anim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [1, 0, 0] });
   const expandedOpacity = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 0, 1] });
   const expandedTranslate = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [8, 8, 0] });
@@ -1286,7 +1293,7 @@ function ShopSideTab({
         />
       )}
       <Animated.View
-        style={[styles.shopSideTab, { width }]}
+        style={[styles.shopSideTab, { width, top: tabTop }]}
         accessibilityRole="button"
         accessibilityLabel={
           expanded
@@ -1694,7 +1701,7 @@ function SpotlightPage({
           accessibilityRole="button"
           accessibilityLabel={`Comments, ${formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}`}
         >
-          <FontAwesome name="commenting" size={30} color={ON_DARK} />
+          <FontAwesome name="commenting" size={30} color={ON_DARK} style={styles.railIconShadow} />
           <Text style={styles.railCount}>{formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}</Text>
         </TouchableOpacity>
 
@@ -1756,7 +1763,7 @@ function SpotlightPage({
             setShareOpen(true);
           }}
         >
-          <FontAwesome name="share" size={30} color={ON_DARK} />
+          <FontAwesome name="share" size={30} color={ON_DARK} style={styles.railIconShadow} />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
@@ -3443,6 +3450,14 @@ const styles = StyleSheet.create({
   },
   railCount: {
     fontSize: 12, lineHeight: 14, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  // Same shadow as railCount above, applied to the rail's two plain icons
+  // (comment, share — the EngagementButton-driven icons get the matching
+  // ebStyles.iconShadow in EngagementButton.tsx). Without it, comment and
+  // share's outline-ish glyph strokes wash out against bright footage even
+  // at full white/opacity 1.
+  railIconShadow: {
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
