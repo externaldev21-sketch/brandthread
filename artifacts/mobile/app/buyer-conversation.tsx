@@ -42,7 +42,7 @@ import ChatWallpaper from '@/components/chat/ChatWallpaper';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaViewer from '@/components/chat/MediaViewer';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { ThreadCashAttachButton, ThreadCashMessageCard } from '@/components/thread-cash/ChatAttachThreadCash';
+import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashCoinMark } from '@/components/thread-cash/ChatAttachThreadCash';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 import {
   ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
@@ -155,6 +155,17 @@ const SCREEN_W = Dimensions.get('window').width;
 const BUBBLE_MAX = SCREEN_W * 0.75;
 const DOUBLE_TAP_MS = 300;
 
+// ─── Composer sizing ────────────────────────────────────────────────────────────
+// One consistent size for every circular control in the composer row (the
+// "+" attach button, the in-pill Thread Cash coin, and the mic⇄send morph) —
+// the previous 44/36/44 mix is exactly what read as mismatched.
+const COMPOSER_CONTROL = 36;
+// The pill grows with the TextInput up to ~5 lines, then scrolls internally.
+const COMPOSER_LINE_HEIGHT = 20;
+const COMPOSER_MAX_LINES = 5;
+const COMPOSER_TEXT_V_PADDING = SP.sm; // matches s.textInput's own vertical padding below
+const COMPOSER_MAX_INPUT_HEIGHT = COMPOSER_LINE_HEIGHT * COMPOSER_MAX_LINES + COMPOSER_TEXT_V_PADDING * 2;
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerConversationScreen() {
@@ -191,6 +202,13 @@ export default function BuyerConversationScreen() {
   // this screen's session; a fresh message fetch elsewhere will show the
   // original status again until the server exposes a live lookup.
   const [threadCashOverrides, setThreadCashOverrides] = useState<Record<string, ThreadCashTransferStatus>>({});
+  // Whether the other participant and I are mutual follows, purely to drive
+  // the Thread Cash entry point's enabled/disabled affordance in the
+  // composer — null while unknown/loading. The server independently
+  // re-validates mutual follow at send AND claim, so this client read can
+  // never itself be the security boundary; it only decides whether the coin
+  // shows as tappable or as a disabled affordance with an explanation.
+  const [threadCashMutual, setThreadCashMutual] = useState<boolean | null>(null);
   /** The signed-in Clerk user; legacy local records used the literal 'me'. */
   const myId = userId ?? MY_USER_ID;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
@@ -202,6 +220,7 @@ export default function BuyerConversationScreen() {
   const [isSending, setIsSending] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
   const [isRecording, setIsRecording]         = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
@@ -398,6 +417,25 @@ export default function BuyerConversationScreen() {
     || convType === 'buyer_to_seller_product'
     || convType === 'buyer_to_seller_order';
   const sellerUserId = participant?.userId ?? params.participantId ?? '';
+
+  // The Thread Cash entry point always renders (once the feature flag is
+  // on) — it never fully disappears for a non-mutual-follow counterpart —
+  // but stays disabled with an explanation until we can confirm mutual
+  // follow. This is an affordance check only; see the state's own comment.
+  useEffect(() => {
+    let cancelled = false;
+    if (!threadCashSendEnabled || !sellerUserId || isPreviewConversationId(conv?.id ?? '')) {
+      setThreadCashMutual(null);
+      return;
+    }
+    api.social.status(sellerUserId)
+      .then((status) => { if (!cancelled) setThreadCashMutual(status.isMutual); })
+      .catch(() => { if (!cancelled) setThreadCashMutual(false); });
+    return () => { cancelled = true; };
+  }, [threadCashSendEnabled, sellerUserId, conv?.id, api]);
+  const threadCashDisabledReason = threadCashMutual === false
+    ? `Follow each other to send Thread Cash${participant?.name ? ` with ${participant.name}` : ''}.`
+    : 'Checking Thread Cash eligibility…';
 
   // ── Load seller products for attachment picker ───────────────────────────────
 
@@ -1335,8 +1373,10 @@ export default function BuyerConversationScreen() {
               </PressableScale>
             </View>
           )}
-          <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
-            {/* Attach — photos, video, and (for seller chats) products/posts */}
+          <View style={[s.inputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
+            {/* Attach — photos, video, Thread Cash (Apple-Cash-style), and
+                (for seller chats) products/posts. A single plain "+" — no
+                filled blob — matching the restraint of iMessage/Snapchat. */}
             <PressableScale rippleEnabled={false}
               onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
               style={s.roundInputBtn}
@@ -1347,98 +1387,133 @@ export default function BuyerConversationScreen() {
               accessibilityLabel="Attach"
             >
               {isUploading
-                ? <UploadRing size={24} color={theme.accent} />
-                : <Feather name="plus" size={ICON.md} color={theme.muted} />
+                ? <UploadRing size={ICON.md} color={theme.accent} />
+                : <Feather name="plus" size={ICON.md} color={theme.text} />
               }
             </PressableScale>
 
-            {/* Minimal attach entry — works for any conversation participant
-                (buyer-to-buyer friends included), server-gated by mutual
-                follow at send AND claim. The transfer is already final by
-                the time onSent fires, so the bubble is posted immediately
-                rather than staged in the composer. */}
-            {threadCashSendEnabled && sellerUserId ? (
-              <ThreadCashAttachButton
-                recipientId={sellerUserId}
-                conversationId={conv?.id ?? ''}
-                onSent={async ({ transferId, amountCents, note }) => {
-                  if (!conv) return;
-                  try {
-                    await sendMessage(conv.id, '', {
-                      type: 'thread_cash',
-                      title: 'Thread Cash',
-                      accentColor: theme.accent,
-                      meta: {
-                        transferId,
-                        senderId: myId,
-                        amountCents: String(amountCents),
-                        status: 'pending',
-                        ...(note ? { note } : {}),
-                      },
-                    });
-                    const msgs = await getMessages(conv.id);
-                    setMessages(msgs);
-                    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
-                  } catch (e) {
-                    Alert.alert('Sent, but the chat message failed', apiErrorMessage(e, 'The Thread Cash send went through — refresh to see it in chat.'));
-                  }
-                }}
+            {/* One pill: text input, the Thread Cash coin (left of the
+                mic/send control), and the mic⇄send morph — all inside the
+                same rounded bounds instead of floating as separate siblings. */}
+            <View style={s.pill}>
+              <TextInput
+                style={s.textInput}
+                value={text}
+                onChangeText={setText}
+                placeholder="Message…"
+                placeholderTextColor={theme.muted}
+                multiline
+                returnKeyType="default"
               />
-            ) : null}
 
-            {/* Text input */}
-            <TextInput
-              style={s.textInput}
-              value={text}
-              onChangeText={setText}
-              placeholder="Message…"
-              placeholderTextColor={theme.muted}
-              multiline
-              returnKeyType="default"
-            />
+              {/* Minimal Thread Cash entry — works for any conversation
+                  participant (buyer-to-buyer friends included). Always
+                  rendered once the feature flag is on: disabled with an
+                  explanation rather than hidden when not yet confirmed as a
+                  mutual follow. The transfer is already final by the time
+                  onSent fires, so the bubble is posted immediately rather
+                  than staged in the composer. The server independently
+                  re-validates mutual follow at send AND claim — this is an
+                  affordance check only, never the security boundary. */}
+              {threadCashSendEnabled && sellerUserId ? (
+                <ThreadCashAttachButton
+                  recipientId={sellerUserId}
+                  conversationId={conv?.id ?? ''}
+                  disabled={threadCashMutual !== true}
+                  disabledReason={threadCashDisabledReason}
+                  renderTrigger={(open) => (
+                    <PressableScale rippleEnabled={false}
+                      onPress={() => {
+                        // Alert.alert() is a documented no-op on web (RN Web
+                        // ships an empty stub), so the disabled explanation
+                        // is surfaced here via the app's own Snackbar
+                        // instead — visible and consistent on every
+                        // platform, not just native.
+                        if (threadCashMutual !== true) {
+                          setThreadCashNotice(threadCashDisabledReason);
+                          setTimeout(() => setThreadCashNotice(null), 3000);
+                          return;
+                        }
+                        open();
+                      }}
+                      style={s.threadCashCoinBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      testID="conversation-thread-cash"
+                      accessibilityRole="button"
+                      accessibilityLabel={threadCashMutual !== true ? `Thread Cash — ${threadCashDisabledReason}` : 'Send Thread Cash'}
+                      accessibilityState={{ disabled: threadCashMutual !== true }}
+                    >
+                      <ThreadCashCoinMark size={ICON.md} color={theme.text} accent={theme.accent} disabled={threadCashMutual !== true} />
+                    </PressableScale>
+                  )}
+                  onSent={async ({ transferId, amountCents, note }) => {
+                    if (!conv) return;
+                    try {
+                      await sendMessage(conv.id, '', {
+                        type: 'thread_cash',
+                        title: 'Thread Cash',
+                        accentColor: theme.accent,
+                        meta: {
+                          transferId,
+                          senderId: myId,
+                          amountCents: String(amountCents),
+                          status: 'pending',
+                          ...(note ? { note } : {}),
+                        },
+                      });
+                      const msgs = await getMessages(conv.id);
+                      setMessages(msgs);
+                      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+                    } catch (e) {
+                      Alert.alert('Sent, but the chat message failed', apiErrorMessage(e, 'The Thread Cash send went through — refresh to see it in chat.'));
+                    }
+                  }}
+                />
+              ) : null}
 
-            {/* Mic ⇄ Send morph */}
-            <View style={s.morphContainer}>
-              <Animated.View
-                pointerEvents={showSendButton ? 'none' : 'auto'}
-                style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
-              >
-                <PressableScale rippleEnabled={false}
-                  onPressIn={startRecording}
-                  onPressOut={stopRecording}
-                  disabled={isUploading || isSending}
-                  style={s.morphFaceInner}
-                  testID="conversation-mic"
-                  accessibilityRole="button"
-                  accessibilityLabel="Record voice message"
+              {/* Mic ⇄ Send morph, inside the pill's own bounds */}
+              <View style={s.morphContainer}>
+                <Animated.View
+                  pointerEvents={showSendButton ? 'none' : 'auto'}
+                  style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
                 >
-                  <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.md} color={isRecording ? theme.error : theme.muted} />
-                </PressableScale>
-              </Animated.View>
-              <Animated.View
-                pointerEvents={showSendButton ? 'auto' : 'none'}
-                style={[
-                  StyleSheet.absoluteFill, s.morphFace,
-                  { opacity: sendOpacity, transform: [{ scale: sendScale }], backgroundColor: canSend ? theme.accent : theme.cardElevated },
-                ]}
-              >
-                <PressableScale rippleEnabled={false}
-                  onPress={() => { hapticPrimaryAction(); handleSend(); }}
-                  disabled={!canSend}
-                  style={s.morphFaceInner}
-                  activeOpacity={0.8}
-                  testID="conversation-send"
-                  accessibilityRole="button"
-                  accessibilityLabel="Send message"
+                  <PressableScale rippleEnabled={false}
+                    onPressIn={startRecording}
+                    onPressOut={stopRecording}
+                    disabled={isUploading || isSending}
+                    style={s.morphFaceInner}
+                    testID="conversation-mic"
+                    accessibilityRole="button"
+                    accessibilityLabel="Record voice message"
+                  >
+                    <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.sm} color={isRecording ? theme.error : theme.muted} />
+                  </PressableScale>
+                </Animated.View>
+                <Animated.View
+                  pointerEvents={showSendButton ? 'auto' : 'none'}
+                  style={[
+                    StyleSheet.absoluteFill, s.morphFace,
+                    { opacity: sendOpacity, transform: [{ scale: sendScale }], backgroundColor: canSend ? theme.accent : theme.cardElevated },
+                  ]}
                 >
-                  <Feather name="send" size={ICON.sm} color={canSend ? theme.onAccent : theme.muted} />
-                </PressableScale>
-              </Animated.View>
+                  <PressableScale rippleEnabled={false}
+                    onPress={() => { hapticPrimaryAction(); handleSend(); }}
+                    disabled={!canSend}
+                    style={s.morphFaceInner}
+                    activeOpacity={0.8}
+                    testID="conversation-send"
+                    accessibilityRole="button"
+                    accessibilityLabel="Send message"
+                  >
+                    <Feather name="send" size={ICON.sm} color={canSend ? theme.onAccent : theme.muted} />
+                  </PressableScale>
+                </Animated.View>
+              </View>
             </View>
           </View>
         </View>
       ) : (
-        <View style={[s.inputRow, s.disabledInputRow, { paddingBottom: insets.bottom + SP.sm }]}>
+        <View style={[s.inputRow, s.disabledInputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
           <Text style={s.disabledInputText}>Messaging disabled</Text>
         </View>
       )}
@@ -1667,6 +1742,12 @@ export default function BuyerConversationScreen() {
         visible={copiedToast}
         message="Copied"
         onDismiss={() => setCopiedToast(false)}
+      />
+
+      <Snackbar
+        visible={threadCashNotice != null}
+        message={threadCashNotice ?? ''}
+        onDismiss={() => setThreadCashNotice(null)}
       />
     </KeyboardAvoidingView>
   );
@@ -2065,36 +2146,57 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingTop: SP.sm,
     gap: SP.sm,
   },
+  // A light, borderless "+" — no filled grey blob. The visual glyph sits at
+  // COMPOSER_CONTROL (matching every other circular control in the row) but
+  // keeps a generous hitSlop at the call site for a full 44pt tap target.
   roundInputBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: COMPOSER_CONTROL,
+    height: COMPOSER_CONTROL,
+    borderRadius: COMPOSER_CONTROL / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.cardElevated,
-    marginBottom: 0,
+    marginBottom: 2,
   },
-  textInput: {
+  // The single composer pill — holds the TextInput, the Thread Cash coin,
+  // and the mic⇄send morph, all inside one rounded surface.
+  pill: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     backgroundColor: theme.cardElevated,
     borderRadius: RADIUS.xxl,
     borderWidth: 1,
     borderColor: theme.border,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm + 2,
+    paddingLeft: SP.md,
+    paddingRight: SP.xs,
+    minHeight: COMPOSER_CONTROL + SP.xs * 2,
+  },
+  textInput: {
+    flex: 1,
+    paddingVertical: COMPOSER_TEXT_V_PADDING,
+    paddingRight: SP.xs,
     fontSize: FS.base,
+    lineHeight: COMPOSER_LINE_HEIGHT,
     fontFamily: FONT.regular,
     color: theme.text,
-    maxHeight: 120,
-    minHeight: 44,
+    maxHeight: COMPOSER_MAX_INPUT_HEIGHT,
+    minHeight: COMPOSER_CONTROL,
+  },
+  // Sits inside the pill, left of the mic/send control.
+  threadCashCoinBtn: {
+    width: COMPOSER_CONTROL,
+    height: COMPOSER_CONTROL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SP.xs,
   },
   morphContainer: {
-    width: 44,
-    height: 44,
-    marginBottom: 0,
+    width: COMPOSER_CONTROL,
+    height: COMPOSER_CONTROL,
+    marginBottom: SP.xs,
   },
   morphFace: {
-    borderRadius: 22,
+    borderRadius: COMPOSER_CONTROL / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
