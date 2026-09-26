@@ -82,7 +82,19 @@ export default function ConnectionsScreen() {
   const generationRef = useRef(0);
 
   const load = useCallback(() => {
-    if (!clerkLoaded || !user?.id) return;
+    // While Clerk itself hasn't resolved yet, keep the loading skeleton up —
+    // the `clerkLoaded`/`user?.id` change below re-triggers this (see the
+    // useFocusEffect dependency on `load`). But once Clerk *has* resolved and
+    // there is still no signed-in user id, this must resolve the loading
+    // state instead of leaving the skeleton up forever (this previously never
+    // called `setLoading(false)` in that branch, unlike the equivalent guard
+    // in app/(buyer)/inbox.tsx's loadData).
+    if (!clerkLoaded) return;
+    if (!user?.id) {
+      setUsers([]);
+      setLoading(false);
+      return;
+    }
     const generation = ++generationRef.current;
     setError(false);
     const listOwner = isOwnList ? undefined : userId;
