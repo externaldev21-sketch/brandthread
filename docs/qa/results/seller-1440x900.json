@@ -1,0 +1,307 @@
+[
+  {
+    "role": "seller",
+    "viewport": "desktop-1440x900",
+    "route": "/(tabs)",
+    "reachedFrom": "start",
+    "navError": null,
+    "loadTimeMs": 1407,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "In HTML, %s cannot be a descendant of <%s>.\nThis will cause a hydration error.%s <button> button \n\n  ...\n    <ResponsiveContainer maxWidth={1080}>\n      <View style={[...]}>\n        <div dir={null} ref={function forwardRef} className=\"css-view-g...\" style={{width:\"100%\", ...}}>\n          <View style",
+      "<%s> cannot contain a nested %s.\nSee this log for the ancestor stack trace. button <button>",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "$0.00",
+      "fontSize": 52,
+      "x": 581,
+      "y": 86,
+      "w": 278,
+      "h": 63
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-desktop-1440x900-1-_tabs_.png",
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 42
+  },
+  {
+    "role": "seller",
+    "viewport": "desktop-1440x900",
+    "route": "/(tabs)/products",
+    "reachedFrom": "start",
+    "navError": null,
+    "loadTimeMs": 1370,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "Products",
+      "fontSize": 22,
+      "x": 417,
+      "y": 17,
+      "w": 94.609375,
+      "h": 26
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-desktop-1440x900-2-_tabs_products.png",
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 37
+  },
+  {
+    "role": "seller",
+    "viewport": "desktop-1440x900",
+    "route": "/(tabs)/orders",
+    "reachedFrom": "start",
+    "navError": null,
+    "loadTimeMs": 1390,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "Orders",
+      "fontSize": 22,
+      "x": 417,
+      "y": 17,
+      "w": 71.203125,
+      "h": 26
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-desktop-1440x900-3-_tabs_orders.png",
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 36
+  },
+  {
+    "role": "seller",
+    "viewport": "desktop-1440x900",
+    "route": "/(tabs)/profile",
+    "reachedFrom": "start",
+    "navError": null,
+    "loadTimeMs": 1367,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": null,
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-desktop-1440x900-4-_tabs_profile.png",
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 48
+  },
+  {
+    "role": "seller",
+    "viewport": "desktop-1440x900",
+    "route": "/analytics",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1400,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "Analytics",
+      "fontSize": 28,
+      "x": 581,
+      "y": 79,
+      "w": 278,
+      "h": 34
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-desktop-1440x900-5-_analytics.png",
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 27
+  }
+]
