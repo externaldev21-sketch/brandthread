@@ -166,6 +166,15 @@ describe('seller bar full-screen deny-list', () => {
     'quote-request',
     'seller-go-live',
     'seller-live',
+    // Pushed, modal-style profile editor with its own header Save button and
+    // scroll footer — screenshots showed the bar floating on top of its last
+    // row (and the equivalent buyer screen hides its own floating bar too).
+    'edit-profile',
+    // Brandthread AI screen: immersive full-screen chat with its own
+    // floating composer pinned to the safe-area bottom inset — the bar must
+    // never render underneath it (it previously did, and the AI composer
+    // rendered behind it).
+    'ai-brain',
   ];
 
   for (const route of mustHideBar) {
@@ -191,7 +200,6 @@ describe('seller bar full-screen deny-list', () => {
     'team-invite',
     'taxes-duties',
     'integrations',
-    'edit-profile',
     'customers',
     'customer-accounts',
     'customer-events',

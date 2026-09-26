@@ -15,7 +15,7 @@ import { RADII } from '@/constants/radii';
 export interface AvatarProps {
   uri?: string | null;
   name?: string;
-  size?: 24 | 32 | 40 | 48 | 56 | 72;
+  size?: 24 | 32 | 40 | 48 | 56 | 72 | 84 | 96;
   style?: StyleProp<ViewStyle>;
 }
 
