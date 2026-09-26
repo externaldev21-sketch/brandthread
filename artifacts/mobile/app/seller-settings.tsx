@@ -20,6 +20,7 @@ import { SettingsProfileCard, SettingsSearchBar, SettingsSection, SettingsRow, C
 import { Header } from '@/components/layout';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function SellerSettingsScreen() {
   const colors = useColors();
@@ -131,7 +132,7 @@ export default function SellerSettingsScreen() {
         title="Settings"
         largeTitle
         showBack={false}
-        actions={[{ icon: 'x', onPress: () => { hapticLight(); router.back(); }, accessibilityLabel: 'Close settings' }]}
+        actions={[{ icon: 'x', onPress: () => { hapticLight(); goBackOr(router); }, accessibilityLabel: 'Close settings' }]}
       />
 
       <ScrollView

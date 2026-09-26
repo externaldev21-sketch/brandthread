@@ -3,6 +3,7 @@
  * Sizes, fit, categories, alerts, and activity toggles
  */
 import React, { useCallback, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch,
 } from 'react-native';
@@ -101,7 +102,7 @@ export default function ShoppingPreferences() {
     await patchBuyerSettings({ styleCategories: Array.from(selectedCats) });
     setHasChanges(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+    goBackOr(router);
   }
 
   function toggleCat(key: string) {

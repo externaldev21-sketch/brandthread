@@ -22,6 +22,7 @@ import { isBuyerDevPreview } from '@/lib/devPreview';
 import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import { ThreadCashBill, ThreadCashBillStack, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 function historyLabel(entry: ThreadCashEntry): string {
   switch (entry.source) {
@@ -182,7 +183,7 @@ export default function ThreadCashScreen() {
 
   return (
     <BrandthreadScreen scrollable>
-      <BrandthreadHeader title="Thread Cash" onBack={() => router.back()} />
+      <BrandthreadHeader title="Thread Cash" onBack={() => goBackOr(router)} />
       {loading ? (
         <BalanceSkeleton styles={styles} />
       ) : (

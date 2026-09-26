@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert,
@@ -136,7 +137,7 @@ export default function QuoteCompareScreen() {
       {
         text: 'Accept', onPress: async () => {
           await acceptQuote(quoteId);
-          router.back();
+          goBackOr(router);
         },
       },
     ]);
@@ -152,7 +153,7 @@ export default function QuoteCompareScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
-      <BrandthreadHeader title="Compare Quotes" onBack={() => router.back()} />
+      <BrandthreadHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
 
       {loadError ? (
         <ErrorState

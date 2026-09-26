@@ -23,6 +23,7 @@
  */
 
 import React, { useState, useCallback, useRef } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, FlatList, Modal, TextInput,
@@ -1424,11 +1425,11 @@ export default function DesignGalleryScreen() {
        * Horizontal alignment: both flush to GRID_H_PAD.
        */}
       <View style={[s.header, { paddingTop: topInset }]}>
-        {/* Back arrow — taps router.back() when history exists, else goes to seller dashboard */}
+        {/* Back arrow — taps goBackOr(router) when history exists, else goes to seller dashboard */}
         <TouchableOpacity
           onPress={() => {
             if (router.canGoBack()) {
-              router.back();
+              goBackOr(router);
             } else {
               router.replace('/(tabs)/' as never);
             }

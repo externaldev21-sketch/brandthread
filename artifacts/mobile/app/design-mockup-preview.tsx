@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, Dimensions, ActivityIndicator,
@@ -150,7 +151,7 @@ export default function DesignMockupPreviewScreen() {
         <View style={styles.centered}>
           <Feather name="image" size={48} color={SUBTLE} />
           <Text style={styles.disclaimer}>Open a garment project to see the mockup preview.</Text>
-          <SecondaryButton label="Go back" onPress={() => router.back()} style={{ marginTop: SP.md }} />
+          <SecondaryButton label="Go back" onPress={() => goBackOr(router)} style={{ marginTop: SP.md }} />
         </View>
       </View>
     );

@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator,
@@ -156,7 +157,7 @@ export default function DesignVersionsScreen() {
               icon="clock"
               title="No saved versions yet"
               description="Save your project to create a version."
-              action={{ label: 'Save now', onPress: () => router.back() }}
+              action={{ label: 'Save now', onPress: () => goBackOr(router) }}
               style={styles.emptyState}
             />
           }

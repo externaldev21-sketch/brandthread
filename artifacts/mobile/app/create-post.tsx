@@ -3,6 +3,7 @@
 // Screen B: video-edit   → full-screen video preview, floating right toolbar
 // Screen C: post-details → caption + thumbnail at top, settings rows, dual CTA
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Animated, Dimensions, Platform,
@@ -440,7 +441,7 @@ export default function CreatePostScreen() {
 
   function leaveSetupDestination() {
     if (isSellerSetup) { router.replace(SELLER_HOME_ROUTE as never); return; }
-    router.back();
+    goBackOr(router);
   }
 
   // ── Step ──

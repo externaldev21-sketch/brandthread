@@ -13,6 +13,7 @@ import { Header } from '@/components/layout';
 import { EmptyState, PrimaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
 import { getManufacturerProduct, type ManufacturerProduct } from '@/services/manufacturerCatalog';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function ManufacturerProductScreen() {
   const { theme } = useAppTheme();
@@ -38,7 +39,7 @@ export default function ManufacturerProductScreen() {
 
   return (
     <View style={s.root}>
-      <Header title={product?.name ?? 'Product'} onBack={() => router.back()} />
+      <Header title={product?.name ?? 'Product'} onBack={() => goBackOr(router)} />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
       ) : error || !product ? (

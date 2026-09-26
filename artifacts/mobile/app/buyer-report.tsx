@@ -8,6 +8,7 @@
  * and land in the moderation queue; reporters stay anonymous.
  */
 import React, { useMemo, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
@@ -66,7 +67,7 @@ export default function ReportScreen() {
   const canSubmit = !!reason && !noteTooShort && !submitting && !!params.targetId;
 
   function close() {
-    if (router.canGoBack()) router.back();
+    if (router.canGoBack()) goBackOr(router);
     else router.replace('/');
   }
 

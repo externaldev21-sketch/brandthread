@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
 import { getFavoriteManufacturerIds, getManufacturer } from '@/services/manufacturerService';
 import { Manufacturer } from '@/services/manufacturerTypes';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 const MAX_COMPARE = 4;
 const MIN_COMPARE = 2;
@@ -71,7 +72,7 @@ export default function ManufacturerCompareScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="Compare Suppliers" onBack={() => router.back()} />
+      <Header title="Compare Suppliers" onBack={() => goBackOr(router)} />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>

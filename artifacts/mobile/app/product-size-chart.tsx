@@ -7,6 +7,7 @@
  * Route: /product-size-chart?productId=<uuid>
  */
 import React, { useState, useEffect, useMemo } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Alert, ActivityIndicator,
@@ -149,7 +150,7 @@ export default function ProductSizeChartScreen() {
       await (api as any).products.update(productId, { sizeChart: chart });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Saved', 'Size chart updated successfully.', [
-        { text: 'OK', onPress: () => router.back() },
+        { text: 'OK', onPress: () => goBackOr(router) },
       ]);
     } catch {
       Alert.alert('Error', 'Could not save size chart. Please try again.');
@@ -167,7 +168,7 @@ export default function ProductSizeChartScreen() {
           setSaving(true);
           try {
             await (api as any).products.update(productId, { sizeChart: null });
-            router.back();
+            goBackOr(router);
           } catch { Alert.alert('Error', 'Could not remove size chart.'); }
           finally { setSaving(false); }
         },
@@ -188,7 +189,7 @@ export default function ProductSizeChartScreen() {
       <BrandthreadHeader
         title="Size Chart"
         subtitle={productName ?? undefined}
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
       />
 
       <ScrollView

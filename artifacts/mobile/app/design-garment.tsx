@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
 } from 'react-native';
@@ -118,7 +119,7 @@ export default function DesignGarmentScreen() {
     <View style={gs.root}>
       {/* ── TOP BAR ── */}
       <View style={[gs.topBar, { paddingTop: insets.top + 4 }]}>
-        <TouchableOpacity style={gs.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={gs.backBtn} onPress={() => goBackOr(router)}>
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <Text style={gs.topTitle}>Garment Design</Text>

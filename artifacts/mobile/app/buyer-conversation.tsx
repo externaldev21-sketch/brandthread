@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput,
   KeyboardAvoidingView, Alert, Platform, StyleSheet, Dimensions,
@@ -989,7 +990,7 @@ export default function BuyerConversationScreen() {
         onPress: async () => {
           const { archiveConversation } = await import('@/services/socialService');
           if (conv) await archiveConversation(conv.id);
-          router.back();
+          goBackOr(router);
         },
       },
       messaging.blockedByMe
@@ -1396,7 +1397,7 @@ export default function BuyerConversationScreen() {
           underneath instead of a floating "glass" card. */}
       <View style={[s.headerWrap, { paddingTop: headerTopPad + SP.xs }]}>
         <PressableScale rippleEnabled={false}
-          onPress={() => { hapticPrimaryAction(); router.back(); }}
+          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
           style={s.roundBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           testID="conversation-back"

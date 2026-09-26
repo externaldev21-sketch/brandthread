@@ -8,6 +8,7 @@ import { loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionHeader } from '@/components/BrandthreadUI';
 import { Card, ListRow } from '@/components/ui';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function BuyerSecurity() {
   const colors = useColors();
@@ -39,14 +40,14 @@ export default function BuyerSecurity() {
   if (!loaded) {
     return (
       <View style={s.page}>
-        <ScreenHeader title="Password and security" variant="push" onBack={() => router.back()} />
+        <ScreenHeader title="Password and security" variant="push" onBack={() => goBackOr(router)} />
       </View>
     );
   }
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Password and security" variant="push" onBack={() => router.back()} />
+      <ScreenHeader title="Password and security" variant="push" onBack={() => goBackOr(router)} />
 
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
         {/* Protection toggles */}

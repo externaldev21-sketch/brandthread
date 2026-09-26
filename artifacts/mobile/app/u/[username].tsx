@@ -18,6 +18,7 @@
  * Handles: loading, not-found, offline/retry, auth-loading wait.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View,
   Text,
@@ -377,7 +378,7 @@ export default function PublicProfileRoute() {
         <View style={styles.header}>
           <PressableScale
             style={styles.backBtn}
-            onPress={() => { hapticLight(); router.back(); }}
+            onPress={() => { hapticLight(); goBackOr(router); }}
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
@@ -414,7 +415,7 @@ export default function PublicProfileRoute() {
         <View style={styles.header}>
           <PressableScale
             style={styles.backBtn}
-            onPress={() => { hapticLight(); router.back(); }}
+            onPress={() => { hapticLight(); goBackOr(router); }}
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >

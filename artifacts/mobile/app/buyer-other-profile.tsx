@@ -26,6 +26,7 @@ import { emitProfileEvent, subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatProfileCount } from '@/services/profileService';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   InteractionLayer, ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat,
 } from '@/components/profile/ProfileControls';
@@ -211,7 +212,7 @@ export default function BuyerOtherProfileScreen() {
       }
     } else if (await confirmBlock(subject, api.social.block)) {
       hapticSuccess();
-      router.back();
+      goBackOr(router);
     }
   };
   const handleReport = () => {
@@ -236,7 +237,7 @@ export default function BuyerOtherProfileScreen() {
   ), [layout.tileHeight, layout.tileWidth, openVideo]);
 
   const goBack = () => {
-    if (router.canGoBack()) router.back();
+    if (router.canGoBack()) goBackOr(router);
     else router.replace('/(buyer)/' as never);
   };
 

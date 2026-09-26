@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -106,7 +107,7 @@ export default function UsersScreen() {
             setMutating(true);
             try {
               await api.team.remove(member.id);
-              router.back();
+              goBackOr(router);
             } catch (err: any) {
               Alert.alert('Error', err.message ?? 'Failed to remove member');
               setMutating(false);

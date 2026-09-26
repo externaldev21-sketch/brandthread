@@ -4,6 +4,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View,
   Text,
@@ -70,7 +71,7 @@ export default function AiBrandMemoryScreen() {
     setSaving(true);
     await saveBrandMemory(localMemory);
     setSaving(false);
-    router.back();
+    goBackOr(router);
   };
 
   const handleClearAll = () => {

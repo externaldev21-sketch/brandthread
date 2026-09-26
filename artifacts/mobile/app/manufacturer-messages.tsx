@@ -11,6 +11,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable,
   RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -173,7 +174,7 @@ export default function ManufacturerMessagesScreen() {
       `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Pro'}`,
       rejection.message,
       [
-        { text: 'Not now', style: 'cancel', onPress: () => router.back() },
+        { text: 'Not now', style: 'cancel', onPress: () => goBackOr(router) },
         { text: 'View plans', onPress: () => router.replace('/subscription' as never) },
       ],
     );
@@ -322,7 +323,7 @@ export default function ManufacturerMessagesScreen() {
       <BrandthreadHeader
         title={mfrName}
         subtitle={localTime ? `${localTime} for them` : 'Manufacturer conversation'}
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
         rightElement={
           <View style={{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' }}>
             {manufacturerId ? (
@@ -357,7 +358,7 @@ export default function ManufacturerMessagesScreen() {
         {header}
         <View style={s.center}>
           <EmptyState icon="wifi-off" title="Conversation unavailable" description={loadError} />
-          <SecondaryButton label="Try again" onPress={() => { setLoading(true); if (threadId) void loadMessages(threadId).finally(() => setLoading(false)); else router.back(); }} />
+          <SecondaryButton label="Try again" onPress={() => { setLoading(true); if (threadId) void loadMessages(threadId).finally(() => setLoading(false)); else goBackOr(router); }} />
         </View>
       </View>
     );

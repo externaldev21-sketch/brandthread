@@ -10,6 +10,7 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 /**
  * Store Preview — a clean, full-screen render of the seller's actual store,
@@ -105,7 +106,7 @@ export default function StorePreview() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
         <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
           style={styles.closeBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel="Close preview"

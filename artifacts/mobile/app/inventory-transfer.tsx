@@ -11,6 +11,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButt
 import { getLocations, getInventoryItems, getTransfer, getTransfers, createTransfer, shipTransfer, receiveTransfer } from '@/services/inventoryService';
 import { InventoryLocation, InventoryItem, InventoryTransfer, TransferStatus } from '@/services/inventoryTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -253,7 +254,7 @@ export default function InventoryTransferScreen() {
       <View style={[styles.root, { paddingTop: insets.top }]}>
         {/* HEADER */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => goBackOr(router)} style={styles.backBtn}>
             <Feather name="arrow-left" size={ICON.md} color={FG} />
           </TouchableOpacity>
           <View style={styles.headerTitleRow}>

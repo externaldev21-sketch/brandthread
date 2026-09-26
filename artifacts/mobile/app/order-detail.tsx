@@ -20,6 +20,7 @@ import { formatCents } from '@/lib/money';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -690,7 +691,7 @@ export default function OrderDetailScreen() {
           icon="alert-circle"
           title="Order not found"
           description="This order may have been deleted or the ID is invalid."
-          action={{ label: 'Go Back', onPress: () => router.back(), icon: 'arrow-left' }}
+          action={{ label: 'Go Back', onPress: () => goBackOr(router), icon: 'arrow-left' }}
         />
       </View>
     );
@@ -705,7 +706,7 @@ export default function OrderDetailScreen() {
         title={order.orderNumber}
         subtitle={order.customer.name}
         variant="push"
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
         actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
       />
 

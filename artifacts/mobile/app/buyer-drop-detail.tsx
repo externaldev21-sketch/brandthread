@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   AccessibilityInfo, ActivityIndicator, Alert, Animated, Dimensions, Image, LayoutAnimation,
   Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, UIManager, View,
@@ -455,7 +456,7 @@ export default function BuyerDropDetail() {
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => goBackOr(router)}
             accessibilityRole="button"
             accessibilityLabel="Back"
             style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.border }}
@@ -486,7 +487,7 @@ export default function BuyerDropDetail() {
           )}
 
           <View style={[styles.heroHeader, { paddingTop: insets.top + SP.sm }]}>
-            <TouchableOpacity style={styles.roundButton} onPress={() => router.back()} hitSlop={4} accessibilityLabel="Go back">
+            <TouchableOpacity style={styles.roundButton} onPress={() => goBackOr(router)} hitSlop={4} accessibilityLabel="Go back">
               <Feather name="arrow-left" size={21} color={ON_DARK} />
             </TouchableOpacity>
             <View style={styles.heroBadge}>

@@ -15,6 +15,7 @@ import { SettingsProfileCard, SettingsSearchBar, ConfirmSheet } from '@/componen
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionHeader } from '@/components/BrandthreadUI';
 import { Card, ListRow } from '@/components/ui';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function BuyerSettingsScreen() {
   const colors = useColors();
@@ -70,7 +71,7 @@ export default function BuyerSettingsScreen() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Settings" variant="push" onBack={() => router.back()} />
+      <ScreenHeader title="Settings" variant="push" onBack={() => goBackOr(router)} />
 
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: insets.bottom + 48 }}

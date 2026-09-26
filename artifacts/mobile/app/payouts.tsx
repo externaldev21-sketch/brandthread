@@ -20,6 +20,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { scheduleLabel, requirementLabel, taxInfoConfig } from '@/lib/payoutSetup';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -83,7 +84,7 @@ export default function PayoutsScreen() {
       router.replace(SELLER_HOME_ROUTE as never);
       return;
     }
-    router.back();
+    goBackOr(router);
   }
 
   const refreshConnectStatus = useCallback(async () => {

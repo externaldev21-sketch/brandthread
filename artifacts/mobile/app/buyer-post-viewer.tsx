@@ -4,6 +4,7 @@
  * from socialService. Owner-only: edit caption (inline modal) and delete.
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Share, Animated, useWindowDimensions,
@@ -164,7 +165,7 @@ export default function BuyerPostViewer() {
     if (!post) return;
     await deletePost(post.id);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    router.back();
+    goBackOr(router);
   };
 
   // Use params as display fallback while the async load completes

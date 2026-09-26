@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export interface ScreenHeaderAction {
   icon: keyof typeof Feather.glyphMap;
@@ -82,7 +83,7 @@ export function ScreenHeader({
     <View style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }]}>
       <View style={styles.container}>
         {showBack ? <PressableScale
-          onPress={() => (onBack ? onBack() : router.back())}
+          onPress={() => (onBack ? onBack() : goBackOr(router))}
           style={[styles.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel={backAccessibilityLabel ?? (variant === 'modal' ? `Close ${title}` : `Go back from ${title}`)}

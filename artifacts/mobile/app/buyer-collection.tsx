@@ -5,6 +5,7 @@
  * which links here.
  */
 import React, { useCallback, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, Dimensions,
   Modal, TextInput, ActivityIndicator, Share,
@@ -120,7 +121,7 @@ export default function BuyerCollection() {
       {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
-          try { await deleteCollection(collection.id); router.back(); }
+          try { await deleteCollection(collection.id); goBackOr(router); }
           catch { Alert.alert('Couldn’t delete', 'Try again.'); }
         },
       },

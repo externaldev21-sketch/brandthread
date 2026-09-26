@@ -20,6 +20,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListRow, StickyBottomCTA } from '@/components/ui';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function BuyerCloseFriends() {
   const colors = useColors();
@@ -60,7 +61,7 @@ export default function BuyerCloseFriends() {
     try {
       await saveCloseFriendIds(Array.from(closeFriends));
       hapticSuccessAction();
-      router.back();
+      goBackOr(router);
     } finally {
       setSaving(false);
     }

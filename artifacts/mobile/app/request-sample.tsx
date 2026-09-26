@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
@@ -73,7 +74,7 @@ export default function RequestSampleScreen() {
       Alert.alert(
         'Sample request sent',
         `Your request is now visible to ${manufacturer.name}.`,
-        [{ text: 'Done', onPress: () => router.back() }],
+        [{ text: 'Done', onPress: () => goBackOr(router) }],
       );
     } catch (error) {
       Alert.alert('Could not send request', error instanceof Error ? error.message : 'Try again.');
@@ -93,7 +94,7 @@ export default function RequestSampleScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
           accessibilityRole="button"
           accessibilityLabel="Back"
           accessibilityHint={`Returns without sending a sample request to ${manufacturer.name}`}

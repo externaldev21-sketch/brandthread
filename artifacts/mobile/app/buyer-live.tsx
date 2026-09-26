@@ -4,6 +4,7 @@
  * on Expo Go / web where the native SDK is unavailable.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TextInput,
   ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -187,7 +188,7 @@ function BuyerLiveNativeScreen() {
     clearInterval(pollRef.current!);
     try { await (api as any).live.leave(params.streamId); } catch {}
     try { engineRef.current?.leaveChannel(); engineRef.current?.release(); } catch {}
-    if (navigate) router.back();
+    if (navigate) goBackOr(router);
   }
 
   async function sendComment() {
@@ -381,7 +382,7 @@ function BuyerLiveNativeScreen() {
         </View>
         <Text style={[s.endedTitle, { color: FG }]}>Stream ended</Text>
         <Text style={[s.endedSub, { color: MUTED }]}>The replay will appear in the feed shortly.</Text>
-        <PressableScale onPress={() => router.back()} style={[s.backBtn, { backgroundColor: LIVE_RED }]}>
+        <PressableScale onPress={() => goBackOr(router)} style={[s.backBtn, { backgroundColor: LIVE_RED }]}>
           <Text style={s.backBtnText}>Back to feed</Text>
         </PressableScale>
       </View>

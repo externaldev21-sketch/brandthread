@@ -10,6 +10,7 @@ import { FONT, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ListRow } from '@/components/ui';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type Row = {
   label: string;
@@ -39,7 +40,7 @@ export default function BuyerAccountCenter() {
 
   return (
     <View style={s.page}>
-      <ScreenHeader title="Accounts Center" variant="push" onBack={() => router.back()} />
+      <ScreenHeader title="Accounts Center" variant="push" onBack={() => goBackOr(router)} />
 
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
         {/* Hero */}

@@ -10,6 +10,7 @@
  *    every session is signed out.
  */
 import React, { useCallback, useMemo, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
@@ -97,8 +98,7 @@ export default function DeleteAccountScreen() {
 
   function goBack() {
     if (step === 'confirm') { setStep('overview'); return; }
-    if (router.canGoBack()) router.back();
-    else router.replace('/settings' as never);
+    goBackOr(router, '/settings' as never);
   }
 
   if (step === 'done') {

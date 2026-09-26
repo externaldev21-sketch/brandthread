@@ -4,6 +4,7 @@
  */
 import React, { useState } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Alert, ActivityIndicator, Image,
@@ -105,7 +106,7 @@ export default function DesignPromptEditScreen() {
 
   return (
     <BrandthreadScreen>
-      <BrandthreadHeader title="Edit with Prompt" onBack={() => router.back()} />
+      <BrandthreadHeader title="Edit with Prompt" onBack={() => goBackOr(router)} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
