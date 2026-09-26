@@ -4,6 +4,8 @@
  */
 import { initMonitoring } from '@/lib/monitoring';
 import { startBackgroundUpdateChecks } from '@/lib/otaUpdates';
+import { injectWebTextRenderingStyles } from '@/lib/webTextRendering';
 
 initMonitoring();
 startBackgroundUpdateChecks();
+injectWebTextRenderingStyles();

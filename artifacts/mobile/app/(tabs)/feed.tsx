@@ -31,10 +31,11 @@ import { computeJustDroppedDrops, type FollowedDrop } from '@/lib/justDroppedDro
 import type { ViewToken } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { useApi } from '@/lib/api';
+import { useSettled } from '@/lib/animationUtils';
 import {
   BG, SCREEN_BG, SURFACE, CARD, OVERLAY,
   BORDER, BORDER_SUBTLE,
-  FG, MUTED, SUBTLE, ON_DARK,
+  FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
   SUCCESS, RED, GOLD,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
@@ -1234,6 +1235,13 @@ function ShopSideTab({
   const [expanded, setExpanded] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Once the expand/collapse spring settles, `expandedTranslate` below is
+  // sitting at its identity value (0) but the Animated.View's `transform`
+  // key would otherwise stay in place forever — on react-native-web that
+  // pins the expanded card's product name/price to a permanent compositing
+  // layer, which softens the text if that layer's box lands on a fractional
+  // device pixel. Dropped once settled instead. See lib/animationUtils.ts.
+  const settled = useSettled();
 
   const clearCollapseTimer = useCallback(() => {
     if (collapseTimer.current) {
@@ -1245,16 +1253,16 @@ function ShopSideTab({
   const collapse = useCallback(() => {
     clearCollapseTimer();
     setExpanded(false);
-    Animated.spring(anim, { toValue: 0, useNativeDriver: false, speed: 18, bounciness: 0 }).start();
-  }, [anim, clearCollapseTimer]);
+    settled.run(Animated.spring(anim, { toValue: 0, useNativeDriver: false, speed: 18, bounciness: 0 }));
+  }, [anim, clearCollapseTimer, settled]);
 
   const expand = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setExpanded(true);
-    Animated.spring(anim, { toValue: 1, useNativeDriver: false, speed: 18, bounciness: 0 }).start();
+    settled.run(Animated.spring(anim, { toValue: 1, useNativeDriver: false, speed: 18, bounciness: 0 }));
     clearCollapseTimer();
     collapseTimer.current = setTimeout(collapse, SHOP_TAB_COLLAPSE_MS);
-  }, [anim, clearCollapseTimer, collapse]);
+  }, [anim, clearCollapseTimer, collapse, settled]);
 
   useEffect(() => {
     if (!isActive) collapse();
@@ -1326,7 +1334,8 @@ function ShopSideTab({
             pointerEvents={expanded ? 'auto' : 'none'}
             style={[
               styles.shopSideTabExpanded,
-              { opacity: expandedOpacity, transform: [{ translateX: expandedTranslate }] },
+              { opacity: expandedOpacity },
+              !settled.value && { transform: [{ translateX: expandedTranslate }] },
             ]}
           >
             <View style={styles.shopSideTabThumb}>
@@ -3575,8 +3584,12 @@ const styles = StyleSheet.create({
   creatorRetryText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
   feedTabs: { alignSelf: 'center', flexDirection: 'row', gap: 22, marginTop: 0, paddingBottom: 1 },
   feedTab: { paddingHorizontal: 4, paddingVertical: 3, alignItems: 'center' },
-  feedTabText: { color: ON_DARK, opacity: 0.6, fontFamily: FONT.semibold, fontSize: FS.xs },
-  feedTabTextActive: { color: ON_DARK, opacity: 1 },
+  // A solid, pre-blended color (ON_DARK_MUTED) instead of `color: ON_DARK,
+  // opacity: 0.6` — an unfocused tab's own opacity was making its text
+  // subpixel-antialias against whatever's behind it rather than rendering as
+  // one solid, crisp color.
+  feedTabText: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs },
+  feedTabTextActive: { color: ON_DARK },
   feedTabUnderline: { height: 2, width: 22, borderRadius: 2, marginTop: 3 },
 
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

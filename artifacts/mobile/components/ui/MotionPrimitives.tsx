@@ -15,6 +15,7 @@ import Animated, {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticSuccessAction, hapticToggle } from '@/lib/haptics';
+import { identityOrNone } from '@/lib/animationUtils';
 import { FONT, RED } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE, TypeRoleName } from '@/constants/typography';
 
@@ -45,7 +46,7 @@ export function HeartToggle({ liked, onChange, size = 22, accessibilityLabel, on
     wasLiked.current = liked;
   }, [liked, scale]);
 
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const style = useAnimatedStyle(() => ({ transform: identityOrNone([{ scale: scale.value }]) }));
 
   return (
     <Pressable
