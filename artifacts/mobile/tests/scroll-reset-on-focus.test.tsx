@@ -138,6 +138,13 @@ vi.mock('react-native', () => {
         )),
     );
   });
+  class MockAnimatedValue {
+    _value: number;
+    constructor(value: number) { this._value = value; }
+    interpolate() { return this._value; }
+    setValue(value: number) { this._value = value; }
+  }
+  const AnimatedComponent = (Component: unknown) => Component;
   return {
     View: nativeComponent('View'),
     Text: nativeComponent('Text'),
@@ -146,6 +153,13 @@ vi.mock('react-native', () => {
     FlatList: MockFlatList,
     StyleSheet: { create: (styles: unknown) => styles, absoluteFill: {}, hairlineWidth: 1 },
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    Animated: {
+      Value: MockAnimatedValue,
+      View: nativeComponent('Animated.View'),
+      Text: nativeComponent('Animated.Text'),
+      createAnimatedComponent: AnimatedComponent,
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+    },
   };
 });
 
