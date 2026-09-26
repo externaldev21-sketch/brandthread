@@ -56,6 +56,7 @@ export function IconButton({
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       testID={testID}
       style={styles.hit}
+      android_ripple={{ color: `${resolvedColor}33`, borderless: true, radius: COMP.iconBtn / 2 }}
     >
       <Animated.View
         style={[

@@ -76,14 +76,74 @@ describe("checkout redemption", () => {
     });
 
     const attempts = await Promise.allSettled([
-      redeemThreadCash(buyerId, 100),
-      redeemThreadCash(buyerId, 100),
+      redeemThreadCash(buyerId, 100, crypto.randomUUID()),
+      redeemThreadCash(buyerId, 100, crypto.randomUUID()),
     ]);
     expect(attempts.filter((a) => a.status === "fulfilled")).toHaveLength(1);
     expect(attempts.filter((a) => a.status === "rejected")).toHaveLength(1);
 
     const balance = await getBalanceCents(db, buyerId);
     expect(balance).toBe(50);
+  });
+
+  it("redeeming twice with the SAME idempotency key spends exactly once", async () => {
+    const buyerId = `thread-cash-test-${crypto.randomUUID()}`;
+    testBuyerIds.push(buyerId);
+    await db.insert(threadCashEntries).values({
+      buyerId, amountCents: 500, source: "daily_checkin", referenceId: crypto.randomUUID(),
+    });
+    const idempotencyKey = crypto.randomUUID();
+
+    const [first, second] = await Promise.all([
+      redeemThreadCash(buyerId, 200, idempotencyKey),
+      redeemThreadCash(buyerId, 200, idempotencyKey),
+    ]);
+    expect(first.token).toBe(second.token);
+    expect(first.discountCents).toBe(200);
+
+    const balance = await getBalanceCents(db, buyerId);
+    expect(balance).toBe(300); // spent exactly once, not twice
+    const redemptionRows = await db.select().from(threadCashEntries).where(and(
+      eq(threadCashEntries.buyerId, buyerId),
+      eq(threadCashEntries.source, "redemption"),
+    ));
+    expect(redemptionRows).toHaveLength(1);
+  });
+
+  it("20 parallel redemptions with the same idempotency key never double-spend", async () => {
+    const buyerId = `thread-cash-test-${crypto.randomUUID()}`;
+    testBuyerIds.push(buyerId);
+    await db.insert(threadCashEntries).values({
+      buyerId, amountCents: 1_000, source: "daily_checkin", referenceId: crypto.randomUUID(),
+    });
+    const idempotencyKey = crypto.randomUUID();
+
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () => redeemThreadCash(buyerId, 100, idempotencyKey)),
+    );
+    const uniqueTokens = new Set(results.map((r) => r.token));
+    expect(uniqueTokens.size).toBe(1);
+
+    const balance = await getBalanceCents(db, buyerId);
+    expect(balance).toBe(900);
+  });
+
+  it("balance never goes negative under 20 parallel redemption attempts exceeding the balance", async () => {
+    const buyerId = `thread-cash-test-${crypto.randomUUID()}`;
+    testBuyerIds.push(buyerId);
+    await db.insert(threadCashEntries).values({
+      buyerId, amountCents: 500, source: "daily_checkin", referenceId: crypto.randomUUID(),
+    });
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 20 }, () => redeemThreadCash(buyerId, 100, crypto.randomUUID())),
+    );
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    expect(succeeded).toBe(5); // exactly balance / 100, never more
+
+    const balance = await getBalanceCents(db, buyerId);
+    expect(balance).toBeGreaterThanOrEqual(0);
+    expect(balance).toBe(0);
   });
 
   it("reserves one token for checkout, consumes it once, and allows a refund to return it", async () => {

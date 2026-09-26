@@ -41,8 +41,26 @@ export type ThreadCashEntry = {
   amountCents: number;
   source:
     | 'daily_checkin' | 'streak_bonus' | 'redemption' | 'checkout_spend'
-    | 'refund_credit' | 'expiry' | 'admin_adjustment' | 'send_sent' | 'send_received';
+    | 'refund_credit' | 'expiry' | 'admin_adjustment' | 'send_sent' | 'send_received'
+    | 'send_cancelled' | 'send_expired';
   referenceId: string | null;
   note: string | null;
+  createdAt: string;
+};
+
+/** A Thread Cash send-in-chat transfer (Apple-Cash-style). */
+export type ThreadCashTransferStatus = 'pending' | 'claimed' | 'expired' | 'cancelled';
+
+export type ThreadCashTransfer = {
+  id: string;
+  senderId: string;
+  recipientId: string;
+  conversationId: string | null;
+  amountCents: number;
+  status: ThreadCashTransferStatus;
+  note: string | null;
+  claimedAt: string | null;
+  cancelledAt: string | null;
+  expiresAt: string | null;
   createdAt: string;
 };

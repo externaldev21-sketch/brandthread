@@ -10,9 +10,10 @@
  * GET  /api/thread-cash/history     — paginated ledger
  * POST /api/thread-cash/redeem      — reserve balance as a checkout discount token
  *                                      (feature-flagged: 'threadCashCheckoutDiscount')
- * POST /api/thread-cash/send        — send Thread Cash to another buyer in chat
+ * POST /api/thread-cash/send        — send Thread Cash to a friend in chat (mutual-follow required)
  * POST /api/thread-cash/claim       — claim a Thread Cash send
- *                                      (both feature-flagged: 'threadCashSend')
+ * POST /api/thread-cash/cancel      — sender cancels a still-pending send
+ *                                      (send/claim/cancel feature-flagged: 'threadCashSend')
  */
 import { Router } from "express";
 import { eq } from "drizzle-orm";
@@ -21,6 +22,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { computeCheckIn, EMPTY_STREAK_STATE, type StreakState } from "../lib/threadCash/streaks";
 import {
   ThreadCashError,
+  cancelThreadCash,
   claimThreadCash,
   awardDailyCheckInOnce,
   getBalanceCents,
@@ -107,13 +109,22 @@ router.post("/check-in", async (req, res) => {
     return;
   }
 
-  const { created } = await awardDailyCheckInOnce({
-    buyerId,
-    localDate: result.state.lastCheckInDate!,
-    earnedCents: result.earnedCents,
-    streakBonusCents: result.streakBonusCents,
-    deviceId,
-  });
+  let created: boolean;
+  try {
+    ({ created } = await awardDailyCheckInOnce({
+      buyerId,
+      localDate: result.state.lastCheckInDate!,
+      earnedCents: result.earnedCents,
+      streakBonusCents: result.streakBonusCents,
+      deviceId,
+    }));
+  } catch (error) {
+    if (error instanceof ThreadCashError) {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    throw error;
+  }
 
   // A concurrent request may have already claimed this exact local date
   // between the read above and the award; the unique index is the real
@@ -185,8 +196,13 @@ router.post("/redeem", async (req, res) => {
     res.status(400).json({ error: "Provide a valid Thread Cash amount." });
     return;
   }
+  const idempotencyKey = typeof req.body?.idempotencyKey === "string" ? req.body.idempotencyKey.trim() : "";
+  if (!idempotencyKey) {
+    res.status(400).json({ error: "A valid idempotency key is required.", code: "THREAD_CASH_IDEMPOTENCY_KEY_REQUIRED" });
+    return;
+  }
   try {
-    const redemption = await redeemThreadCash(buyerId, amountCents);
+    const redemption = await redeemThreadCash(buyerId, amountCents, idempotencyKey);
     res.json({ ok: true, discountCents: redemption.discountCents, token: redemption.token });
   } catch (error) {
     if (error instanceof ThreadCashError) {
@@ -197,16 +213,17 @@ router.post("/redeem", async (req, res) => {
   }
 });
 
-// ─── POST /api/thread-cash/send, /claim ─────────────────────────────────────
-// Peer-to-peer transfer of cash-like value: OFF until Dev confirms with a
-// lawyer this doesn't trigger money-transmitter / App Store rules.
+// ─── POST /api/thread-cash/send, /claim, /cancel ────────────────────────────
+// Peer-to-peer transfer between friends who follow each other (mutual
+// follow, checked at both send and claim). Feature-flagged as a server-side
+// kill switch only — 'threadCashSend' is ON by default.
 router.post("/send", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
-  if (!(await isFeatureEnabled("threadCashSend"))) {
-    res.status(503).json({ error: "Sending Thread Cash isn't available yet.", code: "THREAD_CASH_SEND_DISABLED" });
+  if (!(await isFeatureEnabled("threadCashSend", true))) {
+    res.status(503).json({ error: "Sending Thread Cash isn't available right now.", code: "THREAD_CASH_SEND_DISABLED" });
     return;
   }
-  const { recipientId, conversationId, amountCents: rawAmount } = req.body ?? {};
+  const { recipientId, conversationId, note, amountCents: rawAmount } = req.body ?? {};
   const amountCents = Math.floor(Number(rawAmount));
   if (typeof recipientId !== "string" || !recipientId.trim()) {
     res.status(400).json({ error: "A recipient is required." });
@@ -216,8 +233,17 @@ router.post("/send", async (req, res) => {
     res.status(400).json({ error: "Provide a valid Thread Cash amount." });
     return;
   }
+  const idempotencyKey = typeof req.body?.idempotencyKey === "string" ? req.body.idempotencyKey.trim() : "";
+  if (!idempotencyKey) {
+    res.status(400).json({ error: "A valid idempotency key is required.", code: "THREAD_CASH_IDEMPOTENCY_KEY_REQUIRED" });
+    return;
+  }
   try {
-    const transfer = await sendThreadCash(buyerId, recipientId, amountCents, typeof conversationId === "string" ? conversationId : null);
+    const transfer = await sendThreadCash(buyerId, recipientId.trim(), amountCents, {
+      conversationId: typeof conversationId === "string" ? conversationId : null,
+      note: typeof note === "string" ? note : null,
+      idempotencyKey,
+    });
     res.json({ ok: true, transferId: transfer.transferId });
   } catch (error) {
     if (error instanceof ThreadCashError) {
@@ -230,8 +256,8 @@ router.post("/send", async (req, res) => {
 
 router.post("/claim", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
-  if (!(await isFeatureEnabled("threadCashSend"))) {
-    res.status(503).json({ error: "Sending Thread Cash isn't available yet.", code: "THREAD_CASH_SEND_DISABLED" });
+  if (!(await isFeatureEnabled("threadCashSend", true))) {
+    res.status(503).json({ error: "Sending Thread Cash isn't available right now.", code: "THREAD_CASH_SEND_DISABLED" });
     return;
   }
   const transferId = typeof req.body?.transferId === "string" ? req.body.transferId : "";
@@ -242,6 +268,29 @@ router.post("/claim", async (req, res) => {
   try {
     const claimed = await claimThreadCash(transferId, buyerId);
     res.json({ ok: true, amountCents: claimed.amountCents });
+  } catch (error) {
+    if (error instanceof ThreadCashError) {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    throw error;
+  }
+});
+
+router.post("/cancel", async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
+  if (!(await isFeatureEnabled("threadCashSend", true))) {
+    res.status(503).json({ error: "Sending Thread Cash isn't available right now.", code: "THREAD_CASH_SEND_DISABLED" });
+    return;
+  }
+  const transferId = typeof req.body?.transferId === "string" ? req.body.transferId : "";
+  if (!transferId) {
+    res.status(400).json({ error: "A transfer id is required." });
+    return;
+  }
+  try {
+    await cancelThreadCash(transferId, buyerId);
+    res.json({ ok: true });
   } catch (error) {
     if (error instanceof ThreadCashError) {
       res.status(error.status).json({ error: error.message, code: error.code });

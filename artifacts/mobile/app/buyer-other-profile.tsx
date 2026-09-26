@@ -32,6 +32,8 @@ import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
 
 type RemoteProfile = {
   userId?: string;
@@ -51,6 +53,7 @@ export default function BuyerOtherProfileScreen() {
   const api     = useApi();
   const layout  = useProfileLayout();
   const { userId: currentUserId } = useAuth();
+  const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   const params  = useLocalSearchParams<{
     userId: string; name: string; handle: string; initials: string; color: string;
   }>();
@@ -249,6 +252,24 @@ export default function BuyerOtherProfileScreen() {
     <ProfileMeta bio={profile?.bio ?? null}>
       {isFollowedBy && !isMutual ? <ProfileChip label="Follows you" icon="user-check" /> : null}
       {isMutual ? <ProfileChip label="Friends" icon="users" tone="accent" /> : null}
+      {isMutual && threadCashSendEnabled ? (
+        <ThreadCashAttachButton
+          recipientId={canonicalUserId}
+          onSent={() => {}}
+          renderTrigger={(open) => (
+            <PressableScale
+              onPress={open}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Send Thread Cash"
+              style={[styles.chip, { borderColor: `${theme.accent}66`, backgroundColor: theme.cardGlass }]}
+            >
+              <Feather name="dollar-sign" size={11} color={theme.accent} />
+              <Text style={[styles.chipText, { color: theme.accent }]}>Thread Cash</Text>
+            </PressableScale>
+          )}
+        />
+      ) : null}
       {iBlockedThem ? (
         <PressableScale
           onPress={handleBlock}
@@ -414,6 +435,14 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     flex: { flex: 1 },
     actionRow: { flexDirection: 'row', gap: SP.sm },
+    // Matches ProfileChip's visual spec (components/profile/ProfileControls.tsx)
+    // for the Thread Cash trigger, which needs onPress — ProfileChip itself is
+    // deliberately non-interactive.
+    chip: {
+      flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
+      borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4,
+    },
+    chipText: { fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 14 },
     followMorphBtn: { width: '100%', minHeight: 46, borderRadius: RADIUS.md },
     blockedBanner: {
       flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.sm,

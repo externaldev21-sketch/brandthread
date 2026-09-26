@@ -17,7 +17,8 @@ export const threadCashEntries = pgTable('thread_cash_entries', {
   buyerId:     text('buyer_id').notNull(),
   amountCents: integer('amount_cents').notNull(), // + earned/refunded, - spent/expired
   // 'daily_checkin' | 'streak_bonus' | 'redemption' | 'checkout_spend' |
-  // 'refund_credit' | 'expiry' | 'admin_adjustment'
+  // 'refund_credit' | 'expiry' | 'admin_adjustment' | 'send_sent' |
+  // 'send_received' | 'send_cancelled' | 'send_expired'
   source:      text('source').notNull(),
   referenceId: text('reference_id'),
   note:        text('note'),
@@ -27,6 +28,9 @@ export const threadCashEntries = pgTable('thread_cash_entries', {
   checkoutSessionId: text('checkout_session_id'),
   usedAt:      timestamp('used_at', { withTimezone: true }),
   usedOrderId: uuid('used_order_id'),
+  // Required for redeem/spend-style mutations so a client retry or double
+  // tap can never post twice; enforced by a unique partial index.
+  idempotencyKey: text('idempotency_key'),
   createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -42,6 +46,12 @@ export const threadCashStreaks = pgTable('thread_cash_streaks', {
   lastCheckInDate: text('last_check_in_date'), // buyer-local YYYY-MM-DD
   lastCheckInAt:   timestamp('last_check_in_at', { withTimezone: true }),
   lastDeviceId:    text('last_device_id'),
+  // Admin moderation kill switch: a frozen buyer can't check in, redeem,
+  // send, or claim, independent of the global feature flags.
+  frozen:          boolean('frozen').notNull().default(false),
+  frozenReason:    text('frozen_reason'),
+  frozenAt:        timestamp('frozen_at', { withTimezone: true }),
+  frozenBy:        text('frozen_by'),
   createdAt:       timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt:       timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -58,6 +68,11 @@ export const threadCashConfig = pgTable('thread_cash_config', {
   expiryDays:          integer('expiry_days'),
   // null = no cap beyond the order total itself
   maxRedemptionPerOrderCents: integer('max_redemption_per_order_cents'),
+  // Anti-farming: caps and eligibility for sending Thread Cash to a friend.
+  dailySendCapCents:      integer('daily_send_cap_cents').notNull().default(2000),
+  dailyReceiveCapCents:   integer('daily_receive_cap_cents').notNull().default(5000),
+  minAccountAgeHoursForSend: integer('min_account_age_hours_for_send').notNull().default(24),
+  maxCheckInsPerDevicePerDay: integer('max_check_ins_per_device_per_day').notNull().default(3),
   updatedBy:           text('updated_by'),
   updatedAt:           timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -75,6 +90,10 @@ export const threadCashTransfers = pgTable('thread_cash_transfers', {
   amountCents:    integer('amount_cents').notNull(),
   status:         text('status').notNull().default('pending'), // pending | claimed | expired | cancelled
   messageId:      uuid('message_id'),
+  note:           text('note'),
   claimedAt:      timestamp('claimed_at', { withTimezone: true }),
+  cancelledAt:    timestamp('cancelled_at', { withTimezone: true }),
+  expiresAt:      timestamp('expires_at', { withTimezone: true }),
+  idempotencyKey: text('idempotency_key'),
   createdAt:      timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });

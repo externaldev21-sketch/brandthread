@@ -7,8 +7,9 @@
  * consistent app-wide.
  */
 import React, { useState } from 'react';
-import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticToggle } from '@/lib/haptics';
@@ -23,14 +24,36 @@ export interface SegmentedControlProps {
   selectedId: string;
   onChange: (id: string) => void;
   testID?: string;
+  /**
+   * 'surface' (default): the original opaque card-background pill — every
+   * existing call site keeps this and is visually unchanged.
+   * 'glass': a translucent, blurred dark pill with light text, for sitting
+   * directly on top of photo/video content (e.g. the buyer Threads Home
+   * feed's "Following / Threads" switcher) where an opaque card would look
+   * like a slapped-on control rather than part of the media surface.
+   */
+  variant?: 'surface' | 'glass';
+  /** Compact sizing (34pt tall instead of 40pt) for tight overlay contexts. */
+  size?: 'default' | 'compact';
+  /**
+   * Extra style on the root pill — existing call sites never pass this and
+   * are unaffected. Used to give the pill an explicit `minWidth` when its
+   * parent is a `flex: 1` wrapper (e.g. centered between other top-bar
+   * icons): without one, a row of `flex: 1` segments inside an
+   * otherwise-unconstrained row collapses to its text's minimum content
+   * size instead of the space actually available, truncating longer labels.
+   */
+  style?: StyleProp<ViewStyle>;
 }
 
-export function SegmentedControl({ options, selectedId, onChange, testID }: SegmentedControlProps) {
+export function SegmentedControl({ options, selectedId, onChange, testID, variant = 'surface', size = 'default', style }: SegmentedControlProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
   const [segmentWidth, setSegmentWidth] = useState(0);
   const activeIndex = Math.max(0, options.findIndex((option) => option.id === selectedId));
   const x = useSharedValue(activeIndex * segmentWidth);
+  const glass = variant === 'glass';
+  const height = size === 'compact' ? 34 : 40;
 
   React.useEffect(() => {
     x.set(withSpring(activeIndex * segmentWidth, SHEET_SPRING));
@@ -46,21 +69,39 @@ export function SegmentedControl({ options, selectedId, onChange, testID }: Segm
   return (
     <View
       accessibilityRole="tablist"
-      style={[styles.root, { backgroundColor: palette.card, borderColor: palette.border, borderRadius: RADII.pill }]}
+      style={[
+        styles.root,
+        { height, borderRadius: RADII.pill },
+        glass
+          ? { backgroundColor: 'rgba(0,0,0,0.28)', borderColor: 'rgba(255,255,255,0.28)', overflow: 'hidden' }
+          : { backgroundColor: palette.card, borderColor: palette.border },
+        style,
+      ]}
       onLayout={onLayout}
       testID={testID}
     >
+      {glass && Platform.OS !== 'android' && (
+        <BlurView intensity={36} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
+      )}
       {segmentWidth > 0 && (
         <Animated.View
           style={[
             styles.indicator,
-            { width: segmentWidth, backgroundColor: theme.accent, borderRadius: RADII.pill },
+            {
+              width: segmentWidth,
+              backgroundColor: glass ? 'rgba(255,255,255,0.94)' : theme.accent,
+              borderRadius: RADII.pill,
+              top: 3,
+              bottom: 3,
+            },
             indicatorStyle,
           ]}
         />
       )}
       {options.map((option) => {
         const selected = option.id === selectedId;
+        const selectedColor = glass ? '#111111' : theme.onAccent;
+        const unselectedColor = glass ? 'rgba(255,255,255,0.82)' : palette.mutedForeground;
         return (
           <Pressable
             key={option.id}
@@ -68,15 +109,17 @@ export function SegmentedControl({ options, selectedId, onChange, testID }: Segm
             accessibilityLabel={option.label}
             accessibilityState={{ selected }}
             onPress={() => { if (!selected) { hapticToggle(); onChange(option.id); } }}
-            style={styles.segment}
+            style={[styles.segment, size === 'compact' && styles.segmentCompact]}
             testID={testID ? `${testID}-${option.id}` : undefined}
           >
             <Text
               style={[
-                TYPE_SCALE.footnote,
-                { fontFamily: selected ? FONT.semibold : FONT.medium, color: selected ? theme.onAccent : palette.mutedForeground },
+                size === 'compact' ? styles.compactLabel : TYPE_SCALE.footnote,
+                { fontFamily: selected ? FONT.semibold : FONT.medium, color: selected ? selectedColor : unselectedColor },
               ]}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
             >
               {option.label}
             </Text>
@@ -88,7 +131,9 @@ export function SegmentedControl({ options, selectedId, onChange, testID }: Segm
 }
 
 const styles = StyleSheet.create({
-  root: { flexDirection: 'row', borderWidth: 1, padding: 3, height: 40 },
-  indicator: { position: 'absolute', top: 3, bottom: 3, left: 3 },
+  root: { flexDirection: 'row', borderWidth: 1, padding: 3 },
+  indicator: { position: 'absolute', left: 3 },
   segment: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.xs },
+  segmentCompact: { paddingHorizontal: 6 },
+  compactLabel: { fontSize: 12, lineHeight: 15 },
 });

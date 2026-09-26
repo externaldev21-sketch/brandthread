@@ -11,7 +11,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard } from '@/components/BrandthreadUI';
+import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
 import { TABULAR_NUMS, tabularType } from '@/constants/typography';
 import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 
@@ -25,6 +25,8 @@ function historyLabel(entry: ThreadCashEntry): string {
     case 'expiry': return 'Expired';
     case 'send_sent': return 'Sent to a friend';
     case 'send_received': return 'Received from a friend';
+    case 'send_cancelled': return 'Cancelled send, returned';
+    case 'send_expired': return 'Unclaimed send, returned';
     default: return 'Adjustment';
   }
 }
@@ -107,7 +109,12 @@ export default function ThreadCashScreen() {
             {/* History */}
             <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
             {history.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.muted }]}>No Thread Cash activity yet.</Text>
+              <EmptyState
+                compact
+                icon="dollar-sign"
+                title="No Thread Cash activity yet"
+                description="Check in daily to start earning."
+              />
             ) : (
               history.map((entry) => (
                 <View key={entry.id} style={[styles.historyRow, { borderColor: theme.borderSubtle }]}>

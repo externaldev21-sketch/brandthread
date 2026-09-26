@@ -6,8 +6,8 @@
  *  - is a single Pressable — nothing interactive is nested inside another
  *    pressable, so web never renders a button inside a button.
  */
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -18,15 +18,27 @@ import { SHOP_PILL_HEIGHT } from './profileLayout';
 type PressState = { pressed: boolean; hovered?: boolean; focused?: boolean };
 type FeatherName = keyof typeof Feather.glyphMap;
 
-/** Hover wash + focus ring painted inside a pressable's own bounds (web only states). */
+/**
+ * Hover wash, press fill and keyboard-focus glow, all painted INSIDE a
+ * pressable's own bounds (never an outer ring — a hard border-width ring
+ * used to render here for the focused state, which on the monochrome theme
+ * is a near-white accent and read as a plain white outline touching
+ * whatever sat above a tightly packed row like the profile tabs). The
+ * pressed and focused washes are both theme.accent at low opacity — a soft
+ * tint, never a hard line — and the pressed one fades in/out with the
+ * press itself instead of appearing instantly.
+ */
 export function InteractionLayer({ state, radius, theme }: { state: PressState; radius: number; theme: AppThemePreset }) {
   return (
     <>
       {state.hovered ? (
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, backgroundColor: `${theme.text}14` }]} />
       ) : null}
+      {state.pressed ? (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, backgroundColor: `${theme.accent}22` }]} />
+      ) : null}
       {state.focused ? (
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, borderWidth: 2, borderColor: theme.accent }]} />
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, backgroundColor: `${theme.accent}1F`, borderWidth: 1, borderColor: `${theme.accent}55` }]} />
       ) : null}
     </>
   );
@@ -208,7 +220,8 @@ export interface ProfileTab {
 /**
  * Equal-width tabs with the icon stacked above the label, so four tabs fit a
  * 375pt phone without icons colliding into their labels. The active tab is
- * marked with a short accent "stitch" under the label.
+ * marked by an animated pill indicator that slides to whichever tab is
+ * pressed, instead of each tab drawing its own static mark.
  */
 export function ProfileTabs({
   tabs,
@@ -220,8 +233,23 @@ export function ProfileTabs({
   onChange: (key: string) => void;
 }) {
   const { theme } = useAppTheme();
+  const [rowWidth, setRowWidth] = useState(0);
+  const activeIndex = Math.max(tabs.findIndex((tab) => tab.key === active), 0);
+  const indicatorX = useRef(new Animated.Value(activeIndex)).current;
+
+  useEffect(() => {
+    Animated.spring(indicatorX, { toValue: activeIndex, useNativeDriver: true, speed: 18, bounciness: 6 }).start();
+  }, [activeIndex, indicatorX]);
+
+  const cellWidth = tabs.length > 0 ? rowWidth / tabs.length : 0;
+  const indicatorWidth = Math.min(cellWidth - SP.md, 28);
+
   return (
-    <View style={[styles.tabs, { borderColor: theme.border, backgroundColor: theme.background }]} accessibilityRole="tablist">
+    <View
+      style={[styles.tabs, { borderColor: theme.border, backgroundColor: theme.background }]}
+      accessibilityRole="tablist"
+      onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
+    >
       {tabs.map((tab) => {
         const selected = tab.key === active;
         const color = selected ? theme.text : theme.muted;
@@ -242,13 +270,35 @@ export function ProfileTabs({
                   <Text style={[styles.tabLabel, { color }, selected && styles.tabLabelActive]} numberOfLines={1}>
                     {tab.label}{typeof tab.count === 'number' && tab.count > 0 ? ` ${tab.count}` : ''}
                   </Text>
-                  <View style={[styles.tabStitch, { backgroundColor: selected ? theme.accent : 'transparent' }]} />
                 </>
               )}
             </PressableScale>
           </View>
         );
       })}
+      {cellWidth > 0 && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.tabIndicator,
+            {
+              width: indicatorWidth,
+              backgroundColor: theme.accent,
+              transform: [
+                {
+                  translateX: indicatorX.interpolate({
+                    inputRange: [0, Math.max(tabs.length - 1, 1)],
+                    outputRange: [
+                      cellWidth / 2 - indicatorWidth / 2,
+                      cellWidth * Math.max(tabs.length - 1, 1) + cellWidth / 2 - indicatorWidth / 2,
+                    ],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      )}
     </View>
   );
 }
@@ -367,12 +417,12 @@ const styles = StyleSheet.create({
 
   tabs: {
     flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: SP.xs,
+    paddingHorizontal: SP.xs, position: 'relative',
   },
   tab: { minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: SP.sm, paddingHorizontal: 2 },
   tabLabel: { fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14 },
   tabLabelActive: { fontFamily: FONT.semibold },
-  tabStitch: { width: 18, height: 2, borderRadius: 1, marginTop: 2 },
+  tabIndicator: { position: 'absolute', bottom: -StyleSheet.hairlineWidth, left: 0, height: 2, borderRadius: 1 },
 
   section: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: SP.sm },
   sectionStitch: { flex: 1, borderTopWidth: 1, borderStyle: 'dashed' },
