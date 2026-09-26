@@ -21,7 +21,6 @@ import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
@@ -59,6 +58,7 @@ import { FeedGestureGuide } from '@/components/FeedGestureGuide';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
 import { getCachedFeedPosts, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
+import { useCommentCountDelta } from '@/lib/commentCountBus';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
 import {
@@ -103,6 +103,13 @@ const THREAD_PAGE_SIZE = 30;
 //   - RAIL_BOTTOM_GAP: >=16pt from the rail's last item to the bar's top.
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
 const RAIL_BOTTOM_GAP = 22;
+
+// Top chrome rhythm — measured from TikTok's For You feed (Mobbin refs cited
+// in the PR): a thin search affordance raised as high as the safe area
+// allows, then the Following/Threads tab row snug underneath it.
+const TOP_SEARCH_BAR_HEIGHT = 33;
+const TOP_SEARCH_TO_TABS_GAP = 7;
+const TOP_TABS_ROW_HEIGHT = 34;
 // How many times a feed's content repeats (under unique keys) once it has
 // no more real pages behind it, so scrolling never dead-ends or shows an
 // end card — see the `canLoopFeed`/`displayItems` comment below.
@@ -1200,89 +1207,149 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
   );
 }
 
-// ─── Shop CTA — an editorial "shop the look" card, elegantly integrated ──────
-// above the creator/caption block rather than a bare floating pill. Carries a
-// product thumb, an eyebrow label, the product name and price, and a chevron
-// affordance — reads as a merchandising surface, not a slapped-on badge. A
-// slow shimmer sweep plus a spring pop-in (on first mount, i.e. whenever the
-// page becomes the active cell) give it presence without being noisy.
+// ─── Shop side tab — a collapsed tab flush against the left screen edge ─────
+// (the right edge is the action rail) that glides out into a full card on
+// tap, rather than an always-visible price pill sitting over the video.
+// Fully solid/flat (no BlurView/backdrop-filter, no shimmer): the earlier
+// pill's frosted-glass background re-sampled the moving video behind it
+// every frame during a swipe, which read as a shimmer/glitch — this has no
+// live-sampling background at all, only a fixed solid fill. Collapsed by
+// default with zero mount/entrance animation (only a user tap ever starts
+// the expand/collapse spring), and force-collapses (no animation skipped —
+// this one transition is allowed since it's a direct response to the cell
+// leaving, matching "collapses back on swiping to the next video" in spec)
+// when the cell stops being active, so it never carries an expanded state
+// into a swipe.
+const SHOP_TAB_COLLAPSE_MS = 4000;
 
-function ShopPill({
-  tag, extraCount, onPress,
+function ShopSideTab({
+  tag, extraCount, onPress, isActive,
 }: {
   tag: SpotlightProductTag;
   extraCount: number;
   onPress: () => void;
+  isActive: boolean;
 }) {
-  const { theme } = useAppTheme();
   const { width: windowWidth } = useWindowDimensions();
-  const shimmer = useRef(new Animated.Value(0)).current;
-  const pop = useRef(new Animated.Value(0)).current;
+  const [expanded, setExpanded] = useState(false);
+  const anim = useRef(new Animated.Value(0)).current;
+  const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  React.useEffect(() => {
-    Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 9 }).start();
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.delay(1600),
-        Animated.timing(shimmer, { toValue: 1, duration: 1000, useNativeDriver: true }),
-        Animated.timing(shimmer, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [shimmer, pop]);
+  const clearCollapseTimer = useCallback(() => {
+    if (collapseTimer.current) {
+      clearTimeout(collapseTimer.current);
+      collapseTimer.current = null;
+    }
+  }, []);
+
+  const collapse = useCallback(() => {
+    clearCollapseTimer();
+    setExpanded(false);
+    Animated.spring(anim, { toValue: 0, useNativeDriver: false, speed: 18, bounciness: 0 }).start();
+  }, [anim, clearCollapseTimer]);
+
+  const expand = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setExpanded(true);
+    Animated.spring(anim, { toValue: 1, useNativeDriver: false, speed: 18, bounciness: 0 }).start();
+    clearCollapseTimer();
+    collapseTimer.current = setTimeout(collapse, SHOP_TAB_COLLAPSE_MS);
+  }, [anim, clearCollapseTimer, collapse]);
+
+  useEffect(() => {
+    if (!isActive) collapse();
+    // Only reacting to the cell becoming inactive — becoming active must
+    // never itself start an animation (see the module comment above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
+
+  useEffect(() => () => clearCollapseTimer(), [clearCollapseTimer]);
+
+  // A sleek, narrow strip when expanded — max ~62% of screen width, not a
+  // big card — sized off the live window width so it holds at 375/390/430.
+  const expandedWidth = Math.round(windowWidth * 0.62);
+  const width = anim.interpolate({ inputRange: [0, 1], outputRange: [28, expandedWidth] });
+  const collapsedOpacity = anim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [1, 0, 0] });
+  const expandedOpacity = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 0, 1] });
+  const expandedTranslate = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [8, 8, 0] });
 
   return (
-    <Animated.View
-      style={{
-        opacity: pop,
-        transform: [
-          { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) },
-          { translateY: pop.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
-        ],
-      }}
-    >
-      <TouchableOpacity
-        style={[styles.shopPill, { borderColor: `${theme.accent}55` }]}
-        activeOpacity={0.85}
-        onPress={onPress}
+    <>
+      {/* Tapping anywhere else on the video collapses the expanded card —
+          rendered only while expanded, behind the tab itself in z-order. */}
+      {expanded && (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={collapse}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
+      )}
+      <Animated.View
+        style={[styles.shopSideTab, { width }]}
         accessibilityRole="button"
-        accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
+        accessibilityLabel={
+          expanded
+            ? `Shop ${tag.productName}, ${formatCents(tag.priceCents)}`
+            : 'Shop this video'
+        }
       >
-        <BlurView intensity={42} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={styles.shopPillThumb}>
-          {tag.imageUri ? (
-            <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-          ) : (
-            <Feather name="shopping-bag" size={13} color="#111111" />
-          )}
-        </View>
-        <Text style={[styles.shopPillName, { maxWidth: windowWidth * 0.6 }]} numberOfLines={1}>
-          {tag.productName}
-        </Text>
-        <Text style={styles.shopPillPrice} numberOfLines={1}>
-          {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
-        </Text>
-        <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.75)" />
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.shopPillShimmer,
-            {
-              opacity: shimmer.interpolate({ inputRange: [0, 0.15, 0.85, 1], outputRange: [0, 0.45, 0.45, 0] }),
-              transform: [{ translateX: shimmer.interpolate({ inputRange: [0, 1], outputRange: [-140, 220] }) }],
-            },
-          ]}
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={0.85}
+          onPress={expanded ? onPress : expand}
+          testID="shop-tag-pill"
         >
-          <LinearGradient
-            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-      </TouchableOpacity>
-    </Animated.View>
+          <Animated.View
+            pointerEvents={expanded ? 'none' : 'auto'}
+            style={[styles.shopSideTabCollapsed, { opacity: collapsedOpacity }]}
+          >
+            {/* Icon + label are laid out and rotated together as ONE unit,
+                not rotated separately: rotating only the Text keeps its
+                pre-rotation (unrotated) box for layout purposes, so
+                anything positioned relative to that stale box — like the
+                icon above it in a flex column — lands using the wrong
+                effective width/height once the text is actually rotated,
+                which is what put the bag icon on top of the "P". Laid out
+                here as a plain horizontal row (label, then icon) and
+                rotated as a whole: a -90deg turn maps "left" to the
+                bottom and "right" to the top, so the label (left) reads
+                bottom-to-top exactly as before and the icon (right) ends
+                up above it, with real layout-computed spacing between
+                them instead of a stale gap. */}
+            <View style={styles.shopSideTabCollapsedStack}>
+              <Text style={styles.shopSideTabLabel}>SHOP</Text>
+              <Feather name="shopping-bag" size={11} color={ON_DARK} />
+            </View>
+          </Animated.View>
+          <Animated.View
+            pointerEvents={expanded ? 'auto' : 'none'}
+            style={[
+              styles.shopSideTabExpanded,
+              { opacity: expandedOpacity, transform: [{ translateX: expandedTranslate }] },
+            ]}
+          >
+            <View style={styles.shopSideTabThumb}>
+              {tag.imageUri ? (
+                <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              ) : (
+                <Feather name="shopping-bag" size={11} color="#111111" />
+              )}
+            </View>
+            {/* Name and price share one line so the whole card reads as a
+                sleek, narrow strip at ~44pt tall rather than a two-line
+                card — the name truncates first (flexShrink), the price
+                never does (flexShrink: 0, its own Text so numberOfLines on
+                the name can't cut it off too). */}
+            <Text style={styles.shopSideTabName} numberOfLines={1}>{tag.productName}</Text>
+            <Text style={styles.shopSideTabPrice} numberOfLines={1}>
+              {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
+            </Text>
+            <Feather name="chevron-right" size={12} color="rgba(255,255,255,0.75)" />
+          </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
+    </>
   );
 }
 
@@ -1317,6 +1384,7 @@ function SpotlightPage({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { push } = useThreadPull();
+  const commentCountDelta = useCommentCountDelta(item.id);
   // The creator player (no tab bar) always plays edge to edge like Buyer Home.
   const immersive = immersiveProp || !hasTabBar;
   const [paused, setPaused] = useState(false);
@@ -1526,6 +1594,19 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
+      {/* ─ Shop side tab ─ collapsed against the left edge (mirrors the
+          rail on the right), only when this video has a tagged product.
+          Lives at this top level, not inside the bottom-left info stack —
+          it's a screen-edge affordance, not part of that stack's flow. */}
+      {!!item.productTags?.length && (
+        <ShopSideTab
+          tag={item.productTags[0]}
+          extraCount={Math.max(0, item.productTags.length - 1)}
+          onPress={() => onShopTag(item, item.productTags![0])}
+          isActive={isActive}
+        />
+      )}
+
       {/* ─ Right action rail ─
           Pinned at bottomClearance + RAIL_BOTTOM_GAP, not bare
           bottomClearance: the scrub/progress bar sits right around
@@ -1582,7 +1663,7 @@ function SpotlightPage({
           <EngagementButton
             icon="heart"
             solidIcon="heart"
-            iconSize={25}
+            iconSize={30}
             count={formatCount(engagement?.likes ?? 0)}
             active={engagement?.liked ?? false}
             activeColor="#EF4444"
@@ -1601,24 +1682,27 @@ function SpotlightPage({
           />
         </View>
 
-        {/* Comments — not async, opens navigation */}
+        {/* Comments — not async, opens navigation. `commentCountDelta` bumps
+            this the instant a comment is posted in the comments sheet (a
+            separate routed screen), so the rail updates immediately instead
+            of waiting for the feed to refetch this post. */}
         <TouchableOpacity
           style={styles.railBtn}
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => onOpenComments(item.id)}
           accessibilityRole="button"
-          accessibilityLabel={`Comments, ${formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}`}
+          accessibilityLabel={`Comments, ${formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}`}
         >
-          <FontAwesome name="commenting" size={24} color={ON_DARK} />
-          <Text style={styles.railCount}>{formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}</Text>
+          <FontAwesome name="commenting" size={30} color={ON_DARK} />
+          <Text style={styles.railCount}>{formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}</Text>
         </TouchableOpacity>
 
         {/* Repost */}
         <EngagementButton
           icon="repeat"
           solidIcon="retweet"
-          iconSize={25}
+          iconSize={30}
           count={formatCount(engagement?.reposts ?? 0)}
           active={engagement?.reposted ?? false}
           activeColor={theme.accent}
@@ -1641,7 +1725,7 @@ function SpotlightPage({
         <EngagementButton
           icon="bookmark"
           solidIcon="bookmark"
-          iconSize={24}
+          iconSize={30}
           count={formatCount(engagement?.saves ?? item.saves)}
           active={engagement?.saved ?? false}
           activeColor={GOLD}
@@ -1672,7 +1756,7 @@ function SpotlightPage({
             setShareOpen(true);
           }}
         >
-          <FontAwesome name="share" size={24} color={ON_DARK} />
+          <FontAwesome name="share" size={30} color={ON_DARK} />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
@@ -1692,27 +1776,18 @@ function SpotlightPage({
         onFeedback={showToast}
       />
 
-      {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─
+      {/* ─ Bottom-left overlay: creator, caption, sound ─
           Pinned at bottomClearance + CAPTION_BOTTOM_GAP for the same reason
           as the rail above: bare bottomClearance put the sound line's own
           bottom edge right where the scrub/progress bar sits, touching it
           with no gap. CAPTION_BOTTOM_GAP guarantees the required >=12pt of
-          clearance from the sound line down to the bar. */}
+          clearance from the sound line down to the bar. The shop tag used to
+          live at the top of this stack as a pill; it's now the screen-edge
+          ShopSideTab rendered above instead, so this stack starts straight
+          at the repost/creator row with no leftover gap where the pill used
+          to sit — nothing here reserves space for it any more (see
+          bottomInfo/bottomInfoWithRepost's shrunk minHeight below). */}
       <Animated.View style={[styles.bottomInfo, chromeStyle, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]} pointerEvents="box-none">
-        {/* Shop pill lives in this same flex column now (not a separately
-            absolute-positioned sibling keyed off a magic bottom offset) so
-            its gap down to whatever comes next is guaranteed by layout, not
-            by a hardcoded number that only happened to work for one caption
-            length. */}
-        {!!item.productTags?.length && (
-          <View style={styles.shopPillWrap} pointerEvents="box-none">
-            <ShopPill
-              tag={item.productTags[0]}
-              extraCount={Math.max(0, item.productTags.length - 1)}
-              onPress={() => onShopTag(item, item.productTags![0])}
-            />
-          </View>
-        )}
         {hasRepostIdentity && (
           <TouchableOpacity
             style={styles.repostIdentity}
@@ -1789,7 +1864,7 @@ function SpotlightPage({
           accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
           accessibilityState={{ checked: soundOn }}
         >
-           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={12} color={`${ON_DARK}CC`} />
+           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={11} color={`${ON_DARK}CC`} />
           <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
         </Pressable>
       </Animated.View>
@@ -1936,11 +2011,12 @@ export default function FeedScreen({
   const creatorSource = creatorFeed?.source;
   const creatorId = creatorFeed?.id;
   const creatorStartPostId = creatorFeed?.startPostId;
-  // Height of the floating top overlay (Friends/Following/For You/Cart row):
-  // topBar's own paddingTop + paddingBottom, plus the buyerTopRow's height.
-  // Single source of truth so BuyerHighDemandPage's content never renders
-  // underneath it (see styles.topBar / styles.buyerTopRow below).
-  const buyerHeaderHeight = Math.max(0, previewTopInset - 4) + 44 + 4;
+  // Height of the floating top overlay (search bar/Following/Threads/Cart
+  // row): topBar's own paddingTop, plus the thin search bar, the gap under
+  // it, and the buyerTopRow's height. Single source of truth so
+  // BuyerHighDemandPage's content never renders underneath it (see
+  // styles.topBar / styles.buyerSearchBarThin / styles.buyerTopRow below).
+  const buyerHeaderHeight = previewTopInset + 4 + TOP_SEARCH_BAR_HEIGHT + TOP_SEARCH_TO_TABS_GAP + TOP_TABS_ROW_HEIGHT + 6;
   const buyerBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { userId } = useAuth();
@@ -1969,9 +2045,6 @@ export default function FeedScreen({
   const pageHeight = viewportSize.height || windowHeight;
   const viewportReady = viewportSize.width > 0 && viewportSize.height > 0;
   const [showSearch, setShowSearch] = useState(false);
-  /** Buyer Threads Home's own search toggle — the glass top bar swaps to a
-   * search row in place, same searchQuery state as the legacy top bar. */
-  const [buyerSearchOpen, setBuyerSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRepostEducation, setShowRepostEducation] = useState(false);
@@ -2947,39 +3020,46 @@ export default function FeedScreen({
           </View>
         </View>
       ) : isBuyerSurface ? (
-        <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none">
-          {/* Buyer Threads Home: For You feed chrome — Friends + Drops entry
-              points, a centered "Following | Threads" glass pill switcher
-              (real SegmentedControl from the shared design system, extended
-              with a translucent `variant="glass"` for use over video — see
-              components/ui/SegmentedControl.tsx), a LIVE jump-to button that
-              only appears while a live stream is actually mixed into the
-              feed, search, activity and cart. */}
-          {buyerSearchOpen ? (
-            <View style={styles.buyerSearchRow}>
-              <BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
-              <Feather name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
-              <TextInput
-                style={styles.buyerSearchInput}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search creators, products…"
-                placeholderTextColor="rgba(255,255,255,0.5)"
-                autoFocus
-                returnKeyType="search"
-                onSubmitEditing={() => setBuyerSearchOpen(false)}
-              />
+        <View style={[styles.topBar, { paddingTop: previewTopInset + 4 }]} pointerEvents="box-none">
+          {/* Buyer Threads Home: For You feed chrome — a persistent thin
+              search bar raised as high as the safe area allows, snug above
+              Friends/Drops entry points, a centered "Following | Threads"
+              underline switcher (real SegmentedControl from the shared
+              design system — see components/ui/SegmentedControl.tsx), a
+              LIVE jump-to button that only appears while a live stream is
+              actually mixed into the feed, activity and cart. Placement
+              measured from TikTok's For You feed (Mobbin refs in the PR):
+              squircle search affordance, tight tab row underneath, right-
+              inset cart mirroring the rail's own right inset. Solid fills
+              only, no BlurView: a live blur here would re-sample the
+              playing video behind it every frame, same class of glitch as
+              the old shop pill's frosted background — see ShopSideTab
+              above. */}
+          <View style={styles.buyerSearchBarThin}>
+            <Feather name="search" size={14} color="rgba(255,255,255,0.75)" style={{ marginLeft: 10 }} />
+            <TextInput
+              style={styles.buyerSearchBarThinInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search…"
+              placeholderTextColor="rgba(255,255,255,0.55)"
+              returnKeyType="search"
+              testID="buyer-home-search-input"
+            />
+            {searchQuery.length > 0 && (
               <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
+                style={styles.buyerSearchBarThinClear}
                 activeOpacity={0.7}
-                onPress={() => { setBuyerSearchOpen(false); setSearchQuery(''); }}
+                onPress={() => setSearchQuery('')}
                 accessibilityRole="button"
-                accessibilityLabel="Close search"
+                accessibilityLabel="Clear search"
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
-                <Feather name="x" size={18} color={ON_DARK} />
+                <Feather name="x" size={14} color={ON_DARK} />
               </TouchableOpacity>
-            </View>
-          ) : (
+            )}
+          </View>
+
           <View style={styles.buyerTopRow}>
             <View style={styles.buyerTopCluster}>
               <TouchableOpacity
@@ -3028,6 +3108,7 @@ export default function FeedScreen({
             <View style={styles.buyerTabSwitcherWrap} pointerEvents="box-none">
               <SegmentedControl
                 variant="underline"
+                size="compact"
                 testID="buyer-home-tabs"
                 options={[
                   { id: 'following', label: 'Following' },
@@ -3042,20 +3123,6 @@ export default function FeedScreen({
             </View>
 
             <View style={styles.buyerTopCluster}>
-              <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  setBuyerSearchOpen(true);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Search"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                testID="buyer-home-search"
-              >
-                <Feather name="search" size={20} color={ON_DARK} />
-              </TouchableOpacity>
               <ActivityBellButton color={ON_DARK} size={20} style={styles.buyerTopBtnCompact} badgeBorderColor={BG} />
               <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtnCompact, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
@@ -3080,7 +3147,6 @@ export default function FeedScreen({
               </Animated.View>
             </View>
           </View>
-          )}
         </View>
       ) : (
       <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none">
@@ -3309,67 +3375,93 @@ const styles = StyleSheet.create({
   speedPillText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13 },
   mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
   mediaDotActive: { width: 18, backgroundColor: ON_DARK },
-  // Compact single-line TikTok-Shop-style product anchor pill — a small
-  // tappable tag, not a card overlaying the video. 28pt thumbnail, 8pt
-  // internal padding, a 12pt gap between name and price (via the name's own
-  // marginRight, not a uniform row `gap`, so that gap can differ from the
-  // tighter thumb→name and price→chevron spacing) and the price never
-  // shrinks or truncates.
-  shopPill: {
-    height: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center',
-    borderRadius: RADII.pill, paddingHorizontal: 8, overflow: 'hidden',
-    borderWidth: 1,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25,
-    shadowRadius: 5, elevation: 4,
+  // Shop side tab: collapsed flush against the left screen edge (26pt of a
+  // 28pt-wide tab sticks out), only the two exposed corners rounded so it
+  // reads as attached to the edge rather than floating. Fully solid fill,
+  // no blur/shimmer — see the ShopSideTab component comment above for why.
+  shopSideTab: {
+    position: 'absolute', left: 0, top: '57%', height: 76,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderTopRightRadius: 12, borderBottomRightRadius: 12,
+    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    overflow: 'hidden',
   },
-  shopPillThumb: {
-    width: 28, height: 28, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: ON_DARK, overflow: 'hidden', marginRight: 8,
+  shopSideTabCollapsed: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 8,
   },
-  shopPillName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13, flexShrink: 1, marginRight: 12 },
-  // flexShrink: 0 — the price never gives up space to the name; it is
-  // always rendered in full, never truncated.
-  shopPillPrice: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, marginRight: 8, ...TABULAR_NUMS },
-  shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
+  // A plain horizontal row (label, then icon) — normal, unrotated layout —
+  // rotated as a whole once it's already sized. Centering this on both axes
+  // keeps it centered in the tab regardless of its rotated bounding box.
+  shopSideTabCollapsedStack: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    transform: [{ rotate: '-90deg' }],
+  },
+  shopSideTabLabel: {
+    color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.5,
+  },
+  // A sleek, narrow strip — 44pt tall (roughly the same visual height
+  // family as the collapsed tab, not a noticeably taller card), name and
+  // price sharing one line so it never needs two rows of text.
+  shopSideTabExpanded: {
+    position: 'absolute', top: 16, left: 0, right: 0, height: 44,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 8, paddingVertical: 6, gap: 8,
+  },
+  shopSideTabThumb: {
+    width: 32, height: 32, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ON_DARK, overflow: 'hidden', flexShrink: 0,
+  },
+  shopSideTabName: { flexShrink: 1, color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
+  shopSideTabPrice: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, ...TABULAR_NUMS },
 
+  // Placement measured from TikTok's For You feed (Mobbin refs in the PR):
+  // right inset ~10-12pt, ~30-32pt icons, 14-18pt rhythm between items.
   rail: {
-    position: 'absolute', right: 10, width: 52, bottom: 116, alignItems: 'center', gap: 19,
+    position: 'absolute', right: 12, width: 48, bottom: 116, alignItems: 'center', gap: 16,
   },
-  railAvatarWrap: { alignItems: 'center', marginBottom: 3 },
+  railAvatarWrap: { alignItems: 'center', marginBottom: 2 },
   railAvatar: {
-    width: 44, height: 44, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    width: 36, height: 36, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: ON_DARK,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
   },
-  railAvatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
+  railAvatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
   railFollowBadge: {
-    position: 'absolute', bottom: -8, width: 20, height: 20, borderRadius: RADII.pill,
+    position: 'absolute', bottom: -7, width: 18, height: 18, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
-  railBtn: { width: 48, alignItems: 'center', gap: 3 },
-  railActionContent: { width: 48, alignItems: 'center', gap: 3 },
-  railLikeWrap: { width: 48, alignItems: 'center', justifyContent: 'center' },
+  railBtn: { width: 44, alignItems: 'center', gap: 4 },
+  railActionContent: { width: 44, alignItems: 'center', gap: 4 },
+  railLikeWrap: { width: 44, alignItems: 'center', justifyContent: 'center' },
   railLikeRing: {
-    position: 'absolute', top: 4, width: 34, height: 34, borderRadius: RADII.pill,
+    position: 'absolute', top: 2, width: 38, height: 38, borderRadius: RADII.pill,
     borderWidth: 2, borderColor: '#EF4444',
   },
   railCount: {
-    fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: ON_DARK, ...TABULAR_NUMS,
+    fontSize: 12, lineHeight: 14, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
   // The bottom-left stack's vertical rhythm is one consistent system, set
   // as explicit per-step margins (not a single uniform `gap`, since each
-  // step needs its own value): shop pill -> 12pt -> creator name row ->
-  // 6pt -> caption -> 8pt -> sound line -> (CAPTION_BOTTOM_GAP, on the
-  // container's own `bottom` above) -> progress bar.
+  // step needs its own value): creator name row -> 6pt -> caption -> 8pt ->
+  // sound line -> (CAPTION_BOTTOM_GAP, on the container's own `bottom`
+  // above) -> progress bar. The shop tag no longer starts this stack (it's
+  // the screen-edge ShopSideTab now) — minHeight shrunk by its old
+  // 44pt-tall pill + 12pt gap (56pt) accordingly, so there's no leftover
+  // reserved space where it used to sit.
+  // Left inset tightened to match TikTok; right inset + maxWidth both cap
+  // the block so it stops well before the action rail and stays narrow
+  // enough (~75%) that the video shows through around it.
   bottomInfo: {
-    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 112,
+    position: 'absolute', left: 12, right: 78, maxWidth: '75%', bottom: 26, minHeight: 56,
     justifyContent: 'flex-end',
   },
-  bottomInfoWithRepost: { minHeight: 148 },
-  shopPillWrap: { marginBottom: 12, alignItems: 'flex-start' },
+  bottomInfoWithRepost: { minHeight: 92 },
   repostIdentity: {
     alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -3386,26 +3478,26 @@ const styles = StyleSheet.create({
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
-    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 8,
-    lineHeight: 20.5, letterSpacing: 0.1,
+    fontSize: 14, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 8,
+    lineHeight: 19, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
-  creatorRow: { minHeight: 30, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorRow: { minHeight: 26, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
   creatorName: {
-    fontSize: FS.base + 3, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    fontSize: 16, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   soundRow: {
-    height: 24, flexDirection: 'row', alignItems: 'center', gap: 6,
-    alignSelf: 'flex-start', paddingHorizontal: 9, borderRadius: RADII.pill,
+    height: 20, flexDirection: 'row', alignItems: 'center', gap: 5,
+    alignSelf: 'flex-start', paddingHorizontal: 8, borderRadius: RADII.pill,
     backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
-  soundText: { fontSize: FS.xs, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
+  soundText: { fontSize: 11, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
 
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 10, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  buyerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: 2 },
+  buyerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TOP_TABS_ROW_HEIGHT, gap: 2 },
   // Compact 36×36 visual footprint with 5pt hitSlop on every button above =
   // a real 44×44+ touch target while leaving the centered pill enough room
   // to breathe at 375pt width (5 icon buttons + LIVE badge otherwise crowd
@@ -3425,12 +3517,20 @@ const styles = StyleSheet.create({
   },
   liveJumpDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
   liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
-  buyerSearchRow: {
-    flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: RADII.pill,
-    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+  // Persistent thin search bar — squircle (not a full pill, not sharp),
+  // lighter/more transparent fill than a solid pill so it never darkens the
+  // video underneath. No blur: a live blur here would re-sample the playing
+  // video every frame (same class of glitch as the old shop pill).
+  buyerSearchBarThin: {
+    flexDirection: 'row', alignItems: 'center', height: TOP_SEARCH_BAR_HEIGHT,
+    borderRadius: 10, marginBottom: TOP_SEARCH_TO_TABS_GAP,
+    backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
   },
-  buyerSearchInput: {
-    flex: 1, height: 44, paddingHorizontal: 10, fontSize: FS.sm, fontFamily: FONT.regular, color: ON_DARK,
+  buyerSearchBarThinInput: {
+    flex: 1, height: '100%', paddingHorizontal: 8, fontSize: 13, fontFamily: FONT.regular, color: ON_DARK,
+  },
+  buyerSearchBarThinClear: {
+    width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 4,
   },
   topAvatarBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   topAvatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },

@@ -12,7 +12,8 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import {
-  blocks, db, follows, pool, threadCashConfig, threadCashEntries, threadCashStreaks, threadCashTransfers, users,
+  blocks, db, follows, pool, threadCashConfig, threadCashEntries, threadCashHeartbeats, threadCashStreaks,
+  threadCashTransfers, users,
 } from "@workspace/db";
 import { DEFAULT_THREAD_CASH_CONFIG, type ThreadCashConfig } from "./streaks";
 
@@ -148,6 +149,133 @@ export async function awardDailyCheckInOnce(
       source: "daily_checkin",
       referenceId: award.localDate,
       note: `Daily check-in (${award.localDate})`,
+    });
+    if (award.streakBonusCents > 0) {
+      await tx.insert(threadCashEntries).values({
+        buyerId: award.buyerId,
+        amountCents: award.streakBonusCents,
+        source: "streak_bonus",
+        referenceId: award.localDate,
+        note: `Streak bonus (${award.localDate})`,
+      });
+    }
+    return { created: true };
+  });
+}
+
+// ─── Active-time daily claim (replaces the button-tap check-in trigger) ────
+// The buyer no longer taps to claim: the client accumulates foreground
+// seconds and pings a heartbeat roughly once a minute, then calls
+// /daily/claim once it has 420s. The award itself reuses the exact same
+// streak math and one-per-buyer-local-date ledger guard as
+// awardDailyCheckInOnce; the only difference is this extra gate requiring
+// the server to have actually heard from the client a handful of times that
+// day, so a client can't just claim on launch by lying about elapsed time.
+
+export const MIN_HEARTBEATS_FOR_DAILY_CLAIM = 6;
+export const MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM = 420;
+
+/** Records one heartbeat for the buyer's local day; idempotent-additive (each call increments). */
+export async function recordThreadCashHeartbeat(
+  buyerId: string,
+  localDate: string,
+  activeSeconds: number,
+): Promise<{ heartbeatCount: number }> {
+  const clampedSeconds = Math.max(0, Math.min(24 * 3600, Math.floor(activeSeconds) || 0));
+  const [row] = await db
+    .insert(threadCashHeartbeats)
+    .values({ buyerId, localDate, heartbeatCount: 1, activeSeconds: clampedSeconds })
+    .onConflictDoUpdate({
+      target: [threadCashHeartbeats.buyerId, threadCashHeartbeats.localDate],
+      set: {
+        heartbeatCount: sql`${threadCashHeartbeats.heartbeatCount} + 1`,
+        activeSeconds: sql`GREATEST(${threadCashHeartbeats.activeSeconds}, ${clampedSeconds})`,
+        updatedAt: new Date(),
+      },
+    })
+    .returning({ heartbeatCount: threadCashHeartbeats.heartbeatCount });
+  return { heartbeatCount: row?.heartbeatCount ?? 1 };
+}
+
+async function getHeartbeatState(executor: DbExecutor, buyerId: string, localDate: string): Promise<{ heartbeatCount: number }> {
+  const [row] = await executor
+    .select({ heartbeatCount: threadCashHeartbeats.heartbeatCount })
+    .from(threadCashHeartbeats)
+    .where(and(eq(threadCashHeartbeats.buyerId, buyerId), eq(threadCashHeartbeats.localDate, localDate)))
+    .limit(1);
+  return { heartbeatCount: row?.heartbeatCount ?? 0 };
+}
+
+type ActiveTimeClaimAward = CheckInAward & {
+  /** Cumulative active seconds the client reports for this local date. */
+  activeSeconds: number;
+};
+
+/**
+ * Awards one day's Thread Cash from active foreground time rather than a
+ * button tap. Same one-per-(buyer, local date) ledger guard as
+ * awardDailyCheckInOnce (still the ultimate idempotency boundary), plus a
+ * minimum-active-time and minimum-heartbeat-count abuse gate before paying.
+ */
+export async function awardDailyActiveTimeClaimOnce(
+  award: ActiveTimeClaimAward,
+): Promise<{ created: boolean }> {
+  if (award.activeSeconds < MIN_ACTIVE_SECONDS_FOR_DAILY_CLAIM) {
+    throw new ThreadCashError(
+      "Keep the app open a little longer to earn today's Thread Cash.",
+      400,
+      "THREAD_CASH_NOT_ENOUGH_ACTIVE_TIME",
+    );
+  }
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-checkin:${award.buyerId}:${award.localDate}`}))`);
+    await assertThreadCashNotFrozen(tx, award.buyerId);
+
+    const [existing] = await tx
+      .select({ id: threadCashEntries.id })
+      .from(threadCashEntries)
+      .where(and(
+        eq(threadCashEntries.buyerId, award.buyerId),
+        eq(threadCashEntries.source, "daily_checkin"),
+        eq(threadCashEntries.referenceId, award.localDate),
+      ))
+      .limit(1);
+    if (existing) return { created: false };
+
+    const { heartbeatCount } = await getHeartbeatState(tx, award.buyerId, award.localDate);
+    if (heartbeatCount < MIN_HEARTBEATS_FOR_DAILY_CLAIM) {
+      throw new ThreadCashError(
+        "Keep the app open a little longer to earn today's Thread Cash.",
+        400,
+        "THREAD_CASH_NOT_ENOUGH_HEARTBEATS",
+      );
+    }
+
+    if (award.deviceId) {
+      const config = await getThreadCashConfig(tx);
+      const [row] = await tx
+        .select({ count: sql<string>`COUNT(*)` })
+        .from(threadCashStreaks)
+        .where(and(
+          eq(threadCashStreaks.lastDeviceId, award.deviceId),
+          eq(threadCashStreaks.lastCheckInDate, award.localDate),
+          sql`${threadCashStreaks.buyerId} <> ${award.buyerId}`,
+        ));
+      if (Number(row?.count ?? 0) >= config.maxCheckInsPerDevicePerDay) {
+        throw new ThreadCashError(
+          "Too many Thread Cash claims from this device today.",
+          429,
+          "THREAD_CASH_DEVICE_CHECKIN_CAP",
+        );
+      }
+    }
+
+    await tx.insert(threadCashEntries).values({
+      buyerId: award.buyerId,
+      amountCents: award.earnedCents,
+      source: "daily_checkin",
+      referenceId: award.localDate,
+      note: `Daily Thread Cash (${award.localDate})`,
     });
     if (award.streakBonusCents > 0) {
       await tx.insert(threadCashEntries).values({

@@ -2611,8 +2611,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     threadCash: {
       get: () =>
         get<ThreadCashStatus>('/api/thread-cash'),
-      checkIn: (body: { timezone: string; deviceId?: string }) =>
-        post<ThreadCashCheckInResult>('/api/thread-cash/check-in', body),
+      dailyHeartbeat: (body: { timezone: string; activeSeconds: number }) =>
+        post<{ ok: boolean; heartbeatCount: number }>('/api/thread-cash/daily/heartbeat', body),
+      dailyClaim: (body: { timezone: string; deviceId?: string; activeSeconds: number }) =>
+        post<ThreadCashCheckInResult>('/api/thread-cash/daily/claim', body),
       history: (limit = 50) =>
         get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
       redeem: (body: { amountCents: number; idempotencyKey: string }) =>

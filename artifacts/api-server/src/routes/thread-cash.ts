@@ -6,7 +6,11 @@
  * only toward purchases in the app.
  *
  * GET  /api/thread-cash             — balance, streak state, config, history
- * POST /api/thread-cash/check-in    — claim today's check-in (server-time, tz-aware)
+ * POST /api/thread-cash/check-in    — DEPRECATED, kept for older clients; claim today's
+ *                                      check-in (server-time, tz-aware)
+ * POST /api/thread-cash/daily/heartbeat — record ~60s of active foreground time today
+ * POST /api/thread-cash/daily/claim     — claim today's reward once 7 cumulative active
+ *                                      minutes (and enough heartbeats) have been recorded
  * GET  /api/thread-cash/history     — paginated ledger
  * POST /api/thread-cash/redeem      — reserve balance as a checkout discount token
  *                                      (feature-flagged: 'threadCashCheckoutDiscount')
@@ -19,13 +23,15 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, threadCashStreaks } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
-import { computeCheckIn, EMPTY_STREAK_STATE, type StreakState } from "../lib/threadCash/streaks";
+import { computeCheckIn, localDateString, EMPTY_STREAK_STATE, type StreakState } from "../lib/threadCash/streaks";
 import { notifyThreadCashReceived } from "../lib/activityEvents";
 import {
   ThreadCashError,
   cancelThreadCash,
   claimThreadCash,
   awardDailyCheckInOnce,
+  awardDailyActiveTimeClaimOnce,
+  recordThreadCashHeartbeat,
   getBalanceCents,
   getHistory,
   getThreadCashConfig,
@@ -130,6 +136,107 @@ router.post("/check-in", async (req, res) => {
   // A concurrent request may have already claimed this exact local date
   // between the read above and the award; the unique index is the real
   // guard, this just keeps the persisted streak row from double-incrementing.
+  if (created) {
+    await db.insert(threadCashStreaks).values({
+      buyerId,
+      timezone,
+      currentStreak: result.state.currentStreak,
+      longestStreak: result.state.longestStreak,
+      lastCheckInDate: result.state.lastCheckInDate,
+      lastCheckInAt: now,
+      lastDeviceId: deviceId,
+    }).onConflictDoUpdate({
+      target: threadCashStreaks.buyerId,
+      set: {
+        timezone,
+        currentStreak: result.state.currentStreak,
+        longestStreak: result.state.longestStreak,
+        lastCheckInDate: result.state.lastCheckInDate,
+        lastCheckInAt: now,
+        lastDeviceId: deviceId,
+        updatedAt: now,
+      },
+    });
+  }
+
+  const balanceCents = await getBalanceCents(db, buyerId);
+  res.json({
+    ok: true,
+    earnedCents: created ? result.earnedCents : 0,
+    streakBonusCents: created ? result.streakBonusCents : 0,
+    streakBroken: result.streakBroken,
+    balanceCents,
+    streak: {
+      currentStreak: result.state.currentStreak,
+      longestStreak: result.state.longestStreak,
+      lastCheckInDate: result.state.lastCheckInDate,
+      timezone,
+      dayInCycle: result.dayInCycle,
+      streakBonusDays: config.streakBonusDays,
+    },
+  });
+});
+
+// ─── POST /api/thread-cash/daily/heartbeat ──────────────────────────────────
+// Body: { timezone?: string }. Fired roughly every 60s the app is
+// foregrounded. Purely additive bookkeeping — never itself pays out
+// anything — so it's safe to call liberally; /daily/claim is what actually
+// checks the accumulated count against the config gate.
+router.post("/daily/heartbeat", async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
+  const timezone = normalizeTimezone(req.body?.timezone);
+  const activeSeconds = Math.max(0, Math.floor(Number(req.body?.activeSeconds)) || 0);
+  const localDate = localDateString(new Date(), timezone);
+  const { heartbeatCount } = await recordThreadCashHeartbeat(buyerId, localDate, activeSeconds);
+  res.json({ ok: true, heartbeatCount });
+});
+
+// ─── POST /api/thread-cash/daily/claim ──────────────────────────────────────
+// Body: { timezone?: string, deviceId?: string, activeSeconds: number }.
+// Replaces the button-tap /check-in as the buyer-facing trigger: the client
+// calls this once its cumulative foreground time for today reaches 420s.
+// "Server time" is still authoritative for which calendar day this is, same
+// as /check-in — see that handler's note.
+router.post("/daily/claim", async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
+  const timezone = normalizeTimezone(req.body?.timezone);
+  const deviceId = typeof req.body?.deviceId === "string" ? req.body.deviceId.slice(0, 128) : null;
+  const activeSeconds = Math.max(0, Math.floor(Number(req.body?.activeSeconds)) || 0);
+
+  const [config, { state: previousState }] = await Promise.all([
+    getThreadCashConfig(),
+    loadStreakState(buyerId),
+  ]);
+  const now = new Date();
+  const result = computeCheckIn(previousState, config, now, timezone);
+
+  if (result.alreadyCheckedInToday) {
+    res.status(409).json({
+      error: "You've already claimed today's Thread Cash.",
+      code: "THREAD_CASH_ALREADY_CHECKED_IN",
+      streak: { ...result.state, timezone, dayInCycle: result.dayInCycle },
+    });
+    return;
+  }
+
+  let created: boolean;
+  try {
+    ({ created } = await awardDailyActiveTimeClaimOnce({
+      buyerId,
+      localDate: result.state.lastCheckInDate!,
+      earnedCents: result.earnedCents,
+      streakBonusCents: result.streakBonusCents,
+      deviceId,
+      activeSeconds,
+    }));
+  } catch (error) {
+    if (error instanceof ThreadCashError) {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    throw error;
+  }
+
   if (created) {
     await db.insert(threadCashStreaks).values({
       buyerId,

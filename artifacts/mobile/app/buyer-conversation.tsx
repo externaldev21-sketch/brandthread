@@ -38,6 +38,8 @@ import { useAuth } from '@clerk/expo';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
+import { ThreadCashCoin } from '@/components/thread-cash/ThreadCashBill';
 import { formatCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
 import UploadRing from '@/components/chat/UploadRing';
@@ -216,6 +218,7 @@ export default function BuyerConversationScreen() {
   // this screen's session; a fresh message fetch elsewhere will show the
   // original status again until the server exposes a live lookup.
   const [threadCashOverrides, setThreadCashOverrides] = useState<Record<string, ThreadCashTransferStatus>>({});
+  const celebrateThreadCash = useCelebrateThreadCash();
   // Whether the other participant and I are mutual follows, purely to drive
   // the Thread Cash entry point's enabled/disabled affordance in the
   // composer — null while unknown/loading. The server independently
@@ -778,9 +781,9 @@ export default function BuyerConversationScreen() {
         </PressableScale>
       );
     }
-    // 'thread_cash' and 'quick_replies' are handled in renderItem() before
-    // this function is ever called for them — they're standalone rows, not
-    // content that belongs inside a chat bubble.
+    // 'thread_cash', 'quick_replies' and 'agent_card' are handled in
+    // renderItem() before this function is ever called for them — they're
+    // standalone rows, not content that belongs inside a chat bubble.
     // Default: product / order / post / profile card
     return (
       <PressableScale rippleEnabled={false}
@@ -1155,11 +1158,15 @@ export default function BuyerConversationScreen() {
             onPress={() => { if (deepLink) router.push(deepLink as never); }}
           >
             <View style={[s.agentCardIconCircle, { backgroundColor: theme.accentDim }]}>
-              <Feather
-                name={cardKind === 'thread_cash' ? 'dollar-sign' : cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
-                size={18}
-                color={theme.accent}
-              />
+              {cardKind === 'thread_cash' ? (
+                <ThreadCashCoin size={18} />
+              ) : (
+                <Feather
+                  name={cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
+                  size={18}
+                  color={theme.accent}
+                />
+              )}
             </View>
             <View style={{ flex: 1, marginLeft: SP.sm }}>
               {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
@@ -1197,6 +1204,7 @@ export default function BuyerConversationScreen() {
               try {
                 await api.threadCash.claim({ transferId });
                 setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
+                celebrateThreadCash({ amount: amountCents, from: displayName });
               } catch (e: any) {
                 Alert.alert('Could not claim', e?.message ?? 'Please try again.');
                 throw e;

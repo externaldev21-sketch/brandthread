@@ -40,7 +40,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock } from '@/components/layout';
-import { ScreenHeader } from '@/components/ScreenHeader';
+import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ThemedRefreshControl } from '@/components/ui';
@@ -80,6 +80,7 @@ import {
   type SuggestedPerson,
 } from '@/services/activityService';
 import { setSellerFollowing } from '@/services/socialService';
+import { ThreadCashCoin } from '@/components/thread-cash/ThreadCashBill';
 
 const EMPTY_ICON = 'activity' as const;
 const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
@@ -201,7 +202,11 @@ const ActivityRowView = React.memo(function ActivityRowView({
         ) : (
           <View style={styles.leading}>
             <View style={styles.iconCircle}>
-              <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
+              {row.type === 'thread_cash_received' ? (
+                <ThreadCashCoin size={ICON.md} />
+              ) : (
+                <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
+              )}
             </View>
           </View>
         )}
@@ -250,7 +255,11 @@ const ActivityRowView = React.memo(function ActivityRowView({
           />
         ) : row.actors.length > 0 ? (
           <View style={styles.thumbFallback}>
-            <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
+            {row.type === 'thread_cash_received' ? (
+              <ThreadCashCoin size={ICON.sm} />
+            ) : (
+              <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
+            )}
           </View>
         ) : null}
 
@@ -746,10 +755,10 @@ export default function ActivityCenterScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader
+      <TabPageHeader
         title="Activity"
         actions={hasUnread ? [{
-          icon: 'check-circle',
+          name: 'check-circle',
           onPress: () => { void handleMarkAll(); },
           accessibilityLabel: 'Mark all activity as read',
         }] : []}
