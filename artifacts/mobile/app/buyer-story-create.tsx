@@ -115,7 +115,13 @@ const TYPE_TABS: { label: string; value: MediaType; icon: string }[] = [
 export default function BuyerStoryCreate() {
   const colors = useColors();
   const { theme } = useAppTheme();
-  const PURPLE = colors.primary, PURPLE_DIM = colors.accent, CYAN = theme.secondary;
+  const PURPLE = colors.primary, PURPLE_DIM = colors.accent;
+  // A fixed cyan, not `theme.secondary` — every theme built from this app's
+  // `palette()` helper sets `secondary` equal to `accent` (same as `PURPLE`
+  // above), so using it here always produced two swatches with the exact
+  // same color value, which React then saw as a duplicate list `key` (see
+  // the `key={`${c}-${i}`}` swatch keys below) and warned about.
+  const CYAN = '#22D3EE';
   const BORDER_ACTIVE = `${theme.accent}73`;
   const TEXT_COLORS = ['#FFFFFF', '#000000', PURPLE, CYAN, '#F59E0B', '#10B981'];
   const styles = makeStyles(theme);
@@ -590,9 +596,9 @@ export default function BuyerStoryCreate() {
           <View style={styles.controlsPanel}>
             <Text style={styles.controlLabel}>Background</Text>
             <View style={styles.colorRow}>
-              {BG_COLORS.map(c => (
+              {BG_COLORS.map((c, i) => (
                 <PressableScale
-                  key={c}
+                  key={`${c}-${i}`}
                   style={[styles.colorCircle, { backgroundColor: c }, bgColor === c && styles.colorCircleActive]}
                   onPress={() => { hapticToggle(); setBgColor(c); }}
                   accessibilityRole="button"
@@ -603,9 +609,9 @@ export default function BuyerStoryCreate() {
             </View>
             <Text style={[styles.controlLabel, { marginTop: SP.md }]}>Text color</Text>
             <View style={styles.colorRow}>
-              {TEXT_COLORS.map(c => (
+              {TEXT_COLORS.map((c, i) => (
                 <PressableScale
-                  key={c}
+                  key={`${c}-${i}`}
                   style={[
                     styles.colorCircle,
                     { backgroundColor: c },
@@ -674,9 +680,9 @@ export default function BuyerStoryCreate() {
               autoFocus
             />
             <View style={[styles.colorRow, { marginTop: SP.sm }]}>
-              {TEXT_COLORS.map(c => (
+              {TEXT_COLORS.map((c, i) => (
                 <PressableScale
-                  key={c}
+                  key={`${c}-${i}`}
                   style={[
                     styles.colorCircle,
                     { backgroundColor: c },
