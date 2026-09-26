@@ -106,6 +106,10 @@ const THREAD_PAGE_SIZE = 30;
 //   - RAIL_BOTTOM_GAP: >=16pt from the rail's last item to the bar's top.
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
 const RAIL_BOTTOM_GAP = 22;
+// How many times a feed's content repeats (under unique keys) once it has
+// no more real pages behind it, so scrolling never dead-ends or shows an
+// end card — see the `canLoopFeed`/`displayItems` comment below.
+const FEED_LOOP_REPEAT = 6;
 const CAPTION_BOTTOM_GAP = 18;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
@@ -2069,10 +2073,23 @@ export default function FeedScreen({
   // displayItems: sentinel at index 0 only when buyerMode=true.
   // Seller mode: if (!buyerMode) — sentinel never enters the array.
   // getItemLayout stays uniform using the measured tab-scene height for all items.
+  //
+  // Once there's no more real content to paginate in, the same items repeat
+  // under unique keys instead of ending — no "You're all caught up" card;
+  // scrolling past the last video should feel seamless and never-ending.
+  // Not applied while a search filter is active, or to the single-
+  // creator/product player (a deliberate end there is fine).
+  const canLoopFeed = !searchQuery.trim() && !feedHasMore && filteredContentItems.length > 1 && !isCreatorFeed;
   const displayItems: FeedItem[] = useMemo(() => {
-    if (!buyerMode) return filteredContentItems as FeedItem[];
-    return [DEMAND_PAGE_SENTINEL, ...filteredContentItems] as FeedItem[];
-  }, [buyerMode, filteredContentItems]);
+    const base = filteredContentItems as FeedItem[];
+    const content = canLoopFeed
+      ? Array.from({ length: FEED_LOOP_REPEAT }, (_, cycle) => (
+          cycle === 0 ? base : base.map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
+        )).flat()
+      : base;
+    if (!buyerMode) return content;
+    return [DEMAND_PAGE_SENTINEL, ...content];
+  }, [buyerMode, filteredContentItems, canLoopFeed]);
 
   // buyerOffset: used to compute correct isActive for video playback when the
   // demand sentinel sits at index 0.
@@ -2300,16 +2317,22 @@ export default function FeedScreen({
     return () => { cancelled = true; };
   }, [sellerFeedPosts]);
 
-  /** Top-bar LIVE button: jumps the feed to the nearest active live stream
-   * card already mixed into displayItems, ahead of the current position
-   * when one exists downstream, otherwise the closest one behind it. */
+  /** Top-bar LIVE button: when a live stream card is already mixed into
+   * this feed, jumps to the nearest one (ahead of the current position when
+   * one exists downstream, otherwise the closest one behind it). Otherwise
+   * — the common case — it's a real navigation entry point into the
+   * dedicated live feed (a vertical swipe pager of live streams) at `/live`.
+   */
   function jumpToNearestLive() {
     const indices: number[] = [];
     displayItems.forEach((it, i) => { if ((it as any)._isLive) indices.push(i); });
-    if (!indices.length) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (!indices.length) {
+      router.push('/live' as never);
+      return;
+    }
     const ahead = indices.find(i => i > activeIndex);
     const target = ahead ?? indices[indices.length - 1];
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     feedListRef.current?.scrollToIndex({ index: target, animated: true });
   }
 
@@ -2491,24 +2514,6 @@ export default function FeedScreen({
           feedLoadingMore ? (
             <View style={styles.feedFooter}>
               <ActivityIndicator size="small" color={MUTED} />
-            </View>
-          ) : (!feedHasMore && sellerFeedPosts.length > 0) || (isBuyerSurface && !isCreatorFeed) ? (
-            // Buyer preview/live feeds have a fixed set of videos with no
-            // real pagination behind them — without an explicit end card
-            // here, swiping past the last one used to just run out of
-            // rendered content and show blank space. This always renders
-            // right after the last item so the feed never dead-ends blank.
-            <View style={[styles.feedFooter, { width: pageWidth, height: pageHeight }]}>
-              <Feather name="check-circle" size={28} color={MUTED} />
-              <Text style={styles.feedFooterText}>You're all caught up</Text>
-              <TouchableOpacity
-                onPress={() => feedListRef.current?.scrollToIndex({ index: buyerOffset, animated: true })}
-                style={styles.creatorRetry}
-                accessibilityRole="button"
-                accessibilityLabel="Back to the top"
-              >
-                <Text style={styles.creatorRetryText}>Back to the top</Text>
-              </TouchableOpacity>
             </View>
           ) : null
         }
