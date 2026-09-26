@@ -80,6 +80,25 @@ import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 // visible behind cards, sheets, and full-screen modal content.
 const OPAQUE_SCREEN_CONTENT = { backgroundColor: 'transparent' } as const;
 
+// Tap-outside-to-dismiss-keyboard wraps the whole app. On native this is
+// inert for a tap that lands directly on a text field: RN's responder
+// negotiation lets the TextInput claim the touch, so it never reaches this
+// outer Pressable's onPress. react-native-web has no such negotiation —
+// every click bubbles through normal DOM propagation — so without this
+// guard, clicking any TextInput/TextArea anywhere in the app focuses it and
+// then immediately blurs it again as the click bubbles up and this
+// handler fires Keyboard.dismiss(), making every text field on web look
+// completely dead to typing. Skip the dismiss when the click actually
+// originated on a text-entry element.
+function dismissKeyboardUnlessTextInput(e: { nativeEvent?: { target?: unknown } }) {
+  if (Platform.OS === 'web') {
+    const target = e?.nativeEvent?.target as HTMLElement | undefined;
+    const tag = target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+  }
+  Keyboard.dismiss();
+}
+
 function IsolatedStackScene({ children }: { children: React.ReactNode }) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & Record<string, any>;
@@ -236,6 +255,10 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // Seller livestream — real full-screen camera/broadcast controls.
   'seller-go-live',
   'seller-live',
+  // Pushed, modal-style profile editor with its own header Save button and
+  // scroll footer — the bar has no business floating over its form/photo
+  // pickers (screenshots showed it sitting on top of the last row).
+  'edit-profile',
   // Brandthread AI screen — immersive full-screen chat takeover with its own
   // floating composer pinned to the safe-area bottom inset. The floating
   // seller tab bar previously stayed mounted on top of it (this route wasn't
@@ -944,7 +967,7 @@ function RootLayoutNav() {
       <StoreContextBanner />
       <NotificationBanner />
       <NetworkNoticeBanner />
-      <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1 }}>
+      <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
       <Stack
         screenLayout={({ children }) => (
