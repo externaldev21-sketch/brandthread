@@ -11,6 +11,7 @@ import { useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -233,13 +234,7 @@ export default function LocationsScreen() {
             <Text style={[s.modalTitle, { color: colors.foreground }]}>
               {editTarget ? 'Edit location' : 'Add location'}
             </Text>
-            <TouchableOpacity
-              onPress={handleSave}
-              disabled={saving}
-              style={[s.modalSaveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}
-            >
-              {saving ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Text style={[s.modalSaveBtnText, { color: colors.primaryForeground }]}>Save</Text>}
-            </TouchableOpacity>
+            <Button label="Save" variant="primary" size="compact" loading={saving} onPress={handleSave} />
           </View>
           <ScrollView contentContainerStyle={s.modalBody}>
             {[
@@ -302,8 +297,6 @@ const s = StyleSheet.create({
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1 },
   modalCloseBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   modalTitle: { fontSize: FS.base, fontFamily: FONT.bold },
-  modalSaveBtn: { borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 8 },
-  modalSaveBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   modalBody: { padding: 20, gap: 16, paddingBottom: 60 },
   formField: { gap: 6 },
   formLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.6 },

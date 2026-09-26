@@ -17,6 +17,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, ActivityIndicator } from 'react-native';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import * as Haptics from 'expo-haptics';
 import { randomUUID } from 'expo-crypto';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -217,15 +218,15 @@ export function ThreadCashAttachButton({
               ))}
             </View>
 
-            <TouchableOpacity
-              style={[styles.sendBtn, { backgroundColor: cents > 0 ? theme.accent : theme.borderSubtle }]}
-              onPress={handleSend}
+            <Button
+              label="Send"
+              variant="primary"
+              fullWidth
+              loading={sending}
               disabled={sending || cents < 1}
-              accessibilityRole="button"
+              onPress={handleSend}
               accessibilityLabel="Confirm send"
-            >
-              {sending ? <ActivityIndicator color={theme.onAccent} /> : <Text style={[styles.sendBtnText, { color: theme.onAccent }]}>Send</Text>}
-            </TouchableOpacity>
+            />
           </View>
         </View>
       </Modal>
@@ -285,15 +286,15 @@ export function ThreadCashMessageCard({
       {status !== 'pending' ? (
         <Text style={[styles.cardStatus, { color: theme.muted }]}>{statusLabel[status]}</Text>
       ) : isRecipient ? (
-        <TouchableOpacity
-          style={[styles.claimBtn, { backgroundColor: theme.accent }]}
-          onPress={() => run(onClaim)}
+        <Button
+          label="Claim"
+          variant="primary"
+          size="compact"
+          loading={busy}
           disabled={busy}
-          accessibilityRole="button"
+          onPress={() => run(onClaim)}
           accessibilityLabel="Claim Thread Cash"
-        >
-          {busy ? <ActivityIndicator color={theme.onAccent} size="small" /> : <Text style={[styles.claimBtnText, { color: theme.onAccent }]}>Claim</Text>}
-        </TouchableOpacity>
+        />
       ) : isSender && onCancel ? (
         <View style={{ alignItems: 'center', gap: SP.xs }}>
           <Text style={[styles.cardStatus, { color: theme.muted }]}>Waiting to be claimed</Text>
@@ -320,13 +321,9 @@ const styles = StyleSheet.create({
   numpad: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: SP.md },
   numpadKey: { width: '32%', height: COMP.buttonH, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
   numpadKeyText: { fontSize: FS.xl, fontFamily: FONT.semibold },
-  sendBtn: { paddingVertical: SP.sm, borderRadius: RADIUS.md, alignItems: 'center', minHeight: COMP.buttonH, justifyContent: 'center' },
-  sendBtnText: { fontSize: FS.base, fontFamily: FONT.semibold },
   card: { borderWidth: 1, borderRadius: RADIUS.lg, padding: SP.md, alignItems: 'center', gap: SP.xs, minWidth: 200, maxWidth: 260 },
   cardAmount: { fontSize: FS.lg, fontFamily: FONT.bold },
   cardNote: { fontSize: FS.xs, fontFamily: FONT.regular, fontStyle: 'italic', textAlign: 'center' },
   cardStatus: { fontSize: FS.xs, fontFamily: FONT.regular },
-  claimBtn: { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: RADIUS.pill, marginTop: SP.xs, minHeight: 36, justifyContent: 'center' },
-  claimBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   cancelLink: { fontSize: FS.xs, fontFamily: FONT.medium, textDecorationLine: 'underline' },
 });

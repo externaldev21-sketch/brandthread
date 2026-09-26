@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { File, Paths } from 'expo-file-system';
@@ -222,23 +223,11 @@ export default function AiDesignChatScreen() {
               <Text style={s.pinnedLabel}>CURRENT VERSION</Text>
               <Text style={s.pinnedPrompt} numberOfLines={2}>{current.prompt}</Text>
               <View style={s.pinnedActions}>
-                <TouchableOpacity style={s.pinnedActionBtn} onPress={handleSave}>
-                  <Feather name="bookmark" size={ICON.xs} color={colors.text} />
-                  <Text style={s.pinnedActionText}>Save</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.pinnedActionBtn} onPress={handleSendToDesignStudio}>
-                  <Feather name="layers" size={ICON.xs} color={colors.text} />
-                  <Text style={s.pinnedActionText}>Design Studio</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.pinnedActionBtn} onPress={handleSendToMockupToModel}>
-                  <Feather name="user" size={ICON.xs} color={colors.text} />
-                  <Text style={s.pinnedActionText}>Mockup to Model</Text>
-                </TouchableOpacity>
+                <Button label="Save" icon="bookmark" variant="secondary" size="compact" onPress={handleSave} />
+                <Button label="Design Studio" icon="layers" variant="secondary" size="compact" onPress={handleSendToDesignStudio} />
+                <Button label="Mockup to Model" icon="user" variant="secondary" size="compact" onPress={handleSendToMockupToModel} />
                 {versions.length > 1 && (
-                  <TouchableOpacity style={s.pinnedActionBtn} onPress={() => setShowHistory(true)}>
-                    <Feather name="clock" size={ICON.xs} color={colors.text} />
-                    <Text style={s.pinnedActionText}>History ({versions.length})</Text>
-                  </TouchableOpacity>
+                  <Button label={`History (${versions.length})`} icon="clock" variant="secondary" size="compact" onPress={() => setShowHistory(true)} />
                 )}
               </View>
             </View>
@@ -354,21 +343,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: SP.xs,
-  },
-  pinnedActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SP.xs,
-    paddingVertical: 4,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  pinnedActionText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    color: colors.text,
   },
   emptyWrap: {
     flex: 1,

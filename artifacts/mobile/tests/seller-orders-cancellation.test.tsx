@@ -114,6 +114,7 @@ vi.mock('@/lib/money', () => ({
 }));
 
 vi.mock('@/lib/theme', () => ({
+  ACCENT: '#f8fafc',
   BG: '#09090b',
   SCREEN_BG: 'transparent',
   SURFACE: '#18181b',

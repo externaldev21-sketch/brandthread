@@ -1,9 +1,10 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { Button } from '@/components/ui/Button';
 
 const CARD_WIDTH = 116;
 const AVATAR_SIZE = 72;
@@ -47,19 +48,15 @@ export function FollowerAvatarCard({
         </View>
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{name}</Text>
       </PressableScale>
-      <PressableScale rippleEnabled={false}
-        style={[styles.messageBtn, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}
+      <Button
+        label="Message"
+        variant="secondary"
+        size="compact"
+        fullWidth
+        loading={busy}
         onPress={onMessage}
-        disabled={busy}
-        accessibilityRole="button"
         accessibilityLabel={`Message ${name}`}
-      >
-        {busy ? (
-          <ActivityIndicator size="small" color={theme.text} />
-        ) : (
-          <Text style={[styles.messageText, { color: theme.text }]}>Message</Text>
-        )}
-      </PressableScale>
+      />
     </View>
   );
 }
@@ -93,13 +90,4 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   name: { fontSize: FS.xs, fontFamily: FONT.semibold, textAlign: 'center', maxWidth: CARD_WIDTH },
-  messageBtn: {
-    width: '100%',
-    height: 32,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  messageText: { fontSize: FS.xs, fontFamily: FONT.semibold },
 });

@@ -23,6 +23,7 @@ import {
   FONT, FS, SP, RADIUS, SURFACE,
 } from '@/lib/theme';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { Button } from '@/components/ui/Button';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
@@ -577,23 +578,22 @@ export default function ProfileScreen() {
             />
 
             <View style={s.sheetActions}>
-              <TouchableOpacity
+              <Button
+                label="Cancel"
+                variant="secondary"
                 style={s.cancelButton}
                 onPress={closeProfileEditor}
                 disabled={savingProfile}
-                activeOpacity={0.8}
-              >
-                <Text style={s.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.saveButton, { borderColor: theme.accent }, savingProfile && s.saveButtonDisabled]}
+              />
+              <Button
+                label="Save changes"
+                variant="primary"
+                loading={savingProfile}
+                style={s.saveButton}
                 onPress={saveProfileDetails}
                 disabled={savingProfile}
-                activeOpacity={0.8}
                 testID="profile-edit-save"
-              >
-                <Text style={[s.saveButtonText, { color: theme.accent }]}>{savingProfile ? 'Saving…' : 'Save changes'}</Text>
-              </TouchableOpacity>
+              />
             </View>
           </SheetRise>
         </KeyboardAvoidingView>
@@ -654,15 +654,6 @@ const s = StyleSheet.create({
   },
   bioInput: { minHeight: 96, maxHeight: 128 },
   sheetActions: { flexDirection: 'row', gap: 10, marginTop: SP.lg },
-  cancelButton: {
-    flex: 1, minHeight: 48, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center',
-  },
-  cancelButtonText: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
-  saveButton: {
-    flex: 1.45, minHeight: 48, borderRadius: RADIUS.md,
-    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
-  },
-  saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { fontFamily: FONT.bold, fontSize: FS.sm },
+  cancelButton: { flex: 1 },
+  saveButton: { flex: 1.45 },
 });

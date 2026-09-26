@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
@@ -160,22 +161,8 @@ export function OrderSuccessSheet({
         )}
 
         <Animated.View style={[s.buttons, stagger[4]]}>
-          <TouchableOpacity
-            style={[s.primaryBtn, { backgroundColor: theme.accent }]}
-            onPress={() => onTrackOrder(order.orderId)}
-            accessibilityRole="button"
-            accessibilityLabel="Track order"
-          >
-            <Text style={[s.primaryBtnText, { color: theme.onAccent }]}>Track Order</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.secondaryBtn, { backgroundColor: theme.cardElevated }]}
-            onPress={onContinue}
-            accessibilityRole="button"
-            accessibilityLabel="Continue"
-          >
-            <Text style={[s.secondaryBtnText, { color: theme.text }]}>Continue</Text>
-          </TouchableOpacity>
+          <Button label="Track Order" variant="primary" fullWidth onPress={() => onTrackOrder(order.orderId)} />
+          <Button label="Continue" variant="secondary" fullWidth onPress={onContinue} />
         </Animated.View>
       </View>
     </View>
@@ -206,8 +193,4 @@ const s = StyleSheet.create({
   mapIconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   mapText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.medium },
   buttons: { gap: 10, marginTop: SP.lg },
-  primaryBtn: { minHeight: 52, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-  primaryBtnText: { fontSize: FS.base, fontFamily: FONT.bold },
-  secondaryBtn: { minHeight: 52, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-  secondaryBtnText: { fontSize: FS.base, fontFamily: FONT.semibold },
 });

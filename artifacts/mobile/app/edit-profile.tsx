@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -345,9 +346,7 @@ export default function EditProfileScreen() {
           <Feather name="alert-circle" size={28} color={theme.muted} />
           <Text style={styles.errorTitle}>Couldn't load your profile</Text>
           <Text style={styles.errorBody}>Check your connection and try again.</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={loadProfile} activeOpacity={0.8}>
-            <Text style={styles.retryBtnText}>Retry</Text>
-          </TouchableOpacity>
+          <Button label="Retry" variant="primary" size="small" style={styles.retryBtn} onPress={loadProfile} />
         </View>
       ) : !profileLoaded ? (
         <View style={styles.errorState}>
@@ -675,8 +674,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40 },
   errorTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.text, marginTop: 4 },
   errorBody:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, textAlign: 'center' },
-  retryBtn:   { marginTop: 12, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, backgroundColor: theme.accent },
-  retryBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: theme.onAccent },
+  retryBtn:   { marginTop: 12 },
 
   sectionLabel: {
     fontSize: 13, fontFamily: 'Inter_500Medium', color: theme.muted,
