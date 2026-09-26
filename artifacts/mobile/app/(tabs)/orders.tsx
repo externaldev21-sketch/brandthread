@@ -12,8 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, SearchBar } from '@/components/BrandthreadUI';
+import { Button } from '@/components/ui/Button';
 import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -453,46 +454,37 @@ export function OrderRow({
           {/* Quick action — pushed right */}
           <View style={{ flex: 1 }} />
           {order.status === 'new' && (
-            <TouchableOpacity
+            <Button
+              label="Accept"
+              icon="check-circle"
+              variant="primary"
+              size="compact"
               style={s.quickAction}
-              onPress={e => { e.stopPropagation(); onMarkProcessing(); }}
-              activeOpacity={0.8}
-              accessibilityRole="button"
+              onPress={e => { e?.stopPropagation?.(); onMarkProcessing(); }}
               accessibilityLabel={`Accept order ${order.orderNumber}`}
-            >
-              <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.quickActionGrad}>
-                <Feather name="check-circle" size={11} color={theme.onAccent} />
-                <Text style={[s.quickActionText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Accept</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            />
           )}
           {order.status === 'processing' && (
-            <TouchableOpacity
+            <Button
+              label="Ready"
+              icon="package"
+              variant="primary"
+              size="compact"
               style={s.quickAction}
-              onPress={e => { e.stopPropagation(); onMarkReady(); }}
-              activeOpacity={0.8}
-              accessibilityRole="button"
+              onPress={e => { e?.stopPropagation?.(); onMarkReady(); }}
               accessibilityLabel={`Mark order ${order.orderNumber} ready`}
-            >
-              <LinearGradient colors={[BLUE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.quickActionGrad}>
-                <Feather name="package" size={11} color={theme.onAccent} />
-                <Text style={[s.quickActionText, { color: theme.onAccent }]}>Ready</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            />
           )}
           {order.status === 'ready_to_ship' && (
-            <TouchableOpacity
+            <Button
+              label="Ship"
+              icon="send"
+              variant="primary"
+              size="compact"
               style={s.quickAction}
-              onPress={e => { e.stopPropagation(); onShip(); }}
-              activeOpacity={0.8}
-              accessibilityRole="button"
+              onPress={e => { e?.stopPropagation?.(); onShip(); }}
               accessibilityLabel={`Ship order ${order.orderNumber}`}
-            >
-              <LinearGradient colors={[SUCCESS, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.quickActionGrad}>
-                <Feather name="send" size={11} color={theme.onAccent} />
-                <Text style={[s.quickActionText, { color: theme.onAccent }]}>Ship</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            />
           )}
           {order.status === 'shipped' && order.shipments[0] && (
             <View style={s.trackingPill}>
@@ -550,9 +542,7 @@ function SortModal({
             {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
           </TouchableOpacity>
         ))}
-        <TouchableOpacity style={s.modalCloseBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Cancel sorting">
-          <Text style={s.modalCloseBtnText}>Cancel</Text>
-        </TouchableOpacity>
+        <Button label="Cancel" variant="secondary" fullWidth style={s.modalCloseBtn} onPress={onClose} accessibilityLabel="Cancel sorting" />
       </SheetRise>
     </Modal>
   );
@@ -594,9 +584,7 @@ function FilterSheet({
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <TouchableOpacity style={s.modalCloseBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Cancel filtering">
-          <Text style={s.modalCloseBtnText}>Cancel</Text>
-        </TouchableOpacity>
+        <Button label="Cancel" variant="secondary" fullWidth style={s.modalCloseBtn} onPress={onClose} accessibilityLabel="Cancel filtering" />
       </SheetRise>
     </Modal>
   );
@@ -1620,20 +1608,7 @@ const createStyles = (theme: any) => {
 
   // Quick action
   quickAction: {
-    borderRadius: RADIUS.xs,
-    overflow: 'hidden',
-  },
-  quickActionGrad: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 4,
-  },
-  quickActionText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
-    color: '#fff',
+    minWidth: 88,
   },
   trackingPill: {
     flexDirection: 'row',
@@ -1816,17 +1791,6 @@ const createStyles = (theme: any) => {
   },
   modalCloseBtn: {
     marginTop: SP.md,
-    alignItems: 'center',
-    paddingVertical: SP.md,
-    backgroundColor: CARD_GLASS,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  modalCloseBtnText: {
-    fontSize: FS.base,
-    fontFamily: FONT.semibold,
-    color: MUTED,
   },
   });
 };

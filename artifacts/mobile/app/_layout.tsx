@@ -80,6 +80,25 @@ import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 // visible behind cards, sheets, and full-screen modal content.
 const OPAQUE_SCREEN_CONTENT = { backgroundColor: 'transparent' } as const;
 
+// Tap-outside-to-dismiss-keyboard wraps the whole app. On native this is
+// inert for a tap that lands directly on a text field: RN's responder
+// negotiation lets the TextInput claim the touch, so it never reaches this
+// outer Pressable's onPress. react-native-web has no such negotiation —
+// every click bubbles through normal DOM propagation — so without this
+// guard, clicking any TextInput/TextArea anywhere in the app focuses it and
+// then immediately blurs it again as the click bubbles up and this
+// handler fires Keyboard.dismiss(), making every text field on web look
+// completely dead to typing. Skip the dismiss when the click actually
+// originated on a text-entry element.
+function dismissKeyboardUnlessTextInput(e: { nativeEvent?: { target?: unknown } }) {
+  if (Platform.OS === 'web') {
+    const target = e?.nativeEvent?.target as HTMLElement | undefined;
+    const tag = target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+  }
+  Keyboard.dismiss();
+}
+
 function IsolatedStackScene({ children }: { children: React.ReactNode }) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & Record<string, any>;
@@ -236,6 +255,10 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // Seller livestream — real full-screen camera/broadcast controls.
   'seller-go-live',
   'seller-live',
+  // Pushed, modal-style profile editor with its own header Save button and
+  // scroll footer — the bar has no business floating over its form/photo
+  // pickers (screenshots showed it sitting on top of the last row).
+  'edit-profile',
   // Brandthread AI screen — immersive full-screen chat takeover with its own
   // floating composer pinned to the safe-area bottom inset. The floating
   // seller tab bar previously stayed mounted on top of it (this route wasn't
@@ -944,7 +967,7 @@ function RootLayoutNav() {
       <StoreContextBanner />
       <NotificationBanner />
       <NetworkNoticeBanner />
-      <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1 }}>
+      <Pressable onPress={dismissKeyboardUnlessTextInput} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
       <Stack
         screenLayout={({ children }) => (
@@ -1069,7 +1092,18 @@ function RootLayoutNav() {
         <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
         <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="thread-checkout"       options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
+        {/*
+          slide_from_bottom (not 'none'): Buy now from the Shop sheet needs a
+          full-screen cover that slides up over BOTH the feed and the sheet in
+          one motion — the sheet is removed the instant this push starts (see
+          ShopProductSheet.handleBuyNow), so there is never a frame where the
+          incoming Checkout and the outgoing sheet are both visible/animating
+          at once. 'none' previously left this route with no transition of
+          its own, which is what let the sheet's own trailing dismiss
+          animation become the only visible motion, reading as Checkout
+          appearing underneath a still-open sheet.
+        */}
+        <Stack.Screen name="thread-checkout"       options={{ headerShown: false, animation: 'slide_from_bottom', gestureEnabled: false }} />
         <Stack.Screen name="buyer-return-request"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-refund-request"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-problem-report"  options={{ headerShown: false, animation: 'ios_from_right' }} />

@@ -38,15 +38,26 @@ import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSa
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
-import ChatWallpaper from '@/components/chat/ChatWallpaper';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaViewer from '@/components/chat/MediaViewer';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { ThreadCashAttachButton, ThreadCashMessageCard } from '@/components/thread-cash/ChatAttachThreadCash';
+import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashCoinMark } from '@/components/thread-cash/ChatAttachThreadCash';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 import {
   ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
 } from '@/components/chat/ReactionBar';
+import {
+  isPreviewConversationId, getPreviewConversation, getPreviewMessages,
+} from '@/lib/previewInbox';
+import {
+  parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed,
+  type AgentQuickReply,
+} from '@/lib/agentChat';
+
+/** Well-known clerkId of the official Brandthread Agent account — matches
+ *  the preview seed (lib/previewInboxData.ts) and the api-server system
+ *  account (lib/brandthreadAgent.ts). */
+const BRANDTHREAD_AGENT_USER_ID = 'brandthread-agent';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -152,6 +163,17 @@ const SCREEN_W = Dimensions.get('window').width;
 const BUBBLE_MAX = SCREEN_W * 0.75;
 const DOUBLE_TAP_MS = 300;
 
+// ─── Composer sizing ────────────────────────────────────────────────────────────
+// One consistent size for every circular control in the composer row (the
+// "+" attach button, the in-pill Thread Cash coin, and the mic⇄send morph) —
+// the previous 44/36/44 mix is exactly what read as mismatched.
+const COMPOSER_CONTROL = 36;
+// The pill grows with the TextInput up to ~5 lines, then scrolls internally.
+const COMPOSER_LINE_HEIGHT = 20;
+const COMPOSER_MAX_LINES = 5;
+const COMPOSER_TEXT_V_PADDING = SP.sm; // matches s.textInput's own vertical padding below
+const COMPOSER_MAX_INPUT_HEIGHT = COMPOSER_LINE_HEIGHT * COMPOSER_MAX_LINES + COMPOSER_TEXT_V_PADDING * 2;
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerConversationScreen() {
@@ -188,6 +210,13 @@ export default function BuyerConversationScreen() {
   // this screen's session; a fresh message fetch elsewhere will show the
   // original status again until the server exposes a live lookup.
   const [threadCashOverrides, setThreadCashOverrides] = useState<Record<string, ThreadCashTransferStatus>>({});
+  // Whether the other participant and I are mutual follows, purely to drive
+  // the Thread Cash entry point's enabled/disabled affordance in the
+  // composer — null while unknown/loading. The server independently
+  // re-validates mutual follow at send AND claim, so this client read can
+  // never itself be the security boundary; it only decides whether the coin
+  // shows as tappable or as a disabled affordance with an explanation.
+  const [threadCashMutual, setThreadCashMutual] = useState<boolean | null>(null);
   /** The signed-in Clerk user; legacy local records used the literal 'me'. */
   const myId = userId ?? MY_USER_ID;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
@@ -197,8 +226,10 @@ export default function BuyerConversationScreen() {
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [agentTyping, setAgentTyping] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
   const [isRecording, setIsRecording]         = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
@@ -249,7 +280,14 @@ export default function BuyerConversationScreen() {
   // ── Load conversation + messages ────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
-    if (!userId) {
+    // The dev-web ?bt_preview=buyer bypass never signs in through Clerk (see
+    // lib/devPreview.ts / the buyer inbox's own identical guard), so
+    // `userId` is null here in that mode — check for a seeded preview
+    // conversation id BEFORE the real-account `userId` guard below, or the
+    // whole preview thread (and its Thread Cash flow) is unreachable no
+    // matter what. Real accounts always have a userId and never hit this
+    // branch either way.
+    if (!userId && !(params.id && isPreviewConversationId(params.id))) {
       setConv(null);
       setMessages([]);
       setIsLoading(false);
@@ -258,6 +296,41 @@ export default function BuyerConversationScreen() {
     try {
       let loadedConv: Conversation | null = null;
       let unreadBeforeRead = 0;
+
+      // Dev/preview only: a seeded thread from lib/previewInbox.ts has no
+      // real backend record, so skip the real API entirely for it rather
+      // than relying on its 404 error path — never taken for a real
+      // conversation id.
+      if (params.id && isPreviewConversationId(params.id)) {
+        loadedConv = getPreviewConversation(params.id);
+        setConv(loadedConv);
+        setMessaging({ blockedByMe: false, unavailable: false });
+        setIsLoading(false);
+        if (loadedConv) {
+          const seeded = getPreviewMessages(loadedConv.id);
+          const alreadyPlayed = await hasWelcomePlayed(loadedConv.id);
+          if (alreadyPlayed || !loadedConv.isOfficial) {
+            // Ordinary preview threads, or a Brandthread Agent thread whose
+            // welcome has already played once — show everything at once.
+            setMessages(seeded);
+          } else {
+            // First time opening the Brandthread Agent preview thread: type
+            // the seeded welcome messages in one at a time, with a natural
+            // typing pause between them, then remember it played.
+            setMessages([]);
+            for (let i = 0; i < seeded.length; i++) {
+              setAgentTyping(true);
+              await new Promise((resolve) => setTimeout(resolve, 700 + Math.random() * 500));
+              setAgentTyping(false);
+              setMessages((prev) => [...prev, seeded[i]]);
+              setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+              await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+            await markWelcomePlayed(loadedConv.id);
+          }
+        }
+        return;
+      }
 
       if (params.id) {
         loadedConv = await getConversation(params.id);
@@ -314,7 +387,7 @@ export default function BuyerConversationScreen() {
 
   useEffect(() => {
     const unsub = subscribeSocial(() => {
-      if (conv?.id) {
+      if (conv?.id && !isPreviewConversationId(conv.id)) {
         getMessages(conv.id).then(setMessages);
       }
     });
@@ -325,8 +398,9 @@ export default function BuyerConversationScreen() {
   // reaction or reply added by the other participant only appears once we
   // refetch. Poll at a light cadence while the screen is focused — mirrors
   // the refetch-on-local-change pattern `subscribeSocial` already uses.
+  // Skipped for a seeded preview thread (no real backend to poll).
   useFocusEffect(useCallback(() => {
-    if (!conv?.id) return;
+    if (!conv?.id || isPreviewConversationId(conv.id)) return;
     const interval = setInterval(() => {
       getMessages(conv.id).then(setMessages).catch(() => {});
     }, 12000);
@@ -373,7 +447,10 @@ export default function BuyerConversationScreen() {
   // presence signals ConversationParticipant carries; the backend does not
   // currently populate them (see socialTypes.ts), so this line is simply
   // omitted rather than fabricating an "online"/"typing…" state from nothing.
-  const statusLine = statusLineFor(participant);
+  const isAgentConv = !!conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID;
+  const statusLine = isAgentConv
+    ? (agentTyping ? 'typing…' : 'Official Brandthread AI')
+    : statusLineFor(participant);
 
   // Show "View store" button for any seller conversation (resolved or pre-created)
   const convType = conv?.type ?? params.type ?? '';
@@ -381,6 +458,33 @@ export default function BuyerConversationScreen() {
     || convType === 'buyer_to_seller_product'
     || convType === 'buyer_to_seller_order';
   const sellerUserId = participant?.userId ?? params.participantId ?? '';
+
+  // The Thread Cash entry point always renders (once the feature flag is
+  // on) — it never fully disappears for a non-mutual-follow counterpart —
+  // but stays disabled with an explanation until we can confirm mutual
+  // follow. This is an affordance check only; see the state's own comment.
+  useEffect(() => {
+    let cancelled = false;
+    if (!threadCashSendEnabled || !sellerUserId) {
+      setThreadCashMutual(null);
+      return;
+    }
+    // Preview conversations have no real backend to check against — the
+    // whole Thread Cash flow must be clickable end-to-end there, so treat
+    // them as an already-confirmed mutual follow.
+    if (isPreviewConversationId(conv?.id ?? '')) {
+      setThreadCashMutual(true);
+      return;
+    }
+    api.social.status(sellerUserId)
+      .then((status) => { if (!cancelled) setThreadCashMutual(status.isMutual); })
+      .catch(() => { if (!cancelled) setThreadCashMutual(false); });
+    return () => { cancelled = true; };
+  }, [threadCashSendEnabled, sellerUserId, conv?.id, api]);
+  // UI-only: this must never surface a "checking…" string. While the check
+  // is still pending (threadCashMutual === null) a tap is a silent no-op —
+  // only a confirmed non-mutual-follow result shows an explainer.
+  const threadCashDisabledReason = `You can send Thread Cash to people who follow you back`;
 
   // ── Load seller products for attachment picker ───────────────────────────────
 
@@ -623,7 +727,7 @@ export default function BuyerConversationScreen() {
       return (
         <View style={s.photoGrid}>
           {uris.slice(0, 4).map((uri, idx) => (
-            <PressableScale
+            <PressableScale rippleEnabled={false}
               key={idx}
               style={[s.photoCell, uris.length === 1 && s.photoCellSingle]}
               activeOpacity={0.9}
@@ -649,7 +753,7 @@ export default function BuyerConversationScreen() {
     }
     if (att.type === 'voice') {
       return (
-        <PressableScale style={s.voiceRow} activeOpacity={0.8}
+        <PressableScale rippleEnabled={false} style={s.voiceRow} activeOpacity={0.8}
           onPress={() => att.uri && handlePlayVoice(att.uri)}>
           <View style={[s.voicePlayBtn, playingVoiceUri === att.uri && s.voicePlayBtnActive]}>
             <Feather name={playingVoiceUri === att.uri ? 'square' : 'play'} size={14} color="#fff" />
@@ -696,9 +800,50 @@ export default function BuyerConversationScreen() {
         />
       );
     }
+    if (att.type === 'quick_replies') {
+      const options = parseQuickReplies(att.meta?.optionsJson);
+      return (
+        <View style={s.quickReplyRow}>
+          {options.map((opt) => (
+            <PressableScale rippleEnabled={false}
+              key={opt.label}
+              style={[s.quickReplyChip, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}
+              activeOpacity={0.7}
+              onPress={() => sendQuickReply(opt)}
+              accessibilityRole="button"
+              accessibilityLabel={opt.label}
+            >
+              <Text style={[s.quickReplyChipText, { color: theme.text }]}>{opt.label}</Text>
+            </PressableScale>
+          ))}
+        </View>
+      );
+    }
+    if (att.type === 'agent_card') {
+      const deepLink = att.meta?.deepLink;
+      const cardKind = att.meta?.cardKind;
+      return (
+        <PressableScale rippleEnabled={false}
+          style={s.attachCard}
+          activeOpacity={deepLink ? 0.7 : 1}
+          onPress={() => { if (deepLink) router.push(deepLink as never); }}
+        >
+          <Feather
+            name={cardKind === 'thread_cash' ? 'dollar-sign' : cardKind === 'product' ? 'shopping-bag' : cardKind === 'profile' ? 'user' : 'compass'}
+            size={ICON.sm}
+            color={theme.accent}
+          />
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
+            {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={2}>{att.subtitle}</Text> : null}
+          </View>
+          {deepLink && <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />}
+        </PressableScale>
+      );
+    }
     // Default: product / order / post / profile card
     return (
-      <PressableScale
+      <PressableScale rippleEnabled={false}
         style={s.attachCard}
         activeOpacity={att.type === 'product' || att.type === 'order' || att.type === 'post' ? 0.7 : 1}
         onPress={() => {
@@ -775,6 +920,92 @@ export default function BuyerConversationScreen() {
 
   // ── Send message ────────────────────────────────────────────────────────────
 
+  /** Sends one freeform (or quick-reply) message to the Brandthread Agent.
+   *  Real conversations hit the real AI endpoint; a seeded preview
+   *  conversation (no backend to call) uses a canned reply matching the same
+   *  tone/content instead — see lib/agentChat.ts. */
+  async function sendToAgent(messageText: string) {
+    if (!conv) return;
+    const optimistic: Message = {
+      id: `local-${Date.now()}`,
+      conversationId: conv.id,
+      fromId: MY_USER_ID,
+      fromName: 'You',
+      fromInitials: 'Y',
+      fromColor: '#8B5CF6',
+      text: messageText,
+      reactions: [],
+      status: 'sent',
+      ts: Date.now(),
+      deletedForMe: false,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    setAgentTyping(true);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+
+    if (isPreviewConversationId(conv.id)) {
+      // No backend reachable in preview — canned reply, paced like a real
+      // reply so the typing indicator reads naturally.
+      const { text: replyText, cardKind } = cannedAgentReply(messageText);
+      await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 700));
+      setAgentTyping(false);
+      setMessages((prev) => [...prev, {
+        id: `local-agent-${Date.now()}`,
+        conversationId: conv.id,
+        fromId: participant?.userId ?? BRANDTHREAD_AGENT_USER_ID,
+        fromName: displayName,
+        fromInitials: participant?.initials ?? 'BT',
+        fromColor: participant?.color ?? '#0A0A0B',
+        text: replyText,
+        attachment: cardKind
+          ? { type: 'agent_card', title: cardKind === 'thread_cash' ? 'How Thread Cash works' : 'Go to Discover', meta: { cardKind, deepLink: cardKind === 'thread_cash' ? '/thread-cash' : '/(buyer)/discover' } }
+          : undefined,
+        reactions: [],
+        status: 'read',
+        ts: Date.now(),
+        deletedForMe: false,
+      }]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      return;
+    }
+
+    try {
+      // Best-effort short timeout so a genuinely unreachable API (e.g. dev
+      // web preview with no backend) still falls back gracefully instead of
+      // hanging the typing indicator.
+      const result = await Promise.race([
+        api.brandthreadAgent.sendMessage({ conversationId: conv.id, text: messageText }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
+      ]);
+      const msgs = await getMessages(conv.id);
+      setMessages(msgs);
+      void result;
+    } catch {
+      const { text: replyText } = cannedAgentReply(messageText);
+      setMessages((prev) => [...prev.filter((m) => m.id !== optimistic.id), optimistic, {
+        id: `local-agent-fallback-${Date.now()}`,
+        conversationId: conv.id,
+        fromId: participant?.userId ?? BRANDTHREAD_AGENT_USER_ID,
+        fromName: displayName,
+        fromInitials: participant?.initials ?? 'BT',
+        fromColor: participant?.color ?? '#0A0A0B',
+        text: replyText,
+        reactions: [],
+        status: 'read',
+        ts: Date.now(),
+        deletedForMe: false,
+      }]);
+    } finally {
+      setAgentTyping(false);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    }
+  }
+
+  function sendQuickReply(reply: AgentQuickReply) {
+    hapticSelection();
+    void sendToAgent(reply.value);
+  }
+
   async function handleSend() {
     if (!conv || !canSend) return;
     const t = text.trim();
@@ -783,6 +1014,12 @@ export default function BuyerConversationScreen() {
     setText('');
     setSelectedAttachment(null);
     setReplyTo(null);
+
+    if (isAgentConv && !att && !replyingTo) {
+      await sendToAgent(t);
+      return;
+    }
+
     setIsSending(true);
     try {
       await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
@@ -927,7 +1164,7 @@ export default function BuyerConversationScreen() {
     const isRead = msg.status === 'read' || !!msg.readAt;
 
     return (
-      <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? SP.sm : 0 }]}>
+      <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? 12 : 2 }]}>
         {/* Other-user avatar — only on the last bubble of a run */}
         {!isOwn && (
           isLastInGroup ? (
@@ -939,7 +1176,7 @@ export default function BuyerConversationScreen() {
 
         <View style={{ maxWidth: BUBBLE_MAX }}>
           {/* Bubble */}
-          <PressableScale
+          <PressableScale rippleEnabled={false}
             testID={`conversation-bubble-${msg.id}`}
             activeOpacity={0.88}
             onPress={(e) => handleBubblePress(msg, e)}
@@ -952,10 +1189,10 @@ export default function BuyerConversationScreen() {
               s.bubble,
               {
                 backgroundColor: isOwn ? theme.accent : theme.cardElevated,
-                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.xl,
-                borderTopRightRadius: (isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.xl,
-                borderBottomRightRadius: isOwn ? (isLastInGroup ? 6 : RADIUS.xl) : RADIUS.xl,
-                borderBottomLeftRadius: !isOwn ? (isLastInGroup ? 6 : RADIUS.xl) : RADIUS.xl,
+                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.lg,
+                borderTopRightRadius: (isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.lg,
+                borderBottomRightRadius: isOwn ? (isLastInGroup ? 6 : RADIUS.lg) : RADIUS.lg,
+                borderBottomLeftRadius: !isOwn ? (isLastInGroup ? 6 : RADIUS.lg) : RADIUS.lg,
                 alignSelf: isOwn ? 'flex-end' : 'flex-start',
                 shadowColor: theme.shadowColor,
                 shadowOffset: { width: 0, height: 2 },
@@ -1003,7 +1240,7 @@ export default function BuyerConversationScreen() {
 
             {/* Failed / retry */}
             {isOwn && msg.status === 'failed' && (
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 onPress={() => conv && retryMessage(conv.id, msg.id)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={s.retryRow}
@@ -1018,7 +1255,7 @@ export default function BuyerConversationScreen() {
           {reactionEntries.length > 0 && (
             <View style={[s.reactionsRow, isOwn ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }]}>
               {reactionEntries.map(([kind, count]) => (
-                <PressableScale
+                <PressableScale rippleEnabled={false}
                   key={kind}
                   style={[
                     s.reactionChip,
@@ -1075,93 +1312,86 @@ export default function BuyerConversationScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      <ChatWallpaper />
+      {/* Plain flat header — no card, no pill, no background decoration.
+          Sits directly on the theme background with a hairline border
+          underneath instead of a floating "glass" card. */}
+      <View style={[s.headerWrap, { paddingTop: insets.top + SP.xs }]}>
+        <PressableScale rippleEnabled={false}
+          onPress={() => { hapticPrimaryAction(); router.back(); }}
+          style={s.roundBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          testID="conversation-back"
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+        </PressableScale>
 
-      {/* Floating glass header */}
-      <View style={[s.headerWrap, { paddingTop: insets.top + SP.sm }]}>
-        <View style={s.headerPill}>
-          <PressableScale
-            onPress={() => { hapticPrimaryAction(); router.back(); }}
-            style={s.roundBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            testID="conversation-back"
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-          </PressableScale>
-
-          <PressableScale
-            style={s.headerCenter}
-            activeOpacity={participant ? 0.7 : 1}
-            disabled={!participant}
-            onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
-            accessibilityRole="button"
-            accessibilityLabel={`View ${displayName}'s profile`}
-          >
-            <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+        <PressableScale rippleEnabled={false}
+          style={s.headerCenter}
+          activeOpacity={participant ? 0.7 : 1}
+          disabled={!participant}
+          onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${displayName}'s profile`}
+        >
+          {participant && (
+            <View style={s.headerAvatarWrap} testID="conversation-avatar">
+              <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
+                <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+              </View>
+              {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
+            </View>
+          )}
+          <View style={s.headerTextCol}>
+            <View style={s.headerNameRow}>
+              <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+              {isAgentConv && (
+                <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
+                  <Feather name="check-circle" size={13} color={theme.accent} style={{ marginLeft: 4 }} />
+                  <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
+                    <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
+                  </View>
+                </View>
+              )}
+            </View>
             {statusLine ? (
               <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
                 {statusLine}
               </Text>
             ) : null}
-          </PressableScale>
+          </View>
+        </PressableScale>
 
-          {participant && (
-            <PressableScale
-              onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
-              testID="conversation-avatar"
+        {conv && (
+          <>
+            <PressableScale rippleEnabled={false}
+              style={s.roundBtn}
+              onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="conversation-call-voice"
               accessibilityRole="button"
-              accessibilityLabel={`View ${displayName}'s profile`}
+              accessibilityLabel="Voice call"
             >
-              <View style={s.headerAvatarWrap}>
-                <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                  <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
-                </View>
-                {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
-              </View>
+              <Feather name="phone" size={ICON.sm} color={theme.muted} />
             </PressableScale>
-          )}
-
-          {conv && (
-            <>
-              <PressableScale
-                style={s.roundBtn}
-                onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                testID="conversation-call-voice"
-                accessibilityRole="button"
-                accessibilityLabel="Voice call"
-              >
-                <Feather name="phone" size={ICON.sm} color={theme.muted} />
-              </PressableScale>
-              <PressableScale
-                style={s.roundBtn}
-                onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                testID="conversation-call-video"
-                accessibilityRole="button"
-                accessibilityLabel="Video call"
-              >
-                <Feather name="video" size={ICON.sm} color={theme.muted} />
-              </PressableScale>
-            </>
-          )}
-          <PressableScale
-            style={s.roundBtn}
-            onPress={() => { hapticPrimaryAction(); openOptions(); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel="More options"
-          >
-            <Feather name="more-horizontal" size={ICON.sm} color={theme.muted} />
-          </PressableScale>
-        </View>
+          </>
+        )}
+        <PressableScale rippleEnabled={false}
+          style={s.roundBtn}
+          onPress={() => { hapticPrimaryAction(); openOptions(); }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          testID="conversation-options"
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+        >
+          <Feather name="more-horizontal" size={ICON.sm} color={theme.muted} />
+        </PressableScale>
       </View>
 
       {/* Order context card */}
       {conv?.type === 'buyer_to_seller_order' && (
-        <PressableScale
+        <PressableScale rippleEnabled={false}
           style={s.orderCard}
           onPress={() => router.push('/(buyer)/orders' as never)}
           activeOpacity={0.8}
@@ -1183,7 +1413,7 @@ export default function BuyerConversationScreen() {
 
       {/* Product context card — shown for seller product conversations */}
       {conv?.type === 'buyer_to_seller_product' && conv.contextProductName && (
-        <PressableScale
+        <PressableScale rippleEnabled={false}
           style={s.orderCard}
           onPress={() => {
             // The product card opens the product; without an id, the store.
@@ -1256,7 +1486,7 @@ export default function BuyerConversationScreen() {
             <Text style={s.replyFromName}>{replyTo.fromName}</Text>
             <Text style={s.replyPreviewText} numberOfLines={1}>{replyTo.text}</Text>
           </View>
-          <PressableScale
+          <PressableScale rippleEnabled={false}
             onPress={() => setReplyTo(null)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -1308,7 +1538,7 @@ export default function BuyerConversationScreen() {
                   {selectedAttachment.title}
                 </Text>
               </View>
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 onPress={() => setSelectedAttachment(null)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
@@ -1318,9 +1548,11 @@ export default function BuyerConversationScreen() {
               </PressableScale>
             </View>
           )}
-          <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
-            {/* Attach — photos, video, and (for seller chats) products/posts */}
-            <PressableScale
+          <View style={[s.inputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
+            {/* Attach — photos, video, Thread Cash (Apple-Cash-style), and
+                (for seller chats) products/posts. A single plain "+" — no
+                filled blob — matching the restraint of iMessage/Snapchat. */}
+            <PressableScale rippleEnabled={false}
               onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
               style={s.roundInputBtn}
               disabled={isUploading || isSending}
@@ -1330,24 +1562,70 @@ export default function BuyerConversationScreen() {
               accessibilityLabel="Attach"
             >
               {isUploading
-                ? <UploadRing size={24} color={theme.accent} />
-                : <Feather name="plus" size={ICON.md} color={theme.muted} />
+                ? <UploadRing size={ICON.md} color={theme.accent} />
+                : <Feather name="plus" size={ICON.md} color={theme.text} />
               }
             </PressableScale>
 
-            {/* Minimal attach entry — works for any conversation participant
-                (buyer-to-buyer friends included), server-gated by mutual
-                follow at send AND claim. The transfer is already final by
-                the time onSent fires, so the bubble is posted immediately
-                rather than staged in the composer. */}
-            {threadCashSendEnabled && sellerUserId ? (
-              <ThreadCashAttachButton
-                recipientId={sellerUserId}
-                conversationId={conv?.id ?? ''}
-                onSent={async ({ transferId, amountCents, note }) => {
-                  if (!conv) return;
-                  try {
-                    await sendMessage(conv.id, '', {
+            {/* One pill: text input, the Thread Cash coin (left of the
+                mic/send control), and the mic⇄send morph — all inside the
+                same rounded bounds instead of floating as separate siblings. */}
+            <View style={s.pill}>
+              <TextInput
+                style={s.textInput}
+                value={text}
+                onChangeText={setText}
+                placeholder="Message…"
+                placeholderTextColor={theme.muted}
+                multiline
+                returnKeyType="default"
+              />
+
+              {/* Minimal Thread Cash entry — works for any conversation
+                  participant (buyer-to-buyer friends included). Always
+                  rendered once the feature flag is on: disabled with an
+                  explanation rather than hidden when not yet confirmed as a
+                  mutual follow. The transfer is already final by the time
+                  onSent fires, so the bubble is posted immediately rather
+                  than staged in the composer. The server independently
+                  re-validates mutual follow at send AND claim — this is an
+                  affordance check only, never the security boundary. */}
+              {threadCashSendEnabled && sellerUserId ? (
+                <ThreadCashAttachButton
+                  recipientId={sellerUserId}
+                  recipientName={participant?.name}
+                  recipientHandle={participant?.handle}
+                  conversationId={conv?.id ?? ''}
+                  disabled={threadCashMutual !== true}
+                  disabledReason={threadCashDisabledReason}
+                  renderTrigger={(open) => (
+                    <PressableScale rippleEnabled={false}
+                      onPress={() => {
+                        // Still checking mutual-follow status — silent no-op.
+                        // Never surface a "checking…" string to the user.
+                        if (threadCashMutual === null) return;
+                        // Confirmed not mutual — the one clean explainer,
+                        // with a Follow action, via the app's own Snackbar
+                        // (Alert.alert() is a documented no-op on RN Web).
+                        if (threadCashMutual === false) {
+                          setThreadCashNotice(threadCashDisabledReason);
+                          return;
+                        }
+                        open();
+                      }}
+                      style={s.threadCashCoinBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      testID="conversation-thread-cash"
+                      accessibilityRole="button"
+                      accessibilityLabel={threadCashMutual !== true ? `Thread Cash — ${threadCashDisabledReason}` : 'Send Thread Cash'}
+                      accessibilityState={{ disabled: threadCashMutual !== true }}
+                    >
+                      <ThreadCashCoinMark size={ICON.md} color={theme.text} accent={theme.accent} disabled={threadCashMutual !== true} />
+                    </PressableScale>
+                  )}
+                  onSent={async ({ transferId, amountCents, note }) => {
+                    if (!conv) return;
+                    const attachment: MessageAttachment = {
                       type: 'thread_cash',
                       title: 'Thread Cash',
                       accentColor: theme.accent,
@@ -1358,70 +1636,83 @@ export default function BuyerConversationScreen() {
                         status: 'pending',
                         ...(note ? { note } : {}),
                       },
-                    });
-                    const msgs = await getMessages(conv.id);
-                    setMessages(msgs);
-                    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
-                  } catch (e) {
-                    Alert.alert('Sent, but the chat message failed', apiErrorMessage(e, 'The Thread Cash send went through — refresh to see it in chat.'));
-                  }
-                }}
-              />
-            ) : null}
+                    };
+                    // Preview conversations have no real backend to post
+                    // to — append a local mock message directly, the same
+                    // way the seeded agent-reply flow above does.
+                    if (isPreviewConversationId(conv.id)) {
+                      setMessages((prev) => [...prev, {
+                        id: `local-thread-cash-${transferId}`,
+                        conversationId: conv.id,
+                        fromId: myId,
+                        fromName: 'You',
+                        fromInitials: 'Y',
+                        fromColor: theme.accent,
+                        text: '',
+                        attachment,
+                        reactions: [],
+                        status: 'sent',
+                        ts: Date.now(),
+                        deletedForMe: false,
+                      }]);
+                      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+                      return;
+                    }
+                    try {
+                      await sendMessage(conv.id, '', attachment);
+                      const msgs = await getMessages(conv.id);
+                      setMessages(msgs);
+                      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+                    } catch (e) {
+                      Alert.alert('Sent, but the chat message failed', apiErrorMessage(e, 'The Thread Cash send went through — refresh to see it in chat.'));
+                    }
+                  }}
+                />
+              ) : null}
 
-            {/* Text input */}
-            <TextInput
-              style={s.textInput}
-              value={text}
-              onChangeText={setText}
-              placeholder="Message…"
-              placeholderTextColor={theme.muted}
-              multiline
-              returnKeyType="default"
-            />
-
-            {/* Mic ⇄ Send morph */}
-            <View style={s.morphContainer}>
-              <Animated.View
-                pointerEvents={showSendButton ? 'none' : 'auto'}
-                style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
-              >
-                <PressableScale
-                  onPressIn={startRecording}
-                  onPressOut={stopRecording}
-                  disabled={isUploading || isSending}
-                  style={s.morphFaceInner}
-                  testID="conversation-mic"
-                  accessibilityRole="button"
-                  accessibilityLabel="Record voice message"
+              {/* Mic ⇄ Send morph, inside the pill's own bounds */}
+              <View style={s.morphContainer}>
+                <Animated.View
+                  pointerEvents={showSendButton ? 'none' : 'auto'}
+                  style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
                 >
-                  <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.md} color={isRecording ? theme.error : theme.muted} />
-                </PressableScale>
-              </Animated.View>
-              <Animated.View
-                pointerEvents={showSendButton ? 'auto' : 'none'}
-                style={[
-                  StyleSheet.absoluteFill, s.morphFace,
-                  { opacity: sendOpacity, transform: [{ scale: sendScale }], backgroundColor: canSend ? theme.accent : theme.cardElevated },
-                ]}
-              >
-                <PressableScale
-                  onPress={() => { hapticPrimaryAction(); handleSend(); }}
-                  disabled={!canSend}
-                  style={s.morphFaceInner}
-                  activeOpacity={0.8}
-                  testID="conversation-send"
-                  accessibilityRole="button"
-                  accessibilityLabel="Send message"
+                  <PressableScale rippleEnabled={false}
+                    onPressIn={startRecording}
+                    onPressOut={stopRecording}
+                    disabled={isUploading || isSending}
+                    style={s.morphFaceInner}
+                    testID="conversation-mic"
+                    accessibilityRole="button"
+                    accessibilityLabel="Record voice message"
+                  >
+                    <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.sm} color={isRecording ? theme.error : theme.muted} />
+                  </PressableScale>
+                </Animated.View>
+                <Animated.View
+                  pointerEvents={showSendButton ? 'auto' : 'none'}
+                  style={[
+                    StyleSheet.absoluteFill, s.morphFace,
+                    { opacity: sendOpacity, transform: [{ scale: sendScale }], backgroundColor: canSend ? theme.accent : theme.cardElevated },
+                  ]}
                 >
-                  <Feather name="send" size={ICON.sm} color={canSend ? theme.onAccent : theme.muted} />
-                </PressableScale>
-              </Animated.View>
+                  <PressableScale rippleEnabled={false}
+                    onPress={() => { hapticPrimaryAction(); handleSend(); }}
+                    disabled={!canSend}
+                    style={s.morphFaceInner}
+                    activeOpacity={0.8}
+                    testID="conversation-send"
+                    accessibilityRole="button"
+                    accessibilityLabel="Send message"
+                  >
+                    <Feather name="send" size={ICON.sm} color={canSend ? theme.onAccent : theme.muted} />
+                  </PressableScale>
+                </Animated.View>
+              </View>
             </View>
           </View>
         </View>
       ) : (
-        <View style={[s.inputRow, s.disabledInputRow, { paddingBottom: insets.bottom + SP.sm }]}>
+        <View style={[s.inputRow, s.disabledInputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
           <Text style={s.disabledInputText}>Messaging disabled</Text>
         </View>
       )}
@@ -1433,18 +1724,18 @@ export default function BuyerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowMediaSheet(false)}
       >
-        <PressableScale style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
+        <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
         <SheetRise style={s.mediaSheet}>
           <View style={s.mediaSheetHandle} />
           <Text style={s.mediaSheetTitle}>Add to message</Text>
-          <PressableScale style={s.mediaSheetOption} onPress={handlePickPhoto}>
+          <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickPhoto}>
             <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
             <View>
               <Text style={s.mediaSheetLabel}>Photos</Text>
               <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
             </View>
           </PressableScale>
-          <PressableScale style={s.mediaSheetOption} onPress={handlePickVideo}>
+          <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo}>
             <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
             <View>
               <Text style={s.mediaSheetLabel}>Video clip</Text>
@@ -1452,7 +1743,7 @@ export default function BuyerConversationScreen() {
             </View>
           </PressableScale>
           {isSellerConv && (
-            <PressableScale style={s.mediaSheetOption} onPress={openAttachmentPicker}>
+            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={openAttachmentPicker}>
               <View style={s.mediaSheetIcon}><Feather name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
               <View>
                 <Text style={s.mediaSheetLabel}>Product or post</Text>
@@ -1477,7 +1768,7 @@ export default function BuyerConversationScreen() {
                 <Text style={s.pickerTitle}>Attach to message</Text>
                 <Text style={s.pickerSubtitle}>Choose from {displayName}'s store</Text>
               </View>
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 onPress={() => setShowAttachmentPicker(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
@@ -1485,7 +1776,7 @@ export default function BuyerConversationScreen() {
               </PressableScale>
             </View>
             <View style={s.attachmentTabs}>
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('product')}
               >
@@ -1494,7 +1785,7 @@ export default function BuyerConversationScreen() {
                   Products
                 </Text>
               </PressableScale>
-              <PressableScale
+              <PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'post' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('post')}
               >
@@ -1527,7 +1818,7 @@ export default function BuyerConversationScreen() {
                       .filter((price) => price > 0);
                     const lowestPriceCents = prices.length > 0 ? Math.min(...prices) : null;
                     return (
-                      <PressableScale
+                      <PressableScale rippleEnabled={false}
                         key={product.id}
                         style={s.productOption}
                         onPress={() => pickProduct(product)}
@@ -1571,7 +1862,7 @@ export default function BuyerConversationScreen() {
                   keyboardShouldPersistTaps="handled"
                 >
                   {sellerPosts.map((post) => (
-                    <PressableScale
+                    <PressableScale rippleEnabled={false}
                       key={post.id}
                       style={s.productOption}
                       onPress={() => pickPost(post)}
@@ -1609,7 +1900,7 @@ export default function BuyerConversationScreen() {
         animationType="fade"
         onRequestClose={closeMessageSheet}
       >
-        <PressableScale style={s.modalBackdrop} activeOpacity={1} onPress={closeMessageSheet} />
+        <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={closeMessageSheet} />
         <SheetRise style={s.reactionSheet}>
           <View style={s.mediaSheetHandle} />
           <ReactionChipsRow
@@ -1621,21 +1912,21 @@ export default function BuyerConversationScreen() {
             }}
           />
           <View style={s.sheetDivider} />
-          <PressableScale style={s.sheetAction} onPress={sheetReply}>
+          <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetReply}>
             <Feather name="corner-up-left" size={ICON.sm} color={theme.text} />
             <Text style={s.sheetActionText}>Reply</Text>
           </PressableScale>
-          <PressableScale style={s.sheetAction} onPress={sheetCopy}>
+          <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetCopy}>
             <Feather name="copy" size={ICON.sm} color={theme.text} />
             <Text style={s.sheetActionText}>Copy</Text>
           </PressableScale>
           {isOwnSheetMsg ? (
-            <PressableScale style={s.sheetAction} onPress={sheetDelete}>
+            <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetDelete}>
               <Feather name="trash-2" size={ICON.sm} color={theme.error} />
               <Text style={[s.sheetActionText, { color: theme.error }]}>Delete for me</Text>
             </PressableScale>
           ) : (
-            <PressableScale style={s.sheetAction} onPress={sheetReport}>
+            <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetReport}>
               <Feather name="flag" size={ICON.sm} color={theme.error} />
               <Text style={[s.sheetActionText, { color: theme.error }]}>Report message</Text>
             </PressableScale>
@@ -1650,6 +1941,27 @@ export default function BuyerConversationScreen() {
         visible={copiedToast}
         message="Copied"
         onDismiss={() => setCopiedToast(false)}
+      />
+
+      <Snackbar
+        visible={threadCashNotice != null}
+        message={threadCashNotice ?? ''}
+        actionLabel="Follow"
+        onAction={async () => {
+          setThreadCashNotice(null);
+          if (!sellerUserId) return;
+          try {
+            await api.social.follow(sellerUserId);
+            hapticSuccessAction();
+            setThreadCashMutual(null);
+            const status = await api.social.status(sellerUserId);
+            setThreadCashMutual(status.isMutual);
+          } catch {
+            // Following can still fail (rate limit, blocked, etc.) — the
+            // coin's own disabled state already reflects reality either way.
+          }
+        }}
+        onDismiss={() => setThreadCashNotice(null)}
       />
     </KeyboardAvoidingView>
   );
@@ -1697,25 +2009,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Floating glass header
   headerWrap: {
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    zIndex: 5,
-  },
-  headerPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.cardGlass,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: theme.border,
+    backgroundColor: theme.background,
     paddingHorizontal: SP.xs,
-    paddingVertical: SP.xs,
+    paddingBottom: SP.sm,
     gap: 2,
-    shadowColor: theme.shadowColor,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 3,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.border,
+    zIndex: 5,
   },
   roundBtn: {
     width: 36,
@@ -1726,14 +2028,38 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   headerCenter: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: SP.xs,
+    gap: SP.sm,
+  },
+  headerTextCol: {
+    alignItems: 'center',
+  },
+  headerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerName: {
     fontSize: FS.md,
     fontFamily: FONT.bold,
     color: theme.text,
     letterSpacing: -0.2,
+  },
+  headerAiBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerAiTag: {
+    borderRadius: RADIUS.xs,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginLeft: 4,
+  },
+  headerAiTagText: {
+    fontSize: 10,
+    fontFamily: FONT.bold,
   },
   headerStatusLine: {
     fontSize: FS.xs,
@@ -1892,11 +2218,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: '#FFFFFF',
   },
 
-  // Bubble
+  // Bubble — 12x8pt padding, 18pt corner radius (Mobbin iMessage/Luma refs).
   bubble: {
-    borderRadius: RADIUS.xl,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm + 4,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: 12,
+    paddingVertical: SP.sm,
   },
   bubbleMeta: {
     flexDirection: 'row',
@@ -1932,12 +2258,29 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   attachCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: 240,
     backgroundColor: theme.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: theme.border,
     padding: SP.sm,
     marginBottom: SP.xs,
+  },
+  quickReplyRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.xs,
+    marginTop: SP.xs,
+  },
+  quickReplyChip: {
+    borderWidth: 1,
+    borderRadius: RADIUS.pill,
+    paddingVertical: 6,
+    paddingHorizontal: SP.sm,
+  },
+  quickReplyChipText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
   },
   attachTitle: {
     fontSize: FS.sm,
@@ -2048,36 +2391,57 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingTop: SP.sm,
     gap: SP.sm,
   },
+  // A light, borderless "+" — no filled grey blob. The visual glyph sits at
+  // COMPOSER_CONTROL (matching every other circular control in the row) but
+  // keeps a generous hitSlop at the call site for a full 44pt tap target.
   roundInputBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: COMPOSER_CONTROL,
+    height: COMPOSER_CONTROL,
+    borderRadius: COMPOSER_CONTROL / 2,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 2,
+  },
+  // The single composer pill — holds the TextInput, the Thread Cash coin,
+  // and the mic⇄send morph, all inside one rounded surface.
+  pill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     backgroundColor: theme.cardElevated,
-    marginBottom: 0,
+    borderRadius: RADIUS.xxl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.border,
+    paddingLeft: SP.sm,
+    paddingRight: SP.xs,
+    minHeight: COMPOSER_CONTROL + SP.xs,
   },
   textInput: {
     flex: 1,
-    backgroundColor: theme.cardElevated,
-    borderRadius: RADIUS.xxl,
-    borderWidth: 1,
-    borderColor: theme.border,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm + 2,
+    paddingVertical: COMPOSER_TEXT_V_PADDING,
+    paddingRight: SP.xs,
     fontSize: FS.base,
+    lineHeight: COMPOSER_LINE_HEIGHT,
     fontFamily: FONT.regular,
     color: theme.text,
-    maxHeight: 120,
-    minHeight: 44,
+    maxHeight: COMPOSER_MAX_INPUT_HEIGHT,
+    minHeight: COMPOSER_CONTROL,
+  },
+  // Sits inside the pill, left of the mic/send control.
+  threadCashCoinBtn: {
+    width: COMPOSER_CONTROL,
+    height: COMPOSER_CONTROL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SP.xs,
   },
   morphContainer: {
-    width: 44,
-    height: 44,
-    marginBottom: 0,
+    width: COMPOSER_CONTROL,
+    height: COMPOSER_CONTROL,
+    marginBottom: SP.xs,
   },
   morphFace: {
-    borderRadius: 22,
+    borderRadius: COMPOSER_CONTROL / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

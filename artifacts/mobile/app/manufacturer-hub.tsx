@@ -9,6 +9,7 @@ import {
   StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -1032,18 +1033,9 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
             </TouchableOpacity>
             <View style={relCard.divider} />
             <View style={relCard.actionRow}>
-              <TouchableOpacity style={relCard.btn} onPress={() => openThread(rel)} testID={`relationship-message-${mfg.id}`}>
-                <Feather name="message-circle" size={ICON.sm} color={theme.secondary} />
-                <Text style={[relCard.btnText, { color: theme.secondary }]}>Message</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={relCard.btn} onPress={() => router.push((`/quote-request?manufacturerId=${mfg.id}`) as never)}>
-                <Feather name="file-text" size={ICON.sm} color={theme.accentLight} />
-                <Text style={[relCard.btnText, { color: theme.accentLight }]}>Quote</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={relCard.btn} onPress={() => router.push((`/manufacturer-profile?id=${mfg.id}`) as never)}>
-                <Feather name="user" size={ICON.sm} color={theme.muted} />
-                <Text style={relCard.btnText}>Profile</Text>
-              </TouchableOpacity>
+              <Button label="Message" icon="message-circle" variant="secondary" size="compact" onPress={() => openThread(rel)} testID={`relationship-message-${mfg.id}`} />
+              <Button label="Quote" icon="file-text" variant="secondary" size="compact" onPress={() => router.push((`/quote-request?manufacturerId=${mfg.id}`) as never)} />
+              <Button label="Profile" icon="user" variant="secondary" size="compact" onPress={() => router.push((`/manufacturer-profile?id=${mfg.id}`) as never)} />
             </View>
           </View>
         );
@@ -1071,8 +1063,6 @@ const makeRelCard = (theme: AppThemePreset) => StyleSheet.create({
   lastMsg:  { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: 3 },
   divider:  { height: 1, backgroundColor: theme.border, marginVertical: SP.sm },
   actionRow:{ flexDirection: 'row', gap: SP.xs },
-  btn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: SP.sm, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevated },
-  btnText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1243,12 +1233,8 @@ function QuoteRequestCard({ req, manufacturerName, onView, onWithdraw }: { req: 
       <Text style={qc.details}>Qty: {req.quantity}{req.targetUnitPriceCents ? ` · Target: ${formatCents(req.targetUnitPriceCents)}/unit` : ''}</Text>
       {req.submittedAt && <Text style={qc.date}>Submitted: {fmtDate(req.submittedAt)}</Text>}
       <View style={qc.actionRow}>
-        <TouchableOpacity style={qc.btn} onPress={onView}>
-          <Text style={qc.btnText}>View</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[qc.btn, qc.dangerBtn]} onPress={onWithdraw}>
-          <Text style={[qc.btnText, { color: theme.error }]}>Withdraw</Text>
-        </TouchableOpacity>
+        <Button label="View" variant="secondary" size="compact" onPress={onView} />
+        <Button label="Withdraw" variant="destructive" size="compact" onPress={onWithdraw} />
       </View>
     </View>
   );
@@ -1272,23 +1258,13 @@ function QuoteReceivedCard({ quote, manufacturerName, canCompare, onAccept, onDe
       <Text style={qc.details}>Unit: {formatCents(quote.unitPriceCents)} · Total: ~{formatCents(quote.totalEstimateCents)}</Text>
       {quote.validUntil && <Text style={qc.date}>Expires: {fmtDate(quote.validUntil)}</Text>}
       <View style={[qc.actionRow, { flexWrap: 'wrap' }]}>
-        <TouchableOpacity style={[qc.btn, qc.successBtn]} onPress={onAccept}>
-          <Text style={[qc.btnText, { color: theme.success }]}>Accept</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[qc.btn, qc.dangerBtn]} onPress={onDecline}>
-          <Text style={[qc.btnText, { color: theme.error }]}>Decline</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={qc.btn} onPress={onCounter}>
-          <Text style={qc.btnText}>Counter</Text>
-        </TouchableOpacity>
+        <Button label="Accept" variant="primary" size="compact" onPress={onAccept} />
+        <Button label="Decline" variant="destructive" size="compact" onPress={onDecline} />
+        <Button label="Counter" variant="secondary" size="compact" onPress={onCounter} />
         {canCompare && (
-          <TouchableOpacity style={qc.btn} onPress={onCompare}>
-            <Text style={qc.btnText}>Compare</Text>
-          </TouchableOpacity>
+          <Button label="Compare" variant="secondary" size="compact" onPress={onCompare} />
         )}
-        <TouchableOpacity style={qc.btn} onPress={onDetails}>
-          <Text style={qc.btnText}>Details</Text>
-        </TouchableOpacity>
+        <Button label="Details" variant="secondary" size="compact" onPress={onDetails} />
       </View>
     </View>
   );
@@ -1302,10 +1278,6 @@ const makeQc = (theme: AppThemePreset) => StyleSheet.create({
   details:    { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text, marginBottom: SP.xs },
   date:       { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginBottom: SP.sm },
   actionRow:  { flexDirection: 'row', gap: SP.sm, marginTop: SP.xs },
-  btn:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardElevated },
-  dangerBtn:  { borderColor: 'rgba(248,113,113,0.3)', backgroundColor: 'rgba(248,113,113,0.08)' },
-  successBtn: { borderColor: 'rgba(16,185,129,0.3)', backgroundColor: 'rgba(16,185,129,0.08)' },
-  btnText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1378,20 +1350,17 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
             )}
             <Text style={smpCard.details}>Type: {item.type.replace(/_/g, ' ')} · Cost: {formatCents(item.costCents)}</Text>
             <View style={smpCard.actionRow}>
-              <TouchableOpacity style={smpCard.btn} onPress={() => router.push((`/production-detail?id=${item.id}`) as never)}>
-                <Text style={smpCard.btnText}>{item.status === 'pending_payment' || item.status === 'awaiting_payment' ? 'Review & pay' : 'Track'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={smpCard.btn} onPress={() => router.push((`/sample-detail?id=${item.id}`) as never)}>
-                <Text style={smpCard.btnText}>Details</Text>
-              </TouchableOpacity>
+              <Button
+                label={item.status === 'pending_payment' || item.status === 'awaiting_payment' ? 'Review & pay' : 'Track'}
+                variant="secondary"
+                size="compact"
+                onPress={() => router.push((`/production-detail?id=${item.id}`) as never)}
+              />
+              <Button label="Details" variant="secondary" size="compact" onPress={() => router.push((`/sample-detail?id=${item.id}`) as never)} />
               {canReview && (
                 <>
-                  <TouchableOpacity style={[smpCard.btn, smpCard.successBtn]} onPress={() => router.push((`/sample-detail?id=${item.id}&action=approve`) as never)}>
-                    <Text style={[smpCard.btnText, { color: theme.success }]}>Approve</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[smpCard.btn, smpCard.warnBtn]} onPress={() => router.push((`/sample-detail?id=${item.id}&action=revision`) as never)}>
-                    <Text style={[smpCard.btnText, { color: theme.warning }]}>Revision</Text>
-                  </TouchableOpacity>
+                  <Button label="Approve" variant="primary" size="compact" onPress={() => router.push((`/sample-detail?id=${item.id}&action=approve`) as never)} />
+                  <Button label="Revision" variant="secondary" size="compact" onPress={() => router.push((`/sample-detail?id=${item.id}&action=revision`) as never)} />
                 </>
               )}
             </View>
@@ -1413,10 +1382,6 @@ const makeSmpCard = (theme: AppThemePreset) => StyleSheet.create({
   date:       { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginBottom: SP.xs },
   details:    { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text, marginBottom: SP.sm },
   actionRow:  { flexDirection: 'row', gap: SP.sm },
-  btn:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardElevated },
-  successBtn: { borderColor: 'rgba(16,185,129,0.3)', backgroundColor: 'rgba(16,185,129,0.08)' },
-  warnBtn:    { borderColor: 'rgba(249,115,22,0.3)', backgroundColor: 'rgba(249,115,22,0.08)' },
-  btnText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1506,11 +1471,9 @@ function OrderRowCard({ order, router }: { order: SellerOrderRow; router: Return
       <Text style={prodCard.stage}>{awaiting ? 'Pay the card to start production' : reached > 0 ? `Stage ${reached} of 6 · ${orderStatusLabel(order.status)}` : orderStatusLabel(order.status)}</Text>
       </TouchableOpacity>
       <View style={prodCard.actionRow}>
-        <TouchableOpacity style={prodCard.btn} onPress={() => router.push((`/production-detail?id=${order.id}`) as never)}><Text style={prodCard.btnText}>{awaiting ? 'Review & pay' : 'Open tracker'}</Text></TouchableOpacity>
+        <Button label={awaiting ? 'Review & pay' : 'Open tracker'} variant="secondary" size="compact" onPress={() => router.push((`/production-detail?id=${order.id}`) as never)} />
         {!!order.threadId && (
-          <TouchableOpacity style={prodCard.btn} onPress={() => router.push((`/manufacturer-messages?threadId=${order.threadId}`) as never)}>
-            <Text style={prodCard.btnText}>Message</Text>
-          </TouchableOpacity>
+          <Button label="Message" variant="secondary" size="compact" onPress={() => router.push((`/manufacturer-messages?threadId=${order.threadId}`) as never)} />
         )}
       </View>
     </View>
@@ -1532,9 +1495,6 @@ const makeProdCard = (theme: AppThemePreset) => StyleSheet.create({
   segment:    { flex: 1, height: 5, borderRadius: 3, backgroundColor: theme.borderSubtle },
   segmentDone:{ backgroundColor: theme.text },
   actionRow:  { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
-  btn:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardElevated },
-  advanceBtn: { borderColor: theme.border, backgroundColor: theme.accentDim },
-  btnText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

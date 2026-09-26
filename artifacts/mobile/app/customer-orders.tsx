@@ -8,6 +8,7 @@ import {
   ActivityIndicator, TouchableOpacity,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { FS } from '@/lib/theme';
@@ -118,13 +119,7 @@ export default function CustomerOrdersScreen() {
           <Text style={[s.errorText, { color: colors.mutedForeground }]}>
             Couldn't load this customer. Check your connection and try again.
           </Text>
-          <TouchableOpacity
-            style={[s.retryBtn, { borderColor: colors.border }]}
-            onPress={() => { setLoading(true); load(); }}
-            activeOpacity={0.7}
-          >
-            <Text style={[s.retryText, { color: colors.foreground }]}>Retry</Text>
-          </TouchableOpacity>
+          <Button label="Retry" variant="secondary" size="small" style={s.retryBtn} onPress={() => { setLoading(true); load(); }} />
         </View>
       ) : (
         <ScrollView
@@ -237,8 +232,7 @@ const s = StyleSheet.create({
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   errorText:    { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 24 },
-  retryBtn:     { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1 },
-  retryText:    { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  retryBtn:     { marginTop: 8 },
 
   custCard:     { borderRadius: 16, borderWidth: 1, padding: 16, gap: 14 },
   custAvatarRow:{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 },

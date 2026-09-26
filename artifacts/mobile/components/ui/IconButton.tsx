@@ -32,11 +32,16 @@ export interface IconButtonProps {
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /** Opt out of the Android/web ripple circle while keeping the scale press
+   *  feel. Defaults to `true` (existing global behavior) — set `false` on a
+   *  per-screen basis where the ripple reads as an unwanted translucent grey
+   *  circle (e.g. the buyer Messages screens). */
+  rippleEnabled?: boolean;
 }
 
 export function IconButton({
   name, onPress, accessibilityLabel, accessibilityHint, color, size = 20,
-  variant = 'filled', badge, disabled = false, style, testID,
+  variant = 'filled', badge, disabled = false, style, testID, rippleEnabled = true,
 }: IconButtonProps) {
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
@@ -56,7 +61,7 @@ export function IconButton({
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       testID={testID}
       style={styles.hit}
-      android_ripple={{ color: `${resolvedColor}33`, borderless: true, radius: COMP.iconBtn / 2 }}
+      android_ripple={rippleEnabled ? { color: `${resolvedColor}33`, borderless: true, radius: COMP.iconBtn / 2 } : undefined}
     >
       <Animated.View
         style={[

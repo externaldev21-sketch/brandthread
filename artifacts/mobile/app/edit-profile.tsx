@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -18,6 +19,8 @@ import { pickProfileImage } from '@/lib/pickProfileImage';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { Avatar } from '@/components/ui/Avatar';
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -44,6 +47,18 @@ const EMPTY_FIELDS: Fields = {
 
 type ImageSlotKey = 'avatar' | 'logo' | 'banner';
 
+// Dev-web preview only (?bt_preview=seller): no signed-in session exists so
+// api.seller.getProfile()/updateProfile() and the upload endpoints all 401.
+// Seed a local editable profile so the whole screen works end-to-end, and
+// simulate the reserved-username / upload round trips below. __DEV__-gated,
+// so this is never reachable outside a dev web preview.
+const PREVIEW_TAKEN_USERNAMES = new Set(['admin', 'test', 'brandthread', 'shop']);
+const PREVIEW_SELLER_FIELDS: Fields = {
+  name: 'Preview Studio', username: 'preview_studio', bio: 'Handmade goods, made to order.',
+  website: 'https://example.com', category: 'Streetwear', tagsText: 'handmade, small batch',
+  location: 'Los Angeles, CA', contactEmail: 'hello@example.com', instagram: '@previewstudio', tiktok: '@previewstudio',
+};
+
 /** Quick links into existing seller settings screens — never duplicate those forms here. */
 const QUICK_LINKS: { icon: keyof typeof Feather.glyphMap; label: string; description: string; route: string }[] = [
   { icon: 'home', label: 'Store settings', description: 'Storefront identity, localization, checkout', route: '/store-settings' },
@@ -59,6 +74,7 @@ export default function EditProfileScreen() {
   const api = useApi();
   const { getToken } = useAuth();
   const { theme } = useAppTheme();
+  const preview = __DEV__ && isSellerDevPreview();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
 
   const [fields, setFields] = useState<Fields>(EMPTY_FIELDS);
@@ -97,6 +113,14 @@ export default function EditProfileScreen() {
 
   const loadProfile = useCallback(() => {
     setProfileError(false);
+    if (preview) {
+      // No authenticated session to load from — seed a local, fully
+      // editable preview profile so every control on this screen works.
+      setFields(PREVIEW_SELLER_FIELDS);
+      setInitial(PREVIEW_SELLER_FIELDS);
+      setProfileLoaded(true);
+      return;
+    }
     api.seller.getProfile()
       .then((profile) => {
         setAvatarUri(profile.profileImageUrl ?? null);
@@ -119,7 +143,7 @@ export default function EditProfileScreen() {
         setProfileLoaded(true);
       })
       .catch(() => setProfileError(true));
-  }, [api]);
+  }, [api, preview]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
@@ -132,17 +156,18 @@ export default function EditProfileScreen() {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
       if (!isDirty || saving) return;
       e.preventDefault();
-      Alert.alert(
-        'Discard changes?',
-        'You have unsaved changes. If you leave now, they will be lost.',
-        [
-          { text: 'Keep editing', style: 'cancel' },
-          { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
-        ],
-      );
+      confirmDiscardChanges(() => navigation.dispatch(e.data.action));
     });
     return unsubscribe;
   }, [navigation, isDirty, saving]);
+
+  // Guard the header back button directly too, so the prompt is reliable
+  // even in navigation contexts where 'beforeRemove' isn't raised for this
+  // particular pop (the listener above stays as extra coverage).
+  function handleBackPress() {
+    if (isDirty && !saving) { confirmDiscardChanges(() => router.back()); return; }
+    router.back();
+  }
 
   function set(key: keyof Fields, val: string) {
     setFields(prev => ({ ...prev, [key]: val }));
@@ -158,6 +183,15 @@ export default function EditProfileScreen() {
       return false;
     }
     setUsernameStatus('checking');
+    if (preview) {
+      await new Promise(resolve => setTimeout(resolve, 400));
+      if (PREVIEW_TAKEN_USERNAMES.has(u)) {
+        setUsernameStatus('taken'); setUsernameError('Username already taken');
+        return false;
+      }
+      setUsernameStatus('ok'); setUsernameError('');
+      return true;
+    }
     try {
       const result = await api.auth.checkUsername(u);
       if (result.available) { setUsernameStatus('ok'); setUsernameError(''); return true; }
@@ -186,14 +220,24 @@ export default function EditProfileScreen() {
     const previousUri = key === 'avatar' ? avatarUri : key === 'logo' ? logoUri : bannerUri;
     setUri(asset.uri);
     try {
-      const token = await getToken();
-      const result = await uploadImageWithProgress<Record<string, string>>(
-        path,
-        { uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' },
-        token,
-        (pct) => setUploadProgress(prev => ({ ...prev, [key]: pct })),
-      );
-      setUri(result[responseKey]);
+      if (preview) {
+        // No upload endpoint to hit in preview mode — simulate progress
+        // locally and keep the picked local URI as the "uploaded" result.
+        for (const pct of [30, 65, 100]) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+          setUploadProgress(prev => ({ ...prev, [key]: pct }));
+        }
+        setUri(asset.uri);
+      } else {
+        const token = await getToken();
+        const result = await uploadImageWithProgress<Record<string, string>>(
+          path,
+          { uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' },
+          token,
+          (pct) => setUploadProgress(prev => ({ ...prev, [key]: pct })),
+        );
+        setUri(result[responseKey]);
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast(`${title.replace('Update ', '')} updated`);
       if (setupTaskOnSuccess) void completeSetupTaskWhen('customize_store', true);
@@ -238,21 +282,23 @@ export default function EditProfileScreen() {
     setSaving(true);
     try {
       const tags = fields.tagsText.split(',').map(t => t.trim()).filter(Boolean).slice(0, 20);
-      await api.seller.updateProfile({
-        name:        fields.name.trim(),
-        brandName:   fields.name.trim(),
-        username:    rawUsername,
-        bio:         fields.bio.trim(),
-        website:     fields.website.trim(),
-        category:    fields.category.trim(),
-        location:    fields.location.trim(),
-        contactEmail: fields.contactEmail.trim(),
-        tags,
-        socialLinks: {
-          instagram: fields.instagram.trim(),
-          tiktok:    fields.tiktok.trim(),
-        },
-      });
+      if (!preview) {
+        await api.seller.updateProfile({
+          name:        fields.name.trim(),
+          brandName:   fields.name.trim(),
+          username:    rawUsername,
+          bio:         fields.bio.trim(),
+          website:     fields.website.trim(),
+          category:    fields.category.trim(),
+          location:    fields.location.trim(),
+          contactEmail: fields.contactEmail.trim(),
+          tags,
+          socialLinks: {
+            instagram: fields.instagram.trim(),
+            tiktok:    fields.tiktok.trim(),
+          },
+        });
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setInitial(fields);
       showToast('Profile updated');
@@ -279,7 +325,7 @@ export default function EditProfileScreen() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? topPad + 44 : 0}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 10 }]}>
-        <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => router.back()}>
+        <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={handleBackPress}>
           <Feather name="chevron-left" size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit profile</Text>
@@ -301,9 +347,7 @@ export default function EditProfileScreen() {
           <Feather name="alert-circle" size={28} color={theme.muted} />
           <Text style={styles.errorTitle}>Couldn't load your profile</Text>
           <Text style={styles.errorBody}>Check your connection and try again.</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={loadProfile} activeOpacity={0.8}>
-            <Text style={styles.retryBtnText}>Retry</Text>
-          </TouchableOpacity>
+          <Button label="Retry" variant="primary" size="small" style={styles.retryBtn} onPress={loadProfile} />
         </View>
       ) : !profileLoaded ? (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, gap: 20 }}>
@@ -320,7 +364,7 @@ export default function EditProfileScreen() {
           ))}
         </ScrollView>
       ) : (
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 60 }}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}>
 
         {/* Live storefront header preview */}
         <Text style={styles.sectionLabel}>Storefront preview</Text>
@@ -376,17 +420,16 @@ export default function EditProfileScreen() {
             <View style={styles.avatarColumn}>
               <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={uploading.avatar}>
                 <View style={styles.avatarWrap}>
-                  {avatarUri ? (
-                    <Image source={{ uri: avatarUri }} style={styles.avatar} />
-                  ) : (
-                    <LinearGradient colors={theme.primaryGradient as any} style={styles.avatar}>
-                      <Text style={styles.avatarText}>{(fields.name || fields.username || '?').slice(0, 2).toUpperCase()}</Text>
-                    </LinearGradient>
-                  )}
+                  <Avatar uri={avatarUri} name={fields.name || fields.username} size={84} />
                   {uploading.avatar && (
                     <View style={styles.imageOverlay}>
                       <ActivityIndicator color="#FFF" size="small" />
                       <Text style={styles.imageOverlayText}>{uploadProgress.avatar}%</Text>
+                    </View>
+                  )}
+                  {!uploading.avatar && (
+                    <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
+                      <Feather name="camera" size={12} color={theme.onAccent} />
                     </View>
                   )}
                 </View>
@@ -525,6 +568,28 @@ export default function EditProfileScreen() {
 
 /* ── Sub-components ──────────────────────────────────────────────── */
 
+// react-native-web's Alert.alert() is a no-op (RN's Alert has no web
+// implementation upstream), so the native Alert.alert below never shows
+// anything in a browser — the unsaved-changes prompt would silently vanish
+// on web only. Use the browser's own confirm() there; every other platform
+// keeps the native two-button alert.
+function confirmDiscardChanges(onDiscard: () => void) {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.confirm('Discard changes? You have unsaved changes. If you leave now, they will be lost.')) {
+      onDiscard();
+    }
+    return;
+  }
+  Alert.alert(
+    'Discard changes?',
+    'You have unsaved changes. If you leave now, they will be lost.',
+    [
+      { text: 'Keep editing', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: onDiscard },
+    ],
+  );
+}
+
 function Divider({ theme }: { theme: AppThemePreset }) {
   return <View style={{ height: 1, backgroundColor: theme.border, marginLeft: 16 }} />;
 }
@@ -620,8 +685,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40 },
   errorTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.text, marginTop: 4 },
   errorBody:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, textAlign: 'center' },
-  retryBtn:   { marginTop: 12, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, backgroundColor: theme.accent },
-  retryBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: theme.onAccent },
+  retryBtn:   { marginTop: 12 },
 
   sectionLabel: {
     fontSize: 13, fontFamily: 'Inter_500Medium', color: theme.muted,
@@ -652,12 +716,15 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatarSection: { paddingVertical: 8 },
   avatarLogoRow: { flexDirection: 'row', justifyContent: 'center', gap: 36 },
   avatarColumn: { alignItems: 'center', gap: 6 },
-  avatarWrap: { width: 84, height: 84, borderRadius: 42, overflow: 'hidden', position: 'relative' },
+  avatarWrap: { width: 84, height: 84, borderRadius: 42, position: 'relative' },
   avatar: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 28, fontFamily: 'Inter_700Bold', color: theme.onAccent },
   logoEmpty: { backgroundColor: theme.surface },
+  cameraBadge: {
+    position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2.5,
+  },
   imageOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 42,
     backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 2, // theme-exempt: scrim over avatar media
   },
   imageOverlayText: { color: '#FFF', fontSize: 11, fontFamily: 'Inter_600SemiBold' },
