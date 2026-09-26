@@ -92,6 +92,18 @@ export interface CreatorFeedConfig {
 
 const THREAD_PAGE_SIZE = 30;
 
+// Vertical rhythm in the bottom chrome zone, measured from TikTok: the
+// scrub/progress bar sits just above the tab bar (at `bottomClearance`,
+// 0-4pt of gap to the bar), so the right rail's last item (share) and the
+// caption block's last line (the sound row) both need extra clearance above
+// that same `bottomClearance` anchor, or they end up touching/overlapping
+// the bar — which is exactly what a bare `bottom: bottomClearance` on both
+// of them used to do. These two constants are that clearance:
+//   - RAIL_BOTTOM_GAP: >=16pt from the rail's last item to the bar's top.
+//   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
+const RAIL_BOTTOM_GAP = 22;
+const CAPTION_BOTTOM_GAP = 18;
+
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
 // The sentinel is the first element in displayItems when buyerMode=true.
 // It is never stored in the DB and is never passed through the regular feed
@@ -1528,8 +1540,14 @@ function SpotlightPage({
         </Animated.View>
       )}
 
-      {/* ─ Right action rail ─ */}
-      <Animated.View style={[styles.rail, chromeStyle, { bottom: bottomClearance }]}>
+      {/* ─ Right action rail ─
+          Pinned at bottomClearance + RAIL_BOTTOM_GAP, not bare
+          bottomClearance: the scrub/progress bar sits right around
+          bottomClearance too (see ScrubProgressBar's `bottom - 13` math
+          below), so anchoring the rail there put its last item (share)
+          directly touching the bar with zero gap. RAIL_BOTTOM_GAP clears
+          the bar's own height/hit-area with the required >=16pt to spare. */}
+      <Animated.View style={[styles.rail, chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}>
         {/* Avatar + follow badge */}
         <View style={styles.railAvatarWrap}>
           <TouchableOpacity
@@ -1688,8 +1706,13 @@ function SpotlightPage({
         onFeedback={showToast}
       />
 
-      {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─ */}
-      <Animated.View style={[styles.bottomInfo, chromeStyle, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance }]} pointerEvents="box-none">
+      {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─
+          Pinned at bottomClearance + CAPTION_BOTTOM_GAP for the same reason
+          as the rail above: bare bottomClearance put the sound line's own
+          bottom edge right where the scrub/progress bar sits, touching it
+          with no gap. CAPTION_BOTTOM_GAP guarantees the required >=12pt of
+          clearance from the sound line down to the bar. */}
+      <Animated.View style={[styles.bottomInfo, chromeStyle, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]} pointerEvents="box-none">
         {hasRepostIdentity && (
           <TouchableOpacity
             style={styles.repostIdentity}
@@ -3298,7 +3321,7 @@ const styles = StyleSheet.create({
 
   bottomInfo: {
     position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 112,
-    justifyContent: 'flex-end', gap: 10,
+    justifyContent: 'flex-end', gap: 8,
   },
   bottomInfoWithRepost: { minHeight: 148 },
   repostIdentity: {
