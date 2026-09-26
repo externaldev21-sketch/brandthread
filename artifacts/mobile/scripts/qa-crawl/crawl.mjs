@@ -393,7 +393,7 @@ async function testBackNav(page, target) {
 }
 
 async function crawlRole(browser, role, viewport, maxPages, seedRoutes, onFlush) {
-  const context = await browser.newContext({
+  let context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     userAgent:
       "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) QA-Crawler/1.0",
@@ -429,6 +429,15 @@ async function crawlRole(browser, role, viewport, maxPages, seedRoutes, onFlush)
 
   let pagesVisited = 0;
 
+  // Playwright/CDP occasionally wedges in this sandbox (a page's renderer
+  // process dies without the CDP pipe surfacing an error), and several calls
+  // below (page.evaluate, etc.) have no built-in timeout of their own -- a
+  // single wedged page would otherwise hang the entire multi-hundred-route
+  // crawl forever. PAGE_TIMEOUT_MS bounds worst-case time-per-route: if it's
+  // hit, the route is recorded as a timeout finding (not silently dropped)
+  // and the loop moves on to the next one.
+  const PAGE_TIMEOUT_MS = 90000;
+
   while (queue.length && pagesVisited < maxPages) {
     const { route, depth, from } = queue.shift();
     const key = normalizeRoute(route);
@@ -437,6 +446,83 @@ async function crawlRole(browser, role, viewport, maxPages, seedRoutes, onFlush)
     visited.add(key);
     pagesVisited++;
 
+    let timedOut = false;
+    const watchdog = new Promise((resolve) => {
+      setTimeout(() => {
+        timedOut = true;
+        resolve("timeout");
+      }, PAGE_TIMEOUT_MS);
+    });
+
+    const pageResult = await Promise.race([
+      processRoute({ context, route, key, depth, from, viewport, role, qaUserId, findings, pagesVisited }),
+      watchdog,
+    ]);
+
+    if (pageResult === "timeout") {
+      findings.push({
+        role,
+        viewport: viewport.name,
+        route: key,
+        reachedFrom: from,
+        navError: `PAGE_TIMEOUT: exceeded ${PAGE_TIMEOUT_MS}ms -- likely a wedged browser page/CDP connection, not a real app hang. Route abandoned so the crawl could continue.`,
+        loadTimeMs: PAGE_TIMEOUT_MS,
+        slow: true,
+        consoleErrors: [],
+        pageErrors: [],
+        networkErrors: [],
+        stillSpinning: false,
+        truncatedTextSamples: [],
+        offscreenElements: [],
+        looksBlank: false,
+        looksLikeErrorBoundary: false,
+        header: null,
+        scrollBottom: {},
+        screenshot: null,
+        candidateDeadClicks: [],
+        unclosableSheets: [],
+        interactiveElementCount: 0,
+        harnessTimeout: true,
+      });
+      // A wedged page/context is unrecoverable in place -- recreate the
+      // browser context (and reinstall the auth-bypass route handler) so the
+      // next route gets a clean slate instead of also hanging.
+      try {
+        await context.close();
+      } catch {}
+      context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        userAgent:
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) QA-Crawler/1.0",
+      });
+      if (role === "guest") {
+        await installGuestClerkMock(context).catch(() => {});
+      }
+      if (qaUserId) {
+        await context.route(`${API_BASE_URL}/**`, async (route2) => {
+          const headers = { ...route2.request().headers(), "x-qa-user-id": qaUserId };
+          await route2.continue({ headers });
+        });
+      }
+    } else if (pageResult && pageResult.childRoutes) {
+      for (const child of pageResult.childRoutes) {
+        if (!visited.has(normalizeRoute(child.route))) queue.push(child);
+      }
+    }
+
+    if (onFlush && pagesVisited % 5 === 0) onFlush(findings);
+  }
+
+  try {
+    await context.close();
+  } catch {}
+  if (onFlush) onFlush(findings);
+  return findings;
+}
+
+async function processRoute({ context, route, key, depth, from, viewport, role, qaUserId, findings, pagesVisited }) {
+  const childRoutes = [];
+  {
     const page = await context.newPage();
     const consoleErrors = [];
     const networkErrors = [];
@@ -594,10 +680,7 @@ async function crawlRole(browser, role, viewport, maxPages, seedRoutes, onFlush)
           const afterUrl = freshPage.url();
 
           if (afterUrl !== beforeUrl) {
-            const childKey = normalizeRoute(afterUrl);
-            if (!visited.has(childKey)) {
-              queue.push({ route: afterUrl, depth: depth + 1, from: `${key} -> click "${el.label}"` });
-            }
+            childRoutes.push({ route: afterUrl, depth: depth + 1, from: `${key} -> click "${el.label}"` });
           } else {
             // No navigation. Could be a genuine same-screen action (opened a
             // sheet/toggled state) or a dead button. We can't tell the two
@@ -657,16 +740,10 @@ async function crawlRole(browser, role, viewport, maxPages, seedRoutes, onFlush)
       await collectInteractiveElements(page).catch(() => [])
     ).length;
 
-    await page.close();
-    // Flush progress every few pages so a crash on a long run (hundreds of
-    // routes) doesn't lose everything already crawled -- see report "Known
-    // limitations" for why this matters (the previous pass's Metro OOM).
-    if (onFlush && pagesVisited % 5 === 0) onFlush(findings);
+    await page.close().catch(() => {});
   }
 
-  await context.close();
-  if (onFlush) onFlush(findings);
-  return findings;
+  return { childRoutes };
 }
 
 async function main() {
