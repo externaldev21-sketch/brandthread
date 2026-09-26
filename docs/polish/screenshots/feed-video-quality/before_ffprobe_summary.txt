@@ -1,0 +1,12 @@
+== BEFORE (original bundled clips) ==
+fashion_runway_01.mp4
+fashion_runway_02.mp4
+fashion_runway_03.mp4
+fashion_runway_04.mp4
+fashion_runway_05.mp4
+fashion_runway_06.mp4
+fashion_runway_07.mp4
+fashion_runway_08.mp4
+fashion_runway_09.mp4
+fashion_runway_10.mp4
+(all: 1080x1920, H.264 High, yuv420p, level 4.0, 24fps, 6.0s, bitrate range 1.7-3.2 Mbps)
