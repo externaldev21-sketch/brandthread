@@ -185,16 +185,17 @@ const EditorialTile = React.memo(function EditorialTile({ item, theme }: { item:
         {item.isUrgent && (
           <View style={[tile.urgentDot, { backgroundColor: theme.accent }]} />
         )}
-        {item.priceCents != null && (
-          <View style={tile.pricePill}>
-            <Text style={[TYPE_SCALE.caption, TABULAR_NUMS, { fontFamily: FONT.bold, color: '#0A0A0B' }]}>
-              {formatCents(item.priceCents)}
-            </Text>
-          </View>
-        )}
       </LinearGradient>
-      <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text, marginTop: 8 }]} numberOfLines={1}>{item.name}</Text>
-      <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 1 }]} numberOfLines={1}>{item.brand}</Text>
+      {/* Image, then name / brand / price below it with an 8pt rhythm — never
+          an overlay pill sitting on the image's bottom edge, which clipped
+          against the image and crowded the name below it. */}
+      <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text, marginTop: 8 }]} numberOfLines={2}>{item.name}</Text>
+      <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 4 }]} numberOfLines={1}>{item.brand}</Text>
+      {item.priceCents != null && (
+        <Text style={[TYPE_SCALE.caption, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.text, marginTop: 4 }]}>
+          {formatCents(item.priceCents)}
+        </Text>
+      )}
     </Pressable>
   );
 });
@@ -205,11 +206,6 @@ const tile = StyleSheet.create({
   fallback: { alignItems: 'center', justifyContent: 'center' },
   fallbackText: { fontSize: 34, fontFamily: FONT.bold, color: '#FFFFFF' },
   urgentDot: { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4 },
-  pricePill: {
-    position: 'absolute', bottom: 10, left: 10,
-    paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADII.pill,
-    backgroundColor: '#FFFFFF',
-  },
 });
 
 function TileRailSkeleton() {
@@ -220,6 +216,7 @@ function TileRailSkeleton() {
           <SkeletonBlock width={TILE_WIDTH} height={TILE_IMAGE_HEIGHT} radius={RADII.sheet} />
           <SkeletonBlock width="80%" height={12} />
           <SkeletonBlock width="50%" height={11} />
+          <SkeletonBlock width="35%" height={11} />
         </View>
       ))}
     </ScrollView>
@@ -345,7 +342,12 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
           });
 
           return (
-            <Animated.View style={{ width: cardWidth, opacity, transform: [{ scale }] }}>
+            <Animated.View style={{ width: cardWidth, opacity, transform: [{ scale }], position: 'relative' }}>
+              {/* This card's own navigation Pressable renders as a real DOM
+                  <button> on web. The save heart below is rendered as a
+                  sibling (not a descendant) positioned absolutely on top of
+                  it — a real <button> can never contain another <button>,
+                  so the heart must live outside this Pressable's subtree. */}
               <Pressable
                 onPress={() => openProduct(item)}
                 accessibilityRole="button"
@@ -362,32 +364,10 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                       <View style={showcase.brandPill}>
                         <Text style={showcase.brandPillText} numberOfLines={1}>{item.brand}</Text>
                       </View>
-                      <HeartToggle
-                        liked={saved}
-                        onChange={(nextSaved) => {
-                          setSavedIds(current => ({ ...current, [item.id]: nextSaved }));
-                          const targetId = item.productId ?? item.id;
-                          const action = nextSaved
-                            ? saveItem({ type: 'product', targetId, title: item.name, subtitle: item.brand, accentColor: item.colorHex, priceCents: item.commerce.currentPriceCents ?? undefined })
-                            : removeSavedItem(targetId);
-                          action.catch(() => {
-                            setSavedIds(current => ({ ...current, [item.id]: !nextSaved }));
-                          });
-                        }}
-                        onLongPress={() => {
-                          hapticMedium();
-                          setSavedIds(current => ({ ...current, [item.id]: true }));
-                          setSaveToSheetItem({
-                            type: 'product',
-                            targetId: item.productId ?? item.id,
-                            title: item.name,
-                            subtitle: item.brand,
-                            accentColor: item.colorHex,
-                            priceCents: item.commerce.currentPriceCents ?? undefined,
-                          });
-                        }}
-                        accessibilityLabel={saved ? 'Remove from saved' : 'Save product'}
-                      />
+                      {/* Reserves the same row space the heart used to occupy
+                          so the brand pill doesn't stretch full-width now
+                          that the heart is a sibling, not a flex child here. */}
+                      <View style={showcase.heartSpacer} />
                     </View>
 
                     {item.imageUri ? (
@@ -434,6 +414,34 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                   </View>
                 </View>
               </Pressable>
+              <View style={showcase.heartWrap} pointerEvents="box-none">
+                <HeartToggle
+                  liked={saved}
+                  onChange={(nextSaved) => {
+                    setSavedIds(current => ({ ...current, [item.id]: nextSaved }));
+                    const targetId = item.productId ?? item.id;
+                    const action = nextSaved
+                      ? saveItem({ type: 'product', targetId, title: item.name, subtitle: item.brand, accentColor: item.colorHex, priceCents: item.commerce.currentPriceCents ?? undefined })
+                      : removeSavedItem(targetId);
+                    action.catch(() => {
+                      setSavedIds(current => ({ ...current, [item.id]: !nextSaved }));
+                    });
+                  }}
+                  onLongPress={() => {
+                    hapticMedium();
+                    setSavedIds(current => ({ ...current, [item.id]: true }));
+                    setSaveToSheetItem({
+                      type: 'product',
+                      targetId: item.productId ?? item.id,
+                      title: item.name,
+                      subtitle: item.brand,
+                      accentColor: item.colorHex,
+                      priceCents: item.commerce.currentPriceCents ?? undefined,
+                    });
+                  }}
+                  accessibilityLabel={saved ? 'Remove from saved' : 'Save product'}
+                />
+              </View>
             </Animated.View>
           );
         }}
@@ -463,6 +471,12 @@ const makeShowcaseStyles = (theme: AppThemePreset) => StyleSheet.create({
   topline:        { position: 'absolute', top: 12, left: 12, right: 12, zIndex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brandPill:      { maxWidth: '70%', paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADII.pill, backgroundColor: 'rgba(0,0,0,0.4)' },
   brandPillText:  { fontSize: 11, fontFamily: FONT.semibold, color: '#FFFFFF' },
+  // Reserves the same 22pt the heart used to occupy inside `topline`.
+  heartSpacer:    { width: 22, height: 22 },
+  // The heart lives outside the card's Pressable (a real <button> on web) so
+  // it's a DOM sibling, not a nested <button> — positioned to land exactly
+  // where it used to sit inside `topline` (top:12, right edge of the card).
+  heartWrap:      { position: 'absolute', top: 12, right: 12, zIndex: 3 },
   visual:         { height: 380, position: 'relative', overflow: 'hidden', borderRadius: RADII.sheet, alignItems: 'center', justifyContent: 'center' },
   productImage:   { width: '74%', height: '70%' },
   visualFallback: { alignItems: 'center', justifyContent: 'center' },
