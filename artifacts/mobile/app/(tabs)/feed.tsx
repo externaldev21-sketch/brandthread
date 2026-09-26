@@ -122,7 +122,7 @@ const TOP_TABS_ROW_HEIGHT = 34;
 // no more real pages behind it, so scrolling never dead-ends or shows an
 // end card — see the `canLoopFeed`/`displayItems` comment below.
 const FEED_LOOP_REPEAT = 6;
-const CAPTION_BOTTOM_GAP = 12;
+const CAPTION_BOTTOM_GAP = 10;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
 // The sentinel is the first element in displayItems when buyerMode=true.
@@ -1678,7 +1678,7 @@ function SpotlightPage({
           {!(engagement?.following) && (
             <EngagementButton
               icon="plus"
-              iconSize={11}
+              iconSize={9}
               active={false}
               accessibilityLabel={`Follow ${item.creator}`}
               style={[styles.railFollowBadge, { backgroundColor: item.accentColor }]}
@@ -1708,7 +1708,7 @@ function SpotlightPage({
           <EngagementButton
             icon="heart"
             solidIcon="heart"
-            iconSize={34}
+            iconSize={26}
             count={formatCount(engagement?.likes ?? 0)}
             active={engagement?.liked ?? false}
             activeColor="#EF4444"
@@ -1739,7 +1739,7 @@ function SpotlightPage({
           accessibilityRole="button"
           accessibilityLabel={`Comments, ${formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}`}
         >
-          <FontAwesome name="commenting" size={34} color={ON_DARK} style={styles.railIconShadow} />
+          <FontAwesome name="commenting" size={26} color={ON_DARK} style={styles.railIconShadow} />
           <Text style={styles.railCount}>{formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}</Text>
         </TouchableOpacity>
 
@@ -1747,7 +1747,7 @@ function SpotlightPage({
         <EngagementButton
           icon="repeat"
           solidIcon="retweet"
-          iconSize={34}
+          iconSize={26}
           count={formatCount(engagement?.reposts ?? 0)}
           active={engagement?.reposted ?? false}
           activeColor={theme.accent}
@@ -1770,7 +1770,7 @@ function SpotlightPage({
         <EngagementButton
           icon="bookmark"
           solidIcon="bookmark"
-          iconSize={34}
+          iconSize={26}
           count={formatCount(engagement?.saves ?? item.saves)}
           active={engagement?.saved ?? false}
           activeColor={GOLD}
@@ -1801,7 +1801,7 @@ function SpotlightPage({
             setShareOpen(true);
           }}
         >
-          <FontAwesome name="share" size={34} color={ON_DARK} style={styles.railIconShadow} />
+          <FontAwesome name="share" size={26} color={ON_DARK} style={styles.railIconShadow} />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
@@ -1909,7 +1909,7 @@ function SpotlightPage({
           accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
           accessibilityState={{ checked: soundOn }}
         >
-           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={11} color={`${ON_DARK}CC`} />
+           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={12} color={`${ON_DARK}CC`} />
           <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
         </Pressable>
       </Animated.View>
@@ -3462,34 +3462,34 @@ const styles = StyleSheet.create({
   shopSideTabName: { flexShrink: 1, color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
   shopSideTabPrice: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, ...TABULAR_NUMS },
 
-  // Placement measured from TikTok's For You feed at 390x844 (Mobbin refs in
-  // the PR): right inset ~8pt, 44pt avatar, ~34pt icon glyphs, ~14pt rhythm
-  // between items — tighter/smaller than the previous pass, which read as
-  // bigger due to its 12pt inset and 16pt gaps despite smaller icons.
+  // Corrected pass, smaller than even the pre-#129 numbers per the owner's
+  // explicit direction (SMALLER and TIGHTER than before, so the video
+  // stands out): 38pt avatar, 26pt icon glyphs, 12pt rhythm between items,
+  // 8pt right inset.
   rail: {
-    position: 'absolute', right: 8, width: 44, bottom: 116, alignItems: 'center', gap: 14,
+    position: 'absolute', right: 8, width: 38, bottom: 116, alignItems: 'center', gap: 12,
   },
   railAvatarWrap: { alignItems: 'center', marginBottom: 2 },
   railAvatar: {
-    width: 44, height: 44, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    width: 38, height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: ON_DARK,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
   },
   railAvatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
   railFollowBadge: {
-    position: 'absolute', bottom: -7, width: 18, height: 18, borderRadius: RADII.pill,
+    position: 'absolute', bottom: -6, width: 16, height: 16, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
-  railBtn: { width: 44, alignItems: 'center', gap: 4 },
-  railActionContent: { width: 44, alignItems: 'center', gap: 4 },
-  railLikeWrap: { width: 44, alignItems: 'center', justifyContent: 'center' },
+  railBtn: { width: 38, alignItems: 'center', gap: 2 },
+  railActionContent: { width: 38, alignItems: 'center', gap: 2 },
+  railLikeWrap: { width: 38, alignItems: 'center', justifyContent: 'center' },
   railLikeRing: {
-    position: 'absolute', top: 2, width: 42, height: 42, borderRadius: RADII.pill,
+    position: 'absolute', top: 2, width: 34, height: 34, borderRadius: RADII.pill,
     borderWidth: 2, borderColor: '#EF4444',
   },
   railCount: {
-    fontSize: 12, lineHeight: 14, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
+    fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   // Same shadow as railCount above, applied to the rail's two plain icons
@@ -3511,11 +3511,11 @@ const styles = StyleSheet.create({
   // reserved space where it used to sit.
   // Left inset tightened to match TikTok; right inset + maxWidth both cap
   // the block so it stops well before the action rail and stays narrow
-  // enough (~75%) that the video shows through around it. `bottom` matches
-  // CAPTION_BOTTOM_GAP's ~12pt TikTok clearance above the tab bar/progress
-  // line (see the module-level comment on CAPTION_BOTTOM_GAP).
+  // enough (~72%) that the video shows through around it. `bottom` matches
+  // CAPTION_BOTTOM_GAP's 10pt clearance above the tab bar/progress line
+  // (see the module-level comment on CAPTION_BOTTOM_GAP).
   bottomInfo: {
-    position: 'absolute', left: 12, right: 68, maxWidth: '75%', bottom: 14, minHeight: 56,
+    position: 'absolute', left: 12, right: 62, maxWidth: '72%', bottom: 12, minHeight: 50,
     justifyContent: 'flex-end',
   },
   bottomInfoWithRepost: { minHeight: 92 },
@@ -3535,22 +3535,22 @@ const styles = StyleSheet.create({
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
-    fontSize: 14, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 8,
-    lineHeight: 19, letterSpacing: 0.1,
+    fontSize: 13, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 7,
+    lineHeight: 17, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
-  creatorRow: { minHeight: 26, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorRow: { minHeight: 22, marginBottom: 5, flexDirection: 'row', alignItems: 'center', gap: 6 },
   creatorName: {
-    fontSize: 15, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    fontSize: 14, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   soundRow: {
-    height: 22, flexDirection: 'row', alignItems: 'center', gap: 5,
-    alignSelf: 'flex-start', paddingHorizontal: 8, borderRadius: RADII.pill,
+    height: 20, flexDirection: 'row', alignItems: 'center', gap: 5,
+    alignSelf: 'flex-start', paddingHorizontal: 7, borderRadius: RADII.pill,
     backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
-  soundText: { fontSize: 13, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
+  soundText: { fontSize: 12, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
 
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 10, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
