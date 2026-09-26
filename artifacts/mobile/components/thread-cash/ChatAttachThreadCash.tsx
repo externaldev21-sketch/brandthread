@@ -34,6 +34,7 @@ import { formatCents } from '@/lib/money';
 import { isPreviewConversationId } from '@/lib/previewInbox';
 import { authenticateForAppLock, getDeviceSecurity } from '@/lib/appLock';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
+import { mixHex } from '@/lib/backgroundPalette';
 
 const MAX_NOTE_LENGTH = 140;
 const NUMPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
@@ -494,8 +495,14 @@ export function ThreadCashMessageCard({
         <Text style={[styles.cardAmount, { color: theme.onAccent }]}>{formatCents(amountCents)}</Text>
         {status === 'pending' && amountWidth > 0 && <ShimmerSweep width={amountWidth} height={34} />}
       </View>
-      {note ? <Text style={[styles.cardNote, { color: theme.onAccent, opacity: 0.75 }]} numberOfLines={2}>“{note}”</Text> : null}
-      <Text style={[styles.cardStatus, { color: theme.onAccent, opacity: 0.8 }]}>{statusLabel[status]}</Text>
+      {/* Solid blended colors, not `opacity` — the card behind this text is
+          a known flat theme.accent rectangle, so pre-mixing onAccent into it
+          reproduces the same "dimmed" look as a translucent color without
+          leaving any alpha compositing for react-native-web to soften the
+          text with. See lib/backgroundPalette.ts's `mixHex` and
+          components/ui/AppText.tsx's `tone` doc. */}
+      {note ? <Text style={[styles.cardNote, { color: mixHex(theme.onAccent, theme.accent, 0.75) }]} numberOfLines={2}>“{note}”</Text> : null}
+      <Text style={[styles.cardStatus, { color: mixHex(theme.onAccent, theme.accent, 0.8) }]}>{statusLabel[status]}</Text>
 
       {status === 'pending' && isRecipient && (
         <TouchableOpacity
