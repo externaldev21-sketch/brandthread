@@ -18,6 +18,7 @@ import { NavigationCard } from '@/components/BrandthreadUI';
 import { pickProfileImage } from '@/lib/pickProfileImage';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { Avatar } from '@/components/ui/Avatar';
 
@@ -349,9 +350,19 @@ export default function EditProfileScreen() {
           <Button label="Retry" variant="primary" size="small" style={styles.retryBtn} onPress={loadProfile} />
         </View>
       ) : !profileLoaded ? (
-        <View style={styles.errorState}>
-          <ActivityIndicator color={theme.accent} />
-        </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, gap: 20 }}>
+          <SkeletonBlock width="100%" height={120} radius={16} />
+          <View style={{ alignItems: 'center', gap: 8, marginTop: -40 }}>
+            <SkeletonBlock width={80} height={80} radius={40} />
+            <SkeletonLine width={140} height={14} />
+          </View>
+          {[0, 1, 2, 3, 4].map((row) => (
+            <View key={row} style={{ gap: 6 }}>
+              <SkeletonLine width={90} height={11} />
+              <SkeletonBlock width="100%" height={44} radius={12} />
+            </View>
+          ))}
+        </ScrollView>
       ) : (
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}>
 

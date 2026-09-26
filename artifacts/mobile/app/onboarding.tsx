@@ -46,6 +46,7 @@ import { AccountTypeStep, type AccountType } from './account-type';
 // Required on Android so the in-app browser tab closes after OAuth redirect
 WebBrowser.maybeCompleteAuthSession();
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import GoogleGlyph from '@/components/branding/GoogleGlyph';
 import {
   APP_THEME_PRESETS,
   DEFAULT_THEME,
@@ -1491,7 +1492,7 @@ function SharedAuthStep({
           disabled={!!oauthLoading || loading}
         >
           {oauthLoading === 'Google' ? <ActivityIndicator color={theme.text} size="small" /> : <>
-            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: CARD, lineHeight: 14 }}>G</Text></View>
+            <GoogleGlyph size={20} />
             <Text style={ssa.oauthText}>Continue with Google</Text>
           </>}
         </PressableScale>

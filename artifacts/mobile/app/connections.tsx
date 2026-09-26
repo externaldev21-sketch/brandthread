@@ -24,6 +24,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { profileHref } from '@/lib/profileNavigation';
 import { InteractionLayer, ProfileChip } from '@/components/profile/ProfileControls';
+import { setSellerFollowing } from '@/services/socialService';
 
 export interface ConnectionUser {
   id: string;
@@ -79,6 +80,7 @@ export default function ConnectionsScreen() {
   const [users, setUsers]     = useState<ConnectionUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(false);
+  const [followPending, setFollowPending] = useState<Set<string>>(new Set());
   const generationRef = useRef(0);
 
   const load = useCallback(() => {
@@ -100,6 +102,33 @@ export default function ConnectionsScreen() {
   // profile and coming back shows the change immediately.
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  // Rows in "my following" are followed by definition; other lists rely on
+  // whatever follow-state the API returned for that row.
+  const followStateFor = useCallback((row: ConnectionUser) => (
+    row.isFollowing ?? (isOwnList && !isFollowers)
+  ), [isFollowers, isOwnList]);
+
+  const handleToggleFollow = useCallback(async (row: ConnectionUser) => {
+    if (followPending.has(row.id) || row.id === user?.id) return;
+    const wasFollowing = followStateFor(row);
+    setFollowPending((prev) => new Set(prev).add(row.id));
+    setUsers((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: !wasFollowing } : u)));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      if (row.accountType === 'seller') {
+        await setSellerFollowing(row.id, !wasFollowing);
+      } else if (wasFollowing) {
+        await api.social.unfollow(row.id);
+      } else {
+        await api.social.follow(row.id);
+      }
+    } catch {
+      setUsers((prev) => prev.map((u) => (u.id === row.id ? { ...u, isFollowing: wasFollowing } : u)));
+    } finally {
+      setFollowPending((prev) => { const next = new Set(prev); next.delete(row.id); return next; });
+    }
+  }, [api, followPending, followStateFor, user?.id]);
+
   function renderItem({ item }: { item: ConnectionUser }) {
     const initials = item.initials || (item.name ?? item.username ?? '?')
       .split(' ')
@@ -109,37 +138,49 @@ export default function ConnectionsScreen() {
       .toUpperCase();
 
     return (
-      <PressableScale
-        style={styles.row}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${item.name}'s profile`}
-        testID={`connection-row-${item.id}`}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          router.push(connectionHref(item) as never);
-        }}
-      >
-        {(state) => (
-          <>
-            <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.md} theme={theme} />
-            {item.avatarUrl ? (
-              <CachedImage source={{ uri: item.avatarUrl }} style={styles.avatar} contentFit="cover" />
-            ) : (
-              <View style={styles.avatarFallback}>
-                <Text style={styles.avatarInitials}>{initials}</Text>
+      <View style={styles.row}>
+        <PressableScale
+          style={styles.rowTap}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${item.name}'s profile`}
+          testID={`connection-row-${item.id}`}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push(connectionHref(item) as never);
+          }}
+        >
+          {(state) => (
+            <>
+              <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.md} theme={theme} />
+              {item.avatarUrl ? (
+                <CachedImage source={{ uri: item.avatarUrl }} style={styles.avatar} contentFit="cover" />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarInitials}>{initials}</Text>
+                </View>
+              )}
+              <View style={styles.rowCopy}>
+                <Text style={styles.name} numberOfLines={1}>{item.name ?? item.username ?? 'Unknown'}</Text>
+                {item.username ? <Text style={styles.username} numberOfLines={1}>@{item.username}</Text> : null}
+                {item.accountType === 'seller' ? (
+                  <View style={{ marginTop: 4 }}><ProfileChip label="Seller" icon="shopping-bag" /></View>
+                ) : null}
               </View>
-            )}
-            <View style={styles.rowCopy}>
-              <Text style={styles.name} numberOfLines={1}>{item.name ?? item.username ?? 'Unknown'}</Text>
-              {item.username ? <Text style={styles.username} numberOfLines={1}>@{item.username}</Text> : null}
-            </View>
-            {item.accountType === 'seller' ? <ProfileChip label="Seller" icon="shopping-bag" /> : null}
-            {item.isFollowing && !isOwnList ? <ProfileChip label="Following" /> : null}
-            <Feather name="chevron-right" size={16} color={theme.muted} />
-          </>
+            </>
+          )}
+        </PressableScale>
+        {item.id !== user?.id ? (
+          <FollowPill
+            following={followStateFor(item)}
+            disabled={followPending.has(item.id)}
+            onPress={() => handleToggleFollow(item)}
+            theme={theme}
+          />
+        ) : (
+          <Feather name="chevron-right" size={16} color={theme.muted} />
         )}
-      </PressableScale>
+      </View>
     );
   }
 
@@ -172,11 +213,46 @@ export default function ConnectionsScreen() {
   );
 }
 
+/** Compact Follow/Following pill — no reanimated dependency, so this screen
+ *  stays lightweight to test and mount. */
+function FollowPill({
+  following, disabled, onPress, theme,
+}: { following: boolean; disabled?: boolean; onPress: () => void; theme: AppThemePreset }) {
+  return (
+    <PressableScale
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={following ? 'Following, tap to unfollow' : 'Follow'}
+      accessibilityState={{ selected: following, disabled: !!disabled }}
+      style={[
+        pillStyles.pill,
+        following
+          ? { backgroundColor: 'transparent', borderColor: theme.text, borderWidth: 1 }
+          : { backgroundColor: theme.accent, borderColor: theme.accent, borderWidth: 1 },
+        disabled && { opacity: 0.5 },
+      ]}
+    >
+      {() => (
+        <Text style={[pillStyles.text, { color: following ? theme.text : theme.onAccent }]}>
+          {following ? 'Following' : 'Follow'}
+        </Text>
+      )}
+    </PressableScale>
+  );
+}
+
+const pillStyles = StyleSheet.create({
+  pill: { height: 32, paddingHorizontal: 14, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+  text: { fontFamily: FONT.semibold, fontSize: FS.xs },
+});
+
 function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     root:   { flex: 1, backgroundColor: theme.background },
     pad:    { padding: SP.md },
     row:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, minHeight: 64, paddingVertical: SP.sm },
+    rowTap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     rowCopy: { flex: 1, minWidth: 0 },
     avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.cardElevated },
     avatarFallback: {
