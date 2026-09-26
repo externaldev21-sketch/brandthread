@@ -91,7 +91,7 @@ describe('Entry points', () => {
     // components/buyer-feed/RightActionRail.tsx (PR #129's sizing rebuild
     // moved the rail's JSX out of app/(tabs)/feed.tsx into its own file).
     expect(feed).toContain('hostId={item.sellerId}');
-    expect(rightActionRail).toContain('<LiveHostRing hostId={hostId} size={44}');
+    expect(rightActionRail).toContain('<LiveHostRing hostId={hostId} size={38}');
     expect(feed).toContain('const liveStreamId = getLiveDirectory().streamFor(item.sellerId);');
   });
 

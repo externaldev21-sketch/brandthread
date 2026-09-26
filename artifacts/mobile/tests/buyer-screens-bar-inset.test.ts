@@ -71,7 +71,8 @@ describe('buyer Home feed behind the bar', () => {
     expect(feed).toContain('<RightActionRail\n        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}');
     expect(feed).toContain('<CaptionBlock\n        style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}');
     expect(feed).toContain('const RAIL_BOTTOM_GAP = 16;');
-    expect(feed).toContain('const CAPTION_BOTTOM_GAP = 12;');
+    // PR #133 shrank CAPTION_BOTTOM_GAP again (12 -> 10) on top of #129.
+    expect(feed).toContain('const CAPTION_BOTTOM_GAP = 10;');
     // The shop trigger is a collapsed side tab on the left screen edge (see
     // components/buyer-feed/ShopSideTab.tsx), not part of the bottom-left
     // flex column at all.

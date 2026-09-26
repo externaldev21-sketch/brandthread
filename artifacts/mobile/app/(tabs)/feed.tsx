@@ -122,7 +122,7 @@ const TOP_TABS_ROW_HEIGHT = 34;
 // no more real pages behind it, so scrolling never dead-ends or shows an
 // end card — see the `canLoopFeed`/`displayItems` comment below.
 const FEED_LOOP_REPEAT = 6;
-const CAPTION_BOTTOM_GAP = 12;
+const CAPTION_BOTTOM_GAP = 10;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
 // The sentinel is the first element in displayItems when buyerMode=true.
@@ -3086,11 +3086,11 @@ const styles = StyleSheet.create({
   // reserved space where it used to sit.
   // Left inset tightened to match TikTok; right inset + maxWidth both cap
   // the block so it stops well before the action rail and stays narrow
-  // enough (~75%) that the video shows through around it. `bottom` matches
-  // CAPTION_BOTTOM_GAP's ~12pt TikTok clearance above the tab bar/progress
-  // line (see the module-level comment on CAPTION_BOTTOM_GAP).
+  // enough (~72%) that the video shows through around it. `bottom` matches
+  // CAPTION_BOTTOM_GAP's 10pt clearance above the tab bar/progress line
+  // (see the module-level comment on CAPTION_BOTTOM_GAP).
   bottomInfo: {
-    position: 'absolute', left: 12, right: 68, maxWidth: '75%', bottom: 14, minHeight: 56,
+    position: 'absolute', left: 12, right: 62, maxWidth: '72%', bottom: 12, minHeight: 50,
     justifyContent: 'flex-end',
   },
   bottomInfoWithRepost: { minHeight: 92 },
@@ -3110,22 +3110,22 @@ const styles = StyleSheet.create({
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
-    fontSize: 14, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 8,
-    lineHeight: 19, letterSpacing: 0.1,
+    fontSize: 13, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 7,
+    lineHeight: 17, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
-  creatorRow: { minHeight: 26, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorRow: { minHeight: 22, marginBottom: 5, flexDirection: 'row', alignItems: 'center', gap: 6 },
   creatorName: {
-    fontSize: 15, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    fontSize: 14, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   soundRow: {
-    height: 22, flexDirection: 'row', alignItems: 'center', gap: 5,
-    alignSelf: 'flex-start', paddingHorizontal: 8, borderRadius: RADII.pill,
+    height: 20, flexDirection: 'row', alignItems: 'center', gap: 5,
+    alignSelf: 'flex-start', paddingHorizontal: 7, borderRadius: RADII.pill,
     backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
-  soundText: { fontSize: 13, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
+  soundText: { fontSize: 12, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
 
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 10, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
