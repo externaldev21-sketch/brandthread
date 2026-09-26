@@ -8,11 +8,13 @@
  * GET    /api/social/status/:userId      — { isFollowing, isFollowedBy, isMutual }
  * GET    /api/social/profile/:userId     — public buyer profile + follow counts
  * GET    /api/social/search?q=&limit=    — search buyers by name / username
+ * GET    /api/social/suggested?limit=    — "Suggested for you" (Activity tab)
+ * POST   /api/social/suggested/:userId/dismiss — hide a suggestion
  */
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions } from "@workspace/db";
-import { eq, and, or, ilike, ne, inArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
+import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions, notificationsFeed, suggestionDismissals } from "@workspace/db";
+import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
@@ -27,7 +29,7 @@ import {
   profilesById,
   publishingRestriction,
 } from "../lib/safety";
-import { actorFieldsFromProfile } from "../lib/activityEvents";
+import { actorFieldsFromProfile, notifyStoryLike } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 
@@ -254,7 +256,9 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
         const profile = (await profilesById([myId])).get(myId);
         if (profile && !profile.deleted && !profile.suspended) {
           const actor = actorFieldsFromProfile(profile);
-          // Offer "Follow back" only when the relationship is one-way.
+          // "Follow back" only offered when the relationship was one-way;
+          // when userId already followed myId, this follow completes the
+          // pair, so it reads as a follow-back rather than a fresh follow.
           const [alreadyFollowing] = await db
             .select({ followerId: follows.followerId })
             .from(follows)
@@ -264,7 +268,7 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
             userId:        userId,
             category:      "social",
             type:          "new_follower",
-            title:         `${actor.actorName} started following you`,
+            title:         alreadyFollowing ? `${actor.actorName} followed you back` : `${actor.actorName} started following you`,
             ...actor,
             targetId:      myId,
             targetType:    "user",
@@ -290,6 +294,16 @@ router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
     `);
     await tx.delete(follows)
       .where(and(eq(follows.followerId, myId), eq(follows.followingId, target)));
+    // An unfollow right after a follow (or a follow/unfollow bounce) must not
+    // leave a stale "started following you" notification in the target's
+    // Activity tab for a relationship that no longer exists.
+    await tx.delete(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, target),
+        eq(notificationsFeed.type, "new_follower"),
+        eq(notificationsFeed.actorId, myId),
+        eq(notificationsFeed.isRead, false),
+      ));
     const [countRow] = await tx
       .select({ n: sql<number>`cast(count(*) as int)` })
       .from(follows)
@@ -636,6 +650,99 @@ router.get("/search", async (req, res) => {
   res.json(rows.map(u => ({ ...formatUser(u), isFollowing: followingSet.has(u.clerkId) })));
 });
 
+// ─── GET /api/social/suggested?limit= — "Suggested for you" ─────────────────
+// Ranked by mutual-follow count (people followed by accounts the viewer
+// follows), then filled out with recently-joined buyers. Excludes people the
+// viewer already follows, blocks, or has dismissed from this list.
+const NEW_ON_BRANDTHREAD_DAYS = 14;
+
+router.get("/suggested", async (req, res) => {
+  const myId  = (req as any).clerkUserId as string;
+  const limit = Math.min(parseInt((req.query.limit as string) || "20", 10) || 20, 50);
+
+  const [followingRows, dismissedRows, blockedRows] = await Promise.all([
+    db.select({ followingId: follows.followingId }).from(follows).where(eq(follows.followerId, myId)),
+    db.select({ suggestedUserId: suggestionDismissals.suggestedUserId }).from(suggestionDismissals)
+      .where(eq(suggestionDismissals.userId, myId)),
+    db.select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId }).from(blocks)
+      .where(or(eq(blocks.blockerId, myId), eq(blocks.blockedId, myId))),
+  ]);
+  const followingIds = followingRows.map(r => r.followingId);
+  const excluded = new Set<string>([
+    myId,
+    ...followingIds,
+    ...dismissedRows.map(r => r.suggestedUserId),
+    ...blockedRows.flatMap(b => [b.blockerId === myId ? b.blockedId : b.blockerId]),
+  ]);
+
+  // Mutual-follow candidates: people followed by people I follow.
+  const mutualRows = followingIds.length === 0 ? [] : await db
+    .select({
+      candidateId: follows.followingId,
+      mutualCount: sql<number>`count(*)::int`,
+      sampleMutualName: sql<string | null>`(array_agg(coalesce(${users.displayName}, ${users.name}) order by ${follows.createdAt} desc))[1]`,
+    })
+    .from(follows)
+    .innerJoin(users, eq(users.clerkId, follows.followerId))
+    .where(and(inArray(follows.followerId, followingIds), ne(follows.followingId, myId)))
+    .groupBy(follows.followingId)
+    .orderBy(desc(sql`count(*)`))
+    .limit(limit * 2);
+  const mutualIds = mutualRows
+    .map((row) => row.candidateId)
+    .filter((id) => !excluded.has(id));
+
+  const fillCount = Math.max(0, limit - mutualIds.length);
+  const excludeFromFresh = [...excluded, ...mutualIds];
+  const freshRows = fillCount === 0 ? [] : await db.select({ clerkId: users.clerkId, createdAt: users.createdAt }).from(users)
+    .where(and(
+      eq(users.accountType, "buyer"),
+      isNull(users.suspendedAt),
+      isNull(users.deletedAt),
+      ne(users.clerkId, myId),
+      excludeFromFresh.length > 0 ? notInArray(users.clerkId, excludeFromFresh) : undefined,
+    ))
+    .orderBy(desc(users.createdAt))
+    .limit(fillCount);
+
+  const candidateIds = [...mutualIds, ...freshRows.map((r) => r.clerkId)].slice(0, limit);
+  if (candidateIds.length === 0) { res.json([]); return; }
+
+  const userRows = await db.select().from(users).where(inArray(users.clerkId, candidateIds));
+  const byId = new Map(userRows.map((u) => [u.clerkId, u]));
+  const mutualById = new Map(mutualRows.map((row) => [row.candidateId, row]));
+  const freshById = new Map(freshRows.map((r) => [r.clerkId, r]));
+  const cutoff = Date.now() - NEW_ON_BRANDTHREAD_DAYS * 24 * 60 * 60 * 1000;
+
+  res.json(candidateIds.map((id) => {
+    const user = byId.get(id);
+    if (!user) return null;
+    const mutual = mutualById.get(id);
+    const mutualCount = mutual ? Number(mutual.mutualCount) : 0;
+    const fresh = freshById.get(id);
+    let reason: string;
+    if (mutualCount > 0 && mutual?.sampleMutualName) {
+      reason = mutualCount > 1
+        ? `Followed by ${mutual.sampleMutualName} + ${mutualCount - 1} other${mutualCount - 1 === 1 ? "" : "s"}`
+        : `Followed by ${mutual.sampleMutualName}`;
+    } else if (fresh?.createdAt && fresh.createdAt.getTime() >= cutoff) {
+      reason = "New on Brandthread";
+    } else {
+      reason = "Suggested for you";
+    }
+    return { ...formatUser(user), reason, mutualCount };
+  }).filter(Boolean));
+});
+
+router.post("/suggested/:userId/dismiss", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const target = req.params.userId as string;
+  await db.insert(suggestionDismissals)
+    .values({ userId: myId, suggestedUserId: target })
+    .onConflictDoNothing();
+  res.json({ ok: true });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // STORIES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -927,11 +1034,14 @@ router.post("/stories/:id/like", async (req, res) => {
       .where(eq(stories.id, storyId));
     liked = false;
   } else {
-    await db.insert(storyLikes).values({ storyId, userId: myId }).onConflictDoNothing();
+    const inserted = await db.insert(storyLikes).values({ storyId, userId: myId })
+      .onConflictDoNothing()
+      .returning({ storyId: storyLikes.storyId });
     await db.update(stories)
       .set({ likesCount: sql`likes_count + 1` })
       .where(eq(stories.id, storyId));
     liked = true;
+    if (inserted.length > 0) void notifyStoryLike({ storyId, likerId: myId });
   }
 
   const [row] = await db.select({ likesCount: stories.likesCount })

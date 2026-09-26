@@ -22,7 +22,7 @@
  *
  * On desktop web it fills the global WebAppShell column (components/web).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo, Animated, FlatList, RefreshControl, StyleSheet, Text, View,
   type ListRenderItem,
@@ -157,13 +157,60 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     return () => { alive = false; sub?.remove?.(); };
   }, []);
 
+  // Last known scroll offset, kept live off of React state so it survives the
+  // list remounts below without waiting on a render.
+  const lastOffsetRef = useRef(0);
   useEffect(() => {
     const id = scrollY.addListener(({ value }) => {
+      lastOffsetRef.current = value;
       const next = value < heroHeight - 40;
       setHeroOnScreen((prev) => (prev === next ? prev : next));
     });
     return () => scrollY.removeListener(id);
   }, [scrollY, heroHeight]);
+
+  // ── Preserve scroll position across an in-screen tab switch ─────────────
+  // `listKey` changes when a tab needs a different `numColumns` (FlatList
+  // can't change column count on a mounted instance — RN throws), which
+  // forces the list below to remount. A remount alone would reset scroll to
+  // 0, which reads as "switching tabs jumps to the top" — wrong: only a
+  // fresh screen mount/focus should do that. So on every listKey change we
+  // capture the last scroll offset (read from the ref above, not state, so
+  // it reflects the instant *before* this render — i.e. right before the old
+  // list unmounts) and restore it onto the new list right after it mounts,
+  // clamped to whatever the new tab's content can actually scroll to so a
+  // short tab never leaves the tab bar floating over blank space.
+  const listRef = useRef<FlatList<T> | null>(null);
+  const prevListKeyRef = useRef(listKey);
+  const pendingOffsetRef = useRef(0);
+  if (prevListKeyRef.current !== listKey) {
+    pendingOffsetRef.current = lastOffsetRef.current;
+    prevListKeyRef.current = listKey;
+  }
+  const contentHeightRef = useRef(0);
+  // Jumps the list straight to `offset` (no animation, so no visible
+  // scroll), clamped to what the current content can actually scroll to.
+  const applyOffset = useCallback((offset: number) => {
+    const maxScroll = Math.max(0, contentHeightRef.current - viewportHeight);
+    const clamped = Math.max(0, Math.min(offset, maxScroll));
+    lastOffsetRef.current = clamped;
+    scrollY.setValue(clamped);
+    if (clamped > 0 || offset > 0) listRef.current?.scrollToOffset?.({ offset: clamped, animated: false });
+  }, [scrollY, viewportHeight]);
+  useLayoutEffect(() => {
+    if (pendingOffsetRef.current > 0) applyOffset(pendingOffsetRef.current);
+    // Only re-run when the list itself remounts (a new listKey) — not on
+    // every scroll or content-size change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listKey]);
+  const handleContentSizeChange = useCallback((_width: number, height: number) => {
+    contentHeightRef.current = height;
+    // Shorter content than the current offset (e.g. the newly active tab
+    // has fewer items): clamp so the tab bar pins near the top instead of
+    // showing blank space below a stranded scroll position.
+    const maxScroll = Math.max(0, height - viewportHeight);
+    if (lastOffsetRef.current > maxScroll) applyOffset(maxScroll);
+  }, [viewportHeight, applyOffset]);
 
   // ── Collapse-on-scroll choreography ──────────────────────────────────────
   // The hero doesn't just fade: the media parallaxes at half speed and sinks
@@ -349,6 +396,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         <ProfileEmptyAreaContext.Provider value={emptyArea.minHeight}>
         <AnimatedFlatList
           key={listKey}
+          ref={listRef as unknown as React.Ref<FlatList>}
           data={data}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
@@ -357,6 +405,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           ListHeaderComponent={header}
           ListEmptyComponent={ListEmptyComponent}
           ListFooterComponent={ListFooterComponent}
+          onContentSizeChange={handleContentSizeChange}
           onEndReached={onEndReached}
           onEndReachedThreshold={0.6}
           onScroll={onScroll}

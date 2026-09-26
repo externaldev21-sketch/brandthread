@@ -40,7 +40,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -58,6 +58,7 @@ import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { FeedGestureGuide } from '@/components/FeedGestureGuide';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
+import { getCachedFeedPosts, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
 import {
@@ -1351,27 +1352,17 @@ function SpotlightPage({
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTriggered = useRef(false);
-  /** Chrome entrance: the rail + bottom-info block settle in with a soft
-   * rise-and-fade whenever this page becomes the active cell (first mount,
-   * or swiping back to a previously-seen post), instead of appearing
-   * instantly — the small per-item "arrival" beat that makes swiping feel
-   * directed rather than like frames simply being swapped. Inactive cells
-   * hold their chrome fully visible with no motion so nothing pops mid-swipe. */
-  const chromeIn = useRef(new Animated.Value(isActive ? 1 : 0.001)).current;
-  const wasActive = useRef(isActive);
-  React.useEffect(() => {
-    if (isActive && !wasActive.current) {
-      chromeIn.setValue(0.001);
-      Animated.spring(chromeIn, { toValue: 1, useNativeDriver: true, speed: 15, bounciness: 6 }).start();
-    } else if (!isActive) {
-      chromeIn.setValue(1);
-    }
-    wasActive.current = isActive;
-  }, [isActive, chromeIn]);
-  const chromeStyle = {
-    opacity: chromeIn,
-    transform: [{ translateY: chromeIn.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-  };
+  // No entrance animation on the overlay chrome (rail + bottom-info block):
+  // it must move 1:1 with its own page as part of the same cell, exactly
+  // like the video does, with zero opacity/position animation when a cell
+  // becomes active — a previous "rise and fade in" spring keyed off
+  // `isActive` becoming true fired on every single swipe (every cell starts
+  // inactive, becomes active, that transition ran the spring every time),
+  // reading as the whole overlay bouncing in on every swipe instead of
+  // holding sturdy with the page. `chromeStyle` is now a plain, static,
+  // always-settled style — kept as a style object (not removed outright) so
+  // every call site below stays unchanged.
+  const chromeStyle = { opacity: 1 };
   const friendReposts = item.friendReposts ?? [];
   const hasRepostIdentity = engagement?.reposted === true || friendReposts.length > 0;
   const repostLabel = engagement?.reposted
@@ -1997,8 +1988,20 @@ export default function FeedScreen({
   const [cartCount, setCartCount] = useState(0);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [hasUnread, setHasUnread] = useState(false);
-  const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
-  const [feedLoading, setFeedLoading] = useState(true);
+  // Real TikTok never shows a placeholder/skeleton box over the feed. Seed
+  // the very first render from whatever we already have in memory for this
+  // tab (instant on a tab switch within the session) so there is a real post
+  // — poster included — on screen from frame one instead of an empty list
+  // that would otherwise need a loading state to cover. A cold app start has
+  // nothing in memory yet; `hydrateFeedPostsCache` below fills it in from
+  // AsyncStorage a beat later, still well before any skeleton would ever be
+  // justified, and with no placeholder shapes in between either way.
+  const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>(() => (
+    creatorSource && creatorId ? [] : getCachedFeedPosts<SpotlightItem>('for-you') ?? []
+  ));
+  const [feedLoading, setFeedLoading] = useState(() => (
+    creatorSource && creatorId ? true : (getCachedFeedPosts<SpotlightItem>('for-you') ?? []).length === 0
+  ));
   const [feedRefreshing, setFeedRefreshing] = useState(false);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [feedHasMore, setFeedHasMore] = useState(true);
@@ -2089,8 +2092,20 @@ export default function FeedScreen({
     feedHasMoreRef.current = true;
     setFeedHasMore(true);
     setFeedLoadingMore(false);
-    if (initial) setFeedLoading(true);
-    else setFeedRefreshing(true);
+    if (initial) {
+      setFeedLoading(true);
+      // No skeleton ever covers this — instead, show whatever we last saw
+      // for this tab (in memory instantly, or from AsyncStorage a beat
+      // later on a cold start) while the real page loads underneath it.
+      const cachedNow = getCachedFeedPosts<SpotlightItem>(loadKey);
+      if (cachedNow) {
+        setSellerFeedPosts(cachedNow);
+      } else {
+        void hydrateFeedPostsCache<SpotlightItem>(loadKey).then(cached => {
+          if (cached && feedLoadKeyRef.current === loadKey) setSellerFeedPosts(cached);
+        });
+      }
+    } else setFeedRefreshing(true);
     try {
       const page = await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
@@ -2099,6 +2114,7 @@ export default function FeedScreen({
         .map(mapSellerPost)
         .filter((p): p is SpotlightItem => p !== null);
       setSellerFeedPosts(mapped);
+      setCachedFeedPosts(loadKey, mapped);
       feedCursorRef.current = page.cursor;
       feedHasMoreRef.current = page.hasMore;
       setFeedHasMore(page.hasMore);
@@ -2706,11 +2722,6 @@ export default function FeedScreen({
         }
       }}
     >
-      {feedLoading && (
-        <FeedSkeleton
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
-        />
-      )}
       {viewportReady && <FlatList
         ref={feedListRef}
         // The creator player remounts once its videos load so it opens at the tapped one.
@@ -2723,6 +2734,19 @@ export default function FeedScreen({
         disableIntervalMomentum
         showsVerticalScrollIndicator={false}
         decelerationRate="fast"
+        // A slow drag-then-release let the list rubber-band past the page
+        // boundary before paging snapped it back — on iOS that's the default
+        // vertical bounce, on Android the default overscroll glow/stretch,
+        // and on web (react-native-web) the equivalent elastic overshoot.
+        // Only the video itself should ever appear to move like that; the
+        // overlay chrome doesn't animate at all (see chromeStyle above), so
+        // that rubber-band snap-back read as the whole page — video and
+        // overlay together — bouncing. Disabling native overscroll here
+        // makes every release, slow or fast, land exactly on the page
+        // boundary with no elastic overshoot to snap back from.
+        bounces={false}
+        alwaysBounceVertical={false}
+        overScrollMode="never"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         onEndReached={loadMoreFeed}
