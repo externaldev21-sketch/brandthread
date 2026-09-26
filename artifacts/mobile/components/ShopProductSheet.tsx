@@ -15,7 +15,6 @@ import {
   Easing,
   Image,
   Modal,
-  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,11 +24,14 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ReanimatedAnimated from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useSheetTransition } from '@/components/ui/BottomSheet';
 import { CachedImage } from '@/components/CachedImage';
 import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
 import { formatCents } from '@/lib/money';
@@ -331,46 +333,39 @@ export function ShopProductSheet({
   const [cartTarget, setCartTarget] = useState<CartFlightPoint | null>(null);
   const addedConfirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Slide-up animation
-  const slideY = useRef(new Animated.Value(400)).current;
+  // cart-fly-to-icon animation only (unrelated to the sheet's own
+  // mount/close transform — kept on the legacy Animated API, out of scope
+  // for the sheet-close-glitch fix).
   const cartFlyProgress = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    if (!shouldAnimateCartSuccess(reduceMotion)) {
-      slideY.setValue(0);
-      return;
-    }
-    Animated.spring(slideY, {
-      toValue: 0,
-      useNativeDriver: true,
-      speed: 18,
-      bounciness: 3,
-      // A bouncy spring settles asymptotically, not at an exact bit-for-bit
-      // 0 — snapping it once "finished" fires keeps the sheet's translateY
-      // (applied to its entire subtree, text included) at a true identity
-      // transform at rest instead of a permanent sub-pixel residual.
-    }).start(() => slideY.setValue(0));
-  }, [reduceMotion, slideY]);
+  // Sheet mount/close transform + backdrop fade — Reanimated (UI-thread),
+  // shared with every other sheet in the app via `useSheetTransition`
+  // (components/ui/BottomSheet.tsx). `sheetOpen` starts true and flips false
+  // on dismiss; `onClose` (passed as the hook's `onClosed`) fires exactly
+  // once the close animation has actually finished — never before — so the
+  // parent's `setShopSelection(null)` (which unmounts this component) can
+  // never race the animation and yank it mid-flight.
+  const [sheetOpen, setSheetOpen] = useState(true);
+  const { modalVisible, sheetStyle, backdropStyle, panGesture } = useSheetTransition(
+    sheetOpen,
+    onClose,
+    { reduceMotion: !shouldAnimateCartSuccess(reduceMotion) },
+  );
 
   useEffect(() => () => {
     if (addedConfirmationTimer.current) clearTimeout(addedConfirmationTimer.current);
   }, []);
 
-  // Dismiss animation
-  function dismissSheet(cb?: () => void) {
-    if (!shouldAnimateCartSuccess(reduceMotion)) {
-      cb?.();
-      return;
-    }
-    Animated.timing(slideY, {
-      toValue: 500,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => cb?.());
+  // Dismiss: flips `sheetOpen` false, which drives the single Reanimated
+  // close timeline above; `onClose` (passed as `useSheetTransition`'s
+  // `onClosed`) fires once that finishes — every call site here dismisses
+  // via `onClose`, so this just triggers that shared timeline.
+  function dismissSheet() {
+    setSheetOpen(false);
   }
 
   function handleClose() {
-    dismissSheet(onClose);
+    dismissSheet();
   }
 
   /**
@@ -390,7 +385,7 @@ export function ShopProductSheet({
    */
   function navigateAndDismiss(action: () => void) {
     action();
-    dismissSheet(onClose);
+    dismissSheet();
   }
 
   /**
@@ -443,22 +438,9 @@ export function ShopProductSheet({
     });
   }
 
-  // Swipe-down to close
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) slideY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 80 || g.vy > 0.8) {
-          dismissSheet(onClose);
-        } else {
-          Animated.spring(slideY, { toValue: 0, useNativeDriver: true, speed: 20 }).start(() => slideY.setValue(0));
-        }
-      },
-    }),
-  ).current;
+  // Swipe-down to close now lives entirely inside `useSheetTransition`'s
+  // `panGesture` (Reanimated + react-native-gesture-handler, UI-thread) —
+  // see the `GestureDetector` wrapping the sheet below.
 
   // Hydrate product when active tag changes
   const loadProduct = useCallback(async (tagIdx: number) => {
@@ -648,21 +630,25 @@ export function ShopProductSheet({
   const currentPhase: string = phase;
 
   return (
-    <Modal transparent animationType="none" visible onRequestClose={handleClose}>
-      {/* Dim backdrop — tap to dismiss */}
-      <TouchableWithoutFeedback onPress={handleClose}>
-        <View style={ss.backdrop} />
-      </TouchableWithoutFeedback>
+    <Modal transparent animationType="none" visible={modalVisible} onRequestClose={handleClose}>
+      {/* Dim backdrop — tap to dismiss. Fades on the exact same Reanimated
+          timeline/duration as the sheet's own slide (see useSheetTransition),
+          instead of popping instantly. */}
+      <ReanimatedAnimated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
+        <TouchableWithoutFeedback onPress={handleClose}>
+          <View style={ss.backdrop} />
+        </TouchableWithoutFeedback>
+      </ReanimatedAnimated.View>
 
-      <Animated.View
-        style={[ss.sheet, {
-          backgroundColor: theme.surface,
-          borderColor: theme.border,
-          paddingBottom: insets.bottom + 8,
-          transform: [{ translateY: slideY }],
-        }]}
-        {...panResponder.panHandlers}
-      >
+      <GestureDetector gesture={panGesture}>
+        <ReanimatedAnimated.View
+          testID="shop-product-sheet"
+          style={[ss.sheet, {
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
+            paddingBottom: insets.bottom + 8,
+          }, sheetStyle]}
+        >
         {/* ─ Handle ─ */}
         <View style={ss.handle} />
 
@@ -949,7 +935,8 @@ export function ShopProductSheet({
             </TouchableOpacity>
           </View>
         )}
-      </Animated.View>
+        </ReanimatedAnimated.View>
+      </GestureDetector>
 
       {flyingToCart && (
         <Animated.View

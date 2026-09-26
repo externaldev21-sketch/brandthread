@@ -5,6 +5,7 @@
  * components. `lib/theme.ts` still exports the legacy `ANIM` timing object
  * used across many existing screens — left untouched for Phase 2 migration.
  */
+import { Easing } from 'react-native-reanimated';
 
 /** Press feedback: shrink to 0.97 over 120ms, every press-state animation
  *  used by a new/migrated component. Never scales below 1 at rest — this is
@@ -14,6 +15,16 @@ export const PRESS_DURATION_MS = 120;
 
 /** Sheets (BottomSheet, action sheets) spring in with this feel. */
 export const SHEET_SPRING = { damping: 20, stiffness: 220 } as const;
+
+/** Shared close timeline for every bottom sheet (`useSheetTransition`,
+ *  `components/ui/BottomSheet.tsx`): a single, monotonic ease-out slide —
+ *  never a spring — so the close never overshoots or pauses mid-flight.
+ *  220-260ms band per the app's motion guidelines. */
+export const SHEET_CLOSE_MS = 240;
+export const SHEET_CLOSE_EASING = Easing.out(Easing.cubic);
+/** How far below the sheet's resting position it travels when closed —
+ *  comfortably past any device's bottom inset so it's fully offscreen. */
+export const SHEET_OFFSCREEN_Y = 500;
 
 /** Sliding tab/segment indicators (e.g. the feed's top tab underline): a
  *  near-critically-damped spring (damping ratio ~1.1) so it glides to rest

@@ -12,10 +12,13 @@ import {
   ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity,
   TouchableWithoutFeedback, View, FlatList,
 } from 'react-native';
+import ReanimatedAnimated from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useSheetTransition } from '@/components/ui/BottomSheet';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, OVERLAY,
   FONT, FS, SP, RADIUS, ICON, COMP,
@@ -49,6 +52,7 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  const { modalVisible, sheetStyle, backdropStyle, panGesture } = useSheetTransition(visible, onClose);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,14 +104,17 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
     }
   }
 
-  if (!visible) return null;
+  if (!modalVisible) return null;
 
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop} />
-      </TouchableWithoutFeedback>
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>
+    <Modal transparent animationType="none" visible={modalVisible} onRequestClose={onClose}>
+      <ReanimatedAnimated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={styles.backdrop} />
+        </TouchableWithoutFeedback>
+      </ReanimatedAnimated.View>
+      <GestureDetector gesture={panGesture}>
+      <ReanimatedAnimated.View testID="save-to-collection-sheet" style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }, sheetStyle]}>
         <View style={styles.handle} />
         <View style={styles.header}>
           <Text style={styles.title}>Save to…</Text>
@@ -188,7 +195,8 @@ export function SaveToCollectionSheet({ visible, item, onClose, onSaved }: Props
             }
           />
         )}
-      </View>
+      </ReanimatedAnimated.View>
+      </GestureDetector>
     </Modal>
   );
 }
