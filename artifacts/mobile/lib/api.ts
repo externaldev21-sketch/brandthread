@@ -1445,6 +1445,33 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ recorded: true }>('/api/call/events', body),
     },
     /** Unauthenticated public endpoints — no Authorization header needed. */
+    /**
+     * Profile cover video (buyer + seller). The server enforces ≤30s and one
+     * change per 24h (setting and removing both count); a 429 ApiError's
+     * message is the user-facing "You can change your cover again in X hours".
+     */
+    profileCover: {
+      get: () => freshGet<{
+        coverVideoUrl: string | null;
+        coverPosterUrl: string | null;
+        coverVideoUpdatedAt: string | null;
+        canChange: boolean;
+        retryAfterHours?: number;
+        message?: string;
+      }>('/api/profile/cover-video'),
+      upload: (uri: string, mimeType?: string | null, trim?: { start: number; duration: number } | null) =>
+        uploadVideo<{ coverVideoUrl: string; coverPosterUrl: string; coverVideoUpdatedAt: string }>(
+          trim
+            ? `/api/profile/cover-video?trimStart=${encodeURIComponent(trim.start.toFixed(2))}&trimDuration=${encodeURIComponent(trim.duration.toFixed(2))}`
+            : '/api/profile/cover-video',
+          { uri, mimeType },
+          getToken,
+          getCacheScope,
+        ),
+      remove: () => del<{ coverVideoUrl: null; coverPosterUrl: null; coverVideoUpdatedAt: string | null }>('/api/profile/cover-video'),
+      coachmark: () => freshGet<{ seen: boolean; hasCover: boolean }>('/api/profile/cover-coachmark'),
+      markCoachmarkSeen: () => post<{ seen: true }>('/api/profile/cover-coachmark/seen', {}),
+    },
     publicProducts: {
       list: (opts: { limit?: number; category?: string; tag?: string } = {}) => {
         const params = new URLSearchParams();

@@ -41,6 +41,9 @@ import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
+import {
+  CoverCoachmarkSheet, CoverHeroAffordance, CoverManageSheet, CoverTrimSheet, useProfileCover,
+} from '@/components/profile/ProfileCover';
 
 interface SellerView {
   sellerId: string;
@@ -58,6 +61,8 @@ interface SellerView {
   vacationMessage?: string;
   productsCount: number;
   videosCount: number;
+  coverVideoUrl: string | null;
+  coverPosterUrl: string | null;
 }
 
 function initialsOf(name: string): string {
@@ -87,6 +92,8 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
     vacationMessage: profile?.vacationMessage ?? undefined,
     productsCount: Number(profile?.productsCount ?? 0),
     videosCount: Number(profile?.videosCount ?? 0),
+    coverVideoUrl: httpOrNull(profile?.coverVideoUrl),
+    coverPosterUrl: httpOrNull(profile?.coverPosterUrl),
   };
 }
 
@@ -199,6 +206,11 @@ export default function SellerProfileScreen() {
   }), [canonicalSellerId, isOwner]);
 
   const videos = useCreatorVideos(canonicalSellerId, { fresh: isOwner });
+  const coverFlow = useProfileCover({
+    own: isOwner,
+    cover: { videoUrl: seller?.coverVideoUrl ?? null, posterUrl: seller?.coverPosterUrl ?? null },
+    userId: canonicalSellerId,
+  });
 
   // Returning to this profile (after posting, editing listings, deleting a
   // video, or following from another screen) silently refetches counts,
@@ -474,7 +486,14 @@ export default function SellerProfileScreen() {
           roleLabel: 'Seller',
         }}
         avatar={{ ring: !!seller?.verified }}
-        hero={{ videoUri: firstVideo?.mediaUris[0] ?? null, posterUri: heroPoster }}
+        // A cover video, when set, leads the hero for every viewer (muted,
+        // looping, poster first); otherwise the latest video.
+        hero={coverFlow.hasCover
+          ? { videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }
+          : { videoUri: firstVideo?.mediaUris[0] ?? null, posterUri: heroPoster }}
+        coverAffordance={isOwner ? (
+          <CoverHeroAffordance hasCover={coverFlow.hasCover} busy={coverFlow.busy} onAdd={coverFlow.startAdd} onManage={coverFlow.openManage} />
+        ) : undefined}
         topLeft={<ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
         topRight={(
           <>
@@ -543,6 +562,17 @@ export default function SellerProfileScreen() {
         ) : null}
       </Modal>
 
+      {isOwner ? (
+        <>
+          <CoverCoachmarkSheet
+            visible={coverFlow.coachmarkVisible}
+            onAdd={() => { coverFlow.dismissCoachmark(); coverFlow.startAdd(); }}
+            onLater={coverFlow.dismissCoachmark}
+          />
+          <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
+          <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
+        </>
+      ) : null}
       {isOwner ? (
         <ShareProfileSheet
           visible={shareSheetVisible}

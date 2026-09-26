@@ -34,6 +34,9 @@ import {
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
+import {
+  CoverCoachmarkSheet, CoverHeroAffordance, CoverManageSheet, CoverTrimSheet, useProfileCover,
+} from '@/components/profile/ProfileCover';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 
@@ -48,6 +51,8 @@ interface SellerProfileData {
   totalLikes:         number;
   profileImageUrl:    string | null;
   verified:           boolean;
+  coverVideoUrl?:     string | null;
+  coverPosterUrl?:    string | null;
   metrics: {
     revenueCents: number;
     visitors: number;
@@ -90,6 +95,11 @@ export default function ProfileScreen() {
   const [postsError, setPostsError] = useState(false);
   const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
   const [profile, setProfile] = useState<SellerProfileData | null>(null);
+  const coverFlow = useProfileCover({
+    own: true,
+    cover: { videoUrl: profile?.coverVideoUrl ?? null, posterUrl: profile?.coverPosterUrl ?? null },
+    userId,
+  });
   const [socialCounts, setSocialCounts] = useState<SocialCounts>({ followers: 0, following: 0, likes: 0 });
   const [productsCount, setProductsCount] = useState<number | null>(null);
   const [profileEditorVisible, setProfileEditorVisible] = useState(false);
@@ -143,6 +153,8 @@ export default function ProfileScreen() {
         totalLikes:         data.totalLikes ?? 0,
         profileImageUrl:    data.profileImageUrl ?? null,
         verified:           data.verified === true,
+        coverVideoUrl:      (data as any).coverVideoUrl ?? null,
+        coverPosterUrl:     (data as any).coverPosterUrl ?? null,
         metrics: data.metrics ?? {
           revenueCents: 0,
           visitors: 0,
@@ -393,10 +405,14 @@ export default function ProfileScreen() {
           },
           accessibilityLabel: myStoryIds.length > 0 ? 'View your active story' : 'Create your first story',
         }}
-        hero={{
+        // A cover video, when set, leads the hero; otherwise the latest post.
+        hero={coverFlow.hasCover ? { videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl } : {
           videoUri: latestVideo?.mediaUris?.[0] ?? null,
           posterUri: latestVideo?.thumbnailUri ?? latestPoster?.thumbnailUri ?? latestPoster?.mediaUris?.[0] ?? null,
         }}
+        coverAffordance={(
+          <CoverHeroAffordance hasCover={coverFlow.hasCover} busy={coverFlow.busy} onAdd={coverFlow.startAdd} onManage={coverFlow.openManage} />
+        )}
         topLeft={accountSwitcher}
         topRight={(
           <>
@@ -582,6 +598,14 @@ export default function ProfileScreen() {
           </SheetRise>
         </KeyboardAvoidingView>
       </Modal>
+
+      <CoverCoachmarkSheet
+        visible={coverFlow.coachmarkVisible}
+        onAdd={() => { coverFlow.dismissCoachmark(); coverFlow.startAdd(); }}
+        onLater={coverFlow.dismissCoachmark}
+      />
+      <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
+      <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
 
       <ShareProfileSheet
         visible={shareSheetVisible}

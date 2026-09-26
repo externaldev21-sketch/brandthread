@@ -37,6 +37,8 @@ import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
 
 type RemoteProfile = {
+  coverVideoUrl?: string | null;
+  coverPosterUrl?: string | null;
   userId?: string;
   name: string; username: string | null; displayName: string | null;
   bio: string | null; avatarUrl?: string | null;
@@ -338,10 +340,13 @@ export default function BuyerOtherProfileScreen() {
         avatar={storyIds.length > 0
           ? { ring: true, onPress: openStories, accessibilityLabel: `View ${displayName}'s story` }
           : undefined}
-        hero={{
-          videoUri: videos.posts.find((post) => post.contentType === 'video')?.mediaUris[0] ?? null,
-          posterUri: gridItems.find((item) => item.posterUri)?.posterUri ?? null,
-        }}
+        // Their cover video (muted, looping, poster first) leads the hero when set.
+        hero={profile?.coverVideoUrl
+          ? { videoUri: profile.coverVideoUrl, posterUri: profile.coverPosterUrl ?? null }
+          : {
+            videoUri: videos.posts.find((post) => post.contentType === 'video')?.mediaUris[0] ?? null,
+            posterUri: gridItems.find((item) => item.posterUri)?.posterUri ?? null,
+          }}
         topLeft={<ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
         topRight={(
           <ProfileGlassButton

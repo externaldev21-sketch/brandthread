@@ -45,6 +45,9 @@ import {
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { ProfileStoriesRow } from '@/components/profile/ProfileStoriesRow';
+import {
+  CoverCoachmarkSheet, CoverHeroAffordance, CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia,
+} from '@/components/profile/ProfileCover';
 import { profileEmptyState, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 
@@ -217,6 +220,8 @@ export default function ProfileScreen() {
   // Live follower/following counts from the server (the locally cached
   // profile counts went stale after every follow).
   const [socialCounts, setSocialCounts] = useState<{ followers: number; following: number } | null>(null);
+  const [serverCover, setServerCover] = useState<CoverMedia>({ videoUrl: null, posterUrl: null });
+  const coverFlow = useProfileCover({ own: true, cover: serverCover, userId: user?.id });
 
   // Sheets
   const [menuOpen, setMenuOpen] = useState(false);
@@ -230,6 +235,7 @@ export default function ProfileScreen() {
       const data = await api.social.profile(id);
       if (accountRef.current !== id || !data) return;
       setSocialCounts({ followers: Number(data.followersCount ?? 0), following: Number(data.followingCount ?? 0) });
+      setServerCover({ videoUrl: (data as any).coverVideoUrl ?? null, posterUrl: (data as any).coverPosterUrl ?? null });
     } catch { /* keep the last known counts */ }
   }, [api, user?.id]);
 
@@ -596,7 +602,14 @@ export default function ProfileScreen() {
           onPress: () => router.push('/buyer-story-create' as any),
           accessibilityLabel: hasActiveStory ? 'Add to your story' : 'Create a story',
         }}
-        hero={{ videoUri: latestVideo?.mediaUrl ?? null, posterUri: latestPhoto?.mediaUrl ?? null }}
+        // A cover video, when set, leads the hero; otherwise the latest post
+        // (and with neither, the default thread motif).
+        hero={coverFlow.hasCover
+          ? { videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }
+          : { videoUri: latestVideo?.mediaUrl ?? null, posterUri: latestPhoto?.mediaUrl ?? null }}
+        coverAffordance={(
+          <CoverHeroAffordance hasCover={coverFlow.hasCover} busy={coverFlow.busy} onAdd={coverFlow.startAdd} onManage={coverFlow.openManage} />
+        )}
         topLeft={accountSwitcher}
         isOwnProfile
         // Thread Cash: compact owner-only balance chip (flag-gated; P2P stays off).
@@ -679,6 +692,14 @@ export default function ProfileScreen() {
         <View style={[sheetStyles.sheetDivider, { backgroundColor: theme.border }]} />
         <SheetRow icon="log-out" label="Sign out" destructive onPress={handleSignOut} />
       </BottomSheet>
+
+      <CoverCoachmarkSheet
+        visible={coverFlow.coachmarkVisible}
+        onAdd={() => { coverFlow.dismissCoachmark(); coverFlow.startAdd(); }}
+        onLater={coverFlow.dismissCoachmark}
+      />
+      <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
+      <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
 
       <ShareProfileSheet
         visible={shareSheetOpen}

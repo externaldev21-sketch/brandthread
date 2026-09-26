@@ -27,6 +27,8 @@ function ProfileShell(props: any) {
       : null,
     props.hero ? React.createElement('View', { testID: 'profile-hero-media', hero: props.hero }) : null,
     props.topLeft,
+    // Mirrors the real shell: the cover affordance is owner-only.
+    props.isOwnProfile ? props.coverAffordance ?? null : null,
     // Mirrors the real shell's gate: the wallet chip is owner-only.
     props.isOwnProfile && props.walletChip
       ? React.createElement('Pressable', {
