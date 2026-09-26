@@ -15,6 +15,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, ActivityIndicator } from 'react-native';
+import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { randomUUID } from 'expo-crypto';
@@ -31,12 +32,63 @@ function formatAmountDisplay(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+/**
+ * The Thread Cash mark: a monochrome "$" inside a thin dashed ring — a small
+ * stitch/thread detail evoking Brandthread's own thread motif, rather than a
+ * generic filled dollar-sign glyph. The theme's accent is used only as a
+ * tiny highlight dot on the ring, never as a full gold-filled glyph, so it
+ * reads correctly both on monochrome and on the gold-family presets
+ * (gold, black-gold, emerald-gold) alike. `disabled` mutes both the ring and
+ * the highlight to a flat, non-interactive read.
+ */
+export function ThreadCashCoinMark({
+  size = 20,
+  color,
+  accent,
+  disabled = false,
+}: {
+  size?: number;
+  color: string;
+  accent: string;
+  disabled?: boolean;
+}) {
+  const r = size / 2 - 1.6;
+  const cx = size / 2;
+  const cy = size / 2;
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Circle
+        cx={cx} cy={cy} r={r}
+        stroke={color}
+        strokeOpacity={disabled ? 0.5 : 1}
+        strokeWidth={1.3}
+        strokeDasharray={`${Math.max(1.6, r * 0.5)} ${Math.max(1.6, r * 0.55)}`}
+        fill="none"
+      />
+      <SvgText
+        x={cx} y={cy + size * 0.155}
+        fontSize={size * 0.5}
+        fontWeight="700"
+        fill={color}
+        fillOpacity={disabled ? 0.5 : 1}
+        textAnchor="middle"
+      >
+        $
+      </SvgText>
+      {/* Tiny accent highlight — a single stitch tick, not a filled glyph */}
+      <Circle cx={cx} cy={cy - r} r={disabled ? 0 : 1.2} fill={accent} />
+    </Svg>
+  );
+}
+
 /** The "+" attach-menu entry. Render only when useFeatureFlag('threadCashSend'). */
 export function ThreadCashAttachButton({
   recipientId,
   conversationId,
   onSent,
   renderTrigger,
+  disabled = false,
+  disabledReason,
 }: {
   recipientId: string;
   /** Omit when sending from a profile rather than an open chat thread. */
@@ -44,6 +96,16 @@ export function ThreadCashAttachButton({
   onSent: (result: { transferId: string; amountCents: number; note: string | null }) => void;
   /** Custom trigger element (e.g. a profile action button) instead of the default icon button. */
   renderTrigger?: (open: () => void) => React.ReactNode;
+  /**
+   * When true, the entry point still renders (never hidden) but tapping it
+   * explains why instead of opening the send sheet — e.g. not yet a mutual
+   * follow. This is an affordance check only: the server independently
+   * re-validates mutual follow at send AND claim, so it is never the actual
+   * security boundary.
+   */
+  disabled?: boolean;
+  /** Shown when `disabled` and the entry point is tapped. */
+  disabledReason?: string;
 }) {
   const { theme } = useAppTheme();
   const api = useApi();
@@ -52,6 +114,14 @@ export function ThreadCashAttachButton({
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const idempotencyKey = useMemo(() => (open ? randomUUID() : null), [open]);
+
+  function requestOpen() {
+    if (disabled) {
+      Alert.alert('Thread Cash', disabledReason || 'Follow each other to send Thread Cash.');
+      return;
+    }
+    setOpen(true);
+  }
 
   function pressKey(key: string) {
     void Haptics.selectionAsync();
@@ -95,14 +165,15 @@ export function ThreadCashAttachButton({
 
   return (
     <>
-      {renderTrigger ? renderTrigger(() => setOpen(true)) : (
+      {renderTrigger ? renderTrigger(requestOpen) : (
         <TouchableOpacity
-          onPress={() => setOpen(true)}
+          onPress={requestOpen}
           accessibilityRole="button"
-          accessibilityLabel="Send Thread Cash"
-          style={[styles.attachButton, { borderColor: theme.borderSubtle }]}
+          accessibilityLabel={disabled ? `Thread Cash — ${disabledReason || 'unavailable'}` : 'Send Thread Cash'}
+          accessibilityState={{ disabled }}
+          style={[styles.attachButton, { borderColor: theme.borderSubtle }, disabled && styles.attachButtonDisabled]}
         >
-          <Feather name="dollar-sign" size={18} color={theme.accent} />
+          <ThreadCashCoinMark size={18} color={theme.text} accent={theme.accent} disabled={disabled} />
         </TouchableOpacity>
       )}
       <Modal transparent animationType="slide" visible={open} onRequestClose={() => setOpen(false)}>
@@ -239,6 +310,7 @@ export function ThreadCashMessageCard({
 
 const styles = StyleSheet.create({
   attachButton: { width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  attachButtonDisabled: { opacity: 0.45 },
   backdrop: { flex: 1, backgroundColor: '#000000A0', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg, borderWidth: 1, padding: SP.lg },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },

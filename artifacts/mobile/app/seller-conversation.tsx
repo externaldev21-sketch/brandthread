@@ -744,7 +744,7 @@ export default function SellerConversationScreen() {
           }}
         />
       ) : (
-      <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
+      <View style={[s.inputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
         {/* Attach button */}
         <PressableScale
           style={s.attachBtn}
@@ -1047,8 +1047,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.md, paddingTop: SP.sm, gap: SP.sm,
     borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG,
   },
+  // Matches buyer-conversation.tsx's COMPOSER_CONTROL — one consistent size
+  // across every circular control in the row (previously 40/40/40/44).
   attachBtn: {
-    width: 40, height: 40,
+    width: 36, height: 36,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 2,
   },
@@ -1059,7 +1061,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.base, fontFamily: FONT.regular, color: FG, maxHeight: 120,
   },
   sendBtn: {
-    width: 44, height: 44, borderRadius: 22,
+    width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, marginBottom: 2,
   },
