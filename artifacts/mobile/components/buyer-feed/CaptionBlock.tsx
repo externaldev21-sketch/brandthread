@@ -136,7 +136,7 @@ export function CaptionBlock({
 const styles = StyleSheet.create({
   root: {
     position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 112,
-    justifyContent: 'flex-end', gap: 10,
+    justifyContent: 'flex-end', gap: 8,
   },
   rootWithRepost: { minHeight: 148 },
   repostIdentity: {

@@ -96,6 +96,18 @@ export interface CreatorFeedConfig {
 
 const THREAD_PAGE_SIZE = 30;
 
+// Vertical rhythm in the bottom chrome zone, measured from TikTok: the
+// scrub/progress bar sits just above the tab bar (at `bottomClearance`,
+// 0-4pt of gap to the bar), so the right rail's last item (share) and the
+// caption block's last line (the sound row) both need extra clearance above
+// that same `bottomClearance` anchor, or they end up touching/overlapping
+// the bar — which is exactly what a bare `bottom: bottomClearance` on both
+// of them (passed as `style` to RightActionRail/CaptionBlock) used to do.
+//   - RAIL_BOTTOM_GAP: >=16pt from the rail's last item to the bar's top.
+//   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
+const RAIL_BOTTOM_GAP = 22;
+const CAPTION_BOTTOM_GAP = 18;
+
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
 // The sentinel is the first element in displayItems when buyerMode=true.
 // It is never stored in the DB and is never passed through the regular feed
@@ -1450,9 +1462,11 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
-      {/* ─ Right action rail (components/buyer-feed/RightActionRail) ─ */}
+      {/* ─ Right action rail (components/buyer-feed/RightActionRail) ─
+          bottom: bottomClearance + RAIL_BOTTOM_GAP, not bare bottomClearance
+          — see the RAIL_BOTTOM_GAP/CAPTION_BOTTOM_GAP comment above. */}
       <RightActionRail
-        style={[chromeStyle, { bottom: bottomClearance }]}
+        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}
         creator={item.creator}
         avatarColor={item.avatarColor}
         initials={item.initials}
@@ -1502,9 +1516,11 @@ function SpotlightPage({
         onClose={() => setMenuOpen(false)}
       />
 
-      {/* ─ Bottom-left overlay: shop pill, creator, caption, sound (components/buyer-feed/CaptionBlock + ShopAnchorPill) ─ */}
+      {/* ─ Bottom-left overlay: shop pill, creator, caption, sound (components/buyer-feed/CaptionBlock + ShopAnchorPill) ─
+          bottom: bottomClearance + CAPTION_BOTTOM_GAP, not bare
+          bottomClearance — same reason as the rail above. */}
       <CaptionBlock
-        style={[chromeStyle, { bottom: bottomClearance }]}
+        style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}
         creator={item.creator}
         verified={!!item.verified}
         caption={item.caption}
