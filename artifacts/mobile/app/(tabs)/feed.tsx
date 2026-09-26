@@ -87,7 +87,6 @@ import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileServic
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { getPreviewCatalog, getPreviewSellers } from '@/lib/previewCatalog';
 import { PREVIEW_FEED_POSTS } from '@/lib/previewFeed';
-import { getPreviewLiveSessions, type PreviewLiveSession } from '@/lib/previewCommerce';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -758,32 +757,6 @@ interface LiveStreamFeedItem {
   title: string;
   viewerCount: number;
   productTags: { productName: string; priceCents: number }[];
-  isPreview?: true;
-}
-
-type LiveSessionRow = Pick<PreviewLiveSession, 'id' | 'title'> & {
-  seller_name?: string;
-  brand_name?: string | null;
-  thumbnail_url?: string | null;
-  viewer_count?: number;
-  product_tags?: { productName: string; priceCents: number }[];
-  is_preview?: true;
-};
-
-function toLiveStreamFeedItem(session: LiveSessionRow): LiveStreamFeedItem {
-  const isPreview = session.is_preview === true;
-  return {
-    _isLive: true,
-    id: `live_${session.id}`,
-    streamId: session.id,
-    sellerName: session.seller_name ?? 'Seller',
-    brandName: session.brand_name ?? null,
-    thumbnailUrl: session.thumbnail_url ?? null,
-    title: session.title,
-    viewerCount: session.viewer_count ?? 0,
-    productTags: Array.isArray(session.product_tags) ? session.product_tags : [],
-    ...(isPreview ? { isPreview: true as const } : {}),
-  };
 }
 
 // ─── "Just dropped from brands you follow" rail ───────────────────────────────
@@ -856,104 +829,6 @@ function JustDroppedRailPage({
   );
 }
 
-function LiveStreamPage({
-  stream,
-  onJoin,
-  isPreview = false,
-  pageWidth,
-  pageHeight,
-  bottomClearance = 90,
-}: {
-  bottomClearance?: number;
-  stream: LiveStreamFeedItem;
-  onJoin: () => void;
-  isPreview?: boolean;
-  pageWidth: number;
-  pageHeight: number;
-}) {
-  const { theme } = useAppTheme();
-  const palette = theme as typeof theme & { background?: string; surface?: string; card?: string; border?: string; text?: string; muted?: string; subtle?: string; };
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.3, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,   duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
-
-  return (
-    <View style={{ width: pageWidth, height: pageHeight, backgroundColor: '#0a0209' }}>
-      {/* Gradient background */}
-      <View style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(10,80,100,0.18)' }} />
-      {/* Centre glow */}
-      <View style={{ position: 'absolute', top: pageHeight * 0.25, alignSelf: 'center', width: 280, height: 280, borderRadius: 140, backgroundColor: theme.accentDim }} />
-
-      {/* Top bar */}
-      <View style={{ position: 'absolute', top: 52, left: 16, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FF3B30', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 }}>
-          <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff', opacity: pulseAnim }} />
-          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.4 }}>{isPreview ? 'PREVIEW' : 'LIVE'}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}>
-          <Feather name="eye" size={12} color="#fff" />
-          <Text style={{ color: '#fff', fontFamily: FONT.semibold, fontSize: 12 }}>
-            {isPreview ? 'Preview only' : stream.viewerCount > 0 ? stream.viewerCount.toLocaleString() : 'Live now'}
-          </Text>
-        </View>
-      </View>
-
-      {/* Centre content */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-        {/* Avatar circle */}
-        <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 3, borderColor: '#fff' }}>
-          <Text style={{ color: theme.onAccent, fontFamily: FONT.bold, fontSize: 32 }}>
-            {(stream.brandName ?? stream.sellerName).slice(0, 1).toUpperCase()}
-          </Text>
-        </View>
-        <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: FS.xl, textAlign: 'center', marginBottom: 8 }}>
-          {stream.brandName ?? stream.sellerName}
-        </Text>
-        <Text style={{ color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20, marginBottom: 32 }}>
-          {stream.title}
-        </Text>
-
-        {/* Product tags preview */}
-        {stream.productTags.length > 0 && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 28 }}>
-            {stream.productTags.slice(0, 3).map((tag, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 }}>
-                <Feather name="shopping-bag" size={11} color="#FF3B30" />
-                <Text style={{ color: '#fff', fontFamily: FONT.semibold, fontSize: 12 }} numberOfLines={1}>{tag.productName}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Join button */}
-        <TouchableOpacity
-          onPress={isPreview ? undefined : onJoin}
-          disabled={isPreview}
-          activeOpacity={0.85}
-          style={{ backgroundColor: '#FF3B30', borderRadius: 28, paddingHorizontal: 40, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}
-        >
-          <Feather name="video" size={18} color="#fff" />
-          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: FS.base }}>{isPreview ? 'Preview only' : 'Join live stream'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom label */}
-      <View style={{ position: 'absolute', bottom: bottomClearance, left: 16, right: 16 }}>
-        <Text style={{ color: 'rgba(255,255,255,0.45)', fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center' }}>
-          {isPreview ? 'Preview card · no broadcast to join' : 'Tap to join — live shopping is on'}
-        </Text>
-      </View>
-    </View>
-  );
-}
 type EngagementState = {
   liked: boolean; likes: number;
   saved: boolean; saves: number;
@@ -2235,7 +2110,6 @@ export default function FeedScreen({
   const [feedRefreshing, setFeedRefreshing] = useState(false);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [feedHasMore, setFeedHasMore] = useState(true);
-  const [activeLiveStreams, setActiveLiveStreams] = useState<LiveStreamFeedItem[]>([]);
   const [feedError, setFeedError] = useState(false);
   const [creatorStartIndex, setCreatorStartIndex] = useState(0);
   const creatorOffsetRef = useRef(0);
@@ -2433,31 +2307,6 @@ export default function FeedScreen({
     void loadFeed();
   }, [feedRefreshing, loadFeed]);
 
-  // Poll active live streams every 30 seconds (main feed only — a creator's
-  // video player never weaves other sellers' streams in)
-  useEffect(() => {
-    if (isCreatorFeed) return undefined;
-    const getSignedOutBuyerPreviewRows = () => !userId
-      ? getPreviewLiveSessions().map(toLiveStreamFeedItem)
-      : [];
-    async function fetchLive() {
-      try {
-        const data = await (api as any).live.active() as { streams: any[] };
-        const rows = Array.isArray(data?.streams) ? data.streams : [];
-        if (rows.length > 0) {
-          setActiveLiveStreams(rows.map((row: LiveSessionRow) => toLiveStreamFeedItem(row)));
-          return;
-        }
-        setActiveLiveStreams(getSignedOutBuyerPreviewRows());
-      } catch {
-        setActiveLiveStreams(getSignedOutBuyerPreviewRows());
-      }
-    }
-    fetchLive();
-    const id = setInterval(fetchLive, 30_000);
-    return () => clearInterval(id);
-  }, [isCreatorFeed, userId]);
-
   // "Just dropped from brands you follow" — real drops only: fetch the
   // buyer's follow graph and the platform's currently-live drops, then
   // intersect them client-side (no server change needed). Never shown if
@@ -2515,15 +2364,12 @@ export default function FeedScreen({
     if (isBuyerSurface && justDroppedDrops.length > 0) {
       regular.splice(Math.min(2, regular.length), 0, { _isJustDropped: true, id: 'just-dropped-rail', drops: justDroppedDrops });
     }
-    if (!activeLiveStreams.length) return regular;
-    // Weave live streams in: first at index 4, then every 10 after
-    const result: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...regular];
-    activeLiveStreams.slice(0, 3).forEach((liveItem, i) => {
-      const insertAt = Math.min(4 + i * 10, result.length);
-      result.splice(insertAt, 0, liveItem);
-    });
-    return result;
-  }, [sellerFeedPosts, activeLiveStreams, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed]);
+    // Live streams no longer weave into the feed itself — the header's LIVE
+    // glyph opens the dedicated full-screen /live-feed experience instead,
+    // so a live card never has to fit inside the feed's own search bar/tabs/
+    // tab bar chrome.
+    return regular;
+  }, [sellerFeedPosts, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed]);
 
   // Every on-screen post's real engagement snapshot (server-backed likes/
   // saves/reposts/liked-by-me/saved-by-me), keyed by id. `engagements` state
@@ -2844,19 +2690,6 @@ export default function FeedScreen({
     return () => { cancelled = true; };
   }, [sellerFeedPosts]);
 
-  /** Top-bar LIVE button: jumps the feed to the nearest active live stream
-   * card already mixed into displayItems, ahead of the current position
-   * when one exists downstream, otherwise the closest one behind it. */
-  function jumpToNearestLive() {
-    const indices: number[] = [];
-    displayItems.forEach((it, i) => { if ((it as any)._isLive) indices.push(i); });
-    if (!indices.length) return;
-    const ahead = indices.find(i => i > activeIndex);
-    const target = ahead ?? indices[indices.length - 1];
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    feedListRef.current?.scrollToIndex({ index: target, animated: true });
-  }
-
   function handleOpenComments(id: string) {
     const item = allItems.find(i => i.id === id);
     if (!item || isLiveStreamItem(item) || isJustDroppedItem(item)) return;
@@ -3066,23 +2899,6 @@ export default function FeedScreen({
               />
             );
           }
-          if ((item as any)._isLive) {
-            const live = item as unknown as LiveStreamFeedItem;
-            return (
-              <LiveStreamPage
-                stream={live}
-                isPreview={live.isPreview === true}
-                pageWidth={pageWidth}
-                pageHeight={pageHeight}
-                bottomClearance={bottomClearance}
-                onJoin={() => {
-                  if (live.isPreview) return;
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  router.push(`/buyer-live?streamId=${encodeURIComponent(live.streamId)}` as never);
-                }}
-              />
-            );
-          }
           const spotlight = item as SpotlightItem;
           // Offset activeIndex comparison by buyerOffset so video playback is correct
           // when the demand sentinel occupies index 0.
@@ -3254,19 +3070,20 @@ export default function FeedScreen({
               >
                 <Feather name="zap" size={20} color={ON_DARK} />
               </TouchableOpacity>
-              {activeLiveStreams.length > 0 && (
-                <TouchableOpacity
-                  style={styles.liveJumpBtn}
-                  activeOpacity={0.78}
-                  onPress={jumpToNearestLive}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Jump to live, ${activeLiveStreams.length} streaming now`}
-                  hitSlop={{ top: 5, bottom: 5, left: 4, right: 5 }}
-                >
-                  <View style={styles.liveJumpDot} />
-                  <Text style={styles.liveJumpText}>LIVE</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  router.push('/live-feed' as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Live"
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                testID="buyer-home-live"
+              >
+                <Feather name="tv" size={20} color={ON_DARK} />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.buyerTabSwitcherWrap} pointerEvents="box-none">
@@ -3676,7 +3493,7 @@ const styles = StyleSheet.create({
   buyerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TOP_TABS_ROW_HEIGHT, gap: 2 },
   // Compact 36×36 visual footprint with 5pt hitSlop on every button above =
   // a real 44×44+ touch target while leaving the centered pill enough room
-  // to breathe at 375pt width (5 icon buttons + LIVE badge otherwise crowd
+  // to breathe at 375pt width (each extra full-size button otherwise crowds
   // "Following"/"Threads" onto two lines).
   buyerTopBtnCompact: { width: 33, height: 36, alignItems: 'center', justifyContent: 'center' },
   // Full 44x44 touch target — used by the creator-profile-videos player's
@@ -3686,13 +3503,6 @@ const styles = StyleSheet.create({
   buyerTopCluster: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   buyerTabSwitcherWrap: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
   buyerCartBadge: { top: 3, right: 1 },
-  liveJumpBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36,
-    paddingHorizontal: 8, borderRadius: RADII.pill,
-    backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.55)',
-  },
-  liveJumpDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
-  liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
   // Persistent thin search bar — squircle (not a full pill, not sharp),
   // lighter/more transparent fill than a solid pill so it never darkens the
   // video underneath. No blur: a live blur here would re-sample the playing
