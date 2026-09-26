@@ -96,13 +96,13 @@ const SCREENS = [
 // ─── In-page audit: overflow + tab-bar overlap ─────────────────────────────
 // Runs inside the browser (page.evaluate). Kept dependency-free (no DOM
 // libs) since it executes in the app's own page context.
-function auditPage(tabBarSelector) {
+function auditPage(tabBarSelector: string | null) {
   const EPS = 1; // px slack for sub-pixel rounding
   const docEl = document.documentElement;
   const pageWidth = docEl.clientWidth;
   const pageHeight = Math.max(docEl.scrollHeight, docEl.clientHeight);
 
-  function isScrollableAncestor(el) {
+  function isScrollableAncestor(el: Element | null) {
     // <body> legitimately clips overflow on this app (it sets
     // `overflow: hidden` to prevent page-level scroll on web) — it counts
     // as a valid clipping ancestor. Only `<html>` itself is excluded, since
@@ -119,7 +119,7 @@ function auditPage(tabBarSelector) {
   // An element is exempt from the page-level overflow check when a
   // non-document ancestor already clips/scrolls it (horizontal product
   // rails, vertical lists, etc. are expected to have off-screen children).
-  function isClippedByAncestor(el) {
+  function isClippedByAncestor(el: Element) {
     let node = el.parentElement;
     while (node && node !== docEl) {
       if (isScrollableAncestor(node)) return true;
@@ -128,7 +128,7 @@ function auditPage(tabBarSelector) {
     return false;
   }
 
-  function describe(el) {
+  function describe(el: Element) {
     const testId = el.getAttribute('data-testid');
     const role = el.getAttribute('role');
     const text = (el.textContent || '').trim().slice(0, 40);
@@ -200,7 +200,7 @@ function auditPage(tabBarSelector) {
         if (x < 0 || y < 0 || x > pageWidth) continue;
         const hit = document.elementFromPoint(x, y);
         if (!hit) continue;
-        if (hit === tabBar || tabBar.contains(hit)) continue;
+        if (hit === tabBar || tabBar!.contains(hit)) continue;
         if (hit === document.documentElement || hit === document.body) continue;
         const key = describe(hit);
         if (seen.has(key)) continue;
@@ -225,8 +225,8 @@ function auditPage(tabBarSelector) {
 }
 
 // ─── Runner ─────────────────────────────────────────────────────────────────
-function parseArgs(argv) {
-  const options = { skipBuild: false, buildDir: DEFAULT_BUILD_DIR, only: null };
+function parseArgs(argv: string[]) {
+  const options: { skipBuild: boolean; buildDir: string; only: string[] | null } = { skipBuild: false, buildDir: DEFAULT_BUILD_DIR, only: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--') continue;
@@ -237,15 +237,21 @@ function parseArgs(argv) {
   return options;
 }
 
-async function auditOne(browser, { screen, viewport, origin, zoom }) {
+type ScreenDef = (typeof SCREENS)[number];
+type ViewportDef = (typeof VIEWPORTS)[number] | typeof TEXT_ZOOM_VIEWPORT;
+
+async function auditOne(
+  browser: any,
+  { screen, viewport, origin, zoom }: { screen: ScreenDef; viewport: ViewportDef; origin: string; zoom: boolean },
+) {
   const device = {
     viewport: { width: viewport.width, height: viewport.height },
     scale: 1,
     isMobile: viewport.width < 700,
     userAgent: undefined,
   };
-  const { context, page, activity } = await openContext(browser, { device, role: screen.role, origin, images: {} });
-  const failures = [];
+  const { context, page, activity } = await openContext(browser, { device, role: screen.role, origin, images: {}, onUnseeded: undefined });
+  const failures: string[] = [];
   try {
     // The buyer feed shows a one-time "Watching Threads" gesture-coach
     // overlay on first view (components/FeedGestureGuide.tsx,
@@ -255,12 +261,12 @@ async function auditOne(browser, { screen, viewport, origin, zoom }) {
     // otherwise every buyer-feed audit would trip on that overlay's
     // intentional coverage of the whole screen (including the tab bar).
     if (screen.role === 'buyer') {
-      await context.addInitScript((key) => {
+      await context.addInitScript((key: string) => {
         try { localStorage.setItem(key, '1'); } catch {}
       }, `feed_gesture_guide_seen:${BUYER_CLERK_ID}`);
     }
     if (zoom) {
-      await context.addInitScript((px) => {
+      await context.addInitScript((px: number) => {
         document.addEventListener('DOMContentLoaded', () => {
           document.documentElement.style.fontSize = `${px}px`;
         });
@@ -272,7 +278,7 @@ async function auditOne(browser, { screen, viewport, origin, zoom }) {
     await waitForImages(page);
     await page.waitForTimeout(500);
 
-    const tabBarSelector = screen.hasTabBar ? TAB_BAR_SELECTOR[screen.role] : null;
+    const tabBarSelector = screen.hasTabBar ? TAB_BAR_SELECTOR[screen.role as 'buyer' | 'seller'] : null;
     if (tabBarSelector) {
       await page.waitForSelector(tabBarSelector, { timeout: 5_000 }).catch(() => {
         failures.push(`expected tab bar "${tabBarSelector}" was not found in the DOM for a screen marked hasTabBar`);
@@ -294,7 +300,7 @@ async function auditOne(browser, { screen, viewport, origin, zoom }) {
       );
     }
     return { status: failures.length ? 'fail' : 'pass', failures };
-  } catch (error) {
+  } catch (error: any) {
     return { status: 'error', failures: [String(error?.message ?? error).split('\n')[0]] };
   } finally {
     await context.close();
@@ -304,7 +310,7 @@ async function auditOne(browser, { screen, viewport, origin, zoom }) {
 // Retries only an infra-flake ("error": a timeout/navigation hiccup), never
 // a genuine "fail" (an actual layout violation must never be silently
 // retried away).
-async function auditWithRetry(browser, args) {
+async function auditWithRetry(browser: any, args: { screen: ScreenDef; viewport: ViewportDef; origin: string; zoom: boolean }) {
   let result = await auditOne(browser, args);
   if (result.status === 'error') {
     console.log(`  (retrying ${args.screen.id} @ ${args.viewport.id} after: ${result.failures[0]})`);
@@ -361,7 +367,7 @@ async function main() {
   }
 }
 
-function report(screen, viewport, result) {
+function report(screen: ScreenDef, viewport: ViewportDef, result: { status: string; failures: string[] }) {
   const mark = result.status === 'pass' ? '✓' : '✗';
   console.log(`${mark} ${screen.id.padEnd(24)} ${viewport.id.padEnd(16)} ${result.status}${result.failures.length ? `  (${result.failures.length} issue${result.failures.length === 1 ? '' : 's'})` : ''}`);
 }
