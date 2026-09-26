@@ -26,7 +26,6 @@ import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSw
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 import { FollowerAvatarCard } from '@/components/inbox/FollowerAvatarCard';
 import { Button } from '@/components/ui/Button';
-import { IconButton } from '@/components/ui/IconButton';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import {
@@ -34,6 +33,7 @@ import {
   subscribePreviewTyping,
 } from '@/lib/previewInbox';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { TabPageHeader } from '@/components/layout/TabPageHeader';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
 // (see rippleEnabled on PressableScale/IconButton) — the translucent ripple
@@ -218,14 +218,6 @@ export default function InboxScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
-  // react-native-web doesn't fill in a real top safe-area inset (no notch/
-  // dynamic-island polyfill), so `insets.top` reads 0 on web and the header
-  // clipped under the dynamic island in a device-frame screenshot. Same
-  // fixed value Discover already uses for this (app/(buyer)/discover.tsx's
-  // `topPad`) — the buyer-wide header standardization (shared PageHeader)
-  // another session is landing should absorb this; keep it isolated here so
-  // that swap is a one-line change.
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
   // The buyer tab shell already centers route content in a max-width column
   // on wide/web viewports, so this only needs the ordinary phone gutter —
   // an extra centered-padding calculation here would double up with that
@@ -900,20 +892,13 @@ export default function InboxScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: SCREEN_BG }]}>
-      {/* Header — big bold large-title style, no back arrow */}
-      <View style={[s.header, { paddingTop: topPad + SP.sm, paddingHorizontal: gutter }]}>
-        <Text style={[s.headerTitle, { color: theme.text }]}>Messages</Text>
-        <IconButton
-          name="edit-3"
-          size={22}
-          variant="filled"
-          color={theme.text}
-          onPress={openCompose}
-          accessibilityLabel="New message"
-          rippleEnabled={NO_RIPPLE}
-          testID="inbox-header-compose"
-        />
-      </View>
+      <TabPageHeader
+        title="Messages"
+        gutter={gutter}
+        actions={[
+          { name: 'edit-3', onPress: openCompose, accessibilityLabel: 'New message', testID: 'inbox-header-compose' },
+        ]}
+      />
 
       {/* Search — always available, not gated behind a tab */}
       {!loading && (
@@ -1164,22 +1149,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   },
   composeAvatar: {
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
-  },
-
-  // Header — bold, large-title treatment (not a small centered header)
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: SP.md,
-    backgroundColor: 'transparent',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: FS.h1,
-    fontFamily: FONT.bold,
-    letterSpacing: -0.5,
-    textAlign: 'left',
   },
 
   // Instagram-Notes-style active-people rail (below search, above the tabs)

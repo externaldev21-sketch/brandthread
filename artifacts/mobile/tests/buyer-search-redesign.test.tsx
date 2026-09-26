@@ -207,6 +207,10 @@ vi.mock('@/components/layout', () => ({
   useGridColumns: () => 2,
 }));
 
+vi.mock('@/components/layout/TabPageHeader', () => ({
+  TabPageHeader: ({ title }: { title: string }) => React.createElement('View', { testID: 'tab-page-header' }, React.createElement('Text', {}, title)),
+}));
+
 vi.mock('@/contexts/BuyerSearchContext', () => ({
   useBuyerSearch: () => {
     const [, force] = React.useState(0);

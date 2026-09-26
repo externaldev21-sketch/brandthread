@@ -39,7 +39,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock } from '@/components/layout';
-import { ScreenHeader } from '@/components/ScreenHeader';
+import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { Button, ThemedRefreshControl } from '@/components/ui';
@@ -776,19 +776,13 @@ export default function ActivityCenterScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader
+      <TabPageHeader
         title="Activity"
-        rightElement={hasUnread ? (
-          <PressableScale
-            style={styles.markAllBtn}
-            onPress={() => { void handleMarkAll(); }}
-            accessibilityRole="button"
-            accessibilityLabel="Mark all activity as read"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Feather name="check" size={ICON.md} color={theme.accent} />
-          </PressableScale>
-        ) : undefined}
+        actions={hasUnread ? [{
+          name: 'check',
+          onPress: () => { void handleMarkAll(); },
+          accessibilityLabel: 'Mark all activity as read',
+        }] : []}
       />
 
       {status === 'loading' ? (
@@ -1011,13 +1005,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
   },
-  markAllBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
   skeletonWrap: {
     paddingHorizontal: SP.md,
     paddingTop: SP.md,
