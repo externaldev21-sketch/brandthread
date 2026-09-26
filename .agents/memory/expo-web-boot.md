@@ -36,3 +36,9 @@ Authenticated seller tools cannot treat this navigation bypass as a real Clerk s
 
 ## Debugging gotcha
 The Screenshot tool captures web pages before async boot completes (sub-second), so it shows the loading state even when the app works — it cannot observe anything time-based. Use the Playwright testing subagent to watch a page over tens of seconds (console timeline, network failures, final render). Verifying signed-in flows: Clerk programmatic login + seeding localStorage (`onboarding_complete`, `user_role`, `splash_seen`) reproduces any auth/role state.
+
+If Playwright is installed but its downloaded Chromium binary is missing, use the available system Chromium (`/repl/tools/bin/chromium`) as `executablePath` for read-only browser-console inspection instead of installing another browser.
+
+**Why:** The normal Playwright launch failed despite the package being present; the system binary opened the running Expo web preview and captured browser console messages.
+
+**How to apply:** Pass `executablePath` and `args: ['--no-sandbox']` to `chromium.launch` after confirming the system binary exists. Do not mistake a failed Playwright launch for an app startup failure.
