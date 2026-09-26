@@ -40,7 +40,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -61,6 +61,7 @@ import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { FeedGestureGuide } from '@/components/FeedGestureGuide';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
+import { getCachedFeedPosts, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
 import {
@@ -1347,27 +1348,17 @@ function SpotlightPage({
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTriggered = useRef(false);
-  /** Chrome entrance: the rail + bottom-info block settle in with a soft
-   * rise-and-fade whenever this page becomes the active cell (first mount,
-   * or swiping back to a previously-seen post), instead of appearing
-   * instantly — the small per-item "arrival" beat that makes swiping feel
-   * directed rather than like frames simply being swapped. Inactive cells
-   * hold their chrome fully visible with no motion so nothing pops mid-swipe. */
-  const chromeIn = useRef(new Animated.Value(isActive ? 1 : 0.001)).current;
-  const wasActive = useRef(isActive);
-  React.useEffect(() => {
-    if (isActive && !wasActive.current) {
-      chromeIn.setValue(0.001);
-      Animated.spring(chromeIn, { toValue: 1, useNativeDriver: true, speed: 15, bounciness: 6 }).start();
-    } else if (!isActive) {
-      chromeIn.setValue(1);
-    }
-    wasActive.current = isActive;
-  }, [isActive, chromeIn]);
-  const chromeStyle = {
-    opacity: chromeIn,
-    transform: [{ translateY: chromeIn.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-  };
+  // No entrance animation on the overlay chrome (rail + bottom-info block):
+  // it must move 1:1 with its own page as part of the same cell, exactly
+  // like the video does, with zero opacity/position animation when a cell
+  // becomes active — a previous "rise and fade in" spring keyed off
+  // `isActive` becoming true fired on every single swipe (every cell starts
+  // inactive, becomes active, that transition ran the spring every time),
+  // reading as the whole overlay bouncing in on every swipe instead of
+  // holding sturdy with the page. `chromeStyle` is now a plain, static,
+  // always-settled style — kept as a style object (not removed outright) so
+  // every call site below stays unchanged.
+  const chromeStyle = { opacity: 1 };
   const friendReposts = item.friendReposts ?? [];
   const hasRepostIdentity = engagement?.reposted === true || friendReposts.length > 0;
   const repostLabel = engagement?.reposted
@@ -1864,6 +1855,26 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
   };
 }
 
+/**
+ * Preview catalog products need a real multi-photo gallery to test the
+ * full-bleed swipeable carousel (product shots + "model photos"), not just
+ * the single video poster frame. Reuse the runway poster set — 3-5 images
+ * per product, cycled by an offset derived from the product id so different
+ * preview products don't all show the same sequence.
+ */
+function buildPreviewGalleryUris(item: SpotlightItem, productId: string): string[] {
+  const pool = FASHION_PREVIEW_POSTER_URIS;
+  if (pool.length === 0) return item.videoPosterUri ? [item.videoPosterUri] : [];
+  let seed = 0;
+  for (let i = 0; i < productId.length; i++) seed = (seed * 31 + productId.charCodeAt(i)) >>> 0;
+  const count = 3 + (seed % 3); // 3-5 images
+  const start = seed % pool.length;
+  const uris = Array.from({ length: count }, (_, i) => pool[(start + i) % pool.length]);
+  // Lead with this post's own poster so the first frame still matches the tag.
+  if (item.videoPosterUri && !uris.includes(item.videoPosterUri)) uris[0] = item.videoPosterUri;
+  return uris;
+}
+
 function buildPreviewShopProduct(
   item: SpotlightItem,
   tag: { productId: string; productName: string; priceCents: number },
@@ -1873,6 +1884,7 @@ function buildPreviewShopProduct(
     id: `${optionId}-${label.toLowerCase()}`,
     label,
   }));
+  const galleryUris = buildPreviewGalleryUris(item, tag.productId);
   return {
     id: tag.productId,
     sellerId: item.sellerId ?? `preview-seller-${item.id}`,
@@ -1881,7 +1893,7 @@ function buildPreviewShopProduct(
     name: tag.productName,
     description: item.caption.replace(/^Preview ·\s*/, ''),
     priceCents: tag.priceCents,
-    imageUris: item.videoPosterUri ? [item.videoPosterUri] : [],
+    imageUris: galleryUris,
     category: 'High Fashion',
     isPreOrder: false,
     cancellationPolicy: 'Preview item — no real order will be placed.',
@@ -1974,8 +1986,20 @@ export default function FeedScreen({
   const [cartCount, setCartCount] = useState(0);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [hasUnread, setHasUnread] = useState(false);
-  const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
-  const [feedLoading, setFeedLoading] = useState(true);
+  // Real TikTok never shows a placeholder/skeleton box over the feed. Seed
+  // the very first render from whatever we already have in memory for this
+  // tab (instant on a tab switch within the session) so there is a real post
+  // — poster included — on screen from frame one instead of an empty list
+  // that would otherwise need a loading state to cover. A cold app start has
+  // nothing in memory yet; `hydrateFeedPostsCache` below fills it in from
+  // AsyncStorage a beat later, still well before any skeleton would ever be
+  // justified, and with no placeholder shapes in between either way.
+  const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>(() => (
+    creatorSource && creatorId ? [] : getCachedFeedPosts<SpotlightItem>('for-you') ?? []
+  ));
+  const [feedLoading, setFeedLoading] = useState(() => (
+    creatorSource && creatorId ? true : (getCachedFeedPosts<SpotlightItem>('for-you') ?? []).length === 0
+  ));
   const [feedRefreshing, setFeedRefreshing] = useState(false);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [feedHasMore, setFeedHasMore] = useState(true);
@@ -2067,8 +2091,20 @@ export default function FeedScreen({
     feedHasMoreRef.current = true;
     setFeedHasMore(true);
     setFeedLoadingMore(false);
-    if (initial) setFeedLoading(true);
-    else setFeedRefreshing(true);
+    if (initial) {
+      setFeedLoading(true);
+      // No skeleton ever covers this — instead, show whatever we last saw
+      // for this tab (in memory instantly, or from AsyncStorage a beat
+      // later on a cold start) while the real page loads underneath it.
+      const cachedNow = getCachedFeedPosts<SpotlightItem>(loadKey);
+      if (cachedNow) {
+        setSellerFeedPosts(cachedNow);
+      } else {
+        void hydrateFeedPostsCache<SpotlightItem>(loadKey).then(cached => {
+          if (cached && feedLoadKeyRef.current === loadKey) setSellerFeedPosts(cached);
+        });
+      }
+    } else setFeedRefreshing(true);
     try {
       const page = await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
@@ -2077,6 +2113,7 @@ export default function FeedScreen({
         .map(mapSellerPost)
         .filter((p): p is SpotlightItem => p !== null);
       setSellerFeedPosts(mapped);
+      setCachedFeedPosts(loadKey, mapped);
       feedCursorRef.current = page.cursor;
       feedHasMoreRef.current = page.hasMore;
       setFeedHasMore(page.hasMore);
@@ -2689,11 +2726,6 @@ export default function FeedScreen({
         }
       }}
     >
-      {feedLoading && (
-        <FeedSkeleton
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
-        />
-      )}
       {viewportReady && <FlatList
         ref={feedListRef}
         // The creator player remounts once its videos load so it opens at the tapped one.
@@ -2702,9 +2734,11 @@ export default function FeedScreen({
         // Creator player opens at the tapped video (uniform page height via getItemLayout).
         initialScrollIndex={isCreatorFeed && creatorStartIndex > 0 && creatorStartIndex < displayItems.length ? creatorStartIndex : undefined}
         keyExtractor={item => item.id}
-        // Snap-per-page + bounded virtualization, shared with the LIVE pager
-        // (app/live.tsx) — see lib/feedPager.ts for why web renders every
-        // page up front and native keeps only ~the active page ±2 mounted.
+        // Snap-per-page + bounded virtualization + no overscroll bounce,
+        // shared with the LIVE pager (app/live.tsx) — see lib/feedPager.ts
+        // for why web renders every page up front, native keeps only ~the
+        // active page ±2 mounted, and native overscroll is disabled (a slow
+        // drag-then-release otherwise rubber-banded the whole page).
         {...verticalPagerListProps(pageHeight, displayItems.length)}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}

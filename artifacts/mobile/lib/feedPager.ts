@@ -11,6 +11,17 @@ export function verticalPagerListProps(pageHeight: number, itemCount: number) {
     disableIntervalMomentum: true,
     showsVerticalScrollIndicator: false,
     decelerationRate: 'fast' as const,
+    // A slow drag-then-release let the list rubber-band past the page
+    // boundary before paging snapped it back — on iOS that's the default
+    // vertical bounce, on Android the default overscroll glow/stretch, and
+    // on web (react-native-web) the equivalent elastic overshoot. Only the
+    // video itself should ever appear to move like that; the overlay chrome
+    // doesn't animate at all, so that snap-back read as the whole page —
+    // video and overlay together — bouncing. Disabling native overscroll
+    // makes every release, slow or fast, land exactly on the page boundary.
+    bounces: false,
+    alwaysBounceVertical: false,
+    overScrollMode: 'never' as const,
     // Bounds how many video players ever exist at once: the active page
     // plus roughly the next/previous 2 stay mounted (poster-first, so they
     // start instantly the moment they become active) — the rest are
