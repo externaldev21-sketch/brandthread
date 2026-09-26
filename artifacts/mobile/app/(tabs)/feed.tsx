@@ -2506,13 +2506,18 @@ export default function FeedScreen({
           TikTok-style small gradients only — a short one at the very top
           (behind the top bar) and a short one at the very bottom (behind the
           caption). Both are capped low enough that they never reach up into
-          the middle of the right action rail. The bottom scrim also stops
-          short of the rail's own column (right: 76 instead of full-width) —
-          it used to run edge to edge, which put its bottom, most-opaque
-          band directly over the repost/save/share icons and made only the
-          bottom half of the rail look faded/grey next to the untouched
-          heart/comment above it, even though every icon is the same solid
-          white. The rail needs zero scrim under it, not just a lighter one. */}
+          the middle of the right action rail.
+
+          The bottom scrim used to stop dead at a fixed inset (`right: 76`)
+          to keep it off the rail — but a gradient with a flat cut edge reads
+          as a hard-edged dark box/column sitting behind the rail rather than
+          legibility shading on the video, which is exactly the opposite of
+          the TikTok look (icons floating directly on the video with only a
+          drop shadow). Instead it's one diagonal gradient (bottom-left,
+          under the caption, to top-right, where the rail starts) — opacity
+          falls off continuously in both directions at once, so by the time
+          it reaches the rail's column it has already faded to nothing, with
+          no straight cut line anywhere. */}
       {isBuyerSurface && (
         <>
           <LinearGradient
@@ -2523,9 +2528,11 @@ export default function FeedScreen({
           />
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.22)', 'rgba(0,0,0,0.58)']}
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.55)']}
             locations={[0, 0.45, 1]}
-            style={[styles.bottomScrim, { height: bottomClearance + 130, right: 76 }]}
+            start={{ x: 1, y: 0 }}
+            end={{ x: 0.15, y: 1 }}
+            style={[styles.bottomScrim, { height: bottomClearance + 130 }]}
           />
         </>
       )}
