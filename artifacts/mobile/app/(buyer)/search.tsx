@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@clerk/expo';
 import { type SearchResult, type TrendingTerm, type SuggestedBrand, type SuggestedProduct, type SearchCategory } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
@@ -15,7 +16,7 @@ import { AnimatedEntrance, EmptyState } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { FONT, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
+import { FONT, GUTTER, GRID_MAX_WIDTH, GRAD_DARK_FADE } from '@/lib/theme';
 import { GridSkeleton, ResponsiveContainer, useGridColumns } from '@/components/layout';
 import { Chip, ListRow, SkeletonBlock, ThemedRefreshControl } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -742,16 +743,25 @@ export default function SearchScreen() {
                     ))}
                   </View>
                 ) : (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.brandCardRow}>
-                    {suggestedBrands.map((b) => (
-                      <BrandCard
-                        key={b.id}
-                        brand={b}
-                        width={128}
-                        onPress={() => goToBrand(b.sellerId)}
-                      />
-                    ))}
-                  </ScrollView>
+                  <View style={{ position: 'relative' }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.brandCardRow}>
+                      {suggestedBrands.map((b) => (
+                        <BrandCard
+                          key={b.id}
+                          brand={b}
+                          width={128}
+                          onPress={() => goToBrand(b.sellerId)}
+                        />
+                      ))}
+                    </ScrollView>
+                    <LinearGradient
+                      pointerEvents="none"
+                      colors={GRAD_DARK_FADE}
+                      start={{ x: 1, y: 0 }}
+                      end={{ x: 0, y: 0 }}
+                      style={styles.brandCardFade}
+                    />
+                  </View>
                 )}
               </AnimatedEntrance>
             )}
@@ -901,6 +911,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
   discoverRow: { paddingHorizontal: SCREEN_GUTTER },
   brandCardRow: { flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xxs },
+  brandCardFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 28 },
   filterBarRow: {
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SPACING.xs,
     paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.xs, paddingBottom: SPACING.sm,

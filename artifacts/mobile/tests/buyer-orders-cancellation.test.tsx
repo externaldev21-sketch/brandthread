@@ -51,6 +51,13 @@ vi.mock('react-native', () => {
   };
 });
 
+// The filter chip row's trailing fade uses LinearGradient, which calls
+// react-native's processColor internally — not present on this suite's
+// plain react-native mock above. Stub it like the other native-only mocks.
+vi.mock('expo-linear-gradient', () => ({
+  LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
+}));
+
 vi.mock('@clerk/expo', () => ({
   useAuth: () => ({ userId: 'buyer-1' }),
 }));
@@ -121,6 +128,7 @@ vi.mock('@/lib/theme', () => ({
   ORANGE_DIM: '#3F2A00',
   RED: '#F87171',
   RED_DIM: '#3F2020',
+  GRAD_DARK_FADE: ['rgba(10,10,11,0)', 'rgba(10,10,11,1)'],
   FONT: {
     regular: 'System',
     medium: 'System',
