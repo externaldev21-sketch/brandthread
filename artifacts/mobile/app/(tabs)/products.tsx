@@ -514,7 +514,7 @@ export default function ProductsScreen() {
   return (
     <View style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
       {/* ── Fixed header ── */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm, backgroundColor: palette.surface ?? BG, borderBottomColor: palette.border ?? BORDER }]}>
+      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? 67 : insets.top) + 12, backgroundColor: palette.surface ?? BG }]}>
         {/* Title row */}
         <View style={s.titleRow}>
           <PressableScale
@@ -683,8 +683,6 @@ const createStyles = (theme: any) => {
   // Header
   header: {
     backgroundColor: BG,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
     paddingBottom: 0,
   },
   titleRow: {
@@ -701,10 +699,10 @@ const createStyles = (theme: any) => {
     gap: 4,
   },
   titleText: {
-    fontSize: FS.xl,
+    fontSize: 20,
     fontFamily: FONT.bold,
     color: FG,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   titleActions: {
     flexDirection: 'row',

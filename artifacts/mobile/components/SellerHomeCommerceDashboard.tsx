@@ -569,7 +569,7 @@ export default function SellerHomeCommerceDashboard({
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
         style={styles.scrollView}
-        contentContainerStyle={[styles.scroll, { paddingTop: topInset + SP.sm }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />
@@ -772,15 +772,19 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingBottom: 160 },
   scrollEndMarker: { height: 1 },
 
+  // Matches the shared root-page Header's exact title/row treatment (Discover
+  // is the reference) — this title has to stay inside the scrolling content
+  // rather than move into a fixed <Header>, per the native device contract
+  // in tests/seller-dashboard-native-contract.test.ts that swipes the
+  // ScrollView and checks this exact testID marker's position moves.
   topBar: {
     minHeight: 44,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: SP.sm,
   },
   topBarAction: { width: 44, height: 44, marginRight: -SP.sm },
-  screenTitle: { fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.4 },
+  screenTitle: { fontFamily: FONT.bold, fontSize: 20, letterSpacing: -0.4 },
 
   heroSkeleton: { paddingTop: SP.md },
 

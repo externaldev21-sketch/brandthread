@@ -55,6 +55,7 @@ export function Header({
   scrollY,
   transparent = false,
   belowTitle,
+  rightElement,
 }: {
   title: string;
   subtitle?: string;
@@ -66,6 +67,13 @@ export function Header({
   transparent?: boolean;
   /** Extra chrome rendered directly under the title at the same gutter (search field, filter row) — root pages only. */
   belowTitle?: React.ReactNode;
+  /**
+   * A custom right-side accessory instead of plain icon `actions` — for the
+   * rare case a page needs something `actions` can't express (e.g. a badged
+   * notification bell). Root pages only; rendered where the plain icons
+   * would go, same size/position, so it still reads as "the same slot".
+   */
+  rightElement?: React.ReactNode;
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -80,7 +88,9 @@ export function Header({
       <View style={[rootStyles.wrap, { paddingTop: topPad, backgroundColor: transparent ? 'transparent' : theme.background }]}>
         <View style={rootStyles.row}>
           <Text numberOfLines={1} style={[rootStyles.title, { color: theme.text }]}>{title}</Text>
-          {actions.length > 0 && (
+          {rightElement ? (
+            <View style={rootStyles.actionsRow}>{rightElement}</View>
+          ) : actions.length > 0 && (
             <View style={rootStyles.actionsRow}>
               {actions.map((action) => (
                 <TouchableOpacity

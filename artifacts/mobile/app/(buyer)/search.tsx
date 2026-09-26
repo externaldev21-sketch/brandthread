@@ -633,12 +633,10 @@ export default function SearchScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
-      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page.
+          No subtitle, matching Discover (the header's reference design). */}
       <Header
         title="Search"
-        subtitle={trimmedQuery.length === 0
-          ? 'Brands, pieces and people on Brandthread'
-          : `Showing matches for "${trimmedQuery}"`}
         largeTitle
         showBack={false}
       />

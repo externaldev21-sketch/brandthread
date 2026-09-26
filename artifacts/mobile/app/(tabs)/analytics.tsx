@@ -343,8 +343,9 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
-      <Header title="Analytics" subtitle="Last 7 days" largeTitle showBack={false} />
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page.
+          No subtitle, matching Discover; the date range moved into the body as a section label. */}
+      <Header title="Analytics" largeTitle showBack={false} />
       <ScrollView
         ref={scrollResetRef}
         style={styles.scroll}
@@ -359,6 +360,7 @@ export default function AnalyticsScreen() {
         }
       >
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
+        <Text style={styles.rangeLabel}>Last 7 days</Text>
         {/* ── Summary stats ──────────────────────────────────────────────── */}
         <View style={styles.statsRow}>
           <StatCard label="Visits" value={summary.visits.toLocaleString()} changePct={summary.visitsChangePct} colors={colors} />
@@ -402,6 +404,8 @@ const styles = StyleSheet.create({
   dateBoxValue: { fontSize: 14, fontFamily: FONT.semibold, color: FG },
   dateSep:      { color: MUTED, fontFamily: FONT.medium, fontSize: FS.md },
   rangeNotice:  { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: -4, marginBottom: 14 },
+
+  rangeLabel:   { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: 10 },
 
   // Stats
   statsRow:     { flexDirection: 'row', gap: 8, marginBottom: 14 },

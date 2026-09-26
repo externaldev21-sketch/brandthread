@@ -196,7 +196,6 @@ export default function StudioScreen() {
           pill button, not a simple icon action. */}
       <Header
         title="Studio"
-        subtitle="Your creative workspace"
         largeTitle
         showBack={false}
         belowTitle={(

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Share } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -1096,7 +1096,7 @@ export default function OrdersScreen() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[s.root, { paddingTop: insets.top, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? 67 : insets.top) + 12, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
       {/* ── Fixed header ── */}
       <View style={s.header}>
         {/* Title row */}
@@ -1286,16 +1286,12 @@ const createStyles = (theme: any) => {
   // Header
   header: {
     backgroundColor: BG,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SP.md,
-    paddingTop: SP.sm,
-    paddingBottom: SP.sm,
     minHeight: 44,
   },
   titleBtn: {
@@ -1304,10 +1300,10 @@ const createStyles = (theme: any) => {
     gap: 4,
   },
   titleText: {
-    fontSize: FS.xl,
+    fontSize: 20,
     fontFamily: FONT.bold,
     color: FG,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   titleActions: {
     flexDirection: 'row',
