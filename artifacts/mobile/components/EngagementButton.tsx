@@ -270,9 +270,14 @@ export function EngagementButton({
 
   const displayIcon = active && activeIcon ? activeIcon : icon;
   const iconColor = active ? activeColor : inactiveColor;
+  // Same subtle drop shadow as the count label below it (ebStyles.count) —
+  // without it, thin-stroke glyphs like retweet/share read as washed-out
+  // outlines against bright footage even at full white/opacity 1, while
+  // bulkier glyphs like heart happen to still read fine unshadowed. Applying
+  // it to every rail icon keeps all five visually consistent.
   const iconNode = solidIcon
-    ? <FontAwesome name={solidIcon} size={iconSize} color={iconColor} />
-    : <Feather name={displayIcon} size={iconSize} color={iconColor} />;
+    ? <FontAwesome name={solidIcon} size={iconSize} color={iconColor} style={ebStyles.iconShadow} />
+    : <Feather name={displayIcon} size={iconSize} color={iconColor} style={ebStyles.iconShadow} />;
 
   const iconTransform: (
     | { scale: Animated.Value }
@@ -325,5 +330,8 @@ export function EngagementButton({
 const ebStyles = StyleSheet.create({
   btn: { alignItems: 'center', gap: 3 },
   count: { fontSize: FS.xs, fontFamily: FONT.semibold, textAlign: 'center' },
+  iconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
 });
 
