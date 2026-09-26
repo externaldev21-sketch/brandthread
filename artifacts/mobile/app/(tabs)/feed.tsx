@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
@@ -2038,7 +2039,7 @@ export default function FeedScreen({
   const handleOpenCreator = useCallback((item: SpotlightItem) => {
     if (!item.sellerId) return;
     if (creatorSource === 'creator' && creatorId && item.sellerId === creatorId && router.canGoBack()) {
-      router.back();
+      goBackOr(router);
       return;
     }
     // A creator wearing the LIVE ring opens straight into their stream.
@@ -2539,7 +2540,7 @@ export default function FeedScreen({
               activeOpacity={0.7}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                if (router.canGoBack()) router.back();
+                if (router.canGoBack()) goBackOr(router);
                 else router.replace('/' as never);
               }}
               accessibilityRole="button"

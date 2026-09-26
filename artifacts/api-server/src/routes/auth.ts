@@ -2,11 +2,15 @@ import { Router } from "express";
 import { clerkClient } from "@clerk/express";
 import {
   db, users, orders, orderItems, conversationParticipants, conversations, messages,
+  passwordResetCodes,
 } from "@workspace/db";
-import { eq, sql, inArray, or, asc } from "drizzle-orm";
+import { eq, sql, inArray, or, asc, desc } from "drizzle-orm";
+import crypto from "node:crypto";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import { awardLoyaltyPointsOnce } from "./loyalty";
 import { sendWelcomeEmail } from "../lib/brandthreadEmail";
+import { isMailerConfigured, sendPasswordResetEmail } from "../lib/mailer";
 import { getDeletionBlockers, hasDeletionConfirmation } from "../lib/accountDeletion";
 import { getAuth } from "@clerk/express";
 import { z } from "@workspace/api-zod";
@@ -63,6 +67,25 @@ const privacyBodySchema = z.object({
 const feedGesturesTipBodySchema = z.object({
   version: z.number().int().min(1),
 }).passthrough();
+const passwordResetRequestSchema = z.object({
+  email: requestPrimitives.email,
+}).passthrough();
+const passwordResetConfirmSchema = z.object({
+  email: requestPrimitives.email,
+  code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code."),
+  newPassword: z.string().min(1),
+}).passthrough();
+
+const PASSWORD_RESET_CODE_TTL_MS = 15 * 60_000;
+const MIN_PASSWORD_LENGTH = 8;
+
+function hashResetCode(code: string): string {
+  return crypto.createHash("sha256").update(code).digest("hex");
+}
+
+function generateResetCode(): string {
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
 
 // ─── Username validation ──────────────────────────────────────────────────────
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
@@ -573,7 +596,7 @@ router.patch("/onboarding", requireAuth, validateRequest({ body: onboardingBodyS
       .where(eq(users.username, uname))
       .limit(1);
     if (taken && taken.clerkId !== clerkUserId) {
-      res.status(409).json({ error: "Username is already taken." });
+      res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
       return;
     }
     updates.username = uname;
@@ -840,7 +863,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
         .where(eq(users.username, uname))
         .limit(1);
       if (taken && taken.clerkId !== clerkId) {
-        res.status(409).json({ error: "Username is already taken." });
+        res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
         return;
       }
       updates.username = uname;
@@ -974,5 +997,145 @@ router.get("/me", requireAuth, async (req, res) => {
   }
   res.json(user);
 });
+
+// ─── POST /api/auth/password-reset/request ──────────────────────────────────
+// Server-issued, Resend-backed forgot-password code (Clerk remains the
+// system of record for the credential itself — see /confirm below). Always
+// responds with the same generic shape whether or not the account exists, so
+// the endpoint can never be used to enumerate registered emails. The one
+// exception is when mail isn't configured at all: nothing was sent, so we
+// say so with a typed error rather than claim success.
+router.post(
+  "/password-reset/request",
+  rateLimit("authentication"),
+  validateRequest({ body: passwordResetRequestSchema }),
+  async (req, res) => {
+    const { email } = req.body as { email: string };
+
+    if (!isMailerConfigured()) {
+      req.log.warn(
+        "Password reset requested but RESEND_API_KEY is not set — no email was sent",
+      );
+      // 422, not 503/500: the request itself is fine and nothing failed on the
+      // server's end — mail is just not configured — so the mobile client's
+      // generic "server unavailable" banner (triggered for >=500) shouldn't
+      // fire; this screen shows its own inline copy for the typed code.
+      res.status(422).json({
+        error: "We can't send emails right now. Please try again shortly or contact support.",
+        code: "MAIL_NOT_CONFIGURED",
+      });
+      return;
+    }
+
+    try {
+      const list = await clerkClient.users.getUserList({ emailAddress: [email] });
+      const clerkUser = list.data[0];
+      if (clerkUser) {
+        const code = generateResetCode();
+        await db.insert(passwordResetCodes).values({
+          email,
+          clerkId: clerkUser.id,
+          codeHash: hashResetCode(code),
+          expiresAt: new Date(Date.now() + PASSWORD_RESET_CODE_TTL_MS),
+        });
+        const sent = await sendPasswordResetEmail({ to: email, code });
+        if (!sent) {
+          req.log.warn({ email }, "Password reset email failed to send after code was issued");
+        }
+      }
+    } catch (err) {
+      req.log.error({ err, email }, "Password reset request failed");
+      // Fall through to the generic response — never leak whether the
+      // failure was account-existence-related or a transient error.
+    }
+
+    res.json({
+      ok: true,
+      message: "If an account exists with that email, we sent a password reset code.",
+    });
+  },
+);
+
+// ─── POST /api/auth/password-reset/confirm ───────────────────────────────────
+// Verifies the caller's own hashed, single-use, 15-minute code, then — only
+// after that check passes — sets the new password through Clerk's backend
+// API. Clerk remains the sole holder of the credential; this route never
+// stores or compares a plaintext password against anything but Clerk.
+router.post(
+  "/password-reset/confirm",
+  rateLimit("authentication"),
+  validateRequest({ body: passwordResetConfirmSchema }),
+  async (req, res) => {
+    const { email, code, newPassword } = req.body as {
+      email: string;
+      code: string;
+      newPassword: string;
+    };
+
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      res.status(400).json({
+        error: `Use at least ${MIN_PASSWORD_LENGTH} characters.`,
+        code: "WEAK_PASSWORD",
+      });
+      return;
+    }
+
+    try {
+      const [latest] = await db
+        .select()
+        .from(passwordResetCodes)
+        .where(eq(passwordResetCodes.email, email))
+        .orderBy(desc(passwordResetCodes.createdAt))
+        .limit(1);
+
+      if (!latest || latest.usedAt) {
+        res.status(400).json({
+          error: "That code isn't valid. Request a new one.",
+          code: "INVALID_CODE",
+        });
+        return;
+      }
+      if (latest.expiresAt.getTime() < Date.now()) {
+        res.status(400).json({
+          error: "That code has expired. Request a new one.",
+          code: "CODE_EXPIRED",
+        });
+        return;
+      }
+      if (hashResetCode(code) !== latest.codeHash) {
+        res.status(400).json({
+          error: "That code isn't right. Check your email and try again.",
+          code: "INVALID_CODE",
+        });
+        return;
+      }
+
+      await clerkClient.users.updateUser(latest.clerkId, { password: newPassword });
+
+      // Marked used only after Clerk confirms the password change, guarded so
+      // a concurrent retry of the same code can't both report success.
+      const [claimed] = await db
+        .update(passwordResetCodes)
+        .set({ usedAt: new Date() })
+        .where(sql`${passwordResetCodes.id} = ${latest.id} AND ${passwordResetCodes.usedAt} IS NULL`)
+        .returning({ id: passwordResetCodes.id });
+      if (!claimed) {
+        res.status(400).json({
+          error: "That code isn't valid. Request a new one.",
+          code: "INVALID_CODE",
+        });
+        return;
+      }
+
+      res.json({ ok: true });
+    } catch (err) {
+      req.log.error({ err, email }, "Password reset confirmation failed");
+      res.status(502).json({
+        error: "We couldn't reset your password right now. Try again.",
+        code: "PASSWORD_RESET_FAILED",
+      });
+    }
+  },
+);
 
 export default router;

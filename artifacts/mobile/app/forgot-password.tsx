@@ -3,24 +3,26 @@
  * Steps: email → code + new password → done
  */
 import React, { useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator,
   ScrollView, StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSignIn } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useApi } from '@/lib/api';
+import { ApiError } from '@/lib/networkNotice';
 
 type Step = 'email' | 'code' | 'done';
 
 export default function ForgotPasswordScreen() {
-  const { signIn, fetchStatus } = useSignIn();
+  const api     = useApi();
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const { theme } = useAppTheme();
@@ -34,7 +36,7 @@ export default function ForgotPasswordScreen() {
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
 
-  const isFetching = fetchStatus === 'fetching' || loading;
+  const isFetching = loading;
 
   // ─── Send reset code ─────────────────────────────────────────────────────────
   async function handleSendCode() {
@@ -43,10 +45,7 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     setError('');
     try {
-      const { error: createError } = await signIn.create({ identifier: email.trim().toLowerCase() });
-      if (createError) { setError(mapError(createError)); return; }
-      const { error: sendError } = await signIn.resetPasswordEmailCode.sendCode();
-      if (sendError) { setError(mapError(sendError)); return; }
+      await api.auth.requestPasswordReset(email.trim().toLowerCase());
       setStep('code');
     } catch (e: any) {
       setError(mapError(e));
@@ -62,10 +61,11 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     setError('');
     try {
-      const { error: verifyError } = await signIn.resetPasswordEmailCode.verifyCode({ code });
-      if (verifyError) { setError("That code isn't right. Check your email and try again."); return; }
-      const { error: submitError } = await signIn.resetPasswordEmailCode.submitPassword({ password });
-      if (submitError) { setError(mapError(submitError)); return; }
+      await api.auth.confirmPasswordReset({
+        email: email.trim().toLowerCase(),
+        code,
+        newPassword: password,
+      });
       setStep('done');
     } catch (e: any) {
       setError(mapError(e));
@@ -93,7 +93,7 @@ export default function ForgotPasswordScreen() {
               style={s.backBtn}
               onPress={() => {
                 Haptics.selectionAsync();
-                step === 'code' ? setStep('email') : router.back();
+                step === 'code' ? setStep('email') : goBackOr(router, '/sign-in');
               }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
@@ -157,7 +157,7 @@ export default function ForgotPasswordScreen() {
 
               <TouchableOpacity
                 style={s.secondaryBtn}
-                onPress={() => { Haptics.selectionAsync(); router.back(); }}
+                onPress={() => { Haptics.selectionAsync(); goBackOr(router, '/sign-in'); }}
                 activeOpacity={0.85}
               >
                 <Text style={s.secondaryBtnText}>Back to sign in</Text>
@@ -298,33 +298,34 @@ export default function ForgotPasswordScreen() {
 // ─── Error mapper ─────────────────────────────────────────────────────────────
 function mapError(err: any): string {
   if (!err) return '';
+
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case 'MAIL_NOT_CONFIGURED':
+        return "We couldn't send that email right now. Please try again shortly or contact support.";
+      case 'INVALID_CODE':
+        return "That code isn't right. Check your email and try again.";
+      case 'CODE_EXPIRED':
+        return 'Code expired. Request a new one.';
+      case 'WEAK_PASSWORD':
+        return 'Use at least 8 characters.';
+      case 'RATE_LIMITED':
+        return 'Too many attempts. Please wait a moment.';
+      case 'timeout':
+        return "Couldn't connect. Check your internet and try again.";
+      default:
+        return err.message?.replace(/^API \d+: /, '') || 'Something went wrong. Please try again.';
+    }
+  }
+
   const inner = err?.errors?.[0] ?? err;
   const code  = (inner?.code ?? '').toLowerCase();
   const msg   = (inner?.message ?? inner?.longMessage ?? err?.message ?? '').toLowerCase();
 
-  if (code === 'form_identifier_not_found')
-    return 'No account found with that email address.';
-  if (code === 'form_code_incorrect')
-    return 'Invalid code. Please check and try again.';
-  if (code === 'verification_expired')
-    return 'Code expired. Request a new one.';
-  if (code === 'form_password_pwned' || code === 'form_password_strength_insufficient')
-    return 'This password is too common. Choose a stronger one.';
-  if (code === 'form_password_length_too_short')
-    return 'Use at least 8 characters.';
-  if (code === 'request_rate_limited')
-    return 'Too many attempts. Please wait a moment.';
   if (code === 'network_failure' || code === 'request_timeout')
     return "Couldn't connect. Check your internet and try again.";
-
-  if (msg.includes('no user') || msg.includes('not found'))
-    return 'No account found with that email address.';
-  if (msg.includes('incorrect') || (msg.includes('code') && msg.includes('invalid')))
-    return 'Invalid code. Please check and try again.';
-  if (msg.includes('expired'))
-    return 'Code expired. Request a new one.';
-  if (msg.includes('weak') || msg.includes('pwned'))
-    return 'Choose a stronger password.';
+  if (msg.includes('network'))
+    return "Couldn't connect. Check your internet and try again.";
 
   return inner?.message || err?.message || 'Something went wrong. Please try again.';
 }

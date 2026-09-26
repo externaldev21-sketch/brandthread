@@ -17,6 +17,7 @@ import { ThreadDraw } from '@/components/onboarding/ThreadLine';
 import { PillButton, Reveal, StepHeadline } from '@/components/onboarding/OnboardingUI';
 import { BG, BORDER, CARD, FG, FONT, FS, MUTED, SP, SUBTLE } from '@/lib/theme';
 import { BRANDTHREAD_ORIGIN } from '@/lib/shareProfile';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 function portalJoinUrl(token?: string) {
   const origin = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/+$/, '') || BRANDTHREAD_ORIGIN;
@@ -31,7 +32,7 @@ export default function ManufacturerOnboardScreen() {
 
   return (
     <View style={s.screen}>
-    <Header title="Manufacturer signup" onBack={() => (router.canGoBack() ? router.back() : router.replace('/' as never))} />
+    <Header title="Manufacturer signup" onBack={() => (router.canGoBack() ? goBackOr(router) : router.replace('/' as never))} />
     <View style={[s.root, { paddingTop: SP.md, paddingBottom: insets.bottom + SP.md }]}>
       <View style={s.body}>
         <View style={s.hero}>

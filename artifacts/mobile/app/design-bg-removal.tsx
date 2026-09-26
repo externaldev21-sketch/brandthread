@@ -12,6 +12,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image, Modal, FlatList,
@@ -539,7 +540,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity style={s.backBtn} onPress={() => goBackOr(router)} activeOpacity={0.7}>
           <Feather name="arrow-left" size={ICON.sm} color={FG} />
         </TouchableOpacity>
         <View style={s.headerText}>

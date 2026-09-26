@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image, Animated, Dimensions,
@@ -266,7 +267,7 @@ export default function UploadSketchScreen() {
   // ─── Upload step ──────────────────────────────────────────────────────────────
   return (
     <BrandthreadScreen>
-      <BrandthreadHeader title="Upload Sketch" onBack={() => router.back()} />
+      <BrandthreadHeader title="Upload Sketch" onBack={() => goBackOr(router)} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={s.content}

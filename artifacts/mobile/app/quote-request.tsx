@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
   Switch, KeyboardAvoidingView, Platform,
@@ -268,15 +269,15 @@ export default function QuoteRequestScreen() {
 
   function handleExit() {
     Alert.alert('Exit quote request?', 'Your progress will be auto-saved as a draft.', [
-      { text: 'Save & Exit', onPress: () => router.back() },
-      { text: 'Discard', style: 'destructive', onPress: () => router.back() },
+      { text: 'Save & Exit', onPress: () => goBackOr(router) },
+      { text: 'Discard', style: 'destructive', onPress: () => goBackOr(router) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
   function handleSaveDraft() {
     Alert.alert('Draft saved', 'You can resume this quote request from the Manufacturer Hub.');
-    router.back();
+    goBackOr(router);
   }
 
   const stepTitles = needsPicker ? ['Choose Manufacturer', ...STEP_TITLES] : STEP_TITLES;
@@ -342,7 +343,7 @@ export default function QuoteRequestScreen() {
       Alert.alert(
         'Quote Request Sent! 🎉',
         'Your request has been submitted. The manufacturer will respond within their stated response time.',
-        [{ text: 'OK', onPress: () => router.back() }]
+        [{ text: 'OK', onPress: () => goBackOr(router) }]
       );
     } catch {
       Alert.alert('Could not submit quote', 'Please try again.');

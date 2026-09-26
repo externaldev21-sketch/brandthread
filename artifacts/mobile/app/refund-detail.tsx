@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, StyleSheet, Alert, Switch, TouchableOpacity,
 } from 'react-native';
@@ -177,7 +178,7 @@ export default function RefundDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
-      <BrandthreadHeader title="Issue Refund" onBack={() => router.back()} />
+      <BrandthreadHeader title="Issue Refund" onBack={() => goBackOr(router)} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

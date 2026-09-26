@@ -17,6 +17,7 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View,
   Text,
@@ -702,7 +703,7 @@ export default function AiBrainScreen() {
         <View style={[styles.header, { paddingTop: insets.top }]}>
           <TouchableOpacity
             style={styles.headerBtn}
-            onPress={() => router.back()}
+            onPress={() => goBackOr(router)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Feather name="x" size={20} color={colors.text} />

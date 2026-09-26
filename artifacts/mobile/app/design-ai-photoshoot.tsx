@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Dimensions, Image, Modal, FlatList,
@@ -303,7 +304,7 @@ export default function AIPhotoshootScreen() {
 
   function goBack() {
     if (step > 1) setStep((step - 1) as Step);
-    else router.back();
+    else goBackOr(router);
   }
 
   function goNext() {

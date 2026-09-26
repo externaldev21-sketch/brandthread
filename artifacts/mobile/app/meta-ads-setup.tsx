@@ -12,6 +12,7 @@
  * editing an existing draft/rejected campaign.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
   ActivityIndicator, TextInput,
@@ -345,7 +346,7 @@ export default function MetaAdsSetupScreen() {
   if (!connected) {
     return (
       <BrandthreadScreen>
-        <BrandthreadHeader title="Run a Meta ad" onBack={() => router.back()} />
+        <BrandthreadHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
         <EmptyState
           icon="link"
           title="Connect Meta first"
@@ -370,7 +371,7 @@ export default function MetaAdsSetupScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <BrandthreadHeader title="Run a Meta ad" onBack={() => router.back()} />
+      <BrandthreadHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 110, gap: SP.xl }}

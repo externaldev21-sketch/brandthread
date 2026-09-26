@@ -12,6 +12,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getIncoming, createIncoming, updateIncomingStatus, receiveIncoming, getInventoryItems, getLocations } from '@/services/inventoryService';
 import { IncomingInventory, IncomingStatus, InventoryItem, InventoryLocation } from '@/services/inventoryTypes';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -268,7 +269,7 @@ export default function IncomingInventoryScreen() {
       <View style={[s.root, { paddingTop: insets.top }]}>
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtn}>
             <Feather name="arrow-left" size={ICON.md} color={FG} />
           </TouchableOpacity>
           <Text style={s.headerTitle}>Incoming Inventory</Text>

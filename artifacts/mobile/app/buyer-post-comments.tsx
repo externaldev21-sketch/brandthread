@@ -21,6 +21,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Modal, Pressable, PanResponder,
   KeyboardAvoidingView, Platform, StyleSheet, Animated, Keyboard, useWindowDimensions,
@@ -31,7 +32,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import {
-  SURFACE, CARD, CARD_ELEVATED, BORDER,
+  SURFACE, CARD, BORDER,
   FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -159,7 +160,7 @@ const csk = StyleSheet.create({
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
-function Avatar({ uri, initials, size = 38 }: { uri?: string | null; initials: string; size?: number }) {
+function Avatar({ uri, initials, size = 38, ring = true }: { uri?: string | null; initials: string; size?: number; ring?: boolean }) {
   const { theme } = useAppTheme();
   if (uri) {
     return <CachedImage source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" />;
@@ -167,7 +168,7 @@ function Avatar({ uri, initials, size = 38 }: { uri?: string | null; initials: s
   return (
     <View style={{
       width: size, height: size, borderRadius: size / 2, backgroundColor: theme.cardElevated,
-      borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center',
+      borderWidth: ring ? 1 : 0, borderColor: theme.border, alignItems: 'center', justifyContent: 'center',
     }}>
       <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: size > 34 ? FS.xs : 10 }}>{initials}</Text>
     </View>
@@ -215,7 +216,7 @@ function LikeHeart({
       accessibilityLabel={accessibilityLabel}
     >
       <Animated.View style={[s.commentLikeIconWrap, { transform: [{ scale: pop }] }]}>
-        <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? theme.error : MUTED} />
+        <Ionicons name={liked ? 'heart' : 'heart-outline'} size={16} color={liked ? theme.error : MUTED} />
       </Animated.View>
       {count > 0 && (
         <Text style={[s.actionLabel, liked && { color: theme.error }]}>{count}</Text>
@@ -296,8 +297,12 @@ function CommentRow({
           ) : null}
         </PressableScale>
 
-        {/* Time / Reply / Like sit on one shared row so they share a single
-            baseline, left-aligned under the comment text above. */}
+        {/* Time and Reply are two plain-text-height children of the same
+            centered flex row — no per-item padding/margin, no minHeight box
+            around either one — so they land on one shared baseline instead
+            of Reply floating above Time inside its own tall tap target.
+            There's no "···" here: long-press on the comment content above
+            opens the same options menu. */}
         <View style={s.commentMeta}>
           <Text style={s.commentTime}>{isPending ? 'Posting…' : shortRelativeTime(comment.createdAt)}</Text>
           {!isPending && !comment.pendingReview && (
@@ -305,28 +310,19 @@ function CommentRow({
               <Text style={s.replyLabel}>Reply</Text>
             </PressableScale>
           )}
-          {!isPending && (
-            <PressableScale
-              style={s.moreBtn}
-              onPress={() => { hapticLight(); onMore(comment); }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel={`More options for ${comment.author.name}'s comment`}
-            >
-              <Feather name="more-horizontal" size={16} color={MUTED} />
-            </PressableScale>
-          )}
-          <View style={{ flex: 1 }} />
-          {!isPending && !comment.pendingReview && (
-            <LikeHeart
-              liked={comment.likedByMe}
-              count={comment.likesCount}
-              onPress={() => onLike(comment)}
-              accessibilityLabel={`${comment.likedByMe ? 'Unlike' : 'Like'} comment`}
-            />
-          )}
         </View>
       </View>
+
+      {/* The heart sits in its own right-hand column, top-aligned a few
+          points below the username — not sunk down to the meta row. */}
+      {!isPending && !comment.pendingReview && (
+        <LikeHeart
+          liked={comment.likedByMe}
+          count={comment.likesCount}
+          onPress={() => onLike(comment)}
+          accessibilityLabel={`${comment.likedByMe ? 'Unlike' : 'Like'} comment`}
+        />
+      )}
     </View>
   );
 }
@@ -349,6 +345,7 @@ function ViewRepliesButton({ count, expanded, onToggle }: { count: number; expan
       <Text style={s.viewRepliesText}>
         {expanded ? 'Hide replies' : `View ${count} ${count === 1 ? 'reply' : 'replies'}`}
       </Text>
+      <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={12} color={MUTED} />
     </PressableScale>
   );
 }
@@ -561,7 +558,7 @@ export default function BuyerPostCommentsScreen() {
       },
       onPanResponderRelease: (_evt, gesture) => {
         if (gesture.dy > DISMISS_THRESHOLD || gesture.vy > 1.2) {
-          Animated.timing(dragY, { toValue: windowHeight, duration: 180, useNativeDriver: true }).start(() => router.back());
+          Animated.timing(dragY, { toValue: windowHeight, duration: 180, useNativeDriver: true }).start(() => goBackOr(router));
         } else {
           Animated.spring(dragY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
         }
@@ -964,7 +961,7 @@ export default function BuyerPostCommentsScreen() {
       <PressableScale
         style={s.backdrop}
         activeOpacity={1}
-        onPress={() => { hapticLight(); router.back(); }}
+        onPress={() => { hapticLight(); goBackOr(router); }}
         accessibilityRole="button"
         accessibilityLabel="Close comments"
       />
@@ -988,12 +985,12 @@ export default function BuyerPostCommentsScreen() {
             </Text>
             <PressableScale
               style={s.headerSide}
-              onPress={() => { hapticLight(); router.back(); }}
+              onPress={() => { hapticLight(); goBackOr(router); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel="Close comments"
             >
-              <Feather name="x" size={22} color={FG} />
+              <Feather name="x" size={20} color={FG} />
             </PressableScale>
           </View>
 
@@ -1109,6 +1106,9 @@ export default function BuyerPostCommentsScreen() {
             </View>
           ) : (
             <>
+              {/* Bare emoji, evenly spaced across the full width, no chip
+                  backgrounds — TikTok's quick-reaction row sits directly
+                  above the composer with nothing else around each glyph. */}
               <View style={s.emojiRow}>
                 {QUICK_EMOJI.map(emoji => (
                   <PressableScale
@@ -1121,17 +1121,18 @@ export default function BuyerPostCommentsScreen() {
                     }}
                     accessibilityRole="button"
                     accessibilityLabel={`Add ${emoji}`}
+                    rippleEnabled={false}
                   >
-                    <AppleEmoji emoji={emoji} size={20} />
+                    <AppleEmoji emoji={emoji} size={24} />
                   </PressableScale>
                 ))}
               </View>
-              {/* TikTok's composer: a slim pill (avatar left, @ + emoji tools
-                  inside the pill on the right), growing up to ~4 lines as you
-                  type — never the old full-width boxy text field. The send
+              {/* TikTok's composer: a slim 36pt pill (avatar left, @ + emoji
+                  tools inside the pill on the right), growing up to ~4 lines
+                  as you type — never a boxy full-height field. The send
                   arrow only exists once there's something to send. */}
               <View style={s.inputRow}>
-                <Avatar uri={myAvatar} initials={myInitials} size={36} />
+                <Avatar uri={myAvatar} initials={myInitials} size={28} ring={false} />
                 <View style={s.inputShell}>
                   <TextInput
                     ref={inputRef}
@@ -1151,7 +1152,7 @@ export default function BuyerPostCommentsScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Emoji"
                   >
-                    <Feather name="smile" size={17} color={MUTED} />
+                    <Feather name="smile" size={18} color={MUTED} />
                   </PressableScale>
                   <PressableScale
                     style={s.inputTool}
@@ -1163,7 +1164,7 @@ export default function BuyerPostCommentsScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Mention someone"
                   >
-                    <Text style={s.mentionIcon}>@</Text>
+                    <Text style={[s.mentionIcon, { fontSize: 18, lineHeight: 20 }]}>@</Text>
                   </PressableScale>
                 </View>
                 {inputText.trim().length > 0 || sending || justSent ? (
@@ -1250,12 +1251,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   commentRowPending: { opacity: 0.6 },
   commentBody: { flex: 1, minWidth: 0 },
   commentHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: 3 },
-  authorName: { fontFamily: FONT.medium, fontSize: 13, color: MUTED, flexShrink: 1 },
+  authorName: { fontFamily: FONT.semibold, fontSize: 13, color: '#8a8a8a', flexShrink: 1 },
   creatorBadge: { fontFamily: FONT.semibold, fontSize: 13 },
   replyContext: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginBottom: 2 },
-  commentTime: { fontFamily: FONT.regular, fontSize: 12, color: SUBTLE },
+  commentTime: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },
   pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE, marginLeft: 2 },
-  commentText: { fontFamily: FONT.medium, fontSize: 14, color: FG, lineHeight: 19 },
+  commentText: { fontFamily: FONT.regular, fontSize: 14, color: FG, lineHeight: 19 },
   commentTextHeld: { color: MUTED },
   reviewPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
@@ -1266,21 +1267,27 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   creatorLikedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
   creatorLikedText: { fontFamily: FONT.semibold, fontSize: 11 },
   commentContentPress: { alignItems: 'flex-start' },
+  // Time and Reply are both plain, unpadded, same-size/same-lineHeight
+  // children of one centered row — no minHeight tap-target box around
+  // either one, which is what used to float Reply above Time.
   commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 5 },
-  replyBtn: { paddingVertical: 2, paddingRight: SP.xs },
-  moreBtn: { paddingVertical: 2, paddingHorizontal: 2 },
-  // No overflow:hidden anywhere in this chain, and the icon wrap is taller
-  // than the glyph itself, so the like-pop spring (which briefly scales past
-  // 1.0) always has headroom instead of getting its top clipped.
-  commentLike: { minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  commentLikeIconWrap: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { fontFamily: FONT.regular, fontSize: 12, color: MUTED, textAlign: 'center' },
-  replyLabel: { fontFamily: FONT.medium, fontSize: 12, color: MUTED },
+  replyBtn: { justifyContent: 'center' },
+  replyLabel: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },
+  // Its own right-hand column, top-aligned ~4pt below the username line
+  // (header line-height ~16 + 3pt header margin + 4pt gap), never sunk down
+  // to the meta row. No overflow:hidden anywhere in this chain, and the icon
+  // wrap is taller than the glyph itself, so the like-pop spring (which
+  // briefly scales past 1.0) always has headroom instead of getting clipped.
+  commentLike: {
+    width: 28, marginTop: 23, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 2,
+  },
+  commentLikeIconWrap: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { fontFamily: FONT.regular, fontSize: 11, color: MUTED, textAlign: 'center' },
   viewRepliesRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingLeft: SP.md + 48, paddingVertical: 8, minHeight: 32,
+    paddingLeft: SP.md + 48, marginTop: 6, paddingVertical: 4, minHeight: 28,
   },
-  viewRepliesLine: { width: 24, height: 1, backgroundColor: BORDER },
+  viewRepliesLine: { width: 20, height: 1, backgroundColor: '#3a3a3a' },
   viewRepliesText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED },
 
   toast: {
@@ -1290,10 +1297,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   toastText: { color: theme.onAccent, fontFamily: FONT.semibold, fontSize: FS.xs },
 
-  // Input
+  // Input — 8pt vertical padding plus the safe area (applied via insets at
+  // the call site), never a fixed larger pad.
   inputWrap: {
     borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: CARD,
-    paddingTop: 6, paddingHorizontal: 12,
+    paddingTop: 8, paddingHorizontal: 12,
   },
   sendErrorBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -1316,25 +1324,24 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   replyingName: { fontFamily: FONT.semibold },
   lockedComposer: { minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingVertical: SP.sm },
   lockedText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
-  emojiRow: { flexDirection: 'row', gap: 6, paddingBottom: 8 },
-  emojiBtn: {
-    width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: CARD_ELEVATED,
-  },
-  emojiText: { fontSize: 17 },
+  // Bare emoji evenly spaced across the full width — no chip circle, no
+  // background — sitting directly above the composer.
+  emojiRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingBottom: 10 },
+  emojiBtn: { alignItems: 'center', justifyContent: 'center' },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingBottom: 6 },
-  // TikTok's composer pill: single-line height 36-40, radius 20, a subtle
-  // dark fill and no heavy border — never the old boxy full-height field.
+  // TikTok's composer pill: 36pt tall at rest, 18pt radius, a flat dark fill
+  // and no border at all — never the old boxy full-height field. Still
+  // allowed to grow (up to ~4 lines) as you type past one line.
   inputShell: {
-    flex: 1, minHeight: 38, maxHeight: 94, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1f1f1f', borderRadius: 20, paddingLeft: 14, paddingRight: 4,
+    flex: 1, minHeight: 36, maxHeight: 96, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#262626', borderRadius: 18, paddingLeft: 14, paddingRight: 4,
   },
   input: {
-    flex: 1, paddingHorizontal: 0, paddingVertical: 9, fontFamily: FONT.regular,
-    fontSize: 15, color: FG, maxHeight: 86, minHeight: 20,
+    flex: 1, paddingHorizontal: 0, paddingVertical: 0, fontFamily: FONT.regular,
+    fontSize: 14, lineHeight: 18, color: FG, maxHeight: 76, minHeight: 18,
   },
-  inputTool: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  mentionIcon: { color: MUTED, fontFamily: FONT.bold, fontSize: 19, lineHeight: 21 },
+  inputTool: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  mentionIcon: { color: MUTED, fontFamily: FONT.bold, fontSize: 18, lineHeight: 20 },
 
   // Actions sheet
   sheetScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.55)' }, // theme-exempt: matches components/ui/BottomSheet.tsx's backdrop

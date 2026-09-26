@@ -7,6 +7,7 @@
  * pause/resume, edit budget, duplicate actions.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
   ActivityIndicator, RefreshControl, Modal, TextInput, Platform,
@@ -149,7 +150,7 @@ export default function MetaAdsManageScreen() {
   if (!connected) {
     return (
       <BrandthreadScreen>
-        <BrandthreadHeader title="Meta Ads" onBack={() => router.back()} />
+        <BrandthreadHeader title="Meta Ads" onBack={() => goBackOr(router)} />
         <EmptyState
           icon="link"
           title="Connect Meta to run ads"
@@ -165,7 +166,7 @@ export default function MetaAdsManageScreen() {
     <BrandthreadScreen>
       <BrandthreadHeader
         title="Meta Ads"
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
         rightElement={<IconButton name="plus" accessibilityLabel="New campaign" onPress={() => router.push('/meta-ads-setup')} />}
       />
       <ScrollView

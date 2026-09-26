@@ -790,6 +790,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{ available: boolean; error?: string }>(
           `/api/auth/username/check?username=${encodeURIComponent(username)}`
         ),
+      /** Same check, usable before sign-up completes (no session yet) —
+       *  the onboarding auth step picks a username before a Clerk account
+       *  exists, so it can't call the authenticated variant above. */
+      checkUsernamePublic: (username: string) =>
+        get<{ available: boolean; error?: string }>(
+          `/api/public/username-check?username=${encodeURIComponent(username)}`
+        ),
       /** Update editable profile fields. username must be letters/numbers/underscores, 3-30 chars. */
       updateProfile: (body: {
         displayName?: string;
@@ -823,6 +830,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       ),
       /** Everything deletion removes/retains, plus anything that must be settled first. */
       deletionCheck: () => freshGet<AccountDeletionCheck>('/api/auth/account/deletion-check'),
+      /** Send a branded, server-issued (Resend) 6-digit password reset code.
+       *  Always resolves — the response is a generic "if an account exists…"
+       *  shape so it never reveals whether the email is registered — except
+       *  when mail isn't configured at all, which throws ApiError with
+       *  code "MAIL_NOT_CONFIGURED". No auth token is required or sent. */
+      requestPasswordReset: (email: string) =>
+        post<{ ok: true; message: string }>('/api/auth/password-reset/request', { email }),
+      /** Verifies the code server-side (hashed, single-use, 15-minute expiry)
+       *  then sets the new password through Clerk. No auth token required. */
+      confirmPasswordReset: (body: { email: string; code: string; newPassword: string }) =>
+        post<{ ok: true }>('/api/auth/password-reset/confirm', body),
       /** Record agreement to the Terms, Community Guidelines and Privacy Policy version shown. */
       acceptLegal: (version: string) =>
         post<{ termsVersion: string; termsAcceptedAt: string }>('/api/auth/legal-acceptance', { version }),

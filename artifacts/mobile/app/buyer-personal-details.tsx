@@ -15,6 +15,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { FONT } from '@/lib/theme';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 /** Fields stored in BuyerProfileFields — everything editable is persisted. */
 type PersistedKey = keyof Omit<BuyerProfileFields, 'aiCreator' | 'avatarUri'>;
@@ -94,7 +95,7 @@ export default function BuyerPersonalDetails() {
       saveBuyerProfile(fields),
       Object.keys(socialPatch).length > 0 ? updateMyProfile(socialPatch) : Promise.resolve(),
     ]);
-    router.back();
+    goBackOr(router);
   }
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
