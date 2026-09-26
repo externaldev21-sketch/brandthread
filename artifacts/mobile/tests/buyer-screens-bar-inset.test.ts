@@ -43,10 +43,16 @@ describe('buyer Home feed behind the bar', () => {
     // line all key off one shared number with no gap between them.
     expect(feed).toContain('? buyerBarInset\n    : Math.max(previewBottomInset, 8) + 14;');
     expect(feed).toContain('immersive={isBuyerSurface}');
-    // Rail, caption and shop tag all anchor to the same clearance.
-    expect(feed).toContain('styles.rail, chromeStyle, { bottom: bottomClearance }');
-    expect(feed).toContain('{ bottom: bottomClearance }]} pointerEvents="box-none"');
+    // The shop tag anchors to bare bottomClearance (it sits well above the
+    // scrub bar regardless). The rail and caption block anchor to
+    // bottomClearance *plus* their own extra gap constants instead — bare
+    // bottomClearance is where the scrub/progress bar itself sits, so both
+    // used to end up touching/overlapping it with zero gap.
+    expect(feed).toContain('styles.rail, chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }');
+    expect(feed).toContain('{ bottom: bottomClearance + CAPTION_BOTTOM_GAP }]} pointerEvents="box-none"');
     expect(feed).toContain('bottom: bottomClearance + (hasRepostIdentity ? 158 : 122)');
+    expect(feed).toContain('const RAIL_BOTTOM_GAP = 22;');
+    expect(feed).toContain('const CAPTION_BOTTOM_GAP = 18;');
     // The scrub line sits exactly at the seam where the sharp video is
     // clipped and the blurred tab-bar strip begins — no offset gap.
     expect(feed).toContain('progressBottom={immersive ? bottomClearance : undefined}');

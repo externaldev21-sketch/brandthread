@@ -268,7 +268,14 @@ const styles = StyleSheet.create({
     fontSize: 15, lineHeight: 18,
     textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
+  // `left: 0` is load-bearing, not decorative: on web, an absolutely
+  // positioned flex child with no inset (left/right/top/bottom) of its own
+  // takes its *static* position from the parent's justify-content (here,
+  // `underlineRoot`'s `center`) before any transform is applied — so without
+  // this, translateX was being added on top of an already-centered position
+  // instead of measured from the container's left edge, landing the
+  // underline under the search icon instead of under the active tab.
   underlineBar: {
-    position: 'absolute', bottom: -6, height: 3, borderRadius: RADII.pill, backgroundColor: '#FFFFFF',
+    position: 'absolute', left: 0, bottom: -6, height: 3, borderRadius: RADII.pill, backgroundColor: '#FFFFFF',
   },
 });
