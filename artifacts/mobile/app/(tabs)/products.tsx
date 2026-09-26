@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -546,7 +547,7 @@ export default function ProductsScreen() {
               variant="plain"
               size={ICON.md}
               color={FG}
-              onPress={() => Alert.alert('Products', 'Choose an action', [
+              onPress={() => showActionSheet('Products', 'Choose an action', [
                 { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
                 { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
                 { text: 'Export products', onPress: () => { void handleExportProducts(); } },

@@ -5,6 +5,7 @@
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -958,9 +959,9 @@ export default function OrdersScreen() {
   }, [orders, ordersOwnerId, userId]);
 
   const handleMoreMenu = useCallback(() => {
-    Alert.alert('Orders', 'Choose an action', [
+    showActionSheet('Orders', 'Choose an action', [
       { text: 'Export CSV', onPress: handleExportCsv },
-      { text: 'Bulk Actions', onPress: () => Alert.alert('Bulk', 'Long-press orders to select.') },
+      { text: 'Bulk Actions', onPress: () => showActionSheet('Bulk', 'Long-press orders to select.', [{ text: 'OK' }]) },
       { text: 'Refresh', onPress: onRefresh },
       { text: 'Cancel', style: 'cancel' },
     ]);
