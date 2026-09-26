@@ -9,6 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP } from '@/lib/theme';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
@@ -24,6 +25,7 @@ export default function SellerSettingsScreen() {
   const colors = useColors();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
+  const tabBar = useTabBarMetrics();
   const router = useRouter();
   const api = useApi();
   const { signOut } = useAuth();
@@ -129,7 +131,7 @@ export default function SellerSettingsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + 48 }}
+        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: tabBar.occupiedHeight + SP.xl }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
