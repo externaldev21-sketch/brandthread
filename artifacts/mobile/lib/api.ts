@@ -2020,6 +2020,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       update: (settings: { dmPrivacy?: 'requests' | 'followers_only' }) =>
         patch<{ dmPrivacy: 'requests' | 'followers_only' }>('/api/auth/privacy', settings),
     },
+    /**
+     * Server-side "seen" state for the buyer "Watching Threads" gesture coach
+     * mark — source of truth across reinstalls/devices. See
+     * lib/feedGestureGuideStorage.ts for the local cache + fallback logic.
+     */
+    feedGesturesTip: {
+      get: () => get<{ seenVersion: number }>('/api/auth/feed-gestures-tip'),
+      markSeen: (version: number) =>
+        patch<{ seenVersion: number }>('/api/auth/feed-gestures-tip', { version }),
+    },
     /** Public seller storefront — profile + products + posts */
     publicSellers: {
       get: (sellerId: string) =>

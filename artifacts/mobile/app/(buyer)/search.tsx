@@ -495,10 +495,14 @@ export default function SearchScreen() {
     return (
       <View testID="buyer-search-no-results">
         <EmptyState
-          compact
           icon="search"
           title="No results — yet."
           description={`We couldn't find anything for "${trimmedQuery}". Try a broader term.`}
+          action={{
+            label: 'Clear search',
+            icon: 'x-circle',
+            onPress: () => setQuery(''),
+          }}
         />
         {noResultsFallbackTerms.length > 0 && (
           <View style={styles.chipRow}>
@@ -784,7 +788,7 @@ export default function SearchScreen() {
               <ListRow
                 icon="compass"
                 iconColor={primary}
-                title="Browse trending brands and drops"
+                title="Browse trending brands"
                 chevron
                 onPress={() => goToBrand()}
                 style={styles.discoverRow}
@@ -793,25 +797,42 @@ export default function SearchScreen() {
           </View>
         ) : (
           <>
-            <SegmentedTabs active={activeTab} onChange={setActiveTab} />
-
-            <View style={styles.filterBarRow}>
+            {/* Tabs share a row with the Filters button instead of the button
+                getting a whole row to itself below — a single icon-only
+                circle here, same footprint as the tab pills, so it never
+                wastes a full row of vertical space when there are no active
+                filter chips to show underneath it. */}
+            <View style={styles.tabsRow}>
+              <View style={{ flex: 1 }}>
+                <SegmentedTabs active={activeTab} onChange={setActiveTab} />
+              </View>
               <TouchableOpacity
                 onPress={() => { hapticSelection(); setFilterSheetVisible(true); }}
-                style={[styles.filterButton, { borderColor: theme.border, backgroundColor: theme.surface }, activeFilterCount > 0 && { borderColor: primary }]}
+                style={[
+                  styles.filterIconButton,
+                  { borderColor: theme.border, backgroundColor: theme.surface },
+                  activeFilterCount > 0 && { borderColor: primary },
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : 'Filters'}
                 testID="search-open-filters"
               >
-                <Feather name="sliders" size={13} color={activeFilterCount > 0 ? primary : fg} />
-                <Text style={[TYPE_SCALE.footnote, { color: activeFilterCount > 0 ? primary : fg, fontFamily: FONT.semibold }]}>
-                  {activeFilterCount > 0 ? `Filters · ${activeFilterCount}` : 'Filters'}
-                </Text>
+                <Feather name="sliders" size={15} color={activeFilterCount > 0 ? primary : fg} />
+                {activeFilterCount > 0 && (
+                  <View style={[styles.filterCountBadge, { backgroundColor: primary }]}>
+                    <Text style={styles.filterCountBadgeText}>{activeFilterCount}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
-              {activeFilterChips.map((chip) => (
-                <Chip key={chip.key} label={chip.label} selected onPress={chip.onClear} onRemove={chip.onClear} removeAccessibilityLabel={`Clear ${chip.label} filter`} />
-              ))}
             </View>
+
+            {activeFilterChips.length > 0 && (
+              <View style={styles.filterBarRow}>
+                {activeFilterChips.map((chip) => (
+                  <Chip key={chip.key} label={chip.label} selected onPress={chip.onClear} onRemove={chip.onClear} removeAccessibilityLabel={`Clear ${chip.label} filter`} />
+                ))}
+              </View>
+            )}
 
             <View testID="buyer-search-results-state" accessibilityLabel={`Search results for ${query}`}>
               {searching ? renderInstantSuggestions() : renderTabContent()}
@@ -901,13 +922,23 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
   discoverRow: { paddingHorizontal: SCREEN_GUTTER },
   brandCardRow: { flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xxs },
+  tabsRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
+    paddingRight: SCREEN_GUTTER,
+  },
+  filterIconButton: {
+    width: 44, height: 44, borderRadius: RADII.pill, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  filterCountBadge: {
+    position: 'absolute', top: -2, right: -2,
+    minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  filterCountBadgeText: { fontSize: 10, fontFamily: FONT.bold, color: '#FFFFFF' },
   filterBarRow: {
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SPACING.xs,
     paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.xs, paddingBottom: SPACING.sm,
-  },
-  filterButton: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.xxs,
-    height: 44, paddingHorizontal: SPACING.sm, borderRadius: RADII.pill, borderWidth: 1,
   },
   suggestionRow: { paddingHorizontal: SCREEN_GUTTER },
   suggestionSkeletonRow: {

@@ -8,6 +8,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { reloadAppAsync } from 'expo';
 import { Button } from '@/components/ui/Button';
@@ -64,6 +66,10 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
       ) : null}
 
       <View style={styles.content}>
+        <View style={[styles.iconCircle, { borderColor: colors.border, backgroundColor: colors.card }]}>
+          <Feather name="alert-triangle" size={28} color={colors.mutedForeground} />
+        </View>
+
         <Text style={[TYPE_SCALE.title1, styles.title, { color: colors.foreground }]}>
           Something went wrong
         </Text>
@@ -77,12 +83,31 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
           </Text>
         ) : null}
 
-        <Button
-          label="Try Again"
-          onPress={handleRestart}
-          variant="primary"
-          style={styles.button}
-        />
+        <View style={styles.actions}>
+          <Button
+            label="Try Again"
+            onPress={handleRestart}
+            variant="primary"
+            style={styles.button}
+          />
+          <View style={styles.secondaryRow}>
+            <Button
+              label="Go back"
+              onPress={() => {
+                if (router.canGoBack()) router.back();
+                else router.replace('/' as never);
+              }}
+              variant="secondary"
+              style={styles.halfButton}
+            />
+            <Button
+              label="Go home"
+              onPress={() => router.replace('/' as never)}
+              variant="secondary"
+              style={styles.halfButton}
+            />
+          </View>
+        </View>
       </View>
 
       {__DEV__ ? (
@@ -170,6 +195,15 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 600,
   },
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.xxs,
+  },
   title: {
     textAlign: 'center',
   },
@@ -181,13 +215,29 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   topButton: {
+    // Clear of the centered icon/title block above at any screen height —
+    // pinned to the top-right corner rather than floating near the content.
     position: 'absolute',
     right: SPACING.md,
     zIndex: 10,
   },
-  button: {
+  actions: {
+    width: '100%',
+    alignItems: 'center',
+    gap: SPACING.sm,
     marginTop: SPACING.xs,
+  },
+  button: {
     minWidth: 200,
+  },
+  secondaryRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    width: '100%',
+    maxWidth: 320,
+  },
+  halfButton: {
+    flex: 1,
   },
   modalOverlay: {
     flex: 1,

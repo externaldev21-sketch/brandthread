@@ -141,3 +141,28 @@ export function fmtCompact(n: number): string {
   if (n < 1_000_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
   return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
 }
+
+// ─── Names ──────────────────────────────────────────────────────────────────
+
+/**
+ * Derives avatar initials from the SAME display name shown next to the
+ * avatar, so the two can never disagree (e.g. avatar showing "BT" while the
+ * name text next to it reads something else entirely). Always pass the
+ * exact string being rendered as the name — never a separate first/last
+ * name pair that might be blank while the display name falls back to a
+ * username or brand name.
+ * @example getInitials('Your Brandthread store') → "YB"
+ * @example getInitials('') → "?"
+ */
+export function getInitials(name: string | undefined | null, fallback = '?'): string {
+  const trimmed = (name ?? '').trim();
+  if (!trimmed) return fallback;
+  const initials = trimmed
+    .split(/\s+/)
+    .map((part) => part[0] ?? '')
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  return initials || fallback;
+}

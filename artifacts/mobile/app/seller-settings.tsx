@@ -10,9 +10,11 @@ import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP } from '@/lib/theme';
+import { getInitials } from '@/lib/format';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
 import { SettingsProfileCard, SettingsSearchBar, SettingsSection, SettingsRow, ConfirmSheet } from '@/components/settings/SettingsKit';
@@ -49,8 +51,12 @@ export default function SellerSettingsScreen() {
   }, [api]);
 
   const profileName = user?.fullName || user?.username || 'Your Brandthread store';
-  const profileInitials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || 'BT';
+  // Initials are derived from the exact same `profileName` string shown next
+  // to the avatar (not a separate first/last-name pair that may be blank),
+  // so the avatar and the name text can never disagree.
+  const profileInitials = getInitials(profileName, 'BT');
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
+  const tabBarInset = useTabBarMetrics(2).occupiedHeight;
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -129,7 +135,7 @@ export default function SellerSettingsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + 48 }}
+        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: tabBarInset + SP.lg }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
