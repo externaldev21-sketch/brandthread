@@ -101,6 +101,10 @@ interface PressableScaleProps extends Omit<PressableProps, 'style'> {
    *  the ripple reads as an unwanted "translucent grey circle" (e.g. the
    *  buyer Messages screens). */
   rippleEnabled?: boolean;
+  /** Set false to drop the springy rebound on release — a plain, no-bounce
+   *  timing animation instead. Defaults to true (existing global behavior)
+   *  so every other call site is unaffected. */
+  bounce?: boolean;
 }
 
 // Press feel shared by every button and card: a quick, firm squish on touch,
@@ -109,7 +113,7 @@ const NATIVE_DRIVER = Platform.OS !== 'web';
 const PRESS_IN_SPRING = { speed: 48, bounciness: 0, useNativeDriver: NATIVE_DRIVER } as const;
 const PRESS_OUT_SPRING = { speed: 14, bounciness: 11, useNativeDriver: NATIVE_DRIVER } as const;
 
-export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.96, activeOpacity = 0.88, rippleEnabled = true, ...rest }: PressableScaleProps) {
+export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.96, activeOpacity = 0.88, rippleEnabled = true, bounce = true, ...rest }: PressableScaleProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
   const { theme } = useAppTheme();
@@ -124,14 +128,18 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
       android_ripple={rippleEnabled ? { color: `${theme.accent}2E`, borderless: false } : undefined}
       onPressIn={(e) => {
         Animated.parallel([
-          Animated.spring(scale, { toValue: activeScale, ...PRESS_IN_SPRING }),
+          bounce
+            ? Animated.spring(scale, { toValue: activeScale, ...PRESS_IN_SPRING })
+            : Animated.timing(scale, { toValue: activeScale, duration: 60, useNativeDriver: NATIVE_DRIVER }),
           Animated.timing(opacity, { toValue: activeOpacity, duration: 60, useNativeDriver: NATIVE_DRIVER }),
         ]).start();
         rest.onPressIn?.(e);
       }}
       onPressOut={(e) => {
         Animated.parallel([
-          Animated.spring(scale, { toValue: 1, ...PRESS_OUT_SPRING }),
+          bounce
+            ? Animated.spring(scale, { toValue: 1, ...PRESS_OUT_SPRING })
+            : Animated.timing(scale, { toValue: 1, duration: 120, useNativeDriver: NATIVE_DRIVER }),
           Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: NATIVE_DRIVER }),
         ]).start();
         rest.onPressOut?.(e);
