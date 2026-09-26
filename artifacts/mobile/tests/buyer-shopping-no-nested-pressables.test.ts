@@ -11,8 +11,8 @@
  * sibling positioned absolutely on top of the card instead of a descendant.
  *
  * This is a lightweight tag-nesting scan, not a full JSX/TSX parse — it's a
- * guardrail against reintroducing this exact class of bug in this PR's
- * files, not a general-purpose linter.
+ * guardrail against reintroducing this exact class of bug in these files,
+ * not a general-purpose linter.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -21,14 +21,19 @@ import { resolve } from 'node:path';
 
 const PRESSABLE_TAGS = ['Pressable', 'TouchableOpacity', 'TouchableHighlight'];
 
-// Files in the buyer shopping area that render product/result cards with a
-// card-level Pressable — the shape most likely to accidentally nest a second
-// pressable (heart/save toggle, bookmark button, follow button, etc.) inside.
+// Screens/components in (or adjacent to) the buyer shopping area that render
+// product/result cards with a card-level Pressable — the shape most likely
+// to accidentally nest a second pressable (heart/save toggle, bookmark
+// button, follow button, etc.) inside.
 const FILES_TO_CHECK = [
   'app/(buyer)/discover.tsx',
   'app/(buyer)/search.tsx',
   'app/buyer-saved.tsx',
+  'app/buyer-product-detail.tsx',
+  'app/seller-profile.tsx',
+  'app/buyer-other-profile.tsx',
   'components/search/ProductTile.tsx',
+  'components/ShopProductSheet.tsx',
 ];
 
 /**
