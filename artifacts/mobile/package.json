@@ -19,6 +19,7 @@
     "serve": "node server/serve.js",
     "test": "vitest run",
     "test:navigation:web": "node tests/navigation-scene-isolation.web.mjs",
+    "test:feed-video:web": "node tests/feed-video-plays.web.mjs",
     "test:navigation:native": "vitest run tests/navigation-scene-isolation.native.test.tsx tests/navigation-scene-isolation.test.ts && node tests/navigation-scene-isolation.device.mjs",
     "test:navigation:native:ci": "NATIVE_GESTURE_REQUIRED=1 pnpm run test:navigation:native",
     "test:onboarding:native": "node tests/onboarding-transitions.device.mjs",
