@@ -35,11 +35,18 @@ export function UseThreadCashCard({
    * stays behind the flag — this only affects presentation.
    */
   disabledReason,
+  /**
+   * Checkout's flat, box-free page (hairline dividers only) vs. cart.tsx's
+   * existing bordered-card style, which this component still matches by
+   * default so cart isn't affected by checkout's redesign.
+   */
+  flat,
 }: {
   /** Order subtotal + shipping minus one cent — the most Thread Cash can cover. */
   maxDiscountCents: number;
   redemption: CheckoutThreadCashRedemption | null;
   onApply: (redemption: CheckoutThreadCashRedemption) => void;
+  flat?: boolean;
   onRemove: () => void;
   disabledReason?: string;
 }) {
@@ -92,7 +99,13 @@ export function UseThreadCashCard({
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.cardGlass, borderColor: isDisabled ? theme.border : theme.accent }, isDisabled && { opacity: 0.6 }]}>
+    <View style={[
+      flat ? styles.rowFlat : styles.card,
+      flat
+        ? { borderBottomColor: theme.border }
+        : { backgroundColor: theme.cardGlass, borderColor: isDisabled ? theme.border : theme.accent },
+      isDisabled && { opacity: 0.6 },
+    ]}>
       <View style={[styles.icon, { backgroundColor: theme.accentDim }]}>
         <Feather name="dollar-sign" size={16} color={theme.accent} />
       </View>
@@ -124,6 +137,7 @@ export function UseThreadCashCard({
 
 const styles = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.md, marginBottom: SP.md },
+  rowFlat: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: SP.md },
   icon: { width: 30, height: 30, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: FS.base, fontFamily: FONT.semibold },
   sub: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },

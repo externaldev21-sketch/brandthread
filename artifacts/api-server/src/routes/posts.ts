@@ -22,7 +22,7 @@ import postVideoRouter, {
 } from "./post-video";
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
-import { notifyPostLike } from "../lib/activityEvents";
+import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
@@ -1296,13 +1296,16 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
       eq(interactions.type, type),
     ));
   } else {
-    await db
+    const inserted = await db
       .insert(interactions)
       .values({ userId: clerkId, postId: id, type, value: null })
       .onConflictDoNothing({
         target: [interactions.userId, interactions.postId],
         where: sql`type = 'repost' AND post_id IS NOT NULL`,
-      });
+      })
+      .returning({ id: interactions.id });
+    // Only a genuinely new repost notifies the owner; retries are silent.
+    if (inserted.length > 0) void notifyRepost({ postId: id, reposterId: clerkId });
   }
 
   const [{ count: newCount }] = await db

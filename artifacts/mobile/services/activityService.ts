@@ -16,6 +16,18 @@ import { ACTIVITY_PAGE_SIZE, type ActivityFilter, type ActivityItem } from '@/li
 export type { ActivityItem, ActivityFilter } from '@/lib/activity';
 
 const BASE = '/api/buyer/notifications';
+const SOCIAL_BASE = '/api/social';
+
+export interface SuggestedPerson {
+  userId: string;
+  name: string;
+  handle: string;
+  initials: string;
+  color: string;
+  avatarUrl?: string | null;
+  reason: string;
+  isFollowing: boolean;
+}
 
 // ─── Change broadcast ─────────────────────────────────────────────────────────
 
@@ -85,4 +97,64 @@ export async function markAllActivityRead(): Promise<void> {
 export async function dismissActivity(id: string): Promise<void> {
   await serviceRequest(`${BASE}/${encodeURIComponent(id)}`, { method: 'DELETE' });
   emitChange();
+}
+
+// ─── Suggested for you ────────────────────────────────────────────────────────
+
+export async function getSuggestedPeople(limit = 20): Promise<SuggestedPerson[]> {
+  const rows = await serviceRequest<SuggestedPerson[]>(`${SOCIAL_BASE}/suggested?limit=${limit}`, {}, false);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function dismissSuggestedPerson(userId: string): Promise<void> {
+  await serviceRequest(`${SOCIAL_BASE}/suggested/${encodeURIComponent(userId)}/dismiss`, { method: 'POST', body: JSON.stringify({}) });
+  emitChange();
+}
+
+// ─── Realtime (short polling while a screen is focused) ──────────────────────
+//
+// There is no websocket/SSE layer in this codebase (see lib/api's polling
+// helpers for the same pattern elsewhere, e.g. buyer-conversation.tsx). This
+// polls the tiny `/unread-count` endpoint every ~1.5s while a screen is
+// focused, and only fires `onChange` when the count or latest event actually
+// moved — cheap enough to run this often, close enough to feel live.
+export interface ActivityRealtimeHandle {
+  stop(): void;
+}
+
+export function watchActivityRealtime(
+  onChange: (info: { count: number; latestId: string | null }) => void,
+  intervalMs = 1500,
+): ActivityRealtimeHandle {
+  let stopped = false;
+  let lastKey = '';
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const tick = async () => {
+    if (stopped) return;
+    try {
+      const result = await serviceRequest<{ count?: number; latestId?: string | null }>(
+        `${BASE}/unread-count`, {}, false,
+      );
+      const count = typeof result?.count === 'number' ? result.count : 0;
+      const latestId = result?.latestId ?? null;
+      const key = `${count}:${latestId}`;
+      if (key !== lastKey) {
+        lastKey = key;
+        onChange({ count, latestId });
+      }
+    } catch {
+      // A failed poll just tries again next tick.
+    } finally {
+      if (!stopped) timer = setTimeout(tick, intervalMs);
+    }
+  };
+
+  void tick();
+  return {
+    stop() {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    },
+  };
 }

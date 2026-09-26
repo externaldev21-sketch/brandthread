@@ -6,11 +6,14 @@ import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS } from '@/lib/theme';
-import { getUnreadActivityCount, subscribeActivity } from '@/services/activityService';
+import { getUnreadActivityCount, subscribeActivity, watchActivityRealtime } from '@/services/activityService';
 
 /**
- * Unread Activity Center count. Refreshes when the host screen gains focus and
- * (debounced) whenever activity is read or dismissed anywhere in the app.
+ * Unread Activity Center count. Refreshes when the host screen gains focus,
+ * (debounced) whenever activity is read or dismissed anywhere in the app, and
+ * short-polls every ~1.5s while this button is mounted so a new follow/like
+ * elsewhere bumps the badge live (see watchActivityRealtime's own comment —
+ * there is no websocket/SSE layer in this codebase).
  */
 export function useActivityUnreadCount(): number {
   const [count, setCount] = useState(0);
@@ -31,9 +34,13 @@ export function useActivityUnreadCount(): number {
       if (debounce.current) clearTimeout(debounce.current);
       debounce.current = setTimeout(refresh, 400);
     });
+    const realtime = watchActivityRealtime(({ count: next }) => {
+      if (mounted.current) setCount(next);
+    });
     return () => {
       mounted.current = false;
       unsubscribe();
+      realtime.stop();
       if (debounce.current) clearTimeout(debounce.current);
     };
   }, [refresh]);

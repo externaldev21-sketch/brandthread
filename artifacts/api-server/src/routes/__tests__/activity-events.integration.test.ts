@@ -12,8 +12,9 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { and, eq, inArray, or } from "drizzle-orm";
 import {
-  db, follows, notificationsFeed, posts, productVariants, products, savedItems, users,
+  db, follows, notificationsFeed, posts, productVariants, products, savedItems, stories, users,
 } from "@workspace/db";
+import { notifyThreadCashReceived } from "../../lib/activityEvents";
 
 const spies = vi.hoisted(() => ({
   publish: vi.fn(),
@@ -64,6 +65,7 @@ let base = "";
 let postId = "";
 let productId = "";
 let variantId = "";
+let storyId = "";
 const createdProductIds: string[] = [];
 
 async function call(method: string, path: string, userId: string, body?: unknown) {
@@ -136,6 +138,14 @@ beforeAll(async () => {
     title: "Heavyweight Tee",
   });
 
+  const [story] = await db.insert(stories).values({
+    authorId: ownerId,
+    authorName: "Olive Owner",
+    media: [{ url: `https://cdn.example.test/${suffix}/story.jpg`, type: "image" }],
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  }).returning({ id: stories.id });
+  storyId = story.id;
+
   // Import sequentially, feed first: concurrent imports can race the async
   // mock factory and hand some routers the unspied publisher.
   const { default: notificationsRouter } = await import("../notifications-feed");
@@ -170,6 +180,7 @@ afterAll(async () => {
   await db.delete(savedItems).where(inArray(savedItems.userId, userIds));
   await db.delete(follows).where(or(inArray(follows.followerId, userIds), inArray(follows.followingId, userIds)));
   if (postId) await db.delete(posts).where(eq(posts.id, postId));
+  if (storyId) await db.delete(stories).where(eq(stories.id, storyId));
   const sellerProducts = await db.select({ id: products.id }).from(products).where(eq(products.ownerId, sellerId));
   const ids = [...new Set([...createdProductIds, ...sellerProducts.map((row) => row.id)])];
   if (ids.length) await db.delete(products).where(inArray(products.id, ids));
@@ -249,6 +260,111 @@ describe("follows", () => {
     await settle(() => expect(publishedOfType("new_follower")).toHaveLength(1));
     expect(publishedOfType("new_follower")[0].userId).toBe(likerA);
     expect(publishedOfType("new_follower")[0].cta).toBeUndefined();
+    expect(publishedOfType("new_follower")[0].title).toBe("Olive Owner followed you back");
+  });
+
+  it("removes a still-unread new_follower notification when the follower immediately unfollows", async () => {
+    const followerId = shopperId;
+    await call("DELETE", `/api/social/follow/${ownerId}`, followerId); // clean slate
+    spies.publish.mockClear();
+    expect((await call("POST", "/api/social/follow", followerId, { userId: ownerId })).status).toBe(200);
+    await settle(() => expect(publishedOfType("new_follower")).toHaveLength(1));
+    expect((await feedRows(ownerId, "new_follower")).some((row) => row.actorId === followerId)).toBe(true);
+
+    expect((await call("DELETE", `/api/social/follow/${ownerId}`, followerId)).status).toBe(200);
+    const remaining = (await feedRows(ownerId, "new_follower")).filter((row) => row.actorId === followerId);
+    expect(remaining).toHaveLength(0);
+  });
+
+  // Two-user real-time scenario: A follows B, and B's Activity feed and
+  // unread count reflect it immediately (the same request cycle the client
+  // polls with `watchActivityRealtime`), with no polling/delay required here
+  // because the write happens inside the request A made.
+  it("delivers a follow into the recipient's activity feed and unread count in the same flow", async () => {
+    const a = likerB;
+    const b = ownerId;
+    await call("DELETE", `/api/social/follow/${b}`, a); // clean slate
+    const before = await call("GET", "/api/buyer/notifications/unread-count", b);
+
+    expect((await call("POST", "/api/social/follow", a, { userId: b })).status).toBe(200);
+    await settle(() => expect(publishedOfType("new_follower").some((row) => row.userId === b)).toBe(true));
+
+    const after = await call("GET", "/api/buyer/notifications/unread-count", b);
+    expect(after.body.count).toBe(before.body.count + 1);
+    expect(after.body.latestId).not.toBe(before.body.latestId);
+
+    const feed = await call("GET", "/api/buyer/notifications?limit=10", b);
+    expect((feed.body as any[]).some((row) => row.type === "new_follower" && row.actorId === a)).toBe(true);
+  });
+});
+
+describe("reposts", () => {
+  it("publishes one repost per distinct reposter, ignoring self-reposts and un-repost/repost toggles", async () => {
+    spies.publish.mockClear();
+    expect((await call("POST", `/api/posts/${postId}/interact`, likerA, { type: "repost" })).status).toBe(200);
+    await settle(() => expect(publishedOfType("repost")).toHaveLength(1));
+
+    await call("POST", `/api/posts/${postId}/interact`, likerA, { type: "repost", value: "remove" });
+    await call("POST", `/api/posts/${postId}/interact`, likerA, { type: "repost" });
+    await call("POST", `/api/posts/${postId}/interact`, ownerId, { type: "repost" });
+    await settle(() => expect(publishedOfType("repost")).toHaveLength(1));
+
+    expect(publishedOfType("repost")[0]).toEqual(expect.objectContaining({
+      userId: ownerId, category: "social", type: "repost", actorId: likerA, targetId: postId, targetImageUrl: POST_THUMB,
+    }));
+  });
+});
+
+describe("story likes", () => {
+  it("publishes one story_like per distinct liker, ignoring self-likes", async () => {
+    spies.publish.mockClear();
+    expect((await call("POST", `/api/social/stories/${storyId}/like`, likerA)).status).toBe(200);
+    await settle(() => expect(publishedOfType("story_like")).toHaveLength(1));
+
+    await call("POST", `/api/social/stories/${storyId}/like`, ownerId);
+    await settle();
+    expect(publishedOfType("story_like")).toHaveLength(1);
+    expect(publishedOfType("story_like")[0]).toEqual(expect.objectContaining({
+      userId: ownerId, category: "social", type: "story_like", actorId: likerA, targetId: storyId, targetType: "story",
+    }));
+  });
+});
+
+describe("Thread Cash received", () => {
+  it("notifies the recipient once per transfer and never notifies a self-send", async () => {
+    spies.publish.mockClear();
+    await notifyThreadCashReceived({ transferId: "t-1", fromUserId: likerA, toUserId: ownerId, amountCents: 500 });
+    await notifyThreadCashReceived({ transferId: "t-1", fromUserId: likerA, toUserId: ownerId, amountCents: 500 });
+    await notifyThreadCashReceived({ transferId: "t-2", fromUserId: ownerId, toUserId: ownerId, amountCents: 500 });
+    await settle(() => expect(publishedOfType("thread_cash_received")).toHaveLength(1));
+    expect(publishedOfType("thread_cash_received")[0]).toEqual(expect.objectContaining({
+      userId: ownerId, category: "social", type: "thread_cash_received", actorId: likerA, targetId: "t-1",
+    }));
+    const rows = await feedRows(ownerId, "thread_cash_received");
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("suggested for you", () => {
+  it("ranks people followed by people I follow, excludes people I already follow", async () => {
+    // Earlier tests may have left ownerId directly following likerA/likerB —
+    // clear those so likerA only qualifies here via the mutual-follow path.
+    await call("DELETE", `/api/social/follow/${likerA}`, ownerId);
+    await call("DELETE", `/api/social/follow/${sellerId}`, ownerId);
+    await call("DELETE", `/api/social/follow/${likerA}`, likerB);
+    await call("POST", "/api/social/follow", ownerId, { userId: likerB });
+    await call("POST", "/api/social/follow", likerB, { userId: likerA });
+
+    const result = await call("GET", "/api/social/suggested?limit=20", ownerId);
+    expect(result.status).toBe(200);
+    const ids = (result.body as any[]).map((row) => row.userId);
+    expect(ids).toContain(likerA);
+    expect(ids).not.toContain(ownerId);
+    expect(ids).not.toContain(likerB); // already followed
+
+    await call("POST", `/api/social/suggested/${likerA}/dismiss`, ownerId);
+    const afterDismiss = await call("GET", "/api/social/suggested?limit=20", ownerId);
+    expect((afterDismiss.body as any[]).map((row) => row.userId)).not.toContain(likerA);
   });
 });
 
@@ -321,8 +437,8 @@ describe("feed paging", () => {
     expect(social.body).toHaveLength(total);
 
     const unread = await call("GET", "/api/buyer/notifications/unread-count", ownerId);
-    expect(unread.body).toEqual({ count: total });
+    expect(unread.body).toMatchObject({ count: total });
     await call("PATCH", `/api/buyer/notifications/${first.body[0].id}/read`, ownerId, {});
-    expect((await call("GET", "/api/buyer/notifications/unread-count", ownerId)).body).toEqual({ count: total - 1 });
+    expect((await call("GET", "/api/buyer/notifications/unread-count", ownerId)).body).toMatchObject({ count: total - 1 });
   });
 });

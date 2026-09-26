@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   activityHref,
+  activityIcon,
   activityKind,
   activityMessage,
   aggregateActivity,
@@ -9,6 +10,7 @@ import {
   createReadTracker,
   groupByRecency,
   isFollowBackRow,
+  newFollowersSummary,
   relativeTime,
   type ActivityItem,
 } from './activity';
@@ -65,18 +67,24 @@ describe('groupByRecency', () => {
     const lateYesterday = item({ createdAt: at(1, 23, 59) });
     const sixDaysAgo = item({ createdAt: at(6, 0, 1) });
     const sevenDaysAgo = item({ createdAt: at(7, 23, 59) });
-    const sections = groupByRecency([justAfterMidnight, lateYesterday, sixDaysAgo, sevenDaysAgo], NOW);
+    const twentyNineDaysAgo = item({ createdAt: at(29, 23, 59) });
+    const thirtyDaysAgo = item({ createdAt: at(30) });
+    const sections = groupByRecency(
+      [justAfterMidnight, lateYesterday, sixDaysAgo, sevenDaysAgo, twentyNineDaysAgo, thirtyDaysAgo],
+      NOW,
+    );
 
-    expect(sections.map((s) => s.key)).toEqual(['today', 'this_week', 'earlier']);
-    expect(sections.map((s) => s.title)).toEqual(['Today', 'This week', 'Earlier']);
+    expect(sections.map((s) => s.key)).toEqual(['today', 'this_week', 'this_month', 'earlier']);
+    expect(sections.map((s) => s.title)).toEqual(['Today', 'This week', 'This month', 'Earlier']);
     expect(sections[0].items).toEqual([justAfterMidnight]);
     expect(sections[1].items).toEqual([lateYesterday, sixDaysAgo]);
-    expect(sections[2].items).toEqual([sevenDaysAgo]);
+    expect(sections[2].items).toEqual([sevenDaysAgo, twentyNineDaysAgo]);
+    expect(sections[3].items).toEqual([thirtyDaysAgo]);
   });
 
-  it('omits empty sections and orders New, Today, This week, Earlier', () => {
+  it('omits empty sections and orders New, Today, This week, This month, Earlier', () => {
     const sections = groupByRecency([
-      item({ createdAt: at(30) }),
+      item({ createdAt: at(45) }),
       item({ isRead: false, createdAt: at(3) }),
     ], NOW);
     expect(sections.map((s) => s.key)).toEqual(['new', 'earlier']);
@@ -269,5 +277,56 @@ describe('classification and routing', () => {
     expect(activityHref(item({ type: 'new_order_message', targetType: 'conversation', targetId: 'c1' }), 'seller'))
       .toBe('/seller-conversation?id=c1');
     expect(activityHref(item({ type: 'system', category: 'system' }))).toBeNull();
+    expect(activityHref(item({ type: 'story_like', targetType: 'story', targetId: 's1' })))
+      .toBe('/buyer-story-viewer?storyId=s1&allStoryIds=s1');
+    expect(activityHref(item({ type: 'thread_cash_received', targetType: 'thread_cash_transfer', targetId: 't1' })))
+      .toBe('/thread-cash');
+    expect(activityHref(item({ type: 'repost', targetType: 'post', targetId: 'p1' })))
+      .toBe('/buyer-post-viewer?postId=p1');
+  });
+
+  it('icons the new event types', () => {
+    expect(activityIcon({ type: 'story_like', category: 'social' })).toBe('heart');
+    expect(activityIcon({ type: 'repost', category: 'social' })).toBe('repeat');
+    expect(activityIcon({ type: 'thread_cash_received', category: 'social' })).toBe('dollar-sign');
+  });
+});
+
+describe('aggregateActivity — reposts and story likes', () => {
+  it('merges repeat reposts on the same post', () => {
+    const repost = (name: string) => item({
+      type: 'repost', title: `${name} reposted your post`, actorId: `u_${name}`,
+      actorName: name, targetId: 'post1', targetType: 'post',
+    });
+    const rows = aggregateActivity([repost('Jay'), repost('Mina')]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].actorCount).toBe(2);
+  });
+
+  it('does not merge story likes on different stories', () => {
+    const storyLike = (storyId: string) => item({
+      type: 'story_like', title: 'Jay liked your story', actorId: 'u_jay',
+      actorName: 'Jay', targetId: storyId, targetType: 'story',
+    });
+    const rows = aggregateActivity([storyLike('s1'), storyLike('s2')]);
+    expect(rows).toHaveLength(2);
+  });
+});
+
+describe('newFollowersSummary', () => {
+  it('returns null when there are no follow events', () => {
+    expect(newFollowersSummary([like('Jay', 'post1')])).toBeNull();
+  });
+
+  it('collects distinct followers, newest first, and unread state', () => {
+    const follow = (name: string, isRead: boolean) => item({
+      type: 'new_follower', title: `${name} started following you`,
+      actorId: `u_${name}`, actorName: name, isRead,
+    });
+    const summary = newFollowersSummary([follow('Jay', false), follow('Mina', true)]);
+    expect(summary).not.toBeNull();
+    expect(summary!.count).toBe(2);
+    expect(summary!.actors.map((a) => a.name)).toEqual(['Jay', 'Mina']);
+    expect(summary!.hasUnread).toBe(true);
   });
 });

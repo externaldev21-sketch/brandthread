@@ -19,7 +19,7 @@
  * seller-facing low/out-of-stock alert.
  */
 import {
-  db, follows, notificationsFeed, posts, products, users,
+  db, follows, notificationsFeed, posts, products, stories, users,
 } from "@workspace/db";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { publishNotification } from "../routes/notifications-feed";
@@ -162,6 +162,140 @@ export async function notifyPostLike(input: { postId: string; likerId: string })
     });
   } catch (err) {
     logger.warn({ err, postId: input.postId }, "Post like notification failed");
+  }
+}
+
+// ─── Reposts ──────────────────────────────────────────────────────────────────
+
+/** Tell a post's owner someone reposted it. Idempotent per (owner, reposter, post). */
+export async function notifyRepost(input: { postId: string; reposterId: string }): Promise<void> {
+  try {
+    const post = await loadPost(input.postId);
+    if (!post || post.userId === input.reposterId) return;
+    if ((await blockedUserIds(post.userId)).has(input.reposterId)) return;
+
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, post.userId),
+        eq(notificationsFeed.type, "repost"),
+        eq(notificationsFeed.targetId, post.id),
+        eq(notificationsFeed.actorId, input.reposterId),
+      ))
+      .limit(1);
+    if (existing) return;
+
+    const actor = await actorFields(input.reposterId);
+    if (!actor) return;
+
+    await publishNotification({
+      userId: post.userId,
+      category: "social",
+      type: "repost",
+      title: `${actor.actorName} reposted your post`,
+      ...actor,
+      targetId: post.id,
+      targetType: "post",
+      targetImageUrl: postThumbnail(post),
+    });
+  } catch (err) {
+    logger.warn({ err, postId: input.postId }, "Repost notification failed");
+  }
+}
+
+// ─── Story / highlight likes ──────────────────────────────────────────────────
+
+/**
+ * Tell a story's author someone liked it. Highlights are saved stories with
+ * no separate backend identity, so this covers both "liked your story" and
+ * "liked your highlight" — the client renders the same event either way.
+ */
+export async function notifyStoryLike(input: { storyId: string; likerId: string }): Promise<void> {
+  try {
+    const [story] = await db
+      .select({ id: stories.id, authorId: stories.authorId, media: stories.media })
+      .from(stories)
+      .where(eq(stories.id, input.storyId))
+      .limit(1);
+    if (!story || story.authorId === input.likerId) return;
+    if ((await blockedUserIds(story.authorId)).has(input.likerId)) return;
+
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, story.authorId),
+        eq(notificationsFeed.type, "story_like"),
+        eq(notificationsFeed.targetId, story.id),
+        eq(notificationsFeed.actorId, input.likerId),
+      ))
+      .limit(1);
+    if (existing) return;
+
+    const actor = await actorFields(input.likerId);
+    if (!actor) return;
+    const media = Array.isArray(story.media) ? story.media : [];
+    const thumbnail = media.find((m: any) => typeof m?.url === "string")?.url ?? null;
+
+    await publishNotification({
+      userId: story.authorId,
+      category: "social",
+      type: "story_like",
+      title: `${actor.actorName} liked your story`,
+      ...actor,
+      targetId: story.id,
+      targetType: "story",
+      targetImageUrl: thumbnail,
+    });
+  } catch (err) {
+    logger.warn({ err, storyId: input.storyId }, "Story like notification failed");
+  }
+}
+
+// ─── Thread Cash ──────────────────────────────────────────────────────────────
+
+/** Tell the recipient someone sent them Thread Cash. Idempotent per transfer. */
+export async function notifyThreadCashReceived(input: {
+  transferId: string;
+  fromUserId: string;
+  toUserId: string;
+  amountCents: number;
+}): Promise<void> {
+  try {
+    if (input.toUserId === input.fromUserId) return;
+    if ((await blockedUserIds(input.toUserId)).has(input.fromUserId)) return;
+
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, input.toUserId),
+        eq(notificationsFeed.type, "thread_cash_received"),
+        eq(notificationsFeed.targetId, input.transferId),
+      ))
+      .limit(1);
+    if (existing) return;
+
+    const actor = await actorFields(input.fromUserId);
+    if (!actor) return;
+    const dollars = (input.amountCents / 100).toLocaleString(undefined, {
+      style: "currency",
+      currency: "USD",
+    });
+
+    await publishNotification({
+      userId: input.toUserId,
+      category: "social",
+      type: "thread_cash_received",
+      title: `${actor.actorName} sent you Thread Cash`,
+      body: `${dollars} · tap to view`,
+      ...actor,
+      targetId: input.transferId,
+      targetType: "thread_cash_transfer",
+    });
+  } catch (err) {
+    logger.warn({ err, transferId: input.transferId }, "Thread Cash notification failed");
   }
 }
 
