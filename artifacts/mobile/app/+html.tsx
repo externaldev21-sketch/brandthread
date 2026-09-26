@@ -83,14 +83,35 @@ const webPolishCss = `
      so the glow follows pills, chips and circles exactly. */
   [role="button"]:focus-visible,
   [role="tab"]:focus-visible,
-  [role="link"]:focus-visible,
-  input:focus-visible,
-  textarea:focus-visible {
+  [role="link"]:focus-visible {
     outline: none;
     box-shadow: inset 0 0 0 2px var(--bt-accent, rgba(255,255,255,0.55));
   }
   [role="button"]:focus:not(:focus-visible),
   [role="tab"]:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
+  /* Text inputs: no browser outline AND no box-shadow ring of our own here.
+     react-native-web renders a rounded pill/card as a *wrapping* View around
+     a plain, square-cornered <input>/<textarea> with no border-radius of its
+     own, so the [role="button"] glow above — or the browser's native focus
+     outline — draws a hard rectangle floating inside the rounded container
+     (reported as a "box inside the rounded search field", doubling up with
+     any focus border the component already paints on its own wrapper, e.g.
+     components/BrandthreadUI.tsx's SearchBar). The premium focus state for
+     an input is the responsibility of that input's own wrapper component
+     (it brightens its own border on focus, see SearchBar/BuyerTabBar's
+     search field) — this rule only ever needs to remove the raw element's
+     default decoration, on every focus path, not just :focus-visible. */
+  input,
+  textarea {
+    outline: none;
+  }
+  input:focus,
+  input:focus-visible,
+  textarea:focus,
+  textarea:focus-visible {
     outline: none;
     box-shadow: none;
   }

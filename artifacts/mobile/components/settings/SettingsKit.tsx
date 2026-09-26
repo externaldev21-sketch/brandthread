@@ -86,8 +86,9 @@ export function SettingsSearchBar({
 }) {
   const colors = useColors();
   const s = React.useMemo(() => makeCardStyles(colors), [colors]);
+  const [focused, setFocused] = React.useState(false);
   return (
-    <View style={s.searchWrap}>
+    <View style={[s.searchWrap, focused && { borderColor: colors.primary }]}>
       <Feather name="search" size={16} color={colors.mutedForeground} />
       <TextInput
         value={value}
@@ -97,6 +98,8 @@ export function SettingsSearchBar({
         style={s.searchInput}
         autoCorrect={false}
         returnKeyType="search"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
       />
       {value.length > 0 && (
         <TouchableOpacity onPress={() => onChangeText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -330,7 +333,7 @@ function makeCardStyles(colors: Colors) {
     profileEditText: { fontSize: 12, fontFamily: FONT.semibold, color: colors.foreground },
 
     // Search
-    searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.secondary, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 20 },
+    searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.secondary, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 20, borderWidth: 1, borderColor: 'transparent' },
     searchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: colors.foreground },
 
     // Section
