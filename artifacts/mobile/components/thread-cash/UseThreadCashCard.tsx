@@ -21,7 +21,7 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import type { CheckoutThreadCashRedemption } from '@/services/cartTypes';
 import { HapticSwitch } from '@/components/BrandthreadUI';
-import { ThreadCashCoin } from './ThreadCashBill';
+import { ThreadCashBillIcon } from './ThreadCashBill';
 
 export function UseThreadCashCard({
   maxDiscountCents,
@@ -107,7 +107,7 @@ export function UseThreadCashCard({
       isDisabled && { opacity: 0.6 },
     ]}>
       <View style={[styles.icon, { backgroundColor: theme.accentDim }]}>
-        <ThreadCashCoin size={20} />
+        <ThreadCashBillIcon size={20} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.title, { color: theme.text }]}>Thread Cash</Text>

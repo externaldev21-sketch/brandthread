@@ -10,6 +10,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
@@ -165,9 +166,7 @@ export function ProfileWalletChip({ balanceLabel, onPress }: { balanceLabel: str
       {(state) => (
         <>
           <InteractionLayer state={state as PressState} radius={22} theme={theme} />
-          <View style={[styles.walletIcon, { backgroundColor: theme.accent }]}>
-            <Feather name="dollar-sign" size={12} color={theme.onAccent} />
-          </View>
+          <ThreadCashBillIcon size={20} />
           <Text style={[styles.walletText, { color: theme.text }]} numberOfLines={1}>{balanceLabel}</Text>
         </>
       )}
@@ -469,7 +468,6 @@ const styles = StyleSheet.create({
     height: 44, borderRadius: 22, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
     gap: 6, paddingLeft: 7, paddingRight: 12, overflow: 'hidden',
   },
-  walletIcon: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   walletText: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
   glassBadge: { position: 'absolute', top: 9, right: 9, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
 

@@ -90,6 +90,8 @@ export interface ProfileShellProps<T> {
   meta?: React.ReactNode;
   stats: ProfileStat[];
   statsLoading?: boolean;
+  /** Directly under the stats row, above actions (e.g. the Thread Cash streak row). */
+  belowStats?: React.ReactNode;
   actions?: React.ReactNode;
   /** Role-specific rows between actions and content (orders, stories, drops…). */
   extras?: React.ReactNode;
@@ -115,7 +117,7 @@ export interface ProfileShellProps<T> {
 
 export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const {
-    testID, identity, avatar, hero, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, actions, extras,
+    testID, identity, avatar, hero, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, belowStats, actions, extras,
     tabs, section, data, renderItem, keyExtractor, numColumns = 1, listKey,
     ListEmptyComponent, ListFooterComponent, onEndReached, refreshing = false, onRefresh,
     renderFloating, bottomInset = 0,
@@ -369,6 +371,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
 
       {meta ? <View style={styles.meta}>{meta}</View> : null}
       <ProfileStatsRow stats={stats} loading={statsLoading} />
+      {belowStats}
       {actions ? <View style={styles.actions}>{actions}</View> : null}
       {extras ? <View style={styles.extras}>{extras}</View> : null}
       {/* Tabs get their own breathing room so a tab's press state never

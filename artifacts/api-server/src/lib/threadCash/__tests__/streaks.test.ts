@@ -66,9 +66,9 @@ describe("computeCheckIn", () => {
     expect(day2.streakBroken).toBe(false);
   });
 
-  it("resets the streak to 1 after a gap beyond the grace period", () => {
+  it("resets the streak to 1 after any missed calendar day", () => {
     const day1 = computeCheckIn(EMPTY_STREAK_STATE, config, new Date("2025-01-01T12:00:00Z"), "UTC");
-    // config.graceHours = 6h -> allowed gap is 1 day; skip two full days.
+    // Skip several full days.
     const later = computeCheckIn(day1.state, config, new Date("2025-01-04T12:00:00Z"), "UTC");
     expect(later.streakBroken).toBe(true);
     expect(later.state).toMatchObject({ currentStreak: 1, lastCheckInDate: "2025-01-04" });
@@ -102,18 +102,18 @@ describe("computeCheckIn", () => {
     expect(bonuses.filter((c) => c > 0)).toHaveLength(2);
   });
 
-  it("tolerates exactly one missed day as a grace period without resetting the streak", () => {
+  it("has no grace period: missing even one calendar day resets the streak to day 1", () => {
     const day1 = computeCheckIn(EMPTY_STREAK_STATE, config, new Date("2025-01-01T12:00:00Z"), "UTC");
     // Skip 2025-01-02 entirely; check in on 2025-01-03 (gap = 2 days).
-    // graceHours=6 -> allowedGapDays = 1 + floor(6/24) = 1, so a 2-day gap
-    // should NOT be tolerated by the default config.
     const afterGap = computeCheckIn(day1.state, config, new Date("2025-01-03T12:00:00Z"), "UTC");
     expect(afterGap.streakBroken).toBe(true);
+    expect(afterGap.state.currentStreak).toBe(1);
 
-    // With a full 24h of extra grace, the same 2-day gap is tolerated.
+    // A generous graceHours no longer matters — the rule is exact:
+    // consecutive calendar days only, never a tolerated gap.
     const generousConfig = { ...config, graceHours: 24 };
-    const toleratedGap = computeCheckIn(day1.state, generousConfig, new Date("2025-01-03T12:00:00Z"), "UTC");
-    expect(toleratedGap.streakBroken).toBe(false);
-    expect(toleratedGap.state.currentStreak).toBe(2);
+    const stillBroken = computeCheckIn(day1.state, generousConfig, new Date("2025-01-03T12:00:00Z"), "UTC");
+    expect(stillBroken.streakBroken).toBe(true);
+    expect(stillBroken.state.currentStreak).toBe(1);
   });
 });

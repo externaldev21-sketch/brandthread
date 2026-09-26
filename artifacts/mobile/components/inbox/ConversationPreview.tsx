@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 
 import { FONT, FS } from '@/lib/theme';
 import type { MessageAttachmentType } from '@/services/socialTypes';
-import { ThreadCashCoin } from '@/components/thread-cash/ThreadCashBill';
+import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 
 const ATTACHMENT_META: Record<MessageAttachmentType, { icon: keyof typeof Feather.glyphMap; label: string }> = {
   image: { icon: 'image', label: 'Photo' },
@@ -39,7 +39,7 @@ export function ConversationPreview({ text, attachmentType, isFromMe, color, bol
       <View style={styles.row}>
         {prefix ? <Text style={[styles.text, { color, fontFamily }]}>{prefix}</Text> : null}
         {attachmentType === 'thread_cash' ? (
-          <ThreadCashCoin size={13} style={styles.icon} />
+          <ThreadCashBillIcon size={13} style={styles.icon} />
         ) : (
           <Feather name={meta.icon} size={13} color={color} style={styles.icon} />
         )}

@@ -114,10 +114,11 @@ export function computeCheckIn(
   }
 
   const gapDays = state.lastCheckInDate ? daysBetween(state.lastCheckInDate, today) : null;
-  // One missed day is always tolerated; graceHours adds further tolerance
-  // (e.g. 24h grace = one additional missed day) before the streak resets.
-  const allowedGapDays = 1 + Math.floor(Math.max(0, config.graceHours) / 24);
-  const isConsecutive = gapDays !== null && gapDays >= 1 && gapDays <= allowedGapDays;
+  // No grace period: the streak continues only when yesterday (buyer-local)
+  // was also claimed. Missing any calendar day — even one — resets the
+  // streak to day 1. `config.graceHours` is kept in the config shape for
+  // backward compatibility but no longer affects this calculation.
+  const isConsecutive = gapDays === 1;
   const streakBroken = gapDays !== null && !isConsecutive;
 
   const currentStreak = isConsecutive || gapDays === null ? state.currentStreak + 1 : 1;
