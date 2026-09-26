@@ -102,6 +102,10 @@ const THREAD_PAGE_SIZE = 30;
 //   - RAIL_BOTTOM_GAP: >=16pt from the rail's last item to the bar's top.
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
 const RAIL_BOTTOM_GAP = 22;
+// How many times a feed's content repeats (under unique keys) once it has
+// no more real pages behind it, so scrolling never dead-ends or shows an
+// end card — see the `canLoopFeed`/`displayItems` comment below.
+const FEED_LOOP_REPEAT = 6;
 const CAPTION_BOTTOM_GAP = 18;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
@@ -2321,10 +2325,26 @@ export default function FeedScreen({
   // displayItems: sentinel at index 0 only when buyerMode=true.
   // Seller mode: if (!buyerMode) — sentinel never enters the array.
   // getItemLayout stays uniform using the measured tab-scene height for all items.
+  //
+  // Once there's no more real content to paginate in (the fixed preview set,
+  // or a real account that's genuinely reached the end of their feed), the
+  // same items are appended again under unique keys instead of ending —
+  // there is no "You're all caught up" card any more; scrolling past the
+  // last video should feel seamless and never-ending, the way the real app
+  // does, not stop dead or show an end card. Not applied while a search
+  // filter is active (a filtered result set has a real, meaningful end) or
+  // to the single-creator/product player (a deliberate end there is fine).
+  const canLoopFeed = !searchQuery.trim() && !feedHasMore && filteredContentItems.length > 1 && !isCreatorFeed;
   const displayItems: FeedItem[] = useMemo(() => {
-    if (!buyerMode) return filteredContentItems as FeedItem[];
-    return [DEMAND_PAGE_SENTINEL, ...filteredContentItems] as FeedItem[];
-  }, [buyerMode, filteredContentItems]);
+    const base = filteredContentItems as FeedItem[];
+    const content = canLoopFeed
+      ? Array.from({ length: FEED_LOOP_REPEAT }, (_, cycle) => (
+          cycle === 0 ? base : base.map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
+        )).flat()
+      : base;
+    if (!buyerMode) return content;
+    return [DEMAND_PAGE_SENTINEL, ...content];
+  }, [buyerMode, filteredContentItems, canLoopFeed]);
 
   // buyerOffset: used to compute correct isActive for video playback when the
   // demand sentinel sits at index 0.
@@ -2743,24 +2763,6 @@ export default function FeedScreen({
           feedLoadingMore ? (
             <View style={styles.feedFooter}>
               <ActivityIndicator size="small" color={MUTED} />
-            </View>
-          ) : (!feedHasMore && sellerFeedPosts.length > 0) || (isBuyerSurface && !isCreatorFeed) ? (
-            // Buyer preview/live feeds have a fixed set of videos with no
-            // real pagination behind them — without an explicit end card
-            // here, swiping past the last one used to just run out of
-            // rendered content and show blank space. This always renders
-            // right after the last item so the feed never dead-ends blank.
-            <View style={[styles.feedFooter, { width: pageWidth, height: pageHeight }]}>
-              <Feather name="check-circle" size={28} color={MUTED} />
-              <Text style={styles.feedFooterText}>You're all caught up</Text>
-              <TouchableOpacity
-                onPress={() => feedListRef.current?.scrollToIndex({ index: buyerOffset, animated: true })}
-                style={styles.creatorRetry}
-                accessibilityRole="button"
-                accessibilityLabel="Back to the top"
-              >
-                <Text style={styles.creatorRetryText}>Back to the top</Text>
-              </TouchableOpacity>
             </View>
           ) : null
         }
