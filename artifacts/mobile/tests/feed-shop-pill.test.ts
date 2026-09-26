@@ -19,7 +19,9 @@ describe('Shop pill — compact glass trigger', () => {
     expect(feed).toContain('function ShopPill(');
     expect(feed).toContain('styles.shopPillThumb');
     expect(feed).toContain('styles.shopPillShimmer');
-    expect(feed).toContain('<BlurView');
+    // Owner rule: nothing blurs over video — the pill is a solid fill.
+    expect(feed).not.toContain('<BlurView');
+    expect(feed).not.toContain("from 'expo-blur'");
     expect(feed).not.toContain('mediaTagName');
   });
 

@@ -21,7 +21,6 @@ import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
@@ -1253,7 +1252,8 @@ function ShopPill({
         accessibilityRole="button"
         accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
       >
-        <BlurView intensity={42} tint="dark" style={StyleSheet.absoluteFill} />
+        {/* Owner rule: no blur over video — the pill is a plain solid
+            translucent-dark fill (styles.shopPill), never a BlurView. */}
         <View style={styles.shopPillThumb}>
           {tag.imageUri ? (
             <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
@@ -2942,7 +2942,7 @@ export default function FeedScreen({
               feed, search, activity and cart. */}
           {buyerSearchOpen ? (
             <View style={styles.buyerSearchRow}>
-              <BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
+              {/* No blur over video: plain translucent fill (styles.buyerSearchRow). */}
               <Feather name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
               <TextInput
                 style={styles.buyerSearchInput}
@@ -3303,7 +3303,7 @@ const styles = StyleSheet.create({
   shopPill: {
     height: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center',
     borderRadius: RADII.pill, paddingHorizontal: 8, overflow: 'hidden',
-    borderWidth: 1,
+    borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.55)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25,
     shadowRadius: 5, elevation: 4,
   },
@@ -3412,7 +3412,7 @@ const styles = StyleSheet.create({
   liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
   buyerSearchRow: {
     flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: RADII.pill,
-    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
   buyerSearchInput: {
     flex: 1, height: 44, paddingHorizontal: 10, fontSize: FS.sm, fontFamily: FONT.regular, color: ON_DARK,
