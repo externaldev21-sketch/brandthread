@@ -1517,9 +1517,18 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
-      {/* ─ Shop CTA — sits above the creator name, integrated as a merch card ─ */}
+      {/* ─ Shop CTA — sits above the creator name, integrated as a merch card ─
+          zIndex above `bottomInfo` below: on longer captions/repost rows
+          `bottomInfo` (justifyContent: 'flex-end', minHeight only) grows
+          upward past this pill's reserved offset and, on web, its repost-
+          identity/caption rows (real background + touchable, not
+          pointer-events: none) sat visually on top and silently ate the
+          tap — the pill rendered fine but was unclickable. */}
       {!!item.productTags?.length && (
-        <Animated.View style={[styles.mediaTags, chromeStyle, { bottom: bottomClearance + (hasRepostIdentity ? 158 : 122) }]} pointerEvents="box-none">
+        <Animated.View
+          style={[styles.mediaTags, chromeStyle, { bottom: bottomClearance + (hasRepostIdentity ? 158 : 122), zIndex: 6 }]}
+          pointerEvents="box-none"
+        >
           <ShopPill
             tag={item.productTags[0]}
             extraCount={Math.max(0, item.productTags.length - 1)}
