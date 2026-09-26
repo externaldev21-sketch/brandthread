@@ -15,6 +15,8 @@
     "update:production": "node scripts/eas-update.js --channel production",
     "update:rollback": "eas update:rollback",
     "screenshots": "node scripts/store-screenshots/capture.mjs",
+    "test:layout-audit": "node tests/layout-audit.spec.ts",
+    "capture:layout-matrix": "node scripts/capture-layout-matrix.mjs",
     "thread-cash:generate-bill-icon": "node scripts/thread-cash/generate-bill-icon.mjs",
     "walkthrough:onboarding": "node scripts/onboarding-walkthrough/capture.mjs",
     "serve": "node server/serve.js",

@@ -7,9 +7,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
-  FG, SUBTLE, OVERLAY,
-  SUCCESS, ORANGE, RED,
-  FONT, ICON,
+  OVERLAY,
+  FONT, ICON, SHADOW_SM,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -206,14 +205,23 @@ export default function BuyerSaved() {
     }
   }
 
+  // One badge tells the clearer story than a cluttered row — priority order:
+  // sold out > price drop > low stock > back in stock.
   function renderBadges(item: SavedItem) {
     if (item.type !== 'product') return null;
+    const badge = item.soldOut
+      ? { label: 'Sold out', color: theme.error }
+      : item.priceDropped
+        ? { label: 'Price drop', color: theme.success }
+        : item.lowStock
+          ? { label: 'Low stock', color: theme.warning }
+          : item.backInStock
+            ? { label: 'Back in stock', color: theme.accent }
+            : null;
+    if (!badge) return null;
     return (
       <View style={styles.badgeRow}>
-        {item.soldOut ? <Badge label="Sold out" color={RED} /> : null}
-        {!item.soldOut && item.lowStock ? <Badge label="Low stock" color={ORANGE} /> : null}
-        {!item.soldOut && item.backInStock ? <Badge label="Back in stock" color={theme.accent} /> : null}
-        {item.priceDropped ? <Badge label="Price drop" color={SUCCESS} /> : null}
+        <Badge label={badge.label} color={badge.color} />
       </View>
     );
   }
@@ -252,7 +260,7 @@ export default function BuyerSaved() {
           <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
           {isProduct && item.priceCents != null ? (
             <View style={styles.priceRow}>
-              <Text style={[styles.tilePrice, TABULAR_NUMS, item.priceDropped && { color: SUCCESS }]}>
+              <Text style={[styles.tilePrice, TABULAR_NUMS, item.priceDropped && { color: theme.success }]}>
                 {formatCents(item.priceCents)}
               </Text>
               {item.priceDropped && item.oldPriceCents != null ? (
@@ -407,7 +415,7 @@ export default function BuyerSaved() {
             <TextInput
               style={styles.input}
               placeholder="e.g. Fall Fits"
-              placeholderTextColor={SUBTLE}
+              placeholderTextColor={theme.subtle}
               value={newCollectionName}
               onChangeText={setNewCollectionName}
               autoFocus
@@ -433,6 +441,9 @@ export default function BuyerSaved() {
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
+  // Status accents (theme.success/warning/error) are pale across every
+  // preset, so a near-black label reads reliably on all of them — a white
+  // label would wash out against the lighter ones.
   return (
     <View style={[bs.badge, { backgroundColor: color }]}>
       <Text style={bs.badgeText}>{label}</Text>
@@ -440,39 +451,43 @@ function Badge({ label, color }: { label: string; color: string }) {
   );
 }
 const bs = StyleSheet.create({
-  badge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADII.chip, marginRight: SPACING.xxs, marginBottom: SPACING.xxs },
-  badgeText: { color: '#fff', fontSize: 10, fontFamily: FONT.bold },
+  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADII.pill, marginRight: SPACING.xxs, marginBottom: SPACING.xxs },
+  badgeText: { color: '#0A0A0B', fontSize: 10, fontFamily: FONT.bold, letterSpacing: 0.2 },
 });
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   tabBar: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
   gridContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs, gap: GAP, paddingBottom: SPACING.xxl },
+  // 4:5 portrait crop (not a bare square) — the wishlist-grid reference used
+  // for this rebuild (SSENSE/Nike Favorites, Shop Favourites) all crop the
+  // product photo taller than wide, which reads calmer at 2-up than a square.
   tile: {
-    width: TILE_SIZE, marginBottom: GAP, borderRadius: RADII.card,
+    width: TILE_SIZE, marginBottom: GAP, borderRadius: RADII.sheet,
     backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, overflow: 'hidden',
+    ...SHADOW_SM,
   },
-  collectionCard: { width: TILE_SIZE, marginBottom: GAP, padding: 0, overflow: 'hidden' },
-  tileImageWrap: { width: '100%', aspectRatio: 1 },
+  collectionCard: { width: TILE_SIZE, marginBottom: GAP, padding: 0, overflow: 'hidden', borderRadius: RADII.sheet },
+  tileImageWrap: { width: '100%', aspectRatio: 4 / 5 },
   tileImage: { width: '100%', height: '100%' },
   tilePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   newCollectionSquare: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.accent, borderStyle: 'dashed', backgroundColor: 'transparent' },
-  tileMore: { position: 'absolute', top: SPACING.xxs, right: SPACING.xxs },
+  tileMore: { position: 'absolute', top: SPACING.xs, right: SPACING.xs },
   publicBadge: {
-    position: 'absolute', top: SPACING.xxs, right: SPACING.xxs, width: 22, height: 22, borderRadius: RADII.pill,
+    position: 'absolute', top: SPACING.xs, right: SPACING.xs, width: 22, height: 22, borderRadius: RADII.pill,
     backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center',
   },
-  badgeRow: { position: 'absolute', left: SPACING.xxs, bottom: SPACING.xxs, right: SPACING.xxs, flexDirection: 'row', flexWrap: 'wrap' },
-  tileInfo: { paddingHorizontal: SPACING.xs, paddingTop: SPACING.xs, paddingBottom: SPACING.sm, gap: 1 },
-  tileBrand: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.3 },
-  tileTitle: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: FG },
+  badgeRow: { position: 'absolute', left: SPACING.xs, top: SPACING.xs, right: SPACING.xs, flexDirection: 'row', flexWrap: 'wrap' },
+  tileInfo: { paddingHorizontal: SPACING.sm, paddingTop: SPACING.xs + 2, paddingBottom: SPACING.sm, gap: 2 },
+  tileBrand: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: FONT.semibold },
+  tileTitle: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: theme.text },
   tileSubtitle: { ...TYPE_SCALE.caption, color: palette.mutedForeground },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xxs },
-  tilePrice: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: FG },
-  tileOldPrice: { ...TYPE_SCALE.caption, color: SUBTLE, textDecorationLine: 'line-through' },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xxs, marginTop: 1 },
+  tilePrice: { ...TYPE_SCALE.footnote, fontFamily: FONT.bold, color: theme.text },
+  tileOldPrice: { ...TYPE_SCALE.caption, color: theme.subtle, textDecorationLine: 'line-through' },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },
   actionsContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs },
-  actionsTitle: { ...TYPE_SCALE.headline, fontFamily: FONT.bold, color: FG, marginBottom: SPACING.xs, textAlign: 'center' },
+  actionsTitle: { ...TYPE_SCALE.headline, fontFamily: FONT.bold, color: theme.text, marginBottom: SPACING.xs, textAlign: 'center' },
   centerModal: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.lg },
   newCollectionCard: {
     width: '100%', backgroundColor: palette.card, borderRadius: RADII.sheet, borderWidth: 1, borderColor: palette.border,
@@ -480,7 +495,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   },
   input: {
     height: 48, borderRadius: RADII.chip, borderWidth: 1, borderColor: palette.border,
-    backgroundColor: palette.elevated, paddingHorizontal: SPACING.md, color: FG, fontSize: TYPE_SCALE.body.fontSize,
+    backgroundColor: palette.elevated, paddingHorizontal: SPACING.md, color: theme.text, fontSize: TYPE_SCALE.body.fontSize,
   },
   modalActions: { flexDirection: 'row', gap: SPACING.sm, justifyContent: 'flex-end' },
 });

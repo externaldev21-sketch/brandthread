@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { identityOrNone } from '@/lib/animationUtils';
 import { useColors } from '@/hooks/useColors';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -43,7 +44,10 @@ export function Snackbar({ visible, message, thumbnailUri, actionLabel, onAction
     translateY.set(withTiming(visible ? 0 : 12, { duration: FADE_MS }));
   }, [visible, opacity, translateY]);
 
-  const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: translateY.value }] }));
+  // While shown at rest translateY.value is 0; `identityOrNone` drops the
+  // transform then instead of leaving this toast's message text pinned to a
+  // permanent identity-matrix compositing layer for its whole visible time.
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: identityOrNone([{ translateY: translateY.value }]) }));
 
   if (!visible) return null;
 

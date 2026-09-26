@@ -12,7 +12,7 @@
  * POST   /api/internal/notifications            — publish a notification (server-to-user)
  */
 import { Router } from "express";
-import { db, notificationsFeed } from "@workspace/db";
+import { db, notificationsFeed, users } from "@workspace/db";
 import { eq, and, desc, inArray, or, sql, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -35,7 +35,11 @@ const THUMBNAIL_URL_TTL_SEC = 60 * 60;
 
 type FeedRow = typeof notificationsFeed.$inferSelect;
 
-export function adapt(n: FeedRow, targetImageUrl: string | null = n.targetImageUrl ?? null) {
+export function adapt(
+  n: FeedRow,
+  targetImageUrl: string | null = n.targetImageUrl ?? null,
+  actorAvatarUrl: string | null = null,
+) {
   return {
     id:            n.id,
     category:      n.category,
@@ -49,12 +53,35 @@ export function adapt(n: FeedRow, targetImageUrl: string | null = n.targetImageU
     actorHandle:   n.actorHandle  ?? undefined,
     actorInitials: n.actorInitials ?? undefined,
     actorColor:    n.actorColor   ?? undefined,
+    actorAvatarUrl: actorAvatarUrl ?? undefined,
     targetId:      n.targetId     ?? undefined,
     targetType:    n.targetType   ?? undefined,
     targetImageUrl: targetImageUrl ?? undefined,
     cta:           n.cta          ?? undefined,
     createdAt:     n.createdAt?.toISOString() ?? new Date().toISOString(),
   };
+}
+
+/**
+ * Real profile photos for the actors on a page of feed rows — mirrors
+ * social.ts's formatUser() resolution (an uploaded photo wins over the Clerk
+ * avatar; a private /objects/ storage path is never exposed here).
+ */
+async function resolveActorAvatars(actorIds: string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(actorIds)];
+  if (ids.length === 0) return new Map();
+  const rows = await db
+    .select({ clerkId: users.clerkId, profileImageUrl: users.profileImageUrl, avatarUrl: users.avatarUrl })
+    .from(users)
+    .where(inArray(users.clerkId, ids));
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    const url = typeof row.profileImageUrl === "string" && row.profileImageUrl.startsWith("http")
+      ? row.profileImageUrl
+      : row.avatarUrl;
+    if (typeof url === "string" && url.startsWith("http")) map.set(row.clerkId, url);
+  }
+  return map;
 }
 
 /**
@@ -125,8 +152,11 @@ buyerRouter.get("/", async (req, res) => {
     .orderBy(desc(notificationsFeed.createdAt), desc(notificationsFeed.id))
     .limit(limit)
     .offset(offset);
-  const images = await Promise.all(rows.map((row) => resolveTargetImage(row.targetImageUrl ?? null)));
-  return res.json(rows.map((row, index) => adapt(row, images[index])));
+  const [images, avatars] = await Promise.all([
+    Promise.all(rows.map((row) => resolveTargetImage(row.targetImageUrl ?? null))),
+    resolveActorAvatars(rows.map((row) => row.actorId).filter((id): id is string => !!id)),
+  ]);
+  return res.json(rows.map((row, index) => adapt(row, images[index], row.actorId ? avatars.get(row.actorId) ?? null : null)));
 });
 
 /**

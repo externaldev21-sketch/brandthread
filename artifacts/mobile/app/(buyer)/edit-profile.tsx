@@ -16,9 +16,11 @@ import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerPr
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import { pickProfileImage } from '@/lib/pickProfileImage';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
+import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Prefer not to say', 'Custom'] as const;
@@ -90,6 +92,7 @@ function GenderPicker({
 }
 
 export default function BuyerEditProfileScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const navigation = useNavigation();
@@ -279,7 +282,7 @@ export default function BuyerEditProfileScreen() {
     router.back();
   }
 
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
+  const topPad = insets.top;
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof CoreFields, string>> = {};
@@ -365,8 +368,25 @@ export default function BuyerEditProfileScreen() {
 
   if (!loaded) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={theme.accent} />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={[styles.header, { paddingTop: topPad + 10 }]}>
+          <Feather name="chevron-left" size={24} color={theme.text} onPress={() => router.back()} />
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Edit profile</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={{ alignItems: 'center', paddingTop: SP.lg }}>
+          <SkeletonBlock width={92} height={92} radius={46} />
+          <View style={{ height: SP.sm }} />
+          <SkeletonLine width={120} height={14} />
+        </View>
+        <View style={{ paddingHorizontal: SP.md, paddingTop: SP.xl, gap: SP.lg }}>
+          {[0, 1, 2, 3].map((row) => (
+            <View key={row} style={{ gap: SP.xs }}>
+              <SkeletonLine width={80} height={11} />
+              <SkeletonBlock width="100%" height={44} radius={12} />
+            </View>
+          ))}
+        </View>
       </View>
     );
   }
@@ -401,7 +421,7 @@ export default function BuyerEditProfileScreen() {
           <Text style={[styles.toastText, { color: theme.onAccent }]}>{toast.message}</Text>
         </Animated.View>
 
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
+        <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
           {/* Avatar */}
           <View style={styles.avatarSection}>
             <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={avatarUploading}>

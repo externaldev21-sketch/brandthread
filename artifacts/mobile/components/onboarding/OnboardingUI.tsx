@@ -33,6 +33,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { identityOrNone } from '@/lib/animationUtils';
 import { MOTION, PRESS_SCALE, RADIUS, SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
 
 // ─── Reveal ───────────────────────────────────────────────────────────────────
@@ -130,7 +131,7 @@ export function PressableScale({
 >) {
   const { reduceMotion } = useOnboardingMotion();
   const scale = useSharedValue(1);
-  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const pressStyle = useAnimatedStyle(() => ({ transform: identityOrNone([{ scale: scale.value }]) }));
   return (
     <Animated.View style={pressStyle}>
       <Pressable
@@ -199,7 +200,7 @@ export function PillButton({
   const { theme } = useAppTheme();
   const { reduceMotion, lightTap } = useOnboardingMotion();
   const scale = useSharedValue(1);
-  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const pressStyle = useAnimatedStyle(() => ({ transform: identityOrNone([{ scale: scale.value }]) }));
   const inactive = disabled || loading;
 
   const content = loading ? (

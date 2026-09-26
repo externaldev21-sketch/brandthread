@@ -116,7 +116,7 @@ vi.mock('react-native-reanimated', () => ({
   default: {
     View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode),
   },
-  Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, linear: (v: number) => v },
+  Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, linear: (v: number) => v, bezier: (..._points: number[]) => (t: number) => t },
   useSharedValue: (initial: number) => ({ value: initial, set: () => {} }),
   useAnimatedStyle: (fn: () => unknown) => fn(),
   withTiming: (value: unknown) => value,
@@ -131,6 +131,7 @@ vi.mock('expo-router', () => ({
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
   },
+  useScrollToTop: () => {},
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -176,8 +177,28 @@ vi.mock('@/components/BrandthreadUI', () => ({
     ),
 }));
 
+// `tabDataCache` is a module-level in-memory Map (see lib/tabDataCache.ts —
+// PR #128's instant-tab prefetch), so without this mock, whichever test in
+// this file resolves conversations first permanently seeds it for every
+// later test in the same process, making the inbox skip its loading
+// skeleton entirely (`loading` starts `false` whenever a cache hit exists).
+// A plain no-op mock keeps every test's `loading` starting state
+// independent of run order.
+vi.mock('@/lib/tabDataCache', () => ({
+  getCachedTabData: () => undefined,
+  setCachedTabData: () => {},
+  hydrateTabData: async () => undefined,
+}));
+
 vi.mock('@/components/layout', () => ({
   ListSkeleton: () => React.createElement('View', { testID: 'inbox-skeleton' }),
+  Header: ({ title, belowTitle, actions }: any) => React.createElement(
+    'View',
+    { testID: 'inbox-header' },
+    React.createElement('Text', {}, title),
+    belowTitle ?? null,
+    ...(actions ?? []).map((a: any) => React.createElement('View', { key: a.accessibilityLabel, accessibilityLabel: a.accessibilityLabel, onPress: a.onPress })),
+  ),
 }));
 
 vi.mock('@/components/layout/TabPageHeader', () => ({

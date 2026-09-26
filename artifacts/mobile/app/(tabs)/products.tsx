@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -18,6 +19,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, SearchBar, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
 import { IconButton } from '@/components/ui/IconButton';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
@@ -262,6 +264,7 @@ function SortModal({
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProductsScreen() {
+  const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & Record<string, string>;
   const s = React.useMemo(() => createStyles(theme), [theme]);
@@ -487,6 +490,13 @@ export default function ProductsScreen() {
     'out-of-stock': { icon: 'x-circle', message: 'Nothing is out of stock right now.' },
   };
 
+  // Belt-and-suspenders alongside contentContainerStyle's paddingBottom below:
+  // FlashList's web renderer doesn't always honor a large contentContainerStyle
+  // bottom padding, letting the last row sit under the floating tab bar — a
+  // real DOM footer of that height guarantees the scrollable area actually
+  // extends past the bar.
+  const ListFooter = useMemo(() => <View style={{ height: tabBar.occupiedHeight }} />, [tabBar.occupiedHeight]);
+
   const ListEmpty = useMemo(() => {
     const copy = emptyCopy[filter] ?? emptyCopy.all;
     return (
@@ -505,7 +515,7 @@ export default function ProductsScreen() {
   return (
     <View style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
       {/* ── Fixed header ── */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm, backgroundColor: palette.surface ?? BG, borderBottomColor: palette.border ?? BORDER }]}>
+      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? 67 : insets.top) + 12, backgroundColor: palette.surface ?? BG }]}>
         {/* Title row */}
         <View style={s.titleRow}>
           <PressableScale
@@ -537,7 +547,7 @@ export default function ProductsScreen() {
               variant="plain"
               size={ICON.md}
               color={FG}
-              onPress={() => Alert.alert('Products', 'Choose an action', [
+              onPress={() => showActionSheet('Products', 'Choose an action', [
                 { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
                 { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
                 { text: 'Export products', onPress: () => { void handleExportProducts(); } },
@@ -609,12 +619,14 @@ export default function ProductsScreen() {
         </View>
       ) : (
         <FlashList
+          ref={scrollResetRef}
           data={sortedProducts}
           keyExtractor={keyExtractor}
           renderItem={renderProduct}
           numColumns={gridColumns}
           key={`cols-${gridColumns}`}
           ListHeaderComponent={ListHeader}
+          ListFooterComponent={ListFooter}
           ListEmptyComponent={ListEmpty}
           contentContainerStyle={{ paddingHorizontal: gridGutter - gridGap / 2, paddingBottom: tabBar.occupiedHeight + SP.xl }}
           showsVerticalScrollIndicator={false}
@@ -672,8 +684,6 @@ const createStyles = (theme: any) => {
   // Header
   header: {
     backgroundColor: BG,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
     paddingBottom: 0,
   },
   titleRow: {
@@ -690,10 +700,10 @@ const createStyles = (theme: any) => {
     gap: 4,
   },
   titleText: {
-    fontSize: FS.xl,
+    fontSize: 20,
     fontFamily: FONT.bold,
     color: FG,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   titleActions: {
     flexDirection: 'row',
