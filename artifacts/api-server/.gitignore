@@ -1,0 +1,4 @@
+# JSON backups written by scripts/reset-accounts.ts before it deletes any
+# rows. These contain full PII snapshots of deleted accounts and must never
+# be committed.
+backups/
