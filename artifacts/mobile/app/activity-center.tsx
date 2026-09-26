@@ -812,7 +812,7 @@ export default function ActivityCenterScreen() {
 
   const renderSectionHeader = useCallback(({ section }: { section: ListSection }) => (
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle} accessibilityRole="header">{section.title}</Text>
+      <Text style={styles.sectionTitle} accessibilityRole="header" numberOfLines={1}>{section.title}</Text>
     </View>
   ), [styles]);
 

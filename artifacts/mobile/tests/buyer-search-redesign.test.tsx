@@ -227,6 +227,7 @@ vi.mock('react-native-reanimated', () => ({
     inOut: (fn: unknown) => fn,
     cubic: (t: number) => t,
     linear: (t: number) => t,
+    bezier: (..._points: number[]) => (t: number) => t,
   },
 }));
 

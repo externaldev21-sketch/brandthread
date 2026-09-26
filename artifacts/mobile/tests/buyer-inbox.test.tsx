@@ -116,7 +116,7 @@ vi.mock('react-native-reanimated', () => ({
   default: {
     View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode),
   },
-  Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, linear: (v: number) => v },
+  Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, linear: (v: number) => v, bezier: (..._points: number[]) => (t: number) => t },
   useSharedValue: (initial: number) => ({ value: initial, set: () => {} }),
   useAnimatedStyle: (fn: () => unknown) => fn(),
   withTiming: (value: unknown) => value,
