@@ -135,6 +135,7 @@ export function BuyerTabBar({
   // The field stays mounted until the closing animation finishes, then leaves
   // the tree so screen readers and UI tests only ever see one mode.
   const [fieldMounted, setFieldMounted] = useState(searchActive);
+  const [fieldFocused, setFieldFocused] = useState(false);
 
   useEffect(() => {
     const target = searchActive ? 1 : 0;
@@ -352,7 +353,14 @@ export function BuyerTabBar({
               fieldStyle,
             ]}
           >
-            <View style={[StyleSheet.absoluteFill, styles.fieldFill, { borderRadius: fieldHeight / 2 }]} />
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.fieldFill,
+                { borderRadius: fieldHeight / 2 },
+                fieldFocused && { borderColor: theme.accent },
+              ]}
+            />
             <View style={styles.fieldGlyph}>
               <BuyerNavIcon name="search" color={theme.text} size={20} strokeWidth={2} />
             </View>
@@ -373,6 +381,8 @@ export function BuyerTabBar({
                 selectionColor={theme.accent}
                 cursorColor={theme.accent}
                 editable={searchActive}
+                onFocus={() => setFieldFocused(true)}
+                onBlur={() => setFieldFocused(false)}
                 onSubmitEditing={submit}
                 maxFontSizeMultiplier={1.3}
                 testID="buyer-tab-search-input"

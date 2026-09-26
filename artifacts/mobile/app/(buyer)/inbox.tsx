@@ -125,6 +125,7 @@ export default function InboxScreen() {
   const [composeFollowing, setComposeFollowing] = useState<ComposePerson[]>([]);
   const [composeSuggested, setComposeSuggested] = useState<ComposePerson[]>([]);
   const [messagesSearchQuery, setMessagesSearchQuery] = useState('');
+  const [messagesSearchFocused, setMessagesSearchFocused] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
   const [requestsSheetVisible, setRequestsSheetVisible] = useState(false);
   const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -740,7 +741,12 @@ export default function InboxScreen() {
       {/* Search — always available, not gated behind a tab */}
       {!loading && (
         <View style={{ paddingHorizontal: gutter }}>
-          <View style={[s.searchRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
+          <View
+            style={[
+              s.searchRow,
+              { borderColor: messagesSearchFocused ? theme.accent : theme.border, backgroundColor: theme.cardElevated },
+            ]}
+          >
             <Feather name="search" size={16} color={theme.muted} />
             <TextInput
               style={[s.searchInput, { color: theme.text }]}
@@ -749,6 +755,8 @@ export default function InboxScreen() {
               placeholder="Search conversations"
               placeholderTextColor={theme.muted}
               autoCorrect={false}
+              onFocus={() => setMessagesSearchFocused(true)}
+              onBlur={() => setMessagesSearchFocused(false)}
               testID="inbox-search-input"
               accessibilityLabel="Search conversations"
             />
