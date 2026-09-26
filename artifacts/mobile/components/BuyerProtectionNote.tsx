@@ -21,12 +21,19 @@ export { BUYER_PROTECTION_STATUS, BUYER_PROTECTION_TITLE, buyerProtectionLines }
 export function BuyerProtectionNote({
   preorder = false,
   compact = false,
+  flat = false,
   style,
   testID = 'buyer-protection-note',
 }: {
   preorder?: boolean;
   /** Title + first line only, for tight footers. */
   compact?: boolean;
+  /**
+   * A single plain line (shield icon + status text), no card background or
+   * border — for a page like checkout's flat, hairline-divided layout. PDP
+   * and order-detail keep the default bordered-card look.
+   */
+  flat?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }) {
@@ -34,6 +41,25 @@ export function BuyerProtectionNote({
   const router = useRouter();
   const lines = buyerProtectionLines({ preorder });
   const terms = LEGAL_DOCUMENTS.terms;
+
+  if (flat) {
+    return (
+      <TouchableOpacity
+        onPress={() => router.push(terms.route as never)}
+        style={[styles.flatRow, style]}
+        testID={testID}
+        accessibilityRole="link"
+        accessibilityLabel={`${BUYER_PROTECTION_TITLE}. Read the ${terms.title}`}
+      >
+        <Feather name="shield" size={15} color={theme.muted} />
+        <Text style={[styles.flatText, { color: theme.muted }]} numberOfLines={1}>
+          {BUYER_PROTECTION_TITLE} · {BUYER_PROTECTION_STATUS}
+        </Text>
+        <Feather name="chevron-right" size={14} color={theme.muted} />
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <View
       style={[styles.card, { borderColor: theme.border, backgroundColor: theme.cardGlass }, style]}
@@ -76,4 +102,6 @@ const styles = StyleSheet.create({
   body: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
   link: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', minHeight: 44 },
   linkText: { fontFamily: FONT.semibold, fontSize: FS.xs },
+  flatRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.md },
+  flatText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm },
 });
