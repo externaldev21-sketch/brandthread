@@ -919,7 +919,11 @@ export function ShopProductSheet({
       {showAddedConfirmation && (
         <View style={ss.addedConfirmationOverlay} pointerEvents="none" accessibilityLiveRegion="polite">
           <View style={ss.addedConfirmationContent}>
-            <Feather name="shopping-cart" size={36} color={ON_DARK} />
+            {/* Monochrome brand accent circle, not a green/generic icon —
+                same success-moment language as SuccessCheck elsewhere. */}
+            <View style={[ss.addedConfirmationBadge, { backgroundColor: theme.accent }]}>
+              <Feather name="check" size={26} color={theme.onAccent} />
+            </View>
             <Text style={ss.addedConfirmationText}>Added to cart</Text>
           </View>
         </View>
@@ -1111,6 +1115,10 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
+  },
+  addedConfirmationBadge: {
+    width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
   },
   addedConfirmationText: {
     color: ON_DARK,

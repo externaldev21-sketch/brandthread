@@ -39,7 +39,7 @@ import {
 } from '@/lib/theme';
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
-import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar } from '@/components/ui';
+import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, SuccessCheck } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -1192,9 +1192,9 @@ export default function BuyerProductDetailScreen() {
           an auto-dismissing toast: the buyer picks View bag or Keep shopping. */}
       <BottomSheet visible={showAddedSheet} onClose={() => setShowAddedSheet(false)}>
         <View style={s.addedSheetContent}>
-          <View style={s.addedSheetIconWrap}>
-            <Feather name="check" size={22} color={SUCCESS} />
-          </View>
+          {/* Monochrome brand accent, not a green checkmark — the shared
+              success-moment primitive (components/ui/SuccessCheck.tsx). */}
+          <SuccessCheck size={56} iconSize={26} />
           <Text style={s.addedSheetTitle}>Added to your bag</Text>
           <View style={s.addedSheetProductRow}>
             {product.imageUris[0] ? (
@@ -1587,11 +1587,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
   productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
   addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
-  addedSheetIconWrap: {
-    width: 44, height: 44, borderRadius: RADIUS.pill, backgroundColor: SUCCESS_DIM,
-    alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm,
-  },
-  addedSheetTitle: { ...TYPE.title, color: FG, marginBottom: SP.md },
+  addedSheetTitle: { ...TYPE.title, color: FG, marginTop: SP.sm, marginBottom: SP.md },
   addedSheetProductRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, width: '100%',
     marginBottom: SP.lg, padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,

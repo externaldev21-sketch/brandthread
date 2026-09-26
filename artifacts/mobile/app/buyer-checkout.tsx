@@ -859,6 +859,15 @@ function Review({
           <Text style={s.total}>Estimated total</Text>
           <Text style={s.total}>{money(session.summary.totalCents)}</Text>
         </View>
+        <TouchableOpacity
+          onPress={onViewReceipt}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: SP.sm }}
+          accessibilityRole="button"
+          accessibilityLabel="View full receipt"
+        >
+          <Feather name="file-text" size={13} color={PURPLE_LIGHT} />
+          <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.xs }}>View full receipt</Text>
+        </TouchableOpacity>
       </Card>
 
       {session.deliveryGroups.length > 1 && (
@@ -1196,7 +1205,6 @@ export default function BuyerCheckoutScreen() {
    */
   const [verifiedOrders, setVerifiedOrders] = useState<VerifiedOrder[]>([]);
   const [pendingSessionIds, setPendingSessionIds] = useState<string[]>([]);
-  const [expandedSection, setExpandedSection] = useState<GuidedCheckoutSection>('information');
   const [receiptVisible, setReceiptVisible] = useState(false);
   /**
    * In-memory map: sellerId → verified server order ID.
@@ -1227,7 +1235,6 @@ export default function BuyerCheckoutScreen() {
       setSession(next);
       setContact(restoredContact);
       setAddress(restoredAddress);
-      setExpandedSection(firstIncomplete);
 
       // Restore paid state — only entries with a verified orderId are considered confirmed.
       // Entries with only orderNumber (legacy sessions) are treated as pending until
@@ -1348,44 +1355,27 @@ export default function BuyerCheckoutScreen() {
     }
   };
 
-  const handleContinue = async () => {
-    if (current.step === 'information') {
-      if (!validateInformation() || !await validateServerCart()) return;
-      await persist({ ...current, contact: contact as CheckoutContact, shippingAddress: address as CheckoutAddress, step: 'delivery' });
-      setExpandedSection('delivery');
+  /**
+   * Single-page checkout has no per-step "Continue" gate — one "Place order"
+   * CTA runs every check the old information/delivery/review steps used to
+   * run in sequence, in the same order, before calling the same pay(). The
+   * checks themselves (and pay() itself) are unchanged; only the fact that
+   * they now run together instead of behind three separate taps is new.
+   */
+  const handlePlaceOrder = async () => {
+    if (!validateInformation()) return;
+    if (current.deliveryGroups.some(g => !g.selectedMethodId)) {
+      Alert.alert('Choose delivery', 'Select a delivery option for every seller before paying.');
       return;
     }
-    if (current.step === 'delivery') {
-      if (current.deliveryGroups.some(g => !g.selectedMethodId)) {
-        Alert.alert('Choose delivery', 'Select a delivery option for every seller before reviewing your order.');
-        return;
-      }
-      if (!await validateServerCart()) return;
-      await persist({ ...current, step: 'review' });
-      setExpandedSection('review');
+    const blockingSection = getCheckoutBlockingSection(contact, address, current);
+    if (blockingSection === 'acknowledgments') {
+      Alert.alert('Acknowledgment required', 'Please accept the required policies before paying.');
       return;
     }
-    if (current.step === 'review') {
-      const blockingSection = getCheckoutBlockingSection(contact, address, current);
-      if (blockingSection === 'information') {
-        setExpandedSection('information');
-        validateInformation();
-        return;
-      }
-      if (blockingSection === 'delivery') {
-        setExpandedSection('delivery');
-        Alert.alert('Choose delivery', 'Select a delivery option for every seller before paying.');
-        return;
-      }
-      if (blockingSection === 'acknowledgments' || !await validateServerCart()) {
-        if (blockingSection === 'acknowledgments') {
-          setExpandedSection('review');
-          Alert.alert('Acknowledgment required', 'Please accept the required policies before paying.');
-        }
-        return;
-      }
-      await pay();
-    }
+    if (!await validateServerCart()) return;
+    await persist({ ...current, contact: contact as CheckoutContact, shippingAddress: address as CheckoutAddress, step: 'review' });
+    await pay();
   };
 
   const pay = async () => {
@@ -1624,14 +1614,16 @@ export default function BuyerCheckoutScreen() {
     && !!address.state && (address.postalCode ?? '').trim().length >= 3 && !!address.country;
   const deliveryComplete = current.deliveryGroups.every(g => !!g.selectedMethodId);
   const reviewComplete = current.acknowledgments.every(ack => !ack.required || ack.acknowledged);
+  const itemCount = current.deliveryGroups.reduce((total, g) => total + g.items.reduce((n, i) => n + i.quantity, 0), 0);
 
-  const ctaLabel = current.step === 'review'
-    ? canRetryPayment ? 'Try a different card' : 'Continue to payment'
-    : 'Continue';
+  const ctaLabel = canRetryPayment
+    ? 'Try a different card'
+    : `Place order · ${money(current.summary.totalCents)}`;
 
   return (
     <KeyboardAvoidingView style={s.root} behavior="padding" keyboardVerticalOffset={0}>
-      {/* Header */}
+      {/* Header — single "Checkout" title, no step progress: every section
+          below is already on screen, there is nothing to step through. */}
       {current.step !== 'confirmation' && (
         <View style={[s.header, { paddingTop: insets.top + SP.xs }]}>
           <IconButton
@@ -1641,8 +1633,8 @@ export default function BuyerCheckoutScreen() {
             accessibilityLabel="Back"
           />
           <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={s.stepLabel}>Secure checkout</Text>
-            <Progress step={current.step} />
+            <Text style={s.stepLabel}>Checkout</Text>
+            <Text style={s.stepSubLabel}>{itemCount} item{itemCount === 1 ? '' : 's'} · Secured by Stripe</Text>
           </View>
           <View style={s.back} />
         </View>
@@ -1657,25 +1649,13 @@ export default function BuyerCheckoutScreen() {
       >
         {current.step !== 'confirmation' && (
           <>
-            {/* Compact summary view always visible at top (Depop pattern) */}
-            {current.step === 'review' && (
-              <CheckoutSummaryView
-                session={current}
-                onTapSummary={() => setReceiptVisible(true)}
-                onTapShipping={() => setExpandedSection('delivery')}
-                onTapAddress={() => setExpandedSection('information')}
-              />
-            )}
+            {/* Items glance, always visible — tap the total for the full receipt. */}
+            <CheckoutSummaryView
+              session={current}
+              onTapSummary={() => setReceiptVisible(true)}
+            />
 
-            <GuidedSection
-              title="Contact & shipping address"
-              summary={informationComplete
-                ? `${contact.email} · ${address.city}, ${address.state}`
-                : 'Add your contact and delivery address'}
-              expanded={expandedSection === 'information'}
-              complete={informationComplete}
-              onPress={() => setExpandedSection('information')}
-            >
+            <SectionCard title="Contact & shipping address" icon="map-pin" complete={informationComplete}>
               <Information
                 contact={contact}
                 address={address}
@@ -1684,17 +1664,9 @@ export default function BuyerCheckoutScreen() {
                 savedAddresses={savedAddresses}
                 onSelectAddress={handleSelectAddress}
               />
-            </GuidedSection>
+            </SectionCard>
 
-            <GuidedSection
-              title="Delivery & promo"
-              summary={deliveryComplete
-                ? `${current.deliveryGroups.length} delivery choice${current.deliveryGroups.length === 1 ? '' : 's'} selected`
-                : 'Choose delivery and add a promo code'}
-              expanded={expandedSection === 'delivery'}
-              complete={deliveryComplete}
-              onPress={() => setExpandedSection('delivery')}
-            >
+            <SectionCard title="Delivery & promo" icon="truck" complete={deliveryComplete}>
               <Delivery
                 session={current}
                 onSelect={(sellerId, methodId) =>
@@ -1715,7 +1687,7 @@ export default function BuyerCheckoutScreen() {
                   )
                 }
               />
-            </GuidedSection>
+            </SectionCard>
 
             {/* THREAD CASH HOOK POINT: same self-contained card cart.tsx uses,
                 gated behind the same OFF-by-default 'threadCashCheckoutDiscount'
@@ -1731,13 +1703,7 @@ export default function BuyerCheckoutScreen() {
               />
             )}
 
-            <GuidedSection
-              title="Review & policies"
-              summary={`${money(current.summary.totalCents)} · Stripe secure payment`}
-              expanded={expandedSection === 'review'}
-              complete={reviewComplete}
-              onPress={() => setExpandedSection('review')}
-            >
+            <SectionCard title="Payment & policies" icon="lock" complete={reviewComplete}>
               <Review
                 session={current}
                 onAck={(key, checked) =>
@@ -1748,8 +1714,9 @@ export default function BuyerCheckoutScreen() {
                     ),
                   })
                 }
+                onViewReceipt={() => setReceiptVisible(true)}
               />
-            </GuidedSection>
+            </SectionCard>
 
             {/* Buyer protection — shown right before the buyer pays. */}
             <BuyerProtectionNote
@@ -1792,15 +1759,17 @@ export default function BuyerCheckoutScreen() {
         )}
       </ScrollView>
 
-      {/* Persistent Pay securely CTA — hidden on confirmation */}
+      {/* Single persistent "Place order" CTA — hidden on confirmation. This is
+          the one and only forward action on the page; there is no "Continue"
+          between sections any more. */}
       {current.step !== 'confirmation' && (
         <StickyFooter style={s.bottom}>
           <Button
             label={ctaLabel}
-            icon={current.step === 'review' ? 'lock' : undefined}
+            icon="lock"
             loading={placing}
             fullWidth
-            onPress={() => void (canRetryPayment ? retryPayment() : handleContinue())}
+            onPress={() => void (canRetryPayment ? retryPayment() : handlePlaceOrder())}
           />
         </StickyFooter>
       )}
@@ -1851,10 +1820,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
       paddingHorizontal: SP.md, paddingBottom: SP.sm,
     },
     back: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, justifyContent: 'center', alignItems: 'center' },
-    stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 5 },
-    progress: { flexDirection: 'row', gap: 4, width: 120 },
-    progressSegment: { height: 4, flex: 1, borderRadius: RADII.pill, backgroundColor: CARD_ELEVATED },
-    progressSegmentActive: { backgroundColor: PURPLE },
+    stepLabel: { fontFamily: FONT.bold, fontSize: FS.base, color: FG },
+    stepSubLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED, marginTop: 2 },
 
     // Card
     card: {
@@ -1876,20 +1843,22 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     toggleTitle: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm },
     muted: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
 
-    // Guided sections
+    // Section cards — always-open rows of the single-page checkout (no accordion).
     guidedSection: {
-      borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_ELEVATED,
-      borderRadius: RADIUS.lg, overflow: 'hidden', marginBottom: SP.sm,
+      borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
+      borderRadius: RADIUS.lg, overflow: 'hidden', marginBottom: SP.md,
+      ...SHADOW_PURPLE, shadowOpacity: 0.08, elevation: 2,
     },
     guidedHeader: {
-      minHeight: 72, flexDirection: 'row', alignItems: 'center',
-      gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm,
+      minHeight: 52, flexDirection: 'row', alignItems: 'center',
+      gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xs,
     },
-    guidedStatus: { width: 26, height: 26, borderRadius: RADII.pill, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+    sectionIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
+    guidedStatus: { width: 22, height: 22, borderRadius: RADII.pill, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
     guidedStatusComplete: { backgroundColor: SUCCESS, borderColor: SUCCESS },
-    guidedTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
+    guidedTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base },
     guidedSummary: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 3 },
-    guidedBody: { paddingHorizontal: SP.sm, paddingBottom: SP.sm },
+    guidedBody: { paddingHorizontal: SP.md, paddingBottom: SP.md, paddingTop: SP.xs },
 
     // Checkout summary (Depop compact rows)
     summaryItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.sm },
