@@ -2949,20 +2949,6 @@ export default function FeedScreen({
               >
                 <BuyerNavIcon name="friends" color={ON_DARK} size={22} strokeWidth={1.9} />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  router.push('/buyer-drops' as never);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Drops"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                testID="buyer-home-drops"
-              >
-                <Feather name="zap" size={20} color={ON_DARK} />
-              </TouchableOpacity>
               {activeLiveStreams.length > 0 && (
                 <TouchableOpacity
                   style={styles.liveJumpBtn}
