@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { FONT } from '@/lib/theme';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function NotFoundScreen() {
   const { theme } = useAppTheme();
@@ -18,7 +19,7 @@ export default function NotFoundScreen() {
 
   const goHome = () => {
     if (router.canGoBack()) {
-      router.back();
+      goBackOr(router);
     } else {
       router.replace('/');
     }

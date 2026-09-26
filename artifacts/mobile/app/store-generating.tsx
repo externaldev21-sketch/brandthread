@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
@@ -147,7 +148,7 @@ export default function StoreGeneratingScreen() {
       />
       {/* Back button — lets users cancel generation */}
       <TouchableOpacity
-        onPress={() => router.back()}
+        onPress={() => goBackOr(router)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         activeOpacity={0.75}
         style={{ position: 'absolute', top: insets.top + 12, left: SP.md, width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}

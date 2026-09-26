@@ -54,6 +54,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/hooks/useApi';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   estimateReach,
   BUDGET_STEPS,
@@ -594,8 +595,8 @@ export default function CreateAdScreen() {
     return (
       <Header
         title="Create Ad"
-        onBack={() => router.back()}
-        actions={[{ icon: 'x', onPress: () => router.back(), accessibilityLabel: 'Close' }]}
+        onBack={() => goBackOr(router)}
+        actions={[{ icon: 'x', onPress: () => goBackOr(router), accessibilityLabel: 'Close' }]}
       />
     );
   }
@@ -631,7 +632,7 @@ export default function CreateAdScreen() {
           <Text style={[styles.stageSub, { textAlign: 'center', color: colors.subtle, fontSize: FS.xs }]}>
             Estimated reach: {reach.low.toLocaleString()}–{reach.high.toLocaleString()} people (estimate only — not a delivered-impression guarantee).
           </Text>
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => router.back()}>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => goBackOr(router)}>
             <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Back to Design Studio</Text>
           </TouchableOpacity>
         </View>
@@ -650,7 +651,7 @@ export default function CreateAdScreen() {
           <Feather name={isAuthError ? 'lock' : 'alert-circle'} size={36} color={colors.destructive} />
           <Text style={[styles.stageHeading, { color: colors.foreground }]}>{isAuthError ? 'Sign in required' : 'Something went wrong'}</Text>
           <Text style={[styles.stageSub, { textAlign: 'center', color: colors.mutedForeground }]}>{initError}</Text>
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => { setInitError(null); router.back(); }}>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => { setInitError(null); goBackOr(router); }}>
             <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Go back</Text>
           </TouchableOpacity>
         </View>

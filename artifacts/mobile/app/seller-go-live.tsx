@@ -4,6 +4,7 @@
  * bottom gradient, then hands off into the existing /seller-live broadcast flow.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
   Animated, KeyboardAvoidingView, Platform, Linking, Image, FlatList,
@@ -164,7 +165,7 @@ function SellerGoLiveNativeScreen() {
     const blocked = camBlocked || micBlocked;
     return (
       <View style={[s.permRoot, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={[s.closeBtn, { top: insets.top + 8 }]} accessibilityLabel="Close">
+        <TouchableOpacity onPress={() => goBackOr(router)} style={[s.closeBtn, { top: insets.top + 8 }]} accessibilityLabel="Close">
           <Feather name="x" size={22} color={FG} />
         </TouchableOpacity>
         <View style={s.permBox}>
@@ -193,7 +194,7 @@ function SellerGoLiveNativeScreen() {
               <Text style={[s.permBtnText, { color: theme.onAccent }]}>Allow camera</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => goBackOr(router)}>
             <Text style={s.permCancel}>Not now</Text>
           </TouchableOpacity>
         </View>
@@ -218,7 +219,7 @@ function SellerGoLiveNativeScreen() {
 
       {/* Top bar */}
       <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.iconBtn} accessibilityLabel="Close">
+        <TouchableOpacity onPress={() => goBackOr(router)} style={s.iconBtn} accessibilityLabel="Close">
           <Feather name="x" size={20} color={FG} />
         </TouchableOpacity>
         <View style={s.topRight}>

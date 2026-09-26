@@ -1849,4 +1849,38 @@ router.get("/discover/feed", async (req, res) => {
   }
 });
 
+// ─── GET /api/public/username-check ─────────────────────────────────────────
+// Unauthenticated live-availability check for the onboarding username field,
+// used before a Clerk account exists (the authenticated variant at
+// /api/auth/username/check needs a signed-in session, which isn't available
+// until sign-up completes). Never leaks anything beyond taken/available.
+const PUBLIC_USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
+
+router.get("/username-check", async (req, res) => {
+  const raw = (req.query.username as string || "").trim().toLowerCase();
+
+  if (!raw) {
+    res.json({ available: false, error: "Username is required." });
+    return;
+  }
+  if (/\s/.test(raw) || !PUBLIC_USERNAME_REGEX.test(raw)) {
+    res.json({ available: false, error: "Letters, numbers, and underscores only (3–30 characters)." });
+    return;
+  }
+
+  try {
+    const [existing] = await db
+      .select({ clerkId: users.clerkId })
+      .from(users)
+      .where(eq(users.username, raw))
+      .limit(1);
+    res.json(existing ? { available: false, error: "Username is already taken." } : { available: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to check username availability");
+    // Fail open: never block sign-up on a transient check failure — the
+    // server still enforces uniqueness at submit time regardless.
+    res.json({ available: true });
+  }
+});
+
 export default router;

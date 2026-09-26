@@ -18,6 +18,7 @@ import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { centsAtBasisPoints, parseDecimalToCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 const PLATFORM_FEE_BASIS_POINTS = 500; // display only — server computes the real fee
 
@@ -95,7 +96,7 @@ export default function FreelancerProfileScreen() {
             try {
               await api.freelancers.deactivate();
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.back();
+              goBackOr(router);
             } catch (e) {
               Alert.alert('Failed', apiErrorMessage(e));
             }

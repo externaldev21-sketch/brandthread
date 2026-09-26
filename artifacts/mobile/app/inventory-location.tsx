@@ -15,6 +15,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getLocations, addLocation, updateLocation, archiveLocation } from '@/services/inventoryService';
 import { InventoryLocation, LocationType, LOCATION_TYPES } from '@/services/inventoryTypes';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type Mode = 'list' | 'add' | 'edit';
 
@@ -177,7 +178,7 @@ export default function InventoryLocationScreen() {
         {/* Header */}
         <View style={ls.header}>
           <TouchableOpacity
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
             style={ls.backBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >

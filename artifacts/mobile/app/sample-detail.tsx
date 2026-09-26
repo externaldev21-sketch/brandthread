@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, Alert, Image,
   StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform,
@@ -636,7 +637,7 @@ export default function SampleDetailScreen() {
   if (loading) {
     return (
       <BrandthreadScreen>
-        <BrandthreadHeader title="Sample Details" onBack={() => router.back()} />
+        <BrandthreadHeader title="Sample Details" onBack={() => goBackOr(router)} />
         <View style={s.loadingContainer}>
           <LoadingSkeleton height={120} style={s.skeleton} />
           <LoadingSkeleton height={200} style={s.skeleton} />
@@ -649,13 +650,13 @@ export default function SampleDetailScreen() {
   if (!sample) {
     return (
       <BrandthreadScreen>
-        <BrandthreadHeader title="Sample Details" onBack={() => router.back()} />
+        <BrandthreadHeader title="Sample Details" onBack={() => goBackOr(router)} />
         <View style={s.centered}>
           <EmptyState
             icon="package"
             title="Sample not found"
             description="It may have been withdrawn."
-            action={{ label: 'Back', onPress: () => router.back() }}
+            action={{ label: 'Back', onPress: () => goBackOr(router) }}
           />
         </View>
       </BrandthreadScreen>
@@ -687,7 +688,7 @@ export default function SampleDetailScreen() {
       <BrandthreadHeader
         title="Sample Details"
         subtitle={manufacturerName}
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView

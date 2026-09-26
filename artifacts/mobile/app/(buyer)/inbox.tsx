@@ -13,7 +13,7 @@ import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, P
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS, ICON, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
@@ -707,31 +707,27 @@ export default function InboxScreen() {
             rippleEnabled={NO_RIPPLE}
             testID={`inbox-conversation-${conv.id}`}
           >
-            {/* Avatar with unread + online dots */}
+            {/* Avatar — Threads-style: no unread/online dot chrome on the
+                avatar itself, unread is conveyed by the name/preview weight
+                and the trailing dot instead (see below). The LIVE ring
+                (LiveHostRing) is the only badge that still lives here. */}
             <View style={s.avatarContainer}>
               {conv.isOfficial ? (
-                <View style={[s.avatar60, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <BrandthreadLogo size={30} />
+                <View style={[s.avatar56, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  <BrandthreadLogo size={28} />
                 </View>
               ) : (
                 // LIVE ring while this person is streaming; tapping the
                 // ringed avatar opens their live instead of the thread.
-                <LiveHostRing hostId={participant.userId} hostName={participant.name} size={60} pressToWatch>
+                <LiveHostRing hostId={participant.userId} hostName={participant.name} size={56} pressToWatch>
                   {participant.avatarUri ? (
-                    <Image source={{ uri: participant.avatarUri }} style={s.avatar60} testID={`inbox-avatar-image-${conv.id}`} />
+                    <Image source={{ uri: participant.avatarUri }} style={s.avatar56} testID={`inbox-avatar-image-${conv.id}`} />
                   ) : (
-                    <View style={[s.avatar60, { backgroundColor: participant.color }]}>
+                    <View style={[s.avatar56, { backgroundColor: participant.color }]}>
                       <Text style={s.avatarInitials}>{participant.initials}</Text>
                     </View>
                   )}
                 </LiveHostRing>
-              )}
-              {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent, borderColor: theme.background }]} />}
-              {participant.isOnline && (
-                <View
-                  style={[s.onlineDot, { backgroundColor: theme.success, borderColor: theme.background }]}
-                  testID={`inbox-online-dot-${conv.id}`}
-                />
               )}
             </View>
 
@@ -746,14 +742,14 @@ export default function InboxScreen() {
                 </Text>
                 {conv.isOfficial && (
                   <View style={s.officialBadgeRow} testID={`inbox-official-badge-${conv.id}`}>
-                    <Feather name="check-circle" size={13} color={theme.accent} style={{ marginLeft: 4 }} />
+                    <Feather name="check-circle" size={12} color={theme.accent} />
                     <View style={[s.aiTag, { backgroundColor: theme.accentDim }]}>
                       <Text style={[s.aiTagText, { color: theme.accent }]}>AI</Text>
                     </View>
                   </View>
                 )}
                 {conv.lastMessageTs ? (
-                  <Text style={[s.convTime, { color: isUnread ? theme.accent : theme.muted }]}>{timeAgo(conv.lastMessageTs)}</Text>
+                  <Text style={[s.convTime, { color: theme.muted }]} numberOfLines={1}>{timeAgo(conv.lastMessageTs)}</Text>
                 ) : null}
               </View>
               {conv.contextOrderNumber ? (
@@ -776,14 +772,12 @@ export default function InboxScreen() {
               )}
             </View>
 
-            {/* Trailing: unread pill badge, hidden when there is nothing unread */}
+            {/* Trailing: Threads-style unread indicator — a single small dot
+                at the row's right edge, nothing when read. No numeric
+                badge, no chevron. */}
             {isUnread ? (
-              <View style={[s.unreadBadge, { backgroundColor: theme.accent }]} testID={`inbox-unread-badge-${conv.id}`}>
-                <Text style={[s.unreadBadgeText, { color: theme.onAccent }]}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
-              </View>
-            ) : (
-              <Feather name="chevron-right" size={ICON.sm} color={theme.subtle} />
-            )}
+              <View style={[s.unreadDotTrailing, { backgroundColor: theme.accent }]} testID={`inbox-unread-badge-${conv.id}`} />
+            ) : null}
           </PressableScale>
         </InboxSwipeRow>
       </AnimatedEntrance>
@@ -1085,7 +1079,7 @@ export default function InboxScreen() {
             data={filteredConvs}
             keyExtractor={item => item.id}
             renderItem={renderConvRow}
-            contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md, paddingHorizontal: gutter }])}
+            contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.lg, paddingHorizontal: gutter }])}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             refreshing={refreshing}
@@ -1329,23 +1323,17 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     minWidth: 88,
   },
 
-  // Conversation row — roomier, no per-row hairline (rhythm from spacing,
-  // not chrome); bigger avatar for a real visual step up from the prior pass.
+  // Conversation row — Threads style: no per-row hairline (rhythm from
+  // spacing/height alone, not chrome), consistent height regardless of a
+  // row's optional content (order pill, AI badge).
   convRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SP.md,
-    minHeight: 96,
+    paddingVertical: SP.sm,
+    minHeight: 72,
   },
   avatarContainer: {
     position: 'relative',
-  },
-  avatar60: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   avatar56: {
     width: 56,
@@ -1358,25 +1346,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     fontSize: FS.md,
     fontFamily: FONT.bold,
     color: '#FFFFFF',
-  },
-  unreadDot: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: theme.background,
-  },
-  onlineDot: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
   },
   searchRow: {
     flexDirection: 'row',
@@ -1405,10 +1374,10 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   },
   convName: {
     flex: 1,
-    fontSize: FS.md,
+    fontSize: FS.base,
   },
   convTime: {
-    fontSize: FS.xs,
+    fontSize: FS.sm,
     fontFamily: FONT.medium,
     marginLeft: SP.xs,
   },
@@ -1424,21 +1393,16 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     fontFamily: FONT.semibold,
   },
   convPreview: {
-    fontSize: FS.sm,
+    fontSize: 14,
     fontFamily: FONT.regular,
   },
-  unreadBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SP.xs,
+  // Threads-style unread marker: one small dot at the row's right edge,
+  // replacing the old numeric badge/chevron.
+  unreadDotTrailing: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     marginLeft: SP.sm,
-  },
-  unreadBadgeText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
   },
 
   // Empty state

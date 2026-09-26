@@ -3,6 +3,7 @@
  * and request a switch between Buyer and Seller modes.
  */
 import React, { useState, useEffect, useRef } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView,
 } from 'react-native';
@@ -98,7 +99,7 @@ export default function AccountTypeSettingsScreen() {
               Alert.alert(
                 'Account type updated',
                 `You are now a ${accountInfo[selectedType].title}. Restart the app to apply all changes.`,
-                [{ text: 'OK', onPress: () => router.back() }],
+                [{ text: 'OK', onPress: () => goBackOr(router) }],
               );
             } catch {
               Alert.alert('Error', 'Could not update account type. Please try again.');

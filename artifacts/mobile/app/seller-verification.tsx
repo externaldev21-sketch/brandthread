@@ -18,6 +18,7 @@ import { BrandthreadHeader, PrimaryButton, SecondaryButton, GradientCard, Brande
 import { useApi } from '@/lib/api';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'failed';
 
@@ -97,7 +98,7 @@ export default function SellerVerificationScreen() {
       router.replace(SELLER_HOME_ROUTE as never);
       return;
     }
-    router.back();
+    goBackOr(router);
   }
 
   // Load current verification status

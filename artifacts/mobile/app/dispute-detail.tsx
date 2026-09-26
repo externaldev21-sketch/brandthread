@@ -9,6 +9,7 @@ import { BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton, Second
 import { useApi } from '@/lib/api';
 import { Dispute, DisputeEvidence, DISPUTE_TYPES } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -274,7 +275,7 @@ export default function DisputeDetailScreen() {
       {/* 1. HEADER */}
       <BrandthreadHeader
         title="Dispute"
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
         rightElement={
           <StatusBadge
             label={disputeStatusLabel(status)}

@@ -17,6 +17,7 @@
  * zonedTimeToUtc, which is unit-tested for DST + non-whole-hour offsets.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform,
   ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
@@ -340,7 +341,7 @@ export default function SellerDropCreate() {
       if (effectiveDropId) {
         router.replace((`/seller-drop-preview?dropId=${encodeURIComponent(effectiveDropId)}`) as never);
       } else {
-        router.back();
+        goBackOr(router);
       }
     } catch {
       Alert.alert('Could not save', 'Please check the fields and try again.');
@@ -361,7 +362,7 @@ export default function SellerDropCreate() {
           try {
             await api.drops.cancel(dropId);
             Alert.alert('Drop cancelled');
-            router.back();
+            goBackOr(router);
           } catch (err: any) {
             if (err?.code === 'CONFIRM_REQUIRED' || err?.body?.code === 'CONFIRM_REQUIRED') {
               const n = err?.body?.orderCount ?? err?.orderCount;
@@ -377,7 +378,7 @@ export default function SellerDropCreate() {
                       try {
                         await api.drops.cancel(dropId, true);
                         Alert.alert('Drop cancelled', 'Unshipped orders have been refunded.');
-                        router.back();
+                        goBackOr(router);
                       } catch {
                         Alert.alert("Couldn't cancel", 'Please try again.');
                       }

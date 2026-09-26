@@ -12,6 +12,7 @@
  * reason/resolution seen on SHEIN, Etsy and Meta Quest return/refund flows.
  */
 import React, { useState, useEffect, useMemo } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, Alert, Image,
@@ -178,7 +179,7 @@ export default function BuyerReturnRequestScreen() {
   if (loading) {
     return (
       <BrandthreadScreen>
-        <BrandthreadHeader title="Request Return" onBack={() => router.back()} />
+        <BrandthreadHeader title="Request Return" onBack={() => goBackOr(router)} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={theme.accent} size="large" />
         </View>
@@ -196,7 +197,7 @@ export default function BuyerReturnRequestScreen() {
           <Text style={s.successTitle}>Return Request Submitted</Text>
           <Text style={s.successSub}>Your request has been received. The seller will review it and respond within 1–3 business days.</Text>
           <Text style={s.successNote}>Return requests will appear here once confirmed.</Text>
-          <PrimaryButton label="Back to Order" onPress={() => router.back()} style={{ width: '100%', marginTop: SP.md }} />
+          <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={{ width: '100%', marginTop: SP.md }} />
         </View>
       </BrandthreadScreen>
     );
@@ -211,7 +212,7 @@ export default function BuyerReturnRequestScreen() {
       <BrandthreadHeader
         title="Request Return"
         subtitle={order ? `${order.orderNumber} · ${order.sellerName}` : undefined}
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>

@@ -196,12 +196,12 @@ const styles = StyleSheet.create({
   // stands out): 38pt avatar, 26pt icon glyphs, 12pt rhythm between items,
   // 8pt right inset. (PR #133.)
   rail: {
-    position: 'absolute', right: 8, width: 38, alignItems: 'center', gap: 12,
+    position: 'absolute', right: 10, width: 38, alignItems: 'center', gap: 14,
   },
   avatarWrap: { alignItems: 'center', marginBottom: 2 },
   avatar: {
     width: 38, height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: ON_DARK,
+    borderWidth: 1.5, borderColor: ON_DARK,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
   },
   avatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
@@ -210,8 +210,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
-  btn: { width: 38, alignItems: 'center', gap: 2 },
-  actionContent: { width: 38, alignItems: 'center', gap: 2 },
+  btn: { width: 38, alignItems: 'center', gap: 3 },
+  actionContent: { width: 38, alignItems: 'center', gap: 3 },
   likeWrap: { width: 38, alignItems: 'center', justifyContent: 'center' },
   likeRing: {
     position: 'absolute', top: 2, width: 34, height: 34, borderRadius: RADII.pill,

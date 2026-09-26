@@ -329,7 +329,13 @@ export function EngagementButton({
 
 const ebStyles = StyleSheet.create({
   btn: { alignItems: 'center', gap: 3 },
-  count: { fontSize: FS.xs, fontFamily: FONT.semibold, textAlign: 'center' },
+  // Same size/weight/shadow as the rail's plain (non-EngagementButton) counts
+  // — see RightActionRail's own `count` style — so every unit in the rail
+  // reads as one consistent row, not a mix of shadowed and unshadowed text.
+  count: {
+    fontSize: FS.xs, lineHeight: 13, fontFamily: FONT.semibold, textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
   iconShadow: {
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },

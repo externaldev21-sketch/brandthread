@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   TextInput, StyleSheet, RefreshControl, ActivityIndicator, Alert, Share,
@@ -287,7 +288,7 @@ export default function InventoryScreen() {
   const renderHeader = () => (
     <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
       <TouchableOpacity
-        onPress={() => router.back()}
+        onPress={() => goBackOr(router)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         activeOpacity={0.75}
         style={{ width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center' as const, justifyContent: 'center' as const }}

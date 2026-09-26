@@ -398,12 +398,12 @@ describe('buyer inbox', () => {
     expect(fontFamilyOf(readName!)).toContain('Test-Regular');
   });
 
-  it('shows the unread badge with the right count and hides it once read', async () => {
+  it('shows the unread dot while unread and hides it once read', async () => {
     getConversationsMock.mockResolvedValue([conversation('unread-thread', 3)]);
     renderer = await renderScreen();
 
+    // Threads-style: a single dot marks an unread row, not a numeric count.
     expect(renderer.root.findAllByProps({ testID: 'inbox-unread-badge-unread-thread' }, { deep: false })).toHaveLength(1);
-    expect(textContent(renderer)).toContain('3');
 
     getConversationsMock.mockResolvedValue([conversation('unread-thread', 0)]);
     await act(async () => {

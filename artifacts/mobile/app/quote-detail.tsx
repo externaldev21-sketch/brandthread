@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, Alert, TextInput,
   StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform,
@@ -246,7 +247,7 @@ export default function QuoteDetailScreen() {
             setActionLoading(true);
             try {
               await declineQuote(quoteId!);
-              router.back();
+              goBackOr(router);
             } catch (error) {
               Alert.alert('Could not decline quote', error instanceof Error ? error.message : 'Refresh and try again.');
             } finally {
@@ -302,7 +303,7 @@ export default function QuoteDetailScreen() {
   if (loading) {
     return (
       <BrandthreadScreen>
-        <BrandthreadHeader title="Quote Details" onBack={() => router.back()} />
+        <BrandthreadHeader title="Quote Details" onBack={() => goBackOr(router)} />
         <View style={s.loadingContainer}>
           <LoadingSkeleton height={120} style={s.skeleton} />
           <LoadingSkeleton height={200} style={s.skeleton} />
@@ -315,13 +316,13 @@ export default function QuoteDetailScreen() {
   if (!quote) {
     return (
       <BrandthreadScreen>
-        <BrandthreadHeader title="Quote Details" onBack={() => router.back()} />
+        <BrandthreadHeader title="Quote Details" onBack={() => goBackOr(router)} />
         <View style={s.centered}>
           <EmptyState
             icon="file-text"
             title="Quote not found"
             description="It may have been withdrawn."
-            action={{ label: 'Back to quotes', onPress: () => router.back() }}
+            action={{ label: 'Back to quotes', onPress: () => goBackOr(router) }}
           />
         </View>
       </BrandthreadScreen>
@@ -340,7 +341,7 @@ export default function QuoteDetailScreen() {
       <BrandthreadHeader
         title="Quote Details"
         subtitle={manufacturerName}
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
       />
       <KeyboardAvoidingView
         style={{ flex: 1 }}

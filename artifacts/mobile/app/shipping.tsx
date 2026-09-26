@@ -14,6 +14,7 @@ import { FS, SP, RADIUS } from '@/lib/theme';
 import { dbStatusToOrderStatus } from '@/lib/orderStatusAdapter';
 import { parseDecimalToCents } from '@/lib/money';
 import { HapticSwitch } from '@/components/BrandthreadUI';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ export default function ShippingScreen() {
       router.replace(SELLER_HOME_ROUTE as never);
       return;
     }
-    router.back();
+    goBackOr(router);
   }
 
   const loadShipping = useCallback(() => {

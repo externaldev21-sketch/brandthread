@@ -11,6 +11,7 @@
  *  - Toggle draft / active status
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Alert, ActivityIndicator, Switch,
@@ -176,7 +177,7 @@ export default function ProductBundleEditScreen() {
           setDeleting(true);
           try {
             await (api as any).bundles.delete(bundleId!);
-            router.back();
+            goBackOr(router);
           } catch { Alert.alert('Error', 'Could not delete bundle.'); }
           finally { setDeleting(false); }
         },
@@ -190,7 +191,7 @@ export default function ProductBundleEditScreen() {
     <View style={[s.root, { paddingTop: insets.top }]}>
       <BrandthreadHeader
         title={isNew ? 'New Bundle' : 'Edit Bundle'}
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
       />
 
       <ScrollView

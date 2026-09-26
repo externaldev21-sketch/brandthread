@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 interface NativeOnlyFeatureProps {
   title: string;
@@ -44,7 +45,7 @@ export default function NativeOnlyFeature({
       </Text>
       <TouchableOpacity
         style={[styles.button, { backgroundColor: colors.primary }]}
-        onPress={() => router.back()}
+        onPress={() => goBackOr(router)}
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >

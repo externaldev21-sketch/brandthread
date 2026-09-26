@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Header } from '@/components/layout';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -86,7 +87,7 @@ export default function StoreSectionsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await createSection(sectionType as StoreSectionType);
-      Alert.alert('Section added.', undefined, [{ text: 'OK', onPress: () => router.back() }]);
+      Alert.alert('Section added.', undefined, [{ text: 'OK', onPress: () => goBackOr(router) }]);
     } catch (e) {
       Alert.alert('Error', 'Failed to add section. Please try again.');
     } finally {
@@ -98,7 +99,7 @@ export default function StoreSectionsScreen() {
     <View style={styles.root}>
       <Header
         title="Add Section"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
       />
 
       <Text style={styles.subtitle}>Choose a section to add to your homepage.</Text>

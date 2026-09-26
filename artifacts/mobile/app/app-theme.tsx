@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { APP_THEME_PRESETS, AppThemeId, AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type ThemeImageContext = {
   (key: string): ImageSourcePropType;
@@ -78,7 +79,7 @@ export default function AppThemeScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top, backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={[styles.back, { borderColor: theme.border, backgroundColor: theme.card }]} accessibilityRole="button" accessibilityLabel="Back to settings">
+        <TouchableOpacity onPress={() => goBackOr(router)} style={[styles.back, { borderColor: theme.border, backgroundColor: theme.card }]} accessibilityRole="button" accessibilityLabel="Back to settings">
           <Feather name="arrow-left" size={20} color={theme.text} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>

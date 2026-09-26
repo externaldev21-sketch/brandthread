@@ -8,6 +8,7 @@
  *   from the rail, straight into CREATE (text-only background-swatch mode).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   Alert, Animated, Dimensions, Image, Modal, PanResponder, Platform,
   Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -445,7 +446,7 @@ export default function StoryComposer() {
       }).catch(() => {});
 
       hapticSuccessAction();
-      router.back();
+      goBackOr(router);
     } catch {
       Alert.alert("Couldn't share your story", 'Try again.');
       setIsPosting(false);
@@ -462,7 +463,7 @@ export default function StoryComposer() {
     void doShare({ type: 'text', bg: swatches[bgIdx].colors[0], text: createText.trim(), textColor: createColor, ovs: [] });
   };
 
-  const closeAll = () => router.back();
+  const closeAll = () => goBackOr(router);
 
   // ── CAMERA STEP ───────────────────────────────────────────────────────────
 

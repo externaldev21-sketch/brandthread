@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, Pressable, TextInput, Animated, Easing,
   Dimensions, PanResponder, StyleSheet, Alert, Modal, FlatList,
@@ -198,7 +199,7 @@ export default function BuyerStoryViewer() {
   const slideCounts = stories.map(s => s.media.length);
 
   const applyNav = useCallback((result: { storyIdx: number; slideIdx: number; shouldClose: boolean }) => {
-    if (result.shouldClose) { router.back(); return; }
+    if (result.shouldClose) { goBackOr(router); return; }
     setStoryIdx(result.storyIdx);
     setSlideIdx(result.slideIdx);
   }, [router]);
@@ -253,7 +254,7 @@ export default function BuyerStoryViewer() {
         switch (classifyGesture(g.dx, g.dy)) {
           case 'next-user': goToNextUser(); break;
           case 'prev-user': goToPrevUser(); break;
-          case 'close': router.back(); break;
+          case 'close': goBackOr(router); break;
         }
       },
     })
@@ -274,7 +275,7 @@ export default function BuyerStoryViewer() {
           </>
         )}
         <View style={[styles.closeBtnWrap, { top: insets.top + SP.sm }]}>
-          <IconButton name="x" onPress={() => router.back()} accessibilityLabel="Close" color={ON_DARK} variant="plain" />
+          <IconButton name="x" onPress={() => goBackOr(router)} accessibilityLabel="Close" color={ON_DARK} variant="plain" />
         </View>
       </View>
     );
@@ -486,7 +487,7 @@ export default function BuyerStoryViewer() {
                       initials: currentStory.authorInitials,
                       color: currentStory.authorColor,
                     });
-                    router.back();
+                    goBackOr(router);
                   },
                 },
                 {
@@ -503,7 +504,7 @@ export default function BuyerStoryViewer() {
                   text: `Block ${currentStory.authorName}`,
                   style: 'destructive',
                   onPress: async () => {
-                    if (await confirmBlock(author, api.social.block)) router.back();
+                    if (await confirmBlock(author, api.social.block)) goBackOr(router);
                     else setIsPaused(false);
                   },
                 },
@@ -517,7 +518,7 @@ export default function BuyerStoryViewer() {
           variant="plain"
           color={ON_DARK}
           accessibilityLabel="Close"
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router)}
         />
       </View>
 

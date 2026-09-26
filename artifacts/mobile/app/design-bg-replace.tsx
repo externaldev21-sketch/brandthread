@@ -5,6 +5,7 @@
  */
 import React, { useState } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image, TextInput, Modal, FlatList,
@@ -239,7 +240,7 @@ export default function DesignBgReplaceScreen({
 
   return (
     <BrandthreadScreen>
-      <BrandthreadHeader title="Background Tools" onBack={() => router.back()} />
+      <BrandthreadHeader title="Background Tools" onBack={() => goBackOr(router)} />
       {embedded && (
         <View style={s.modeWrap}>
           <View style={s.modeRow}>

@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
@@ -160,7 +161,7 @@ export default function ManufacturerHub() {
       router.replace(SELLER_HOME_ROUTE as never);
       return;
     }
-    router.back();
+    goBackOr(router);
   }
 
   const { hasPlan, loading: planLoading, error: planError } = useSubscriptionPlan();

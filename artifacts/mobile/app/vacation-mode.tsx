@@ -3,6 +3,7 @@
  * Route: /vacation-mode
  */
 import React, { useState, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator, Switch,
@@ -63,7 +64,7 @@ export default function VacationModeScreen() {
         vacationMode
           ? 'Buyers will see an away banner on your storefront. New orders are paused.'
           : 'Your store is open again. Buyers can place new orders.',
-        [{ text: 'Done', onPress: () => router.back() }],
+        [{ text: 'Done', onPress: () => goBackOr(router) }],
       );
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Could not save. Please try again.');

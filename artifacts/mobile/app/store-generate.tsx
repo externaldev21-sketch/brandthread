@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   KeyboardAvoidingView, Platform, Alert, Switch, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -160,13 +161,13 @@ export default function StoreGenerateScreen() {
       setStep(s => s - 1);
     } else {
       await saveDraftAnswers(answers);
-      router.back();
+      goBackOr(router);
     }
   };
 
   const handleSaveAndExit = async () => {
     await saveDraftAnswers(answers);
-    router.back();
+    goBackOr(router);
   };
 
   const handleContinue = () => {

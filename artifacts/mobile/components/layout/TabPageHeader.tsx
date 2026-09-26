@@ -6,7 +6,7 @@
  * and top offsets.
  */
 import React from 'react';
-import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Platform, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { FONT, GUTTER } from '@/lib/theme';
@@ -31,11 +31,15 @@ interface TabPageHeaderProps {
 export function TabPageHeader({ title, actions, gutter = GUTTER, style }: TabPageHeaderProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
-  // Real safe-area inset on every platform, including web (see the
-  // `viewport-fit=cover` meta tag in app/+html.tsx, which is what makes
-  // react-native-safe-area-context's web implementation return a non-zero
-  // `insets.top` under a simulated notch instead of always 0).
-  const topPad = insets.top;
+  // Same fixed value across every tab page, matching the other buyer/seller
+  // tab headers (see e.g. orders.tsx, products.tsx): outside of a real
+  // device (or a preview frame that actually emulates one), the browser
+  // never fills in a non-zero `env(safe-area-inset-top)`, so
+  // react-native-safe-area-context's web implementation reads 0 for
+  // `insets.top` and the title sits flush at the very top of the viewport —
+  // this is what pushed Discover/Messages/Activity's titles up into the
+  // corner, nearly under the notch, in the plain 390x844 web preview.
+  const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   return (
     <View style={[styles.row, { paddingTop: topPad + 12, paddingHorizontal: gutter }, style]}>

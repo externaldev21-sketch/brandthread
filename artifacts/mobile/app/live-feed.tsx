@@ -35,6 +35,7 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
 import { SHEET_TIMING } from '@/constants/motion';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 const LIVE_RED = '#FF3B30';
 
@@ -138,8 +139,7 @@ export default function LiveFeedScreen() {
 
   function close() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)/feed' as never);
+    goBackOr(router, '/(tabs)/feed');
   }
 
   return (
