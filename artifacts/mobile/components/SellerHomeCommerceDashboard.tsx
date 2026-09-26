@@ -298,7 +298,7 @@ export default function SellerHomeCommerceDashboard({
       setTopProducts([]);
       setRecentOrders([]);
       setEverSoldCount(12);
-      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0 });
+      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: 0 });
       setSecondaryError(false);
       return;
     }

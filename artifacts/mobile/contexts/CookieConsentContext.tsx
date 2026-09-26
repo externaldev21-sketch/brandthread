@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
+import { usePathname } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
@@ -10,6 +11,8 @@ import { WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 
 export { COOKIE_CONSENT_VERSION, CookieConsent, canUseAnalytics, canUseMarketing } from '@/lib/cookieConsent';
 const KEY = 'bt:cookie-consent';
+// Keep the banner off pre-auth screens with bottom-pinned actions.
+const SUPPRESS_ON_PATHNAMES = new Set(['/splash', '/sign-in', '/onboarding', '/forgot-password']);
 type Value = { consent: CookieConsent | null; saveConsent: (choices: Pick<CookieConsent, 'analytics' | 'marketing'>) => Promise<void>; openPreferences: () => void; noticeClearance: number };
 const Context = createContext<Value>({ consent: null, saveConsent: async () => {}, openPreferences: () => {}, noticeClearance: 0 });
 export function useCookieConsent() { return useContext(Context); }
@@ -18,6 +21,8 @@ export function useCanUseMarketing() { return canUseMarketingValue(useCookieCons
 
 export function CookieConsentProvider({ children }: { children: React.ReactNode }) {
   const { theme } = useAppTheme();
+  const pathname = usePathname();
+  const suppressForRoute = SUPPRESS_ON_PATHNAMES.has(pathname);
   // occupiedHeight is the exact space the floating tab bar (buyer or seller —
   // both share this geometry) reserves at the bottom of the screen, including
   // its own clearance. The banner's hardcoded "72" was tuned for phone

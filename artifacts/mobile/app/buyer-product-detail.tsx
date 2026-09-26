@@ -49,6 +49,7 @@ import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import {
   messageSellerAboutProductHref, profileHref, profileVideosHref,
 } from '@/lib/profileNavigation';
+import { getPreviewCatalogProduct, isPreviewCatalogEnabled } from '@/lib/previewCatalog';
 
 type ThemeAliases = {
   theme: AppThemePreset;
@@ -143,6 +144,42 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     variants,
     isActive:           true,
     tags:               row.tags ?? [],
+  };
+}
+
+/** Preview catalog variants are display-only and intentionally use synthetic IDs. */
+function adaptPreviewProductToBuyerProduct(row: NonNullable<ReturnType<typeof getPreviewCatalogProduct>>): BuyerProduct {
+  const options: BuyerProductOption[] = row.sizes.length
+    ? [{ id: 'opt_size', name: 'Size', values: row.sizes.map(size => ({ id: `size_${size}`, label: size })) }]
+    : [];
+  const variants: BuyerProductVariant[] = row.sizes.map(size => ({
+    id: `preview-variant-${row.id}-${size}`,
+    title: size,
+    optionValues: [{ optionId: 'opt_size', valueId: `size_${size}` }],
+    priceCents: row.priceCents,
+    inventoryQuantity: row.remainingUnits,
+    isAvailable: row.remainingUnits > 0,
+    imageUri: row.images[0],
+  }));
+
+  return {
+    id: row.id,
+    sellerId: row.sellerId,
+    sellerName: row.sellerDisplayName,
+    sellerHandle: '',
+    name: row.name,
+    description: '',
+    priceCents: row.priceCents,
+    compareAtPriceCents: row.compareAtPriceCents ?? undefined,
+    imageUris: row.images,
+    category: row.category,
+    isPreOrder: false,
+    cancellationPolicy: '',
+    refundPolicy: '',
+    options,
+    variants,
+    isActive: true,
+    tags: row.tags,
   };
 }
 
@@ -528,7 +565,21 @@ export default function BuyerProductDetailScreen() {
         let prod: BuyerProduct | null = null;
         let paymentStatus: { ready: boolean; reason?: string } | null = null;
 
-        if (productId) {
+        const previewCatalogEnabled = isPreviewCatalogEnabled();
+        const previewRow = previewCatalogEnabled && productId?.startsWith('preview-product-')
+          ? getPreviewCatalogProduct(productId)
+          : null;
+
+        if (previewRow) {
+          prod = adaptPreviewProductToBuyerProduct(previewRow);
+          if (!cancelled) {
+            setDemandClaimedUnits(previewRow.claimedUnits);
+            setDemandRemainingUnits(previewRow.remainingUnits);
+            setDemandCount(previewRow.demandCount);
+            setDemandEndsAt(null);
+            setSellerVacationMessage(null);
+          }
+        } else if (productId && !(previewCatalogEnabled && productId.startsWith('preview-product-'))) {
           // Load the live product from the public API.
           // DB product UUIDs from the discover feed carry real variant IDs
           // so the checkout server can look them up correctly.
@@ -573,7 +624,7 @@ export default function BuyerProductDetailScreen() {
           }
           // Best-effort — a failed view record should never affect the
           // product page itself, so no error handling beyond swallowing it.
-          if (prod?.id && isSignedIn) api.buyer.recentlyViewed.record(prod.id).catch(() => {});
+          if (prod?.id && isSignedIn && !prod.id.startsWith('preview-product-')) api.buyer.recentlyViewed.record(prod.id).catch(() => {});
         }
       } catch {}
       if (!cancelled) setLoading(false);
@@ -586,7 +637,7 @@ export default function BuyerProductDetailScreen() {
   // is the real buyer-facing product page (product-detail.tsx is the seller's
   // own management view), so it's the correct place to fire ViewContent.
   useEffect(() => {
-    if (!product?.id) return;
+    if (!product?.id || (isPreviewCatalogEnabled() && product.id.startsWith('preview-product-'))) return;
     void trackAndRelayConversionEvent(
       'ViewContent',
       { content_ids: [product.id], content_type: 'product', value: product.priceCents / 100, currency: 'usd' },
@@ -687,6 +738,7 @@ export default function BuyerProductDetailScreen() {
   }
 
   const variant = findVariant(product, selections);
+  const isPreviewProduct = isPreviewCatalogEnabled() && product.id.startsWith('preview-product-');
   const variantPrice = variant?.priceCents ?? product.priceCents;
   const variantCompare = variant?.compareAtPriceCents ?? product.compareAtPriceCents;
   const hasDiscount = variantCompare && variantCompare > variantPrice;
@@ -747,6 +799,7 @@ export default function BuyerProductDetailScreen() {
   }
 
   async function handleAddToCart() {
+    if (isPreviewProduct) return;
     if (!allSelected) {
       // Mark options as touched so unselected options show a required indicator
       setOptionsTouched(true);
@@ -797,6 +850,7 @@ export default function BuyerProductDetailScreen() {
   }
 
   async function handleBuyNow() {
+    if (isPreviewProduct) return;
     if (sellerVacationMessage) {
       Alert.alert('Seller is away', sellerVacationMessage);
       return;
@@ -1142,15 +1196,15 @@ export default function BuyerProductDetailScreen() {
 
           {/* Reviews — shared with the Shop sheet so review UI never drifts
               between the two surfaces. Renders nothing when there are none. */}
-          <ProductReviewsSection productId={product.id} productName={product.name} />
+          {!isPreviewProduct && <ProductReviewsSection productId={product.id} productName={product.name} />}
 
           {/* Worn in these videos */}
-          <WornInVideos productId={product.id} productName={product.name} />
+          {!isPreviewProduct && <WornInVideos productId={product.id} productName={product.name} />}
 
           {/* Related Products */}
           <View style={s.divider} />
           <Text style={s.reviewsHeader}>You Might Also Like</Text>
-          <RelatedProducts productId={product.id} />
+          {!isPreviewProduct && <RelatedProducts productId={product.id} />}
 
         </ResponsiveContainer>
       </ScrollView>
@@ -1219,9 +1273,9 @@ export default function BuyerProductDetailScreen() {
           <IconButton
             name="shopping-bag"
             onPress={handleAddToCart}
-            disabled={addingToCart || !inStock}
-            accessibilityLabel={!allSelected ? 'Select options to add to cart' : !inStock ? 'Out of stock' : 'Add to cart'}
-            color={allSelected && inStock ? PURPLE_LIGHT : SUBTLE}
+            disabled={addingToCart || !inStock || isPreviewProduct}
+            accessibilityLabel={isPreviewProduct ? 'Preview item only' : !allSelected ? 'Select options to add to cart' : !inStock ? 'Out of stock' : 'Add to cart'}
+            color={allSelected && inStock && !isPreviewProduct ? PURPLE_LIGHT : SUBTLE}
             style={s.addToCartIconBtn}
           />
         )}
@@ -1239,7 +1293,8 @@ export default function BuyerProductDetailScreen() {
         ) : (
           <Button
             label={
-              paymentUnavailable ? 'Payments unavailable'
+              isPreviewProduct ? 'Preview only'
+                : paymentUnavailable ? 'Payments unavailable'
                 : !allSelected ? 'Select options'
                 : !inStock ? 'Sold Out'
                 : 'Buy now'
@@ -1248,7 +1303,7 @@ export default function BuyerProductDetailScreen() {
             onPress={handleBuyNow}
             variant="primary"
             loading={buyingNow}
-            disabled={buyingNow || !inStock || !allSelected || paymentUnavailable}
+            disabled={isPreviewProduct || buyingNow || !inStock || !allSelected || paymentUnavailable}
             style={s.buyNowBtn}
           />
         )}
