@@ -25,7 +25,7 @@
  * edge-attached tab shape.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
@@ -50,6 +50,7 @@ export function ShopSideTab({
   onPress: () => void;
   isActive: boolean;
 }) {
+  const { width: windowWidth } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,7 +85,10 @@ export function ShopSideTab({
 
   useEffect(() => () => clearCollapseTimer(), [clearCollapseTimer]);
 
-  const width = anim.interpolate({ inputRange: [0, 1], outputRange: [28, 218] });
+  // A sleek, narrow strip when expanded — max ~62% of screen width, not a
+  // big card — sized off the live window width so it holds at 375/390/430.
+  const expandedWidth = Math.round(windowWidth * 0.62);
+  const width = anim.interpolate({ inputRange: [0, 1], outputRange: [28, expandedWidth] });
   const collapsedOpacity = anim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [1, 0, 0] });
   const expandedOpacity = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 0, 1] });
   const expandedTranslate = anim.interpolate({ inputRange: [0, 0.55, 1], outputRange: [8, 8, 0] });
@@ -117,8 +121,23 @@ export function ShopSideTab({
             pointerEvents={expanded ? 'none' : 'auto'}
             style={[styles.collapsed, { opacity: collapsedOpacity }]}
           >
-            <Feather name="shopping-bag" size={11} color={ON_DARK} />
-            <Text style={styles.label}>SHOP</Text>
+            {/* Icon + label are laid out and rotated together as ONE unit,
+                not rotated separately: rotating only the Text keeps its
+                pre-rotation (unrotated) box for layout purposes, so
+                anything positioned relative to that stale box — like the
+                icon above it in a flex column — lands using the wrong
+                effective width/height once the text is actually rotated,
+                which is what put the bag icon on top of the "P". Laid out
+                here as a plain horizontal row (label, then icon) and
+                rotated as a whole: a -90deg turn maps "left" to the
+                bottom and "right" to the top, so the label (left) reads
+                bottom-to-top exactly as before and the icon (right) ends
+                up above it, with real layout-computed spacing between
+                them instead of a stale gap. */}
+            <View style={styles.collapsedStack}>
+              <Text style={styles.label}>SHOP</Text>
+              <Feather name="shopping-bag" size={11} color={ON_DARK} />
+            </View>
           </Animated.View>
           <Animated.View
             pointerEvents={expanded ? 'auto' : 'none'}
@@ -131,16 +150,19 @@ export function ShopSideTab({
               {tag.imageUri ? (
                 <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
               ) : (
-                <Feather name="shopping-bag" size={13} color="#111111" />
+                <Feather name="shopping-bag" size={11} color="#111111" />
               )}
             </View>
-            <View style={styles.text}>
-              <Text style={styles.name} numberOfLines={1}>{tag.productName}</Text>
-              <Text style={styles.price} numberOfLines={1}>
-                {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.75)" />
+            {/* Name and price share one line so the whole card reads as a
+                sleek, narrow strip at ~44pt tall rather than a two-line
+                card — the name truncates first (flexShrink), the price
+                never does (flexShrink: 0, its own Text so numberOfLines on
+                the name can't cut it off too). */}
+            <Text style={styles.name} numberOfLines={1}>{tag.productName}</Text>
+            <Text style={styles.price} numberOfLines={1}>
+              {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
+            </Text>
+            <Feather name="chevron-right" size={12} color="rgba(255,255,255,0.75)" />
           </Animated.View>
         </TouchableOpacity>
       </Animated.View>
@@ -159,22 +181,31 @@ const styles = StyleSheet.create({
   },
   collapsed: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center', gap: 6,
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  // A plain horizontal row (label, then icon) — normal, unrotated layout —
+  // rotated as a whole once it's already sized. Centering this on both axes
+  // keeps it centered in the tab regardless of its rotated bounding box.
+  collapsedStack: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    transform: [{ rotate: '-90deg' }],
   },
   label: {
     color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.5,
-    transform: [{ rotate: '-90deg' }],
   },
+  // A sleek, narrow strip — 44pt tall (roughly the same visual height
+  // family as the collapsed tab, not a noticeably taller card), name and
+  // price sharing one line so it never needs two rows of text.
   expanded: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    position: 'absolute', top: 16, left: 0, right: 0, height: 44,
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 10, gap: 8,
+    paddingHorizontal: 8, paddingVertical: 6, gap: 8,
   },
   thumb: {
-    width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+    width: 32, height: 32, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
     backgroundColor: ON_DARK, overflow: 'hidden', flexShrink: 0,
   },
-  text: { flexShrink: 1, flexGrow: 1, gap: 1 },
-  name: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
-  price: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, ...TABULAR_NUMS },
+  name: { flexShrink: 1, color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
+  price: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, ...TABULAR_NUMS },
 });
