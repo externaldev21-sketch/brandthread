@@ -16,9 +16,9 @@ Keep test and spec modules outside Expo Router's `app/` directory.
 - Put route regression tests in a top-level test directory, never beside route files under `app/`. Expo Router can evaluate those files while building the route graph; a Vitest import outside its runner makes static rendering return HTTP 500.
 
 ## Dev preview bypass
-The bare development web preview opens a synthetic Demo Seller session with populated seller dashboard data. `?bt_preview=buyer` switches to Demo Buyer, and the dev-only account switcher exposes both identities. Onboarding remains intact but is not the default preview entry.
-**Why:** the owner wants Replit’s phone-frame preview optimized for reviewing populated seller screens without repeating authentication or onboarding.
-**How to apply:** use the bare preview URL for seller review and `?bt_preview=buyer` for buyer review. Keep the bypass, synthetic identities, and demo financial values limited to development web; native/device and production users must retain real auth and onboarding.
+The development web preview supports synthetic Demo Buyer and Demo Seller sessions. Explicit `?bt_preview=buyer` and `?bt_preview=seller` links select either side, and the dev-only account switcher exposes both identities. Onboarding remains intact behind the preview entry.
+**Why:** the owner needs to inspect either buyer or seller screens without repeating authentication or onboarding; the preferred default can change during testing.
+**How to apply:** use explicit role URLs for repeatable screen review; do not assume the bare preview URL always selects the same role. Keep synthetic identities and demo financial values limited to development previews. Production must retain real auth and onboarding; any native development exception must be temporary, explicit, and never persist fake completion.
 
 The dev-web account switcher's selected demo side must survive Expo Router removing query parameters and browser reloads, scoped to the current browser tab. This is preview navigation, not a Clerk account switch.
 **Why:** clicking Demo Buyer opened the buyer home, but the root redirect dropped the query; reloading silently returned to Demo Seller.

@@ -7,7 +7,7 @@ const indexSource = readFileSync(path.resolve(__dirname, '../app/index.tsx'), 'u
 const dashboardSource = readFileSync(path.resolve(__dirname, '../components/SellerHomeCommerceDashboard.tsx'), 'utf8');
 
 describe('development app preview routing', () => {
-  it('starts the default web preview as seller and preserves explicit preview roles', () => {
+  it('starts the temporary default web preview as buyer and preserves explicit preview roles', () => {
     expect(layoutSource).toContain(
       "if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;",
     );
@@ -30,9 +30,14 @@ describe('development app preview routing', () => {
     expect(dashboardSource).toContain("formatted: '$1,842.50'");
   });
 
-  it('keeps the native dev bypass opt-in via EXPO_PUBLIC_DEV_BYPASS_ROLE, off by default', () => {
+  it('temporarily enters buyer on native development without persisting onboarding or affecting production', () => {
     const devBypassSource = readFileSync(path.resolve(__dirname, '../lib/devBypass.ts'), 'utf8');
     expect(devBypassSource).toContain('process.env.EXPO_PUBLIC_DEV_BYPASS_ROLE');
-    expect(devBypassSource).not.toMatch(/DEV_BYPASS_ROLE[^=]*=\s*__DEV__\s*\?\s*'seller'/);
+    expect(devBypassSource).toContain("!__DEV__ ? null");
+    expect(devBypassSource).toContain("Platform.OS !== 'web' ? 'buyer'");
+    expect(layoutSource).toContain('if (PREVIEW_ROLE || DEV_BYPASS_ROLE)');
+    expect(layoutSource).toContain('{PREVIEW_ROLE || DEV_BYPASS_ROLE ? (');
+    expect(indexSource).toContain("effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/'");
+    expect(devBypassSource).not.toContain('AsyncStorage');
   });
 });

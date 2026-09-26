@@ -67,6 +67,7 @@ import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
 import { getDevWebPreviewRole } from '@/lib/devPreview';
+import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
@@ -400,7 +401,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 // ─── DEV design-preview bypass (web only) ─────────────────────────────────────
-// The default development web preview opens the populated seller workspace.
+// The temporary default development web preview opens the buyer side.
 // Explicit ?bt_preview=buyer and ?bt_preview=seller links switch preview roles.
 // The web guard keeps this inert on native builds. Expo Go follows real auth;
 // non-dev navigation-isolation tests require an explicit preview role.
@@ -642,8 +643,10 @@ function AuthGate() {
       (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
       ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
 
-    // Review-only web preview. Never bypass authentication on Expo Go.
-    if (PREVIEW_ROLE) {
+    // Development previews skip the onboarding redirect without writing
+    // completion flags. Expo Go temporarily starts in the buyer preview;
+    // production and normal account data stay server-authoritative.
+    if (PREVIEW_ROLE || DEV_BYPASS_ROLE) {
       // The index route handles the preview redirect after the root Stack has
       // mounted. Redirecting from this root-level effect races Expo Router's
       // initial navigator on web and produces a blank error screen.
@@ -1323,8 +1326,8 @@ export default function RootLayout() {
   return (
     <AppIntroSplash ready={appReady}>
       <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-        {PREVIEW_ROLE ? (
-          // Web design preview renders without waiting for Clerk.
+        {PREVIEW_ROLE || DEV_BYPASS_ROLE ? (
+          // Development previews render without waiting for Clerk.
           appTree
         ) : (
           <>

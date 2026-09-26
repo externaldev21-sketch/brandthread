@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { resolvePreviewRole } from '../previewRoleSelection';
 
 describe('demo preview role selection', () => {
-  it('defaults to the seller side without a selection', () => {
-    expect(resolvePreviewRole('', null)).toBe('seller');
+  it('temporarily defaults to the buyer side without a selection', () => {
+    expect(resolvePreviewRole('', null)).toBe('buyer');
   });
 
   it('remembers the buyer side after navigation removes the query', () => {
@@ -16,7 +16,8 @@ describe('demo preview role selection', () => {
     expect(resolvePreviewRole('?bt_preview=seller', 'buyer')).toBe('seller');
   });
 
-  it('ignores invalid stored roles', () => {
-    expect(resolvePreviewRole('', 'admin')).toBe('seller');
+  it('remembers an explicit seller choice and ignores invalid stored roles', () => {
+    expect(resolvePreviewRole('', 'seller')).toBe('seller');
+    expect(resolvePreviewRole('', 'admin')).toBe('buyer');
   });
 });
