@@ -3,6 +3,7 @@
  * Issue type, description, evidence, contact seller, escalate.
  */
 import React, { useState, useEffect } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, Alert, Image,
@@ -103,7 +104,7 @@ export default function BuyerProblemReportScreen() {
         <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
         <Text style={s.successTitle}>Report submitted</Text>
         <Text style={s.successSub}>Your problem report has been received. Our team will review it and reach out if needed.</Text>
-        <PrimaryButton label="Back to Order" onPress={() => router.back()} style={s.doneBtn} />
+        <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
       </View>
     );
   }
@@ -111,7 +112,7 @@ export default function BuyerProblemReportScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity style={s.backBtn} onPress={() => goBackOr(router)} activeOpacity={0.7}>
           <Feather name="chevron-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <View>

@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, GUTTER, ICON, SP } from '@/lib/theme';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export type HeaderAction = {
   icon: keyof typeof Feather.glyphMap;
@@ -58,7 +59,7 @@ export function Header({
     ? y.interpolate({ inputRange: [0, COLLAPSE_DISTANCE], outputRange: [0, 1], extrapolate: 'clamp' })
     : 1;
 
-  const handleBack = onBack ?? (() => router.back());
+  const handleBack = onBack ?? (() => goBackOr(router));
 
   return (
     <View

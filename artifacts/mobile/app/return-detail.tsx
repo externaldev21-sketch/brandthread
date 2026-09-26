@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, TextInput, Image,
 } from 'react-native';
@@ -198,7 +199,7 @@ export default function ReturnDetailScreen() {
       {/* HEADER */}
       <BrandthreadHeader
         title="Return Request"
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
         rightElement={
           <StatusBadge
             label={returnStatusLabel(status)}

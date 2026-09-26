@@ -22,6 +22,7 @@ import { formatProfileCount } from '@/services/profileService';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   connectionsHref, messageSellerHref, profileProductsHref, profileVideosHref,
 } from '@/lib/profileNavigation';
@@ -321,7 +322,7 @@ export default function SellerProfileScreen() {
           style: 'destructive' as const,
           onPress: async () => {
             if (await confirmBlock({ userId: sellerId, name: seller.brandName }, api.social.block)) {
-              if (router.canGoBack()) router.back();
+              if (router.canGoBack()) goBackOr(router);
               else router.replace('/(buyer)/' as never);
             }
           },
@@ -369,7 +370,7 @@ export default function SellerProfileScreen() {
   ), [handleTileLongPress, isOwner, layout.tileHeight, layout.tileWidth, openVideo]);
 
   const goBack = useCallback(() => {
-    if (router.canGoBack()) router.back();
+    if (router.canGoBack()) goBackOr(router);
     else router.replace('/' as never);
   }, [router]);
 

@@ -4,6 +4,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { useRouter } from 'expo-router';
 import { hapticPrimaryAction } from '@/lib/haptics';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function CommunityChatScreen() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function CommunityChatScreen() {
             label: 'Back to dashboard',
             onPress: () => {
               hapticPrimaryAction();
-              router.back();
+              goBackOr(router);
             },
           }}
         />

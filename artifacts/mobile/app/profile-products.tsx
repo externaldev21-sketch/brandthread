@@ -26,6 +26,7 @@ import { productDetailHref } from '@/lib/profileNavigation';
 import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
 import { InteractionLayer, ProfileButton, ProfileGlassButton } from '@/components/profile/ProfileControls';
 import { useProfileLayout } from '@/components/profile/profileLayout';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 const GAP = SP.sm;
 
@@ -103,7 +104,7 @@ export default function ProfileProductsScreen() {
   }, [isOwner, router]);
 
   const goBack = useCallback(() => {
-    if (router.canGoBack()) router.back();
+    if (router.canGoBack()) goBackOr(router);
     else router.replace('/' as never);
   }, [router]);
 

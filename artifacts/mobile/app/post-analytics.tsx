@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View,
   Text,
@@ -177,7 +178,7 @@ export default function PostAnalyticsScreen() {
     return (
       <View style={styles.root}>
         <View style={[styles.header, { paddingTop: insets.top }]}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
             <Feather name="arrow-left" size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
@@ -199,7 +200,7 @@ export default function PostAnalyticsScreen() {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
           <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Post Analytics</Text>
@@ -280,7 +281,7 @@ export default function PostAnalyticsScreen() {
               <Text style={styles.quickActionText}>Boost Post</Text>
             </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionShare} activeOpacity={0.85} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.quickActionShare} activeOpacity={0.85} onPress={() => goBackOr(router)}>
              <Feather name="arrow-left" size={18} color={colors.primaryForeground} />
             <Text style={styles.quickActionText}>Back</Text>
           </TouchableOpacity>
@@ -297,7 +298,7 @@ export default function PostAnalyticsScreen() {
     <View style={styles.root}>
       {/* ─── Fixed Header ──────────────────────────────────────────────────── * /}
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
           <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Post Analytics</Text>
@@ -339,7 +340,7 @@ export default function PostAnalyticsScreen() {
               </View>
             </View>
           </View>
-          <TouchableOpacity style={styles.openBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.openBtn} onPress={() => goBackOr(router)}>
             <Text style={styles.openBtnText}>Open</Text>
           </TouchableOpacity>
         </View>

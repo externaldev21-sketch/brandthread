@@ -5,6 +5,7 @@
  * and lets the user switch, add an existing account, or create a new one.
  */
 import React, { useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View,
   Text,
@@ -80,7 +81,7 @@ export default function AccountSwitcherScreen() {
 
   function handleBack() {
     Haptics.selectionAsync();
-    router.back();
+    goBackOr(router);
   }
 
   function handleAddExisting() {

@@ -21,6 +21,7 @@ import { SettingsProfileCard, SettingsSearchBar, SettingsSection, SettingsRow, C
 import { IconButton } from '@/components/BrandthreadUI';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function SellerSettingsScreen() {
   const colors = useColors();
@@ -131,7 +132,7 @@ export default function SellerSettingsScreen() {
     <View style={s.page}>
       <View style={[s.header, { paddingTop: topPad + 12 }]}>
         <Text style={s.headerTitle}>Settings</Text>
-        <IconButton name="x" color={colors.foreground} onPress={() => { hapticLight(); router.back(); }} accessibilityLabel="Close settings" />
+        <IconButton name="x" color={colors.foreground} onPress={() => { hapticLight(); goBackOr(router); }} accessibilityLabel="Close settings" />
       </View>
 
       <ScrollView

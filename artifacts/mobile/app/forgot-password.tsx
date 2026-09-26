@@ -3,6 +3,7 @@
  * Steps: email → code + new password → done
  */
 import React, { useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -93,7 +94,7 @@ export default function ForgotPasswordScreen() {
               style={s.backBtn}
               onPress={() => {
                 Haptics.selectionAsync();
-                step === 'code' ? setStep('email') : router.back();
+                step === 'code' ? setStep('email') : goBackOr(router, '/sign-in');
               }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
@@ -157,7 +158,7 @@ export default function ForgotPasswordScreen() {
 
               <TouchableOpacity
                 style={s.secondaryBtn}
-                onPress={() => { Haptics.selectionAsync(); router.back(); }}
+                onPress={() => { Haptics.selectionAsync(); goBackOr(router, '/sign-in'); }}
                 activeOpacity={0.85}
               >
                 <Text style={s.secondaryBtnText}>Back to sign in</Text>

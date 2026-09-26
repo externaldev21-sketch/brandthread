@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, Platform, Image,
@@ -165,10 +166,10 @@ export default function ManufacturerProfileScreen() {
   if (!manufacturer) {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
-        <EmptyState icon="alert-circle" title="Manufacturer unavailable" description="This profile is no longer listed, or it's a private manufacturer you aren't connected to." action={{ label: 'Back to directory', onPress: () => router.back() }} />
+        <EmptyState icon="alert-circle" title="Manufacturer unavailable" description="This profile is no longer listed, or it's a private manufacturer you aren't connected to." action={{ label: 'Back to directory', onPress: () => goBackOr(router) }} />
       </View>
     );
   }
@@ -190,7 +191,7 @@ export default function ManufacturerProfileScreen() {
           style={[s.hero, { paddingTop: insets.top + SP.sm }]}
         >
           {/* Back button */}
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtnHero} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtnHero} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Feather name="arrow-left" size={ICON.md} color={ON_DARK} />
           </TouchableOpacity>
 

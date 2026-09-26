@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   Animated, View, Text, ScrollView, Pressable, TextInput,
   StyleSheet, Dimensions, Alert, Image, FlatList, Modal, PanResponder,
@@ -320,7 +321,7 @@ export default function BuyerStoryCreate() {
         privacy:           { visibility: privacyVis, replyPermission: allowReplies ? 'everyone' : 'off' },
       }).catch(() => {});
 
-      router.back();
+      goBackOr(router);
     } catch {
       Alert.alert("Couldn't share your story", 'Try again.');
     } finally {
@@ -337,7 +338,7 @@ export default function BuyerStoryCreate() {
 
       {/* HEADER */}
       <View style={styles.header}>
-        <IconButton name="x" variant="plain" color={ON_DARK} accessibilityLabel="Close" onPress={() => router.back()} />
+        <IconButton name="x" variant="plain" color={ON_DARK} accessibilityLabel="Close" onPress={() => goBackOr(router)} />
         <Text style={styles.headerTitle}>New story</Text>
         <PressableScale
           onPress={() => { hapticPrimaryAction(); doShare(); }}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Platform, TextInput, Modal, Alert, ActivityIndicator,
@@ -275,8 +276,8 @@ export default function BuyerEditProfileScreen() {
   // fires every time, and keep the listener above as extra coverage for
   // any other way this screen gets popped (e.g. a real stack push).
   function handleBackPress() {
-    if (isDirty && !saving) { confirmDiscardChanges(() => router.back()); return; }
-    router.back();
+    if (isDirty && !saving) { confirmDiscardChanges(() => goBackOr(router)); return; }
+    goBackOr(router);
   }
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
@@ -355,7 +356,7 @@ export default function BuyerEditProfileScreen() {
       setInitial(fields);
       setLoadedProfile(cleanedFields);
       showToast('Profile updated');
-      setTimeout(() => router.back(), 500);
+      setTimeout(() => goBackOr(router), 500);
     } catch {
       Alert.alert('Could not save', 'Something went wrong saving your profile. Please try again.');
     } finally {

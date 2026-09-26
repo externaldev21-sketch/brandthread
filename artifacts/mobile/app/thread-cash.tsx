@@ -14,6 +14,7 @@ import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard, EmptyState } fro
 import { TABULAR_NUMS, tabularType } from '@/constants/typography';
 import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import { ThreadCashBill, ThreadCashCoin } from '@/components/thread-cash/ThreadCashBill';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 function historyLabel(entry: ThreadCashEntry): string {
   switch (entry.source) {
@@ -59,7 +60,7 @@ export default function ThreadCashScreen() {
 
   return (
     <BrandthreadScreen scrollable>
-      <BrandthreadHeader title="Thread Cash" onBack={() => router.back()} />
+      <BrandthreadHeader title="Thread Cash" onBack={() => goBackOr(router)} />
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={theme.accent} /></View>
       ) : (

@@ -7,6 +7,7 @@
  * Non-moderators see an access notice instead of the queue.
  */
 import React, { useCallback, useMemo, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, ScrollView, StyleSheet, RefreshControl, ActivityIndicator,
   Modal, Pressable, TextInput,
@@ -130,7 +131,7 @@ export default function ReviewQueueScreen() {
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <PressableScale onPress={() => router.back()} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <PressableScale onPress={() => goBackOr(router)} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
         </PressableScale>
         <View style={{ flex: 1 }}>
@@ -151,7 +152,7 @@ export default function ReviewQueueScreen() {
           icon="lock"
           title="Moderator access required"
           description="The review queue is available to Brandthread safety moderators. If you think you should have access, contact support."
-          action={{ label: 'Go back', onPress: () => router.back() }}
+          action={{ label: 'Go back', onPress: () => goBackOr(router) }}
           style={{ marginTop: SP.xxl }}
         />
       ) : (

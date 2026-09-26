@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, ScrollView, Alert, StyleSheet,
 } from 'react-native';
@@ -81,7 +82,7 @@ export default function BuyerPrivacySettings() {
 
   async function handleBack() {
     if (hasChanges) await saveSettings(false);
-    router.back();
+    goBackOr(router);
   }
 
   if (!settings) {

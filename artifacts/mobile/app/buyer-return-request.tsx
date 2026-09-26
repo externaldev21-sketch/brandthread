@@ -3,6 +3,7 @@
  * Eligible items, reason, resolution, evidence, submit.
  */
 import React, { useState, useEffect } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, Alert, Image,
@@ -125,7 +126,7 @@ export default function BuyerReturnRequestScreen() {
         <Text style={s.successTitle}>Return Request Submitted</Text>
         <Text style={s.successSub}>Your request has been received. The seller will review it and respond within 1–3 business days.</Text>
         <Text style={s.successNote}>Return requests will appear here once confirmed.</Text>
-        <PrimaryButton label="Back to Order" onPress={() => router.back()} style={s.doneBtn} />
+        <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
       </View>
     );
   }
@@ -137,7 +138,7 @@ export default function BuyerReturnRequestScreen() {
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity style={s.backBtn} onPress={() => goBackOr(router)} activeOpacity={0.7}>
           <Feather name="chevron-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <View>

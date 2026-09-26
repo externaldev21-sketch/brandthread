@@ -36,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useApi } from '@/hooks/useApi';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
   PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -606,7 +607,7 @@ export default function BoostScreen() {
   // ── Navigation ────────────────────────────────────────────────────────────
 
   function goBack() {
-    if (step === 0) { router.back(); return; }
+    if (step === 0) { goBackOr(router); return; }
     setStep((s) => (s - 1) as 0 | 1 | 2);
     Haptics.selectionAsync();
   }
@@ -752,7 +753,7 @@ export default function BoostScreen() {
       <Header
         title={title}
         onBack={goBack}
-        actions={[{ icon: 'x', onPress: () => router.back(), accessibilityLabel: 'Close' }]}
+        actions={[{ icon: 'x', onPress: () => goBackOr(router), accessibilityLabel: 'Close' }]}
       />
     );
   }
@@ -1096,7 +1097,7 @@ export default function BoostScreen() {
             </View>
           )}
 
-          <Button label="Done" variant="primary" fullWidth style={{ marginTop: SP.xl }} onPress={() => router.back()} />
+          <Button label="Done" variant="primary" fullWidth style={{ marginTop: SP.xl }} onPress={() => goBackOr(router)} />
         </ScrollView>
       </View>
     );

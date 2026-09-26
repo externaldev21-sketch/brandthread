@@ -3,6 +3,7 @@
  * Pure sign-in: email/password, Google OAuth, Apple OAuth
  */
 import React, { useEffect, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TextInput, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -191,7 +192,7 @@ export default function SignInScreen() {
             color={theme.muted}
             style={s.backBtn}
             accessibilityLabel="Go back"
-            onPress={() => router.back()}
+            onPress={() => goBackOr(router, '/onboarding')}
           />
 
           {/* Logo */}
@@ -331,7 +332,7 @@ export default function SignInScreen() {
             color={theme.muted}
             style={s.backBtn}
             accessibilityLabel="Go back"
-            onPress={() => router.back()}
+            onPress={() => goBackOr(router, '/onboarding')}
           />
 
           {/* Logo */}
