@@ -23,6 +23,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
+import { useScrollReset } from '@/hooks/useScrollReset';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,6 +188,7 @@ function DropCardSkeleton() {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function FollowingScreen() {
+  const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const palette = useColors();
   const insets = useSafeAreaInsets();
@@ -304,6 +306,7 @@ export default function FollowingScreen() {
         </View>
       ) : (
         <FlatList
+          ref={scrollResetRef}
           data={drops}
           keyExtractor={d => d.id}
           contentContainerStyle={{ padding: SPACING.md, paddingBottom: Math.max(120, barInset + SPACING.md) }}

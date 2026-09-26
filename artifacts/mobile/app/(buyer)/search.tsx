@@ -18,6 +18,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, GUTTER, GRID_MAX_WIDTH, GRAD_DARK_FADE } from '@/lib/theme';
 import { GridSkeleton, Header, ResponsiveContainer, useGridColumns } from '@/components/layout';
 import { Chip, ListRow, SkeletonBlock, ThemedRefreshControl } from '@/components/ui';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -624,6 +625,8 @@ export default function SearchScreen() {
     return chips;
   }, [filters, suggestedBrands]);
 
+  const scrollResetRef = useScrollReset<ScrollView>();
+
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
@@ -636,6 +639,7 @@ export default function SearchScreen() {
         showBack={false}
       />
       <ScrollView
+        ref={scrollResetRef}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={

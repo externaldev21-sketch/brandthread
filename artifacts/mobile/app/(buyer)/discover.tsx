@@ -73,6 +73,7 @@ import {
   type CommerceSignalData,
 } from '@/components/CommerceSignal';
 import { SectionError } from '@/components/InlineFeedback';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { Card, IconButton, HeartToggle, ThemedRefreshControl, GlassPanel } from '@/components/ui';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
@@ -874,6 +875,7 @@ const dh = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DiscoverScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const insets    = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router    = useRouter();
@@ -1120,6 +1122,7 @@ export default function DiscoverScreen() {
 
   return (
     <ScrollView
+      ref={scrollResetRef}
       style={{ flex: 1, backgroundColor: theme.background }}
       contentContainerStyle={{ paddingBottom: barInset + SP.md }}
       showsVerticalScrollIndicator={false}

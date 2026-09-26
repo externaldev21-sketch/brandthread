@@ -56,6 +56,7 @@ import {
 import { DASHBOARD_RANGES, SellerDashboardChart, type SellerDashboardRange } from '@/components/SellerDashboardChart';
 import { SellerDashboardStatGrid, type SellerDashboardStatTileData } from '@/components/SellerDashboardStatGrid';
 import { SellerDashboardActionNeeded } from '@/components/SellerDashboardActionNeeded';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProducts';
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
@@ -149,6 +150,7 @@ export default function SellerHomeCommerceDashboard({
   const { theme } = useAppTheme();
   const { currentRole, isLoadingRole } = useTeamRole();
   const { isTablet } = useBreakpoint();
+  const scrollResetRef = useScrollReset<ScrollView>();
 
   const [range, setRange] = useState<SellerDashboardRange>('week');
   const [metric, setMetric] = useState<MetricKey>('sales');
@@ -559,6 +561,7 @@ export default function SellerHomeCommerceDashboard({
   return (
     <View style={[styles.root, { backgroundColor: theme.background ?? SCREEN_BG }]}>
       <ScrollView
+        ref={scrollResetRef}
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
         style={styles.scrollView}

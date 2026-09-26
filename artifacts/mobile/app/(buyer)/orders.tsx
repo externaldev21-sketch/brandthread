@@ -12,6 +12,7 @@ import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
 import { getBuyerOrdersWithStatus } from '@/services/orderService';
 import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
@@ -230,6 +231,7 @@ function BuyerOrdersListSkeleton() {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerOrdersScreen() {
+  const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
@@ -420,6 +422,7 @@ export default function BuyerOrdersScreen() {
             )
           ) : (
             <FlashList
+              ref={scrollResetRef}
               data={filtered}
               keyExtractor={o => o.id}
               showsVerticalScrollIndicator={false}

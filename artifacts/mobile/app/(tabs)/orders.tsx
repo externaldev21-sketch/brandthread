@@ -26,6 +26,7 @@ import { clearBadge } from '@/lib/orderBadgeStore';
 import { formatCents } from '@/lib/money';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { useScrollReset } from '@/hooks/useScrollReset';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -701,6 +702,7 @@ function SellerOrdersListSkeleton() {
 }
 
 export default function OrdersScreen() {
+  const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const { background: BG, surface: SCREEN_BG, text: FG, muted: MUTED, subtle: SUBTLE, error: RED, success: SUCCESS, warning: ORANGE, accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM, border: BORDER, borderSubtle: BORDER_ACTIVE, card: CARD, cardElevatedGlass: CARD_ELEVATED_GLASS } = theme;
@@ -1154,6 +1156,7 @@ export default function OrdersScreen() {
         </View>
       ) : (
         <FlashList
+          ref={scrollResetRef}
           data={listRows}
           keyExtractor={keyExtractor}
           getItemType={getItemType}
