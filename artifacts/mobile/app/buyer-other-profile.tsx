@@ -12,6 +12,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
@@ -55,6 +56,7 @@ export default function BuyerOtherProfileScreen() {
   const router  = useRouter();
   const api     = useApi();
   const layout  = useProfileLayout();
+  const barInset = useBuyerTabBarInset();
   const { userId: currentUserId } = useAuth();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   const params  = useLocalSearchParams<{
@@ -394,6 +396,7 @@ export default function BuyerOtherProfileScreen() {
         onEndReached={videos.loadMore}
         refreshing={refreshing}
         onRefresh={handleRefresh}
+        bottomInset={barInset}
       />
 
       {/* ── More options sheet ── */}
