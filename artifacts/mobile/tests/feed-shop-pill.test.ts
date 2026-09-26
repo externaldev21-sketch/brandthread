@@ -13,19 +13,25 @@ import { describe, expect, it } from 'vitest';
 const feed = readFileSync(resolve(__dirname, '../app/(tabs)/feed.tsx'), 'utf8');
 const social = readFileSync(resolve(__dirname, '../services/socialService.ts'), 'utf8');
 const postsRoute = readFileSync(resolve(__dirname, '../../api-server/src/routes/posts.ts'), 'utf8');
+// The shop pill was extracted into its own component as part of the buyer
+// feed presentation-layer rebuild (see components/buyer-feed/) — it's now a
+// compact single-line TikTok-Shop-style anchor pill, smaller than the
+// "glass trigger" card this file originally described.
+const shopPill = readFileSync(resolve(__dirname, '../components/buyer-feed/ShopAnchorPill.tsx'), 'utf8');
 
-describe('Shop pill — compact glass trigger', () => {
+describe('Shop pill — compact single-line anchor pill', () => {
   it('is a small pill with a thumbnail, price, and shimmer — not the old wide row', () => {
-    expect(feed).toContain('function ShopPill(');
-    expect(feed).toContain('styles.shopPillThumb');
-    expect(feed).toContain('styles.shopPillShimmer');
-    expect(feed).toContain('<BlurView');
+    expect(feed).toContain('ShopAnchorPill');
+    expect(shopPill).toContain('function ShopAnchorPill(');
+    expect(shopPill).toContain('styles.thumb');
+    expect(shopPill).toContain('styles.shimmer');
+    expect(shopPill).toContain('<BlurView');
     expect(feed).not.toContain('mediaTagName');
   });
 
   it('shows the real product thumbnail when available, falling back to a bag icon', () => {
-    expect(feed).toContain('tag.imageUri ? (');
-    expect(feed).toContain('<Feather name="shopping-bag"');
+    expect(shopPill).toContain('tag.imageUri ? (');
+    expect(shopPill).toContain('<Feather name="shopping-bag"');
   });
 });
 

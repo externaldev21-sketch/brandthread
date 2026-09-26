@@ -69,13 +69,17 @@ import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
+import { FeedTopBar } from '@/components/buyer-feed/FeedTopBar';
+import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { CaptionBlock } from '@/components/buyer-feed/CaptionBlock';
+import { ShopAnchorPill } from '@/components/buyer-feed/ShopAnchorPill';
+import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -1183,89 +1187,13 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
   );
 }
 
-// ─── Shop CTA — an editorial "shop the look" card, elegantly integrated ──────
-// above the creator/caption block rather than a bare floating pill. Carries a
-// product thumb, an eyebrow label, the product name and price, and a chevron
-// affordance — reads as a merchandising surface, not a slapped-on badge. A
-// slow shimmer sweep plus a spring pop-in (on first mount, i.e. whenever the
-// page becomes the active cell) give it presence without being noisy.
-
-function ShopPill({
-  tag, extraCount, onPress,
-}: {
-  tag: SpotlightProductTag;
-  extraCount: number;
-  onPress: () => void;
-}) {
-  const { theme } = useAppTheme();
-  const shimmer = useRef(new Animated.Value(0)).current;
-  const pop = useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
-    Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 9 }).start();
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.delay(1600),
-        Animated.timing(shimmer, { toValue: 1, duration: 1000, useNativeDriver: true }),
-        Animated.timing(shimmer, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [shimmer, pop]);
-
-  return (
-    <Animated.View
-      style={{
-        opacity: pop,
-        transform: [
-          { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) },
-          { translateY: pop.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
-        ],
-      }}
-    >
-      <TouchableOpacity
-        style={[styles.shopPill, { borderColor: `${theme.accent}55` }]}
-        activeOpacity={0.85}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
-      >
-        <BlurView intensity={42} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={styles.shopPillThumb}>
-          {tag.imageUri ? (
-            <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-          ) : (
-            <Feather name="shopping-bag" size={11} color="#111111" />
-          )}
-        </View>
-        <Text style={styles.shopPillName} numberOfLines={1}>{tag.productName}</Text>
-        <Text style={styles.shopPillDot}>·</Text>
-        <Text style={styles.shopPillPrice} numberOfLines={1}>
-          {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
-        </Text>
-        <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.75)" />
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.shopPillShimmer,
-            {
-              opacity: shimmer.interpolate({ inputRange: [0, 0.15, 0.85, 1], outputRange: [0, 0.45, 0.45, 0] }),
-              transform: [{ translateX: shimmer.interpolate({ inputRange: [0, 1], outputRange: [-140, 220] }) }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
+// The old inline ShopPill/right-rail/caption-block/top-bar JSX previously
+// defined in this file has been rebuilt as its own component tree under
+// components/buyer-feed/ (ShopAnchorPill, RightActionRail, CaptionBlock,
+// FeedTopBar, LongPressMenu) — see the imports above. This file keeps the
+// video player logic and gesture handling (SpotlightPage, VideoVisual,
+// ScrubProgressBar) and the data/engagement hooks, and wires the new
+// presentational components to them below.
 
 function SpotlightPage({
   item, isActive, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound,
@@ -1309,6 +1237,8 @@ function SpotlightPage({
   const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+  /** Long-press context menu: "2x speed" / "Not interested" / "Report". */
+  const [menuOpen, setMenuOpen] = useState(false);
   const { showToast } = useFeedToast();
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -1461,7 +1391,10 @@ function SpotlightPage({
           native does) — which silently zeroed out the whole video area
           (390x0) while the separately-sized blurred mirror strip kept
           rendering, producing an all-black screen with nothing playing. */}
-      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
+      <Pressable
+        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setMenuOpen(true); }}
+        delayLongPress={550}
+        onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
         <View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>
           {item.contentType === 'video'
             ? (
@@ -1517,162 +1450,34 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
-      {/* ─ Shop CTA — sits above the creator name, integrated as a merch card ─ */}
-      {!!item.productTags?.length && (
-        <Animated.View style={[styles.mediaTags, chromeStyle, { bottom: bottomClearance + (hasRepostIdentity ? 158 : 122) }]} pointerEvents="box-none">
-          <ShopPill
-            tag={item.productTags[0]}
-            extraCount={Math.max(0, item.productTags.length - 1)}
-            onPress={() => onShopTag(item, item.productTags![0])}
-          />
-        </Animated.View>
-      )}
-
-      {/* ─ Right action rail ─ */}
-      <Animated.View style={[styles.rail, chromeStyle, { bottom: bottomClearance }]}>
-        {/* Avatar + follow badge */}
-        <View style={styles.railAvatarWrap}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onOpenCreator(item);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`View ${item.creator}'s profile`}
-          >
-            <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
-              <Text style={styles.railAvatarText}>{item.initials}</Text>
-            </View>
-          </TouchableOpacity>
-          {!(engagement?.following) && (
-            <EngagementButton
-              icon="plus"
-              iconSize={11}
-              active={false}
-              accessibilityLabel={`Follow ${item.creator}`}
-              style={[styles.railFollowBadge, { backgroundColor: item.accentColor }]}
-              onPress={async () => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                await onFollow(item.id);
-              }}
-              testID={`follow-btn-${item.id}`}
-            />
-          )}
-        </View>
-
-        {/* Like — a ring echoes outward from behind the icon on every tap
-            that likes the post (not just the double-tap burst on the video
-            itself), so the rail control has its own moment of feedback. */}
-        <View style={styles.railLikeWrap} pointerEvents="box-none">
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.railLikeRing,
-              {
-                opacity: likeRing.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.55, 0] }),
-                transform: [{ scale: likeRing.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.9] }) }],
-              },
-            ]}
-          />
-          <EngagementButton
-            icon="heart"
-            solidIcon="heart"
-            iconSize={25}
-            count={formatCount(engagement?.likes ?? 0)}
-            active={engagement?.liked ?? false}
-            activeColor="#EF4444"
-            inactiveColor={ON_DARK}
-            accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${formatCount(engagement?.likes ?? 0)} likes`}
-            accessibilityState={{ checked: engagement?.liked ?? false }}
-            scaleAnim={heartScale}
-            style={styles.railActionContent}
-            onPress={async () => {
-              bumpHeart();
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              await onLike(item.id);
-            }}
-            hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-            testID={`like-btn-${item.id}`}
-          />
-        </View>
-
-        {/* Comments — not async, opens navigation */}
-        <TouchableOpacity
-          style={styles.railBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          onPress={() => onOpenComments(item.id)}
-          accessibilityRole="button"
-          accessibilityLabel={`Comments, ${formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}`}
-        >
-          <FontAwesome name="commenting" size={24} color={ON_DARK} />
-          <Text style={styles.railCount}>{formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}</Text>
-        </TouchableOpacity>
-
-        {/* Repost */}
-        <EngagementButton
-          icon="repeat"
-          solidIcon="retweet"
-          iconSize={25}
-          count={formatCount(engagement?.reposts ?? 0)}
-          active={engagement?.reposted ?? false}
-          activeColor={theme.accent}
-          inactiveColor={ON_DARK}
-          accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${formatCount(engagement?.reposts ?? 0)} reposts`}
-          accessibilityState={{ checked: engagement?.reposted ?? false }}
-          style={styles.railActionContent}
-          rotateAnim={repostSpin}
-          scaleAnim={repostScale}
-          onPress={async () => {
-            spinRepost();
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            await onRepost(item.id);
-          }}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          testID={`repost-btn-${item.id}`}
-        />
-
-        {/* Save */}
-        <EngagementButton
-          icon="bookmark"
-          solidIcon="bookmark"
-          iconSize={24}
-          count={formatCount(engagement?.saves ?? item.saves)}
-          active={engagement?.saved ?? false}
-          activeColor={GOLD}
-          inactiveColor={ON_DARK}
-          accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${formatCount(engagement?.saves ?? item.saves)} saves`}
-          accessibilityState={{ checked: engagement?.saved ?? false }}
-          style={styles.railActionContent}
-          translateYAnim={saveDrop}
-          scaleAnim={saveScale}
-          onPress={async () => {
-            dropSave();
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            await onSave(item.id);
-          }}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          testID={`save-btn-${item.id}`}
-        />
-
-        {/* Share */}
-        <TouchableOpacity
-          style={styles.railBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="Share post"
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShareOpen(true);
-          }}
-        >
-          <FontAwesome name="share" size={24} color={ON_DARK} />
-          <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
-        </TouchableOpacity>
-
-      </Animated.View>
+      {/* ─ Right action rail (components/buyer-feed/RightActionRail) ─ */}
+      <RightActionRail
+        style={[chromeStyle, { bottom: bottomClearance }]}
+        creator={item.creator}
+        avatarColor={item.avatarColor}
+        initials={item.initials}
+        accentColor={item.accentColor}
+        engagement={engagement}
+        commentsCount={item.commentsCount ?? (engagement?.comments ?? []).length}
+        shares={item.shares}
+        saves={item.saves}
+        soundOn={soundOn}
+        onToggleSound={onToggleSound}
+        onOpenCreator={() => { onOpenCreator(item); }}
+        onFollow={() => onFollow(item.id)}
+        onLike={async () => { bumpHeart(); await onLike(item.id); }}
+        onOpenComments={() => onOpenComments(item.id)}
+        onRepost={async () => { spinRepost(); await onRepost(item.id); }}
+        onSave={async () => { dropSave(); await onSave(item.id); }}
+        onShare={() => setShareOpen(true)}
+        heartScale={heartScale}
+        likeRing={likeRing}
+        repostSpin={repostSpin}
+        repostScale={repostScale}
+        saveDrop={saveDrop}
+        saveScale={saveScale}
+        testIdBase={item.id}
+      />
 
       <ThreadShareSheet
         visible={shareOpen}
@@ -1688,88 +1493,43 @@ function SpotlightPage({
         onFeedback={showToast}
       />
 
-      {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─ */}
-      <Animated.View style={[styles.bottomInfo, chromeStyle, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance }]} pointerEvents="box-none">
-        {hasRepostIdentity && (
-          <TouchableOpacity
-            style={styles.repostIdentity}
-            activeOpacity={friendReposts.length > 0 ? 0.8 : 1}
-            disabled={friendReposts.length === 0}
-            onPress={() => {
-              const friend = friendReposts[0];
-              // buyer-other-profile reads `userId` — the old `id` param opened a blank profile.
-              if (friend) router.push(profileHref({ userId: friend.userId, accountType: 'buyer', name: friend.displayName }) as never);
-            }}
-            accessibilityRole={friendReposts.length > 0 ? 'button' : 'text'}
-            accessibilityLabel={repostLabel}
-          >
-            <View style={styles.repostAvatarStack}>
-              {friendReposts.slice(0, 3).map((friend, index) => (
-                <View
-                  key={friend.userId}
-                  style={[styles.repostAvatar, { marginLeft: index === 0 ? 0 : -7, zIndex: 3 - index }]}
-                >
-                  {friend.avatarUrl ? (
-                    <CachedImage source={{ uri: friend.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                  ) : (
-                    <View style={[StyleSheet.absoluteFill, styles.repostAvatarFallback]}>
-                      <Text style={styles.repostAvatarInitials}>
-                        {friend.displayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              ))}
-              {friendReposts.length === 0 && (
-                <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
-                  <Feather name="user" size={13} color={ON_DARK} />
-                </View>
-              )}
-            </View>
-            <Text style={styles.repostIdentityText} numberOfLines={1}>{repostLabel}</Text>
-          </TouchableOpacity>
+      <LongPressMenu
+        visible={menuOpen}
+        speedActive={speedActive}
+        onToggleSpeed={() => setSpeedActive(v => !v)}
+        onNotInterested={() => onNotInterested(item.id)}
+        onReport={() => router.push(`/buyer-report?targetType=post&targetId=${encodeURIComponent(item.id)}&targetLabel=Post` as never)}
+        onClose={() => setMenuOpen(false)}
+      />
+
+      {/* ─ Bottom-left overlay: shop pill, creator, caption, sound (components/buyer-feed/CaptionBlock + ShopAnchorPill) ─ */}
+      <CaptionBlock
+        style={[chromeStyle, { bottom: bottomClearance }]}
+        creator={item.creator}
+        verified={!!item.verified}
+        caption={item.caption}
+        sound={item.sound}
+        soundOn={soundOn}
+        onToggleSound={onToggleSound}
+        friendReposts={friendReposts}
+        hasRepostIdentity={hasRepostIdentity}
+        repostLabel={repostLabel}
+        onOpenRepostIdentity={() => {
+          const friend = friendReposts[0];
+          // buyer-other-profile reads `userId` — the old `id` param opened a blank profile.
+          if (friend) router.push(profileHref({ userId: friend.userId, accountType: 'buyer', name: friend.displayName }) as never);
+        }}
+        captionExpanded={captionExpanded}
+        onToggleCaptionExpanded={() => setCaptionExpanded(v => !v)}
+        onOpenCreator={() => onOpenCreator(item)}
+        shopPill={!!item.productTags?.length && (
+          <ShopAnchorPill
+            tag={item.productTags[0]}
+            extraCount={Math.max(0, item.productTags.length - 1)}
+            onPress={() => onShopTag(item, item.productTags![0])}
+          />
         )}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onOpenCreator(item);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${item.creator}'s profile`}
-        >
-          <View style={styles.creatorRow}>
-            <Text style={styles.creatorName} numberOfLines={1}>{item.creator}</Text>
-            {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
-          </View>
-        </TouchableOpacity>
-
-        <Pressable
-          onPress={() => item.caption.length > 86 && setCaptionExpanded(v => !v)}
-          accessibilityRole={item.caption.length > 86 ? 'button' : 'text'}
-          accessibilityLabel={item.caption.length > 86 ? (captionExpanded ? 'Collapse caption' : 'Expand caption') : undefined}
-          hitSlop={{ top: 4, bottom: 4 }}
-        >
-          <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
-            {item.caption}
-            {item.caption.length > 86 && (
-              <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
-            )}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.soundRow}
-          onPress={onToggleSound}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
-          accessibilityState={{ checked: soundOn }}
-        >
-           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={12} color={`${ON_DARK}CC`} />
-          <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
-        </Pressable>
-      </Animated.View>
+      />
     </View>
   );
 }
@@ -2872,141 +2632,38 @@ export default function FeedScreen({
           </View>
         </View>
       ) : isBuyerSurface ? (
-        <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none">
-          {/* Buyer Threads Home: For You feed chrome — Friends + Drops entry
-              points, a centered "Following | Threads" glass pill switcher
-              (real SegmentedControl from the shared design system, extended
-              with a translucent `variant="glass"` for use over video — see
-              components/ui/SegmentedControl.tsx), a LIVE jump-to button that
-              only appears while a live stream is actually mixed into the
-              feed, search, activity and cart. */}
-          {buyerSearchOpen ? (
-            <View style={styles.buyerSearchRow}>
-              <BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
-              <Feather name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
-              <TextInput
-                style={styles.buyerSearchInput}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search creators, products…"
-                placeholderTextColor="rgba(255,255,255,0.5)"
-                autoFocus
-                returnKeyType="search"
-                onSubmitEditing={() => setBuyerSearchOpen(false)}
-              />
-              <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
-                activeOpacity={0.7}
-                onPress={() => { setBuyerSearchOpen(false); setSearchQuery(''); }}
-                accessibilityRole="button"
-                accessibilityLabel="Close search"
-              >
-                <Feather name="x" size={18} color={ON_DARK} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-          <View style={styles.buyerTopRow}>
-            <View style={styles.buyerTopCluster}>
-              <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  router.navigate('/(buyer)/friends' as never);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Friends"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                testID="buyer-home-friends"
-              >
-                <BuyerNavIcon name="friends" color={ON_DARK} size={22} strokeWidth={1.9} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  router.push('/buyer-drops' as never);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Drops"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                testID="buyer-home-drops"
-              >
-                <Feather name="zap" size={20} color={ON_DARK} />
-              </TouchableOpacity>
-              {activeLiveStreams.length > 0 && (
-                <TouchableOpacity
-                  style={styles.liveJumpBtn}
-                  activeOpacity={0.78}
-                  onPress={jumpToNearestLive}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Jump to live, ${activeLiveStreams.length} streaming now`}
-                  hitSlop={{ top: 5, bottom: 5, left: 4, right: 5 }}
-                >
-                  <View style={styles.liveJumpDot} />
-                  <Text style={styles.liveJumpText}>LIVE</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={styles.buyerTabSwitcherWrap} pointerEvents="box-none">
-              <SegmentedControl
-                variant="underline"
-                testID="buyer-home-tabs"
-                options={[
-                  { id: 'following', label: 'Following' },
-                  { id: 'for-you', label: 'Threads' },
-                ]}
-                selectedId={feedTab}
-                onChange={(id) => {
-                  setActiveIndex(0);
-                  setFeedTab(id as 'following' | 'for-you');
-                }}
-              />
-            </View>
-
-            <View style={styles.buyerTopCluster}>
-              <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  setBuyerSearchOpen(true);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Search"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                testID="buyer-home-search"
-              >
-                <Feather name="search" size={20} color={ON_DARK} />
-              </TouchableOpacity>
-              <ActivityBellButton color={ON_DARK} size={20} style={styles.buyerTopBtnCompact} badgeBorderColor={BG} />
-              <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtnCompact, { transform: [{ scale: cartPulse }] }]}>
-              <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/(buyer)/cart' as never);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-              >
-                <Feather name="shopping-cart" size={20} color={ON_DARK} />
-                {cartCount > 0 && (
-                  <View style={[styles.cartCountBadge, styles.buyerCartBadge, { backgroundColor: theme.accent }]}>
-                    <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
-                      {cartCount > 99 ? '99+' : cartCount}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              </Animated.View>
-            </View>
-          </View>
-          )}
-        </View>
+        <>
+          {/* Buyer Threads Home top bar (components/buyer-feed/FeedTopBar):
+              LIVE on the left, "Following / Threads" text tabs with a
+              sliding underline centered, search on the right. Cart and
+              notifications were deliberately dropped from this header (both
+              are one tap away via the buyer tab bar) to match a plain
+              TikTok-style top bar — see the PR description. The cart-flight
+              landing target is kept as an invisible anchor so "add to cart"
+              from a shop sheet opened off this feed still animates to the
+              same place it always has, just without a visible icon here. */}
+          <FeedTopBar
+            topInset={previewTopInset}
+            feedTab={feedTab}
+            onChangeTab={(id) => { setActiveIndex(0); setFeedTab(id); }}
+            hasActiveLive={activeLiveStreams.length > 0}
+            onPressLive={jumpToNearestLive}
+            searchOpen={buyerSearchOpen}
+            searchQuery={searchQuery}
+            onChangeSearchQuery={setSearchQuery}
+            onOpenSearch={() => setBuyerSearchOpen(true)}
+            onCloseSearch={() => { setBuyerSearchOpen(false); setSearchQuery(''); }}
+            onOpenFriends={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              router.navigate('/(buyer)/friends' as never);
+            }}
+          />
+          <Animated.View
+            ref={cartTargetRef}
+            pointerEvents="none"
+            style={{ position: 'absolute', top: Math.max(0, previewTopInset - 4) + 10, right: 14, width: 1, height: 1 }}
+          />
+        </>
       ) : (
       <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none">
         {showSearch ? (

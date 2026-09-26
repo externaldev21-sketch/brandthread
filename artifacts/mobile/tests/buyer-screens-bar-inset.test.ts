@@ -43,10 +43,12 @@ describe('buyer Home feed behind the bar', () => {
     // line all key off one shared number with no gap between them.
     expect(feed).toContain('? buyerBarInset\n    : Math.max(previewBottomInset, 8) + 14;');
     expect(feed).toContain('immersive={isBuyerSurface}');
-    // Rail, caption and shop tag all anchor to the same clearance.
-    expect(feed).toContain('styles.rail, chromeStyle, { bottom: bottomClearance }');
-    expect(feed).toContain('{ bottom: bottomClearance }]} pointerEvents="box-none"');
-    expect(feed).toContain('bottom: bottomClearance + (hasRepostIdentity ? 158 : 122)');
+    // Rail and caption block (which carries the shop pill in its own flow,
+    // rather than a separately-positioned overlay) both anchor to the same
+    // clearance — see components/buyer-feed/RightActionRail.tsx and
+    // CaptionBlock.tsx, wired from app/(tabs)/feed.tsx.
+    expect(feed).toContain('<RightActionRail\n        style={[chromeStyle, { bottom: bottomClearance }]}');
+    expect(feed).toContain('<CaptionBlock\n        style={[chromeStyle, { bottom: bottomClearance }]}');
     // The scrub line sits exactly at the seam where the sharp video is
     // clipped and the blurred tab-bar strip begins — no offset gap.
     expect(feed).toContain('progressBottom={immersive ? bottomClearance : undefined}');
