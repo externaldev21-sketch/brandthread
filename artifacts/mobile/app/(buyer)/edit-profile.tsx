@@ -1,14 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Modal, Image, Alert, ActivityIndicator,
+  Platform, TextInput, Modal, Alert, ActivityIndicator,
   KeyboardAvoidingView, Animated,
 } from 'react-native';
 import { HapticSwitch } from '@/components/BrandthreadUI';
+import { Avatar } from '@/components/ui/Avatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
@@ -19,15 +18,41 @@ import { useApi } from '@/lib/api';
 import { pickProfileImage } from '@/lib/pickProfileImage';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
-import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Prefer not to say', 'Custom'] as const;
 const BIO_MAX = 150;
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 const LINK_RE = /^(https?:\/\/)?[^\s.]+\.[^\s]{2,}$/i;
+// Dev-web preview only: reserved names that always read as "taken" so the
+// availability UI (spinner → taken/ok) can be exercised without a backend.
+const PREVIEW_TAKEN_USERNAMES = new Set(['admin', 'test', 'brandthread', 'jordan']);
 
 type CoreFields = { name: string; username: string; bio: string; link: string };
+
+// react-native-web's Alert.alert() is a no-op (RN's Alert has no web
+// implementation upstream), so the native Alert.alert below never shows
+// anything in a browser — the unsaved-changes prompt would silently vanish
+// on web only. Use the browser's own confirm() there; every other platform
+// keeps the native two-button alert.
+function confirmDiscardChanges(onDiscard: () => void) {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.confirm('Discard changes? You have unsaved changes. If you leave now, they will be lost.')) {
+      onDiscard();
+    }
+    return;
+  }
+  Alert.alert(
+    'Discard changes?',
+    'You have unsaved changes. If you leave now, they will be lost.',
+    [
+      { text: 'Keep editing', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: onDiscard },
+    ],
+  );
+}
 
 function Divider({ theme }: { theme: AppThemePreset }) {
   return <View style={{ height: 1, backgroundColor: theme.border, marginLeft: 16 }} />;
@@ -68,12 +93,19 @@ function GenderPicker({
 export default function BuyerEditProfileScreen() {
   const scrollResetRef = useScrollReset<ScrollView>();
   const insets = useSafeAreaInsets();
-  const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const navigation = useNavigation();
   const { theme } = useAppTheme();
   const api = useApi();
   const { getToken } = useAuth();
+  // Dev-web preview (?bt_preview=buyer): there is no signed-in Clerk user, so
+  // every real network call below 401s. Route those specific calls through a
+  // local-only path instead so the whole screen — including username
+  // availability, photo upload and Save — works end-to-end against the same
+  // AsyncStorage-backed profile store the rest of the screen already reads
+  // and writes via loadBuyerProfile/saveBuyerProfile. __DEV__-gated, so this
+  // is never reachable in a production build.
+  const preview = __DEV__ && isBuyerDevPreview();
 
   const [badge, setBadge] = useState<StyleBadgeState>({ ...DEFAULT_STYLE_BADGE, enabled: true });
   const [extra, setExtra] = useState<Pick<BuyerProfileFields, 'pronouns' | 'gender' | 'aiCreator'>>({
@@ -119,6 +151,19 @@ export default function BuyerEditProfileScreen() {
       return false;
     }
     setUsernameStatus('checking');
+    if (preview) {
+      // No backend to ask in preview mode — simulate the round trip against
+      // a small local reserved-name list so the taken/ok states are real.
+      await new Promise(resolve => setTimeout(resolve, 400));
+      if (PREVIEW_TAKEN_USERNAMES.has(u)) {
+        setUsernameStatus('taken');
+        setUsernameError('Username already taken');
+        return false;
+      }
+      setUsernameStatus('ok');
+      setUsernameError('');
+      return true;
+    }
     try {
       const result = await api.auth.checkUsername(u);
       if (result.available) {
@@ -151,16 +196,27 @@ export default function BuyerEditProfileScreen() {
     const previousUri = avatarUri;
     setAvatarUri(asset.uri); // optimistic local preview while it uploads
     try {
-      const token = await getToken();
-      const result = await uploadImageWithProgress<{ profileImageUrl: string }>(
-        '/api/seller/profile/avatar/upload',
-        { uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' },
-        token,
-        setAvatarProgress,
-      );
-      setAvatarUri(result.profileImageUrl);
-      setLoadedProfile(prev => ({ ...prev, avatarUri: result.profileImageUrl }));
-      await saveBuyerProfile({ ...loadedProfile, avatarUri: result.profileImageUrl });
+      let finalUri = asset.uri;
+      if (preview) {
+        // No upload endpoint to hit in preview mode — simulate progress
+        // locally and keep the picked local URI as the "uploaded" result.
+        for (const pct of [30, 65, 100]) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+          setAvatarProgress(pct);
+        }
+      } else {
+        const token = await getToken();
+        const result = await uploadImageWithProgress<{ profileImageUrl: string }>(
+          '/api/seller/profile/avatar/upload',
+          { uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' },
+          token,
+          setAvatarProgress,
+        );
+        finalUri = result.profileImageUrl;
+      }
+      setAvatarUri(finalUri);
+      setLoadedProfile(prev => ({ ...prev, avatarUri: finalUri }));
+      await saveBuyerProfile({ ...loadedProfile, avatarUri: finalUri });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast('Photo updated');
     } catch {
@@ -208,17 +264,22 @@ export default function BuyerEditProfileScreen() {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
       if (!isDirty || saving) return;
       e.preventDefault();
-      Alert.alert(
-        'Discard changes?',
-        'You have unsaved changes. If you leave now, they will be lost.',
-        [
-          { text: 'Keep editing', style: 'cancel' },
-          { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
-        ],
-      );
+      confirmDiscardChanges(() => navigation.dispatch(e.data.action));
     });
     return unsubscribe;
   }, [navigation, isDirty, saving]);
+
+  // The header back button is the primary way off this screen and must be
+  // reliable on its own: this screen lives inside the buyer Tabs navigator
+  // (see BUYER_ROUTE_SLOT above) rather than a plain stack, and switching
+  // away from a tab-hosted screen there doesn't always raise 'beforeRemove'
+  // the way a stack screen's pop does. Guard the tap directly so the prompt
+  // fires every time, and keep the listener above as extra coverage for
+  // any other way this screen gets popped (e.g. a real stack push).
+  function handleBackPress() {
+    if (isDirty && !saving) { confirmDiscardChanges(() => router.back()); return; }
+    router.back();
+  }
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
 
@@ -281,7 +342,9 @@ export default function BuyerEditProfileScreen() {
           website: cleanedFields.links,
           avatarInitials: initials,
         }),
-        api.auth.updateProfile({
+        // No authenticated session to save against in preview mode — the two
+        // local writes above already persist everything this screen edits.
+        preview ? Promise.resolve() : api.auth.updateProfile({
           username: rawUsername || undefined,
           displayName: cleanedFields.name,
           name: cleanedFields.name,
@@ -318,7 +381,7 @@ export default function BuyerEditProfileScreen() {
     >
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={[styles.header, { paddingTop: topPad + 10 }]}>
-          <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => router.back()}>
+          <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={handleBackPress}>
             <Feather name="chevron-left" size={24} color={theme.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>Edit profile</Text>
@@ -340,24 +403,21 @@ export default function BuyerEditProfileScreen() {
           <Text style={[styles.toastText, { color: theme.onAccent }]}>{toast.message}</Text>
         </Animated.View>
 
-        <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: barInset + SP.lg }}>
+        <ScrollView ref={scrollResetRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}>
           {/* Avatar */}
           <View style={styles.avatarSection}>
             <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={avatarUploading}>
               <View style={styles.avatarWrap}>
-                {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={styles.avatar} />
-                ) : (
-                  <LinearGradient colors={[...theme.primaryGradient]} style={styles.avatar}>
-                    <Text style={[styles.avatarText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                      {fields.name ? fields.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '🙂'}
-                    </Text>
-                  </LinearGradient>
-                )}
+                <Avatar uri={avatarUri} name={fields.name} size={96} />
                 {avatarUploading && (
                   <View style={styles.avatarOverlay}>
                     <ActivityIndicator color="#FFF" size="small" />
                     <Text style={styles.avatarOverlayText}>{avatarProgress}%</Text>
+                  </View>
+                )}
+                {!avatarUploading && (
+                  <View style={[styles.cameraBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
+                    <Feather name="camera" size={13} color={theme.onAccent} />
                   </View>
                 )}
               </View>
@@ -586,8 +646,10 @@ const styles = StyleSheet.create({
   chevronLabel: { fontSize: 13.5, fontFamily: 'Inter_400Regular' },
   avatarSection: { alignItems: 'center', paddingVertical: 20, gap: 10 },
   avatarWrap: { width: 96, height: 96, borderRadius: 48 },
-  avatar: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 30, fontFamily: 'Inter_700Bold' },
+  cameraBadge: {
+    position: 'absolute', right: -2, bottom: -2, width: 30, height: 30, borderRadius: 15,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2.5,
+  },
   avatarOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 48,
     backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 4, // theme-exempt: scrim over avatar media

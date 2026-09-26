@@ -1414,6 +1414,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
         ),
     },
+    /** Brandthread Agent — the official AI friend account's chat backend. */
+    brandthreadAgent: {
+      sendMessage: (body: { conversationId: string; text: string }) =>
+        post<{
+          userMessage: { id: string; text: string; ts: number };
+          agentMessage: { id: string; text: string; attachment?: any; ts: number };
+        }>('/api/brandthread-agent/message', body),
+    },
     /** 1:1 voice / video call tokens (Agora RTC). */
     call: {
       token: (body: { conversationId: string; mode: 'voice' | 'video' }) =>

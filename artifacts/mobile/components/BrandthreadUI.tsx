@@ -1199,10 +1199,21 @@ export function CheckoutSkeleton() {
   );
 }
 
-export function HapticSwitch({ onValueChange, ...props }: SwitchProps) {
+export function HapticSwitch({ onValueChange, thumbColor, ...props }: SwitchProps) {
   return (
     <Switch
       {...props}
+      thumbColor={thumbColor}
+      // react-native-web's Switch has a web-only `activeThumbColor` prop for
+      // the thumb while the switch is on, separate from `thumbColor`. Native
+      // iOS/Android ignore it entirely and just use `thumbColor` in both
+      // states. When a screen sets a custom `thumbColor` (e.g. white) but
+      // never passes `activeThumbColor`, react-native-web silently falls
+      // back to its own default (#009688, teal) for the "on" thumb — so on
+      // web only, every switch with a custom thumb color showed a
+      // hardcoded teal dot once flipped on. Mirror `thumbColor` into it so
+      // web matches native and the app stays on-brand in all themes.
+      {...({ activeThumbColor: thumbColor } as object)}
       onValueChange={(value) => {
         hapticSelection();
         onValueChange?.(value);

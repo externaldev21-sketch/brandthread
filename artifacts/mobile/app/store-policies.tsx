@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Header } from '@/components/layout';
 import {
@@ -161,9 +162,7 @@ export default function StorePoliciesScreen() {
         <View style={[s.header, { borderBottomColor: BORDER, height: 56 + headerTopInset, paddingTop: headerTopInset }]}>
           <TouchableOpacity onPress={closeEdit} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="x" size={21} color={FG} /></TouchableOpacity>
           <Text style={[s.headerTitle, { color: FG }]} numberOfLines={1} ellipsizeMode="tail">{policyMeta.label}</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving} style={[s.saveBtn, { backgroundColor: PURPLE, opacity: saving ? 0.6 : 1 }]}>
-            {saving ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Text style={[s.saveBtnText, { color: theme.onAccent }]}>Save</Text>}
-          </TouchableOpacity>
+          <Button label="Save" variant="primary" size="compact" loading={saving} onPress={handleSave} />
         </View>
 
         <View style={[s.aiBar, { backgroundColor: `${PURPLE}12`, borderBottomColor: BORDER }]}>
@@ -259,8 +258,6 @@ const s = StyleSheet.create({
   header: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1 },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FS.base, fontFamily: FONT.bold, flex: 1, flexShrink: 1, textAlign: 'center', marginHorizontal: SP.sm },
-  saveBtn: { borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 8 },
-  saveBtnText: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
   aiBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: SP.md, paddingVertical: 10, borderBottomWidth: 1 },
   aiBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.sm, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
   aiBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },

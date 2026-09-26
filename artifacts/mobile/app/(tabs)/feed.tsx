@@ -102,6 +102,10 @@ const THREAD_PAGE_SIZE = 30;
 //   - RAIL_BOTTOM_GAP: >=16pt from the rail's last item to the bar's top.
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
 const RAIL_BOTTOM_GAP = 22;
+// How many times a feed's content repeats (under unique keys) once it has
+// no more real pages behind it, so scrolling never dead-ends or shows an
+// end card — see the `canLoopFeed`/`displayItems` comment below.
+const FEED_LOOP_REPEAT = 6;
 const CAPTION_BOTTOM_GAP = 18;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
@@ -1210,6 +1214,7 @@ function ShopPill({
   onPress: () => void;
 }) {
   const { theme } = useAppTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const shimmer = useRef(new Animated.Value(0)).current;
   const pop = useRef(new Animated.Value(0)).current;
 
@@ -1248,15 +1253,16 @@ function ShopPill({
           {tag.imageUri ? (
             <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
-            <Feather name="shopping-bag" size={11} color="#111111" />
+            <Feather name="shopping-bag" size={13} color="#111111" />
           )}
         </View>
-        <Text style={styles.shopPillName} numberOfLines={1}>{tag.productName}</Text>
-        <Text style={styles.shopPillDot}>·</Text>
+        <Text style={[styles.shopPillName, { maxWidth: windowWidth * 0.6 }]} numberOfLines={1}>
+          {tag.productName}
+        </Text>
         <Text style={styles.shopPillPrice} numberOfLines={1}>
           {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
         </Text>
-        <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.75)" />
+        <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.75)" />
         <Animated.View
           pointerEvents="none"
           style={[
@@ -1529,17 +1535,6 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
-      {/* ─ Shop CTA — sits above the creator name, integrated as a merch card ─ */}
-      {!!item.productTags?.length && (
-        <Animated.View style={[styles.mediaTags, chromeStyle, { bottom: bottomClearance + (hasRepostIdentity ? 158 : 122) }]} pointerEvents="box-none">
-          <ShopPill
-            tag={item.productTags[0]}
-            extraCount={Math.max(0, item.productTags.length - 1)}
-            onPress={() => onShopTag(item, item.productTags![0])}
-          />
-        </Animated.View>
-      )}
-
       {/* ─ Right action rail ─
           Pinned at bottomClearance + RAIL_BOTTOM_GAP, not bare
           bottomClearance: the scrub/progress bar sits right around
@@ -1713,6 +1708,20 @@ function SpotlightPage({
           with no gap. CAPTION_BOTTOM_GAP guarantees the required >=12pt of
           clearance from the sound line down to the bar. */}
       <Animated.View style={[styles.bottomInfo, chromeStyle, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]} pointerEvents="box-none">
+        {/* Shop pill lives in this same flex column now (not a separately
+            absolute-positioned sibling keyed off a magic bottom offset) so
+            its gap down to whatever comes next is guaranteed by layout, not
+            by a hardcoded number that only happened to work for one caption
+            length. */}
+        {!!item.productTags?.length && (
+          <View style={styles.shopPillWrap} pointerEvents="box-none">
+            <ShopPill
+              tag={item.productTags[0]}
+              extraCount={Math.max(0, item.productTags.length - 1)}
+              onPress={() => onShopTag(item, item.productTags![0])}
+            />
+          </View>
+        )}
         {hasRepostIdentity && (
           <TouchableOpacity
             style={styles.repostIdentity}
@@ -2316,10 +2325,26 @@ export default function FeedScreen({
   // displayItems: sentinel at index 0 only when buyerMode=true.
   // Seller mode: if (!buyerMode) — sentinel never enters the array.
   // getItemLayout stays uniform using the measured tab-scene height for all items.
+  //
+  // Once there's no more real content to paginate in (the fixed preview set,
+  // or a real account that's genuinely reached the end of their feed), the
+  // same items are appended again under unique keys instead of ending —
+  // there is no "You're all caught up" card any more; scrolling past the
+  // last video should feel seamless and never-ending, the way the real app
+  // does, not stop dead or show an end card. Not applied while a search
+  // filter is active (a filtered result set has a real, meaningful end) or
+  // to the single-creator/product player (a deliberate end there is fine).
+  const canLoopFeed = !searchQuery.trim() && !feedHasMore && filteredContentItems.length > 1 && !isCreatorFeed;
   const displayItems: FeedItem[] = useMemo(() => {
-    if (!buyerMode) return filteredContentItems as FeedItem[];
-    return [DEMAND_PAGE_SENTINEL, ...filteredContentItems] as FeedItem[];
-  }, [buyerMode, filteredContentItems]);
+    const base = filteredContentItems as FeedItem[];
+    const content = canLoopFeed
+      ? Array.from({ length: FEED_LOOP_REPEAT }, (_, cycle) => (
+          cycle === 0 ? base : base.map(item => ({ ...item, id: `${item.id}__loop${cycle}` }))
+        )).flat()
+      : base;
+    if (!buyerMode) return content;
+    return [DEMAND_PAGE_SENTINEL, ...content];
+  }, [buyerMode, filteredContentItems, canLoopFeed]);
 
   // buyerOffset: used to compute correct isActive for video playback when the
   // demand sentinel sits at index 0.
@@ -2753,24 +2778,6 @@ export default function FeedScreen({
           feedLoadingMore ? (
             <View style={styles.feedFooter}>
               <ActivityIndicator size="small" color={MUTED} />
-            </View>
-          ) : (!feedHasMore && sellerFeedPosts.length > 0) || (isBuyerSurface && !isCreatorFeed) ? (
-            // Buyer preview/live feeds have a fixed set of videos with no
-            // real pagination behind them — without an explicit end card
-            // here, swiping past the last one used to just run out of
-            // rendered content and show blank space. This always renders
-            // right after the last item so the feed never dead-ends blank.
-            <View style={[styles.feedFooter, { width: pageWidth, height: pageHeight }]}>
-              <Feather name="check-circle" size={28} color={MUTED} />
-              <Text style={styles.feedFooterText}>You're all caught up</Text>
-              <TouchableOpacity
-                onPress={() => feedListRef.current?.scrollToIndex({ index: buyerOffset, animated: true })}
-                style={styles.creatorRetry}
-                accessibilityRole="button"
-                accessibilityLabel="Back to the top"
-              >
-                <Text style={styles.creatorRetryText}>Back to the top</Text>
-              </TouchableOpacity>
             </View>
           ) : null
         }
@@ -3272,24 +3279,27 @@ const styles = StyleSheet.create({
   speedPillText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13 },
   mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
   mediaDotActive: { width: 18, backgroundColor: ON_DARK },
-  mediaTags: { position: 'absolute', left: 16, right: 86, alignItems: 'flex-start' },
-  // Compact single-line TikTok-Shop-style product anchor pill — roughly half
-  // the height/width of the old two-line merch card it replaces, so it reads
-  // as a small tappable tag rather than a card overlaying the video.
+  // Compact single-line TikTok-Shop-style product anchor pill — a small
+  // tappable tag, not a card overlaying the video. 28pt thumbnail, 8pt
+  // internal padding, a 12pt gap between name and price (via the name's own
+  // marginRight, not a uniform row `gap`, so that gap can differ from the
+  // tighter thumb→name and price→chevron spacing) and the price never
+  // shrinks or truncates.
   shopPill: {
-    height: 26, maxWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderRadius: RADII.pill, paddingLeft: 3, paddingRight: 8, overflow: 'hidden',
+    height: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center',
+    borderRadius: RADII.pill, paddingHorizontal: 8, overflow: 'hidden',
     borderWidth: 1,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25,
     shadowRadius: 5, elevation: 4,
   },
   shopPillThumb: {
-    width: 20, height: 20, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: ON_DARK, overflow: 'hidden',
+    width: 28, height: 28, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ON_DARK, overflow: 'hidden', marginRight: 8,
   },
-  shopPillName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 11, flexShrink: 1, maxWidth: 68 },
-  shopPillDot: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
-  shopPillPrice: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
+  shopPillName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13, flexShrink: 1, marginRight: 12 },
+  // flexShrink: 0 — the price never gives up space to the name; it is
+  // always rendered in full, never truncated.
+  shopPillPrice: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, marginRight: 8, ...TABULAR_NUMS },
   shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
 
   rail: {
@@ -3319,13 +3329,19 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
 
+  // The bottom-left stack's vertical rhythm is one consistent system, set
+  // as explicit per-step margins (not a single uniform `gap`, since each
+  // step needs its own value): shop pill -> 12pt -> creator name row ->
+  // 6pt -> caption -> 8pt -> sound line -> (CAPTION_BOTTOM_GAP, on the
+  // container's own `bottom` above) -> progress bar.
   bottomInfo: {
     position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 112,
-    justifyContent: 'flex-end', gap: 8,
+    justifyContent: 'flex-end',
   },
   bottomInfoWithRepost: { minHeight: 148 },
+  shopPillWrap: { marginBottom: 12, alignItems: 'flex-start' },
   repostIdentity: {
-    alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32,
+    alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 7,
     paddingHorizontal: 7, paddingVertical: 5,
@@ -3340,12 +3356,12 @@ const styles = StyleSheet.create({
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
-    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK,
+    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 8,
     lineHeight: 20.5, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
-  creatorRow: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorRow: { minHeight: 30, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
   creatorName: {
     fontSize: FS.base + 3, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,

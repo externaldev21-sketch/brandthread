@@ -11,7 +11,8 @@
  */
 
 export type PreviewMessageAttachmentSeed = {
-  type: 'image' | 'video' | 'voice' | 'product' | 'post' | 'order' | 'profile' | 'thread_cash';
+  type: 'image' | 'video' | 'voice' | 'product' | 'post' | 'order' | 'profile' | 'thread_cash'
+    | 'agent_card' | 'quick_replies';
   title?: string;
   subtitle?: string;
   meta?: Record<string, string>;
@@ -54,10 +55,9 @@ export type PreviewConversationSeed = {
 };
 
 // The official "Brandthread Agent" AI friend account — pinned above every
-// other thread. The real account/backend is being wired up in a separate
-// change (see the `isPinned`/`isOfficial` comment on Conversation in
-// services/socialTypes.ts); this seed just gives the redesigned inbox UI
-// something real-looking to render meanwhile.
+// other thread. Mirrors the real welcome copy the api-server sends on
+// onboarding completion (see api-server/src/lib/brandthreadAgent.ts) so
+// preview and production agree on tone/content.
 export const BRANDTHREAD_AGENT_SEED: PreviewConversationSeed = {
   id: 'preview-conversation-brandthread',
   participantUserId: 'brandthread-agent',
@@ -68,7 +68,7 @@ export const BRANDTHREAD_AGENT_SEED: PreviewConversationSeed = {
   isBrandMark: true,
   isPinned: true,
   isOfficial: true,
-  lastMessage: 'yo, welcome to Brandthread 👋',
+  lastMessage: 'want me to show you how Thread Cash works?',
   lastMessageFromMe: false,
   minutesAgo: 3,
   unreadCount: 1,
@@ -77,17 +77,41 @@ export const BRANDTHREAD_AGENT_SEED: PreviewConversationSeed = {
     {
       id: 'preview-msg-brandthread-1',
       fromOfficialOrParticipant: 'them',
-      text: 'yo, welcome to Brandthread 👋 glad you\'re here.',
+      text: 'yo, welcome to Brandthread 👋',
       minutesAgo: 4,
     },
     {
       id: 'preview-msg-brandthread-2',
       fromOfficialOrParticipant: 'them',
-      text: 'One thing worth knowing right away —',
+      text: "I'm the Brandthread Agent, here 24/7 if you wanna talk fits, find brands, or figure anything out",
+      minutesAgo: 3.5,
+    },
+    {
+      id: 'preview-msg-brandthread-3',
+      fromOfficialOrParticipant: 'them',
+      text: 'want me to show you how Thread Cash works?',
       attachment: {
-        type: 'post',
+        type: 'agent_card',
         title: 'How Thread Cash works',
-        subtitle: 'Check in daily to earn credit, then redeem it at checkout.',
+        subtitle: 'Check in daily to earn credit, then stack it as a discount at checkout.',
+        meta: { cardKind: 'thread_cash', deepLink: '/thread-cash' },
+      },
+      minutesAgo: 3,
+    },
+    {
+      id: 'preview-msg-brandthread-4',
+      fromOfficialOrParticipant: 'them',
+      text: '',
+      attachment: {
+        type: 'quick_replies',
+        meta: {
+          optionsJson: JSON.stringify([
+            { label: 'Show me Thread Cash', value: 'Show me how Thread Cash works' },
+            { label: 'Find me brands', value: "Find me some brands I'd like" },
+            { label: 'How do I sell?', value: 'How do I start selling on Brandthread?' },
+            { label: 'Just vibing', value: 'Just vibing, no questions right now' },
+          ]),
+        },
       },
       minutesAgo: 3,
     },

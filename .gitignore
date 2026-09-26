@@ -53,3 +53,6 @@ Thumbs.db
 
 # Claude Code agent worktrees/scratch (not project content)
 .claude/
+
+# Local environment overrides
+.env
