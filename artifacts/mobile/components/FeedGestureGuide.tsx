@@ -63,9 +63,9 @@ function HoldRightGlyph() {
   return (
     <AnimatedGlyph>
       {t => (
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={glyphStyles.holdRow}>
           <Animated.View style={{ opacity: t.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }}>
-            <Feather name="circle" size={10} color="#FFFFFF" style={{ marginRight: -2 }} />
+            <Feather name="circle" size={10} color="#FFFFFF" />
           </Animated.View>
           <Animated.View style={{ transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.15] }) }] }}>
             <Text style={glyphStyles.speedText}>2x</Text>
@@ -91,6 +91,11 @@ function ScrubGlyph() {
 }
 
 const glyphStyles = StyleSheet.create({
+  // A real gap (not the previous negative margin) between the small "hold"
+  // ring and the "2x" label — at small sizes the negative margin let the
+  // ring's glyph box clip into the text's first character, reading as the
+  // two colliding into one glyph.
+  holdRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   speedText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 16 },
   scrubTrack: { width: 44, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.28)', justifyContent: 'center' },
   scrubDot: { position: 'absolute', left: '50%', width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF', marginLeft: -5 },

@@ -1,8 +1,17 @@
 /**
  * Brandthread Buyer Return Request
  * Eligible items, reason, resolution, evidence, submit.
+ *
+ * Rebuilt to read every color off the active theme (useAppTheme) instead of
+ * the static dark-mode-only constants the old version imported directly from
+ * lib/theme — this screen previously never re-skinned across the app's 12
+ * themes. Structure follows the same header/card language as
+ * buyer-order-detail.tsx (BrandthreadHeader + SectionCard-style grouped
+ * cards) so the buyer's order → return path reads as one continuous flow
+ * rather than two different apps, and borrows the radio-list treatment for
+ * reason/resolution seen on SHEIN, Etsy and Meta Quest return/refund flows.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
@@ -12,39 +21,93 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { createReturnRequest } from '@/services/cartService';
 import { RETURN_REASON_OPTIONS, BuyerReturnReason, BuyerReturnResolution } from '@/services/cartTypes';
 import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE, ON_DARK,
-  SUCCESS,
-  RED, RED_DIM,
-  FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
-import { PrimaryButton } from '@/components/BrandthreadUI';
+import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard, PrimaryButton } from '@/components/BrandthreadUI';
 
 function fmtDate(iso: string) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 
-const RESOLUTIONS: { key: BuyerReturnResolution; label: string; icon: string }[] = [
-  { key: 'refund',       label: 'Refund to original payment',  icon: 'credit-card' },
-  { key: 'exchange',     label: 'Exchange for another size/color', icon: 'refresh-cw' },
-  { key: 'store_credit', label: 'Store credit',                icon: 'gift' },
-  { key: 'replacement',  label: 'Replacement item',            icon: 'package' },
+const RESOLUTIONS: { key: BuyerReturnResolution; label: string; description: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: 'refund',       label: 'Refund to original payment', description: 'Usually available within 5–10 business days', icon: 'credit-card' },
+  { key: 'exchange',     label: 'Exchange for another size/color', description: 'Seller confirms availability first', icon: 'refresh-cw' },
+  { key: 'store_credit', label: 'Store credit',                description: 'Available immediately once approved', icon: 'gift' },
+  { key: 'replacement',  label: 'Replacement item',            description: 'Seller ships a new unit', icon: 'package' },
 ];
 
-export default function BuyerReturnRequestScreen() {
-  const colors = useColors();
+// ─── Section wrapper — mirrors buyer-order-detail's SectionCard so both
+// screens in this flow read as one visual language ────────────────────────
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   const { theme } = useAppTheme();
-  const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
-  const BORDER_ACTIVE = `${theme.accent}73`;
-  const s = makeStyles(theme);
+  const s = useMemo(() => makeSectionStyles(theme), [theme]);
+  return (
+    <View style={s.root}>
+      <Text style={s.title}>{title}</Text>
+      {subtitle ? <Text style={s.subtitle}>{subtitle}</Text> : null}
+      <BrandthreadCard style={{ marginTop: subtitle ? SP.sm : SP.sm }}>{children}</BrandthreadCard>
+    </View>
+  );
+}
+
+function makeSectionStyles(theme: AppThemePreset) {
+  return StyleSheet.create({
+    root: { marginBottom: SP.md },
+    title: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.4, textTransform: 'uppercase', color: theme.muted },
+    subtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: 2 },
+  });
+}
+
+// ─── Radio row — reused for both reason and resolution lists ──────────────
+function RadioRow({
+  label, description, icon, selected, onPress, isLast,
+}: {
+  label: string; description?: string; icon?: keyof typeof Feather.glyphMap;
+  selected: boolean; onPress: () => void; isLast?: boolean;
+}) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeRadioStyles(theme), [theme]);
+  return (
+    <TouchableOpacity
+      style={[s.row, !isLast && s.rowBorder]}
+      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      activeOpacity={0.7}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+    >
+      <View style={[s.radio, selected && s.radioSelected]}>
+        {selected && <View style={s.radioDot} />}
+      </View>
+      {icon && <Feather name={icon} size={ICON.sm} color={selected ? theme.accent : theme.muted} />}
+      <View style={{ flex: 1 }}>
+        <Text style={[s.label, selected && s.labelSelected]}>{label}</Text>
+        {description ? <Text style={s.description}>{description}</Text> : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function makeRadioStyles(theme: AppThemePreset) {
+  return StyleSheet.create({
+    row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
+    rowBorder: { borderBottomWidth: 1, borderBottomColor: theme.border },
+    radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+    radioSelected: { borderColor: theme.accent },
+    radioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: theme.accent },
+    label: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted, flex: 1 },
+    labelSelected: { color: theme.text, fontFamily: FONT.semibold },
+    description: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: 1 },
+  });
+}
+
+export default function BuyerReturnRequestScreen() {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -114,54 +177,70 @@ export default function BuyerReturnRequestScreen() {
   }
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>;
+    return (
+      <BrandthreadScreen>
+        <BrandthreadHeader title="Request Return" onBack={() => goBackOr(router)} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={theme.accent} size="large" />
+        </View>
+      </BrandthreadScreen>
+    );
   }
 
   if (submitted) {
     return (
-      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-        <View style={s.successIcon}>
-          <Feather name="check" size={32} color={ON_DARK} />
+      <BrandthreadScreen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
+          <View style={s.successIcon}>
+            <Feather name="check" size={32} color={theme.onAccent} />
+          </View>
+          <Text style={s.successTitle}>Return Request Submitted</Text>
+          <Text style={s.successSub}>Your request has been received. The seller will review it and respond within 1–3 business days.</Text>
+          <Text style={s.successNote}>Return requests will appear here once confirmed.</Text>
+          <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={{ width: '100%', marginTop: SP.md }} />
         </View>
-        <Text style={s.successTitle}>Return Request Submitted</Text>
-        <Text style={s.successSub}>Your request has been received. The seller will review it and respond within 1–3 business days.</Text>
-        <Text style={s.successNote}>Return requests will appear here once confirmed.</Text>
-        <PrimaryButton label="Back to Order" onPress={() => goBackOr(router)} style={s.doneBtn} />
-      </View>
+      </BrandthreadScreen>
     );
   }
 
   const refundEstimateCents = order?.lineItems.reduce((sum, i) => sum + i.unitPriceCents * i.quantity, 0) ?? 0;
   const returnDeadline = order?.createdAt ? new Date(new Date(order.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : '';
+  const canSubmit = !!reason && description.trim().length > 0 && !submitting;
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => goBackOr(router)} activeOpacity={0.7}>
-          <Feather name="chevron-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <View>
-          <Text style={s.headerTitle}>Request Return</Text>
-          {order && <Text style={s.headerSub}>{order.orderNumber} · {order.sellerName}</Text>}
-        </View>
-      </View>
+    <BrandthreadScreen noSafeBottom>
+      <BrandthreadHeader
+        title="Request Return"
+        subtitle={order ? `${order.orderNumber} · ${order.sellerName}` : undefined}
+        onBack={() => goBackOr(router)}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>
-        {/* Policy info */}
+        {/* Policy banner */}
         <View style={s.policyCard}>
-          <View style={s.policyRow}><Feather name="refresh-ccw" size={13} color={PURPLE_LIGHT} /><Text style={s.policyText}>30-day return window · Return deadline: {returnDeadline ? fmtDate(returnDeadline) : '30 days from purchase'}</Text></View>
-          <View style={s.policyRow}><Feather name="dollar-sign" size={13} color={SUCCESS} /><Text style={s.policyText}>Estimated refund: {formatCents(refundEstimateCents)}</Text></View>
+          <View style={s.policyRow}>
+            <Feather name="refresh-ccw" size={13} color={theme.accentLight} />
+            <Text style={s.policyText}>30-day return window · Return by {returnDeadline ? fmtDate(returnDeadline) : '30 days from purchase'}</Text>
+          </View>
+          <View style={s.policyRow}>
+            <Feather name="dollar-sign" size={13} color={theme.success} />
+            <Text style={s.policyText}>Estimated refund: {formatCents(refundEstimateCents)}</Text>
+          </View>
           <Text style={s.policyNote}>Refunds are subject to seller review. Approved amounts may differ from estimates.</Text>
         </View>
 
         {/* Items */}
         {order && (
-          <View style={s.card}>
-            <Text style={s.sectionTitle}>Eligible Items</Text>
+          <Section title="Eligible Items">
             {order.lineItems.map((item, idx) => (
               <View key={idx} style={[s.itemRow, idx > 0 && s.itemBorder]}>
-                <Feather name="package" size={14} color={MUTED} />
+                <View style={s.itemThumb}>
+                  {item.imageUri ? (
+                    <Image source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : (
+                    <Feather name="package" size={16} color={theme.subtle} />
+                  )}
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.itemName}>{item.productName}</Text>
                   <Text style={s.itemVariant}>{item.variant} · ×{item.quantity}</Text>
@@ -169,80 +248,72 @@ export default function BuyerReturnRequestScreen() {
                 <Text style={s.itemPrice}>{formatCents(item.unitPriceCents * item.quantity)}</Text>
               </View>
             ))}
-          </View>
+          </Section>
         )}
 
         {/* Return reason */}
-        <View style={s.card}>
-          <Text style={s.sectionTitle}>Return Reason</Text>
-          {RETURN_REASON_OPTIONS.map(opt => (
-            <TouchableOpacity key={opt.key} style={s.optionRow} onPress={() => { Haptics.selectionAsync(); setReason(opt.key); }} activeOpacity={0.7}>
-              <View style={[s.radio, reason === opt.key && s.radioSelected]}>
-                {reason === opt.key && <View style={s.radioDot} />}
-              </View>
-              <Text style={[s.optionLabel, reason === opt.key && { color: FG }]}>{opt.label}</Text>
-            </TouchableOpacity>
+        <Section title="Return Reason">
+          {RETURN_REASON_OPTIONS.map((opt, idx) => (
+            <RadioRow
+              key={opt.key}
+              label={opt.label}
+              selected={reason === opt.key}
+              onPress={() => setReason(opt.key)}
+              isLast={idx === RETURN_REASON_OPTIONS.length - 1}
+            />
           ))}
-        </View>
+        </Section>
 
         {/* Description */}
-        <View style={s.card}>
-          <Text style={s.sectionTitle}>Describe the Issue</Text>
+        <Section title="Describe the Issue">
           <TextInput
             style={s.textarea}
             value={description}
             onChangeText={setDescription}
             placeholder="Describe what happened in as much detail as possible…"
-            placeholderTextColor={SUBTLE}
+            placeholderTextColor={theme.subtle}
             multiline
             numberOfLines={5}
             textAlignVertical="top"
           />
-        </View>
+        </Section>
 
         {/* Evidence photos */}
-        <View style={s.card}>
-          <Text style={s.sectionTitle}>Evidence Photos</Text>
-          <Text style={[s.sectionTitle, { fontFamily: FONT.regular, color: MUTED, fontSize: FS.xs, marginBottom: SP.sm }]}>
-            Add up to 5 photos showing the issue (optional).
-          </Text>
+        <Section title="Evidence Photos" subtitle="Add up to 5 photos showing the issue (optional).">
           {evidencePhotos.length > 0 && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SP.sm }}>
               {evidencePhotos.map((uri, idx) => (
                 <TouchableOpacity key={idx} onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))} activeOpacity={0.8}>
-                  <Image source={{ uri }} style={{ width: 72, height: 72, borderRadius: 8, borderWidth: 1, borderColor: BORDER }} />
-                  <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
-                    <Feather name="x" size={10} color="#fff" />
+                  <Image source={{ uri }} style={s.evidenceThumb} />
+                  <View style={s.evidenceRemove}>
+                    <Feather name="x" size={10} color={theme.onAccent} />
                   </View>
                 </TouchableOpacity>
               ))}
             </View>
           )}
           {evidencePhotos.length < 5 && (
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignSelf: 'flex-start' }}
-              onPress={pickEvidence}
-              activeOpacity={0.8}
-            >
-              <Feather name="camera" size={15} color={PURPLE_LIGHT} />
-              <Text style={{ fontFamily: FONT.medium, fontSize: FS.sm, color: PURPLE_LIGHT }}>Add photos</Text>
+            <TouchableOpacity style={s.addPhotoBtn} onPress={pickEvidence} activeOpacity={0.8}>
+              <Feather name="camera" size={15} color={theme.accentLight} />
+              <Text style={s.addPhotoText}>Add photos</Text>
             </TouchableOpacity>
           )}
-        </View>
+        </Section>
 
         {/* Preferred resolution */}
-        <View style={s.card}>
-          <Text style={s.sectionTitle}>Preferred Resolution</Text>
-          {RESOLUTIONS.map(r => (
-            <TouchableOpacity key={r.key} style={s.optionRow} onPress={() => { Haptics.selectionAsync(); setResolution(r.key); }} activeOpacity={0.7}>
-              <View style={[s.radio, resolution === r.key && s.radioSelected]}>
-                {resolution === r.key && <View style={s.radioDot} />}
-              </View>
-              <Feather name={r.icon as any} size={14} color={resolution === r.key ? PURPLE_LIGHT : MUTED} />
-              <Text style={[s.optionLabel, resolution === r.key && { color: FG }]}>{r.label}</Text>
-            </TouchableOpacity>
+        <Section title="Preferred Resolution">
+          {RESOLUTIONS.map((r, idx) => (
+            <RadioRow
+              key={r.key}
+              label={r.label}
+              description={r.description}
+              icon={r.icon}
+              selected={resolution === r.key}
+              onPress={() => setResolution(r.key)}
+              isLast={idx === RESOLUTIONS.length - 1}
+            />
           ))}
-        </View>
+        </Section>
 
         <Text style={s.disclaimer}>
           Submitting a return request does not guarantee approval. The seller will review your request and respond within 1–3 business days. Do not ship items before receiving return instructions.
@@ -250,55 +321,57 @@ export default function BuyerReturnRequestScreen() {
       </ScrollView>
 
       {/* Submit bar */}
-      <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
-        <PrimaryButton label="Submit Return Request" onPress={handleSubmit} loading={submitting} disabled={submitting} />
+      <View style={[s.bottomBar, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
+        <PrimaryButton label="Submit Return Request" onPress={handleSubmit} loading={submitting} disabled={!canSubmit} />
       </View>
-    </View>
+    </BrandthreadScreen>
   );
 }
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
-  const BORDER_ACTIVE = `${theme.accent}73`;
-  return StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  headerSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
-  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
-  sectionTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
-  policyCard: { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER_ACTIVE, padding: SP.md, marginBottom: SP.md, gap: 6 },
-  policyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  policyText: { fontSize: FS.xs, fontFamily: FONT.medium, color: FG, flex: 1 },
-  policyNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 4, lineHeight: 16 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 6 },
-  itemBorder: { borderTopWidth: 1, borderTopColor: BORDER },
-  itemName: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-  itemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  itemPrice: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  optionRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 8 },
-  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  radioSelected: { borderColor: PURPLE },
-  radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: PURPLE },
-  optionLabel: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, flex: 1 },
-  textarea: {
-    minHeight: 100, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: BORDER, padding: SP.md,
-    fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20,
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
+  policyCard: {
+    backgroundColor: theme.accentDim, borderRadius: RADIUS.md, borderWidth: 1,
+    borderColor: `${theme.accent}73`, padding: SP.md, marginBottom: SP.md, gap: 6,
   },
-  evidenceNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, padding: SP.sm, marginBottom: SP.md },
-  evidenceNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, flex: 1, lineHeight: 17 },
-  disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 17, marginBottom: SP.lg },
-  bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.md, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
-  submitBtn: { borderRadius: RADIUS.lg, overflow: 'hidden' },
-  submitGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-   submitText: { fontSize: FS.base, fontFamily: FONT.bold },
-  successIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: SUCCESS, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
-  successTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm },
-  successSub: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 22, marginBottom: SP.sm },
-  successNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', marginBottom: SP.lg },
-  doneBtn: { width: '100%', borderRadius: RADIUS.lg, overflow: 'hidden' },
-  doneBtnGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-   doneBtnText: { fontSize: FS.base, fontFamily: FONT.bold },
-  });
-};
+  policyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  policyText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.text, flex: 1 },
+  policyNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: 4, lineHeight: 16 },
+
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 8 },
+  itemBorder: { borderTopWidth: 1, borderTopColor: theme.border },
+  itemThumb: {
+    width: 44, height: 44, borderRadius: RADIUS.sm, overflow: 'hidden',
+    backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: theme.border,
+  },
+  itemName: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
+  itemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
+  itemPrice: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
+
+  textarea: {
+    minHeight: 100, backgroundColor: theme.cardElevated, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: theme.border, padding: SP.md,
+    fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 20,
+  },
+
+  evidenceThumb: { width: 72, height: 72, borderRadius: 8, borderWidth: 1, borderColor: theme.border },
+  evidenceRemove: {
+    position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 8, width: 16, height: 16, alignItems: 'center', justifyContent: 'center',
+  },
+  addPhotoBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14,
+    backgroundColor: theme.cardElevated, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border,
+    alignSelf: 'flex-start',
+  },
+  addPhotoText: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.accentLight },
+
+  disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', lineHeight: 17, marginBottom: SP.lg },
+
+  bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.md, backgroundColor: theme.background, borderTopWidth: 1, borderTopColor: theme.border },
+
+  successIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: theme.success, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
+  successTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, marginBottom: SP.sm, textAlign: 'center' },
+  successSub: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 22, marginBottom: SP.sm },
+  successNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
+});

@@ -69,7 +69,7 @@ export default function AIPhotographyChatScreen() {
   const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
   const flatRef = useRef<FlatList>(null);
 
-  const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom;
+  const bottomPad = insets.bottom;
 
   useEffect(() => {
     if (!outfitSwapEnabled && mode === 'outfitSwap') setMode('free');

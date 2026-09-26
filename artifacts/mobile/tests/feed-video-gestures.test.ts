@@ -102,7 +102,11 @@ describe('Feed page/video container sizing (web all-black bug)', () => {
   // absoluteFill/flex.
 
   it('gives the page-level Pressable and its inner view an explicit width/height, not just absoluteFill', () => {
-    expect(feed).toContain('<Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>');
+    // The Pressable also gained an onLongPress (the long-press context menu
+    // added in the feed rebuild), so it's no longer a single-line literal —
+    // assert on the pieces instead of one exact contiguous string.
+    expect(feed).toMatch(/<Pressable[\s\S]*?onPressIn=\{handlePressIn\} onPressOut=\{handlePressOut\} style=\{\{ width: pageWidth, height: pageHeight \}\}>/);
+    expect(feed).toContain('onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setMenuOpen(true); }}');
     expect(feed).toContain('<View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>');
   });
 

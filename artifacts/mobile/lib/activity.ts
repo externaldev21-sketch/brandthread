@@ -25,6 +25,7 @@ export interface ActivityItem {
   actorHandle?: string;
   actorInitials?: string;
   actorColor?: string;
+  actorAvatarUrl?: string;
   targetId?: string;
   targetType?: string;
   targetImageUrl?: string;
@@ -37,6 +38,7 @@ export interface ActivityActor {
   name: string;
   initials: string;
   color?: string;
+  avatarUrl?: string;
 }
 
 /** A display row: one feed item, or several merged repeat events. */
@@ -173,6 +175,7 @@ function actorOf(item: ActivityItem): ActivityActor | null {
     name,
     initials: item.actorInitials || name.slice(0, 2).toUpperCase(),
     color: item.actorColor,
+    avatarUrl: item.actorAvatarUrl,
   };
 }
 
@@ -440,6 +443,7 @@ export function newFollowersSummary(items: readonly ActivityItem[]): NewFollower
       name,
       initials: item.actorInitials || name.slice(0, 2).toUpperCase(),
       color: item.actorColor,
+      avatarUrl: item.actorAvatarUrl,
     });
   }
   return { actors, count: actors.length, hasUnread: rows.some((item) => !item.isRead) };

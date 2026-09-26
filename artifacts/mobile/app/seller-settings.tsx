@@ -3,22 +3,21 @@
  * Profile card + search + compact grouped iOS-Settings-style sections.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, SP } from '@/lib/theme';
 import { getInitials } from '@/lib/format';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
-import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
 import { SettingsProfileCard, SettingsSearchBar, SettingsSection, SettingsRow, ConfirmSheet } from '@/components/settings/SettingsKit';
-import { IconButton } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -26,7 +25,6 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 export default function SellerSettingsScreen() {
   const colors = useColors();
   const s = useMemo(() => makeStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
   const { signOut } = useAuth();
@@ -56,7 +54,6 @@ export default function SellerSettingsScreen() {
   // to the avatar (not a separate first/last-name pair that may be blank),
   // so the avatar and the name text can never disagree.
   const profileInitials = getInitials(profileName, 'BT');
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
   const tabBarInset = useTabBarMetrics(2).occupiedHeight;
 
   const groups = useMemo(() => {
@@ -130,13 +127,16 @@ export default function SellerSettingsScreen() {
 
   return (
     <View style={s.page}>
-      <View style={[s.header, { paddingTop: topPad + 12 }]}>
-        <Text style={s.headerTitle}>Settings</Text>
-        <IconButton name="x" color={colors.foreground} onPress={() => { hapticLight(); goBackOr(router); }} accessibilityLabel="Close settings" />
-      </View>
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
+      <Header
+        title="Settings"
+        largeTitle
+        showBack={false}
+        actions={[{ icon: 'x', onPress: () => { hapticLight(); goBackOr(router); }, accessibilityLabel: 'Close settings' }]}
+      />
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: tabBarInset + SP.lg }}
+        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: tabBarInset + SP.xl }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -279,8 +279,6 @@ function AccountScopeSheet({
 function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     page: { flex: 1, backgroundColor: colors.background },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: 20 },
-    headerTitle: { fontSize: 30, fontFamily: FONT.bold, color: colors.foreground },
     version: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 4 },
   });
 }

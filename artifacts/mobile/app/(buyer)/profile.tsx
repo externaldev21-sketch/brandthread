@@ -541,9 +541,6 @@ export default function ProfileScreen() {
 
   const extras = (
     <>
-      {/* ── Thread Cash streak — 7-dot week row, flag-gated ── */}
-      {threadCashEnabled ? <ThreadCashStreakRow streak={threadCashStreak} /> : null}
-
       {/* ── My Orders — always-visible way back to order history ── */}
       {featuredOrder ? (
         <View style={styles.inset}>
@@ -642,6 +639,9 @@ export default function ProfileScreen() {
         )}
         stats={stats}
         statsLoading={loading}
+        belowStats={threadCashEnabled
+          ? <ThreadCashStreakRow streak={threadCashStreak} onPress={() => router.push('/thread-cash' as never)} />
+          : null}
         actions={(
           <>
             <View style={styles.actionRow}>

@@ -38,7 +38,7 @@ import React, {
 } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator, Platform, TextInput,
+  Alert, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -246,7 +246,7 @@ export default function CreateAdScreen() {
   const colors    = useColors();
   const { user }  = useUser();
 
-  const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 96;
+  const bottomPad = insets.bottom + 96;
 
   // ── Campaign state ────────────────────────────────────────────────────────
   const [campaign,  setCampaign]  = useState<AdCampaign | null>(null);
@@ -931,7 +931,7 @@ export default function CreateAdScreen() {
       </ScrollView>
 
       {/* 7 — Sticky Launch button */}
-      <View style={[styles.stickyBottom, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 0) + SP.md, flexDirection: 'column', gap: SP.sm }]}>
+      <View style={[styles.stickyBottom, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: insets.bottom + SP.md, flexDirection: 'column', gap: SP.sm }]}>
         {/* Alternate entry point: run a real ad on Meta's own platform instead of
             Brandthread's in-house boost above. Carries over whatever CTA
             destination is already selected here, mapped the same way the

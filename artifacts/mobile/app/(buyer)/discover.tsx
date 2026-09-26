@@ -67,6 +67,7 @@ import {
   type CommerceSignalData,
 } from '@/components/CommerceSignal';
 import { SectionError } from '@/components/InlineFeedback';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { Card, HeartToggle, ThemedRefreshControl, GlassPanel } from '@/components/ui';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
@@ -184,16 +185,17 @@ const EditorialTile = React.memo(function EditorialTile({ item, theme }: { item:
         {item.isUrgent && (
           <View style={[tile.urgentDot, { backgroundColor: theme.accent }]} />
         )}
-        {item.priceCents != null && (
-          <View style={tile.pricePill}>
-            <Text style={[TYPE_SCALE.caption, TABULAR_NUMS, { fontFamily: FONT.bold, color: '#0A0A0B' }]}>
-              {formatCents(item.priceCents)}
-            </Text>
-          </View>
-        )}
       </LinearGradient>
-      <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text, marginTop: 8 }]} numberOfLines={1}>{item.name}</Text>
-      <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 1 }]} numberOfLines={1}>{item.brand}</Text>
+      {/* Image, then name / brand / price below it with an 8pt rhythm — never
+          an overlay pill sitting on the image's bottom edge, which clipped
+          against the image and crowded the name below it. */}
+      <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text, marginTop: 8 }]} numberOfLines={2}>{item.name}</Text>
+      <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 4 }]} numberOfLines={1}>{item.brand}</Text>
+      {item.priceCents != null && (
+        <Text style={[TYPE_SCALE.caption, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.text, marginTop: 4 }]}>
+          {formatCents(item.priceCents)}
+        </Text>
+      )}
     </Pressable>
   );
 });
@@ -204,11 +206,6 @@ const tile = StyleSheet.create({
   fallback: { alignItems: 'center', justifyContent: 'center' },
   fallbackText: { fontSize: 34, fontFamily: FONT.bold, color: '#FFFFFF' },
   urgentDot: { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4 },
-  pricePill: {
-    position: 'absolute', bottom: 10, left: 10,
-    paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADII.pill,
-    backgroundColor: '#FFFFFF',
-  },
 });
 
 function TileRailSkeleton() {
@@ -219,6 +216,7 @@ function TileRailSkeleton() {
           <SkeletonBlock width={TILE_WIDTH} height={TILE_IMAGE_HEIGHT} radius={RADII.sheet} />
           <SkeletonBlock width="80%" height={12} />
           <SkeletonBlock width="50%" height={11} />
+          <SkeletonBlock width="35%" height={11} />
         </View>
       ))}
     </ScrollView>
@@ -618,7 +616,7 @@ function DiscoverHero({
           <Text style={dh.counterChipText}>{activeIndex + 1}/{items.length}</Text>
         </View>
         <Text style={dh.title} numberOfLines={1}>Just Dropped</Text>
-        <Pressable onPress={onShopAll} style={dh.shopAllPill} accessibilityRole="button" accessibilityLabel="Shop all">
+        <Pressable onPress={onShopAll} style={dh.shopAllPill} accessibilityRole="button" accessibilityLabel="Shop all" hitSlop={8}>
           <Text style={dh.shopAllText}>Shop all</Text>
         </Pressable>
       </View>
@@ -720,7 +718,7 @@ const dh = StyleSheet.create({
     position: 'absolute', bottom: -100, right: -80, width: 320, height: 320, borderRadius: 220, opacity: 0.4,
   },
   topBar: {
-    marginTop: SP.lg,
+    marginTop: SP.lg + SP.md,
     flexDirection: 'row', alignItems: 'center', gap: 10,
   },
   counterChip: {
@@ -769,6 +767,7 @@ const dh = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DiscoverScreen() {
+  const scrollResetRef = useScrollReset<ScrollView>();
   const barInset = useBuyerTabBarInset();
   const router    = useRouter();
   const { push }  = useThreadPull();
@@ -974,6 +973,7 @@ export default function DiscoverScreen() {
 
   return (
     <ScrollView
+      ref={scrollResetRef}
       style={{ flex: 1, backgroundColor: theme.background }}
       contentContainerStyle={{ paddingBottom: barInset + SP.md }}
       showsVerticalScrollIndicator={false}
@@ -997,16 +997,20 @@ export default function DiscoverScreen() {
         </View>
       ) : forYouError ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <SectionError message={forYouError} onRetry={fetchProducts} />
+          <View style={{ paddingTop: SP.md }}>
+            <SectionError message={forYouError} onRetry={fetchProducts} />
+          </View>
         </ResponsiveContainer>
       ) : forYouItems.length === 0 ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <EmptyState
-            icon="package"
-            title="No products available right now"
-            description="New arrivals show up here as sellers add them."
-            action={{ label: 'Search products', onPress: () => router.push('/(buyer)/search' as never) }}
-          />
+          <View style={{ paddingTop: SP.md }}>
+            <EmptyState
+              icon="package"
+              title="No products available right now"
+              description="New arrivals show up here as sellers add them."
+              action={{ label: 'Search products', onPress: () => router.push('/(buyer)/search' as never) }}
+            />
+          </View>
         </ResponsiveContainer>
       ) : (
         <DiscoverHero

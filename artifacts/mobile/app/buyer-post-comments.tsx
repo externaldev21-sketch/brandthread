@@ -26,7 +26,7 @@ import {
   View, Text, FlatList, TextInput, Modal, Pressable, PanResponder,
   KeyboardAvoidingView, Platform, StyleSheet, Animated, Keyboard, useWindowDimensions,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -48,9 +48,11 @@ import type { ThreadComment } from '@/lib/safetyTypes';
 import { hapticSelection, hapticLight, hapticSuccess, hapticError, hapticDestructiveConfirm } from '@/lib/haptics';
 import { bumpCommentCount } from '@/lib/commentCountBus';
 import { buildPreviewComments } from '@/lib/previewComments';
+import { AppleEmoji, QUICK_REACTION_EMOJI } from '@/lib/appleEmoji';
 
 const MAX_COMMENT_LENGTH = 1000;
-const QUICK_EMOJI = ['🔥', '😍', '👏', '😂'];
+/** TikTok's own quick-reaction set, in TikTok's own order. */
+const QUICK_EMOJI = QUICK_REACTION_EMOJI;
 
 /**
  * Matches the server's UUID check in post-comments.ts. Preview/demo posts
@@ -59,6 +61,39 @@ const QUICK_EMOJI = ['🔥', '😍', '👏', '😂'];
  * instead of showing the scary "no longer available" error for them.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Dev-only guard for this screen: react-native-web renders
+ * accessibilityRole="button" as a real <button> element, so a Pressable
+ * nested inside another Pressable produces an actual invalid
+ * <button><button/></button>, and React's DOM validation (validateDOMNesting)
+ * logs a loud warning through console.error — easy to miss in a noisy
+ * console. React calls console.error with a %s-templated format string plus
+ * separate substitution args (e.g. "cannot contain a nested %s" and the
+ * literal string "button" as its own arg) rather than one interpolated
+ * sentence, so this checks for the phrase and the tag name as two separate
+ * tokens rather than one combined string. This turns a match into a thrown
+ * error while developing/testing this screen (never in production), so a
+ * regression is impossible to scroll past. `tests/comments-no-dom-nesting.web.mjs`
+ * asserts the same thing from a real browser for CI.
+ */
+const NESTED_DOM_PHRASE_RE = /cannot (?:contain a nested|be a descendant of)/i;
+
+function useFailOnNestedButtonWarning() {
+  useEffect(() => {
+    if (!__DEV__ || Platform.OS !== 'web') return;
+    const original = console.error;
+    console.error = (...args: unknown[]) => {
+      const message = args.map(String).join(' ');
+      if (NESTED_DOM_PHRASE_RE.test(message) && /\bbutton\b/i.test(message)) {
+        original(...args);
+        throw new Error(`[buyer-post-comments] nested <button> detected: ${message}`);
+      }
+      original(...args);
+    };
+    return () => { console.error = original; };
+  }, []);
+}
 
 /** A flattened list row: roots followed by their replies. */
 type Row = ThreadComment & { isReply: boolean; parentAuthorName?: string; creatorLiked?: boolean };
@@ -140,7 +175,66 @@ function Avatar({ uri, initials, size = 38 }: { uri?: string | null; initials: s
   );
 }
 
+// ─── Like heart ───────────────────────────────────────────────────────────────
+// Solid filled heart when liked, outline when not (Feather only ships an
+// outline heart, so liking used to just recolor the same stroked glyph —
+// Ionicons gives us a true filled variant). The container is taller than the
+// icon itself with no overflow:hidden, so the pop animation on toggle can
+// exceed the glyph's own bounds without being clipped at the top.
+
+function LikeHeart({
+  liked,
+  count,
+  onPress,
+  accessibilityLabel,
+}: {
+  liked: boolean;
+  count: number;
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
+  const { theme } = useAppTheme();
+  const s = makeStyles(theme);
+  const pop = useRef(new Animated.Value(1)).current;
+  const wasLiked = useRef(liked);
+
+  useEffect(() => {
+    if (liked && !wasLiked.current) {
+      Animated.sequence([
+        Animated.spring(pop, { toValue: 1.35, speed: 40, bounciness: 10, useNativeDriver: true }),
+        Animated.spring(pop, { toValue: 1, speed: 24, bounciness: 6, useNativeDriver: true }),
+      ]).start();
+    }
+    wasLiked.current = liked;
+  }, [liked, pop]);
+
+  return (
+    <PressableScale
+      style={s.commentLike}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Animated.View style={[s.commentLikeIconWrap, { transform: [{ scale: pop }] }]}>
+        <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? theme.error : MUTED} />
+      </Animated.View>
+      {count > 0 && (
+        <Text style={[s.actionLabel, liked && { color: theme.error }]}>{count}</Text>
+      )}
+    </PressableScale>
+  );
+}
+
 // ─── Comment Row ──────────────────────────────────────────────────────────────
+// The row's own long-press-to-open-menu area (avatar + header + body text)
+// is one Pressable wrapping only plain text/decoration — never another
+// Pressable — and the Reply / more / like controls are separate sibling
+// Pressables on the meta line below. Nothing here nests a button inside a
+// button (react-native-web renders accessibilityRole="button" as a real
+// <button> element, so a Pressable-in-Pressable used to produce an actual
+// invalid <button><button/></button> and — because pointer events see two
+// overlapping interactive elements — spurious hover/press flicker on the
+// outer row whenever the cursor crossed into an inner button).
 
 function CommentRow({
   comment,
@@ -162,43 +256,49 @@ function CommentRow({
   const isPending = comment.id.startsWith('tmp_');
 
   return (
-    <PressableScale
-      style={[s.commentRow, comment.isReply && s.commentRowIndented, isPending && s.commentRowPending]}
-      activeOpacity={0.8}
-      onLongPress={() => { if (!isPending) onMore(comment); }}
-      delayLongPress={400}
-      accessibilityActions={[{ name: 'longpress', label: 'Comment options' }]}
-      onAccessibilityAction={() => { if (!isPending) onMore(comment); }}
-    >
-      <Avatar uri={comment.author.avatarUrl} initials={comment.author.initials} size={comment.isReply ? 30 : 38} />
+    <View style={[s.commentRow, comment.isReply && s.commentRowIndented, isPending && s.commentRowPending]}>
+      <Avatar uri={comment.author.avatarUrl} initials={comment.author.initials} size={comment.isReply ? 26 : 32} />
 
       <View style={s.commentBody}>
-        <View style={s.commentHeader}>
-          <Text style={s.authorName} numberOfLines={1}>{comment.author.name}</Text>
-          {isCreator && <Text style={[s.creatorBadge, { color: theme.text }]}>· Creator</Text>}
-          {isPending && <View style={s.pendingDot} />}
-        </View>
-
-        {comment.isReply && comment.parentAuthorName ? (
-          <Text style={s.replyContext}>Replying to {comment.parentAuthorName}</Text>
-        ) : null}
-
-        <Text style={[s.commentText, comment.pendingReview && s.commentTextHeld]}>{comment.body}</Text>
-
-        {comment.creatorLiked && !isCreator ? (
-          <View style={s.creatorLikedBadge}>
-            <Feather name="heart" size={9} color={theme.accent} />
-            <Text style={[s.creatorLikedText, { color: theme.accent }]}>Creator liked</Text>
+        <PressableScale
+          style={s.commentContentPress}
+          accessibilityRole="button"
+          accessibilityLabel={`Comment by ${comment.author.name}`}
+          onLongPress={() => { if (!isPending) onMore(comment); }}
+          delayLongPress={400}
+          accessibilityActions={[{ name: 'longpress', label: 'Comment options' }]}
+          onAccessibilityAction={() => { if (!isPending) onMore(comment); }}
+          rippleEnabled={false}
+        >
+          <View style={s.commentHeader}>
+            <Text style={s.authorName} numberOfLines={1}>{comment.author.name}</Text>
+            {isCreator && <Text style={[s.creatorBadge, { color: theme.text }]}>· Creator</Text>}
+            {isPending && <View style={s.pendingDot} />}
           </View>
-        ) : null}
 
-        {comment.pendingReview ? (
-          <View style={s.reviewPill}>
-            <Feather name="eye-off" size={11} color={theme.warning} />
-            <Text style={s.reviewPillText}>In review · only you can see this</Text>
-          </View>
-        ) : null}
+          {comment.isReply && comment.parentAuthorName ? (
+            <Text style={s.replyContext}>Replying to {comment.parentAuthorName}</Text>
+          ) : null}
 
+          <Text style={[s.commentText, comment.pendingReview && s.commentTextHeld]}>{comment.body}</Text>
+
+          {comment.creatorLiked && !isCreator ? (
+            <View style={s.creatorLikedBadge}>
+              <Ionicons name="heart" size={9} color={theme.accent} />
+              <Text style={[s.creatorLikedText, { color: theme.accent }]}>Creator liked</Text>
+            </View>
+          ) : null}
+
+          {comment.pendingReview ? (
+            <View style={s.reviewPill}>
+              <Feather name="eye-off" size={11} color={theme.warning} />
+              <Text style={s.reviewPillText}>In review · only you can see this</Text>
+            </View>
+          ) : null}
+        </PressableScale>
+
+        {/* Time / Reply / Like sit on one shared row so they share a single
+            baseline, left-aligned under the comment text above. */}
         <View style={s.commentMeta}>
           <Text style={s.commentTime}>{isPending ? 'Posting…' : shortRelativeTime(comment.createdAt)}</Text>
           {!isPending && !comment.pendingReview && (
@@ -217,25 +317,18 @@ function CommentRow({
               <Feather name="more-horizontal" size={16} color={MUTED} />
             </PressableScale>
           )}
+          <View style={{ flex: 1 }} />
+          {!isPending && !comment.pendingReview && (
+            <LikeHeart
+              liked={comment.likedByMe}
+              count={comment.likesCount}
+              onPress={() => onLike(comment)}
+              accessibilityLabel={`${comment.likedByMe ? 'Unlike' : 'Like'} comment`}
+            />
+          )}
         </View>
       </View>
-
-      {!isPending && !comment.pendingReview && (
-        <PressableScale
-          style={s.commentLike}
-          onPress={() => onLike(comment)}
-          accessibilityRole="button"
-          accessibilityLabel={`${comment.likedByMe ? 'Unlike' : 'Like'} comment`}
-        >
-          <Feather name="heart" size={19} color={comment.likedByMe ? theme.error : MUTED} />
-          {comment.likesCount > 0 && (
-            <Text style={[s.actionLabel, comment.likedByMe && { color: theme.error }]}>
-              {comment.likesCount}
-            </Text>
-          )}
-        </PressableScale>
-      )}
-    </PressableScale>
+    </View>
   );
 }
 
@@ -425,6 +518,7 @@ function CommentActionsSheet({
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function BuyerPostCommentsScreen() {
+  useFailOnNestedButtonWarning();
   const { theme } = useAppTheme();
   const { height: windowHeight } = useWindowDimensions();
   const s = makeStyles(theme);
@@ -1029,12 +1123,16 @@ export default function BuyerPostCommentsScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Add ${emoji}`}
                   >
-                    <Text style={s.emojiText}>{emoji}</Text>
+                    <AppleEmoji emoji={emoji} size={20} />
                   </PressableScale>
                 ))}
               </View>
+              {/* TikTok's composer: a slim pill (avatar left, @ + emoji tools
+                  inside the pill on the right), growing up to ~4 lines as you
+                  type — never the old full-width boxy text field. The send
+                  arrow only exists once there's something to send. */}
               <View style={s.inputRow}>
-                <Avatar uri={myAvatar} initials={myInitials} />
+                <Avatar uri={myAvatar} initials={myInitials} size={36} />
                 <View style={s.inputShell}>
                   <TextInput
                     ref={inputRef}
@@ -1050,6 +1148,14 @@ export default function BuyerPostCommentsScreen() {
                   />
                   <PressableScale
                     style={s.inputTool}
+                    onPress={() => { hapticLight(); inputRef.current?.focus(); }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Emoji"
+                  >
+                    <Feather name="smile" size={17} color={MUTED} />
+                  </PressableScale>
+                  <PressableScale
+                    style={s.inputTool}
                     onPress={() => {
                       hapticLight();
                       setInputText(value => value.endsWith(' ') || !value ? `${value}@` : `${value} @`);
@@ -1061,15 +1167,17 @@ export default function BuyerPostCommentsScreen() {
                     <Text style={s.mentionIcon}>@</Text>
                   </PressableScale>
                 </View>
-                <AnimatedSendButton
-                  disabled={!inputText.trim() || sending}
-                  sending={sending}
-                  justSent={justSent}
-                  onPress={handleSend}
-                  accessibilityLabel={sending ? 'Posting comment' : 'Send comment'}
-                  accentColor={theme.accent}
-                  onAccentColor={theme.onAccent}
-                />
+                {inputText.trim().length > 0 || sending || justSent ? (
+                  <AnimatedSendButton
+                    disabled={!inputText.trim() || sending}
+                    sending={sending}
+                    justSent={justSent}
+                    onPress={handleSend}
+                    accessibilityLabel={sending ? 'Posting comment' : 'Send comment'}
+                    accentColor={theme.accent}
+                    onAccentColor={theme.onAccent}
+                  />
+                ) : null}
               </View>
             </>
           )}
@@ -1146,7 +1254,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   authorName: { fontFamily: FONT.medium, fontSize: 13, color: MUTED, flexShrink: 1 },
   creatorBadge: { fontFamily: FONT.semibold, fontSize: 13 },
   replyContext: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginBottom: 2 },
-  commentTime: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
+  commentTime: { fontFamily: FONT.regular, fontSize: 12, color: SUBTLE },
   pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE, marginLeft: 2 },
   commentText: { fontFamily: FONT.medium, fontSize: 14, color: FG, lineHeight: 19 },
   commentTextHeld: { color: MUTED },
@@ -1158,12 +1266,17 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   reviewPillText: { color: theme.warning, fontFamily: FONT.medium, fontSize: 11 },
   creatorLikedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
   creatorLikedText: { fontFamily: FONT.semibold, fontSize: 11 },
+  commentContentPress: { alignItems: 'flex-start' },
   commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 5 },
   replyBtn: { paddingVertical: 2, paddingRight: SP.xs },
   moreBtn: { paddingVertical: 2, paddingHorizontal: 2 },
-  commentLike: { width: 38, minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  actionLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
-  replyLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED },
+  // No overflow:hidden anywhere in this chain, and the icon wrap is taller
+  // than the glyph itself, so the like-pop spring (which briefly scales past
+  // 1.0) always has headroom instead of getting its top clipped.
+  commentLike: { minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  commentLikeIconWrap: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { fontFamily: FONT.regular, fontSize: 12, color: MUTED, textAlign: 'center' },
+  replyLabel: { fontFamily: FONT.medium, fontSize: 12, color: MUTED },
   viewRepliesRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingLeft: SP.md + 48, paddingVertical: 8, minHeight: 32,
@@ -1210,17 +1323,19 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     backgroundColor: CARD_ELEVATED,
   },
   emojiText: { fontSize: 17 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingBottom: 6 },
+  // TikTok's composer pill: single-line height 36-40, radius 20, a subtle
+  // dark fill and no heavy border — never the old boxy full-height field.
   inputShell: {
-    flex: 1, minHeight: 42, maxHeight: 96, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: CARD_ELEVATED, borderRadius: 21, paddingLeft: 12, paddingRight: 4,
+    flex: 1, minHeight: 38, maxHeight: 94, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#1f1f1f', borderRadius: 20, paddingLeft: 14, paddingRight: 4,
   },
   input: {
     flex: 1, paddingHorizontal: 0, paddingVertical: 9, fontFamily: FONT.regular,
-    fontSize: FS.sm, color: FG, maxHeight: 88, minHeight: 42,
+    fontSize: 15, color: FG, maxHeight: 86, minHeight: 20,
   },
-  inputTool: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  mentionIcon: { color: FG, fontFamily: FONT.bold, fontSize: 22, lineHeight: 24 },
+  inputTool: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  mentionIcon: { color: MUTED, fontFamily: FONT.bold, fontSize: 19, lineHeight: 21 },
 
   // Actions sheet
   sheetScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.55)' }, // theme-exempt: matches components/ui/BottomSheet.tsx's backdrop

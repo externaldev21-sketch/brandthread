@@ -32,8 +32,8 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const topInset = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
-  const bottomInset = Platform.OS === 'web' ? Math.max(insets.bottom, 34) : insets.bottom;
+  const topInset = insets.top;
+  const bottomInset = insets.bottom;
   const doc = LEGAL_DOCUMENTS[docId];
 
   function leaveDocument() {

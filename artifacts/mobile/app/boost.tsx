@@ -27,8 +27,7 @@ import React, {
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, PanResponder, LayoutChangeEvent,
-  Platform,
-} from 'react-native';
+  } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -399,7 +398,7 @@ export default function BoostScreen() {
   const api     = useApi();
   const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string; bt_preview?: string }>();
 
-  const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 90;
+  const bottomPad = insets.bottom + 90;
   const inSellerPreview = isSellerDevPreview(
     params.bt_preview === 'buyer' ? '?bt_preview=buyer' : '?bt_preview=seller',
   );
@@ -1032,7 +1031,7 @@ export default function BoostScreen() {
         </ScrollView>
 
         {/* Sticky bottom CTA — matches Create Ad "Create ad · $X" pattern */}
-        <View style={[s.stickyBottom, { paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 16) }]}>
+        <View style={[s.stickyBottom, { paddingBottom: insets.bottom + 16 }]}>
           <TouchableOpacity
             style={[s.primaryBtn, isLoading && { opacity: 0.65 }]}
             onPress={handleBoostPost}

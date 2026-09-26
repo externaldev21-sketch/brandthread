@@ -40,7 +40,7 @@ import {
 } from '@/lib/theme';
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
-import { Button, IconButton, Chip, QuantityStepper, BottomSheet } from '@/components/ui';
+import { Button, IconButton, Chip, QuantityStepper, BottomSheet, Avatar, SuccessCheck } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -150,9 +150,6 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtPrice = formatCents;
-// Shared look for the icon buttons floating over the hero image (back/cart),
-// used with IconButton's `variant="plain"` so the translucent scrim shows.
-const overlayIconBtnStyle = { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADII.pill, borderWidth: 0 } as const;
 const GALLERY_WIDTH = Dimensions.get('window').width;
 const GALLERY_HEIGHT = Math.min(520, Math.max(430, GALLERY_WIDTH * 1.22));
 
@@ -415,6 +412,11 @@ function OptionPicker({ product, option, selections, onSelect }: {
               label={val.label}
               selected={isSelected}
               disabled={!available}
+              // A leading slash glyph makes "unavailable" a distinct shape,
+              // not just a greyed-out label (Nike / GOAT / UNIQLO size-grid
+              // convention) — see https://mobbin.com/screens/76430e6c-342a-42be-8fce-148ab5d9651e
+              icon={available ? undefined : 'slash'}
+              iconColor={theme.subtle}
               onPress={() => onSelect(option.id, val.id)}
               testID={`option-${option.id}-${val.id}`}
             />
@@ -653,9 +655,7 @@ export default function BuyerProductDetailScreen() {
             name="arrow-left"
             onPress={leaveProduct}
             accessibilityLabel="Back"
-            color={ON_DARK}
-            variant="plain"
-            style={overlayIconBtnStyle}
+            variant="filled"
           />
         </View>
       </View>
@@ -680,9 +680,7 @@ export default function BuyerProductDetailScreen() {
             name="arrow-left"
             onPress={leaveProduct}
             accessibilityLabel="Back"
-            color={ON_DARK}
-            variant="plain"
-            style={overlayIconBtnStyle}
+            variant="filled"
           />
         </View>
       </View>
@@ -862,15 +860,20 @@ export default function BuyerProductDetailScreen() {
         {/* Immersive product gallery */}
         <View style={s.imageArea}>
           <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} />
-          {/* Back button */}
+          {/* Back button — solid dark chrome over the full-bleed gallery. A
+              BlurView-based "glass" variant re-samples whatever sits behind
+              it every frame; on a swipeable gallery that reads as the same
+              shimmer/glitch PR #109 killed on the video feed, so this uses
+              the same solid rgba(0,0,0,0.6) scrim pattern that PR used over
+              other media chrome, not a frosted blur. */}
           <View style={[s.backBtnWrap, { top: insets.top + SP.sm }]}>
             <IconButton
               name="arrow-left"
               onPress={leaveProduct}
               accessibilityLabel="Back to previous screen"
-              color={ON_DARK}
               variant="plain"
-              style={overlayIconBtnStyle}
+              color="#FFFFFF"
+              style={s.mediaChromeBtn}
             />
           </View>
           {/* Cart button */}
@@ -880,9 +883,9 @@ export default function BuyerProductDetailScreen() {
               onPress={() => router.push('/(buyer)/cart' as never)}
               accessibilityLabel="Open cart"
               accessibilityHint="View items in your cart"
-              color={ON_DARK}
               variant="plain"
-              style={overlayIconBtnStyle}
+              color="#FFFFFF"
+              style={s.mediaChromeBtn}
             />
           </View>
         </View>
@@ -906,10 +909,10 @@ export default function BuyerProductDetailScreen() {
           {/* Title & Seller */}
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
           <TouchableOpacity style={s.sellerCard} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
-            <View style={s.sellerAvatar}><Text style={s.sellerInitial}>{product.sellerName.charAt(0)}</Text></View>
+            <Avatar name={product.sellerName} size={40} />
             <View style={{ flex: 1 }}>
               <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
-              <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>
+              {!!product.sellerHandle && <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>}
             </View>
             <View style={s.sellerViewStore}>
               <Text style={s.sellerViewStoreText}>View store</Text>
@@ -923,25 +926,16 @@ export default function BuyerProductDetailScreen() {
             variant="secondary"
             size="small"
             accessibilityHint="Opens a chat with the seller about this product"
-            style={{ alignSelf: 'flex-start', marginBottom: SP.sm }}
+            style={{ alignSelf: 'flex-start', marginBottom: SP.md }}
             testID="product-message-seller"
           />
 
-          {/* Buyer protection trust cues */}
-          <View style={s.trustRow}>
-            <View style={s.trustCue}>
-              <Feather name="shield" size={13} color={MUTED} />
-              <Text style={s.trustCueText}>Buyer Protection</Text>
-            </View>
-            <View style={s.trustCue}>
-              <Feather name="lock" size={13} color={MUTED} />
-              <Text style={s.trustCueText}>Secure checkout</Text>
-            </View>
-            <View style={s.trustCue}>
-              <Feather name="refresh-cw" size={13} color={MUTED} />
-              <Text style={s.trustCueText}>Easy returns</Text>
-            </View>
-          </View>
+          {/* Buyer protection — a single glanceable badge + one-line copy
+              (BuyerProtectionNote's `compact` mode), not a wall of trust
+              copy. Reference: Apple Store's compact delivery/protection strip
+              above its sticky CTA — https://mobbin.com/screens/65c853c9-7b34-40c4-af81-67ad778bacac */}
+          <BuyerProtectionNote preorder={product.isPreOrder} compact style={{ marginBottom: SP.md }} />
+
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.md, marginBottom: SP.md }}>
             <TouchableOpacity
               onPress={() => router.push(reportHref({
@@ -1166,9 +1160,9 @@ export default function BuyerProductDetailScreen() {
           an auto-dismissing toast: the buyer picks View bag or Keep shopping. */}
       <BottomSheet visible={showAddedSheet} onClose={() => setShowAddedSheet(false)}>
         <View style={s.addedSheetContent}>
-          <View style={s.addedSheetIconWrap}>
-            <Feather name="check" size={22} color={SUCCESS} />
-          </View>
+          {/* Monochrome brand accent, not a green checkmark — the shared
+              success-moment primitive (components/ui/SuccessCheck.tsx). */}
+          <SuccessCheck size={56} iconSize={26} />
           <Text style={s.addedSheetTitle}>Added to your bag</Text>
           <View style={s.addedSheetProductRow}>
             {product.imageUris[0] ? (
@@ -1549,10 +1543,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   imageArea: { height: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   imagePlaceholderText: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.lg },
-  // Positioning wrappers only — the translucent pill look and hit area now
-  // come from the shared IconButton (variant="plain" + overlayIconBtnStyle).
+  // Positioning wrappers only — the solid dark chrome and hit area come
+  // from `mediaChromeBtn` below on a `variant="plain"` IconButton (no blur
+  // over the swipeable gallery — see the comment where these render).
   backBtnWrap: { position: 'absolute', left: SP.md },
   cartBtnWrap: { position: 'absolute', right: SP.md },
+  mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CYAN_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
@@ -1561,11 +1557,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
   productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
   addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
-  addedSheetIconWrap: {
-    width: 44, height: 44, borderRadius: RADIUS.pill, backgroundColor: SUCCESS_DIM,
-    alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm,
-  },
-  addedSheetTitle: { ...TYPE.title, color: FG, marginBottom: SP.md },
+  addedSheetTitle: { ...TYPE.title, color: FG, marginTop: SP.sm, marginBottom: SP.md },
   addedSheetProductRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, width: '100%',
     marginBottom: SP.lg, padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
@@ -1577,15 +1569,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm,
     padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
   },
-  sellerAvatar: { width: 36, height: 36, borderRadius: RADIUS.pill, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  sellerInitial: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT },
   sellerName: { ...TYPE.bodyMedium, color: FG, flexShrink: 1 },
   sellerHandle: { ...TYPE.caption, color: MUTED, flexShrink: 1 },
   sellerViewStore: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   sellerViewStoreText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  trustRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.md, marginBottom: SP.md },
-  trustCue: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  trustCueText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   paymentWarningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',

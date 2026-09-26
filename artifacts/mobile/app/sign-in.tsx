@@ -10,6 +10,7 @@ import {
   ScrollView, StatusBar,
 } from 'react-native';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import GoogleGlyph from '@/components/branding/GoogleGlyph';
 import { useSignIn, useSSO, useAuth, useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
@@ -388,7 +389,7 @@ export default function SignInScreen() {
                 <ActivityIndicator color={theme.text} size="small" />
               ) : (
                 <>
-                  <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: FONT.bold, fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
+                  <GoogleGlyph size={18} />
                   <Text style={s.oauthText}>Continue with Google</Text>
                 </>
               )}

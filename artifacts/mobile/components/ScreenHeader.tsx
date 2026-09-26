@@ -1,5 +1,5 @@
 import React from 'react';
-import { Animated, View, Text, StyleSheet, Platform } from 'react-native';
+import { Animated, View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -54,9 +54,13 @@ export function ScreenHeader({
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const topPad = Platform.OS === 'web'
-    ? SP.xxl + SP.md + SP.xs
-    : insets.top + SP.sm;
+  // Real safe-area inset on every platform, including web: the root HTML
+  // document sets `viewport-fit=cover` (see app/+html.tsx) so
+  // react-native-safe-area-context's web implementation can read the
+  // browser's actual `env(safe-area-inset-top)` instead of always 0. This
+  // used to hardcode a fixed value for web, which meant a simulated notch
+  // (e.g. Replit's phone-frame preview) never showed up in the header.
+  const topPad = insets.top + SP.sm;
 
   const largeTitleOpacity = scrollY
     ? scrollY.interpolate({ inputRange: [0, collapseDistance], outputRange: [1, 0], extrapolate: 'clamp' })

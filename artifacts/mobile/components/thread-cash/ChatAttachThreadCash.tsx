@@ -20,7 +20,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Pressable, Alert, Animated, Easing } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { ThreadCashBill, ThreadCashCoin } from './ThreadCashBill';
+import { ThreadCashBill, ThreadCashBillIcon } from './ThreadCashBill';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/ui/Button';
@@ -45,14 +45,15 @@ function formatAmountDisplay(cents: number): string {
 }
 
 /**
- * The Thread Cash mark, wherever a small coin glyph is needed inline (the
+ * The Thread Cash mark, wherever a small bill glyph is needed inline (the
  * attach button, the sheet's balance pill and badge, the message card).
- * Renders the owner's actual Thread Cash coin art (see ThreadCashBill.tsx)
- * rather than a generic dollar-sign glyph. `color`/`accent` are kept as
- * no-op props for call-site compatibility; only `size` and `disabled`
- * (dimmed via opacity) affect the render.
+ * Thread Cash is cash, not a coin — this is always a little bill (see
+ * ThreadCashBillIcon in ThreadCashBill.tsx), never a round coin or a
+ * generic dollar-sign glyph. `color`/`accent` are kept as no-op props for
+ * call-site compatibility; only `size` and `disabled` (dimmed via opacity)
+ * affect the render.
  */
-export function ThreadCashCoinMark({
+export function ThreadCashBillMark({
   size = 20,
   disabled = false,
 }: {
@@ -61,7 +62,7 @@ export function ThreadCashCoinMark({
   accent?: string;
   disabled?: boolean;
 }) {
-  return <ThreadCashCoin size={size} style={disabled ? { opacity: 0.5 } : undefined} />;
+  return <ThreadCashBillIcon size={size} style={disabled ? { opacity: 0.5 } : undefined} />;
 }
 
 type SheetStep = 'amount' | 'keypad' | 'confirm';
@@ -232,7 +233,7 @@ export function ThreadCashAttachButton({
           accessibilityState={{ disabled }}
           style={[styles.attachButton, { borderColor: theme.borderSubtle }, disabled && styles.attachButtonDisabled]}
         >
-          <ThreadCashCoinMark size={18} color={theme.text} accent={theme.accent} disabled={disabled} />
+          <ThreadCashBillMark size={18} color={theme.text} accent={theme.accent} disabled={disabled} />
         </TouchableOpacity>
       )}
       <Modal transparent animationType="fade" visible={open} onRequestClose={() => setOpen(false)}>
@@ -240,7 +241,7 @@ export function ThreadCashAttachButton({
         <SheetRise style={[styles.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {/* Circular badge, half in / half out of the sheet's top edge */}
           <View style={[styles.badge, { backgroundColor: theme.accent, borderColor: theme.card }]}>
-            <ThreadCashCoinMark size={26} color={theme.onAccent} accent={theme.onAccent} />
+            <ThreadCashBillMark size={26} color={theme.onAccent} accent={theme.onAccent} />
           </View>
 
           <View style={styles.sheetHeader}>
@@ -254,7 +255,7 @@ export function ThreadCashAttachButton({
               <Feather name="chevron-down" size={22} color={theme.muted} />
             </TouchableOpacity>
             <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-              <ThreadCashCoinMark size={14} color={theme.text} accent={theme.accent} />
+              <ThreadCashBillMark size={14} color={theme.text} accent={theme.accent} />
               <Text style={[styles.balanceText, { color: theme.text }]} testID="thread-cash-balance">
                 {balanceCents == null ? '···' : formatCents(balanceCents)}
               </Text>
@@ -452,41 +453,49 @@ export function ThreadCashMessageCard({
   }
 
   const statusLabel: Record<ThreadCashTransferStatus, string> = {
-    pending: isSender ? 'Sent' : 'Pending',
+    pending: isSender ? 'Sent — waiting to be accepted' : 'Tap Accept to add it to your balance',
     claimed: 'Accepted',
     cancelled: 'Cancelled',
     expired: 'Expired — returned to sender',
   };
+  const subtitle = note ? `“${note}”` : statusLabel[status];
+  const showAccept = status === 'pending' && isRecipient;
+  const showCancel = status === 'pending' && isSender && !!onCancel;
 
+  // A full-width row card — coin in a circle, bold title, subtitle, and a
+  // trailing chevron (or an explicit Accept pill when the receiver needs to
+  // act) — not the previous big centered card, which only looked right on
+  // its own and got crushed once it landed inside a chat bubble.
   return (
-    <View style={[styles.card, { backgroundColor: theme.accent, overflow: 'hidden' }]}>
-      <View style={styles.cardBillWatermark} pointerEvents="none">
-        <ThreadCashBill width={260} />
+    <View style={[styles.card, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
+      <View style={[styles.cardCoinCircle, { backgroundColor: theme.accentDim }]}>
+        <ThreadCashBillMark size={20} />
       </View>
-      <ThreadCashCoinMark size={28} color={theme.onAccent} accent={theme.onAccent} />
-      <View style={styles.cardAmountWrap} onLayout={(e) => setAmountWidth(e.nativeEvent.layout.width)}>
-        <Text style={[styles.cardAmount, { color: theme.onAccent }]}>{formatCents(amountCents)}</Text>
-        {status === 'pending' && amountWidth > 0 && <ShimmerSweep width={amountWidth} height={34} />}
+      <View style={styles.cardTextCol} onLayout={(e) => setAmountWidth(e.nativeEvent.layout.width)}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>{formatCents(amountCents)} Thread Cash</Text>
+          {status === 'pending' && amountWidth > 0 && <ShimmerSweep width={amountWidth} height={20} />}
+        </View>
+        <Text style={[styles.cardSubtitle, { color: theme.muted }]} numberOfLines={1}>{subtitle}</Text>
       </View>
-      {note ? <Text style={[styles.cardNote, { color: theme.onAccent, opacity: 0.75 }]} numberOfLines={2}>“{note}”</Text> : null}
-      <Text style={[styles.cardStatus, { color: theme.onAccent, opacity: 0.8 }]}>{statusLabel[status]}</Text>
 
-      {status === 'pending' && isRecipient && (
+      {showAccept ? (
         <TouchableOpacity
-          style={[styles.acceptBtn, { backgroundColor: theme.onAccent }]}
+          style={[styles.acceptBtn, { backgroundColor: theme.accent }]}
           disabled={busy}
           onPress={() => run(onClaim)}
           accessibilityRole="button"
           accessibilityLabel="Accept Thread Cash"
           testID="thread-cash-accept"
         >
-          <Text style={[styles.acceptBtnText, { color: theme.accent }]}>{busy ? 'Accepting…' : 'Accept'}</Text>
+          <Text style={[styles.acceptBtnText, { color: theme.onAccent }]}>{busy ? '…' : 'Accept'}</Text>
         </TouchableOpacity>
-      )}
-      {status === 'pending' && isSender && onCancel && (
-        <TouchableOpacity onPress={() => run(onCancel)} disabled={busy} accessibilityRole="button" accessibilityLabel="Cancel send">
-          <Text style={[styles.cancelLink, { color: theme.onAccent }]}>{busy ? 'Cancelling…' : 'Cancel'}</Text>
+      ) : showCancel ? (
+        <TouchableOpacity onPress={() => run(onCancel!)} disabled={busy} accessibilityRole="button" accessibilityLabel="Cancel send">
+          <Text style={[styles.cancelLink, { color: theme.muted }]}>{busy ? '…' : 'Cancel'}</Text>
         </TouchableOpacity>
+      ) : (
+        <Feather name="chevron-right" size={18} color={theme.subtle} />
       )}
     </View>
   );
@@ -527,13 +536,16 @@ const styles = StyleSheet.create({
   backToChipsText: { fontSize: FS.sm, fontFamily: FONT.medium, textDecorationLine: 'underline' },
   confirmBlock: { alignItems: 'center', marginBottom: SP.lg },
   confirmNote: { fontSize: FS.xs, fontFamily: FONT.regular, fontStyle: 'italic', marginTop: SP.xs },
-  card: { borderRadius: RADIUS.lg, padding: SP.md, alignItems: 'center', gap: SP.xs, minWidth: 200, maxWidth: 240 },
-  cardBillWatermark: { position: 'absolute', top: -10, left: '50%', marginLeft: -130, opacity: 0.18 },
-  cardAmountWrap: { position: 'relative' },
-  cardAmount: { fontSize: FS.xxl, fontFamily: FONT.bold },
-  cardNote: { fontSize: FS.xs, fontFamily: FONT.regular, fontStyle: 'italic', textAlign: 'center' },
-  cardStatus: { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
-  acceptBtn: { borderRadius: RADIUS.pill, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.xs },
-  acceptBtnText: { fontSize: FS.sm, fontFamily: FONT.bold },
-  cancelLink: { fontSize: FS.xs, fontFamily: FONT.medium, textDecorationLine: 'underline', marginTop: SP.xs },
+  // Full-width row card: coin circle | title+subtitle | chevron/Accept.
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+    borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.sm, width: '100%',
+  },
+  cardCoinCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  cardTextCol: { flex: 1, position: 'relative' },
+  cardTitle: { fontSize: FS.sm, fontFamily: FONT.bold },
+  cardSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 1 },
+  acceptBtn: { borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: 6 },
+  acceptBtnText: { fontSize: FS.xs, fontFamily: FONT.bold },
+  cancelLink: { fontSize: FS.xs, fontFamily: FONT.medium, textDecorationLine: 'underline' },
 });

@@ -22,14 +22,6 @@ import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import ReanimatedAnimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  interpolate,
-  Extrapolation,
-} from 'react-native-reanimated';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
@@ -40,19 +32,23 @@ import { computeJustDroppedDrops, type FollowedDrop } from '@/lib/justDroppedDro
 import type { ViewToken } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { useApi } from '@/lib/api';
+import { useSettled } from '@/lib/animationUtils';
 import {
   BG, SCREEN_BG, SURFACE, CARD, OVERLAY,
   BORDER, BORDER_SUBTLE,
-  FG, MUTED, SUBTLE, ON_DARK,
+  FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
   SUCCESS, RED, GOLD,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
+import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
+import { getLiveDirectory, useOpenLive } from '@/lib/live/useLiveDirectory';
+import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import {
   ClaimedRemainingLabel,
   TimeRemainingLabel,
@@ -86,6 +82,10 @@ import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
+import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { CaptionBlock } from '@/components/buyer-feed/CaptionBlock';
+import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
+import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -748,101 +748,6 @@ function JustDroppedRailPage({
   );
 }
 
-function LiveStreamPage({
-  stream,
-  onJoin,
-  pageWidth,
-  pageHeight,
-  bottomClearance = 90,
-}: {
-  bottomClearance?: number;
-  stream: LiveStreamFeedItem;
-  onJoin: () => void;
-  pageWidth: number;
-  pageHeight: number;
-}) {
-  const { theme } = useAppTheme();
-  const palette = theme as typeof theme & { background?: string; surface?: string; card?: string; border?: string; text?: string; muted?: string; subtle?: string; };
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.3, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,   duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
-
-  return (
-    <View style={{ width: pageWidth, height: pageHeight, backgroundColor: '#0a0209' }}>
-      {/* Gradient background */}
-      <View style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(10,80,100,0.18)' }} />
-      {/* Centre glow */}
-      <View style={{ position: 'absolute', top: pageHeight * 0.25, alignSelf: 'center', width: 280, height: 280, borderRadius: 140, backgroundColor: theme.accentDim }} />
-
-      {/* Top bar */}
-      <View style={{ position: 'absolute', top: 52, left: 16, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FF3B30', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 }}>
-          <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff', opacity: pulseAnim }} />
-          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.4 }}>LIVE</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}>
-          <Feather name="eye" size={12} color="#fff" />
-          <Text style={{ color: '#fff', fontFamily: FONT.semibold, fontSize: 12 }}>
-            {stream.viewerCount > 0 ? stream.viewerCount.toLocaleString() : 'Live now'}
-          </Text>
-        </View>
-      </View>
-
-      {/* Centre content */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-        {/* Avatar circle */}
-        <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 3, borderColor: '#fff' }}>
-          <Text style={{ color: theme.onAccent, fontFamily: FONT.bold, fontSize: 32 }}>
-            {(stream.brandName ?? stream.sellerName).slice(0, 1).toUpperCase()}
-          </Text>
-        </View>
-        <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: FS.xl, textAlign: 'center', marginBottom: 8 }}>
-          {stream.brandName ?? stream.sellerName}
-        </Text>
-        <Text style={{ color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20, marginBottom: 32 }}>
-          {stream.title}
-        </Text>
-
-        {/* Product tags preview */}
-        {stream.productTags.length > 0 && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 28 }}>
-            {stream.productTags.slice(0, 3).map((tag, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 }}>
-                <Feather name="shopping-bag" size={11} color="#FF3B30" />
-                <Text style={{ color: '#fff', fontFamily: FONT.semibold, fontSize: 12 }} numberOfLines={1}>{tag.productName}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Join button */}
-        <TouchableOpacity
-          onPress={onJoin}
-          activeOpacity={0.85}
-          style={{ backgroundColor: '#FF3B30', borderRadius: 28, paddingHorizontal: 40, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}
-        >
-          <Feather name="video" size={18} color="#fff" />
-          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: FS.base }}>Join live stream</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom label */}
-      <View style={{ position: 'absolute', bottom: bottomClearance, left: 16, right: 16 }}>
-        <Text style={{ color: 'rgba(255,255,255,0.45)', fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center' }}>
-          Tap to join — live shopping is on
-        </Text>
-      </View>
-    </View>
-  );
-}
 type EngagementState = {
   liked: boolean; likes: number;
   saved: boolean; saves: number;
@@ -1012,7 +917,8 @@ function ScrubProgressBar({
   );
 }
 
-function VideoVisual({
+/** Exported for reuse by the LIVE pager (app/live.tsx). */
+export function VideoVisual({
   source,
   isActive,
   paused,
@@ -1216,188 +1122,15 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
   );
 }
 
-// ─── Shop side tab — a collapsed tab flush against the left screen edge ─────
-// (the right edge is the action rail) that glides out into a full card on
-// tap, rather than an always-visible price pill sitting over the video.
-// Fully solid/flat (no BlurView/backdrop-filter, no shimmer): the earlier
-// pill's frosted-glass background re-sampled the moving video behind it
-// every frame during a swipe, which read as a shimmer/glitch — this has no
-// live-sampling background at all, only a fixed solid fill. Collapsed by
-// default with zero mount/entrance animation (only a user tap ever starts
-// the expand/collapse spring), and force-collapses (no animation skipped —
-// this one transition is allowed since it's a direct response to the cell
-// leaving, matching "collapses back on swiping to the next video" in spec)
-// when the cell stops being active, so it never carries an expanded state
-// into a swipe.
-const SHOP_TAB_COLLAPSE_MS = 4000;
-
-// Expand/collapse runs entirely on the UI thread via Reanimated shared
-// values (no JS-driven Animated.Value): a 220ms timing slide out from the
-// left edge into a thin horizontal strip, not a spring overshoot — "smooth",
-// not bouncy, and identical on web (Reanimated's web runtime) and native.
-const SHOP_TAB_ANIM_MS = 220;
-
-function ShopSideTab({
-  tag, extraCount, onPress, isActive,
-}: {
-  tag: SpotlightProductTag;
-  extraCount: number;
-  onPress: () => void;
-  isActive: boolean;
-}) {
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const [expanded, setExpanded] = useState(false);
-  const progress = useSharedValue(0);
-  const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragStartX = useRef(0);
-
-  const clearCollapseTimer = useCallback(() => {
-    if (collapseTimer.current) {
-      clearTimeout(collapseTimer.current);
-      collapseTimer.current = null;
-    }
-  }, []);
-
-  const collapse = useCallback(() => {
-    clearCollapseTimer();
-    setExpanded(false);
-    progress.value = withTiming(0, { duration: SHOP_TAB_ANIM_MS });
-  }, [progress, clearCollapseTimer]);
-
-  const expand = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setExpanded(true);
-    progress.value = withTiming(1, { duration: SHOP_TAB_ANIM_MS });
-    clearCollapseTimer();
-    collapseTimer.current = setTimeout(collapse, SHOP_TAB_COLLAPSE_MS);
-  }, [progress, clearCollapseTimer, collapse]);
-
-  // Swipe left anywhere on the expanded strip collapses it (in addition to
-  // tapping outside, below) — a plain PanResponder is enough to recognize
-  // the gesture; the actual collapse animation still runs on Reanimated.
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponderCapture: (_evt, gesture) => expanded && gesture.dx < -6 && Math.abs(gesture.dy) < 12,
-      onPanResponderGrant: (evt) => { dragStartX.current = evt.nativeEvent.pageX; },
-      onPanResponderRelease: (_evt, gesture) => {
-        if (gesture.dx < -24) collapse();
-      },
-    }),
-  ).current;
-
-  useEffect(() => {
-    if (!isActive) collapse();
-    // Only reacting to the cell becoming inactive — becoming active must
-    // never itself start an animation (see the module comment above).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive]);
-
-  useEffect(() => () => clearCollapseTimer(), [clearCollapseTimer]);
-
-  // A thin horizontal strip when expanded — max ~70% of screen width, 52-56pt
-  // tall (TikTok's own shop trigger footprint), sized off the live window
-  // width so it holds at 375/390/430.
-  const expandedWidth = Math.min(Math.round(windowWidth * 0.7), 320);
-  const collapsedHeight = 76;
-  const expandedHeight = 54;
-  // Clamped, not a bare 57%: on the shortest screens (e.g. 375x667) with a
-  // repost-identity chip and a full 2-line caption, the caption block's top
-  // edge can rise as high as ~this tab's bottom edge at a bare 57%, closing
-  // the gap to nothing. windowHeight - 340 only overrides the 57% on those
-  // short screens — on 390x844+ this is always >= the 57% value, so the tab
-  // stays exactly where it was there.
-  const tabTop = Math.min(windowHeight * 0.57, windowHeight - 340);
-
-  const containerStyle = useAnimatedStyle(() => ({
-    width: interpolate(progress.value, [0, 1], [28, expandedWidth], Extrapolation.CLAMP),
-    height: interpolate(progress.value, [0, 1], [collapsedHeight, expandedHeight], Extrapolation.CLAMP),
-  }));
-  const collapsedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.2, 1], [1, 0, 0], Extrapolation.CLAMP),
-  }));
-  const expandedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.55, 1], [0, 0, 1], Extrapolation.CLAMP),
-    transform: [{ translateX: interpolate(progress.value, [0, 0.55, 1], [8, 8, 0], Extrapolation.CLAMP) }],
-  }));
-
-  return (
-    <>
-      {/* Tapping anywhere else on the video collapses the expanded card —
-          rendered only while expanded, behind the tab itself in z-order. */}
-      {expanded && (
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={collapse}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        />
-      )}
-      <ReanimatedAnimated.View
-        style={[styles.shopSideTab, containerStyle, { top: tabTop }]}
-        accessibilityRole="button"
-        accessibilityLabel={
-          expanded
-            ? `Shop ${tag.productName}, ${formatCents(tag.priceCents)}`
-            : 'Shop this video'
-        }
-        {...panResponder.panHandlers}
-      >
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={0.85}
-          onPress={expanded ? onPress : expand}
-          testID="shop-tag-pill"
-        >
-          <ReanimatedAnimated.View
-            pointerEvents={expanded ? 'none' : 'auto'}
-            style={[styles.shopSideTabCollapsed, collapsedStyle]}
-          >
-            {/* Icon + label are laid out and rotated together as ONE unit,
-                not rotated separately: rotating only the Text keeps its
-                pre-rotation (unrotated) box for layout purposes, so
-                anything positioned relative to that stale box — like the
-                icon above it in a flex column — lands using the wrong
-                effective width/height once the text is actually rotated,
-                which is what put the bag icon on top of the "P". Laid out
-                here as a plain horizontal row (label, then icon) and
-                rotated as a whole: a -90deg turn maps "left" to the
-                bottom and "right" to the top, so the label (left) reads
-                bottom-to-top exactly as before and the icon (right) ends
-                up above it, with real layout-computed spacing between
-                them instead of a stale gap. */}
-            <View style={styles.shopSideTabCollapsedStack}>
-              <Text style={styles.shopSideTabLabel}>SHOP</Text>
-              <Feather name="shopping-bag" size={11} color={ON_DARK} />
-            </View>
-          </ReanimatedAnimated.View>
-          <ReanimatedAnimated.View
-            pointerEvents={expanded ? 'auto' : 'none'}
-            style={[styles.shopSideTabExpanded, expandedStyle]}
-          >
-            <View style={styles.shopSideTabThumb}>
-              {tag.imageUri ? (
-                <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-              ) : (
-                <Feather name="shopping-bag" size={14} color="#111111" />
-              )}
-            </View>
-            {/* Name and price share one line so the whole card reads as a
-                sleek, narrow strip rather than a two-line card — the name
-                truncates first (flexShrink), the price never does
-                (flexShrink: 0, its own Text so numberOfLines on the name
-                can't cut it off too). */}
-            <Text style={styles.shopSideTabName} numberOfLines={1}>{tag.productName}</Text>
-            <Text style={styles.shopSideTabPrice} numberOfLines={1}>
-              {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
-            </Text>
-            <Feather name="chevron-right" size={12} color="rgba(255,255,255,0.75)" />
-          </ReanimatedAnimated.View>
-        </TouchableOpacity>
-      </ReanimatedAnimated.View>
-    </>
-  );
-}
+// The old inline ShopPill/right-rail/caption-block/top-bar JSX previously
+// defined in this file has been rebuilt as its own component tree under
+// components/buyer-feed/ (ShopSideTab, RightActionRail, CaptionBlock,
+// FeedTopBar, LongPressMenu) — see the imports above. ShopSideTab and
+// RightActionRail's *content* were updated to match dev PR #129's
+// TikTok-exact sizing/placement (see those files); this file keeps the
+// video player logic and gesture handling (SpotlightPage, VideoVisual,
+// ScrubProgressBar) and the data/engagement hooks, and wires the
+// presentational components to them below.
 
 function SpotlightPage({
   item, isActive, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound,
@@ -1442,6 +1175,8 @@ function SpotlightPage({
   const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+  /** Long-press context menu: "2x speed" / "Not interested" / "Report". */
+  const [menuOpen, setMenuOpen] = useState(false);
   const { showToast } = useFeedToast();
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -1584,7 +1319,10 @@ function SpotlightPage({
           native does) — which silently zeroed out the whole video area
           (390x0) while the separately-sized blurred mirror strip kept
           rendering, producing an all-black screen with nothing playing. */}
-      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
+      <Pressable
+        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setMenuOpen(true); }}
+        delayLongPress={550}
+        onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
         <View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>
           {item.contentType === 'video'
             ? (
@@ -1640,10 +1378,11 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
-      {/* ─ Shop side tab ─ collapsed against the left edge (mirrors the
-          rail on the right), only when this video has a tagged product.
-          Lives at this top level, not inside the bottom-left info stack —
-          it's a screen-edge affordance, not part of that stack's flow. */}
+      {/* ─ Shop side tab (components/buyer-feed/ShopSideTab) ─ collapsed
+          against the left edge (mirrors the rail on the right), only when
+          this video has a tagged product. Lives at this top level, not
+          inside CaptionBlock — it's a screen-edge affordance, not part of
+          that stack's flow. */}
       {!!item.productTags?.length && (
         <ShopSideTab
           tag={item.productTags[0]}
@@ -1653,160 +1392,38 @@ function SpotlightPage({
         />
       )}
 
-      {/* ─ Right action rail ─
-          Pinned at bottomClearance + RAIL_BOTTOM_GAP, not bare
-          bottomClearance: the scrub/progress bar sits right around
-          bottomClearance too (see ScrubProgressBar's `bottom - 13` math
-          below), so anchoring the rail there put its last item (share)
-          directly touching the bar with zero gap. RAIL_BOTTOM_GAP clears
-          the bar's own height/hit-area with the required >=16pt to spare. */}
-      <Animated.View style={[styles.rail, chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}>
-        {/* Avatar + follow badge */}
-        <View style={styles.railAvatarWrap}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onOpenCreator(item);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`View ${item.creator}'s profile`}
-          >
-            <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
-              <Text style={styles.railAvatarText}>{item.initials}</Text>
-            </View>
-          </TouchableOpacity>
-          {!(engagement?.following) && (
-            <EngagementButton
-              icon="plus"
-              iconSize={9}
-              active={false}
-              accessibilityLabel={`Follow ${item.creator}`}
-              style={[styles.railFollowBadge, { backgroundColor: item.accentColor }]}
-              onPress={async () => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                await onFollow(item.id);
-              }}
-              testID={`follow-btn-${item.id}`}
-            />
-          )}
-        </View>
-
-        {/* Like — a ring echoes outward from behind the icon on every tap
-            that likes the post (not just the double-tap burst on the video
-            itself), so the rail control has its own moment of feedback. */}
-        <View style={styles.railLikeWrap} pointerEvents="box-none">
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.railLikeRing,
-              {
-                opacity: likeRing.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.55, 0] }),
-                transform: [{ scale: likeRing.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.9] }) }],
-              },
-            ]}
-          />
-          <EngagementButton
-            icon="heart"
-            solidIcon="heart"
-            iconSize={26}
-            count={formatCount(engagement?.likes ?? 0)}
-            active={engagement?.liked ?? false}
-            activeColor="#EF4444"
-            inactiveColor={ON_DARK}
-            accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${formatCount(engagement?.likes ?? 0)} likes`}
-            accessibilityState={{ checked: engagement?.liked ?? false }}
-            scaleAnim={heartScale}
-            style={styles.railActionContent}
-            onPress={async () => {
-              bumpHeart();
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              await onLike(item.id);
-            }}
-            hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-            testID={`like-btn-${item.id}`}
-          />
-        </View>
-
-        {/* Comments — not async, opens navigation. `commentCountDelta` bumps
-            this the instant a comment is posted in the comments sheet (a
-            separate routed screen), so the rail updates immediately instead
-            of waiting for the feed to refetch this post. */}
-        <TouchableOpacity
-          style={styles.railBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          onPress={() => onOpenComments(item.id)}
-          accessibilityRole="button"
-          accessibilityLabel={`Comments, ${formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}`}
-        >
-          <FontAwesome name="commenting" size={26} color={ON_DARK} style={styles.railIconShadow} />
-          <Text style={styles.railCount}>{formatCount((item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta)}</Text>
-        </TouchableOpacity>
-
-        {/* Repost */}
-        <EngagementButton
-          icon="repeat"
-          solidIcon="retweet"
-          iconSize={26}
-          count={formatCount(engagement?.reposts ?? 0)}
-          active={engagement?.reposted ?? false}
-          activeColor={theme.accent}
-          inactiveColor={ON_DARK}
-          accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${formatCount(engagement?.reposts ?? 0)} reposts`}
-          accessibilityState={{ checked: engagement?.reposted ?? false }}
-          style={styles.railActionContent}
-          rotateAnim={repostSpin}
-          scaleAnim={repostScale}
-          onPress={async () => {
-            spinRepost();
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            await onRepost(item.id);
-          }}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          testID={`repost-btn-${item.id}`}
-        />
-
-        {/* Save */}
-        <EngagementButton
-          icon="bookmark"
-          solidIcon="bookmark"
-          iconSize={26}
-          count={formatCount(engagement?.saves ?? item.saves)}
-          active={engagement?.saved ?? false}
-          activeColor={GOLD}
-          inactiveColor={ON_DARK}
-          accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${formatCount(engagement?.saves ?? item.saves)} saves`}
-          accessibilityState={{ checked: engagement?.saved ?? false }}
-          style={styles.railActionContent}
-          translateYAnim={saveDrop}
-          scaleAnim={saveScale}
-          onPress={async () => {
-            dropSave();
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            await onSave(item.id);
-          }}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          testID={`save-btn-${item.id}`}
-        />
-
-        {/* Share */}
-        <TouchableOpacity
-          style={styles.railBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="Share post"
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShareOpen(true);
-          }}
-        >
-          <FontAwesome name="share" size={26} color={ON_DARK} style={styles.railIconShadow} />
-          <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
-        </TouchableOpacity>
-
-      </Animated.View>
+      {/* ─ Right action rail (components/buyer-feed/RightActionRail) ─
+          bottom: bottomClearance + RAIL_BOTTOM_GAP, not bare bottomClearance
+          — see the RAIL_BOTTOM_GAP/CAPTION_BOTTOM_GAP comment above. Sizing
+          ported from dev PR #129; icon shadows from PR #122. Sound toggle
+          lives in the caption block (CaptionBlock's sound row) instead of a
+          rail-mounted disc — matches dev's #129 rail exactly. */}
+      <RightActionRail
+        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}
+        creator={item.creator}
+        hostId={item.sellerId}
+        avatarColor={item.avatarColor}
+        initials={item.initials}
+        accentColor={item.accentColor}
+        engagement={engagement}
+        commentsCount={(item.commentsCount ?? (engagement?.comments ?? []).length) + commentCountDelta}
+        shares={item.shares}
+        saves={item.saves}
+        onOpenCreator={() => { onOpenCreator(item); }}
+        onFollow={() => onFollow(item.id)}
+        onLike={async () => { bumpHeart(); await onLike(item.id); }}
+        onOpenComments={() => onOpenComments(item.id)}
+        onRepost={async () => { spinRepost(); await onRepost(item.id); }}
+        onSave={async () => { dropSave(); await onSave(item.id); }}
+        onShare={() => setShareOpen(true)}
+        heartScale={heartScale}
+        likeRing={likeRing}
+        repostSpin={repostSpin}
+        repostScale={repostScale}
+        saveDrop={saveDrop}
+        saveScale={saveScale}
+        testIdBase={item.id}
+      />
 
       <ThreadShareSheet
         visible={shareOpen}
@@ -1822,98 +1439,39 @@ function SpotlightPage({
         onFeedback={showToast}
       />
 
-      {/* ─ Bottom-left overlay: creator, caption, sound ─
-          Pinned at bottomClearance + CAPTION_BOTTOM_GAP for the same reason
-          as the rail above: bare bottomClearance put the sound line's own
-          bottom edge right where the scrub/progress bar sits, touching it
-          with no gap. CAPTION_BOTTOM_GAP guarantees the required >=12pt of
-          clearance from the sound line down to the bar. The shop tag used to
-          live at the top of this stack as a pill; it's now the screen-edge
-          ShopSideTab rendered above instead, so this stack starts straight
-          at the repost/creator row with no leftover gap where the pill used
-          to sit — nothing here reserves space for it any more (see
-          bottomInfo/bottomInfoWithRepost's shrunk minHeight below). */}
-      <Animated.View style={[styles.bottomInfo, chromeStyle, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]} pointerEvents="box-none">
-        {hasRepostIdentity && (
-          <TouchableOpacity
-            style={styles.repostIdentity}
-            activeOpacity={friendReposts.length > 0 ? 0.8 : 1}
-            disabled={friendReposts.length === 0}
-            onPress={() => {
-              const friend = friendReposts[0];
-              // buyer-other-profile reads `userId` — the old `id` param opened a blank profile.
-              if (friend) router.push(profileHref({ userId: friend.userId, accountType: 'buyer', name: friend.displayName }) as never);
-            }}
-            accessibilityRole={friendReposts.length > 0 ? 'button' : 'text'}
-            accessibilityLabel={repostLabel}
-          >
-            <View style={styles.repostAvatarStack}>
-              {friendReposts.slice(0, 3).map((friend, index) => (
-                <View
-                  key={friend.userId}
-                  style={[styles.repostAvatar, { marginLeft: index === 0 ? 0 : -7, zIndex: 3 - index }]}
-                >
-                  {friend.avatarUrl ? (
-                    <CachedImage source={{ uri: friend.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                  ) : (
-                    <View style={[StyleSheet.absoluteFill, styles.repostAvatarFallback]}>
-                      <Text style={styles.repostAvatarInitials}>
-                        {friend.displayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              ))}
-              {friendReposts.length === 0 && (
-                <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
-                  <Feather name="user" size={13} color={ON_DARK} />
-                </View>
-              )}
-            </View>
-            <Text style={styles.repostIdentityText} numberOfLines={1}>{repostLabel}</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onOpenCreator(item);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${item.creator}'s profile`}
-        >
-          <View style={styles.creatorRow}>
-            <Text style={styles.creatorName} numberOfLines={1}>{item.creator}</Text>
-            {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
-          </View>
-        </TouchableOpacity>
+      <LongPressMenu
+        visible={menuOpen}
+        speedActive={speedActive}
+        onToggleSpeed={() => setSpeedActive(v => !v)}
+        onNotInterested={() => onNotInterested(item.id)}
+        onReport={() => router.push(`/buyer-report?targetType=post&targetId=${encodeURIComponent(item.id)}&targetLabel=Post` as never)}
+        onClose={() => setMenuOpen(false)}
+      />
 
-        <Pressable
-          onPress={() => item.caption.length > 86 && setCaptionExpanded(v => !v)}
-          accessibilityRole={item.caption.length > 86 ? 'button' : 'text'}
-          accessibilityLabel={item.caption.length > 86 ? (captionExpanded ? 'Collapse caption' : 'Expand caption') : undefined}
-          hitSlop={{ top: 4, bottom: 4 }}
-        >
-          <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
-            {item.caption}
-            {item.caption.length > 86 && (
-              <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
-            )}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.soundRow}
-          onPress={onToggleSound}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
-          accessibilityState={{ checked: soundOn }}
-        >
-           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={12} color={`${ON_DARK}CC`} />
-          <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
-        </Pressable>
-      </Animated.View>
+      {/* ─ Bottom-left overlay: creator, caption, sound (components/buyer-feed/CaptionBlock) ─
+          bottom: bottomClearance + CAPTION_BOTTOM_GAP, not bare
+          bottomClearance — same reason as the rail above. The shop tag is
+          the ShopSideTab rendered above instead of a CaptionBlock slot. */}
+      <CaptionBlock
+        style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}
+        creator={item.creator}
+        verified={!!item.verified}
+        caption={item.caption}
+        sound={item.sound}
+        soundOn={soundOn}
+        onToggleSound={onToggleSound}
+        friendReposts={friendReposts}
+        hasRepostIdentity={hasRepostIdentity}
+        repostLabel={repostLabel}
+        onOpenRepostIdentity={() => {
+          const friend = friendReposts[0];
+          // buyer-other-profile reads `userId` — the old `id` param opened a blank profile.
+          if (friend) router.push(profileHref({ userId: friend.userId, accountType: 'buyer', name: friend.displayName }) as never);
+        }}
+        captionExpanded={captionExpanded}
+        onToggleCaptionExpanded={() => setCaptionExpanded(v => !v)}
+        onOpenCreator={() => onOpenCreator(item)}
+      />
     </View>
   );
 }
@@ -2050,7 +1608,7 @@ export default function FeedScreen({
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
-  const previewTopInset = Platform.OS === 'web' ? 67 : insets.top;
+  const previewTopInset = insets.top;
   const previewBottomInset = insets.bottom;
   const isBuyerSurface = buyerMode || showFashionPreview;
   const isCreatorFeed = !!creatorFeed;
@@ -2116,7 +1674,6 @@ export default function FeedScreen({
   const [feedRefreshing, setFeedRefreshing] = useState(false);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [feedHasMore, setFeedHasMore] = useState(true);
-  const [activeLiveStreams, setActiveLiveStreams] = useState<LiveStreamFeedItem[]>([]);
   const [feedError, setFeedError] = useState(false);
   const [creatorStartIndex, setCreatorStartIndex] = useState(0);
   const creatorOffsetRef = useRef(0);
@@ -2128,6 +1685,7 @@ export default function FeedScreen({
   const feedLoadingMoreRef = useRef(false);
   const feedHasMoreRef = useRef(true);
   const repostPendingRef = useRef(new Set<string>());
+  const openLive = useOpenLive();
   const cartPulse = useRef(new Animated.Value(1)).current;
   const cartTargetRef = useRef<View>(null);
   const feedListRef = useRef<FlatList<FeedItem>>(null);
@@ -2314,33 +1872,6 @@ export default function FeedScreen({
     void loadFeed();
   }, [feedRefreshing, loadFeed]);
 
-  // Poll active live streams every 30 seconds (main feed only — a creator's
-  // video player never weaves other sellers' streams in)
-  useEffect(() => {
-    if (isCreatorFeed) return undefined;
-    async function fetchLive() {
-      try {
-        const data = await (api as any).live.active() as { streams: any[] };
-        const rows = Array.isArray(data?.streams) ? data.streams : [];
-        setActiveLiveStreams(rows.map((s: any) => ({
-          _isLive: true as const,
-          id:          `live_${s.id}`,
-          streamId:    s.id,
-          sellerName:  s.seller_name ?? 'Seller',
-          brandName:   s.brand_name ?? null,
-          thumbnailUrl: s.thumbnail_url ?? null,
-          title:       s.title,
-          viewerCount: s.viewer_count ?? 0,
-          productTags: Array.isArray(s.product_tags) ? s.product_tags : [],
-        })));
-      } catch {
-        setActiveLiveStreams([]);
-      }
-    }
-    fetchLive();
-    const id = setInterval(fetchLive, 30_000);
-    return () => clearInterval(id);
-  }, [isCreatorFeed]);
 
   // "Just dropped from brands you follow" — real drops only: fetch the
   // buyer's follow graph and the platform's currently-live drops, then
@@ -2399,15 +1930,12 @@ export default function FeedScreen({
     if (isBuyerSurface && justDroppedDrops.length > 0) {
       regular.splice(Math.min(2, regular.length), 0, { _isJustDropped: true, id: 'just-dropped-rail', drops: justDroppedDrops });
     }
-    if (!activeLiveStreams.length) return regular;
-    // Weave live streams in: first at index 4, then every 10 after
-    const result: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...regular];
-    activeLiveStreams.slice(0, 3).forEach((liveItem, i) => {
-      const insertAt = Math.min(4 + i * 10, result.length);
-      result.splice(insertAt, 0, liveItem);
-    });
-    return result;
-  }, [sellerFeedPosts, activeLiveStreams, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed]);
+    // Live streams no longer weave into the feed itself — the header's LIVE
+    // glyph opens the dedicated full-screen /live-feed experience instead,
+    // so a live card never has to fit inside the feed's own search bar/tabs/
+    // tab bar chrome.
+    return regular;
+  }, [sellerFeedPosts, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed]);
 
   // Every on-screen post's real engagement snapshot (server-backed likes/
   // saves/reposts/liked-by-me/saved-by-me), keyed by id. `engagements` state
@@ -2514,6 +2042,12 @@ export default function FeedScreen({
       goBackOr(router);
       return;
     }
+    // A creator wearing the LIVE ring opens straight into their stream.
+    const liveStreamId = getLiveDirectory().streamFor(item.sellerId);
+    if (liveStreamId) {
+      openLive({ streamId: liveStreamId, hostId: item.sellerId });
+      return;
+    }
     router.push(profileHref({
       userId: item.sellerId,
       accountType: item.authorAccountType ?? 'seller',
@@ -2521,7 +2055,7 @@ export default function FeedScreen({
       handle: item.handle,
       initials: item.initials,
     }) as never);
-  }, [creatorSource, creatorId, router]);
+  }, [creatorSource, creatorId, router, openLive]);
 
   // Record one view per post per session when it becomes the active page —
   // the view counts profile video tiles show.
@@ -2728,19 +2262,13 @@ export default function FeedScreen({
     return () => { cancelled = true; };
   }, [sellerFeedPosts]);
 
-  /** Top-bar LIVE button: jumps the feed to the nearest active live stream
-   * card already mixed into displayItems, ahead of the current position
-   * when one exists downstream, otherwise the closest one behind it. */
-  function jumpToNearestLive() {
-    const indices: number[] = [];
-    displayItems.forEach((it, i) => { if ((it as any)._isLive) indices.push(i); });
-    if (!indices.length) return;
-    const ahead = indices.find(i => i > activeIndex);
-    const target = ahead ?? indices[indices.length - 1];
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    feedListRef.current?.scrollToIndex({ index: target, animated: true });
-  }
-
+  // The Threads header LIVE button now opens the dedicated full-screen
+  // /live-feed viewer (PR #134) unconditionally, rather than jumping within
+  // the feed pager to a live card mixed into displayItems — that weaving
+  // was removed. Per-host targeting (LiveHostRing taps, the creator-avatar
+  // "wearing the LIVE ring" case below, profile/inbox entry points) still
+  // opens the specific host's stream via openLive()/the app/live.tsx pager,
+  // which PR #134 left untouched.
   function handleOpenComments(id: string) {
     const item = allItems.find(i => i.id === id);
     if (!item || isLiveStreamItem(item) || isJustDroppedItem(item)) return;
@@ -2804,7 +2332,7 @@ export default function FeedScreen({
     }
   }, [activeIndex, displayItems]);
 
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+  const viewabilityConfig = useRef(VERTICAL_PAGER_VIEWABILITY).current;
   // Buyer Home plays edge to edge behind the floating tab bar, so every
   // overlay (shop tag, caption, rail, progress) starts above the bar.
   // Buyer Home: this is the exact height of the floating tab bar's zone
@@ -2833,6 +2361,26 @@ export default function FeedScreen({
         }
       }}
     >
+      {feedLoading && (
+        <FeedSkeleton
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
+        />
+      )}
+      {/*
+       * SCROLL-RESET EXCEPTION (see hooks/useScrollReset.ts): this vertical
+       * video FlatList deliberately does NOT use useScrollReset. Its
+       * "comments" UI (`/buyer-post-comments`, see app/_layout.tsx) is a
+       * real pushed modal route, not local component state — so the feed
+       * screen actually loses and regains focus every time comments opens
+       * and closes. Wiring useScrollReset as-is would fire on that refocus
+       * and snap the feed back to its first video (via initialScrollIndex/
+       * scrollToOffset(0)), which would violate the product requirement
+       * that this feed keeps its current video position across a
+       * comments open/close cycle. Left out of the universal migration
+       * pending a design decision on how to distinguish "returning from a
+       * child modal" focus events from "genuine tab-switch-back" focus
+       * events for this screen specifically.
+       */}
       {viewportReady && <FlatList
         ref={feedListRef}
         // The creator player remounts once its videos load so it opens at the tapped one.
@@ -2841,43 +2389,16 @@ export default function FeedScreen({
         // Creator player opens at the tapped video (uniform page height via getItemLayout).
         initialScrollIndex={isCreatorFeed && creatorStartIndex > 0 && creatorStartIndex < displayItems.length ? creatorStartIndex : undefined}
         keyExtractor={item => item.id}
-        pagingEnabled
-        disableIntervalMomentum
-        showsVerticalScrollIndicator={false}
-        decelerationRate="fast"
-        // A slow drag-then-release let the list rubber-band past the page
-        // boundary before paging snapped it back — on iOS that's the default
-        // vertical bounce, on Android the default overscroll glow/stretch,
-        // and on web (react-native-web) the equivalent elastic overshoot.
-        // Only the video itself should ever appear to move like that; the
-        // overlay chrome doesn't animate at all (see chromeStyle above), so
-        // that rubber-band snap-back read as the whole page — video and
-        // overlay together — bouncing. Disabling native overscroll here
-        // makes every release, slow or fast, land exactly on the page
-        // boundary with no elastic overshoot to snap back from.
-        bounces={false}
-        alwaysBounceVertical={false}
-        overScrollMode="never"
+        // Snap-per-page + bounded virtualization + no overscroll bounce,
+        // shared with the LIVE pager (app/live.tsx) — see lib/feedPager.ts
+        // for why web renders every page up front, native keeps only ~the
+        // active page ±2 mounted, and native overscroll is disabled (a slow
+        // drag-then-release otherwise rubber-banded the whole page).
+        {...verticalPagerListProps(pageHeight, displayItems.length)}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         onEndReached={loadMoreFeed}
         onEndReachedThreshold={0.5}
-        // Bounds how many video players ever exist at once: the active
-        // page plus roughly the next/previous 2 stay mounted (poster-first,
-        // so they start instantly the moment they become active) — the
-        // rest are unmounted rather than left decoding off-screen. On web,
-        // react-native-web's VirtualizedList batches renders off scroll
-        // events rather than native's more reliable cell-recycling timers;
-        // a low initialNumToRender/windowSize there let fast/paginated
-        // swiping through the feed outrun the render batches, landing on
-        // pages that were never mounted at all (a blank page) after only a
-        // handful of swipes. Web renders the whole (small, ~10-item) preview
-        // feed up front instead of virtualizing it away.
-        initialNumToRender={Platform.OS === 'web' ? displayItems.length : 3}
-        maxToRenderPerBatch={Platform.OS === 'web' ? displayItems.length : 2}
-        windowSize={Platform.OS === 'web' ? 21 : 5}
-        removeClippedSubviews={Platform.OS !== 'web'}
-        getItemLayout={(_, index) => ({ length: pageHeight, offset: pageHeight * index, index })}
         refreshControl={
           <RefreshControl
             refreshing={feedRefreshing}
@@ -2950,21 +2471,6 @@ export default function FeedScreen({
               />
             );
           }
-          if ((item as any)._isLive) {
-            const live = item as unknown as LiveStreamFeedItem;
-            return (
-              <LiveStreamPage
-                stream={live}
-                pageWidth={pageWidth}
-                pageHeight={pageHeight}
-                bottomClearance={bottomClearance}
-                onJoin={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  router.push(`/buyer-live?streamId=${encodeURIComponent(live.streamId)}` as never);
-                }}
-              />
-            );
-          }
           const spotlight = item as SpotlightItem;
           // Offset activeIndex comparison by buyerOffset so video playback is correct
           // when the demand sentinel occupies index 0.
@@ -3000,10 +2506,14 @@ export default function FeedScreen({
           they stay put while the video underneath swipes past. Standard
           TikTok-style small gradients only — a short one at the very top
           (behind the top bar) and a short one at the very bottom (behind the
-          caption/rail and the tab bar). Nothing here is a translucent panel:
-          both are capped low enough that they never reach up into the
-          middle of the right action rail, which previously read as a washed-
-          out band over the comment/repost/save/share icons. */}
+          caption). Both are capped low enough that they never reach up into
+          the middle of the right action rail. The bottom scrim also stops
+          short of the rail's own column (right: 76 instead of full-width) —
+          it used to run edge to edge, which put its bottom, most-opaque
+          band directly over the repost/save/share icons and made only the
+          bottom half of the rail look faded/grey next to the untouched
+          heart/comment above it, even though every icon is the same solid
+          white. The rail needs zero scrim under it, not just a lighter one. */}
       {isBuyerSurface && (
         <>
           <LinearGradient
@@ -3016,7 +2526,7 @@ export default function FeedScreen({
             pointerEvents="none"
             colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.22)', 'rgba(0,0,0,0.58)']}
             locations={[0, 0.45, 1]}
-            style={[styles.bottomScrim, { height: bottomClearance + 130 }]}
+            style={[styles.bottomScrim, { height: bottomClearance + 130, right: 76 }]}
           />
         </>
       )}
@@ -3136,19 +2646,20 @@ export default function FeedScreen({
               >
                 <Feather name="zap" size={20} color={ON_DARK} />
               </TouchableOpacity>
-              {activeLiveStreams.length > 0 && (
-                <TouchableOpacity
-                  style={styles.liveJumpBtn}
-                  activeOpacity={0.78}
-                  onPress={jumpToNearestLive}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Jump to live, ${activeLiveStreams.length} streaming now`}
-                  hitSlop={{ top: 5, bottom: 5, left: 4, right: 5 }}
-                >
-                  <View style={styles.liveJumpDot} />
-                  <Text style={styles.liveJumpText}>LIVE</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  router.push('/live-feed' as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Live"
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                testID="buyer-home-live"
+              >
+                <Feather name="tv" size={20} color={ON_DARK} />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.buyerTabSwitcherWrap} pointerEvents="box-none">
@@ -3421,87 +2932,6 @@ const styles = StyleSheet.create({
   speedPillText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13 },
   mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
   mediaDotActive: { width: 18, backgroundColor: ON_DARK },
-  // Shop side tab: collapsed flush against the left screen edge (26pt of a
-  // 28pt-wide tab sticks out), only the two exposed corners rounded so it
-  // reads as attached to the edge rather than floating. Fully solid fill,
-  // no blur/shimmer — see the ShopSideTab component comment above for why.
-  shopSideTab: {
-    position: 'absolute', left: 0, top: '57%', height: 76,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderTopRightRadius: 12, borderBottomRightRadius: 12,
-    borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    overflow: 'hidden',
-  },
-  shopSideTabCollapsed: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  // A plain horizontal row (label, then icon) — normal, unrotated layout —
-  // rotated as a whole once it's already sized. Centering this on both axes
-  // keeps it centered in the tab regardless of its rotated bounding box.
-  shopSideTabCollapsedStack: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    transform: [{ rotate: '-90deg' }],
-  },
-  shopSideTabLabel: {
-    color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.5,
-  },
-  // A sleek, thin horizontal strip — fills the container's animated 54pt
-  // height (see ShopSideTab's expandedHeight), name and price sharing one
-  // line so it never needs two rows of text.
-  shopSideTabExpanded: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 8, paddingVertical: 6, gap: 8,
-  },
-  shopSideTabThumb: {
-    width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: ON_DARK, overflow: 'hidden', flexShrink: 0,
-  },
-  shopSideTabName: { flexShrink: 1, color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },
-  shopSideTabPrice: { flexShrink: 0, color: ON_DARK, fontFamily: FONT.bold, fontSize: 13, ...TABULAR_NUMS },
-
-  // Corrected pass, smaller than even the pre-#129 numbers per the owner's
-  // explicit direction (SMALLER and TIGHTER than before, so the video
-  // stands out): 38pt avatar, 26pt icon glyphs, 12pt rhythm between items,
-  // 8pt right inset.
-  rail: {
-    position: 'absolute', right: 8, width: 38, bottom: 116, alignItems: 'center', gap: 12,
-  },
-  railAvatarWrap: { alignItems: 'center', marginBottom: 2 },
-  railAvatar: {
-    width: 38, height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: ON_DARK,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
-  },
-  railAvatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
-  railFollowBadge: {
-    position: 'absolute', bottom: -6, width: 16, height: 16, borderRadius: RADII.pill,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
-  },
-  railBtn: { width: 38, alignItems: 'center', gap: 2 },
-  railActionContent: { width: 38, alignItems: 'center', gap: 2 },
-  railLikeWrap: { width: 38, alignItems: 'center', justifyContent: 'center' },
-  railLikeRing: {
-    position: 'absolute', top: 2, width: 34, height: 34, borderRadius: RADII.pill,
-    borderWidth: 2, borderColor: '#EF4444',
-  },
-  railCount: {
-    fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-  },
-  // Same shadow as railCount above, applied to the rail's two plain icons
-  // (comment, share — the EngagementButton-driven icons get the matching
-  // ebStyles.iconShadow in EngagementButton.tsx). Without it, comment and
-  // share's outline-ish glyph strokes wash out against bright footage even
-  // at full white/opacity 1.
-  railIconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-  },
-
   // The bottom-left stack's vertical rhythm is one consistent system, set
   // as explicit per-step margins (not a single uniform `gap`, since each
   // step needs its own value): creator name row -> 6pt -> caption -> 8pt ->
@@ -3558,7 +2988,7 @@ const styles = StyleSheet.create({
   buyerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TOP_TABS_ROW_HEIGHT, gap: 2 },
   // Compact 36×36 visual footprint with 5pt hitSlop on every button above =
   // a real 44×44+ touch target while leaving the centered pill enough room
-  // to breathe at 375pt width (5 icon buttons + LIVE badge otherwise crowd
+  // to breathe at 375pt width (each extra full-size button otherwise crowds
   // "Following"/"Threads" onto two lines).
   buyerTopBtnCompact: { width: 33, height: 36, alignItems: 'center', justifyContent: 'center' },
   // Full 44x44 touch target — used by the creator-profile-videos player's
@@ -3568,13 +2998,6 @@ const styles = StyleSheet.create({
   buyerTopCluster: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   buyerTabSwitcherWrap: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
   buyerCartBadge: { top: 3, right: 1 },
-  liveJumpBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36,
-    paddingHorizontal: 8, borderRadius: RADII.pill,
-    backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.55)',
-  },
-  liveJumpDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
-  liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
   // Persistent thin search bar — squircle (not a full pill, not sharp),
   // lighter/more transparent fill than a solid pill so it never darkens the
   // video underneath. No blur: a live blur here would re-sample the playing
@@ -3613,8 +3036,12 @@ const styles = StyleSheet.create({
   creatorRetryText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
   feedTabs: { alignSelf: 'center', flexDirection: 'row', gap: 22, marginTop: 0, paddingBottom: 1 },
   feedTab: { paddingHorizontal: 4, paddingVertical: 3, alignItems: 'center' },
-  feedTabText: { color: ON_DARK, opacity: 0.6, fontFamily: FONT.semibold, fontSize: FS.xs },
-  feedTabTextActive: { color: ON_DARK, opacity: 1 },
+  // A solid, pre-blended color (ON_DARK_MUTED) instead of `color: ON_DARK,
+  // opacity: 0.6` — an unfocused tab's own opacity was making its text
+  // subpixel-antialias against whatever's behind it rather than rendering as
+  // one solid, crisp color.
+  feedTabText: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs },
+  feedTabTextActive: { color: ON_DARK },
   feedTabUnderline: { height: 2, width: 22, borderRadius: 2, marginTop: 3 },
 
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -6,6 +6,10 @@ const routesSource = fs.readFileSync(
   path.resolve(__dirname, "..", "index.ts"),
   "utf8",
 );
+const liveSource = fs.readFileSync(
+  path.resolve(__dirname, "..", "live.ts"),
+  "utf8",
+);
 const manufacturersSource = fs.readFileSync(
   path.resolve(__dirname, "..", "manufacturers.ts"),
   "utf8",
@@ -38,11 +42,23 @@ describe("paid route mounts", () => {
       'router.use("/team",                      teamRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/live",                      tc, requirePlan("pro"), liveRouter);',
+      'router.use("/live",                      tc, liveRouter);',
     );
     expect(routesSource).toContain(
       'router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);',
     );
+  });
+
+  it("gates hosting a live behind Pro without blocking buyers from watching", () => {
+    expect(liveSource).toContain('const hostPlan = requirePlan("pro");');
+    expect(liveSource).toContain('router.post("/start", requireAuth, hostPlan,');
+    expect(liveSource).toContain('router.post("/:id/end", requireAuth, hostPlan,');
+    expect(liveSource).toContain('router.patch("/:id/products", requireAuth, hostPlan,');
+    // Viewer routes carry no plan gate.
+    expect(liveSource).toContain('router.get("/feed", async');
+    expect(liveSource).toContain('router.get("/active", async');
+    expect(liveSource).toContain('router.post("/:id/join", requireAuth, async');
+    expect(liveSource).toContain('router.post("/:id/comment", requireAuth, async');
   });
 
   it("gates seller manufacturer actions without blocking manufacturer onboarding", () => {

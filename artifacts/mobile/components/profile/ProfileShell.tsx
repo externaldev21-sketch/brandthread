@@ -35,6 +35,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { TYPE_SCALE } from '@/constants/typography';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import {
@@ -45,6 +46,8 @@ import { PROFILE_GRID_GAP, SHOP_PILL_HEIGHT, useProfileLayout } from './profileL
 import { computeEmptyArea } from './profileEmptyStates';
 import { ProfileEmptyAreaContext } from './ProfileEmptyAreaContext';
 import { loadBuyerSettings } from '@/lib/buyerSettings';
+import { LiveAvatarRing } from '@/components/live/LiveAvatarRing';
+import { useLiveStreamForHost, useOpenLive } from '@/lib/live/useLiveDirectory';
 /** Compact sticky header height below the status bar. */
 const COMPACT_BAR = 64;
 
@@ -72,6 +75,11 @@ export interface ProfileShellProps<T> {
     accessibilityLabel?: string;
     /** Small corner badge on the avatar (e.g. "plus" to add a story). */
     badgeIcon?: keyof typeof Feather.glyphMap;
+    /**
+     * This profile's user id for the LIVE ring: while they are live, the
+     * avatar wears a red LIVE ring and tapping it opens their stream.
+     */
+    liveHostId?: string | null;
   };
   hero: { videoUri?: string | null; posterUri?: string | null };
   /** Owner-only cover-video affordance ("Add cover video" / "Edit cover"), shown in the hero. */
@@ -90,6 +98,8 @@ export interface ProfileShellProps<T> {
   meta?: React.ReactNode;
   stats: ProfileStat[];
   statsLoading?: boolean;
+  /** Directly under the stats row, above actions (e.g. the Thread Cash streak row). */
+  belowStats?: React.ReactNode;
   actions?: React.ReactNode;
   /** Role-specific rows between actions and content (orders, stories, drops…). */
   extras?: React.ReactNode;
@@ -115,7 +125,7 @@ export interface ProfileShellProps<T> {
 
 export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const {
-    testID, identity, avatar, hero, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, actions, extras,
+    testID, identity, avatar, hero, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, belowStats, actions, extras,
     tabs, section, data, renderItem, keyExtractor, numColumns = 1, listKey,
     ListEmptyComponent, ListFooterComponent, onEndReached, refreshing = false, onRefresh,
     renderFloating, bottomInset = 0,
@@ -123,10 +133,13 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const liveStreamId = useLiveStreamForHost(isOwnProfile ? null : avatar?.liveHostId);
+  const openLive = useOpenLive();
   const layout = useProfileLayout();
   const { heroHeight, columnWidth } = layout;
 
   const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollResetRef = useScrollReset<any>();
   const [heroOnScreen, setHeroOnScreen] = useState(true);
   const [focused, setFocused] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -284,7 +297,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     floatingReserve,
   });
 
-  const avatarNode = (
+  const avatarBody = (
     <View style={[styles.avatarRing, avatar?.ring && { borderColor: theme.accent }]}>
       <View style={styles.avatar}>
         {identity.avatarUrl ? (
@@ -300,6 +313,18 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       ) : null}
     </View>
   );
+  // LIVE: red ring + tag around the avatar, and the avatar opens the stream.
+  const avatarNode = (
+    <LiveAvatarRing live={!!liveStreamId} size={AVATAR + 8} testID={liveStreamId ? 'profile-live-ring' : undefined}>
+      {avatarBody}
+    </LiveAvatarRing>
+  );
+  const avatarPress = liveStreamId
+    ? () => openLive({ streamId: liveStreamId, hostId: avatar?.liveHostId })
+    : avatar?.onPress;
+  const avatarPressLabel = liveStreamId
+    ? `${identity.name} is live. Watch now`
+    : avatar?.accessibilityLabel ?? `${identity.name} avatar`;
 
   const header = (
     <View>
@@ -329,11 +354,11 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
             { opacity: identityOpacity, transform: [{ translateY: identityLift }, { scale: identityScale }] },
           ]}
         >
-          {avatar?.onPress ? (
+          {avatarPress ? (
             <PressableScale
-              onPress={avatar.onPress}
+              onPress={avatarPress}
               accessibilityRole="button"
-              accessibilityLabel={avatar.accessibilityLabel ?? `${identity.name} avatar`}
+              accessibilityLabel={avatarPressLabel}
               testID="profile-avatar"
               style={styles.avatarPress}
             >
@@ -369,6 +394,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
 
       {meta ? <View style={styles.meta}>{meta}</View> : null}
       <ProfileStatsRow stats={stats} loading={statsLoading} />
+      {belowStats}
       {actions ? <View style={styles.actions}>{actions}</View> : null}
       {extras ? <View style={styles.extras}>{extras}</View> : null}
       {/* Tabs get their own breathing room so a tab's press state never
@@ -395,8 +421,16 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       >
         <ProfileEmptyAreaContext.Provider value={emptyArea.minHeight}>
         <AnimatedFlatList
+          ref={(node: FlatList<T> | null) => {
+            // Two independent mechanisms share this one FlatList instance:
+            // useScrollReset resets to offset 0 on a real route-focus change
+            // (tab-bar nav, push/pop), while `listRef` (below) restores each
+            // in-page tab's own saved scroll offset when the tab changes
+            // locally — they fire on different events and don't conflict.
+            (scrollResetRef as React.MutableRefObject<FlatList<T> | null>).current = node;
+            listRef.current = node;
+          }}
           key={listKey}
-          ref={listRef as unknown as React.Ref<FlatList>}
           data={data}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
@@ -493,7 +527,10 @@ function makeStyles(theme: AppThemePreset) {
       textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 12, // theme-exempt: legibility over media
     },
     handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.sm },
-    handle: { fontFamily: FONT.semibold, fontSize: FS.md, color: theme.text, opacity: 0.86 },
+    // Solid `theme.muted` (as `handleSoft` right below already uses) instead
+    // of `color: theme.text, opacity: 0.86` — text opacity anti-aliases
+    // against whatever's behind it instead of rendering as one solid color.
+    handle: { fontFamily: FONT.semibold, fontSize: FS.md, color: theme.muted },
     handleSoft: { fontFamily: FONT.medium, fontSize: FS.md, color: theme.muted },
 
     meta: { paddingHorizontal: SP.md, paddingTop: SP.xs, paddingBottom: SP.md, gap: SP.xs },

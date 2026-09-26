@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, ScrollView, Alert, StyleSheet,
+  View, ScrollView, StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -9,10 +9,36 @@ import { SP } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SectionHeader } from '@/components/BrandthreadUI';
-import { Card, ListRow, Button } from '@/components/ui';
+import { ListSkeleton } from '@/components/layout/Skeleton';
+import { Card, ListRow, Button, OptionSheet, OptionSheetOption } from '@/components/ui';
 import { getPrivacySettings, updatePrivacySettings } from '@/services/socialService';
 import { PrivacySettings, AudienceOption, DmPrivacy } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+
+const AUDIENCE_LABEL: Record<AudienceOption, string> = {
+  everyone: 'Everyone',
+  friends_of_friends: 'Friends of friends',
+  friends: 'Friends only',
+  nobody: 'Nobody',
+  only_me: 'Only me',
+};
+
+const AUDIENCE_DESCRIPTION: Record<AudienceOption, string> = {
+  everyone: 'Anyone on Brandthread',
+  friends_of_friends: "Your friends, and their friends",
+  friends: 'Only people you follow',
+  nobody: 'No one — turns this off entirely',
+  only_me: 'Only visible to you',
+};
+
+function audienceOptions(ids: AudienceOption[]): OptionSheetOption[] {
+  return ids.map((id) => ({ id, label: AUDIENCE_LABEL[id], description: AUDIENCE_DESCRIPTION[id] }));
+}
+
+type PickerKey = keyof Pick<
+  PrivacySettings,
+  'profileVisibility' | 'whoCanSendFriendRequests' | 'whoCanSeePosts' | 'whoCanSeeFriendsList' | 'whoCanReplyToStories' | 'whoCanMention'
+> | 'dmPrivacy';
 
 export default function BuyerPrivacySettings() {
   const colors = useColors();
@@ -22,8 +48,10 @@ export default function BuyerPrivacySettings() {
   const api    = useApi();
   const [settings, setSettings] = useState<PrivacySettings | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   // dmPrivacy is server-backed — loaded from and saved to /api/auth/privacy
   const [dmPrivacy, setDmPrivacy] = useState<DmPrivacy>('requests');
+  const [picker, setPicker] = useState<PickerKey | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -32,32 +60,6 @@ export default function BuyerPrivacySettings() {
       api.privacy.get().then(({ dmPrivacy: p }) => setDmPrivacy(p)).catch(() => {});
     }, [])
   );
-
-  function audienceLabel(val: AudienceOption): string {
-    switch (val) {
-      case 'everyone': return 'Everyone';
-      case 'friends_of_friends': return 'Friends of friends';
-      case 'friends': return 'Friends only';
-      case 'nobody': return 'Nobody';
-      case 'only_me': return 'Only me';
-    }
-  }
-
-  function showAudiencePicker(
-    title: string,
-    current: AudienceOption,
-    options: AudienceOption[],
-    onSelect: (v: AudienceOption) => void
-  ) {
-    Alert.alert(
-      title,
-      undefined,
-      [
-        ...options.map(o => ({ text: audienceLabel(o), onPress: () => onSelect(o) })),
-        { text: 'Cancel', style: 'cancel' as const },
-      ]
-    );
-  }
 
   function update(key: keyof PrivacySettings, val: any) {
     setSettings(s => s ? { ...s, [key]: val } : s);
@@ -72,9 +74,9 @@ export default function BuyerPrivacySettings() {
       // Save server-side DM privacy setting
       await api.privacy.update({ dmPrivacy });
       setHasChanges(false);
-      if (showConfirmation) Alert.alert('Saved', 'Privacy updated.');
+      setSaveError(null);
     } catch {
-      if (showConfirmation) Alert.alert('Error', "Couldn't save. Try again.");
+      if (showConfirmation) setSaveError("Couldn't save. Try again.");
       // On silent (back-navigation) saves, leave hasChanges set so the user
       // isn't told their change was saved when it wasn't.
     }
@@ -86,7 +88,14 @@ export default function BuyerPrivacySettings() {
   }
 
   if (!settings) {
-    return <View style={[styles.root, { paddingTop: insets.top }]} />;
+    return (
+      <View style={styles.root}>
+        <ScreenHeader title="Privacy" variant="push" onBack={() => goBackOr(router)} />
+        <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md }}>
+          <ListSkeleton rows={7} />
+        </ScrollView>
+      </View>
+    );
   }
 
   return (
@@ -99,6 +108,8 @@ export default function BuyerPrivacySettings() {
       />
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xxl }} showsVerticalScrollIndicator={false}>
+        {saveError ? <Card style={[styles.card, styles.errorCard]}><ListRow icon="alert-circle" iconColor={colors.destructive} title={saveError} disabled /></Card> : null}
+
         {/* PROFILE VISIBILITY */}
         <SectionHeader title="PROFILE" />
         <Card style={styles.card}>
@@ -107,92 +118,51 @@ export default function BuyerPrivacySettings() {
             title="Profile visibility"
             value={settings.profileVisibility === 'public' ? 'Public' : 'Private'}
             chevron
-            onPress={() =>
-              Alert.alert('Profile Visibility', undefined, [
-                { text: 'Public', onPress: () => update('profileVisibility', 'public') },
-                { text: 'Private', onPress: () => update('profileVisibility', 'private') },
-                { text: 'Cancel', style: 'cancel' },
-              ])
-            }
+            onPress={() => setPicker('profileVisibility')}
           />
         </Card>
 
         {/* INTERACTIONS */}
-        <SectionHeader title="WHO CAN..." style={styles.sectionSpacing} />
+        <SectionHeader title="WHO CAN SEE AND CONTACT YOU" style={styles.sectionSpacing} />
         <Card style={styles.card}>
           <ListRow
             icon="user-plus"
             title="Send friend requests"
-            value={audienceLabel(settings.whoCanSendFriendRequests)}
+            value={AUDIENCE_LABEL[settings.whoCanSendFriendRequests]}
             chevron
-            onPress={() =>
-              showAudiencePicker(
-                'Friend Requests',
-                settings.whoCanSendFriendRequests,
-                ['everyone', 'friends_of_friends', 'nobody'],
-                v => update('whoCanSendFriendRequests', v)
-              )
-            }
+            onPress={() => setPicker('whoCanSendFriendRequests')}
           />
           <View style={styles.divider} />
           <ListRow
             icon="grid"
             title="See your posts"
-            value={audienceLabel(settings.whoCanSeePosts)}
+            value={AUDIENCE_LABEL[settings.whoCanSeePosts]}
             chevron
-            onPress={() =>
-              showAudiencePicker(
-                'Post Visibility',
-                settings.whoCanSeePosts,
-                ['everyone', 'friends', 'only_me'],
-                v => update('whoCanSeePosts', v)
-              )
-            }
+            onPress={() => setPicker('whoCanSeePosts')}
           />
           <View style={styles.divider} />
           <ListRow
             icon="users"
             title="See your friends list"
-            value={audienceLabel(settings.whoCanSeeFriendsList)}
+            value={AUDIENCE_LABEL[settings.whoCanSeeFriendsList]}
             chevron
-            onPress={() =>
-              showAudiencePicker(
-                'Friends List',
-                settings.whoCanSeeFriendsList,
-                ['everyone', 'friends', 'only_me'],
-                v => update('whoCanSeeFriendsList', v)
-              )
-            }
+            onPress={() => setPicker('whoCanSeeFriendsList')}
           />
           <View style={styles.divider} />
           <ListRow
             icon="message-square"
             title="Reply to stories"
-            value={audienceLabel(settings.whoCanReplyToStories)}
+            value={AUDIENCE_LABEL[settings.whoCanReplyToStories]}
             chevron
-            onPress={() =>
-              showAudiencePicker(
-                'Story Replies',
-                settings.whoCanReplyToStories,
-                ['everyone', 'friends', 'nobody'],
-                v => update('whoCanReplyToStories', v)
-              )
-            }
+            onPress={() => setPicker('whoCanReplyToStories')}
           />
           <View style={styles.divider} />
           <ListRow
             icon="at-sign"
             title="Mention you"
-            value={audienceLabel(settings.whoCanMention)}
+            value={AUDIENCE_LABEL[settings.whoCanMention]}
             chevron
-            onPress={() =>
-              showAudiencePicker(
-                'Mentions',
-                settings.whoCanMention,
-                ['everyone', 'friends', 'nobody'],
-                v => update('whoCanMention', v)
-              )
-            }
+            onPress={() => setPicker('whoCanMention')}
           />
         </Card>
 
@@ -215,7 +185,7 @@ export default function BuyerPrivacySettings() {
         </Card>
 
         {/* SEARCH & DISCOVERY */}
-        <SectionHeader title="SEARCH & DISCOVERY" style={styles.sectionSpacing} />
+        <SectionHeader title="SEARCH AND DISCOVERY" style={styles.sectionSpacing} />
         <Card style={styles.card}>
           <ListRow
             icon="search"
@@ -240,33 +210,17 @@ export default function BuyerPrivacySettings() {
             title="Who can message you"
             subtitle={
               dmPrivacy === 'followers_only'
-                ? 'Only people you follow can send you DMs'
-                : 'Others go to your Requests inbox until you accept'
+                ? 'Only people you follow can message you'
+                : 'Others go to your requests inbox until you accept'
             }
             value={dmPrivacy === 'followers_only' ? 'Followers only' : 'Everyone'}
             chevron
-            onPress={() =>
-              Alert.alert(
-                'Who can message you',
-                'Others can always see your profile, but direct messages from non-followers are handled based on this setting.',
-                [
-                  {
-                    text: 'Everyone (non-followers go to Requests)',
-                    onPress: () => { setDmPrivacy('requests'); setHasChanges(true); },
-                  },
-                  {
-                    text: 'Followers only (block others entirely)',
-                    onPress: () => { setDmPrivacy('followers_only'); setHasChanges(true); },
-                  },
-                  { text: 'Cancel', style: 'cancel' },
-                ]
-              )
-            }
+            onPress={() => setPicker('dmPrivacy')}
           />
         </Card>
 
         {/* BLOCKED & MUTED & RESTRICTED */}
-        <SectionHeader title="BLOCKED & MUTED" style={styles.sectionSpacing} />
+        <SectionHeader title="BLOCKED AND MUTED" style={styles.sectionSpacing} />
         <Card style={styles.card}>
           <ListRow
             icon="slash"
@@ -293,6 +247,70 @@ export default function BuyerPrivacySettings() {
           />
         </Card>
       </ScrollView>
+
+      <OptionSheet
+        visible={picker === 'profileVisibility'}
+        onClose={() => setPicker(null)}
+        title="Profile visibility"
+        options={[
+          { id: 'public', label: 'Public', description: 'Anyone can see your profile and posts', icon: 'globe' },
+          { id: 'private', label: 'Private', description: 'Only people you approve can see your posts', icon: 'lock' },
+        ]}
+        selectedId={settings.profileVisibility}
+        onSelect={(id) => { update('profileVisibility', id); setPicker(null); }}
+      />
+      <OptionSheet
+        visible={picker === 'whoCanSendFriendRequests'}
+        onClose={() => setPicker(null)}
+        title="Who can send friend requests"
+        options={audienceOptions(['everyone', 'friends_of_friends', 'nobody'])}
+        selectedId={settings.whoCanSendFriendRequests}
+        onSelect={(id) => { update('whoCanSendFriendRequests', id as AudienceOption); setPicker(null); }}
+      />
+      <OptionSheet
+        visible={picker === 'whoCanSeePosts'}
+        onClose={() => setPicker(null)}
+        title="Who can see your posts"
+        options={audienceOptions(['everyone', 'friends', 'only_me'])}
+        selectedId={settings.whoCanSeePosts}
+        onSelect={(id) => { update('whoCanSeePosts', id as AudienceOption); setPicker(null); }}
+      />
+      <OptionSheet
+        visible={picker === 'whoCanSeeFriendsList'}
+        onClose={() => setPicker(null)}
+        title="Who can see your friends list"
+        options={audienceOptions(['everyone', 'friends', 'only_me'])}
+        selectedId={settings.whoCanSeeFriendsList}
+        onSelect={(id) => { update('whoCanSeeFriendsList', id as AudienceOption); setPicker(null); }}
+      />
+      <OptionSheet
+        visible={picker === 'whoCanReplyToStories'}
+        onClose={() => setPicker(null)}
+        title="Who can reply to stories"
+        options={audienceOptions(['everyone', 'friends', 'nobody'])}
+        selectedId={settings.whoCanReplyToStories}
+        onSelect={(id) => { update('whoCanReplyToStories', id as AudienceOption); setPicker(null); }}
+      />
+      <OptionSheet
+        visible={picker === 'whoCanMention'}
+        onClose={() => setPicker(null)}
+        title="Who can mention you"
+        options={audienceOptions(['everyone', 'friends', 'nobody'])}
+        selectedId={settings.whoCanMention}
+        onSelect={(id) => { update('whoCanMention', id as AudienceOption); setPicker(null); }}
+      />
+      <OptionSheet
+        visible={picker === 'dmPrivacy'}
+        onClose={() => setPicker(null)}
+        title="Who can message you"
+        description="Others can always see your profile, but direct messages from non-followers are handled based on this setting."
+        options={[
+          { id: 'requests', label: 'Everyone', description: 'Non-followers go to your requests inbox', icon: 'inbox' },
+          { id: 'followers_only', label: 'Followers only', description: 'Block direct messages from everyone else', icon: 'user-check' },
+        ]}
+        selectedId={dmPrivacy}
+        onSelect={(id) => { setDmPrivacy(id as DmPrivacy); setHasChanges(true); setPicker(null); }}
+      />
     </View>
   );
 }
@@ -305,6 +323,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     },
     sectionSpacing: { marginTop: SP.lg },
     card: { padding: 0, paddingHorizontal: SP.md },
+    errorCard: { marginBottom: SP.md },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   });
 }

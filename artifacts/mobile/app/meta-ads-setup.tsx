@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
-  ActivityIndicator, Platform, TextInput,
+  ActivityIndicator, TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
@@ -374,7 +374,7 @@ export default function MetaAdsSetupScreen() {
       <BrandthreadHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 110, gap: SP.xl }}
+        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 110, gap: SP.xl }}
       >
         {rejectionReason && (
           <View style={[s.rejectBanner, { backgroundColor: colors.destructive + '14', borderColor: colors.destructive }]}>
@@ -548,7 +548,7 @@ export default function MetaAdsSetupScreen() {
         )}
       </ScrollView>
 
-      <View style={[s.stickyBottom, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 0) + SP.md }]}>
+      <View style={[s.stickyBottom, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: insets.bottom + SP.md }]}>
         <PrimaryButton
           label={`Launch · ${formatBudgetCents(budgetCents)}${budgetType === 'daily' ? '/day' : ''}`}
           icon="zap"

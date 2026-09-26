@@ -77,6 +77,7 @@ function useThemeAliases(): ThemeAliases {
   };
 }
 import { formatCents } from '@/lib/money';
+import { mixHex } from '@/lib/backgroundPalette';
 import {
   getCheckoutBlockingSection,
   getFirstIncompleteCheckoutSection,
@@ -614,7 +615,7 @@ function Delivery({
   onApply: (code: string) => Promise<void>;
   onRemove: (code: string) => void;
 }) {
-  const { theme, MUTED, SUBTLE, RED } = useThemeAliases();
+  const { theme, BG, MUTED, SUBTLE, RED } = useThemeAliases();
   const s = makeStyles(theme);
   const PURPLE = theme.accent;
   const PURPLE_LIGHT = theme.accentLight;
@@ -715,7 +716,13 @@ function Delivery({
                 accessibilityLabel="Apply promo code"
                 accessibilityState={{ disabled: applying || !code.trim(), busy: applying }}
               >
-                <Text style={[s.applyText, { color: PURPLE_LIGHT, opacity: applying || !code.trim() ? 0.5 : 1 }]}>{applying ? '…' : 'Apply'}</Text>
+                {/* Solid blended color, not `opacity` — this row's own
+                    background is the screen's flat BG (see `card` above:
+                    "no background... comes from the screen's own
+                    ScrollView"), so pre-mixing the disabled look into it
+                    keeps the "Apply" label crisp instead of leaving a
+                    translucent layer for react-native-web to soften. */}
+                <Text style={[s.applyText, { color: applying || !code.trim() ? mixHex(PURPLE_LIGHT, BG, 0.5) : PURPLE_LIGHT }]}>{applying ? '…' : 'Apply'}</Text>
               </TouchableOpacity>
             </View>
             {session.discounts.map(discount => (

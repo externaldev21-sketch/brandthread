@@ -43,3 +43,7 @@ yarn-error.*
 .store-screenshots/
 .onboarding-walkthrough/
 scripts/onboarding-walkthrough/output/
+scratch/
+e2e/__screenshots__/
+test-results/
+playwright-report/

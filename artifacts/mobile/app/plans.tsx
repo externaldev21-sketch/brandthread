@@ -259,8 +259,8 @@ export default function PlansScreen() {
   }
 
   // ── Layout ────────────────────────────────────────────────────────────────
-  const topPad    = Platform.OS === 'web' ? 24 : insets.top;
-  const bottomPad = Platform.OS === 'web' ? 24 : insets.bottom;
+  const topPad    = insets.top;
+  const bottomPad = insets.bottom;
 
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>

@@ -6,7 +6,7 @@
  * and top offsets.
  */
 import React from 'react';
-import { Platform, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { FONT, GUTTER } from '@/lib/theme';
@@ -31,10 +31,11 @@ interface TabPageHeaderProps {
 export function TabPageHeader({ title, actions, gutter = GUTTER, style }: TabPageHeaderProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
-  // Same fixed value across every tab page: react-native-web doesn't fill in
-  // a real top safe-area inset (no notch/dynamic-island polyfill), so
-  // insets.top reads 0 on web.
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  // Real safe-area inset on every platform, including web (see the
+  // `viewport-fit=cover` meta tag in app/+html.tsx, which is what makes
+  // react-native-safe-area-context's web implementation return a non-zero
+  // `insets.top` under a simulated notch instead of always 0).
+  const topPad = insets.top;
 
   return (
     <View style={[styles.row, { paddingTop: topPad + 12, paddingHorizontal: gutter }, style]}>

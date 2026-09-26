@@ -5,22 +5,24 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
 import { getBuyerOrdersWithStatus } from '@/services/orderService';
 import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
 import { formatCents } from '@/lib/money';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, GRAD_DARK_FADE } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadHeader, FilterChip,
+  BrandthreadScreen, FilterChip,
   StatusBadge, EmptyState,
 } from '@/components/BrandthreadUI';
-import { SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
+import { Header, SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
@@ -229,6 +231,7 @@ function BuyerOrdersListSkeleton() {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerOrdersScreen() {
+  const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
@@ -344,24 +347,35 @@ export default function BuyerOrdersScreen() {
   const visibleLoading = loading || !ownsRenderedOrders;
 
   return (
-    <BrandthreadScreen noSafeBottom>
-      <BrandthreadHeader title="My Orders" />
+    <BrandthreadScreen noSafeBottom noSafeTop>
+      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
+      <Header title="My Orders" largeTitle showBack={false} />
 
-      {/* Filter chips */}
-      <FlatList
-        horizontal
-        data={FILTER_CHIPS}
-        keyExtractor={i => i.key}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: centeredPadding, gap: 8, paddingBottom: SP.sm }}
-        renderItem={({ item }) => (
-          <FilterChip
-            label={item.label}
-            active={filter === item.key}
-            onPress={() => setFilter(item.key)}
-          />
-        )}
-      />
+      {/* Filter chips — horizontal scroll with a trailing fade so the last
+          chip reads as scrollable instead of abruptly clipped. */}
+      <View style={{ position: 'relative' }}>
+        <FlatList
+          horizontal
+          data={FILTER_CHIPS}
+          keyExtractor={i => i.key}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: centeredPadding, gap: 8, paddingBottom: SP.sm }}
+          renderItem={({ item }) => (
+            <FilterChip
+              label={item.label}
+              active={filter === item.key}
+              onPress={() => setFilter(item.key)}
+            />
+          )}
+        />
+        <LinearGradient
+          pointerEvents="none"
+          colors={GRAD_DARK_FADE}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0, y: 0 }}
+          style={{ position: 'absolute', right: 0, top: 0, bottom: SP.sm, width: 28 }}
+        />
+      </View>
 
       {visibleLoading ? (
         <View style={{ paddingHorizontal: centeredPadding, paddingTop: SP.sm }}>
@@ -409,6 +423,7 @@ export default function BuyerOrdersScreen() {
             )
           ) : (
             <FlashList
+              ref={scrollResetRef}
               data={filtered}
               keyExtractor={o => o.id}
               showsVerticalScrollIndicator={false}
