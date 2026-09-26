@@ -53,6 +53,31 @@ const PEOPLE = [
   { userId: 'preview-seller-10', name: 'Vale Studio', initials: 'VS', color: '#EA580C' },
 ];
 
+// Real photos (the same asset pool the rest of the buyer preview already
+// uses for post/story thumbnails), keyed by the seeded seller id, so
+// Activity rows show an actual image instead of a flat color-and-initials
+// circle. Looked up by `previewActorAvatarUri` below — never used outside
+// the dev-web preview.
+const PEOPLE_AVATAR_INDEX: Record<string, number> = Object.fromEntries(
+  PEOPLE.map((person, index) => [person.userId, index % POSTER_SOURCES.length]),
+);
+
+/**
+ * A preview actor's avatar photo, or `undefined` outside the preview (a real
+ * account's actor never has a `preview-*` id, so this is a guaranteed no-op
+ * there). Looked up by id first, falling back to name for rows that only
+ * carry `actorName` (some seed rows predate `actorId`).
+ */
+export function previewActorAvatarUri(actorId?: string, actorName?: string): string | undefined {
+  if (!isPreviewActivityEnabled()) return undefined;
+  const id = actorId && PEOPLE_AVATAR_INDEX[actorId] !== undefined
+    ? actorId
+    : PEOPLE.find((person) => person.name === actorName)?.userId;
+  if (!id) return undefined;
+  const index = PEOPLE_AVATAR_INDEX[id];
+  return index === undefined ? undefined : posterUri(index);
+}
+
 function minutesAgo(mins: number): string {
   return new Date(Date.now() - mins * 60_000).toISOString();
 }

@@ -50,12 +50,11 @@ import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { ThemedRefreshControl } from '@/components/ui';
-import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
-import { isPreviewActivityEnabled, getPreviewActivity, getPreviewSuggestedPeople } from '@/lib/previewActivity';
+import { isPreviewActivityEnabled, getPreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri } from '@/lib/previewActivity';
 import {
   ACTIVITY_PAGE_SIZE,
   activityDetail,
@@ -88,9 +87,8 @@ import { setSellerFollowing } from '@/services/socialService';
 import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
 
 const EMPTY_ICON = 'activity' as const;
-/** Width of the in-flow unread-dot gutter that precedes every row's avatar. */
-const ROW_GUTTER_WIDTH = 12;
 const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
+const AVATAR_SIZE = 40;
 
 type Styles = ReturnType<typeof makeStyles>;
 type ListSection = ActivitySection<ActivityRow> & { data: ActivityRow[] };
@@ -200,24 +198,30 @@ function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }
 
 // ─── Avatars ──────────────────────────────────────────────────────────────────
 
-function Avatar({ actor, size, styles, ring }: {
+function Avatar({ actor, size, styles }: {
   actor: ActivityActor;
   size: number;
   styles: Styles;
-  ring?: string;
 }) {
   const { theme } = useAppTheme();
+  // Preview-only: a real photo from the same asset pool the rest of the
+  // buyer preview uses, keyed by the seeded seller id, instead of a flat
+  // color-and-initials placeholder. No-op (undefined) for a real account.
+  const imageUri = previewActorAvatarUri(actor.id, actor.name);
+  if (imageUri) {
+    return (
+      <CachedImage
+        source={{ uri: imageUri }}
+        style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
+        accessibilityIgnoresInvertColors
+      />
+    );
+  }
   return (
     <View
       style={[
         styles.avatar,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: actor.color || theme.accent,
-        },
-        ring ? { borderWidth: 2, borderColor: ring } : null,
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: actor.color || theme.accent },
       ]}
     >
       <Text
@@ -232,36 +236,17 @@ function Avatar({ actor, size, styles, ring }: {
 }
 
 /**
- * One actor: a full-size avatar. Two or more: two overlapping avatars, with a
- * "+N" chip for anyone beyond them.
+ * Threads shows one avatar even for a merged row — the most recent actor,
+ * with the small type badge — never a stack of overlapping circles or a
+ * "+N" chip. The "and N others" part lives in the row's text
+ * (`activityMessage`), not in extra avatar chrome.
  */
-function ActivityAvatarStack({ row, styles, ring }: { row: ActivityRow; styles: Styles; ring: string }) {
-  const [first, second] = row.actors;
+function ActivityAvatarStack({ row, styles }: { row: ActivityRow; styles: Styles }) {
+  const first = row.actors[0];
   if (!first) return null;
-  if (!second) {
-    return (
-      <View style={styles.leading}>
-        <Avatar actor={first} size={44} styles={styles} />
-        <ActivityTypeBadge row={row} styles={styles} />
-      </View>
-    );
-  }
-  const hidden = row.actorCount - 2;
   return (
-    <View style={styles.leading} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <View style={styles.stackBack}>
-        <Avatar actor={second} size={30} styles={styles} />
-      </View>
-      <View style={styles.stackFront}>
-        <Avatar actor={first} size={32} styles={styles} ring={ring} />
-      </View>
-      {hidden > 0 && (
-        <View style={[styles.moreChip, { borderColor: ring }]}>
-          <Text style={styles.moreChipText} allowFontScaling={false}>
-            +{hidden > 99 ? '99' : hidden}
-          </Text>
-        </View>
-      )}
+    <View style={styles.leading}>
+      <Avatar actor={first} size={AVATAR_SIZE} styles={styles} />
       <ActivityTypeBadge row={row} styles={styles} />
     </View>
   );
@@ -298,100 +283,87 @@ const ActivityRowView = React.memo(function ActivityRowView({
   // like an ordinary detail caption.
   const cashAmount = row.type === 'thread_cash_received' ? row.body?.match(/\$[\d,.]+/)?.[0] : null;
 
+  const longPress = () => {
+    Alert.alert('Options', undefined, [
+      { text: 'Dismiss', style: 'destructive', onPress: () => onDismiss(row) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
-    <SwipeActionRow
-      label="Dismiss"
-      icon="trash-2"
-      color={theme.error}
-      onAction={() => onDismiss(row)}
-      accessibilityLabel="Dismiss activity"
+    <PressableScale
+      style={styles.row}
+      onPress={() => onPress(row)}
+      onLongPress={longPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
     >
-      <PressableScale
-        style={styles.row}
-        onPress={() => onPress(row)}
-        accessibilityRole="button"
-        accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
-      >
-        {/* In-flow gutter, not an absolutely-positioned dot — RN positions
-            absolute children against the parent's border box, ignoring its
-            padding, which is what put the old dot outside the row's padding
-            (and outside the avatar) entirely. Always rendered so row
-            alignment never shifts between read/unread. */}
-        <View style={styles.unreadGutter}>
-          {unread && <View style={styles.unreadDotSmall} />}
-        </View>
-
-        {row.actors.length > 0 ? (
-          <ActivityAvatarStack row={row} styles={styles} ring={theme.background} />
-        ) : (
-          <View style={styles.leading}>
-            <View style={styles.iconCircle}>
-              {row.type === 'thread_cash_received' ? (
-                <ThreadCashBill width={32} />
-              ) : (
-                <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
-              )}
-            </View>
-          </View>
-        )}
-
-        <View style={styles.center}>
-          <Text style={styles.message} numberOfLines={3}>
-            {parts.map((part, index) => (
-              <Text key={index} style={part.bold ? styles.messageBold : undefined}>{part.text}</Text>
-            ))}
-            <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
-          </Text>
-          {cashAmount ? (
-            <Text style={[styles.detail, { color: theme.success, fontFamily: FONT.bold }]}>{`+${cashAmount}`}</Text>
-          ) : detail ? (
-            <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
-          ) : null}
-        </View>
-
-        {followBack ? (
-          <PressableScale
-            style={[
-              styles.followBtn,
-              followState === 'done'
-                ? { backgroundColor: 'transparent', borderColor: theme.border }
-                : { backgroundColor: theme.accent, borderColor: theme.accent },
-            ]}
-            disabled={followState !== 'idle'}
-            onPress={() => onFollowBack(row)}
-            accessibilityRole="button"
-            accessibilityLabel={followState === 'done' ? 'Following' : `Follow back ${row.actors[0]?.name ?? ''}`}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            {followState === 'pending' ? (
-              <ActivityIndicator size="small" color={theme.onAccent} />
-            ) : (
-              <Text
-                style={[styles.followText, { color: followState === 'done' ? theme.text : theme.onAccent }]}
-                numberOfLines={1}
-              >
-                {followState === 'done' ? 'Following' : 'Follow back'}
-              </Text>
-            )}
-          </PressableScale>
-        ) : row.targetImageUrl ? (
-          <CachedImage
-            source={{ uri: row.targetImageUrl }}
-            style={styles.thumb}
-            recyclingKey={row.key}
-            accessibilityIgnoresInvertColors
-          />
-        ) : row.actors.length > 0 ? (
-          <View style={styles.thumbFallback}>
+      {row.actors.length > 0 ? (
+        <ActivityAvatarStack row={row} styles={styles} />
+      ) : (
+        <View style={styles.leading}>
+          <View style={styles.iconCircle}>
             {row.type === 'thread_cash_received' ? (
               <ThreadCashBill width={28} />
             ) : (
-              <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
+              <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
             )}
           </View>
+        </View>
+      )}
+
+      <View style={styles.center}>
+        <Text style={styles.message} numberOfLines={2}>
+          {parts.map((part, index) => (
+            <Text key={index} style={part.bold ? styles.messageBold : styles.messageMuted}>{part.text}</Text>
+          ))}
+          <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
+        </Text>
+        {cashAmount ? (
+          <Text style={[styles.detail, { color: theme.success, fontFamily: FONT.bold }]}>{`+${cashAmount}`}</Text>
+        ) : detail ? (
+          <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
         ) : null}
-      </PressableScale>
-    </SwipeActionRow>
+      </View>
+
+      {followBack ? (
+        <PressableScale
+          style={[
+            styles.followBtn,
+            followState === 'done'
+              ? { backgroundColor: 'transparent', borderColor: theme.border }
+              : { backgroundColor: theme.accent, borderColor: theme.accent },
+          ]}
+          disabled={followState !== 'idle'}
+          onPress={() => onFollowBack(row)}
+          accessibilityRole="button"
+          accessibilityLabel={followState === 'done' ? 'Following' : `Follow back ${row.actors[0]?.name ?? ''}`}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          {followState === 'pending' ? (
+            <ActivityIndicator size="small" color={theme.onAccent} />
+          ) : (
+            <Text
+              style={[styles.followText, { color: followState === 'done' ? theme.text : theme.onAccent }]}
+              numberOfLines={1}
+            >
+              {followState === 'done' ? 'Following' : 'Follow back'}
+            </Text>
+          )}
+        </PressableScale>
+      ) : row.type === 'thread_cash_received' ? null : row.targetImageUrl ? (
+        <CachedImage
+          source={{ uri: row.targetImageUrl }}
+          style={styles.thumb}
+          recyclingKey={row.key}
+          accessibilityIgnoresInvertColors
+        />
+      ) : row.actors.length > 0 ? (
+        <View style={styles.thumbFallback}>
+          <Feather name={activityIcon(row) as any} size={ICON.sm} color={theme.muted} />
+        </View>
+      ) : null}
+    </PressableScale>
   );
 });
 
@@ -930,6 +902,8 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     letterSpacing: -0.2,
   },
 
+  // Avatar starts flush at the row's own 16pt padding — the same gutter as
+  // the title and the filter chips. No leading gutter column of any kind.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -938,37 +912,25 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingVertical: SP.md,
     minHeight: 68,
   },
-  // In-flow unread indicator, rendered before the avatar column — see the
-  // comment at its call site for why this replaced an absolutely-positioned
-  // dot (RN ignores parent padding for absolute children, so that dot landed
-  // outside both the row's padding and the avatar).
-  unreadGutter: {
-    width: ROW_GUTTER_WIDTH,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  unreadDotSmall: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.accent,
-  },
+  // Sibling of each row (SectionList's ItemSeparatorComponent, not a row
+  // child), so it needs the row's own left padding folded into its inset:
+  // 16pt gutter + the avatar's width + the row's gap.
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: theme.borderSubtle,
-    marginLeft: ROW_GUTTER_WIDTH + (SP.sm + 4) + 44 + (SP.sm + 4),
+    marginLeft: SP.md + AVATAR_SIZE + (SP.sm + 4),
   },
   leading: {
-    width: 44,
-    height: 44,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
   },
   typeBadge: {
     position: 'absolute',
     right: -2,
     bottom: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: theme.cardElevated,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.border,
@@ -996,38 +958,10 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontFamily: FONT.bold,
     letterSpacing: 0.2,
   },
-  stackBack: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  stackFront: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-  },
-  moreChip: {
-    position: 'absolute',
-    left: -4,
-    bottom: -3,
-    minWidth: 22,
-    height: 18,
-    paddingHorizontal: 4,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    backgroundColor: theme.cardElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moreChipText: {
-    color: theme.text,
-    fontFamily: FONT.semibold,
-    fontSize: 10,
-  },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     backgroundColor: theme.cardElevated,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.border,
@@ -1042,11 +976,17 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   message: {
     color: theme.text,
     fontFamily: FONT.regular,
-    fontSize: FS.sm + 1,
-    lineHeight: 19,
+    fontSize: FS.base,
+    lineHeight: 20,
   },
   messageBold: {
     fontFamily: FONT.semibold,
+    color: theme.text,
+  },
+  // The non-actor-name part of the sentence ("liked your post") reads as
+  // gray, regular weight — only the actor's name is bold white.
+  messageMuted: {
+    color: theme.muted,
   },
   time: {
     color: theme.subtle,
@@ -1061,14 +1001,14 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
 
   thumb: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: RADIUS.xs,
     backgroundColor: theme.cardElevated,
   },
   thumbFallback: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: RADIUS.xs,
     backgroundColor: theme.card,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1077,17 +1017,16 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     justifyContent: 'center',
   },
   followBtn: {
-    minWidth: 96,
-    height: 36,
-    paddingHorizontal: SP.sm + 4,
-    borderRadius: 12,
+    width: 88,
+    height: 32,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   followText: {
     fontFamily: FONT.semibold,
-    fontSize: FS.base,
+    fontSize: FS.sm,
   },
   skeletonWrap: {
     paddingHorizontal: SP.md,
