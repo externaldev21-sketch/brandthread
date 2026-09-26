@@ -338,8 +338,8 @@ export default function BuyerOtherProfileScreen() {
           roleLabel: 'Buyer',
         }}
         avatar={storyIds.length > 0
-          ? { ring: true, onPress: openStories, accessibilityLabel: `View ${displayName}'s story` }
-          : undefined}
+          ? { ring: true, onPress: openStories, accessibilityLabel: `View ${displayName}'s story`, liveHostId: canonicalUserId }
+          : { liveHostId: canonicalUserId }}
         // Their cover video (muted, looping, poster first) leads the hero when set.
         hero={profile?.coverVideoUrl
           ? { videoUri: profile.coverVideoUrl, posterUri: profile.coverPosterUrl ?? null }

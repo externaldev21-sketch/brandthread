@@ -631,7 +631,10 @@ describe('Blocker 2 — FlatList pager integrity (measured scene per item)', () 
   it('getItemLayout is uniform: measured pageHeight per item for all indices', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(tabs)/feed.tsx'), 'utf8');
+    // The feed spreads the shared pager config (also used by the LIVE pager).
+    const feed = readFileSync(resolve(__dirname, '../app/(tabs)/feed.tsx'), 'utf8');
+    expect(feed).toContain('verticalPagerListProps(pageHeight, displayItems.length)');
+    const source = readFileSync(resolve(__dirname, '../lib/feedPager.ts'), 'utf8');
     expect(source).toMatch(/length:\s*pageHeight/);
     expect(source).toMatch(/offset:\s*pageHeight\s*\*\s*index/);
     expect(source).not.toMatch(/offset:\s*pageHeight\s*\*\s*\(\s*index\s*[+-]/);

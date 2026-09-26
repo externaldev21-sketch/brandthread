@@ -45,6 +45,9 @@ import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layo
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
+import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
+import { getLiveDirectory, useOpenLive } from '@/lib/live/useLiveDirectory';
+import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import {
   ClaimedRemainingLabel,
   TimeRemainingLabel,
@@ -995,7 +998,8 @@ function ScrubProgressBar({
   );
 }
 
-function VideoVisual({
+/** Exported for reuse by the LIVE pager (app/live.tsx). */
+export function VideoVisual({
   source,
   isActive,
   paused,
@@ -1554,9 +1558,11 @@ function SpotlightPage({
             accessibilityRole="button"
             accessibilityLabel={`View ${item.creator}'s profile`}
           >
-            <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
-              <Text style={styles.railAvatarText}>{item.initials}</Text>
-            </View>
+            <LiveHostRing hostId={item.sellerId} size={44} showTag={!!engagement?.following}>
+              <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
+                <Text style={styles.railAvatarText}>{item.initials}</Text>
+              </View>
+            </LiveHostRing>
           </TouchableOpacity>
           {!(engagement?.following) && (
             <EngagementButton
@@ -1985,6 +1991,7 @@ export default function FeedScreen({
   const feedLoadingMoreRef = useRef(false);
   const feedHasMoreRef = useRef(true);
   const repostPendingRef = useRef(new Set<string>());
+  const openLive = useOpenLive();
   const cartPulse = useRef(new Animated.Value(1)).current;
   const cartTargetRef = useRef<View>(null);
   const feedListRef = useRef<FlatList<FeedItem>>(null);
@@ -2358,6 +2365,12 @@ export default function FeedScreen({
       router.back();
       return;
     }
+    // A creator wearing the LIVE ring opens straight into their stream.
+    const liveStreamId = getLiveDirectory().streamFor(item.sellerId);
+    if (liveStreamId) {
+      openLive({ streamId: liveStreamId, hostId: item.sellerId });
+      return;
+    }
     router.push(profileHref({
       userId: item.sellerId,
       accountType: item.authorAccountType ?? 'seller',
@@ -2365,7 +2378,7 @@ export default function FeedScreen({
       handle: item.handle,
       initials: item.initials,
     }) as never);
-  }, [creatorSource, creatorId, router]);
+  }, [creatorSource, creatorId, router, openLive]);
 
   // Record one view per post per session when it becomes the active page —
   // the view counts profile video tiles show.
@@ -2575,14 +2588,13 @@ export default function FeedScreen({
   /** Top-bar LIVE button: jumps the feed to the nearest active live stream
    * card already mixed into displayItems, ahead of the current position
    * when one exists downstream, otherwise the closest one behind it. */
+  // The Threads header LIVE button (dev: `liveJumpBtn`; PR #88: FeedTopBar's
+  // `onPressLive`) opens the full-screen LIVE pager (app/live.tsx). When a
+  // live stream is mixed into the feed just ahead, the pager opens on it.
   function jumpToNearestLive() {
-    const indices: number[] = [];
-    displayItems.forEach((it, i) => { if ((it as any)._isLive) indices.push(i); });
-    if (!indices.length) return;
-    const ahead = indices.find(i => i > activeIndex);
-    const target = ahead ?? indices[indices.length - 1];
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    feedListRef.current?.scrollToIndex({ index: target, animated: true });
+    const ahead = displayItems.slice(activeIndex).find(it => (it as LiveStreamFeedItem)._isLive) as LiveStreamFeedItem | undefined;
+    openLive({ streamId: ahead?.streamId });
   }
 
   function handleOpenComments(id: string) {
@@ -2648,7 +2660,7 @@ export default function FeedScreen({
     }
   }, [activeIndex, displayItems]);
 
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+  const viewabilityConfig = useRef(VERTICAL_PAGER_VIEWABILITY).current;
   // Buyer Home plays edge to edge behind the floating tab bar, so every
   // overlay (shop tag, caption, rail, progress) starts above the bar.
   // Buyer Home: this is the exact height of the floating tab bar's zone
@@ -2690,30 +2702,14 @@ export default function FeedScreen({
         // Creator player opens at the tapped video (uniform page height via getItemLayout).
         initialScrollIndex={isCreatorFeed && creatorStartIndex > 0 && creatorStartIndex < displayItems.length ? creatorStartIndex : undefined}
         keyExtractor={item => item.id}
-        pagingEnabled
-        disableIntervalMomentum
-        showsVerticalScrollIndicator={false}
-        decelerationRate="fast"
+        // Snap-per-page + bounded virtualization, shared with the LIVE pager
+        // (app/live.tsx) — see lib/feedPager.ts for why web renders every
+        // page up front and native keeps only ~the active page ±2 mounted.
+        {...verticalPagerListProps(pageHeight, displayItems.length)}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         onEndReached={loadMoreFeed}
         onEndReachedThreshold={0.5}
-        // Bounds how many video players ever exist at once: the active
-        // page plus roughly the next/previous 2 stay mounted (poster-first,
-        // so they start instantly the moment they become active) — the
-        // rest are unmounted rather than left decoding off-screen. On web,
-        // react-native-web's VirtualizedList batches renders off scroll
-        // events rather than native's more reliable cell-recycling timers;
-        // a low initialNumToRender/windowSize there let fast/paginated
-        // swiping through the feed outrun the render batches, landing on
-        // pages that were never mounted at all (a blank page) after only a
-        // handful of swipes. Web renders the whole (small, ~10-item) preview
-        // feed up front instead of virtualizing it away.
-        initialNumToRender={Platform.OS === 'web' ? displayItems.length : 3}
-        maxToRenderPerBatch={Platform.OS === 'web' ? displayItems.length : 2}
-        windowSize={Platform.OS === 'web' ? 21 : 5}
-        removeClippedSubviews={Platform.OS !== 'web'}
-        getItemLayout={(_, index) => ({ length: pageHeight, offset: pageHeight * index, index })}
         refreshControl={
           <RefreshControl
             refreshing={feedRefreshing}
