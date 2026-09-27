@@ -3,9 +3,10 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
-  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView,
+  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';

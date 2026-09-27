@@ -3,8 +3,8 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, Platform, TextInput, Image, Animated, ActivityIndicator,
-  KeyboardAvoidingView,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';

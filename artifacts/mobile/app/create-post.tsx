@@ -7,9 +7,10 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Animated, Dimensions, Platform,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Image, Pressable,
+  ActivityIndicator, Alert, Image, Pressable,
   StatusBar,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';

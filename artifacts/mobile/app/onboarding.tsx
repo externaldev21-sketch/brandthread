@@ -20,7 +20,6 @@ import {
   Dimensions,
   Easing,
   Image,
-  KeyboardAvoidingView,
   Linking,
   Platform,
   ScrollView,
@@ -31,6 +30,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
