@@ -44,7 +44,7 @@ export function EmptyState({
   return (
     <View style={[styles.wrap, compact && styles.wrapCompact, style]} testID={testID}>
       <View style={[styles.iconCircle, compact && styles.iconCircleCompact, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Feather name={icon} size={compact ? ICON.lg : ICON.xl} color={iconColor} />
+        <Feather name={icon} size={compact ? ICON.md : ICON.xl} color={iconColor} />
       </View>
       <View style={styles.copy}>
         {title ? <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{title}</Text> : null}
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.lg,
     gap: SP.md,
   },
-  wrapCompact: { paddingVertical: SP.md, paddingHorizontal: SP.md, gap: SP.md },
+  wrapCompact: { paddingVertical: 12, paddingHorizontal: SP.md, gap: 12 },
   iconCircle: {
     width: 64,
     height: 64,
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconCircleCompact: { width: 56, height: 56, borderRadius: 28 },
+  iconCircleCompact: { width: 48, height: 48, borderRadius: 24 },
   copy: { alignItems: 'center', gap: SP.xs, maxWidth: 320, alignSelf: 'center' },
   title: {
     fontFamily: FONT.bold,
