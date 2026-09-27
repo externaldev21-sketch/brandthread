@@ -62,8 +62,8 @@ function AvatarCircle({
 }
 const av = StyleSheet.create({
   circle:   { alignItems: 'center', justifyContent: 'center' },
-  initials: { color: '#fff', fontFamily: 'System', fontWeight: '700' },
-  label:    { color: MUTED, fontSize: FS.sm, fontFamily: 'System' },
+  initials: { color: '#fff', fontFamily: FONT.bold },
+  label:    { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
