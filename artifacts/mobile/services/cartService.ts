@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeGetItem, safeSetItem, safeRemoveItem } from '@/lib/safeAsyncStorage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import {
   Cart, CartItem, SavedCartItem, CartSellerGroup,
@@ -173,7 +174,7 @@ async function syncToDb(items: any[], savedItems: any[], expectedUserId: string)
 async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; remoteConfirmed: boolean }> {
   let cart: Cart;
   try {
-    const raw = await AsyncStorage.getItem(k.cart);
+    const raw = await safeGetItem(k.cart);
     if (raw) {
       cart = normalizeCart(JSON.parse(raw) as Cart);
     } else {
@@ -205,7 +206,7 @@ async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; r
       if (_cartUserId === k.userId) {
         cart.items = items.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents));
         cart.savedItems = savedItems.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents));
-        await AsyncStorage.setItem(k.cart, JSON.stringify(cart));
+        await safeSetItem(k.cart, JSON.stringify(cart));
       }
     }
   } catch { /* remoteConfirmed stays false — see getCartForScreen() */ }
@@ -236,7 +237,17 @@ export async function getCartForScreen(): Promise<{ cart: Cart; loadError: boole
 
 async function saveCart(cart: Cart, k: CartKeys = keys()): Promise<void> {
   cart.updatedAt = now();
-  await AsyncStorage.setItem(k.cart, JSON.stringify(cart));
+  // safeSetItem (not a bare AsyncStorage.setItem): on web, AsyncStorage is a
+  // thin wrapper over window.localStorage with no try/catch of its own, and
+  // localStorage can throw in real embedding contexts (a sandboxed/
+  // cross-origin preview iframe, Safari ITP, a full origin quota). An
+  // unguarded throw here used to propagate straight out of addToCart() —
+  // the item was never written, no toast, and the Cart screen read back an
+  // empty cart with no sign anything had gone wrong. safeSetItem falls back
+  // to an in-memory store for the rest of this tab's session so the write
+  // (and everything that reads it back) always succeeds from the buyer's
+  // perspective, even when the browser won't actually persist it.
+  await safeSetItem(k.cart, JSON.stringify(cart));
   // Pass k.userId so syncToDb can drop the request if the account switches before it fires.
   void syncToDb(cart.items, cart.savedItems, k.userId);
 }
