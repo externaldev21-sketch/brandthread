@@ -388,7 +388,14 @@ function LiveRoomPage({
         style={[styles.bottom, { paddingBottom: insetBottom + 12 }]}
       >
         {(room.productName != null) && (
-          <ReanimatedAnimated.View style={cardStyle}>
+          // The rail-clearance margin lives on this wrapper, not on
+          // PressableScale's own `style` prop: PressableScale only applies
+          // `style` to its inner visual box, so a margin passed there
+          // narrows what's drawn but leaves the outer Pressable's actual
+          // tap target full-width — silently stealing taps from the rail
+          // buttons it visually stopped short of. Putting it on the
+          // wrapper narrows the real tap target too.
+          <ReanimatedAnimated.View style={[styles.productCardWrap, cardStyle]}>
             <PressableScale onPress={handleBuy} style={styles.productCard} accessibilityRole="button" accessibilityLabel={`Buy ${room.productName}`}>
               {Platform.OS !== 'android' && <ProductCardBlur style={StyleSheet.absoluteFill} />}
               <View style={[StyleSheet.absoluteFill, styles.productCardTint]} pointerEvents="none" />
@@ -504,6 +511,12 @@ const styles = StyleSheet.create({
   },
 
   bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 12, gap: 8 },
+  // The rail sits at right:10, width:38 (occupying the rightmost 48pt of
+  // the screen) — this keeps the card's right edge a clear 12pt further
+  // in, so it never runs under the rail regardless of viewport width. See
+  // the comment at this wrapper's call site for why it's here and not on
+  // productCard's own style.
+  productCardWrap: { marginRight: 48 },
   productCard: {
     height: 64, flexDirection: 'row', alignItems: 'center', gap: 10,
     // Solid fallback color: the blur (ProductCardBlur) and the translucent
@@ -511,10 +524,6 @@ const styles = StyleSheet.create({
     // dark blur" on iOS/web; on Android (no blur) this alone stands in.
     backgroundColor: '#17171A', borderRadius: RADIUS.md, overflow: 'hidden',
     paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    // The rail sits at right:10, width:38 (occupying the rightmost 48pt of
-    // the screen) — this keeps the card's right edge a clear 12pt further
-    // in, so it never runs under the rail regardless of viewport width.
-    marginRight: 48,
   },
   productCardTint: { backgroundColor: 'rgba(20,20,22,0.45)' },
   productThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#33303a', overflow: 'hidden' },
