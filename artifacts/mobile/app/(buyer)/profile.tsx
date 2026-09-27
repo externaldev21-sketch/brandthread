@@ -797,18 +797,18 @@ export default function ProfileScreen() {
           accessibilityRole="button"
           accessibilityLabel="Create a story"
           testID="profile-avatar"
-          style={styles.avatarPress}
+          style={() => styles.avatarPress}
         >
-          <View style={styles.avatarRing}>
-            <View style={styles.avatar}>
+          <View style={styles.avatarRing} testID="profile-avatar-ring">
+            <View style={styles.avatar} testID="profile-avatar-image">
               {avatarUri ? (
                 <CachedImage source={{ uri: avatarUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
               ) : (
                 <Text style={[styles.avatarInitials, { color: theme.text }]}>{avatarInitials}</Text>
               )}
             </View>
-            <View style={[styles.avatarBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-              <Feather name="plus" size={12} color={theme.onAccent} />
+            <View testID="profile-avatar-badge" style={[styles.avatarBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
+              <Feather name="plus" size={14} color={theme.onAccent} />
             </View>
           </View>
         </PressableScale>
@@ -965,9 +965,11 @@ function makeStyles(theme: AppThemePreset) {
     identity: { paddingHorizontal: SP.md, gap: 4 },
     avatarPress: { marginTop: -AVATAR_OVERLAP, alignSelf: 'flex-start', marginBottom: SP.sm },
     avatarRing: {
-      width: AVATAR + 6, height: AVATAR + 6, borderRadius: (AVATAR + 6) / 2,
+      // 3px border + 2px inset on each side leaves exactly AVATAR pixels for
+      // the image, so it stays concentric instead of spilling over the ring.
+      width: AVATAR + 10, height: AVATAR + 10, borderRadius: (AVATAR + 10) / 2,
       borderWidth: 3, borderColor: '#000000', // theme-exempt: fixed black ring per spec
-      padding: 3, backgroundColor: theme.background,
+      padding: 2, backgroundColor: theme.background,
     },
     avatar: {
       width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden',
@@ -975,7 +977,7 @@ function makeStyles(theme: AppThemePreset) {
     },
     avatarInitials: { fontFamily: FONT.bold, fontSize: 28 },
     avatarBadge: {
-      position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11,
+      position: 'absolute', right: 0, bottom: 0, width: 24, height: 24, borderRadius: 12,
       borderWidth: 2, alignItems: 'center', justifyContent: 'center',
     },
     displayName: { fontFamily: FONT.bold, fontSize: 22, letterSpacing: -0.4 },
