@@ -359,16 +359,16 @@ const FASHION_PREVIEW_VIDEO_URIS = FASHION_PREVIEW_VIDEO_SOURCES.map(
 );
 
 const FASHION_PREVIEW_POSTER_SOURCES = [
-  require('../../assets/videos/fashion_runway_01.png'),
-  require('../../assets/videos/fashion_runway_02.png'),
-  require('../../assets/videos/fashion_runway_03.png'),
-  require('../../assets/videos/fashion_runway_04.png'),
-  require('../../assets/videos/fashion_runway_05.png'),
-  require('../../assets/videos/fashion_runway_06.png'),
-  require('../../assets/videos/fashion_runway_07.png'),
-  require('../../assets/videos/fashion_runway_08.png'),
-  require('../../assets/videos/fashion_runway_09.png'),
-  require('../../assets/videos/fashion_runway_10.png'),
+  require('../../assets/videos/fashion_runway_01.jpg'),
+  require('../../assets/videos/fashion_runway_02.jpg'),
+  require('../../assets/videos/fashion_runway_03.jpg'),
+  require('../../assets/videos/fashion_runway_04.jpg'),
+  require('../../assets/videos/fashion_runway_05.jpg'),
+  require('../../assets/videos/fashion_runway_06.jpg'),
+  require('../../assets/videos/fashion_runway_07.jpg'),
+  require('../../assets/videos/fashion_runway_08.jpg'),
+  require('../../assets/videos/fashion_runway_09.jpg'),
+  require('../../assets/videos/fashion_runway_10.jpg'),
 ];
 
 const FASHION_PREVIEW_POSTER_URIS = FASHION_PREVIEW_POSTER_SOURCES.map(
@@ -953,6 +953,12 @@ type VideoVisualProps = {
    * in the background even while not the active page. Anything further
    * away gets no live player at all (see `VideoVisual` below). */
   preload?: boolean;
+  /** expo-image `priority` for this item's poster — set to 'high' only for
+   * the very first feed item so it wins the network/decode queue over
+   * everything else competing for bandwidth right after the bundle loads;
+   * every other item stays at the default priority so this doesn't just
+   * shift the contention elsewhere. */
+  posterPriority?: 'low' | 'normal' | 'high';
 };
 
 /**
@@ -980,6 +986,7 @@ function PosterOnlyVisual({
   pageAspect = 9 / 16,
   pageWidth,
   pageHeight,
+  posterPriority,
 }: VideoVisualProps) {
   const videoAspect = 9 / 16;
   const cropFraction = 1 - Math.min(videoAspect, pageAspect) / Math.max(videoAspect, pageAspect);
@@ -999,7 +1006,7 @@ function PosterOnlyVisual({
         />
       )}
       {posterImage ? (
-        <CachedImage source={posterImage} style={StyleSheet.absoluteFill} contentFit={fit} />
+        <CachedImage source={posterImage} style={StyleSheet.absoluteFill} contentFit={fit} priority={posterPriority} />
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: fallbackColor ?? '#0a0a0a' }]} pointerEvents="none" />
       )}
@@ -1022,6 +1029,7 @@ function LiveVideoVisual({
   pageWidth,
   pageHeight,
   bottomStripHeight = 0,
+  posterPriority,
 }: VideoVisualProps) {
   const player = useVideoPlayer(source, p => {
     p.loop = true;
@@ -1122,6 +1130,7 @@ function LiveVideoVisual({
             source={posterSource ?? { uri: posterUri! }}
             style={StyleSheet.absoluteFill}
             contentFit={fit}
+            priority={posterPriority}
           />
         )}
         {showFallbackCover && (
@@ -1193,7 +1202,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
 // presentational components to them below.
 
 function SpotlightPageImpl({
-  item, isActive, preload = false, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound,
+  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1201,6 +1210,10 @@ function SpotlightPageImpl({
    * (paused, muted) rather than tearing it down, so the swipe to it is
    * instant instead of starting a fresh decode. */
   preload?: boolean;
+  /** The very first item in the feed — its poster gets `priority="high"`
+   * so it wins the network/decode queue immediately after the bundle
+   * loads, instead of competing evenly with every other prefetch. */
+  isFirstItem?: boolean;
   pageWidth: number;
   pageHeight: number;
   bottomClearance: number;
@@ -1399,6 +1412,7 @@ function SpotlightPageImpl({
                 muted={!soundOn}
                 posterUri={item.videoPosterUri}
                 posterSource={item.videoPosterSource}
+                posterPriority={isFirstItem ? 'high' : undefined}
                 fallbackColor={item.accentColor}
                 immersive={immersive}
                 progressBottom={immersive ? bottomClearance : undefined}
@@ -1562,6 +1576,7 @@ const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
   prev.item === next.item
   && prev.isActive === next.isActive
   && prev.preload === next.preload
+  && prev.isFirstItem === next.isFirstItem
   && prev.pageWidth === next.pageWidth
   && prev.pageHeight === next.pageHeight
   && prev.bottomClearance === next.bottomClearance
@@ -2479,7 +2494,19 @@ export default function FeedScreen({
         }
       }}
     >
-      {feedLoading && (
+      {/*
+       * Only cover the screen with the skeleton when there is truly nothing
+       * to show yet (displayItems empty — e.g. a real account's first load
+       * with no cache and no bundled preview content). Buyer Home always
+       * has the bundled fashion-preview posts in displayItems from the very
+       * first render (see `allItems` above), so this used to paint an
+       * opaque, absolutely-positioned overlay (zIndex 5) on top of those
+       * already-rendered posts for as long as `feedLoading` stayed true —
+       * which, if the initial `loadFeed()` call hung waiting on Clerk's
+       * getToken() (see lib/api.ts), meant a solid screen with nothing
+       * visible for as long as that hang lasted, even though real content
+       * was already mounted underneath it the whole time. */}
+      {feedLoading && displayItems.length === 0 && (
         <FeedSkeleton
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
         />
@@ -2599,6 +2626,7 @@ export default function FeedScreen({
               item={spotlight}
               isActive={contentIndex === activeContentIndex && !showNotifs}
               preload={Math.abs(contentIndex - activeContentIndex) === 1}
+              isFirstItem={contentIndex === 0}
                 pageWidth={pageWidth}
               pageHeight={pageHeight}
               bottomClearance={bottomClearance}
