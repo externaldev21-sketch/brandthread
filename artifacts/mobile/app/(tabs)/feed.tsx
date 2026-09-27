@@ -1270,7 +1270,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePa
 // presentational components to them below.
 
 function SpotlightPageImpl({
-  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound, onFirstFramePainted,
+  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1305,6 +1305,8 @@ function SpotlightPageImpl({
   onToggleSound: () => void;
   /** Only passed for the very first feed item — see `VideoVisualProps`. */
   onFirstFramePainted?: () => void;
+  /** Gates the follow badge's rotate/color-fill/fade sub-steps. */
+  reduceMotion?: boolean;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -1380,10 +1382,13 @@ function SpotlightPageImpl({
     Animated.timing(heartBurst, { toValue: 0, duration: 550, delay: 350, useNativeDriver: true }).start();
   }
 
+  // 1 -> 1.15 -> 1 over 180ms total (was a 1.35 spring — stronger overshoot
+  // than this motion pass calls for), timing not spring so the 180ms is
+  // exact rather than however long that spring happened to settle in.
   function bumpHeart() {
     Animated.sequence([
-      Animated.spring(heartScale, { toValue: 1.35, useNativeDriver: true, speed: 40 }),
-      Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
+      Animated.timing(heartScale, { toValue: 1.15, duration: 90, useNativeDriver: true }),
+      Animated.timing(heartScale, { toValue: 1, duration: 90, useNativeDriver: true }),
     ]).start();
     likeRing.setValue(0);
     Animated.timing(likeRing, { toValue: 1, duration: 480, useNativeDriver: true }).start();
@@ -1582,6 +1587,7 @@ function SpotlightPageImpl({
         saveDrop={saveDrop}
         saveScale={saveScale}
         testIdBase={item.id}
+        reduceMotion={reduceMotion}
       />
 
       <ThreadShareSheet
@@ -1674,6 +1680,7 @@ const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
   && prev.onOpenCreator === next.onOpenCreator
   && prev.onNotInterested === next.onNotInterested
   && prev.onToggleSound === next.onToggleSound
+  && prev.reduceMotion === next.reduceMotion
 ));
 
 // CommentsModal replaced by navigation to /buyer-post-comments (see handleOpenComments).
@@ -1878,6 +1885,13 @@ export default function FeedScreen({
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (reduceMotion) return;
+    feedContentOpacity.setValue(0.3);
+    Animated.timing(feedContentOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    // Only the tab switch itself should trigger this fade, not every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedTab]);
   const [hasUnread, setHasUnread] = useState(false);
   // Real TikTok never shows a placeholder/skeleton box over the feed. Seed
   // the very first render from whatever we already have in memory for this
@@ -2834,6 +2848,7 @@ export default function FeedScreen({
               soundOn={soundOn}
               onToggleSound={toggleSound}
               onFirstFramePainted={contentIndex === 0 ? handleFirstCellPainted : undefined}
+              reduceMotion={!!reduceMotion}
             />
           );
         }}

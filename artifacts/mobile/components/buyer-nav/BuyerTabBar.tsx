@@ -8,7 +8,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticTabChange } from '@/lib/haptics';
 import { useActivityUnreadCount } from '@/components/ActivityBellButton';
 import {
-  TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, tabIconColor,
+  TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, CrossfadeNavIcon, tabIconColor,
 } from '@/components/tab-bar/TabBarParts';
 import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { useBuyerTabBarMetrics } from './buyerTabBarMetrics';
@@ -180,10 +180,10 @@ export function BuyerTabBar({
                 accessibilityLabel={label}
                 badge={hasBadge ? <TabBarBadge count={badge} theme={theme} /> : null}
               >
-                <BuyerNavIcon
+                <CrossfadeNavIcon
                   name={item.icon}
-                  color={tabIconColor(theme, focused)}
                   focused={focused}
+                  theme={theme}
                   size={metrics.iconSize}
                 />
               </TabBarSlot>
