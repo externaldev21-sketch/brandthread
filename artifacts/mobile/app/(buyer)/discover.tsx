@@ -34,6 +34,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  LayoutAnimation,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -133,7 +134,7 @@ function EditorialSectionHead({
 }
 
 const esh = StyleSheet.create({
-  kicker: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 1.6, textTransform: 'uppercase', marginBottom: 4 },
+  kicker: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 },
   title:  { fontSize: 28, lineHeight: 32, fontFamily: FONT.bold, letterSpacing: -0.4, textTransform: 'uppercase' },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -155,7 +156,9 @@ interface EditorialTileItem {
 }
 
 const TILE_WIDTH = 152;
-const TILE_IMAGE_HEIGHT = 180;
+// Consistent 3:4 (width:height) tile image, matching the Mobbin references
+// used elsewhere in this pass (TikTok/Instagram shop-grid tiles).
+const TILE_IMAGE_HEIGHT = Math.round((TILE_WIDTH * 4) / 3);
 
 const EditorialTile = React.memo(function EditorialTile({ item, theme }: { item: EditorialTileItem; theme: AppThemePreset }) {
   const { push } = useThreadPull();
@@ -176,7 +179,7 @@ const EditorialTile = React.memo(function EditorialTile({ item, theme }: { item:
         style={[tile.imageWrap, { width: TILE_WIDTH, height: TILE_IMAGE_HEIGHT }]}
       >
         {item.imageUri ? (
-          <CachedImage source={{ uri: item.imageUri }} style={tile.image} contentFit="contain" />
+          <CachedImage source={{ uri: item.imageUri }} style={tile.image} contentFit="cover" />
         ) : (
           <View style={[StyleSheet.absoluteFill, tile.fallback]}>
             <Text style={tile.fallbackText}>{item.initials}</Text>
@@ -186,13 +189,13 @@ const EditorialTile = React.memo(function EditorialTile({ item, theme }: { item:
           <View style={[tile.urgentDot, { backgroundColor: theme.accent }]} />
         )}
       </LinearGradient>
-      {/* Image, then name / brand / price below it with an 8pt rhythm — never
-          an overlay pill sitting on the image's bottom edge, which clipped
-          against the image and crowded the name below it. */}
-      <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text, marginTop: 8 }]} numberOfLines={2}>{item.name}</Text>
-      <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 4 }]} numberOfLines={1}>{item.brand}</Text>
+      {/* Image, then name / brand / price below it with a tight 4-6pt rhythm
+          — never an overlay pill sitting on the image's bottom edge, which
+          clipped against the image and crowded the name below it. */}
+      <Text style={[tile.name, { color: theme.text }]} numberOfLines={2}>{item.name}</Text>
+      <Text style={[tile.brand, { color: theme.muted }]} numberOfLines={1}>{item.brand}</Text>
       {item.priceCents != null && (
-        <Text style={[TYPE_SCALE.caption, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.text, marginTop: 4 }]}>
+        <Text style={[tile.price, TABULAR_NUMS, { color: theme.text }]}>
           {formatCents(item.priceCents)}
         </Text>
       )}
@@ -201,11 +204,20 @@ const EditorialTile = React.memo(function EditorialTile({ item, theme }: { item:
 });
 
 const tile = StyleSheet.create({
-  imageWrap: { borderRadius: RADII.sheet, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  image: { width: '78%', height: '78%' },
+  imageWrap: { borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  image: { width: '100%', height: '100%' },
   fallback: { alignItems: 'center', justifyContent: 'center' },
   fallbackText: { fontSize: 34, fontFamily: FONT.bold, color: '#FFFFFF' },
-  urgentDot: { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4 },
+  // A thin white ring so this reads clearly against a bright product photo —
+  // a bare accent-colored dot could disappear against similarly-colored
+  // imagery (e.g. an accent-red product on a red-toned photo).
+  urgentDot: {
+    position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4,
+    borderWidth: 1.5, borderColor: '#FFFFFF',
+  },
+  name: { fontSize: 14, fontFamily: FONT.semibold, marginTop: 6 },
+  brand: { fontSize: 12, fontFamily: FONT.regular, marginTop: 4 },
+  price: { fontSize: 13, fontFamily: FONT.semibold, marginTop: 4 },
 });
 
 function TileRailSkeleton() {
@@ -317,6 +329,7 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
         scrollEventThrottle={16}
         onMomentumScrollEnd={event => {
           const nextIndex = Math.round(event.nativeEvent.contentOffset.x / snapInterval);
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setActiveIndex(Math.max(0, Math.min(items.length - 1, nextIndex)));
           hapticToggle();
         }}
@@ -361,6 +374,18 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                     style={[showcase.visual, isUrgent && { borderWidth: 1, borderColor: `${theme.accent}66` }]}
                   >
                     <View style={showcase.topline} pointerEvents="box-none">
+                      {/* Brand pill and the "tag" chip share this same
+                          top-left corner — they used to be two independently
+                          absolutely-positioned elements landing directly on
+                          top of each other whenever a post had a tag. Now
+                          they're one row: the tag (when present) leads, the
+                          brand pill follows, so they read side by side
+                          instead of overlapping. */}
+                      {item.tag && (
+                        <View style={showcase.tag}>
+                          <Text style={[TYPE_SCALE.caption, { color: '#FFFFFF', letterSpacing: 0.7, textTransform: 'uppercase' }]} numberOfLines={1}>{item.tag}</Text>
+                        </View>
+                      )}
                       <View style={showcase.brandPill}>
                         <Text style={showcase.brandPillText} numberOfLines={1}>{item.brand}</Text>
                       </View>
@@ -371,16 +396,10 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                     </View>
 
                     {item.imageUri ? (
-                      <CachedImage source={{ uri: item.imageUri }} style={showcase.productImage} contentFit="contain" />
+                      <CachedImage source={{ uri: item.imageUri }} style={showcase.productImage} contentFit="cover" />
                     ) : (
                       <View style={[showcase.productImage, showcase.visualFallback]}>
                         <Text style={showcase.initials}>{item.initials}</Text>
-                      </View>
-                    )}
-
-                    {item.tag && (
-                      <View style={showcase.tag}>
-                        <Text style={[TYPE_SCALE.caption, { color: '#FFFFFF', letterSpacing: 0.7, textTransform: 'uppercase' }]}>{item.tag}</Text>
                       </View>
                     )}
                     {item.commerce.currentPriceCents != null && (
@@ -468,25 +487,26 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
 const makeShowcaseStyles = (theme: AppThemePreset) => StyleSheet.create({
   shell:          { marginBottom: 32 },
   card:           {},
-  topline:        { position: 'absolute', top: 12, left: 12, right: 12, zIndex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  brandPill:      { maxWidth: '70%', paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADII.pill, backgroundColor: 'rgba(0,0,0,0.4)' },
+  topline:        { position: 'absolute', top: 12, left: 12, right: 12, zIndex: 2, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  brandPill:      { flexShrink: 1, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADII.pill, backgroundColor: 'rgba(0,0,0,0.4)' },
   brandPillText:  { fontSize: 11, fontFamily: FONT.semibold, color: '#FFFFFF' },
-  // Reserves the same 22pt the heart used to occupy inside `topline`.
-  heartSpacer:    { width: 22, height: 22 },
+  // Reserves the same 22pt the heart used to occupy inside `topline`, and
+  // pushes the brand pill/tag to the left instead of stretching full-width.
+  heartSpacer:    { width: 22, height: 22, marginLeft: 'auto' },
   // The heart lives outside the card's Pressable (a real <button> on web) so
   // it's a DOM sibling, not a nested <button> — positioned to land exactly
   // where it used to sit inside `topline` (top:12, right edge of the card).
   heartWrap:      { position: 'absolute', top: 12, right: 12, zIndex: 3 },
   visual:         { height: 380, position: 'relative', overflow: 'hidden', borderRadius: RADII.sheet, alignItems: 'center', justifyContent: 'center' },
-  productImage:   { width: '74%', height: '70%' },
+  productImage:   { width: '100%', height: '100%' },
   visualFallback: { alignItems: 'center', justifyContent: 'center' },
   initials:       { fontSize: 56, fontFamily: FONT.bold, color: '#FFFFFF' },
-  tag:            { position: 'absolute', top: 12, left: 12, paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADII.chip, backgroundColor: 'rgba(0,0,0,0.72)' },
+  tag:            { flexShrink: 0, paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADII.chip, backgroundColor: 'rgba(0,0,0,0.72)' },
   pricePill:      { position: 'absolute', bottom: 14, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 9, borderRadius: RADII.pill, backgroundColor: '#FFFFFF' },
   signalRow:      { minHeight: 30, marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 10 },
   pagination:     { height: 22, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  dot:            { width: 5, height: 5, borderRadius: 3, backgroundColor: theme.subtle },
-  dotActive:      { width: 18, backgroundColor: theme.text },
+  dot:            { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.subtle },
+  dotActive:      { width: 16, backgroundColor: theme.text },
 });
 
 // ─── Trending post row ────────────────────────────────────────────────────────
@@ -606,9 +626,16 @@ function DiscoverHero({
         end={{ x: 0.9, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      {/* Soft glow blobs for depth — theme-tinted, never a new hue */}
-      <View pointerEvents="none" style={[dh.glowTop, { backgroundColor: theme.glowGradient[0] }]} />
-      <View pointerEvents="none" style={[dh.glowBottom, { backgroundColor: theme.glowGradient[0] }]} />
+      {/* A single, subtle top highlight — not the two large soft-edged
+          circles this used to have, which read as cheap decoration rather
+          than depth. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[`${theme.glowGradient[0]}33`, 'transparent']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={dh.topHighlight}
+      />
 
       {/* ─ Story bar: counter chip · JUST DROPPED · Shop all pill ─ */}
       <View style={[dh.topBar, { paddingHorizontal: Math.max(SP.md, sideInset) }]}>
@@ -633,6 +660,7 @@ function DiscoverHero({
         scrollEventThrottle={16}
         onMomentumScrollEnd={(e) => {
           const next = Math.round(e.nativeEvent.contentOffset.x / snapInterval);
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setActiveIndex(Math.max(0, Math.min(items.length - 1, next)));
           hapticToggle();
         }}
@@ -651,7 +679,7 @@ function DiscoverHero({
             >
               <Animated.View style={[dh.productWrap, { opacity, transform: [{ scale }, { translateY: index === activeIndex ? floatY : 0 }] }]}>
                 {item.imageUri ? (
-                  <CachedImage source={{ uri: item.imageUri }} style={dh.productImage} contentFit="contain" />
+                  <CachedImage source={{ uri: item.imageUri }} style={dh.productImage} contentFit="cover" />
                 ) : (
                   <View style={[dh.productImage, dh.productImageFallback, { backgroundColor: `${theme.onAccent}22` }]}>
                     <Text style={[dh.productFallbackInitials, { color: theme.onAccent }]}>{item.initials}</Text>
@@ -663,8 +691,12 @@ function DiscoverHero({
         })}
       </Animated.ScrollView>
 
-      {/* ─ Price pill + glass "Best price / Sold / Want" info card ─ */}
+      {/* ─ Name/brand + price pill + glass "Sold / Want" info card ─ */}
       <View style={[dh.bottomChrome, { paddingHorizontal: Math.max(SP.md, sideInset) }]} pointerEvents="box-none">
+        <View style={dh.identityBlock}>
+          <Text style={dh.productName} numberOfLines={1}>{active.name}</Text>
+          <Text style={dh.productBrand} numberOfLines={1}>{active.brand}</Text>
+        </View>
         {active.commerce.currentPriceCents != null && (
           <View style={dh.pricePill}>
             <Text style={dh.pricePillText}>{formatCents(active.commerce.currentPriceCents)}</Text>
@@ -684,14 +716,14 @@ function DiscoverHero({
 }
 
 function HeroStatCard({ item, isUrgent, theme }: { item: ProductCardItem; isUrgent: boolean; theme: AppThemePreset }) {
-  const best = item.commerce.currentPriceCents;
+  // Price already shows once, in the price pill above this card — this row
+  // never repeats it, only the stats the pill doesn't cover.
   const sold = item.commerce.claimedUnits ?? 0;
   const want = item.commerce.demandCount;
   const stats: { label: string; value: string }[] = [];
-  if (best != null) stats.push({ label: 'Best price', value: formatCents(best) });
   if (sold > 0) stats.push({ label: 'Sold', value: sold.toLocaleString() });
   if (want != null && want > 0) stats.push({ label: 'Want', value: want.toLocaleString() });
-  if (stats.length < 2) return null;
+  if (stats.length === 0) return null;
 
   return (
     <GlassPanel style={dh.statCard} intensity={35}>
@@ -701,7 +733,7 @@ function HeroStatCard({ item, isUrgent, theme }: { item: ProductCardItem; isUrge
             {i > 0 && <View style={dh.statDivider} />}
             <View style={dh.statCol}>
               <Text style={dh.statLabel}>{stat.label.toUpperCase()}</Text>
-              <Text style={[dh.statValue, isUrgent && stat.label !== 'Best price' ? { color: theme.accentLight } : null]}>{stat.value}</Text>
+              <Text style={[dh.statValue, isUrgent ? { color: theme.accentLight } : null]}>{stat.value}</Text>
             </View>
           </React.Fragment>
         ))}
@@ -711,14 +743,11 @@ function HeroStatCard({ item, isUrgent, theme }: { item: ProductCardItem; isUrge
 }
 
 const dh = StyleSheet.create({
-  glowTop: {
-    position: 'absolute', top: -80, left: -60, width: 280, height: 280, borderRadius: 200, opacity: 0.55,
-  },
-  glowBottom: {
-    position: 'absolute', bottom: -100, right: -80, width: 320, height: 320, borderRadius: 220, opacity: 0.4,
+  topHighlight: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 160,
   },
   topBar: {
-    marginTop: SP.lg + SP.md,
+    marginTop: SP.lg,
     flexDirection: 'row', alignItems: 'center', gap: 10,
   },
   counterChip: {
@@ -740,17 +769,24 @@ const dh = StyleSheet.create({
     width: '100%', height: 240, alignItems: 'center', justifyContent: 'center', marginTop: 14,
   },
   productImage: {
-    width: '68%', height: '100%',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 22 }, shadowOpacity: 0.4, shadowRadius: 30, elevation: 14,
+    width: '100%', height: '100%', borderRadius: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 6,
   },
-  productImageFallback: { alignItems: 'center', justifyContent: 'center', borderRadius: RADII.card },
+  productImageFallback: { alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
   productFallbackInitials: { fontFamily: FONT.bold, fontSize: 40 },
   bottomChrome: {
     position: 'absolute', bottom: SP.lg, left: 0, right: 0, alignItems: 'center', gap: 12,
   },
+  identityBlock: { alignItems: 'center', gap: 2 },
+  productName: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 15, textAlign: 'center' },
+  productBrand: { color: 'rgba(255,255,255,0.68)', fontFamily: FONT.medium, fontSize: 12, textAlign: 'center' },
   pricePill: {
     paddingHorizontal: 18, paddingVertical: 9, borderRadius: RADII.pill,
     backgroundColor: '#FFFFFF',
+    // A little lift so it reads as a floating chip above the image, matching
+    // the depth the glass stat card right below it already has — previously
+    // flat, it looked pasted on rather than part of the same floating stack.
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.22, shadowRadius: 6, elevation: 4,
   },
   pricePillText: { color: '#0A0A0B', fontFamily: FONT.bold, fontSize: 16, ...TABULAR_NUMS },
   statCard: { width: '100%', maxWidth: 360 },
@@ -759,8 +795,8 @@ const dh = StyleSheet.create({
   statDivider: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,0.18)' },
   statValue: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 15, marginTop: 3, ...TABULAR_NUMS },
   statLabel: { color: 'rgba(255,255,255,0.68)', fontFamily: FONT.semibold, fontSize: 9, letterSpacing: 0.8 },
-  dots: { flexDirection: 'row', gap: 5 },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
+  dots: { flexDirection: 'row', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
   dotActive: { width: 16, backgroundColor: '#FFFFFF' },
 });
 
@@ -934,9 +970,23 @@ export default function DiscoverScreen() {
     try {
       // Correct signature: get(limit: number) — not get({ limit })
       const data = await api.publicTrending.get(20);
-      const rows: any[] = Array.isArray(data?.trending)
+      let rows: any[] = Array.isArray(data?.trending)
         ? data.trending.map((t: any) => ({ ...t, caption: t.caption ?? undefined }))
         : [];
+      // Same preview-catalog pattern already used for High Demand/For You:
+      // in dev preview with no live engagement data, this section otherwise
+      // renders an empty state on every load, which makes it unreviewable.
+      // A real empty account still sees the real empty state — this only
+      // fires when the API genuinely returns zero trending posts.
+      if (rows.length === 0 && isPreviewCatalogEnabled()) {
+        rows = getPreviewCatalog().map((p, i) => ({
+          id: p.id,
+          rank: i + 1,
+          brand: p.sellerDisplayName,
+          brandId: p.sellerId,
+          caption: p.name,
+        }));
+      }
       setTrendingItems(rows.map((t, i): TrendingRowItem => ({
         id:       t.id,
         rank:     t.rank ?? i + 1,
@@ -1045,7 +1095,7 @@ export default function DiscoverScreen() {
             action={{ label: 'Browse products', onPress: () => router.push('/buyer-search' as never) }}
           />
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingRight: GUTTER }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} decelerationRate="fast" snapToInterval={TILE_WIDTH + 16} snapToAlignment="start" contentContainerStyle={{ gap: 16, paddingRight: GUTTER }}>
             {highDemandItems.map(item => (
               <EditorialTile key={item.id} item={item} theme={theme} />
             ))}
@@ -1120,7 +1170,7 @@ export default function DiscoverScreen() {
               compact
             />
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingRight: GUTTER }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} decelerationRate="fast" snapToInterval={TILE_WIDTH + 16} snapToAlignment="start" contentContainerStyle={{ gap: 16, paddingRight: GUTTER }}>
               {followedItems.map(item => (
                 <EditorialTile key={item.id} item={item} theme={theme} />
               ))}

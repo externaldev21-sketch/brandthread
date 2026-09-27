@@ -25,6 +25,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReanimatedAnimated from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -899,7 +900,7 @@ export function ShopProductSheet({
 
         {/* Sticky Add to Cart + Buy Now — always reachable, never scrolls away */}
         {(phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
-          <View style={ss.stickyActionsWrap}>
+          <View style={[ss.stickyActionsWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
             <View style={ss.actions}>
               <TouchableOpacity
                 onPress={phase === 'added' ? handleViewCart : handleAddToCart}
@@ -1236,6 +1237,13 @@ function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
             ))}
           </ScrollView>
           {images.length > 1 && (
+            <LinearGradient
+              pointerEvents="none"
+              colors={['transparent', 'rgba(0,0,0,0.45)']}
+              style={ss.carouselBottomGradient}
+            />
+          )}
+          {images.length > 1 && (
             <View style={ss.carouselCounter} pointerEvents="none">
               <Text style={ss.carouselCounterText}>{index + 1}/{images.length}</Text>
             </View>
@@ -1350,8 +1358,8 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     right: 0,
     bottom: 0,
     backgroundColor: theme.surface,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     borderTopWidth: 1,
     borderColor: theme.border,
     maxHeight: '85%',
@@ -1359,8 +1367,8 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
   },
   handle: {
     width: 36,
-    height: 4,
-    borderRadius: 2,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: theme.border,
     alignSelf: 'center',
     marginTop: 10,
@@ -1406,14 +1414,14 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
   },
   tagCard: {
     width: 112,
-    borderRadius: RADIUS.md,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.card,
     padding: 8,
     gap: 4,
   },
-  tagCardImageWrap: { width: '100%', aspectRatio: 1, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: theme.cardElevated },
+  tagCardImageWrap: { width: '100%', aspectRatio: 1, borderRadius: 10, overflow: 'hidden', backgroundColor: theme.cardElevated },
   tagCardImage: { width: '100%', height: '100%' },
   tagCardName: {
     fontSize: FS.xs,
@@ -1458,7 +1466,7 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
   // Product header
   productRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 12,
     paddingHorizontal: 16,
     paddingTop: 14,
@@ -1480,6 +1488,11 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     backgroundColor: theme.cardElevated,
   },
   carouselWrap: { width: '100%', backgroundColor: theme.cardElevated, overflow: 'hidden' },
+  // Subtle bottom fade so the "1/3" pill and page dots stay readable over a
+  // bright photo — a plain scrim, never a full-image dim.
+  carouselBottomGradient: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 72,
+  },
   carouselCounter: {
     position: 'absolute', right: 10, bottom: 10,
     paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.pill,
@@ -1513,20 +1526,20 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
   },
   preOrderText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
   productName: {
-    fontSize: FS.md,
-    fontFamily: FONT.bold,
+    fontSize: 18,
+    fontFamily: FONT.semibold,
     color: theme.text,
-    lineHeight: 21,
+    lineHeight: 23,
   },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  productPrice: { fontSize: FS.lg, fontFamily: FONT.bold },
+  productPrice: { fontSize: 20, fontFamily: FONT.bold },
   comparePrice: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     color: theme.subtle,
     textDecorationLine: 'line-through',
   },
-  sellerName: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  sellerName: { fontSize: 13, fontFamily: FONT.regular, color: theme.muted },
   descriptionSection: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -1626,7 +1639,7 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
   },
   actions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     paddingHorizontal: 16,
     marginBottom: 10,
   },
@@ -1636,8 +1649,8 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
-    minHeight: 50,
-    borderRadius: RADIUS.md,
+    minHeight: 52,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: theme.cardElevated,
@@ -1653,8 +1666,8 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
-    minHeight: 50,
-    borderRadius: RADIUS.md,
+    minHeight: 52,
+    borderRadius: 14,
   },
   buyBtnText: {
     fontSize: FS.base,
