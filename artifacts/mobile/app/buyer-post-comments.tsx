@@ -26,7 +26,7 @@ import {
   View, Text, FlatList, TextInput, Modal, Pressable, PanResponder,
   KeyboardAvoidingView, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
 } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -179,9 +179,10 @@ function Avatar({ uri, initials, size = 38, ring = true, backgroundColor }: { ur
 // ─── Like heart ───────────────────────────────────────────────────────────────
 // Solid filled heart when liked, outline when not (Feather only ships an
 // outline heart, so liking used to just recolor the same stroked glyph —
-// Ionicons gives us a true filled variant). The container is taller than the
-// icon itself with no overflow:hidden, so the pop animation on toggle can
-// exceed the glyph's own bounds without being clipped at the top.
+// FontAwesome's solid "heart" is the app-wide fallback for a filled heart,
+// same as the feed's RightActionRail/EngagementButton). The container is
+// taller than the icon itself with no overflow:hidden, so the pop animation
+// on toggle can exceed the glyph's own bounds without being clipped at the top.
 
 function LikeHeart({
   liked,
@@ -219,7 +220,9 @@ function LikeHeart({
       noMinHeight
     >
       <Animated.View style={[s.commentLikeIconWrap, { transform: [{ scale: pop }] }]}>
-        <Ionicons name={liked ? 'heart' : 'heart-outline'} size={16} color={liked ? theme.error : MUTED} />
+        {liked
+          ? <FontAwesome name="heart" size={16} color={theme.error} />
+          : <Feather name="heart" size={16} color={MUTED} />}
       </Animated.View>
       {count > 0 && (
         <Text style={[s.actionLabel, liked && { color: theme.error }]}>{count}</Text>
@@ -288,7 +291,7 @@ function CommentRow({
 
           {comment.creatorLiked && !isCreator ? (
             <View style={s.creatorLikedBadge}>
-              <Ionicons name="heart" size={9} color={theme.accent} />
+              <FontAwesome name="heart" size={9} color={theme.accent} />
               <Text style={[s.creatorLikedText, { color: theme.accent }]}>Creator liked</Text>
             </View>
           ) : null}
