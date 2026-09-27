@@ -7,11 +7,11 @@ import {
   FlatList,
   StyleSheet,
   Platform,
-  KeyboardAvoidingView,
   Image,
   ScrollView,
   Alert,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';

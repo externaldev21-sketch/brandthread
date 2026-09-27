@@ -8,7 +8,8 @@
  * before — nothing about eligibility, amounts, or business logic changed.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -91,14 +92,14 @@ function BalanceSkeleton({ styles }: { styles: Styles }) {
         <SkeletonBlock width={120} height={16} style={{ marginBottom: SP.md }} />
         <View style={styles.streakRow}>
           {Array.from({ length: 7 }, (_, i) => (
-            <SkeletonBlock key={i} width={36} height={36} radius={RADIUS.sm} />
+            <SkeletonBlock key={i} width={32} height={32} radius={16} />
           ))}
         </View>
       </View>
-      <SkeletonBlock width={72} height={14} style={{ marginTop: SP.lg, marginBottom: SP.sm }} />
+      <SkeletonBlock width={72} height={20} style={{ marginTop: SP.lg, marginBottom: SP.sm }} />
       {Array.from({ length: 3 }).map((_, i) => (
         <View key={i} style={styles.skeletonRow}>
-          <SkeletonBlock width={36} height={36} radius={18} />
+          <SkeletonBlock width={32} height={32} radius={16} />
           <View style={{ flex: 1, gap: 6 }}>
             <SkeletonBlock width="55%" height={13} />
             <SkeletonBlock width="30%" height={11} />
@@ -117,18 +118,25 @@ export default function ThreadCashScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const api = useApi();
+  const insets = useSafeAreaInsets();
+  // Same gate as the rest of this polish pass: outside a real device (or a
+  // preview frame that emulates one), react-native-safe-area-context's web
+  // implementation reads 0 for `insets.top`, which otherwise put the header
+  // right under the notch/Dynamic Island.
+  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
   const celebrateThreadCash = useCelebrateThreadCash();
   const [status, setStatus] = useState<ThreadCashStatus | null>(null);
   const [history, setHistory] = useState<ThreadCashEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [usingPreview, setUsingPreview] = useState(false);
 
   // Dev-only: a hidden long-press on the balance replays the money-burst
   // celebration on demand, so it can be screenshotted/recorded without
-  // waiting on a real claim. Never present in a production build.
+  // waiting on a real claim. Never present in a production build. Labeled
+  // as a realistic source, not "Preview" — that string would otherwise show
+  // up as visible "from Preview" text in the celebration toast itself.
   const previewBurst = useCallback(() => {
     if (!__DEV__) return;
-    celebrateThreadCash({ amount: 500, from: 'Preview' });
+    celebrateThreadCash({ amount: 500, from: 'Daily reward' });
   }, [celebrateThreadCash]);
 
   const load = useCallback(async () => {
@@ -142,7 +150,6 @@ export default function ThreadCashScreen() {
       await new Promise((resolve) => setTimeout(resolve, 500));
       setStatus(PREVIEW_STATUS);
       setHistory(PREVIEW_HISTORY);
-      setUsingPreview(true);
       setLoading(false);
       return;
     }
@@ -150,7 +157,6 @@ export default function ThreadCashScreen() {
       const [s, h] = await Promise.all([api.threadCash.get(), api.threadCash.history(30)]);
       setStatus(s);
       setHistory(h.history);
-      setUsingPreview(false);
     } catch {
       // Keep whatever was last shown; the screen still renders its chrome.
     } finally {
@@ -164,21 +170,23 @@ export default function ThreadCashScreen() {
   const currentStreak = status?.streak.currentStreak ?? 0;
   const dayInCycle = status?.streak.dayInCycle ?? 1;
   const streakProgress = Math.min(1, dayInCycle / streakBonusDays);
+  // Same rule as the profile's ThreadCashStreakRow: `dayInCycle` is today's
+  // slot regardless of whether today has actually been claimed yet, so the
+  // days that read as filled-in stop one short of it until
+  // `alreadyCheckedInToday` is true. Using a plain `day <= dayInCycle` here
+  // (as this screen previously did) could show one more day lit than the
+  // profile does for the exact same streak state.
+  const claimedThroughDay = status?.streak.alreadyCheckedInToday ? dayInCycle : dayInCycle - 1;
 
   return (
-    <BrandthreadScreen scrollable>
-      <BrandthreadHeader title="Thread Cash" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen scrollable noSafeTop>
+      <View style={{ paddingTop: topPad }}>
+        <BrandthreadHeader title="Thread Cash" onBack={() => goBackOr(router)} />
+      </View>
       {loading ? (
         <BalanceSkeleton styles={styles} />
       ) : (
-          <View style={{ paddingHorizontal: SP.md }}>
-            {usingPreview && (
-              <View style={styles.previewBanner}>
-                <Feather name="eye" size={12} color={theme.subtle} />
-                <Text style={styles.previewBannerText}>Preview data — not your real balance</Text>
-              </View>
-            )}
-
+          <View style={{ paddingHorizontal: SP.md, paddingBottom: Math.max(insets.bottom, SP.lg) }}>
             {/* Balance */}
             <BrandthreadCard glow style={styles.balanceCard}>
               {/* Hidden dev-only long-press to replay the money-burst celebration for screenshots. */}
@@ -194,7 +202,7 @@ export default function ThreadCashScreen() {
               <Text style={[styles.balanceValue, tabularType('display'), { fontFamily: FONT.display, color: theme.text }]}>
                 {formatCents(status?.balanceCents ?? 0)}
               </Text>
-              <Text style={[styles.balanceHint, { color: theme.subtle }]}>
+              <Text style={styles.balanceHint} numberOfLines={2}>
                 Thread Cash isn't money — it can't be cashed out or transferred for cash. Use it toward purchases in the app.
               </Text>
             </BrandthreadCard>
@@ -223,23 +231,26 @@ export default function ThreadCashScreen() {
               />
             </View>
 
+            {/* Same visual system as the profile's ThreadCashStreakRow, so
+                both screens read as one design language: a bill icon for a
+                claimed day, a ring for today, an outline with the plain day
+                number for a day still ahead. */}
             <View style={styles.streakRow}>
               {Array.from({ length: streakBonusDays }, (_, i) => i + 1).map((day) => {
-                const lit = day <= dayInCycle;
-                const isBonusDay = day === streakBonusDays;
+                const claimed = day <= claimedThroughDay;
+                const isToday = day === dayInCycle;
                 return (
                   <View
                     key={day}
                     style={[
                       styles.streakDay,
-                      { borderColor: theme.borderSubtle },
-                      lit && { backgroundColor: theme.accent, borderColor: theme.accent },
+                      { borderColor: theme.borderSubtle, backgroundColor: theme.cardElevated },
+                      claimed && { backgroundColor: theme.accentDim, borderColor: theme.accent },
+                      isToday && { borderColor: theme.accent, borderWidth: 2 },
                     ]}
                   >
-                    {isBonusDay ? (
-                      <Feather name="gift" size={14} color={lit ? theme.onAccent : theme.muted} />
-                    ) : (
-                      <Text style={[styles.streakDayText, TABULAR_NUMS, { color: lit ? theme.onAccent : theme.muted }]}>{day}</Text>
+                    {claimed ? <ThreadCashBillIcon size={32} /> : (
+                      <Text style={[styles.streakDayText, TABULAR_NUMS, { color: theme.subtle }]}>{day}</Text>
                     )}
                   </View>
                 );
@@ -261,7 +272,7 @@ export default function ThreadCashScreen() {
               description="Check in daily to start earning."
             />
           ) : (
-            <BrandthreadCard style={styles.historyCard}>
+            <View style={styles.historyList}>
               {history.map((entry, index) => {
                 const glyph = historyGlyph(entry, theme);
                 const isLast = index === history.length - 1;
@@ -273,23 +284,26 @@ export default function ThreadCashScreen() {
                       !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: theme.borderSubtle },
                     ]}
                   >
-                    <View style={[styles.historyIcon, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
+                    <View style={[styles.historyIcon, { backgroundColor: theme.cardElevated }]}>
                       <Feather name={glyph.icon} size={16} color={glyph.color} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.historyLabel, { color: theme.text }]}>{historyLabel(entry)}</Text>
-                      <Text style={[styles.historyDate, { color: theme.subtle }]}>
+                      <Text style={[styles.historyLabel, { color: theme.text }]} numberOfLines={1}>{historyLabel(entry)}</Text>
+                      <Text style={[styles.historyDate, { color: theme.subtle }]} numberOfLines={1}>
                         {new Date(entry.createdAt).toLocaleDateString()}
                         {entry.note ? ` · “${entry.note}”` : ''}
                       </Text>
                     </View>
-                    <Text style={[styles.historyAmount, TABULAR_NUMS, { color: entry.amountCents >= 0 ? theme.success : theme.muted }]}>
+                    <Text
+                      style={[styles.historyAmount, TABULAR_NUMS, { color: entry.amountCents >= 0 ? theme.success : theme.text }]}
+                      numberOfLines={1}
+                    >
                       {entry.amountCents >= 0 ? '+' : '−'}{formatCents(Math.abs(entry.amountCents))}
                     </Text>
                   </View>
                 );
               })}
-            </BrandthreadCard>
+            </View>
           )}
 
           {/* Rules */}
@@ -322,14 +336,7 @@ export default function ThreadCashScreen() {
 }
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
-  previewBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.xs,
-    alignSelf: 'flex-start', marginBottom: SP.sm,
-    paddingHorizontal: SP.sm, paddingVertical: 4,
-    borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.borderSubtle,
-  },
-  previewBannerText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle },
-  balanceCard: { alignItems: 'center', paddingVertical: SP.md, marginTop: SP.sm },
+  balanceCard: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 20, marginTop: SP.sm },
   // A small stack of two bills, fanned like the owner's stacked-bills art:
   // a duller, more-rotated bill behind, the crisp one tilted slightly on top.
   balanceStack: {
@@ -340,32 +347,37 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-  balanceLabel: { fontSize: FS.sm, fontFamily: FONT.medium },
+  balanceLabel: { fontSize: 13, fontFamily: FONT.medium, color: theme.muted },
   // Balance snaps to the `display` type-scale role (44/48 Bold) via tabularType('display')
   // applied at the call site, rather than the old one-off fontSize: 40 (see design doc audit).
   balanceValue: { marginTop: 2 },
-  balanceHint: { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.xs, paddingHorizontal: SP.md },
+  balanceHint: {
+    fontSize: 12, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 16,
+    marginTop: SP.xs, paddingHorizontal: SP.md,
+    color: 'rgba(255,255,255,0.7)', // theme-exempt: fixed dark hero card per spec
+  },
   streakCard: { marginTop: SP.md },
   streakHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
-  streakFlame: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   streakTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
   streakCaption: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 1 },
   progressTrack: { height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: SP.sm },
   progressFill: { height: '100%', borderRadius: 2 },
-  streakRow: { flexDirection: 'row', gap: SP.xs, justifyContent: 'space-between' },
-  streakDay: { flex: 1, aspectRatio: 1, borderRadius: RADIUS.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  // Same layout as the profile's ThreadCashStreakRow: fixed 32pt dots spread
+  // by `justifyContent: space-between` alone, no inter-dot gap.
+  streakRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  streakDay: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   streakDayText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   streakSub: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.sm, lineHeight: 16 },
-  sectionTitle: { fontSize: FS.md, fontFamily: FONT.semibold, marginTop: SP.lg, marginBottom: SP.sm },
-  historyCard: { padding: 0, overflow: 'hidden' },
-  historyRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm, paddingHorizontal: SP.md, minHeight: 44 },
-  historyIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  sectionTitle: { fontSize: 20, fontFamily: FONT.semibold, marginTop: SP.lg, marginBottom: SP.sm },
+  historyList: { marginBottom: SP.sm },
+  historyRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.xs, minHeight: 60 },
+  historyIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   historyLabel: { fontSize: FS.sm, fontFamily: FONT.medium },
   historyDate: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  historyAmount: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  historyAmount: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'right' },
   rulesCard: { marginBottom: SP.lg, padding: 0, overflow: 'hidden' },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingVertical: SP.sm, paddingHorizontal: SP.md },
   ruleDot: { width: 5, height: 5, borderRadius: 3, marginTop: 7 },
   rulesText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20, flex: 1 },
-  skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
+  skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.xs, minHeight: 60 },
 });

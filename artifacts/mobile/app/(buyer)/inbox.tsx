@@ -5,7 +5,6 @@ import {
   Modal, TextInput, ActivityIndicator, Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -70,8 +69,6 @@ function InboxPillRow({
         style={[pillS.iconPill, { borderColor: theme.border }]}
         onPress={onFilterPress}
         rippleEnabled={NO_RIPPLE}
-        noMinHeight
-        bounce={false}
         accessibilityRole="button"
         accessibilityLabel="Filter messages"
         testID="inbox-filter-pill"
@@ -91,8 +88,6 @@ function InboxPillRow({
             ]}
             onPress={() => onChange(pill.key)}
             rippleEnabled={NO_RIPPLE}
-            noMinHeight
-            bounce={false}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             testID={`inbox-tab-${pill.key}`}
@@ -126,7 +121,7 @@ const pillS = StyleSheet.create({
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 10, lineHeight: 12, fontFamily: FONT.bold, textAlign: 'center' },
+  pillCountText: { fontSize: 10, fontFamily: FONT.bold },
 });
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
@@ -737,12 +732,10 @@ export default function InboxScreen() {
       <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
         <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
           <PressableScale
-            style={({ pressed }) => [s.convRow, { backgroundColor: pressed ? '#FFFFFF0F' : theme.background }]}
+            style={[s.convRow, { backgroundColor: theme.background }]}
             onPress={() => openConversation(conv)}
             onLongPress={() => longPressConversation(conv)}
-            activeOpacity={1}
-            activeScale={1}
-            bounce={false}
+            activeOpacity={0.75}
             rippleEnabled={NO_RIPPLE}
             testID={`inbox-conversation-${conv.id}`}
           >
@@ -764,7 +757,7 @@ export default function InboxScreen() {
                 Line) while non-live rows (no ring at all) rendered fine. */}
             <View style={s.avatarContainer}>
               {conv.isOfficial ? (
-                <View style={[s.avatar56, s.officialAvatar, { backgroundColor: theme.cardElevated, borderColor: `${theme.text}40` }]}>
+                <View style={[s.avatar56, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
                   <BrandthreadLogo size={28} />
                 </View>
               ) : (
@@ -992,7 +985,7 @@ export default function InboxScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
     >
       {requestConvs.length === 0 ? (
-        <EmptyState icon="mail" title="No message requests" description="Requests from people you don't follow appear here" />
+        <EmptyState icon="mail" illustration="envelope" title="No message requests" description="Requests from people you don't follow appear here" />
       ) : (
         requestConvs.map(renderRequestRow)
       )}
@@ -1027,8 +1020,10 @@ export default function InboxScreen() {
               value={messagesSearchQuery}
               onChangeText={setMessagesSearchQuery}
               placeholder="Search"
-              placeholderTextColor="#8A8A8E"
+              placeholderTextColor={theme.muted}
               autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
               onFocus={() => setMessagesSearchFocused(true)}
               onBlur={() => setMessagesSearchFocused(false)}
               testID="inbox-search-input"
@@ -1052,12 +1047,11 @@ export default function InboxScreen() {
       {/* Notes-style active-people rail */}
       {!loading && !messagesSearchLower && activeRail.length > 0 && (
         <AnimatedEntrance distance={12}>
-          <View style={s.activeRailWrap}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={s.activeRail}
-            contentContainerStyle={{ paddingHorizontal: gutter, gap: 14 }}
+            contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md }}
           >
             {activeRail.map(conv => {
               const participant = getParticipant(conv);
@@ -1068,13 +1062,12 @@ export default function InboxScreen() {
                   style={s.activeRailItem}
                   onPress={() => openConversation(conv)}
                   rippleEnabled={NO_RIPPLE}
-                  bounce={false}
                   accessibilityRole="button"
                   accessibilityLabel={participant.name}
                   testID={`inbox-active-rail-${conv.id}`}
                 >
                   {conv.isOfficial ? (
-                    <View style={[s.activeRailAvatar, s.officialAvatar, { backgroundColor: theme.cardElevated, borderColor: `${theme.text}40` }]}>
+                    <View style={[s.activeRailAvatar, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
                       <BrandthreadLogo size={26} />
                     </View>
                   ) : (
@@ -1095,14 +1088,6 @@ export default function InboxScreen() {
               );
             })}
           </ScrollView>
-          <LinearGradient
-            pointerEvents="none"
-            colors={['transparent', theme.background]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.activeRailFade}
-          />
-          </View>
         </AnimatedEntrance>
       )}
 
@@ -1147,6 +1132,7 @@ export default function InboxScreen() {
             contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.lg, paddingHorizontal: gutter }])}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             refreshing={refreshing}
             onRefresh={handleRefresh}
             ListFooterComponent={!messagesSearchLower ? renderSuggestedSection : undefined}
@@ -1201,6 +1187,7 @@ export default function InboxScreen() {
                 sections={composeSections}
                 keyExtractor={item => item.userId}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
                 stickySectionHeadersEnabled={false}
                 ListFooterComponent={
                   composeQueryLower && composeLoading
@@ -1285,19 +1272,13 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   },
 
   // Instagram-Notes-style active-people rail (below search, above the tabs)
-  activeRailWrap: { position: 'relative' },
   activeRail: { marginBottom: SP.md },
-  // The last item peeks cleanly under a right-edge fade instead of getting
-  // abruptly clipped by the ScrollView's edge.
-  activeRailFade: { position: 'absolute', top: 0, right: 0, bottom: SP.md, width: 28 },
   activeRailItem: { width: 72, alignItems: 'center', gap: 6 },
   activeRailAvatar: {
     width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center',
   },
   activeRailInitials: { fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
-  // Truncates at the avatar's own width (64), not the wider 72pt tap
-  // target, so a long name never reads visually wider than its avatar.
-  activeRailName: { fontSize: 12, fontFamily: FONT.medium, width: 64, textAlign: 'center' },
+  activeRailName: { fontSize: 11, fontFamily: FONT.medium, width: 72, textAlign: 'center' },
 
   // Threads-style empty inbox (centered badge + headline + full-width button)
   inboxEmptyWrap: {
@@ -1439,8 +1420,8 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     gap: 8,
     marginBottom: SP.md,
     paddingHorizontal: SP.md,
-    height: 40,
-    borderRadius: 12,
+    height: 44,
+    borderRadius: RADIUS.md,
     borderWidth: StyleSheet.hairlineWidth,
   },
   searchInput: {
@@ -1471,7 +1452,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     fontSize: FS.sm,
     fontFamily: FONT.medium,
     marginLeft: SP.xs,
-    fontVariant: ['tabular-nums'],
   },
   // Trailing column: time above, unread dot below, right-aligned to the
   // row's own right edge — replaces time living inline in convNameRow.
@@ -1491,6 +1471,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     width: 8,
     height: 8,
     borderRadius: 4,
+    marginLeft: SP.sm,
   },
 
   // Empty state

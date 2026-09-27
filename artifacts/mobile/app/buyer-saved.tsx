@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, FlatList, Alert, StyleSheet, Dimensions,
-  Modal, TextInput, Animated, Platform, Pressable,
+  Modal, TextInput, Animated, Pressable,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +29,7 @@ import { Card, IconButton, Button, ListRow, SegmentedControl, BottomSheet, Theme
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
+import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 
 const { width: W } = Dimensions.get('window');
@@ -54,15 +54,14 @@ function TilePressable({ onPress, onLongPress, accessibilityLabel, children, sty
   style?: any;
 }) {
   const scale = React.useRef(new Animated.Value(1)).current;
-  const nativeDriver = Platform.OS !== 'web';
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={() => { hapticLight(); onPress(); }}
       onLongPress={onLongPress}
-      onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}
+      onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
+      onPressOut={() => pressScaleAnim(scale, 1).start()}
     >
       <Animated.View style={[{ transform: [{ scale }] }, style]}>{children}</Animated.View>
     </Pressable>
@@ -358,6 +357,7 @@ export default function BuyerSaved() {
       ) : list.length === 0 ? (
         <EmptyState
           icon="bookmark"
+          illustration="bookmark"
           title={mainTab === 'drops' ? 'No price drops yet' : 'Nothing saved yet'}
           description={mainTab === 'drops'
             ? 'We’ll flag it here the moment something you saved gets cheaper.'

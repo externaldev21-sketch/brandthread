@@ -28,6 +28,7 @@ import {
   Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
 } from '@/services/cartTypes';
 import { useScrollReset } from '@/hooks/useScrollReset';
+import { ThreadIllustration } from '@/components/illustrations/EmptyStateArt';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
@@ -905,7 +906,7 @@ export default function CartScreen() {
         // illustration) at the requested 120pt circle / 52pt CTA sizing.
         <View style={[s.emptyWrap, { flex: 1 }]}>
           <View style={[s.emptyIconCircle, { backgroundColor: theme.cardElevatedGlass, borderColor: theme.border }]}>
-            <Feather name="shopping-bag" size={44} color={theme.muted} />
+            <ThreadIllustration motif="hanger" size={52} color={theme.muted} strokeWidth={4.5} />
           </View>
           <Text style={[s.emptyTitle, { color: theme.text }]}>Your cart is empty</Text>
           <Text style={[s.emptyDescription, { color: theme.muted }]}>Tap Shop on a post you love to add it here.</Text>

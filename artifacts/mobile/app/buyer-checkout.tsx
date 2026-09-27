@@ -13,9 +13,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Alert, Platform, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View, Animated, Image,
-  KeyboardAvoidingView, Modal,
+  StyleSheet, Text, TextInput, TouchableOpacity, View, Animated, Image, Modal,
+  type TextInputProps,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -127,11 +128,13 @@ function Card({ children, style }: { children: React.ReactNode; style?: any }) {
 
 function Input({
   label, value, onChange, keyboardType = 'default', autoCapitalize = 'sentences',
-  placeholder, multiline, numberOfLines,
+  placeholder, multiline, numberOfLines, returnKeyType, autoComplete, textContentType, onSubmitEditing,
 }: {
   label: string; value: string; onChange: (v: string) => void;
   keyboardType?: any; autoCapitalize?: any; placeholder?: string;
   multiline?: boolean; numberOfLines?: number;
+  returnKeyType?: TextInputProps['returnKeyType']; autoComplete?: TextInputProps['autoComplete'];
+  textContentType?: TextInputProps['textContentType']; onSubmitEditing?: TextInputProps['onSubmitEditing'];
 }) {
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
@@ -149,6 +152,10 @@ function Input({
         style={[s.input, multiline && { minHeight: 72, textAlignVertical: 'top' }]}
         multiline={multiline}
         numberOfLines={numberOfLines}
+        returnKeyType={returnKeyType}
+        autoComplete={autoComplete}
+        textContentType={textContentType}
+        onSubmitEditing={onSubmitEditing}
       />
     </View>
   );
@@ -397,19 +404,19 @@ function AddressEditor({
             country: selected.country,
           })}
         />
-        <Input label="Address line 2" placeholder="Optional" value={address.line2 ?? ''} onChange={v => onAddress({ ...address, line2: v })} />
-        <Input label="City" value={address.city ?? ''} onChange={v => onAddress({ ...address, city: v })} />
+        <Input label="Address line 2" placeholder="Optional" value={address.line2 ?? ''} onChange={v => onAddress({ ...address, line2: v })} textContentType="streetAddressLine2" returnKeyType="next" />
+        <Input label="City" value={address.city ?? ''} onChange={v => onAddress({ ...address, city: v })} autoCapitalize="words" textContentType="addressCity" returnKeyType="next" />
 
         <View style={s.twoCol}>
           <View style={{ flex: 1 }}>
-            <Input label="State / Province or region" value={address.state ?? ''} autoCapitalize="characters" onChange={v => onAddress({ ...address, state: v })} />
+            <Input label="State / Province or region" value={address.state ?? ''} autoCapitalize="characters" onChange={v => onAddress({ ...address, state: v })} textContentType="addressState" returnKeyType="next" />
           </View>
           <View style={{ flex: 1 }}>
-            <Input label="Zip or postal code" value={address.postalCode ?? ''} autoCapitalize="characters" onChange={v => onAddress({ ...address, postalCode: v })} />
+            <Input label="Zip or postal code" value={address.postalCode ?? ''} autoCapitalize="characters" keyboardType="number-pad" onChange={v => onAddress({ ...address, postalCode: v })} textContentType="postalCode" autoComplete="postal-code" returnKeyType="next" />
           </View>
         </View>
 
-        <Input label="Country" value={address.country ?? 'US'} autoCapitalize="characters" onChange={v => onAddress({ ...address, country: v })} />
+        <Input label="Country" value={address.country ?? 'US'} autoCapitalize="characters" onChange={v => onAddress({ ...address, country: v })} textContentType="countryName" returnKeyType="done" />
 
         {isSignedIn && (
           <>
@@ -470,6 +477,9 @@ function AddressEditor({
             label="First name"
             value={address.firstName ?? ''}
             onChange={v => onAddress({ ...address, firstName: v })}
+            autoCapitalize="words"
+            textContentType="givenName"
+            returnKeyType="next"
           />
         </View>
         <View style={{ flex: 1 }}>
@@ -477,6 +487,9 @@ function AddressEditor({
             label="Last name"
             value={address.lastName ?? ''}
             onChange={v => onAddress({ ...address, lastName: v })}
+            autoCapitalize="words"
+            textContentType="familyName"
+            returnKeyType="next"
           />
         </View>
       </View>
@@ -486,6 +499,9 @@ function AddressEditor({
         value={contact.phone ?? ''}
         keyboardType="phone-pad"
         autoCapitalize="none"
+        textContentType="telephoneNumber"
+        autoComplete="tel"
+        returnKeyType="next"
         onChange={v => onContact({ ...contact, phone: v })}
       />
 
@@ -494,6 +510,9 @@ function AddressEditor({
         value={contact.email ?? ''}
         keyboardType="email-address"
         autoCapitalize="none"
+        textContentType="emailAddress"
+        autoComplete="email"
+        returnKeyType="done"
         onChange={v => onContact({ ...contact, email: v })}
       />
 

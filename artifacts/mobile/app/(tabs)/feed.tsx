@@ -3,9 +3,10 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
-  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView,
+  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';
@@ -87,6 +88,7 @@ import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { CaptionBlock } from '@/components/buyer-feed/CaptionBlock';
 import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
+import { a11yHidden } from '@/lib/a11yHidden';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -1026,8 +1028,7 @@ function PosterOnlyVisual({
           style={[StyleSheet.absoluteFill, styles.letterboxBackdrop]}
           contentFit="cover"
           blurRadius={40}
-          accessibilityElementsHidden
-          importantForAccessibility="no"
+          {...a11yHidden(true, 'no')}
         />
       )}
       {posterImage ? (
@@ -1181,8 +1182,7 @@ function LiveVideoVisual({
             style={[StyleSheet.absoluteFill, styles.letterboxBackdrop]}
             contentFit="cover"
             blurRadius={40}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
+            {...a11yHidden(true, 'no')}
           />
         )}
         {showPoster && (
@@ -1270,7 +1270,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePa
 // presentational components to them below.
 
 function SpotlightPageImpl({
-  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound, onFirstFramePainted,
+  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1305,6 +1305,8 @@ function SpotlightPageImpl({
   onToggleSound: () => void;
   /** Only passed for the very first feed item — see `VideoVisualProps`. */
   onFirstFramePainted?: () => void;
+  /** Gates the follow badge's rotate/color-fill/fade sub-steps. */
+  reduceMotion?: boolean;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -1380,10 +1382,13 @@ function SpotlightPageImpl({
     Animated.timing(heartBurst, { toValue: 0, duration: 550, delay: 350, useNativeDriver: true }).start();
   }
 
+  // 1 -> 1.15 -> 1 over 180ms total (was a 1.35 spring — stronger overshoot
+  // than this motion pass calls for), timing not spring so the 180ms is
+  // exact rather than however long that spring happened to settle in.
   function bumpHeart() {
     Animated.sequence([
-      Animated.spring(heartScale, { toValue: 1.35, useNativeDriver: true, speed: 40 }),
-      Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
+      Animated.timing(heartScale, { toValue: 1.15, duration: 90, useNativeDriver: true }),
+      Animated.timing(heartScale, { toValue: 1, duration: 90, useNativeDriver: true }),
     ]).start();
     likeRing.setValue(0);
     Animated.timing(likeRing, { toValue: 1, duration: 480, useNativeDriver: true }).start();
@@ -1521,8 +1526,7 @@ function SpotlightPageImpl({
             <Animated.View
               pointerEvents="none"
               style={[styles.speedPill, { opacity: speedPillOpacity, transform: [{ scale: speedPillOpacity.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
+              {...a11yHidden(true, 'no')}
             >
               <Feather name="fast-forward" size={12} color={ON_DARK} />
               <Text style={styles.speedPillText}>2x</Text>
@@ -1582,6 +1586,7 @@ function SpotlightPageImpl({
         saveDrop={saveDrop}
         saveScale={saveScale}
         testIdBase={item.id}
+        reduceMotion={reduceMotion}
       />
 
       <ThreadShareSheet
@@ -1674,6 +1679,7 @@ const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
   && prev.onOpenCreator === next.onOpenCreator
   && prev.onNotInterested === next.onNotInterested
   && prev.onToggleSound === next.onToggleSound
+  && prev.reduceMotion === next.reduceMotion
 ));
 
 // CommentsModal replaced by navigation to /buyer-post-comments (see handleOpenComments).
@@ -1869,9 +1875,22 @@ export default function FeedScreen({
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRepostEducation, setShowRepostEducation] = useState(false);
   const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
+  // Following|Threads content cross-fade: a soft 150ms dissolve on the
+  // list's own opacity when the tab (and therefore its underlying data)
+  // changes, instead of the new content just popping in. Gated by
+  // `reduceMotion` (declared below) via the effect that sets it from
+  // AccessibilityInfo.
+  const feedContentOpacity = useRef(new Animated.Value(1)).current;
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (reduceMotion) return;
+    feedContentOpacity.setValue(0.3);
+    Animated.timing(feedContentOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    // Only the tab switch itself should trigger this fade, not every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedTab]);
   const [hasUnread, setHasUnread] = useState(false);
   // Real TikTok never shows a placeholder/skeleton box over the feed. Seed
   // the very first render from whatever we already have in memory for this
@@ -1917,6 +1936,14 @@ export default function FeedScreen({
       subscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    feedContentOpacity.setValue(0.3);
+    Animated.timing(feedContentOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    // Only the tab switch itself should trigger this fade, not every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedTab]);
 
   // First-time gesture coach — buyer home only, shown once per account (and
   // once more per FEED_GESTURES_TIP_VERSION bump). Server is the source of
@@ -2659,8 +2686,7 @@ export default function FeedScreen({
             transition={0}
             priority="high"
             onLoad={handleOverlayPosterLoaded}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
+            {...a11yHidden(true, 'no')}
           />
         </Animated.View>
       )}
@@ -2696,6 +2722,11 @@ export default function FeedScreen({
        * child modal" focus events from "genuine tab-switch-back" focus
        * events for this screen specifically.
        */}
+      {/* Wrapped in feedContentOpacity (see the effect on `feedTab` above) so
+          switching Following|Threads dissolves into the new content instead
+          of popping in — the list itself, not each cell, so the fade is one
+          motion regardless of how many rows are mounted. */}
+      <Animated.View style={[styles.feedContentFade, { opacity: feedContentOpacity }]}>
       {viewportReady && <FlatList
         ref={feedListRef}
         // The creator player remounts once its videos load so it opens at the tapped one.
@@ -2815,10 +2846,12 @@ export default function FeedScreen({
               soundOn={soundOn}
               onToggleSound={toggleSound}
               onFirstFramePainted={contentIndex === 0 ? handleFirstCellPainted : undefined}
+              reduceMotion={!!reduceMotion}
             />
           );
         }}
       />}
+      </Animated.View>
 
       {/* ─ Legibility scrims: fixed overlay above the list (not per-cell), so
           they stay put while the video underneath swipes past. Standard
@@ -3250,6 +3283,7 @@ const styles = StyleSheet.create({
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   videoFill: { width: '100%', height: '100%' },
   letterboxBackdrop: { opacity: 0.55 },
+  feedContentFade: { flex: 1 },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   // Full-height, rightmost ~90pt only — wide enough to sit behind the
