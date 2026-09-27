@@ -26,6 +26,7 @@ export function ProfileGridPlaceholder({
   description,
   action,
   testID,
+  compact,
 }: {
   loading: boolean;
   error: boolean;
@@ -36,6 +37,8 @@ export function ProfileGridPlaceholder({
   description?: string;
   action?: { label: string; onPress: () => void; icon?: keyof typeof Feather.glyphMap };
   testID?: string;
+  /** Tighter icon/padding — for a screen tight on height above a floating tab bar. */
+  compact?: boolean;
 }) {
   const areaHeight = useContext(ProfileEmptyAreaContext);
   const fill = areaHeight ? { minHeight: areaHeight, justifyContent: 'center' as const } : null;
@@ -60,6 +63,7 @@ export function ProfileGridPlaceholder({
       message={description ?? ''}
       actionLabel={action?.label}
       onAction={action?.onPress}
+      compact={compact}
     />
   );
 }

@@ -57,7 +57,7 @@ import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
 const AVATAR = 88;
 const AVATAR_OVERLAP = 36;
-const COVER_HEIGHT = 160;
+const COVER_HEIGHT = 170;
 // Same reasoning as TabPageHeader: outside a real device (or a preview frame
 // that emulates one) react-native-safe-area-context's web implementation
 // reads 0 for insets.top, which used to push this bar's pills up into the
@@ -723,16 +723,27 @@ export default function ProfileScreen() {
           <ProfileHeroMedia videoUri={latestVideo?.mediaUrl ?? null} posterUri={latestPhoto?.mediaUrl ?? null} active={false} height={COVER_HEIGHT} posterOnly />
         ) : (
           <LinearGradient
-            colors={['#2A2A2E', '#0B0B0D']} // theme-exempt: fixed monochrome empty-cover gradient
+            colors={['#1a1a1a', '#0a0a0a']} // theme-exempt: fixed monochrome empty-cover gradient
             style={StyleSheet.absoluteFill}
           />
         )}
-        {/* Soft top fade so the transparent top bar's icons/text stay legible
-            over whatever the cover is showing underneath. */}
+        {/* Legibility scrim for the transparent top bar's icons/text — only
+            needed over real cover media (a video/photo can be bright); the
+            flat dark empty-cover gradient is already dark enough on its own,
+            and stacking a black scrim on top of it was what made the empty
+            cover read as solid black instead of a visible gradient. */}
+        {(hasCover || latestVideo?.mediaUrl || latestPhoto?.mediaUrl) ? (
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']} // theme-exempt: legibility scrim over cover media
+            style={[styles.coverTopFade, { height: topPad + 60 }]}
+          />
+        ) : null}
+        {/* Soft fade into the page background at the cover's bottom edge. */}
         <LinearGradient
           pointerEvents="none"
-          colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']} // theme-exempt: legibility scrim over cover media
-          style={[styles.coverTopFade, { height: topPad + 60 }]}
+          colors={['rgba(0,0,0,0)', theme.background]}
+          style={styles.coverBottomFade}
         />
         {/* Plain `Pressable` (not `PressableScale`, whose forced 44pt
             minimum touch target — appropriate for a real button — inflated
@@ -804,11 +815,17 @@ export default function ProfileScreen() {
               {avatarUri ? (
                 <CachedImage source={{ uri: avatarUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
               ) : (
-                <Text style={[styles.avatarInitials, { color: theme.text }]}>{avatarInitials}</Text>
+                <>
+                  <LinearGradient
+                    colors={['#2a2a2a', '#1a1a1a']} // theme-exempt: fixed monochrome avatar placeholder per spec
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <Text style={[styles.avatarInitials, { color: theme.text }]}>{avatarInitials}</Text>
+                </>
               )}
             </View>
-            <View style={[styles.avatarBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-              <Feather name="plus" size={12} color={theme.onAccent} />
+            <View style={styles.avatarBadge}>
+              <Feather name="plus" size={12} color="#000000" /* theme-exempt: fixed black glyph on the white badge per spec */ />
             </View>
           </View>
         </PressableScale>
@@ -817,7 +834,9 @@ export default function ProfileScreen() {
         {displayHandle && displayHandle !== displayName ? (
           <Text style={[styles.handle, { color: theme.muted }]} numberOfLines={1}>{displayHandle}</Text>
         ) : null}
-        <ProfileChip label="Buyer" icon="user" />
+        <View style={styles.chipWrap}>
+          <ProfileChip label="Buyer" icon="user" />
+        </View>
 
         <View style={styles.meta}>
           <ProfileMeta
@@ -843,7 +862,9 @@ export default function ProfileScreen() {
       </View>
 
       {threadCashEnabled ? (
-        <ThreadCashStreakRow streak={threadCashStreak} onPress={() => router.push('/thread-cash' as never)} />
+        <View style={styles.streakWrap}>
+          <ThreadCashStreakRow streak={threadCashStreak} onPress={() => router.push('/thread-cash' as never)} />
+        </View>
       ) : null}
 
       <View style={styles.tabsBlock}>
@@ -872,6 +893,7 @@ export default function ProfileScreen() {
             title={emptyTitle}
             description={emptyDescription}
             action={emptyAction}
+            compact
           />
         )}
         showsVerticalScrollIndicator={false}
@@ -951,9 +973,14 @@ function makeStyles(theme: AppThemePreset) {
 
     cover: { height: COVER_HEIGHT, overflow: 'hidden', backgroundColor: theme.card },
     coverTopFade: { position: 'absolute', top: 0, left: 0, right: 0 },
+    // Blends the cover's bottom edge into the page background instead of
+    // cutting off hard — the last quarter of the cover's own height.
+    coverBottomFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: COVER_HEIGHT / 4 },
     coverAdd: {
       position: 'absolute', right: 12, bottom: 10,
       flexDirection: 'row', alignItems: 'center', gap: 4,
+      backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, // theme-exempt: fixed translucent pill per spec
+      paddingHorizontal: 10, paddingVertical: 6,
     },
     coverAddPressed: { opacity: 0.6 },
     coverAddIcon: { opacity: 0.85 },
@@ -962,40 +989,56 @@ function makeStyles(theme: AppThemePreset) {
       textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
     },
 
-    identity: { paddingHorizontal: SP.md, gap: 4 },
-    avatarPress: { marginTop: -AVATAR_OVERLAP, alignSelf: 'flex-start', marginBottom: SP.sm },
+    identity: { paddingHorizontal: SP.md },
+    // Avatar bottom → display name: 12pt.
+    avatarPress: { marginTop: -AVATAR_OVERLAP, alignSelf: 'flex-start', marginBottom: 12 },
     avatarRing: {
       width: AVATAR + 6, height: AVATAR + 6, borderRadius: (AVATAR + 6) / 2,
-      borderWidth: 3, borderColor: '#000000', // theme-exempt: fixed black ring per spec
+      borderWidth: 3, borderColor: theme.background,
       padding: 3, backgroundColor: theme.background,
     },
     avatar: {
       width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden',
-      backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center',
+      alignItems: 'center', justifyContent: 'center',
     },
-    avatarInitials: { fontFamily: FONT.bold, fontSize: 28 },
+    avatarInitials: { fontFamily: FONT.semibold, fontSize: 30 },
     avatarBadge: {
       position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11,
+      backgroundColor: '#FFFFFF', borderColor: theme.background, // theme-exempt: fixed white badge per spec
       borderWidth: 2, alignItems: 'center', justifyContent: 'center',
     },
+    // Name → @handle: 2pt.
     displayName: { fontFamily: FONT.bold, fontSize: 22, letterSpacing: -0.4 },
-    handle: { fontFamily: FONT.medium, fontSize: 14 },
-    meta: { marginTop: SP.xs },
+    handle: { fontFamily: FONT.medium, fontSize: 14, marginTop: 2 },
+    // @handle (or name, if no handle) → Buyer tag: 8pt.
+    chipWrap: { marginTop: 8, alignItems: 'flex-start' },
+    // Buyer tag (or bio) → stats row: 8pt here, plus the stats row's own
+    // 16pt top padding below — see statsStyles.row.
+    meta: { marginTop: 8 },
 
-    actionsRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, alignItems: 'center' },
-    tabsBlock: { paddingTop: SP.sm },
+    // Stats row → Edit/Share buttons: 16pt (statsStyles.row's own bottom
+    // padding is 0 — this is the single source of truth for that gap).
+    actionsRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: 16, alignItems: 'center' },
+    // Buttons → streak card (or tabs, when Thread Cash is off): 20pt.
+    streakWrap: { marginTop: 20 },
+    // Streak card (or buttons) → tabs: 20pt above; tabs → content/empty
+    // state: 24pt below.
+    tabsBlock: { paddingTop: 20, paddingBottom: 24 },
   });
 }
 
 const statsStyles = StyleSheet.create({
   row: {
     flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'flex-end', justifyContent: 'flex-start',
-    paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.sm,
+    // Buyer tag/bio → stats row: 16pt (the row's own top padding); the
+    // bottom gap to the action row is owned entirely by actionsRow's own
+    // top padding, so it isn't double-counted here.
+    paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: 0,
   },
   cell: { flexDirection: 'row', alignItems: 'baseline', flexShrink: 0 },
   // Explicit margin instead of the row's `gap` — spaces every cell but the
-  // first, so the total gap stays 20pt regardless of `gap` support.
-  cellSpacing: { marginLeft: 20 },
+  // first, so the total gap stays 24pt regardless of `gap` support.
+  cellSpacing: { marginLeft: 24 },
   value: { fontFamily: FONT.bold, fontSize: 17, fontVariant: ['tabular-nums'] },
   label: { fontFamily: FONT.medium, fontSize: 13, marginLeft: 4 },
 });
