@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { Tabs } from 'expo-router';
-import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated from 'react-native-reanimated';
 
@@ -18,8 +17,13 @@ type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs
 
 // ─── Navigation contract ──────────────────────────────────────────────────────
 // Capsule: Home · Discover · Inbox · Activity, plus a separate Profile
-// circle. Activity opens /activity-center, pushed onto the root stack —
-// tapping its slot never opens a tab, same as every other icon in this bar.
+// circle. Activity is a Tabs.Screen in this navigator (app/(buyer)/activity.tsx,
+// a thin re-export of the shared app/activity-center.tsx screen also used by
+// the seller side) reached the same way as every other icon in this bar —
+// navigation.navigate, not router.push to the root-level route — so the
+// floating tab bar stays mounted and lit up on Activity instead of
+// disappearing (that root route is still what the seller-side
+// ActivityBellButton instances push to, unchanged).
 // Search lives only as its own full-screen page (see app/buyer-search.tsx),
 // reachable from the feed's top-row icon and Discover — it does NOT get a
 // slot here, so there's exactly one way into it, not two.
@@ -45,6 +49,7 @@ export const BUYER_ROUTE_SLOT: Record<string, Slot> = {
   cart: 'index',
   discover: 'discover',
   inbox: 'inbox',
+  activity: 'activity',
   profile: 'profile',
   orders: 'profile',
   following: 'profile',
@@ -71,7 +76,6 @@ export function BuyerTabBar({
 }: BottomTabBarProps & { inboxBadgeCount: number }) {
   const metrics = useBuyerTabBarMetrics();
   const { theme } = useAppTheme();
-  const router = useRouter();
   const activityUnread = useActivityUnreadCount();
 
   const activeRoute = state.routes[state.index]?.name ?? 'index';
@@ -79,11 +83,6 @@ export function BuyerTabBar({
   const activeIndex = BUYER_TAB_ITEMS.findIndex(item => item.route === activeSlot);
 
   const openRoute = React.useCallback((routeName: string) => {
-    if (routeName === 'activity') {
-      hapticSelection();
-      router.push('/activity-center' as never);
-      return;
-    }
     const route = state.routes.find(candidate => candidate.name === routeName);
     const focused = activeRoute === routeName;
     if (focused) return;
@@ -93,7 +92,7 @@ export function BuyerTabBar({
     if (event?.defaultPrevented) return;
     hapticSelection();
     navigation.navigate(routeName as never);
-  }, [activeRoute, navigation, router, state.routes]);
+  }, [activeRoute, navigation, state.routes]);
 
   const onLongPress = React.useCallback((routeName: string) => {
     const route = state.routes.find(candidate => candidate.name === routeName);
