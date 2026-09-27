@@ -1,6 +1,7 @@
 import React from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { hapticPrimaryAction } from '@/lib/haptics';
@@ -48,9 +49,14 @@ export function VideoTile({ item, width, onPress }: {
             <Text style={styles.fallbackInitials}>{item.initials}</Text>
           </View>
         )}
-        <View style={styles.scrim} pointerEvents="none" />
+        <LinearGradient
+          pointerEvents="none"
+          colors={['#00000000', 'rgba(0,0,0,0.55)']}
+          locations={[0, 1]}
+          style={styles.scrim}
+        />
         <View style={styles.playBadge} pointerEvents="none">
-          <Feather name="play" size={16} color="#FFFFFF" />
+          <Feather name="play" size={14} color="#FFFFFF" />
         </View>
         <View style={styles.overlay} pointerEvents="none">
           {item.caption ? (
@@ -75,21 +81,21 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   card: { borderRadius: RADII.card, overflow: 'hidden', backgroundColor: '#000000' },
   fallback: { alignItems: 'center', justifyContent: 'center' },
   fallbackInitials: { color: theme.onAccent, ...TYPE_SCALE.title1, fontFamily: FONT.bold },
-  scrim: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%',
-    backgroundColor: '#00000000',
-    // Layered via borderless gradient-like scrim using two stacked views isn't
-    // available without a gradient lib import here; a flat translucent black
-    // wash keeps caption/author legible over any thumbnail.
-  },
+  // Transparent-to-black gradient over the bottom 55% keeps the caption and
+  // author row legible over any thumbnail, without flattening the poster
+  // image itself the way a solid wash would.
+  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
   playBadge: {
     position: 'absolute', top: SPACING.xs, right: SPACING.xs,
     width: 26, height: 26, borderRadius: RADII.avatar,
     backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center',
   },
+  // No fill of its own — the gradient `scrim` beneath already carries the
+  // contrast; stacking a second flat wash here was muddying the poster's
+  // own bottom edge instead of keeping it readable through the gradient.
   overlay: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
-    padding: SPACING.xs + 2, backgroundColor: 'rgba(0,0,0,0.38)',
+    padding: SPACING.xs + 2,
   },
   caption: { color: '#FFFFFF', ...TYPE_SCALE.caption, fontFamily: FONT.semibold, marginBottom: 3 },
   authorRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.xxs },

@@ -2050,7 +2050,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<Array<{
           userId: string; name: string; username: string | null; handle: string;
           initials: string; color: string; bio: string | null; isFollowing: boolean;
-          accountType: string; verified: boolean; roleTag: string;
+          accountType: string; verified: boolean; roleTag: string; avatarUrl: string | null;
         }>>(`/api/social/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 
       // ── Stories ─────────────────────────────────────────────────────────────
