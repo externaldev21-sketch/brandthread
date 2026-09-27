@@ -58,6 +58,19 @@ export function useCelebrateThreadCash(): (payload: CelebrateThreadCashPayload) 
   return ctx.celebrateThreadCash;
 }
 
+/**
+ * Same safe-area approach as components/layout/TabPageHeader.tsx: on a real
+ * device (or a preview frame that actually emulates one) `insets.top`
+ * already clears the notch/Dynamic Island, so a small +6 is enough. Outside
+ * that — the plain 390x844 web preview — react-native-safe-area-context's
+ * web implementation reads 0 for `insets.top`, which put the toast and the
+ * burst's origin right at the very top edge, behind where a real Dynamic
+ * Island sits; `Math.max(insets.top, 54)` keeps them clear of it there too.
+ */
+function topInset(insetsTop: number): number {
+  return Platform.OS === 'web' ? Math.max(insetsTop, 54) : insetsTop + 6;
+}
+
 const PARTICLE_COUNT = 48;
 const BURST_DURATION_MS = 2000;
 const TOAST_HOLD_MS = 1400;
@@ -221,7 +234,7 @@ function BurstToast({ event, onDone }: { event: CelebrationEvent; onDone: () => 
       style={[
         styles.toast,
         style,
-        { top: insets.top + 6, backgroundColor: theme.card, borderColor: theme.border },
+        { top: topInset(insets.top), backgroundColor: theme.card, borderColor: theme.border },
       ]}
       accessibilityLiveRegion="polite"
       accessibilityLabel={`Received ${formatCents(event.amount)} Thread Cash from ${event.from}`}
@@ -247,7 +260,7 @@ function BurstLayer({ event, onDone }: { event: CelebrationEvent; onDone: () => 
 
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.overlay]}>
-      <View style={[styles.origin, { top: insets.top + 24 }]}>
+      <View style={[styles.origin, { top: topInset(insets.top) + 18 }]}>
         {particles.map((spec, i) => (
           <Particle key={i} spec={spec} />
         ))}
