@@ -1,5 +1,5 @@
 import React from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { hapticSelection } from '@/lib/haptics';
@@ -7,7 +7,7 @@ import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
+import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 import type { SearchCategory } from '@/lib/searchData';
 
 /** "Shop top categories" tile — rounded image with a label overlay, eBay-style. */
@@ -19,14 +19,13 @@ export function CategoryTile({ item, width, onPress }: {
   const { theme } = useAppTheme();
   const styles = makeStyles(theme);
   const scale = React.useRef(new Animated.Value(1)).current;
-  const nativeDriver = Platform.OS !== 'web';
   const height = width;
 
   return (
     <Pressable
       onPress={() => { hapticSelection(); onPress(); }}
-      onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}
+      onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
+      onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"
       accessibilityLabel={`Search ${item.category}, ${item.productCount} items`}
     >

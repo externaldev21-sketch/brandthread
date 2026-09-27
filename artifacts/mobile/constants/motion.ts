@@ -5,13 +5,36 @@
  * components. `lib/theme.ts` still exports the legacy `ANIM` timing object
  * used across many existing screens — left untouched for Phase 2 migration.
  */
+import { Animated, Platform } from 'react-native';
 import { Easing } from 'react-native-reanimated';
 
-/** Press feedback: shrink to 0.97 over 120ms, every press-state animation
- *  used by a new/migrated component. Never scales below 1 at rest — this is
- *  the resting (unpressed) scale, never overshot past 1. */
-export const PRESS_SCALE = 0.97;
-export const PRESS_DURATION_MS = 120;
+/** Press feedback: shrink to ~0.96, every press-state animation used by a
+ *  shared pressable/button/card/tile/row component. Never scales below 1 at
+ *  rest — this is the resting (unpressed) scale, never overshot past 1.
+ *  PRESS_DURATION_MS is kept only for the non-scale (opacity/highlight) half
+ *  of a press — the scale itself now always animates on PRESS_SPRING below,
+ *  never a plain timing, so it settles at the same physical rate touch-down
+ *  and touch-up. */
+export const PRESS_SCALE = 0.96;
+export const PRESS_DURATION_MS = 100;
+
+/** Critically damped (no overshoot) in both directions — this is the one
+ *  press-scale spring every shared component uses via `pressScaleAnim`
+ *  below. Replaces each component's own copy of a timing press-in paired
+ *  with a bouncy (bounciness: 6) release spring: the mismatch meant a tap
+ *  still visibly bounced back on release even after the touch-down side had
+ *  been made bounce-free. stiffness 500 / damping 45 / mass 1 sits just
+ *  above the critical-damping point (damping ≈ 44.7) so it settles in
+ *  ~100ms with zero visible rebound, never below it. */
+export const PRESS_SPRING = { stiffness: 500, damping: 45, mass: 1 } as const;
+
+/** The one press-scale animation every shared pressable/button/card/tile/
+ *  row component calls, on both touch-down (toValue: PRESS_SCALE) and
+ *  touch-up (toValue: 1) — see PRESS_SPRING above for why this replaced a
+ *  per-component timing/spring pair. */
+export function pressScaleAnim(scale: Animated.Value, toValue: number) {
+  return Animated.spring(scale, { toValue, ...PRESS_SPRING, useNativeDriver: Platform.OS !== 'web' });
+}
 
 /** Shared open/close timeline for every bottom sheet (`useSheetTransition`,
  *  `components/ui/BottomSheet.tsx`, `SheetRise`, and any bespoke sheet) —
