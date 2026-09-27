@@ -1471,7 +1471,12 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   },
 
   // Empty state
-  listSurface: { flex: 1, backgroundColor: 'transparent' },
+  // Opaque, matching every row's own `theme.background` fill (see convRow's
+  // PressableScale) — was `transparent`, which on FlashList's web renderer
+  // let a 1px cell-measurement rounding gap between rows show whatever sits
+  // behind the whole screen stack instead of the row color, reading as a
+  // faint gray hairline "divider" the app never actually draws.
+  listSurface: { flex: 1, backgroundColor: theme.background },
   listContent: { paddingBottom: 112 },
   listEmptyContainer: {
     flex: 1,
