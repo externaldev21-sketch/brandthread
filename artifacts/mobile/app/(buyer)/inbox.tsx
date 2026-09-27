@@ -992,7 +992,7 @@ export default function InboxScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
     >
       {requestConvs.length === 0 ? (
-        <EmptyState icon="mail" title="No message requests" description="Requests from people you don't follow appear here" />
+        <EmptyState icon="mail" illustration="envelope" title="No message requests" description="Requests from people you don't follow appear here" />
       ) : (
         requestConvs.map(renderRequestRow)
       )}

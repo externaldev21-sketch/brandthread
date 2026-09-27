@@ -358,6 +358,7 @@ export default function BuyerSaved() {
       ) : list.length === 0 ? (
         <EmptyState
           icon="bookmark"
+          illustration="bookmark"
           title={mainTab === 'drops' ? 'No price drops yet' : 'Nothing saved yet'}
           description={mainTab === 'drops'
             ? 'We’ll flag it here the moment something you saved gets cheaper.'
