@@ -38,7 +38,7 @@ import {
 } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import {
-  EmptyState, BrandedLoader, PressableScale, useUndoToast,
+  BrandedLoader, PressableScale, useUndoToast,
 } from '@/components/BrandthreadUI';
 import {
   Button, Card, ErrorState, QuantityStepper, StickyBottomCTA, ThemedRefreshControl,
@@ -79,6 +79,7 @@ function QuantityControl({
         min={1}
         max={Math.max(max, 1)}
         disabled={busy}
+        size="sm"
         onChange={next => (next > value ? onInc() : onDec())}
       />
       {busy && <ActivityIndicator size="small" color={theme.text} style={{ marginLeft: 2 }} />}
@@ -139,7 +140,7 @@ function CartItemRow({
       <View style={ir.img}>
         {item.imageUri
           ? <Image source={{ uri: item.imageUri }} style={ir.productImage} resizeMode="cover" />
-           : <Feather name="image" size={ICON.lg} color={theme.muted} />}
+           : <Feather name="image" size={ICON.md} color={theme.muted} />}
       </View>
 
       {/* Details */}
@@ -250,21 +251,21 @@ function CartItemRow({
 const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm, alignItems: 'flex-start' },
   rowBusy: { opacity: 0.7 },
-  checkbox: { width: COMP.minTouchTarget, height: 100, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
+  checkbox: { width: COMP.minTouchTarget, height: 72, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
   checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
   },
   img: {
-    width: 80, height: 100, borderRadius: 10,
+    width: 72, height: 72, borderRadius: 10,
     backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   productImage: { width: '100%', height: '100%' },
   name: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
   variantRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  variant: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   preOrderText: { fontSize: FS.xs, fontFamily: FONT.medium },
   unavailBadge: {
@@ -290,7 +291,10 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: COMP.minTouchTarget, paddingVertical: 4, paddingHorizontal: 8 },
   actionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
-  actionDivider: { width: 1, height: 14, backgroundColor: theme.border },
+  // Softened to match the header's own subtle hairline (see Header.tsx's
+  // dividerVariant="subtle") instead of the full-strength theme.border —
+  // a decorative in-row separator, not a meaningful content divide.
+  actionDivider: { width: 1, height: 14, backgroundColor: '#FFFFFF', opacity: 0.06 },
   buyBtn: { minWidth: 72 },
 });
 
@@ -383,8 +387,11 @@ const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   sellerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
-  divider: { height: 1, backgroundColor: theme.border, marginVertical: SP.xs },
-  footer: { borderTopWidth: 1, borderTopColor: theme.border, marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
+  // Softened to a fixed 6%-white hairline (same treatment as the header's
+  // dividerVariant="subtle") — the full-strength theme.border read as a
+  // heavier second divider right under the already-subtle header line.
+  divider: { height: 1, backgroundColor: '#FFFFFF', opacity: 0.06, marginVertical: SP.xs },
+  footer: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   footerText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   groupSubtotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginTop: 4 },
@@ -889,20 +896,27 @@ export default function CartScreen() {
             <Text style={[s.editText, { color: theme.accentLight }]}>{editMode ? 'Done' : 'Edit'}</Text>
           </TouchableOpacity>
         ) : undefined}
+        dividerVariant="subtle"
       />
 
       {!hasItems && !hasSaved && !loadError ? (
-        <EmptyState
-          icon="shopping-bag"
-          title="Your cart is ready."
-          description="Tap Shop on a post you love to add it here."
-          action={{
-            label: 'Continue shopping',
-            icon: 'compass',
-            onPress: () => router.push('/(buyer)/discover' as never),
-          }}
-          style={{ flex: 1 }}
-        />
+        // Monochrome empty state (Threads/Instagram-style plain icon-in-circle,
+        // not the shared BrandthreadUI EmptyState's colored gradient
+        // illustration) at the requested 120pt circle / 52pt CTA sizing.
+        <View style={[s.emptyWrap, { flex: 1 }]}>
+          <View style={[s.emptyIconCircle, { backgroundColor: theme.cardElevatedGlass, borderColor: theme.border }]}>
+            <Feather name="shopping-bag" size={44} color={theme.muted} />
+          </View>
+          <Text style={[s.emptyTitle, { color: theme.text }]}>Your cart is empty</Text>
+          <Text style={[s.emptyDescription, { color: theme.muted }]}>Tap Shop on a post you love to add it here.</Text>
+          <Button
+            label="Continue shopping"
+            icon="compass"
+            onPress={() => router.push('/(buyer)/discover' as never)}
+            style={s.emptyCta}
+            accessibilityHint="Opens Discover to browse products"
+          />
+        </View>
       ) : !hasItems && !hasSaved && loadError ? (
         <ErrorState
           message="Couldn’t load your cart. Check your connection and try again."
@@ -1135,6 +1149,14 @@ export default function CartScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
+  emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.sm },
+  emptyIconCircle: {
+    width: 120, height: 120, borderRadius: 60, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm,
+  },
+  emptyTitle: { fontSize: FS.lg, fontFamily: FONT.bold, textAlign: 'center' },
+  emptyDescription: { fontSize: FS.base, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 21, maxWidth: 280 },
+  emptyCta: { marginTop: SP.md },
   editText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   editBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -1147,10 +1169,10 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingHorizontal: SP.md, paddingBottom: SP.xs,
   },
   selectAllBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  selectAllText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
+  selectAllText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   savedSection: { marginBottom: SP.md },
   savedTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
-  divider: { height: 1, backgroundColor: theme.border, marginVertical: SP.xs },
+  divider: { height: 1, backgroundColor: '#FFFFFF', opacity: 0.06, marginVertical: SP.xs },
   multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
   multiSellerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
   loyaltyCard: { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.md, marginBottom: SP.md },
@@ -1172,7 +1194,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   checkoutSummaryLabel: { ...TYPE_SCALE.footnote, color: theme.muted },
   checkoutSummaryAmount: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
   checkoutPill: {
-    minWidth: 132, minHeight: COMP.buttonHSm,
+    minWidth: 132, minHeight: COMP.buttonH,
     borderRadius: RADIUS.pill, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: SP.lg,

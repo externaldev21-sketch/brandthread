@@ -2912,8 +2912,8 @@ export default function FeedScreen({
               >
                 <Feather name="shopping-cart" size={22} color={ON_DARK} />
                 {cartCount > 0 && (
-                  <View style={[styles.cartCountBadge, styles.buyerCartBadge, { backgroundColor: theme.accent }]}>
-                    <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
+                  <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
+                    <Text style={styles.cartCountText}>
                       {cartCount > 99 ? '99+' : cartCount}
                     </Text>
                   </View>
@@ -3040,8 +3040,8 @@ export default function FeedScreen({
               >
                 <Feather name="shopping-cart" size={24} color={ON_DARK} />
                 {cartCount > 0 && (
-                  <View style={[styles.cartCountBadge, styles.buyerCartBadge, { backgroundColor: theme.accent }]}>
-                    <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
+                  <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
+                    <Text style={styles.cartCountText}>
                       {cartCount > 99 ? '99+' : cartCount}
                     </Text>
                   </View>
@@ -3114,8 +3114,8 @@ export default function FeedScreen({
             >
               <Feather name="shopping-cart" size={20} color={ON_DARK} />
               {cartCount > 0 && (
-                <View style={[styles.cartCountBadge, { backgroundColor: theme.accent }]}>
-                  <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
+                <View style={styles.cartCountBadge}>
+                  <Text style={styles.cartCountText}>
                     {cartCount > 99 ? '99+' : cartCount}
                   </Text>
                 </View>
@@ -3378,12 +3378,15 @@ const styles = StyleSheet.create({
   unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },
   topIconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   cartHeaderBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  // Fixed white/black regardless of the active theme's accent color — this
+  // is the one small monochrome badge every buyer surface shares, not a
+  // themed accent chip.
   cartCountBadge: {
-    position: 'absolute', top: 1, right: -1, minWidth: 17, height: 17,
+    position: 'absolute', top: 1, right: -1, minWidth: 16, height: 16,
     borderRadius: RADII.pill, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: BG,
+    borderWidth: 1.5, borderColor: BG, backgroundColor: '#FFFFFF',
   },
-  cartCountText: { fontSize: FS.xs, lineHeight: 12, fontFamily: FONT.bold, ...TABULAR_NUMS },
+  cartCountText: { fontSize: 10, lineHeight: 12, fontFamily: FONT.bold, color: '#000000', ...TABULAR_NUMS },
   topTitle: { flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   creatorTitle: {
     flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.semibold, color: ON_DARK,

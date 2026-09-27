@@ -33,6 +33,17 @@ const ROOT_WEB_SAFE_TOP = 67;
 const ROOT_ROW_HEIGHT = 44;
 
 /**
+ * Web never fills in a non-zero `env(safe-area-inset-top)` outside a real
+ * device (or a preview frame that emulates one), so react-native-safe-area-
+ * context's web implementation reads insets.top as 0 — which put the
+ * pushed-screen (showBack) header's back chevron/title flush against, and
+ * partly behind, a simulated notch/Dynamic Island in the web preview. This
+ * mirrors the root header's own ROOT_WEB_SAFE_TOP fallback for the compact
+ * header.
+ */
+const COMPACT_WEB_SAFE_TOP = 54;
+
+/**
  * One header used on every stack screen: consistent back button + right-side
  * actions everywhere, with an optional large title that collapses into the
  * compact bar as the screen scrolls (pass `scrollY` from the screen's
@@ -57,6 +68,7 @@ export function Header({
   transparent = false,
   belowTitle,
   rightElement,
+  dividerVariant = 'default',
 }: {
   title: string;
   subtitle?: string;
@@ -77,6 +89,15 @@ export function Header({
    * as "the same slot".
    */
   rightElement?: React.ReactNode;
+  /**
+   * Pushed-screen (showBack) header only. 'default' keeps the existing
+   * scroll-driven `theme.border` hairline (opaque once `largeTitle` content
+   * scrolls under it, or always-on for a plain header with no `scrollY`).
+   * 'subtle' pins it to a fixed 6%-white line instead — for a header whose
+   * content below it already has its own divider, so the header's own line
+   * doesn't read as a second, heavier one. 'none' omits it entirely.
+   */
+  dividerVariant?: 'default' | 'subtle' | 'none';
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -131,12 +152,13 @@ export function Header({
     : 1;
 
   const handleBack = onBack ?? (() => goBackOr(router));
+  const compactTopPad = Platform.OS === 'web' ? Math.max(insets.top, COMPACT_WEB_SAFE_TOP) : insets.top;
 
   return (
     <View
       style={[
         styles.wrap,
-        { paddingTop: insets.top, backgroundColor: transparent ? 'transparent' : theme.background },
+        { paddingTop: compactTopPad, backgroundColor: transparent ? 'transparent' : theme.background },
       ]}
     >
       <View style={[styles.compactRow, { height: COMPACT_HEIGHT }]}>
@@ -191,7 +213,11 @@ export function Header({
 
       {belowTitle && <View style={styles.belowTitle}>{belowTitle}</View>}
 
-      <Animated.View style={[styles.hairline, { backgroundColor: theme.border, opacity: borderOpacity }]} />
+      {dividerVariant === 'none' ? null : dividerVariant === 'subtle' ? (
+        <View style={[styles.hairline, { backgroundColor: '#FFFFFF', opacity: 0.06 }]} />
+      ) : (
+        <Animated.View style={[styles.hairline, { backgroundColor: theme.border, opacity: borderOpacity }]} />
+      )}
     </View>
   );
 }
