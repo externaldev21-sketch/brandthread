@@ -19,9 +19,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform,
+  ActivityIndicator, Alert, Image, Modal, Platform,
   ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';

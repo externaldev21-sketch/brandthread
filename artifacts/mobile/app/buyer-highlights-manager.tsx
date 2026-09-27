@@ -4,9 +4,9 @@
  */
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput, Modal,
-  KeyboardAvoidingView, Platform, Alert, Pressable,
+  View, Text, StyleSheet, FlatList, TextInput, Modal, Platform, Alert, Pressable,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';

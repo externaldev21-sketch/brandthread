@@ -15,6 +15,7 @@ import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { LIVE_CHAT_VISIBLE, formatViewerCount } from '@/lib/live/liveOrdering';
 import type { LiveChatMessage, LiveHost, LiveProduct, LiveViewerAvatar } from '@/lib/live/types';
 import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
+import { a11yHidden } from '@/lib/a11yHidden';
 import { LIVE_RED } from './LiveAvatarRing';
 
 const ND = Platform.OS !== 'web';
@@ -90,7 +91,7 @@ export function LiveHostPill({
 export function LiveViewerStack({ viewers }: { viewers: LiveViewerAvatar[] }) {
   if (viewers.length === 0) return null;
   return (
-    <View style={styles.viewerStack} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View style={styles.viewerStack} {...a11yHidden(true)}>
       {viewers.slice(0, 3).map((v, i) => (
         <View key={v.id} style={[styles.viewerDot, { backgroundColor: v.color, marginLeft: i === 0 ? 0 : -8, zIndex: 3 - i }]}>
           {v.uri

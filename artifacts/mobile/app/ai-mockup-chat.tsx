@@ -7,9 +7,9 @@ import {
   FlatList,
   StyleSheet,
   Platform,
-  KeyboardAvoidingView,
   Image,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';

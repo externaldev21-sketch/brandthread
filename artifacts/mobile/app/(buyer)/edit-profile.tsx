@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Modal, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Animated,
+  Platform, TextInput, Modal, Alert, ActivityIndicator, Animated,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Avatar } from '@/components/ui/Avatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

@@ -8,9 +8,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert,
-  KeyboardAvoidingView, Modal, Platform, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';

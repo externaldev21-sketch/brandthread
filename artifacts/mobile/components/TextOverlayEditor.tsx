@@ -16,9 +16,10 @@ import React, {
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, Dimensions, Modal, PanResponder, Animated,
-  Pressable, Platform, KeyboardAvoidingView, Keyboard,
+  Pressable, Platform, Keyboard,
   AccessibilityInfo,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';

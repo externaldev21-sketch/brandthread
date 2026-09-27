@@ -5,8 +5,9 @@
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, ScrollView, StyleSheet, ActivityIndicator, Platform,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';

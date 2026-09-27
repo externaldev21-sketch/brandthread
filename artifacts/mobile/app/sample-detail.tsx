@@ -7,9 +7,10 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, Alert, Image,
-  StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform,
+  StyleSheet, TouchableOpacity, Platform,
   ActivityIndicator,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

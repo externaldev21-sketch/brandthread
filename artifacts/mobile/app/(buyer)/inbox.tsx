@@ -1015,6 +1015,8 @@ export default function InboxScreen() {
               placeholder="Search"
               placeholderTextColor={theme.muted}
               autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
               onFocus={() => setMessagesSearchFocused(true)}
               onBlur={() => setMessagesSearchFocused(false)}
               testID="inbox-search-input"
@@ -1123,6 +1125,7 @@ export default function InboxScreen() {
             contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.lg, paddingHorizontal: gutter }])}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             refreshing={refreshing}
             onRefresh={handleRefresh}
             ListFooterComponent={!messagesSearchLower ? renderSuggestedSection : undefined}
@@ -1177,6 +1180,7 @@ export default function InboxScreen() {
                 sections={composeSections}
                 keyExtractor={item => item.userId}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
                 stickySectionHeadersEnabled={false}
                 ListFooterComponent={
                   composeQueryLower && composeLoading

@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', () => ({
   AccessibilityInfo: { isReduceMotionEnabled: () => Promise.resolve(false) },
+  Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
 }));
 
 const { ThreadIllustration } = await import('@/components/illustrations/EmptyStateArt');

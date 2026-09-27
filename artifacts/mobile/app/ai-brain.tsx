@@ -21,7 +21,6 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
   Keyboard,
   Platform,
   Pressable,
@@ -29,6 +28,7 @@ import {
   Animated,
   useWindowDimensions,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';

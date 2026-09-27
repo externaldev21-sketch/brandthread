@@ -39,6 +39,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { formatCents } from '@/lib/money';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { FONT, ON_DARK } from '@/lib/theme';
+import { a11yHidden } from '@/lib/a11yHidden';
 
 export interface ShopSideTabTag {
   productId: string;
@@ -152,8 +153,7 @@ export function ShopSideTab({
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={collapse}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
+          {...a11yHidden(true)}
         />
       )}
       <ReanimatedAnimated.View

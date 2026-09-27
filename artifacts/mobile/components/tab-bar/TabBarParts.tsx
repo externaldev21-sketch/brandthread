@@ -16,6 +16,7 @@ import Animated, {
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { identityOrNone } from '@/lib/animationUtils';
+import { a11yHidden } from '@/lib/a11yHidden';
 import { FONT } from '@/lib/theme';
 import type { TabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
@@ -189,9 +190,7 @@ export function TabBarSlot({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected: focused }}
       aria-selected={focused}
-      aria-hidden={hidden}
-      accessibilityElementsHidden={hidden}
-      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
+      {...a11yHidden(hidden)}
       onPress={onPress}
       onLongPress={onLongPress}
       onPressIn={onPressIn}

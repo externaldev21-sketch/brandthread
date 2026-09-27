@@ -10,8 +10,9 @@
 import React, { useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, TextInput, StyleSheet, KeyboardAvoidingView, Platform,
+  View, Text, ScrollView, TextInput, StyleSheet, Platform,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
