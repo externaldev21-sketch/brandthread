@@ -47,6 +47,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
+import { mark as perfMark } from '@/lib/perf';
 import { getLiveDirectory, useOpenLive } from '@/lib/live/useLiveDirectory';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import {
@@ -982,6 +983,11 @@ type VideoVisualProps = {
    * every other item stays at the default priority so this doesn't just
    * shift the contention elsewhere. */
   posterPriority?: 'low' | 'normal' | 'high';
+  /** Fired once this item actually has a frame ready to paint (poster loaded,
+   * or the video player reaching `readyToPlay`) — used only by the feed's
+   * very first item, to know when it's safe to swap away the plain overlay
+   * poster FeedScreen renders above the whole list on first mount. */
+  onFirstFramePainted?: () => void;
 };
 
 /**
@@ -1053,6 +1059,7 @@ function LiveVideoVisual({
   pageHeight,
   bottomStripHeight = 0,
   posterPriority,
+  onFirstFramePainted,
 }: VideoVisualProps) {
   const player = useVideoPlayer(source, p => {
     p.loop = true;
@@ -1060,13 +1067,27 @@ function LiveVideoVisual({
     if (progressBottom != null) p.timeUpdateEventInterval = 0.25;
   });
   const [hasStarted, setHasStarted] = useState(false);
+  // `playingChange`'s `isPlaying: true` (used alone, previously) fires the
+  // instant `player.play()` is *called* — on web this is wired to the
+  // HTMLVideoElement's `play` event (see expo-video's VideoPlayer.web.tsx
+  // `video.onplay`), which the HTML5 spec fires as soon as playback is
+  // requested, not once a frame has actually decoded. Combined with a cold
+  // dev-server video fetch, that dismissed the poster (below) and swapped in
+  // the video *before* it had any frame to show — a black gap of several
+  // seconds where hasStarted was already true but the video was still
+  // buffering. `status === 'readyToPlay'` (backed by the video element's own
+  // `canplay`/readyState>=3 on web, and the native player's real load state
+  // on iOS/Android) is a real "has a frame ready" signal, so the poster now
+  // only comes down once both have happened: playback was requested AND the
+  // player actually has something to paint.
+  const [readyToPlay, setReadyToPlay] = useState(player.status === 'readyToPlay');
   // Fill the page when that crops little (a vertical clip on a phone or a
   // portrait iPad); otherwise letterbox so a vertical clip on a landscape
   // iPad, or a wide clip on a phone, is never cropped to a sliver.
   const [videoAspect, setVideoAspect] = useState(9 / 16);
   const [progress, setProgress] = useState(0);
-  const showPoster = Boolean(posterSource || posterUri) && !hasStarted;
-  const showFallbackCover = !showPoster && !hasStarted;
+  const showPoster = Boolean(posterSource || posterUri) && !(hasStarted && readyToPlay);
+  const showFallbackCover = !showPoster && !(hasStarted && readyToPlay);
   const cropFraction = 1 - Math.min(videoAspect, pageAspect) / Math.max(videoAspect, pageAspect);
   const fit = immersive && cropFraction <= 0.3 ? 'cover' : 'contain';
   const posterImage = posterSource ?? (posterUri ? { uri: posterUri } : undefined);
@@ -1074,12 +1095,25 @@ function LiveVideoVisual({
     const subscription = player.addListener('playingChange', ({ isPlaying }) => {
       if (isPlaying) setHasStarted(true);
     });
+    const statusSubscription = player.addListener('statusChange', ({ status }) => {
+      if (status === 'readyToPlay') setReadyToPlay(true);
+    });
+    if (player.status === 'readyToPlay') setReadyToPlay(true);
     const trackSubscription = player.addListener('videoTrackChange', ({ videoTrack }) => {
       const size = videoTrack?.size;
       if (size && size.width > 0 && size.height > 0) setVideoAspect(size.width / size.height);
     });
-    return () => { subscription.remove(); trackSubscription.remove(); };
+    return () => { subscription.remove(); statusSubscription.remove(); trackSubscription.remove(); };
   }, [player]);
+  const firstFramePaintedRef = React.useRef(false);
+  const reportFirstFramePainted = React.useCallback(() => {
+    if (firstFramePaintedRef.current) return;
+    firstFramePaintedRef.current = true;
+    onFirstFramePainted?.();
+  }, [onFirstFramePainted]);
+  React.useEffect(() => {
+    if (readyToPlay) reportFirstFramePainted();
+  }, [readyToPlay, reportFirstFramePainted]);
   React.useEffect(() => {
     if (progressBottom == null || !isActive) return undefined;
     const subscription = player.addListener('timeUpdate', ({ currentTime }) => {
@@ -1154,6 +1188,7 @@ function LiveVideoVisual({
             style={StyleSheet.absoluteFill}
             contentFit={fit}
             priority={posterPriority}
+            onLoad={reportFirstFramePainted}
           />
         )}
         {showFallbackCover && (
@@ -1183,7 +1218,7 @@ function LiveVideoVisual({
   );
 }
 
-function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: string[]; pageWidth: number; pageHeight: number; onPageChange?: (index: number) => void }) {
+function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePainted }: { uris: string[]; pageWidth: number; pageHeight: number; onPageChange?: (index: number) => void; onFirstImagePainted?: () => void }) {
   const pages = uris.length > 0 ? uris : [''];
   return (
     <FlatList
@@ -1200,9 +1235,16 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
         const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
         onPageChange(Math.max(0, Math.min(pages.length - 1, index)));
       }}
-      renderItem={({ item: uri }) => (
+      renderItem={({ item: uri, index }) => (
         <View style={{ width: pageWidth, height: pageHeight }}>
-          {uri ? <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" /> : (
+          {uri ? (
+            <CachedImage
+              source={{ uri }}
+              style={StyleSheet.absoluteFill}
+              contentFit="contain"
+              onLoad={index === 0 ? onFirstImagePainted : undefined}
+            />
+          ) : (
             <View style={[StyleSheet.absoluteFill, styles.mediaPlaceholder]}>
               <Feather name="image" size={42} color="#FFFFFF99" />
             </View>
@@ -1225,7 +1267,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
 // presentational components to them below.
 
 function SpotlightPageImpl({
-  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound,
+  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound, onFirstFramePainted,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1258,6 +1300,8 @@ function SpotlightPageImpl({
   /** Whether the app-wide feed sound preference is on. */
   soundOn: boolean;
   onToggleSound: () => void;
+  /** Only passed for the very first feed item — see `VideoVisualProps`. */
+  onFirstFramePainted?: () => void;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -1443,9 +1487,10 @@ function SpotlightPageImpl({
                 pageWidth={pageWidth}
                 pageHeight={pageHeight}
                 bottomStripHeight={immersive && hasTabBar ? bottomClearance : 0}
+                onFirstFramePainted={isFirstItem ? onFirstFramePainted : undefined}
               />
             )
-            : <PhotoVisual uris={item.mediaUris} pageWidth={pageWidth} pageHeight={pageHeight} onPageChange={setPhotoPageIndex} />}
+            : <PhotoVisual uris={item.mediaUris} pageWidth={pageWidth} pageHeight={pageHeight} onPageChange={setPhotoPageIndex} onFirstImagePainted={isFirstItem ? onFirstFramePainted : undefined} />}
           {item.contentType !== 'video' && item.mediaUris.length > 1 && (
             <View style={styles.mediaDots} pointerEvents="none">
               {item.mediaUris.slice(0, 5).map((_, index) => <View key={index} style={[styles.mediaDot, index === photoPageIndex && styles.mediaDotActive]} />)}
@@ -2191,6 +2236,61 @@ export default function FeedScreen({
   // demand sentinel sits at index 0.
   const buyerOffset = buyerMode ? 1 : 0;
 
+  // First-poster overlay: see the plain <Image> rendered directly in this
+  // component's return below, outside the FlatList entirely. It needs
+  // whatever poster the real first *content* item (i.e. `displayItems`
+  // skipping the buyer demand-page sentinel, which has no poster of its
+  // own) resolves to — not always the bundled fashion preview: a real
+  // signed-in feed with actual seller posts has that seller's own post at
+  // this index once `sellerFeedPosts` has loaded. Falls back to the bundled
+  // preview poster (today's only real first-paint case in dev) when the
+  // resolved item has no poster of its own to show yet.
+  const firstContentItem = displayItems[buyerOffset] as SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem | undefined;
+  const overlayPosterSource: ImageSourcePropType | null = useMemo(() => {
+    if (firstContentItem && !isLiveStreamItem(firstContentItem) && !isJustDroppedItem(firstContentItem)) {
+      const spotlight = firstContentItem as SpotlightItem;
+      const fromItem = spotlight.videoPosterSource
+        ?? (spotlight.videoPosterUri ? { uri: spotlight.videoPosterUri } : undefined)
+        ?? (spotlight.contentType !== 'video' && spotlight.mediaUris?.[0] ? { uri: spotlight.mediaUris[0] } : undefined);
+      if (fromItem) return fromItem;
+    }
+    // Nothing resolved yet (a real account's first load, no cache, data
+    // still in flight) — only fall back to the bundled fashion-preview
+    // poster under the exact same condition `allItems` above includes those
+    // preview posts. Outside of that (a real production feed with no
+    // preview content), showing that bundled poster would be actively
+    // wrong, so render nothing and let the existing `FeedSkeleton` cover
+    // this brief window instead.
+    const previewEligible = __DEV__ && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you';
+    if (!previewEligible) return null;
+    return FASHION_PREVIEW_POSTER_SOURCES[0] ?? (FASHION_PREVIEW_POSTER_URIS[0] ? { uri: FASHION_PREVIEW_POSTER_URIS[0] } : null);
+  }, [firstContentItem, isCreatorFeed, buyerMode, showFashionPreview, feedTab]);
+
+  // First-paint overlay lifecycle: visible the instant this screen mounts
+  // (no dependency on the FlatList mounting, cell measurement, or the video
+  // player — see the plain <Image> in the return below), removed once the
+  // real first cell reports it has actually painted a frame
+  // (`onFirstFramePainted`, threaded through SpotlightPage/VideoVisual/
+  // PhotoVisual above). `overlayFading` drives a short crossfade rather than
+  // an instant pop so the handoff to the real content is never a visible
+  // flash either way.
+  const [overlayDismissed, setOverlayDismissed] = useState(false);
+  const overlayOpacity = useRef(new Animated.Value(1)).current;
+  const handleOverlayPosterLoaded = useCallback(() => {
+    // The measurable target the owner traces against — see PERF_NOTES.md /
+    // the PR description for how this is read back (performance.getEntries
+    // ByType('mark') / devtools) and compared against the .jpg's own
+    // request-finish timing.
+    perfMark('bt-first-poster-painted');
+  }, []);
+  const handleFirstCellPainted = useCallback(() => {
+    Animated.timing(overlayOpacity, {
+      toValue: 0,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(() => setOverlayDismissed(true));
+  }, [overlayOpacity]);
+
   // Avatar / name tap: open the creator's profile — or, inside that creator's
   // own video player, go back to the profile it was opened from.
   const handleOpenCreator = useCallback((item: SpotlightItem) => {
@@ -2519,6 +2619,38 @@ export default function FeedScreen({
       }}
     >
       {/*
+       * First-paint overlay (round 3 of the black-screen fix): a plain,
+       * absolutely-positioned, full-screen poster at opacity 1 from this
+       * component's very first render — no dependency on the FlatList
+       * mounting, a cell measuring its own size, or the video player
+       * reaching any particular state. This is deliberately the crudest
+       * possible thing that can paint a real pixel: everything downstream
+       * of it (`viewportReady` gating the FlatList on its own `onLayout`,
+       * VideoVisual's poster/player wiring) can be exactly as slow as it is
+       * today and the buyer still sees this within one frame of mount.
+       * Removed (120ms crossfade) once the real first cell reports it has
+       * actually painted a frame — see `onFirstFramePainted` threaded
+       * through SpotlightPage/VideoVisual/PhotoVisual above — so it never
+       * lingers over, or pops against, live content.
+       */}
+      {overlayPosterSource && !overlayDismissed && (
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { zIndex: 6, opacity: overlayOpacity }]}
+        >
+          <CachedImage
+            source={overlayPosterSource}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={0}
+            priority="high"
+            onLoad={handleOverlayPosterLoaded}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+        </Animated.View>
+      )}
+      {/*
        * Only cover the screen with the skeleton when there is truly nothing
        * to show yet (displayItems empty — e.g. a real account's first load
        * with no cache and no bundled preview content). Buyer Home always
@@ -2668,6 +2800,7 @@ export default function FeedScreen({
               onNotInterested={handleNotInterested}
               soundOn={soundOn}
               onToggleSound={toggleSound}
+              onFirstFramePainted={contentIndex === 0 ? handleFirstCellPainted : undefined}
             />
           );
         }}
