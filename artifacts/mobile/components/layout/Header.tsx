@@ -126,7 +126,7 @@ export function Header({
                   onPress={action.onPress}
                   style={[rootStyles.iconBtn, action.disabled && { opacity: 0.4 }]}
                 >
-                  <Feather name={action.icon} size={ICON.md} color={theme.text} />
+                  <Feather name={action.icon} size={ICON.lg} color={theme.text} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -195,7 +195,7 @@ export function Header({
                   onPress={action.onPress}
                   style={[styles.iconBtn, action.disabled && { opacity: 0.4 }]}
                 >
-                  <Feather name={action.icon} size={ICON.md} color={theme.text} />
+                  <Feather name={action.icon} size={ICON.lg} color={theme.text} />
                 </TouchableOpacity>
               ))}
               {actions.length === 0 && <View style={styles.iconBtn} />}

@@ -127,7 +127,11 @@ export function getBuyerTabBarMetrics({ width, height, bottomInset, sideCircleCo
     bottomOffset,
     fieldHeight: capsuleHeight - (isTablet ? 12 : sizeClass === 'mini' ? 8 : 10),
     keyboardGap: 8,
-    iconSize: isTablet ? 27 : 25,
+    // Flat 24pt — the app-wide "tab bar" icon size (icon-consistency pass).
+    // Purely a glyph size: TabBarSlot's own width/height (and every other
+    // capsule measurement above) don't depend on it, so this doesn't move
+    // or resize anything else in the bar.
+    iconSize: 24,
     // A soft rounded pill roughly the size of a touch target, not a slot-wide
     // bar, so it reads like the reference's active pill rather than a segment.
     indicatorWidth: Math.min(itemWidth - 8, 64),
