@@ -8,12 +8,12 @@ import {
   Alert,
   ScrollView,
   TextInput,
-  KeyboardAvoidingView,
   Platform,
   Modal,
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';

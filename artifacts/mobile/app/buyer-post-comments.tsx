@@ -23,9 +23,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, FlatList, TextInput, Modal, Pressable, PanResponder,
-  KeyboardAvoidingView, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
+  View, Text, FlatList, TextInput, Modal, Pressable, PanResponder, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
 } from 'react-native';
+import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard-controller';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,6 +52,9 @@ import { buildPreviewComments } from '@/lib/previewComments';
 import { AppleEmoji, QUICK_REACTION_EMOJI } from '@/lib/appleEmoji';
 
 const MAX_COMMENT_LENGTH = 1000;
+// Links the comment list's KeyboardGestureArea to the composer's TextInput
+// (react-native-keyboard-controller, iOS) for interactive drag-to-dismiss.
+const COMMENT_INPUT_NATIVE_ID = 'buyer-post-comments-input';
 /** TikTok's own quick-reaction set, in TikTok's own order. */
 const QUICK_EMOJI = QUICK_REACTION_EMOJI;
 
@@ -1040,6 +1043,7 @@ export default function BuyerPostCommentsScreen() {
             </PressableScale>
           </View>
 
+          <KeyboardGestureArea style={{ flex: 1 }} textInputNativeID={COMMENT_INPUT_NATIVE_ID}>
           <FlatList
             ref={listRef}
             data={loading ? [] : visibleRows}
@@ -1097,6 +1101,7 @@ export default function BuyerPostCommentsScreen() {
             </View>
           ) : null}
         />
+          </KeyboardGestureArea>
 
         {toast ? (
           <View style={s.toast} pointerEvents="none" accessibilityLiveRegion="polite">
@@ -1182,6 +1187,7 @@ export default function BuyerPostCommentsScreen() {
                 <View style={s.inputShell}>
                   <TextInput
                     ref={inputRef}
+                    nativeID={COMMENT_INPUT_NATIVE_ID}
                     style={s.input}
                     value={inputText}
                     onChangeText={setInputText}

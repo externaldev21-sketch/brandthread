@@ -3,9 +3,10 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
-  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView,
+  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';
@@ -87,6 +88,7 @@ import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { CaptionBlock } from '@/components/buyer-feed/CaptionBlock';
 import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
+import { a11yHidden } from '@/lib/a11yHidden';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -1026,8 +1028,7 @@ function PosterOnlyVisual({
           style={[StyleSheet.absoluteFill, styles.letterboxBackdrop]}
           contentFit="cover"
           blurRadius={40}
-          accessibilityElementsHidden
-          importantForAccessibility="no"
+          {...a11yHidden(true, 'no')}
         />
       )}
       {posterImage ? (
@@ -1181,8 +1182,7 @@ function LiveVideoVisual({
             style={[StyleSheet.absoluteFill, styles.letterboxBackdrop]}
             contentFit="cover"
             blurRadius={40}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
+            {...a11yHidden(true, 'no')}
           />
         )}
         {showPoster && (
@@ -1526,8 +1526,7 @@ function SpotlightPageImpl({
             <Animated.View
               pointerEvents="none"
               style={[styles.speedPill, { opacity: speedPillOpacity, transform: [{ scale: speedPillOpacity.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
+              {...a11yHidden(true, 'no')}
             >
               <Feather name="fast-forward" size={12} color={ON_DARK} />
               <Text style={styles.speedPillText}>2x</Text>
@@ -2687,8 +2686,7 @@ export default function FeedScreen({
             transition={0}
             priority="high"
             onLoad={handleOverlayPosterLoaded}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
+            {...a11yHidden(true, 'no')}
           />
         </Animated.View>
       )}

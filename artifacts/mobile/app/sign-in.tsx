@@ -2,13 +2,13 @@
  * Sign-in screen — Brandthread premium dark design
  * Pure sign-in: email/password, Google OAuth, Apple OAuth
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, TextInput, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  View, Text, TextInput, StyleSheet, Platform, ActivityIndicator,
   ScrollView, StatusBar,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import GoogleGlyph from '@/components/branding/GoogleGlyph';
 import { useSignIn, useSSO, useAuth, useUser } from '@clerk/expo';
@@ -63,6 +63,7 @@ export default function SignInScreen() {
 
   const [email, setEmail]           = useState('');
   const [password, setPassword]     = useState('');
+  const passwordRef = useRef<TextInput>(null);
   const [showPw, setShowPw]         = useState(false);
   const [oauthLoading, setOAuth]    = useState('');
   const [error, setError]           = useState('');
@@ -289,6 +290,7 @@ export default function SignInScreen() {
                 value={totpCode}
                 onChangeText={t => { setTotpCode(t.replace(/[^0-9]/g, '').slice(0, 6)); setTotpError(''); }}
                 keyboardType="number-pad"
+                textContentType="oneTimeCode"
                 maxLength={6}
                 autoFocus
                 returnKeyType="go"
@@ -415,8 +417,13 @@ export default function SignInScreen() {
               value={email}
               onChangeText={t => { setEmail(t); setError(''); }}
               autoCapitalize="none"
+              autoCorrect={false}
               keyboardType="email-address"
+              textContentType="emailAddress"
               autoComplete="email"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
 
@@ -434,13 +441,17 @@ export default function SignInScreen() {
             </View>
             <View style={s.pwRow}>
               <TextInput
+                ref={passwordRef}
                 style={[s.input, s.pwInput]}
                 placeholder="••••••••"
                 placeholderTextColor={theme.subtle}
                 value={password}
                 onChangeText={t => { setPassword(t); setError(''); }}
                 secureTextEntry={!showPw}
+                textContentType="password"
                 autoComplete="current-password"
+                returnKeyType="go"
+                onSubmitEditing={handleSignIn}
               />
               <IconButton
                 name={showPw ? 'eye-off' : 'eye'}

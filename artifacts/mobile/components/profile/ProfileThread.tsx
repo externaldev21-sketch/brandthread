@@ -13,6 +13,7 @@ import { useReducedMotion, useSharedValue, withDelay, withTiming, cancelAnimatio
 import { ThreadLine } from '@/components/onboarding/ThreadLine';
 import { welcomeThread } from '@/components/onboarding/threadGeometry';
 import { MOTION } from '@/components/onboarding/onboardingTokens';
+import { a11yHidden } from '@/lib/a11yHidden';
 
 export function ProfileThread({
   height,
@@ -52,8 +53,7 @@ export function ProfileThread({
       style={[{ height, opacity }, style]}
       onLayout={onLayout}
       pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      {...a11yHidden(true)}
     >
       {width > 0 ? (
         <ThreadLine geometry={geometry} width={width} height={height} progress={progress} color={color} needle={!reduceMotion} />

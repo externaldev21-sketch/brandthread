@@ -7,8 +7,9 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, Alert, TextInput,
-  StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform,
+  StyleSheet, TouchableOpacity, Platform,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
