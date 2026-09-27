@@ -17,7 +17,7 @@
  */
 import React from 'react';
 import { Animated, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
-import { FontAwesome } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
@@ -79,23 +79,35 @@ export function RightActionRail({
           accessibilityRole="button"
           accessibilityLabel={`View ${creator}'s profile`}
         >
-          <LiveHostRing hostId={hostId} size={38} showTag={!!engagement?.following} ringWidth={1.5}>
+          {/* ringGap 1.5 (was the component's own default, 3) — that
+              default was the "dark gap between the photo and the ring"
+              the owner flagged; the ring now hugs the avatar with only a
+              1.5pt gap, plus ringWidth 2. */}
+          <LiveHostRing hostId={hostId} size={38} showTag={!!engagement?.following} ringGap={1.5} ringWidth={2}>
             <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
               <Text style={styles.avatarText}>{initials}</Text>
             </View>
           </LiveHostRing>
         </TouchableOpacity>
         {!engagement?.following && (
-          <EngagementButton
-            icon="plus"
-            iconSize={9}
-            active={false}
-            inactiveColor="#000000"
+          // Plain TouchableOpacity, not EngagementButton — EngagementButton
+          // applies the `style` prop passed to it to its *inner* content
+          // view, not the outer touchable wrapper, so a positioning style
+          // like this one landed on a zero-size outer box and only
+          // happened to look roughly right by flow-layout coincidence.
+          // That's what let it drift onto the ring/initials; this needs
+          // exact placement (see the math in the PR description), so it's
+          // a plain absolutely-positioned button instead.
+          <TouchableOpacity
+            style={styles.followBadge}
+            activeOpacity={0.8}
+            accessibilityRole="button"
             accessibilityLabel={`Follow ${creator}`}
-            style={[styles.followBadge, { backgroundColor: ON_DARK }]}
             onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onFollow(); }}
             testID={`follow-btn-${testIdBase}`}
-          />
+          >
+            <Feather name="plus" size={11} color="#000000" />
+          </TouchableOpacity>
         )}
       </View>
 
@@ -207,11 +219,22 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
   // 16pt, black-on-white (not the seller's own accent color, which could
-  // wash out or clash against any given video) so it always reads clearly
-  // centered on the avatar's bottom edge.
+  // wash out or clash against any given video), positioned BELOW the ring
+  // (TikTok-style) rather than on top of it.
+  //
+  // The math (avatar 38pt, LiveHostRing's ringGap 1.5 / ringWidth 2 above):
+  //   ring outer radius  = avatar/2 + ringGap + ringWidth = 19 + 1.5 + 2 = 22.5
+  //   ring outer bottom  = avatar center-y (19) + 22.5 = 41.5
+  //   badge center-y     = ring outer bottom + 2         = 43.5
+  //   badge top          = badge center-y - badge/2 (8)  = 35.5
+  //   badge bottom       = badge center-y + badge/2 (8)  = 51.5
+  //   `bottom` offset from the avatar's own bottom (38)  = -(51.5 - 38) = -13.5
+  // avatarWrap centers its children (alignItems: 'center'), which is what
+  // centers this horizontally too since no left/right is set.
   followBadge: {
-    position: 'absolute', bottom: -6, width: 16, height: 16, borderRadius: RADII.pill,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
+    position: 'absolute', bottom: -13.5, width: 16, height: 16, borderRadius: RADII.pill,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: ON_DARK,
+    borderWidth: 1.5, borderColor: '#000',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
   btn: { width: 38, alignItems: 'center', gap: 3 },

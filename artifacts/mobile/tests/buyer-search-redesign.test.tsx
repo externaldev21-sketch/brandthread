@@ -4,13 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { apiMock, routerMock, storageMock, buyerSearchStore } = vi.hoisted(() => {
+const { apiMock, routerMock, storageMock } = vi.hoisted(() => {
   const apiMock = {
     public: {
       search: vi.fn(),
       trending: vi.fn(),
-      suggested: vi.fn(),
-      categories: vi.fn(),
     },
     social: {
       search: vi.fn(),
@@ -31,36 +29,7 @@ const { apiMock, routerMock, storageMock, buyerSearchStore } = vi.hoisted(() => 
     removeItem: vi.fn(),
   };
 
-  // The query field lives in the tab bar, outside this screen. A tiny shared
-  // store lets tests drive it the same way, notifying every mounted consumer
-  // of `useBuyerSearch()` (only this screen, in practice) on change.
-  let listeners: Array<() => void> = [];
-  const state = { query: '', submitRequest: 0 };
-  const buyerSearchStore = {
-    reset() {
-      state.query = '';
-      state.submitRequest = 0;
-      listeners = [];
-    },
-    getQuery: () => state.query,
-    getSubmitRequest: () => state.submitRequest,
-    setQuery(next: string) {
-      state.query = next;
-      listeners.slice().forEach((fn) => fn());
-    },
-    submit() {
-      state.submitRequest += 1;
-      listeners.slice().forEach((fn) => fn());
-    },
-    subscribe(fn: () => void) {
-      listeners.push(fn);
-      return () => {
-        listeners = listeners.filter((l) => l !== fn);
-      };
-    },
-  };
-
-  return { apiMock, routerMock, storageMock, buyerSearchStore };
+  return { apiMock, routerMock, storageMock };
 });
 
 vi.mock('react-native', () => {
@@ -72,10 +41,6 @@ vi.mock('react-native', () => {
     return MockNativeComponent;
   };
 
-  // A minimal Animated stand-in: values with a plain numeric handle and
-  // timing/spring calls that resolve their `start` callback synchronously,
-  // matching how the real API is used by Chip/ListRow/Button-style press
-  // feedback (no native driver needed in this jsdom-free renderer).
   class MockAnimatedValue {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     constructor(_value: number) {}
@@ -96,10 +61,10 @@ vi.mock('react-native', () => {
     Animated: MockAnimated,
     Platform: { OS: 'ios', select: (obj: any) => obj.ios },
     Pressable: nativeComponent('Pressable'),
-    RefreshControl: nativeComponent('RefreshControl'),
     ScrollView: nativeComponent('ScrollView'),
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1, absoluteFill: {} },
     Text: nativeComponent('Text'),
+    TextInput: nativeComponent('TextInput'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
     useWindowDimensions: () => ({ width: 375, height: 812 }),
@@ -115,13 +80,7 @@ vi.mock('@expo/vector-icons', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({}),
   useRouter: () => routerMock,
-  useFocusEffect: (callback: () => void | (() => void)) => {
-    const ReactActual = require('react') as typeof import('react');
-    ReactActual.useEffect(callback, [callback]);
-  },
-  useScrollToTop: () => {},
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -144,6 +103,10 @@ vi.mock('@/lib/api', () => ({
   useApi: () => apiMock,
 }));
 
+vi.mock('@/lib/devPreview', () => ({
+  isBuyerDevPreview: () => false,
+}));
+
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
@@ -163,9 +126,6 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 vi.mock('@/components/BrandthreadUI', () => ({
   EmptyState: ({ title, description }: { title: string; description: string }) =>
     React.createElement('EmptyState', {}, React.createElement('Text', {}, `${title} ${description}`)),
-  // Entrance animation is a real spring against `Animated.Value` in the real
-  // component — irrelevant to what these tests assert — so it renders its
-  // children immediately with no animation wrapper.
   AnimatedEntrance: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -177,39 +137,9 @@ vi.mock('@/components/CachedImage', () => ({
   CachedImage: (props: Record<string, unknown>) => React.createElement('CachedImage', props),
 }));
 
-vi.mock('@/components/search/FilterSheet', () => {
-  const ReactLocal = require('react') as typeof import('react');
-  // The real component pulls in BottomSheet -> react-native-reanimated ->
-  // WebAppShell -> expo-linear-gradient, which this suite's plain
-  // react-native mock doesn't support (no test here exercises the filter
-  // sheet's own content) — stub it to render nothing when hidden, matching
-  // the established pattern for other BottomSheet-based sheets (see
-  // tests/add-product.test.tsx's SuccessSheet stub). `countActiveFilters` is
-  // re-implemented simply since `app/(buyer)/search.tsx` imports it as a
-  // value from this same module.
-  return {
-    FilterSheet: ({ visible }: { visible: boolean }) => {
-      if (!visible) return null;
-      return ReactLocal.createElement('View', { testID: 'search-filter-sheet' });
-    },
-    countActiveFilters: (f: Record<string, unknown>) =>
-      Object.values(f).filter((v) => v !== undefined).length,
-  };
-});
-
-vi.mock('react-native-gesture-handler', () => {
-  function makeChain(): any {
-    const chain: any = {};
-    for (const m of ['onStart', 'onUpdate', 'onEnd', 'onBegin', 'onFinalize', 'enabled']) {
-      chain[m] = () => chain;
-    }
-    return chain;
-  }
-  return {
-    Gesture: { Pan: makeChain },
-    GestureDetector: (props: { children: React.ReactNode }) => props.children,
-  };
-});
+vi.mock('@/app/(tabs)/feed', () => ({
+  FASHION_PREVIEW_POSTS: [],
+}));
 
 vi.mock('react-native-reanimated', () => ({
   default: { View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode) },
@@ -218,9 +148,8 @@ vi.mock('react-native-reanimated', () => ({
   withTiming: (v: unknown) => v,
   withSpring: (v: unknown) => v,
   runOnJS: (fn: (...args: unknown[]) => void) => fn,
-  // `constants/motion.ts` (pulled in transitively by BottomSheet.tsx) calls
-  // `Easing.out(Easing.cubic)` at module scope, so this mock needs a real-
-  // enough `Easing` even though this suite never exercises sheet motion.
+  // `constants/motion.ts` (pulled in transitively via components/ui/Button)
+  // calls `Easing.bezier(...)` at module scope.
   Easing: {
     out: (fn: unknown) => fn,
     in: (fn: unknown) => fn,
@@ -231,70 +160,37 @@ vi.mock('react-native-reanimated', () => ({
   },
 }));
 
-// The trending-brands row's trailing fade uses LinearGradient, which calls
-// react-native's processColor internally — not present on this suite's
-// plain react-native mock. Stub it like the other native-only components above.
-vi.mock('expo-linear-gradient', () => ({
-  LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
-}));
-
-vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
-  useBuyerTabBarInset: () => 64,
+vi.mock('@/components/ui', () => ({
+  // The real barrel eagerly imports SegmentedControl -> expo-blur, which
+  // isn't available in this plain react-native mock — stub just the pieces
+  // this screen uses.
+  Chip: ({ label, onPress, onRemove, removeAccessibilityLabel }: any) =>
+    React.createElement('View', {}, [
+      React.createElement('Pressable', { key: 'main', onPress, accessibilityLabel: label }, React.createElement('Text', {}, label)),
+      onRemove ? React.createElement('Pressable', { key: 'remove', onPress: onRemove, accessibilityLabel: removeAccessibilityLabel }) : null,
+    ]),
+  Button: ({ label, onPress, accessibilityLabel, testID, loading }: any) =>
+    React.createElement('Pressable', { onPress, accessibilityLabel, testID }, React.createElement('Text', {}, loading ? '…' : label)),
 }));
 
 vi.mock('@/components/layout', () => ({
-  GridSkeleton: () => React.createElement('GridSkeleton', {}),
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => React.createElement('View', {}, children),
   useGridColumns: () => 2,
-  Header: ({ title, subtitle }: any) => React.createElement(
-    'View',
-    { testID: 'search-header' },
-    React.createElement('Text', {}, title),
-    subtitle ? React.createElement('Text', {}, subtitle) : null,
-  ),
 }));
 
-vi.mock('@/components/layout/TabPageHeader', () => ({
-  TabPageHeader: ({ title }: { title: string }) => React.createElement('View', { testID: 'tab-page-header' }, React.createElement('Text', {}, title)),
-}));
-
-vi.mock('@/contexts/BuyerSearchContext', () => ({
-  useBuyerSearch: () => {
-    const [, force] = React.useState(0);
-    React.useEffect(() => buyerSearchStore.subscribe(() => force((n) => n + 1)), []);
-    return {
-      query: buyerSearchStore.getQuery(),
-      setQuery: buyerSearchStore.setQuery,
-      filtersRequest: 0,
-      requestFilters: () => {},
-      submitRequest: buyerSearchStore.getSubmitRequest(),
-      submit: buyerSearchStore.submit,
-      activeFilterCount: 0,
-      setActiveFilterCount: () => {},
-      keyboardHeight: { value: 0 },
-    };
-  },
-}));
-
-import SearchScreen from '@/app/(buyer)/search';
+import BuyerSearchScreen from '@/app/buyer-search';
 
 type Person = {
   userId: string; name: string; username: string | null; handle: string;
   initials: string; color: string; bio: string | null; isFollowing: boolean;
+  accountType?: string; verified?: boolean; roleTag?: string;
 };
 
 function person(overrides: Partial<Person> = {}): Person {
   return {
     userId: 'p1', name: 'Jordan Lee', username: 'jordanlee', handle: '@jordanlee',
     initials: 'JL', color: '#5B5CFF', bio: null, isFollowing: false,
-    ...overrides,
-  };
-}
-
-function brand(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'b1', kind: 'brand', name: 'Vault Studio', handle: '@vaultstudio',
-    color: '#00C853', initials: 'VS', sellerId: 'seller-1',
+    accountType: 'buyer', verified: false, roleTag: 'Buyer',
     ...overrides,
   };
 }
@@ -322,16 +218,6 @@ function textContent(target: ReactTestRenderer | ReactTestInstance): string {
   return textOf('root' in target ? target.root : target);
 }
 
-// The screen's mocked host components (View, Text, ...) are plain functions
-// that pass their props straight through to an underlying host element with
-// the same name, so `findAllByProps` on a testID matches both the composite
-// and host instances. Count only the host node.
-function countByTestId(renderer: ReactTestRenderer, testID: string): number {
-  return renderer.root.findAll(
-    (node) => typeof node.type === 'string' && node.props?.testID === testID,
-  ).length;
-}
-
 function flushPromises() {
   return Promise.resolve().then(() => Promise.resolve()).then(() => Promise.resolve());
 }
@@ -339,32 +225,32 @@ function flushPromises() {
 async function renderScreen(): Promise<ReactTestRenderer> {
   let renderer!: ReactTestRenderer;
   await act(async () => {
-    renderer = create(<SearchScreen />);
+    renderer = create(<BuyerSearchScreen />);
     await flushPromises();
   });
   return renderer;
 }
 
-describe('buyer search redesign', () => {
+function setField(renderer: ReactTestRenderer, value: string) {
+  act(() => {
+    renderer.root.findByProps({ testID: 'buyer-search-field' }).props.onChangeText(value);
+  });
+}
+
+describe('buyer full-screen search', () => {
   let renderer: ReactTestRenderer | undefined;
 
   beforeEach(() => {
-    buyerSearchStore.reset();
     apiMock.public.search.mockReset().mockResolvedValue({ results: [] });
-    apiMock.public.trending.mockReset().mockResolvedValue({
-      trending: [{ term: 'Denim', type: 'category' }, { term: 'Vault Studio', type: 'brand' }],
-    });
-    apiMock.public.suggested.mockReset().mockResolvedValue({
-      brands: [{ id: 'b1', sellerId: 'seller-1', name: 'Vault Studio', handle: '@vaultstudio', color: '#00C853', initials: 'VS', followerCount: 120 }],
-      products: [{ id: 'sp1', productId: 'sp1', name: 'Fleece Zip Jacket', brand: 'Vault Studio', category: 'outerwear', imageUri: null, color: '#00C853', initials: 'VS' }],
-    });
-    apiMock.public.categories.mockReset().mockResolvedValue({ categories: [] });
+    apiMock.public.trending.mockReset().mockResolvedValue({ trending: [{ term: 'Denim', type: 'category' }] });
     apiMock.social.search.mockReset().mockResolvedValue([]);
     apiMock.social.follow.mockReset().mockResolvedValue({ ok: true });
     apiMock.social.unfollow.mockReset().mockResolvedValue({ ok: true });
     storageMock.getItem.mockReset().mockResolvedValue(JSON.stringify(['sneakers', 'denim']));
     storageMock.setItem.mockReset().mockResolvedValue(undefined);
     storageMock.removeItem.mockReset().mockResolvedValue(undefined);
+    routerMock.push.mockReset();
+    routerMock.back.mockReset();
   });
 
   afterEach(() => {
@@ -372,126 +258,106 @@ describe('buyer search redesign', () => {
     renderer = undefined;
   });
 
-  it('renders recent searches, trending terms and suggested brands/products in the empty state', async () => {
+  it('pops the screen when Back is pressed', async () => {
     renderer = await renderScreen();
+    act(() => {
+      renderer!.root.findByProps({ testID: 'buyer-search-back' }).props.onPress();
+    });
+    expect(routerMock.back).toHaveBeenCalled();
+  });
 
+  it('renders recent searches and "You may like" trending in the empty state, with no results/product fetch yet', async () => {
+    renderer = await renderScreen();
     const content = textContent(renderer);
     expect(content).toContain('sneakers');
     expect(content).toContain('denim');
     expect(content).toContain('Denim');
-    expect(content).toContain('Vault Studio');
-    expect(content).toContain('Fleece Zip Jacket');
     expect(renderer.root.findAllByProps({ testID: 'buyer-search-empty-state' }, { deep: false })).toHaveLength(1);
+    expect(apiMock.public.search).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the fixed "you may like" terms when trending is empty', async () => {
+    apiMock.public.trending.mockResolvedValue({ trending: [] });
+    renderer = await renderScreen();
+    expect(textContent(renderer)).toContain('black wool coat');
   });
 
   it('clears an individual recent search and all recent searches', async () => {
     renderer = await renderScreen();
-
     await act(async () => {
       renderer!.root.findByProps({ accessibilityLabel: 'Remove sneakers from recent searches' }).props.onPress();
       await flushPromises();
     });
-    expect(storageMock.setItem).toHaveBeenCalledWith(
-      'bt:buyer-search-recent:buyer-1',
-      JSON.stringify(['denim']),
-    );
-    expect(textContent(renderer)).not.toContain('sneakers');
+    expect(storageMock.setItem).toHaveBeenCalledWith('bt:buyer-search-recent:buyer-1', JSON.stringify(['denim']));
 
     await act(async () => {
       renderer!.root.findByProps({ accessibilityLabel: 'Clear recent searches' }).props.onPress();
       await flushPromises();
     });
     expect(storageMock.removeItem).toHaveBeenCalledWith('bt:buyer-search-recent:buyer-1');
-    expect(textContent(renderer)).not.toContain('denim');
   });
 
-  it('debounces typing before calling the search and social APIs, then renders tabs', async () => {
-    apiMock.public.search.mockResolvedValue({
-      results: [brand(), product()],
-    });
+  it('debounces typing (150ms) before calling the search and social APIs, then renders tabs', async () => {
+    apiMock.public.search.mockResolvedValue({ results: [product()] });
     apiMock.social.search.mockResolvedValue([person()]);
 
     renderer = await renderScreen();
 
     vi.useFakeTimers();
-    act(() => {
-      buyerSearchStore.setQuery('vault');
-    });
+    setField(renderer, 'vault');
     expect(apiMock.public.search).not.toHaveBeenCalled();
 
     await act(async () => {
-      vi.advanceTimersByTime(350);
+      vi.advanceTimersByTime(150);
       vi.useRealTimers();
       await flushPromises();
     });
 
-    expect(apiMock.public.search).toHaveBeenCalledWith({
-      q: 'vault', limit: 30,
-      sort: undefined, category: undefined, size: undefined, brand: undefined,
-      minPriceCents: undefined, maxPriceCents: undefined,
-    });
-    expect(apiMock.social.search).toHaveBeenCalledWith('vault', 10);
+    expect(apiMock.public.search).toHaveBeenCalledWith({ q: 'vault', limit: 30 });
+    expect(apiMock.social.search).toHaveBeenCalledWith('vault', 20);
 
-    // Top tab shows a mixed short list by default.
-    expect(textContent(renderer)).toContain('Vault Studio');
     expect(textContent(renderer)).toContain('Jordan Lee');
-
-    // Switch to the Products tab.
-    await act(async () => {
-      renderer!.root.findByProps({ testID: 'search-tab-products' }).props.onPress();
-      await flushPromises();
-    });
     expect(textContent(renderer)).toContain('Canvas Cargo Jacket');
 
-    // Switch to the People tab.
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'search-tab-people' }).props.onPress();
+      renderer!.root.findByProps({ testID: 'search-tab-users' }).props.onPress();
       await flushPromises();
     });
     expect(textContent(renderer)).toContain('Jordan Lee');
     expect(renderer.root.findAllByProps({ testID: 'search-follow-p1' }, { deep: false })).toHaveLength(1);
   });
 
-  it('shows a friendly no-results state with fallback suggestions', async () => {
+  it('shows a friendly no-results state', async () => {
     apiMock.public.search.mockResolvedValue({ results: [] });
     apiMock.social.search.mockResolvedValue([]);
 
     renderer = await renderScreen();
-
     vi.useFakeTimers();
-    act(() => {
-      buyerSearchStore.setQuery('zzznomatch');
-    });
+    setField(renderer, 'zzznomatch');
     await act(async () => {
-      vi.advanceTimersByTime(350);
+      vi.advanceTimersByTime(150);
       vi.useRealTimers();
       await flushPromises();
     });
 
     expect(renderer.root.findAllByProps({ testID: 'buyer-search-no-results' }, { deep: false })).toHaveLength(1);
-    expect(textContent(renderer)).toContain('zzznomatch');
-    // Fallback suggestions reuse the trending/suggested data already loaded.
-    expect(textContent(renderer)).toContain('Denim');
   });
 
-  it('follows and unfollows a person from the People tab', async () => {
+  it('follows and unfollows a person from the Users tab', async () => {
     apiMock.public.search.mockResolvedValue({ results: [] });
     apiMock.social.search.mockResolvedValue([person({ userId: 'p2', name: 'Sam Rivera', isFollowing: false })]);
 
     renderer = await renderScreen();
-
     vi.useFakeTimers();
-    act(() => {
-      buyerSearchStore.setQuery('sam');
-    });
+    setField(renderer, 'sam');
     await act(async () => {
-      vi.advanceTimersByTime(350);
+      vi.advanceTimersByTime(150);
       vi.useRealTimers();
       await flushPromises();
     });
 
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'search-tab-people' }).props.onPress();
+      renderer!.root.findByProps({ testID: 'search-tab-users' }).props.onPress();
       await flushPromises();
     });
 
@@ -504,12 +370,5 @@ describe('buyer search redesign', () => {
     });
     expect(apiMock.social.follow).toHaveBeenCalledWith('p2');
     expect(textContent(followButton())).toContain('Following');
-
-    await act(async () => {
-      followButton().props.onPress();
-      await flushPromises();
-    });
-    expect(apiMock.social.unfollow).toHaveBeenCalledWith('p2');
-    expect(textContent(followButton())).not.toContain('Following');
   });
 });

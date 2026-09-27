@@ -7,11 +7,10 @@
  * it never re-derives it locally.
  */
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, ICON } from '@/lib/theme';
 import { ThreadCashBillIcon } from './ThreadCashBill';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
@@ -34,8 +33,8 @@ export function ThreadCashStreakRow({
   const claimedThroughDay = streak.alreadyCheckedInToday ? dayInCycle : dayInCycle - 1;
 
   return (
-    <PressableScale
-      style={styles.wrap}
+    <Pressable
+      style={[styles.wrap, { backgroundColor: '#141414' }]} // theme-exempt: fixed dark card per spec
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
@@ -71,17 +70,21 @@ export function ThreadCashStreakRow({
           );
         })}
       </View>
-    </PressableScale>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.xs },
+  // Card: 16pt side gutters (matching the rest of the page), 14 radius, 12pt
+  // padding, with the dots row 10pt below the title row.
+  wrap: { marginHorizontal: SP.md, borderRadius: 14, padding: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   title: { fontSize: FS.sm, fontFamily: FONT.semibold },
   subtitle: { fontSize: FS.xs, fontFamily: FONT.medium },
-  dotsRow: { flexDirection: 'row', gap: SP.xs, justifyContent: 'space-between' },
-  dot: { width: 32, height: 32, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  // No inter-dot `gap` — `justifyContent: 'space-between'` alone spreads all
+  // 7 dots evenly across the card's full width.
+  dotsRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  dot: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dotText: { fontSize: FS.xs, fontFamily: FONT.semibold },
 });

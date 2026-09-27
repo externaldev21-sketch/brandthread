@@ -92,6 +92,17 @@ function formatUser(u: UserRow) {
   };
 }
 
+/**
+ * Buyer/seller role tag shown next to a name in account search results.
+ * Sellers show their storefront name when they've set one, so a shopper can
+ * tell "Vault Studio" apart from a same-named personal account at a glance.
+ */
+export function roleTagFor(u: UserRow): string {
+  if (u.accountType === "buyer") return "Buyer";
+  const store = u.brandName?.trim();
+  return store ? store : "Seller";
+}
+
 function countOne(arr: { n: number }[] | undefined) {
   return arr?.[0]?.n ?? 0;
 }
@@ -607,21 +618,42 @@ router.get("/followers", async (req, res) => {
 });
 
 // ─── GET /api/social/search?q=&limit= ────────────────────────────────────────
+// Matches both buyer and seller (and "both") real user profiles — this is a
+// people search, not a brand/storefront directory — ranked exact match, then
+// prefix match, then contains/fuzzy match; verified accounts and accounts
+// with more followers are tie-broken ahead within each tier.
 router.get("/search", async (req, res) => {
   const myId  = (req as any).clerkUserId as string;
   const q     = ((req.query.q as string) || "").trim();
-  const limit = Math.min(parseInt((req.query.limit as string) || "20", 10), 50);
+  const limit = Math.min(parseInt((req.query.limit as string) || "20", 10) || 20, 50);
   if (q.length < 1) { res.json([]); return; }
 
   const term = normalizeSearchTerm(q);
   if (term.length < 2) { res.json([]); return; }
   const pattern = containsSearchPattern(term);
+  const escapedTerm = term.replace(/[\\%_]/g, (character) => `\\${character}`);
+  const prefixPattern = `${escapedTerm}%`;
   const nameCol = sql`COALESCE(${users.displayName}, ${users.name}, ${users.username}, '')`;
   const relevance = relevanceScore(nameCol, term);
+  // 0 = exact match, 1 = prefix match, 2 = contains/fuzzy match — on either
+  // the display name or the @handle, whichever ranks the row better.
+  const matchTier = sql<number>`LEAST(
+    CASE WHEN ${nameCol} ILIKE ${escapedTerm} THEN 0
+         WHEN ${nameCol} ILIKE ${prefixPattern} THEN 1
+         ELSE 2 END,
+    CASE WHEN COALESCE(${users.username}, '') ILIKE ${escapedTerm} THEN 0
+         WHEN COALESCE(${users.username}, '') ILIKE ${prefixPattern} THEN 1
+         ELSE 2 END
+  )`;
+  // Follower count isn't a column — a correlated subquery is the simplest
+  // correct way to fold it into ORDER BY without a full aggregate query.
+  const followerCountExpr = sql<number>`(SELECT COUNT(*)::int FROM ${follows} f WHERE f.following_id = ${users.clerkId})`;
+
   const rows = await db.select().from(users)
     .where(
       and(
-        eq(users.accountType, "buyer"),
+        inArray(users.accountType, ["buyer", "seller", "both"]),
+        eq(users.isSystemAccount, false),
         ne(users.clerkId, myId),
         isNull(users.suspendedAt),
         isNull(users.deletedAt),
@@ -630,10 +662,11 @@ router.get("/search", async (req, res) => {
           fuzzyMatch(users.name,        term, pattern),
           fuzzyMatch(users.displayName, term, pattern),
           fuzzyMatch(users.username,    term, pattern),
+          fuzzyMatch(users.brandName,   term, pattern),
         )
       )
     )
-    .orderBy(desc(relevance), asc(users.clerkId))
+    .orderBy(asc(matchTier), desc(users.verified), desc(followerCountExpr), desc(relevance), asc(users.clerkId))
     .limit(limit);
 
   if (!rows.length) { res.json([]); return; }
@@ -647,7 +680,12 @@ router.get("/search", async (req, res) => {
     ).map(r => r.followingId)
   );
 
-  res.json(rows.map(u => ({ ...formatUser(u), isFollowing: followingSet.has(u.clerkId) })));
+  res.json(rows.map(u => ({
+    ...formatUser(u),
+    isFollowing: followingSet.has(u.clerkId),
+    verified: u.verified,
+    roleTag: roleTagFor(u),
+  })));
 });
 
 // ─── GET /api/social/suggested?limit= — "Suggested for you" ─────────────────

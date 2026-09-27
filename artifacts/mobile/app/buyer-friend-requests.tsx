@@ -318,7 +318,7 @@ export default function BuyerFriendRequestsScreen() {
     <View style={s.container}>
       <Header
         title="Connections"
-        actions={[{ icon: 'search', onPress: () => router.push('/(buyer)/search' as never), accessibilityLabel: 'Search' }]}
+        actions={[{ icon: 'search', onPress: () => router.push('/buyer-search' as never), accessibilityLabel: 'Search' }]}
       />
 
       {/* Tabs */}
