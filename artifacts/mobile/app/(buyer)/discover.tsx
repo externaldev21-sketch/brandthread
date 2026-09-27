@@ -1192,6 +1192,7 @@ export default function DiscoverScreen() {
           ) : trendingItems.length === 0 ? (
             <EmptyState
               icon="activity"
+              illustration="trending"
               title="No trending posts right now"
               description="Posts with the most likes and saves across the platform show up here."
               action={{ label: 'Explore feed', onPress: () => router.push('/(buyer)/feed' as never) }}

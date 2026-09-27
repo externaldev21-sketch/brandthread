@@ -411,6 +411,7 @@ export default function BuyerOrdersScreen() {
             ) : (
               <EmptyState
                 icon="shopping-bag"
+                illustration="tee"
                 title="Your first find is still out there."
                 description="When something catches your eye, every update from checkout to doorstep will live here."
                 action={{

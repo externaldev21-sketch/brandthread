@@ -35,6 +35,10 @@ export function useAnimatedReaction() {
   // no-op in tests
 }
 
+export function useAnimatedProps<T>(fn: () => T): T {
+  return fn();
+}
+
 function identity(v: unknown) { return v; }
 export const withTiming = (toValue: unknown, _config?: unknown, callback?: (finished: boolean) => void) => {
   callback?.(true);
