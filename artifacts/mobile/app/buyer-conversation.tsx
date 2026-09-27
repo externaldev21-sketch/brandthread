@@ -7,7 +7,6 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
@@ -193,7 +192,7 @@ const BUBBLE_COLUMN_LEFT = SP.md + AVATAR_SIZE + AVATAR_GAP;
 // One consistent size for every circular control in the composer row (the
 // "+" attach button, the in-pill Thread Cash coin, and the mic⇄send morph) —
 // the previous 44/36/44 mix is exactly what read as mismatched.
-const COMPOSER_CONTROL = 40;
+const COMPOSER_CONTROL = 36;
 // Mic / gallery / Thread Cash bill inside the pill are all this size, evenly
 // spaced — per the Instagram/Threads composer reference.
 const COMPOSER_ICON = 22;
@@ -487,7 +486,7 @@ export default function BuyerConversationScreen() {
   // dynamic-island polyfill), so insets.top reads 0 on web and the header
   // clipped under the dynamic island in a device-frame screenshot — same
   // fix already applied to app/(buyer)/discover.tsx and inbox.tsx.
-  const headerTopPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const headerTopPad = Platform.OS === 'web' ? 67 : insets.top;
   // Same reasoning at the bottom: react-native-web never fills in a real
   // bottom safe-area inset (no home-indicator polyfill), so insets.bottom
   // reads 0 on web and the composer sat flush against the viewport edge —
@@ -1175,16 +1174,6 @@ export default function BuyerConversationScreen() {
               </View>
             ))}
           </ScrollView>
-          {/* The last chip peeks under a right-edge fade instead of getting
-              abruptly clipped by the ScrollView's edge (same treatment as
-              the inbox's stories rail). */}
-          <LinearGradient
-            pointerEvents="none"
-            colors={['transparent', theme.background]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.quickReplyFade}
-          />
         </View>
       );
     }
@@ -1319,11 +1308,11 @@ export default function BuyerConversationScreen() {
                 backgroundColor: isOwn ? theme.accent : theme.cardElevated,
                 // IG-style grouping: the corner touching an adjacent bubble
                 // in the same group (same side as the avatar column) is
-                // reduced to 6pt; every outer corner stays the full 20pt.
-                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? 6 : 20,
-                borderTopRightRadius: (isOwn && !isFirstInGroup) ? 6 : 20,
-                borderBottomRightRadius: (isOwn && !isLastInGroup) ? 6 : 20,
-                borderBottomLeftRadius: (!isOwn && !isLastInGroup) ? 6 : 20,
+                // reduced to 6pt; every outer corner stays the full 18pt.
+                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? 6 : RADIUS.lg,
+                borderTopRightRadius: (isOwn && !isFirstInGroup) ? 6 : RADIUS.lg,
+                borderBottomRightRadius: (isOwn && !isLastInGroup) ? 6 : RADIUS.lg,
+                borderBottomLeftRadius: (!isOwn && !isLastInGroup) ? 6 : RADIUS.lg,
                 alignSelf: isOwn ? 'flex-end' : 'flex-start',
                 shadowColor: theme.shadowColor,
                 shadowOffset: { width: 0, height: 2 },
@@ -1458,7 +1447,6 @@ export default function BuyerConversationScreen() {
         <PressableScale rippleEnabled={false}
           onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
           style={s.roundBtn}
-          noMinHeight
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           testID="conversation-back"
           accessibilityRole="button"
@@ -1514,7 +1502,6 @@ export default function BuyerConversationScreen() {
         {conv && !isAgentConv && (
           <PressableScale rippleEnabled={false}
             style={s.roundBtn}
-            noMinHeight
             onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             testID="conversation-call-voice"
@@ -1526,7 +1513,6 @@ export default function BuyerConversationScreen() {
         )}
         <PressableScale rippleEnabled={false}
           style={s.roundBtn}
-          noMinHeight
           onPress={() => { hapticPrimaryAction(); openOptions(); }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           testID="conversation-options"
@@ -1702,7 +1688,6 @@ export default function BuyerConversationScreen() {
                 hairline circle, aligned to the pill's own center. */}
             <PressableScale rippleEnabled={false}
               bounce={false}
-              noMinHeight
               onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
               style={[s.roundInputBtn, { backgroundColor: theme.cardElevated, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border }]}
               disabled={isUploading || isSending}
@@ -1739,7 +1724,6 @@ export default function BuyerConversationScreen() {
                 >
                   <PressableScale rippleEnabled={false}
                     bounce={false}
-                    noMinHeight
                     onPressIn={startRecording}
                     onPressOut={stopRecording}
                     disabled={isUploading || isSending}
@@ -1760,7 +1744,6 @@ export default function BuyerConversationScreen() {
                 >
                   <PressableScale rippleEnabled={false}
                     bounce={false}
-                    noMinHeight
                     onPress={() => { hapticPrimaryAction(); handleSend(); }}
                     disabled={!canSend}
                     style={s.morphFaceInner}
@@ -1778,7 +1761,6 @@ export default function BuyerConversationScreen() {
                   Thread Cash bill, per the Instagram/Threads composer. */}
               <PressableScale rippleEnabled={false}
                 bounce={false}
-                noMinHeight
                 onPress={handlePickPhoto}
                 style={s.composerIconBtn}
                 disabled={isUploading || isSending}
@@ -1810,7 +1792,6 @@ export default function BuyerConversationScreen() {
                   renderTrigger={(open) => (
                     <PressableScale rippleEnabled={false}
                       bounce={false}
-                      noMinHeight
                       onPress={() => {
                         // Still checking mutual-follow status — silent no-op.
                         // Never surface a "checking…" string to the user.
@@ -2333,7 +2314,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: 12,
     fontFamily: FONT.medium,
     color: theme.muted,
-    fontVariant: ['tabular-nums'],
   },
 
   // Unread divider
@@ -2399,7 +2379,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   bubbleTime: {
     fontSize: 10,
     fontFamily: FONT.regular,
-    fontVariant: ['tabular-nums'],
   },
   receiptIcon: {
     marginLeft: 2,
@@ -2445,9 +2424,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // left edge as every incoming bubble/card — never inside a bubble.
   quickReplyOuterRow: {
     paddingLeft: BUBBLE_COLUMN_LEFT,
-    position: 'relative',
   },
-  quickReplyFade: { position: 'absolute', top: 0, right: 0, bottom: 0, width: 28 },
   quickReplyScrollContent: {
     flexDirection: 'row',
     paddingRight: SP.md,
@@ -2605,10 +2582,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     // A bare <textarea> on web ships its own default padding/line-height —
     // the explicit `height` set inline on the element (from
     // composerContentHeight) is what actually keeps it at rest/growing
-    // correctly; this minHeight is just a native-platform floor, matching
-    // that same one-line formula rather than the (larger) composer control
-    // size so the rest-state text box stays perfectly centered.
-    minHeight: COMPOSER_LINE_HEIGHT + COMPOSER_TEXT_V_PADDING * 2,
+    // correctly; this minHeight is just a native-platform floor.
+    minHeight: COMPOSER_CONTROL,
     ...(Platform.OS === 'web' ? { paddingTop: COMPOSER_TEXT_V_PADDING, paddingBottom: COMPOSER_TEXT_V_PADDING } : null),
   },
   // Sits inside the pill, after mic/send and gallery.
