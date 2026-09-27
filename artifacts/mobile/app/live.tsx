@@ -45,6 +45,7 @@ import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { LiveEmptyState } from '@/components/live/LiveEmptyState';
 import { VideoVisual } from './(tabs)/feed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { a11yHidden } from '@/lib/a11yHidden';
 
 /** Same preference key as the Threads feed, so sound on/off carries over. */
 const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
@@ -138,8 +139,7 @@ function LivePage({
               source={video.posterSource ?? { uri: video.posterUri! }}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
-              accessibilityElementsHidden
-              importantForAccessibility="no"
+              {...a11yHidden(true, 'no')}
             />
           ) : null}
           <VideoVisual
