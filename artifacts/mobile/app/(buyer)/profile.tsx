@@ -1,14 +1,16 @@
 /**
- * Buyer's own profile — rendered into the same ProfileShell as every seller
- * profile, filled with the buyer's own pieces: their posted photos/videos,
- * stories + highlights, Posts / Tagged / Reposts / Saved tabs, My Orders,
- * the Thread Cash pill (flag-gated), friends and messages.
+ * Buyer's own profile — TikTok/Instagram/Threads-style layout (see the
+ * Mobbin references cited in this change's PR description): a compact top
+ * bar clear of the notch/Dynamic Island, a short cover strip, an overlapping
+ * avatar, inline TikTok-style stats, one row of small actions, the Thread
+ * Cash streak, and a content tab bar (Posts / Saved / Liked / Orders).
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Modal, Animated, Share, Linking, Alert, ScrollView,
+  View, Text, StyleSheet, Modal, Animated, Share, Linking, Alert, ScrollView, Platform, Pressable,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -18,7 +20,7 @@ import { hapticLight, hapticMedium, hapticSelection, hapticDestructiveConfirm } 
 import { FONT, FS, SP, RADIUS, ICON, OVERLAY } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import {
-  getMyProfile, getMyPosts, getMyReposts, getSavedItems,
+  getMyProfile, getMyPosts, getSavedItems,
   getPrivacySettings, archivePost, deletePost,
   subscribeSocial,
 } from '@/services/socialService';
@@ -28,44 +30,46 @@ import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
-import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import { getBuyerOrdersWithStatus } from '@/services/orderService';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import type { BuyerOrderView } from '@/services/orderTypes';
 import type {
-  BuyerSocialProfile, BuyerPost, RepostRecord, SavedItem, PrivacySettings,
+  BuyerSocialProfile, BuyerPost, SavedItem, PrivacySettings,
 } from '@/services/socialTypes';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatProfileCount } from '@/services/profileService';
-import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
-import {
-  InteractionLayer, ProfileButton, ProfileGlassButton, type ProfileStat, type ProfileTab,
-} from '@/components/profile/ProfileControls';
+import { ProfileMeta } from '@/components/profile/ProfileShell';
+import { InteractionLayer, ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
+import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
-import { ProfileStoriesRow } from '@/components/profile/ProfileStoriesRow';
 import {
-  CoverCoachmarkSheet, CoverHeroAffordance, CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia,
+  CoverCoachmarkSheet, CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia,
 } from '@/components/profile/ProfileCover';
 import { profileEmptyState, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRow';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
-// Statuses still "in flight" — an order in one of these is what the My Orders
-// card surfaces first; a fully-resolved order (delivered/cancelled/refunded/
-// disputed) falls back to just showing the most recent order overall.
-const ACTIVE_ORDER_STATUSES: BuyerOrderView['status'][] = ['new', 'processing', 'ready_to_ship', 'shipped'];
+const AVATAR = 88;
+const AVATAR_OVERLAP = 36;
+const COVER_HEIGHT = 160;
+// Same reasoning as TabPageHeader: outside a real device (or a preview frame
+// that emulates one) react-native-safe-area-context's web implementation
+// reads 0 for insets.top, which used to push this bar's pills up into the
+// Dynamic Island corner in the plain web preview.
+const WEB_TOP_FALLBACK = 67;
 
-const TABS = ['Posts', 'Tagged', 'Reposts', 'Saved'] as const;
+const TABS = ['Posts', 'Saved', 'Liked', 'Orders'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_ITEMS: ProfileTab[] = [
   { key: 'Posts', label: 'Posts', icon: 'grid' },
-  { key: 'Tagged', label: 'Tagged', icon: 'user' },
-  { key: 'Reposts', label: 'Reposts', icon: 'repeat' },
   { key: 'Saved', label: 'Saved', icon: 'bookmark' },
+  { key: 'Liked', label: 'Liked', icon: 'heart' },
+  { key: 'Orders', label: 'Orders', icon: 'package' },
 ];
 
 function savedTypeIcon(type: string): keyof typeof Feather.glyphMap {
@@ -147,6 +151,134 @@ function SheetRow({
   );
 }
 
+// ─── Top bar ──────────────────────────────────────────────────────────────────
+function CompactWalletChip({ balanceLabel, onPress, theme }: { balanceLabel: string; onPress: () => void; theme: AppThemePreset }) {
+  return (
+    <PressableScale
+      onPress={() => { hapticSelection(); onPress(); }}
+      accessibilityRole="button"
+      accessibilityLabel={`Thread Cash wallet, ${balanceLabel}`}
+      testID="profile-wallet-chip"
+      hitSlop={4}
+      style={[topBarStyles.walletChip, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
+    >
+      <ThreadCashBillIcon size={16} />
+      <Text style={[topBarStyles.walletText, { color: theme.text }]} numberOfLines={1}>{balanceLabel}</Text>
+    </PressableScale>
+  );
+}
+
+function TopBarIcon({ name, onPress, accessibilityLabel, theme, badge }: {
+  name: keyof typeof Feather.glyphMap;
+  onPress: () => void;
+  accessibilityLabel: string;
+  theme: AppThemePreset;
+  badge?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={() => { hapticLight(); onPress(); }}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={8}
+      style={topBarStyles.iconButton}
+    >
+      <Feather name={name} size={24} color={theme.text} />
+      {badge ? <View style={[topBarStyles.iconBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} /> : null}
+    </Pressable>
+  );
+}
+
+// ─── Actions row ──────────────────────────────────────────────────────────────
+function DarkActionButton({ label, onPress, testID, accessibilityHint }: {
+  label: string;
+  onPress: () => void;
+  testID?: string;
+  accessibilityHint?: string;
+}) {
+  return (
+    <View style={actionStyles.wrap}>
+      <PressableScale
+        onPress={() => { hapticLight(); onPress(); }}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityHint={accessibilityHint}
+        testID={testID}
+        style={actionStyles.button}
+      >
+        {(state) => (
+          <>
+            <InteractionLayer state={state as { pressed: boolean }} radius={8} theme={{ text: '#FFFFFF', accent: '#FFFFFF' } as AppThemePreset} />
+            <Text style={actionStyles.buttonText} numberOfLines={1}>{label}</Text>
+          </>
+        )}
+      </PressableScale>
+    </View>
+  );
+}
+
+function SquareIconButton({ icon, onPress, accessibilityLabel }: {
+  icon: keyof typeof Feather.glyphMap;
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
+  return (
+    <PressableScale
+      onPress={() => { hapticLight(); onPress(); }}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={actionStyles.square}
+    >
+      {(state) => (
+        <>
+          <InteractionLayer state={state as { pressed: boolean }} radius={8} theme={{ text: '#FFFFFF', accent: '#FFFFFF' } as AppThemePreset} />
+          <Feather name={icon} size={16} color="#FFFFFF" /* theme-exempt: fixed dark chip */ />
+        </>
+      )}
+    </PressableScale>
+  );
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+function TikTokStatsRow({ stats, loading, theme }: { stats: ProfileStat[]; loading?: boolean; theme: AppThemePreset }) {
+  return (
+    <View style={statsStyles.row}>
+      {stats.map((stat) => {
+        const content = (
+          <>
+            <Text style={[statsStyles.value, { color: loading ? theme.subtle : theme.text }]} numberOfLines={1}>
+              {loading ? '–' : stat.value}
+            </Text>
+            <Text style={[statsStyles.label, { color: theme.muted }]} numberOfLines={1}>{stat.label}</Text>
+          </>
+        );
+        return stat.onPress ? (
+          <PressableScale
+            key={stat.key}
+            style={statsStyles.cell}
+            onPress={() => { hapticSelection(); stat.onPress?.(); }}
+            accessibilityRole="button"
+            accessibilityLabel={stat.accessibilityLabel ?? `${stat.value} ${stat.label}`}
+            testID={`profile-stat-${stat.key}`}
+          >
+            {content}
+          </PressableScale>
+        ) : (
+          <View
+            key={stat.key}
+            style={statsStyles.cell}
+            accessible
+            accessibilityLabel={stat.accessibilityLabel ?? `${stat.value} ${stat.label}`}
+            testID={`profile-stat-${stat.key}`}
+          >
+            {content}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 // ─── Memoized non-grid cells ─────────────────────────────────────────────────
 const SavedCell = React.memo(function SavedCell({
   item, size, theme, onPress,
@@ -167,28 +299,46 @@ const SavedCell = React.memo(function SavedCell({
   );
 });
 
-const RepostCard = React.memo(function RepostCard({ repost, theme }: { repost: RepostRecord; theme: AppThemePreset }) {
+const OrderRow = React.memo(function OrderRow({ order, theme, onPress }: {
+  order: BuyerOrderView; theme: AppThemePreset; onPress: (order: BuyerOrderView) => void;
+}) {
+  const handlePress = useCallback(() => onPress(order), [onPress, order]);
   return (
-    <View style={[cellStyles.repostRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <View style={cellStyles.repostHeader}>
-        <Feather name="repeat" size={12} color={theme.muted} />
-        <Text style={[cellStyles.repostMeta, { color: theme.muted }]}>You reposted</Text>
+    <PressableScale
+      style={[cellStyles.orderCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+      onPress={handlePress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={`Order ${order.orderNumber}, ${order.status.replace(/_/g, ' ')}`}
+    >
+      {order.lineItems[0]?.imageUri ? (
+        <CachedImage source={{ uri: order.lineItems[0].imageUri }} style={cellStyles.orderCardImage} contentFit="cover" />
+      ) : (
+        <View style={[cellStyles.orderCardImage, cellStyles.orderCardImagePlaceholder, { backgroundColor: theme.cardElevated }]}>
+          <Feather name="shopping-bag" size={ICON.md} color={theme.muted} />
+        </View>
+      )}
+      <View style={cellStyles.orderCardBody}>
+        <Text style={[cellStyles.orderCardSeller, { color: theme.text }]} numberOfLines={1}>{order.sellerName}</Text>
+        <Text style={[cellStyles.orderCardMeta, { color: theme.muted }]} numberOfLines={1}>
+          {order.orderNumber} · {order.lineItems.length} item{order.lineItems.length === 1 ? '' : 's'}
+        </Text>
+        <OrderStatusTimeline status={order.status} compact />
       </View>
-      <Text style={[cellStyles.repostAuthor, { color: theme.text }]}>{repost.originalAuthorName}</Text>
-      <Text style={[cellStyles.repostHandle, { color: theme.muted }]}>{repost.originalAuthorHandle}</Text>
-      <Text style={[cellStyles.repostCaption, { color: theme.subtle }]} numberOfLines={2}>{repost.originalCaption}</Text>
-    </View>
+      <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+    </PressableScale>
   );
 });
 
 type ListRow =
   | { kind: 'post'; item: ProfileGridItem; post: BuyerPost }
-  | { kind: 'repost'; repost: RepostRecord }
-  | { kind: 'saved'; saved: SavedItem };
+  | { kind: 'saved'; saved: SavedItem }
+  | { kind: 'order'; order: BuyerOrderView };
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const barInset = useBuyerTabBarInset();
+  const insets = useSafeAreaInsets();
   const router  = useRouter();
   const { signOut } = useAuth();
   const { user } = useUser();
@@ -201,20 +351,18 @@ export default function ProfileScreen() {
   const listPadding = { paddingBottom: barInset + SP.lg };
   const savedColumns = layout.gridColumns >= 4 ? 3 : 2;
   const savedCellSize = Math.floor((layout.columnWidth - SP.md * 2) / savedColumns);
+  const topPad = Platform.OS === 'web' ? WEB_TOP_FALLBACK : insets.top;
 
   const accountRef = useRef(user?.id);
   accountRef.current = user?.id;
 
   const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
-  const [hasActiveStory, setHasActiveStory] = useState(false);
   const [posts, setPosts] = useState<BuyerPost[]>([]);
-  const [reposts, setReposts] = useState<RepostRecord[]>([]);
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Posts');
   const [refreshing, setRefreshing] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [myOrders, setMyOrders] = useState<BuyerOrderView[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -246,7 +394,6 @@ export default function ProfileScreen() {
     if (!user?.id) {
       setProfile(null);
       setPosts([]);
-      setReposts([]);
       setSavedItems([]);
       setLoading(false);
       return;
@@ -254,32 +401,25 @@ export default function ProfileScreen() {
     setLoadError(false);
     void loadCounts();
     try {
-      const [p, po, rp, sv, pr, bp, hl, myStories, ordersResult] = await Promise.all([
+      const [p, po, sv, pr, bp, ordersResult] = await Promise.all([
         getMyProfile(),
         getMyPosts(),
-        getMyReposts(),
         getSavedItems(),
         getPrivacySettings(),
         loadBuyerProfile(),
-        loadHighlights(),
-        api.social.myStories().catch(() => []),
         getBuyerOrdersWithStatus(user.id).catch(() => ({ orders: [] as BuyerOrderView[], fromCache: true })),
       ]);
       if (accountRef.current !== user?.id) return;
       setProfile(p);
       setPosts(po.filter(x => !x.isArchived && !x.isDraft));
-      setReposts(rp);
       setSavedItems(sv);
       setPrivacySettings(pr);
       setAvatarUri(bp.avatarUri || null);
-      setHighlights(hl);
-      setHasActiveStory(Array.isArray(myStories) && myStories.length > 0);
       setMyOrders(ordersResult.orders);
     } catch (error) {
       setLoadError(true);
       setProfile(null);
       setPosts([]);
-      setReposts([]);
       setSavedItems([]);
     } finally {
       setLoading(false);
@@ -355,25 +495,10 @@ export default function ProfileScreen() {
     setActiveTab(tab as Tab);
   }, []);
 
-  const handleHighlightPress = useCallback(() => {
+  const handleOrdersPress = useCallback((order: BuyerOrderView) => {
     hapticSelection();
-    router.push('/buyer-highlights-manager' as any);
+    router.push(`/buyer-order-detail?id=${order.id}` as never);
   }, [router]);
-
-  // ── My Orders card: the latest in-flight order, or the latest order overall
-  // once everything's resolved, so there's always a fast way back into orders. ──
-  const featuredOrder = myOrders.find(o => ACTIVE_ORDER_STATUSES.includes(o.status)) ?? myOrders[0] ?? null;
-
-  const handleOrdersSeeAll = useCallback(() => {
-    hapticSelection();
-    router.push('/(buyer)/orders' as never);
-  }, [router]);
-
-  const handleFeaturedOrderPress = useCallback(() => {
-    if (!featuredOrder) return;
-    hapticSelection();
-    router.push(`/buyer-order-detail?id=${featuredOrder.id}` as never);
-  }, [featuredOrder, router]);
 
   // ── Post sheet ──
   const handlePostLongPress = useCallback((item: ProfileGridItem) => {
@@ -425,7 +550,13 @@ export default function ProfileScreen() {
   };
 
   const clerkName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || '';
-  const displayName = profile?.name || clerkName || 'Your profile';
+  const displayHandle = profile?.username
+    ? `@${profile.username}`
+    : (user?.username ? `@${user.username}` : '');
+  // Real display name → @username → the generic fallback, in that order —
+  // never the giant hardcoded "Your profile" title unless there's truly no
+  // data yet to show.
+  const displayName = profile?.name || clerkName || displayHandle || 'Your profile';
 
   // Tapping a post opens the full-screen feed player on this buyer's own
   // posts, starting at the tapped one.
@@ -439,10 +570,6 @@ export default function ProfileScreen() {
     router.push('/buyer-saved' as any);
   }, [router]);
 
-  const joinedYear = profile ? new Date(profile.createdAt).getFullYear() : '';
-  const displayHandle = profile?.username
-    ? `@${profile.username}`
-    : (user?.username ? `@${user.username}` : '');
   const avatarInitials = profile?.avatarInitials
     || displayName.split(/\s+/).filter(Boolean).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
     || '•';
@@ -450,10 +577,12 @@ export default function ProfileScreen() {
   // ── Per-tab rows ──
   const rows: ListRow[] = useMemo(() => {
     if (activeTab === 'Posts') return posts.map((post) => ({ kind: 'post' as const, post, item: gridItemFromBuyerPost(post) }));
-    if (activeTab === 'Reposts') return reposts.map((repost) => ({ kind: 'repost' as const, repost }));
     if (activeTab === 'Saved') return savedItems.map((saved) => ({ kind: 'saved' as const, saved }));
+    if (activeTab === 'Orders') return myOrders.map((order) => ({ kind: 'order' as const, order }));
+    // Liked has no backing data yet — a clean empty slot rather than
+    // inventing engagement history.
     return [];
-  }, [activeTab, posts, reposts, savedItems]);
+  }, [activeTab, posts, savedItems, myOrders]);
 
   const numColumns = activeTab === 'Posts' ? layout.gridColumns : activeTab === 'Saved' ? savedColumns : 1;
 
@@ -470,12 +599,12 @@ export default function ProfileScreen() {
         />
       );
     }
-    if (item.kind === 'repost') return <RepostCard repost={item.repost} theme={theme} />;
+    if (item.kind === 'order') return <OrderRow order={item.order} theme={theme} onPress={handleOrdersPress} />;
     return <SavedCell item={item.saved} size={savedCellSize} theme={theme} onPress={handleSavedTap} />;
-  }, [handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, savedCellSize, theme]);
+  }, [handleOrdersPress, handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, savedCellSize, theme]);
 
   const keyForRow = useCallback((row: ListRow) => (
-    row.kind === 'post' ? row.post.id : row.kind === 'repost' ? row.repost.id : row.saved.id
+    row.kind === 'post' ? row.post.id : row.kind === 'order' ? row.order.id : row.saved.id
   ), []);
 
   // One table decides every tab's empty copy + CTA (own profile → CTA).
@@ -502,175 +631,160 @@ export default function ProfileScreen() {
 
   const latestVideo = posts.find((post) => post.type === 'video' && post.mediaUrl);
   const latestPhoto = posts.find((post) => post.type !== 'video' && post.mediaUrl);
+  const hasCover = coverFlow.hasCover;
+  const coverAddLabel = coverFlow.busy === 'uploading'
+    ? 'Uploading cover…'
+    : coverFlow.busy === 'removing'
+      ? 'Removing cover…'
+      : hasCover ? 'Edit cover' : '+ Add cover video';
 
   const stats: ProfileStat[] = [
-    { key: 'posts', label: 'Posts', value: formatProfileCount(posts.length) },
-    {
-      key: 'followers', label: 'Followers',
-      value: formatProfileCount(socialCounts?.followers ?? profile?.friendsCount ?? 0),
-      onPress: () => router.push(connectionsHref('followers') as any),
-    },
     {
       key: 'following', label: 'Following',
       value: formatProfileCount(socialCounts?.following ?? profile?.followingBrandsCount ?? 0),
       onPress: () => router.push(connectionsHref('following') as any),
     },
+    {
+      key: 'followers', label: 'Followers',
+      value: formatProfileCount(socialCounts?.followers ?? profile?.friendsCount ?? 0),
+      onPress: () => router.push(connectionsHref('followers') as any),
+    },
+    { key: 'posts', label: 'Posts', value: formatProfileCount(posts.length) },
   ];
 
-  const accountSwitcher = (
-    <PressableScale
-      style={[styles.switcher, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
-      onPress={() => {
-        hapticLight();
-        router.push('/account-switcher' as never);
-      }}
-      activeOpacity={0.75}
-      accessibilityRole="button"
-      accessibilityLabel="Switch account"
-      testID="buyer-profile-account-switcher"
-    >
-      {(state) => (
-        <>
-          <InteractionLayer state={state as { pressed: boolean }} radius={22} theme={theme} />
-          <Text style={[styles.switcherText, { color: theme.text }]} numberOfLines={1}>{displayName}</Text>
-          <Feather name="chevron-down" size={16} color={theme.text} />
-        </>
-      )}
-    </PressableScale>
-  );
-
-  const extras = (
-    <>
-      {/* ── My Orders — always-visible way back to order history ── */}
-      {featuredOrder ? (
-        <View style={styles.inset}>
-          <View style={styles.ordersSectionHeader}>
-            <Text style={[styles.ordersSectionTitle, { color: theme.text }]}>My Orders</Text>
-            <PressableScale
-              onPress={handleOrdersSeeAll}
-              accessibilityRole="button"
-              accessibilityLabel="See all orders"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={styles.seeAll}
-            >
-              <Text style={[styles.ordersSeeAll, { color: theme.secondary }]}>See all</Text>
-            </PressableScale>
-          </View>
-          <PressableScale
-            style={[styles.orderCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-            onPress={handleFeaturedOrderPress}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={`Order ${featuredOrder.orderNumber}, ${featuredOrder.status.replace(/_/g, ' ')}`}
-          >
-            {featuredOrder.lineItems[0]?.imageUri ? (
-              <CachedImage source={{ uri: featuredOrder.lineItems[0].imageUri }} style={styles.orderCardImage} contentFit="cover" />
-            ) : (
-              <View style={[styles.orderCardImage, styles.orderCardImagePlaceholder, { backgroundColor: theme.cardElevated }]}>
-                <Feather name="shopping-bag" size={ICON.md} color={theme.muted} />
-              </View>
-            )}
-            <View style={styles.orderCardBody}>
-              <Text style={[styles.orderCardSeller, { color: theme.text }]} numberOfLines={1}>{featuredOrder.sellerName}</Text>
-              <Text style={[styles.orderCardMeta, { color: theme.muted }]} numberOfLines={1}>
-                {featuredOrder.orderNumber} · {featuredOrder.lineItems.length} item{featuredOrder.lineItems.length === 1 ? '' : 's'}
-              </Text>
-              <OrderStatusTimeline status={featuredOrder.status} compact />
-            </View>
-            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
-          </PressableScale>
+  const header = (
+    <View>
+      {/* ── Top bar — always clear of the notch/Dynamic Island ── */}
+      <View style={[styles.topBar, { paddingTop: topPad + 6 }]}>
+        <PressableScale
+          style={styles.topBarLeft}
+          onPress={() => {
+            hapticLight();
+            router.push('/account-switcher' as never);
+          }}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Switch account"
+          testID="buyer-profile-account-switcher"
+        >
+          {(state) => (
+            <>
+              <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.sm} theme={theme} />
+              <Text style={[styles.topBarUsername, { color: theme.text }]} numberOfLines={1}>{displayHandle || displayName}</Text>
+              <Feather name="chevron-down" size={16} color={theme.text} />
+            </>
+          )}
+        </PressableScale>
+        <View style={styles.topBarRight}>
+          {threadCashEnabled ? (
+            <CompactWalletChip
+              balanceLabel={formatCents(threadCashBalanceCents)}
+              onPress={() => router.push('/thread-cash' as never)}
+              theme={theme}
+            />
+          ) : null}
+          <TopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" theme={theme} />
+          <TopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" theme={theme} />
         </View>
-      ) : null}
+      </View>
 
-      {/* ── Stories & highlights ── */}
-      <ProfileStoriesRow
-        items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor }))}
-        onNew={handleHighlightPress}
-        onPressItem={handleHighlightPress}
-      />
-    </>
-  );
+      {/* ── Cover — a subtle dark gradient when empty, never a placeholder squiggle ── */}
+      <View style={styles.cover}>
+        {hasCover ? (
+          <ProfileHeroMedia videoUri={coverFlow.cover.videoUrl} posterUri={coverFlow.cover.posterUrl} active height={COVER_HEIGHT} />
+        ) : (latestVideo?.mediaUrl || latestPhoto?.mediaUrl) ? (
+          <ProfileHeroMedia videoUri={latestVideo?.mediaUrl ?? null} posterUri={latestPhoto?.mediaUrl ?? null} active={false} height={COVER_HEIGHT} posterOnly />
+        ) : (
+          <LinearGradient
+            colors={['#2A2A2E', '#0B0B0D']} // theme-exempt: fixed monochrome empty-cover gradient
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+        <PressableScale
+          onPress={hasCover ? coverFlow.openManage : coverFlow.startAdd}
+          disabled={!!coverFlow.busy}
+          accessibilityRole="button"
+          accessibilityLabel={coverAddLabel}
+          accessibilityHint={hasCover ? 'Change or remove your profile cover video' : 'Pick or record a short video to play behind your profile'}
+          testID="profile-cover-affordance"
+          style={styles.coverAdd}
+        >
+          <Text style={styles.coverAddText} numberOfLines={1}>{coverAddLabel}</Text>
+        </PressableScale>
+      </View>
 
-  return (
-    <View style={styles.root}>
-      <ProfileShell
-        testID="buyer-profile"
-        identity={{
-          name: displayName,
-          handle: displayHandle ? `${displayHandle}${joinedYear ? ` · Joined ${joinedYear}` : ''}` : (joinedYear ? `Joined ${joinedYear}` : null),
-          initials: avatarInitials,
-          avatarUrl: avatarUri,
-          roleLabel: 'Buyer',
-          pronouns: profile?.pronouns || null,
-        }}
-        avatar={{
-          ring: hasActiveStory,
-          badgeIcon: 'plus',
-          onPress: () => router.push('/buyer-story-create' as any),
-          accessibilityLabel: hasActiveStory ? 'Add to your story' : 'Create a story',
-        }}
-        // A cover video, when set, leads the hero; otherwise the latest post
-        // (and with neither, the default thread motif).
-        hero={coverFlow.hasCover
-          ? { videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }
-          : { videoUri: latestVideo?.mediaUrl ?? null, posterUri: latestPhoto?.mediaUrl ?? null }}
-        coverAffordance={(
-          <CoverHeroAffordance hasCover={coverFlow.hasCover} busy={coverFlow.busy} onAdd={coverFlow.startAdd} onManage={coverFlow.openManage} />
-        )}
-        topLeft={accountSwitcher}
-        isOwnProfile
-        // Thread Cash: compact owner-only balance chip (flag-gated; P2P stays off).
-        walletChip={threadCashEnabled
-          ? { balanceLabel: formatCents(threadCashBalanceCents), onPress: () => router.push('/thread-cash' as never) }
-          : null}
-        topRight={(
-          <>
-            <ProfileGlassButton icon="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
-            <ProfileGlassButton icon="menu" onPress={handleMenu} accessibilityLabel="More options" />
-          </>
-        )}
-        meta={(
+      {/* ── Identity — avatar overlapping the cover, real name, handle, tag, bio ── */}
+      <View style={styles.identity}>
+        <PressableScale
+          onPress={() => { hapticSelection(); router.push('/buyer-story-create' as any); }}
+          accessibilityRole="button"
+          accessibilityLabel="Create a story"
+          testID="profile-avatar"
+          style={styles.avatarPress}
+        >
+          <View style={styles.avatarRing}>
+            <View style={styles.avatar}>
+              {avatarUri ? (
+                <CachedImage source={{ uri: avatarUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              ) : (
+                <Text style={[styles.avatarInitials, { color: theme.text }]}>{avatarInitials}</Text>
+              )}
+            </View>
+            <View style={[styles.avatarBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
+              <Feather name="plus" size={12} color={theme.onAccent} />
+            </View>
+          </View>
+        </PressableScale>
+
+        <Text style={[styles.displayName, { color: theme.text }]} numberOfLines={2} accessibilityRole="header">{displayName}</Text>
+        {displayHandle && displayHandle !== displayName ? (
+          <Text style={[styles.handle, { color: theme.muted }]} numberOfLines={1}>{displayHandle}</Text>
+        ) : null}
+        <ProfileChip label="Buyer" icon="user" />
+
+        <View style={styles.meta}>
           <ProfileMeta
             bio={profile?.bio}
             website={profile?.website}
             location={profile?.location}
             onOpenWebsite={(url) => { void Linking.openURL(url); }}
           />
-        )}
-        stats={stats}
-        statsLoading={loading}
-        belowStats={threadCashEnabled
-          ? <ThreadCashStreakRow streak={threadCashStreak} onPress={() => router.push('/thread-cash' as never)} />
-          : null}
-        actions={(
-          <>
-            <View style={styles.actionRow}>
-              <ProfileButton label="Edit profile" icon="edit-3" variant="primary" onPress={() => router.push('/(buyer)/edit-profile')} />
-              <ProfileButton
-                label="Share profile"
-                icon="share-2"
-                onPress={handleShareProfile}
-                accessibilityHint="Opens your shareable profile link and QR code"
-              />
-            </View>
-            <View style={styles.actionRow}>
-              <ProfileButton label="Messages" icon="send" onPress={() => router.push('/(buyer)/inbox' as never)} />
-              <ProfileButton label="Friends" icon="users" onPress={() => router.push('/(buyer)/friends' as any)} />
-            </View>
-          </>
-        )}
-        extras={extras}
-        tabs={{ items: TAB_ITEMS, active: activeTab, onChange: handleTabPress }}
+        </View>
+      </View>
+
+      <TikTokStatsRow stats={stats} loading={loading} theme={theme} />
+
+      {/* ── One action row: Edit profile / Share profile / Add friends ── */}
+      <View style={styles.actionsRow}>
+        <DarkActionButton label="Edit profile" onPress={() => router.push('/(buyer)/edit-profile')} />
+        <DarkActionButton
+          label="Share profile"
+          onPress={handleShareProfile}
+          accessibilityHint="Opens your shareable profile link and QR code"
+        />
+        <SquareIconButton icon="user-plus" onPress={() => router.push('/(buyer)/friends' as any)} accessibilityLabel="Add friends" />
+      </View>
+
+      {threadCashEnabled ? (
+        <ThreadCashStreakRow streak={threadCashStreak} onPress={() => router.push('/thread-cash' as never)} />
+      ) : null}
+
+      <View style={styles.tabsBlock}>
+        <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} />
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.root} testID="buyer-profile">
+      <Animated.FlatList
+        key={`buyer-${numColumns}`}
         data={loading ? [] : rows}
-        renderItem={renderRow}
-        keyExtractor={keyForRow}
+        renderItem={renderRow as any}
+        keyExtractor={keyForRow as any}
         numColumns={numColumns}
-        // Keyed on numColumns only (not activeTab): FlatList can't change its
-        // column count on a mounted instance, so a remount is only needed
-        // when the grid shape actually changes between tabs. ProfileShell
-        // preserves (and clamps) scroll position across that remount, so
-        // switching tabs never jumps back to the top.
-        listKey={`buyer-${numColumns}`}
+        columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
+        ListHeaderComponent={header}
         ListEmptyComponent={(
           <ProfileGridPlaceholder
             loading={loading}
@@ -683,9 +797,10 @@ export default function ProfileScreen() {
             action={emptyAction}
           />
         )}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: listPadding.paddingBottom }}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        bottomInset={listPadding.paddingBottom}
       />
 
       {/* ── Profile Menu Sheet ── */}
@@ -743,48 +858,95 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: theme.background },
     errorRoot: { flex: 1, backgroundColor: theme.background, justifyContent: 'center' },
-    inset: { paddingHorizontal: SP.md },
-    actionRow: { flexDirection: 'row', gap: SP.sm },
+    gridRow: { gap: 1 },
 
-    switcher: {
-      flexDirection: 'row', alignItems: 'center', gap: SP.xs, maxWidth: 220,
-      minHeight: 44, borderRadius: 22, borderWidth: 1, paddingLeft: SP.md, paddingRight: SP.sm, overflow: 'hidden',
+    topBar: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: SP.md, paddingBottom: SP.sm,
     },
-    switcherText: { fontFamily: FONT.semibold, fontSize: FS.sm, flexShrink: 1 },
+    topBarLeft: {
+      flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32, maxWidth: '55%',
+      borderRadius: RADIUS.sm, overflow: 'hidden',
+    },
+    topBarUsername: { fontFamily: FONT.semibold, fontSize: 17, flexShrink: 1 },
+    topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
 
-    threadCashChip: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs,
-      alignSelf: 'flex-start', paddingHorizontal: SP.md, minHeight: 44,
-      borderRadius: RADIUS.pill, borderWidth: 1,
+    cover: { height: COVER_HEIGHT, overflow: 'hidden', backgroundColor: theme.card },
+    coverAdd: { position: 'absolute', right: 12, bottom: 10 },
+    coverAddText: {
+      fontFamily: FONT.semibold, fontSize: 13, color: '#FFFFFF', // theme-exempt: legible over cover media
+      textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
     },
-    threadCashChipText: { fontFamily: FONT.semibold, fontSize: FS.xs },
 
-    ordersSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.xs },
-    ordersSectionTitle: { fontFamily: FONT.bold, fontSize: FS.md },
-    seeAll: { justifyContent: 'center', paddingHorizontal: SP.xs },
-    ordersSeeAll: { fontFamily: FONT.semibold, fontSize: FS.sm },
-    orderCard: {
-      flexDirection: 'row', alignItems: 'center',
-      borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm,
+    identity: { paddingHorizontal: SP.md, gap: 4 },
+    avatarPress: { marginTop: -AVATAR_OVERLAP, alignSelf: 'flex-start', marginBottom: SP.sm },
+    avatarRing: {
+      width: AVATAR + 6, height: AVATAR + 6, borderRadius: (AVATAR + 6) / 2,
+      borderWidth: 3, borderColor: '#000000', // theme-exempt: fixed black ring per spec
+      padding: 3, backgroundColor: theme.background,
     },
-    orderCardImage: { width: 52, height: 52, borderRadius: RADIUS.sm },
-    orderCardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-    orderCardBody: { flex: 1, gap: 2 },
-    orderCardSeller: { fontFamily: FONT.semibold, fontSize: FS.sm },
-    orderCardMeta: { fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: 2 },
+    avatar: {
+      width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden',
+      backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center',
+    },
+    avatarInitials: { fontFamily: FONT.bold, fontSize: 28 },
+    avatarBadge: {
+      position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11,
+      borderWidth: 2, alignItems: 'center', justifyContent: 'center',
+    },
+    displayName: { fontFamily: FONT.bold, fontSize: 22, letterSpacing: -0.4 },
+    handle: { fontFamily: FONT.medium, fontSize: 14 },
+    meta: { marginTop: SP.xs },
+
+    actionsRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, alignItems: 'center' },
+    tabsBlock: { paddingTop: SP.sm },
   });
 }
 
+const statsStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'flex-end', gap: SP.lg, paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.sm },
+  cell: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  value: { fontFamily: FONT.bold, fontSize: 17, fontVariant: ['tabular-nums'] },
+  label: { fontFamily: FONT.medium, fontSize: 13 },
+});
+
+const topBarStyles = StyleSheet.create({
+  walletChip: {
+    height: 28, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
+    gap: 4, paddingHorizontal: 8, overflow: 'hidden',
+  },
+  walletText: { fontFamily: FONT.bold, fontSize: FS.xs, fontVariant: ['tabular-nums'] },
+  iconButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  iconBadge: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
+});
+
+const actionStyles = StyleSheet.create({
+  wrap: { flex: 1 },
+  button: {
+    height: 34, borderRadius: 8, backgroundColor: '#1f1f1f', // theme-exempt: fixed dark action per spec
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  buttonText: { fontFamily: FONT.semibold, fontSize: 14, color: '#FFFFFF' /* theme-exempt: fixed dark action */ },
+  square: {
+    width: 34, height: 34, borderRadius: 8, backgroundColor: '#1f1f1f', // theme-exempt: fixed dark action per spec
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+});
+
 const cellStyles = StyleSheet.create({
-  repostRow: { borderWidth: 1, borderRadius: RADIUS.md, marginHorizontal: SP.md, marginVertical: SP.xs, padding: SP.md },
-  repostHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  repostMeta: { fontFamily: FONT.regular, fontSize: FS.xs },
-  repostAuthor: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  repostHandle: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2 },
-  repostCaption: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.xs },
   savedTile: { aspectRatio: 1, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, justifyContent: 'space-between' },
   savedTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: SP.xs },
   savedSubtitle: { fontFamily: FONT.regular, fontSize: FS.xs },
+  orderCard: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm,
+    marginHorizontal: SP.md, marginVertical: SP.xs,
+  },
+  orderCardImage: { width: 52, height: 52, borderRadius: RADIUS.sm },
+  orderCardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  orderCardBody: { flex: 1, gap: 2 },
+  orderCardSeller: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  orderCardMeta: { fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: 2 },
 });
 
 const sheetStyles = StyleSheet.create({
