@@ -9,6 +9,7 @@
  * the creator has liked), and posting a new comment actually appends it to
  * local state so the preview never hits that dead end again.
  */
+import { Asset } from 'expo-asset';
 import type { ThreadComment, ProfileSummary } from '@/lib/safetyTypes';
 
 export interface PreviewComment extends ThreadComment {
@@ -17,21 +18,40 @@ export interface PreviewComment extends ThreadComment {
   replies: PreviewComment[];
 }
 
+// Same bundled-asset-as-stand-in-photo convention as lib/previewActivity.ts /
+// lib/previewCatalog.ts / lib/previewInbox.ts: every preview comment gets a
+// real (if generic) photo avatar instead of a bare initials circle, with no
+// network dependency.
+const AVATAR_SOURCES = [
+  require('../assets/videos/fashion_runway_01.jpg'),
+  require('../assets/videos/fashion_runway_02.jpg'),
+  require('../assets/videos/fashion_runway_03.jpg'),
+  require('../assets/videos/fashion_runway_04.jpg'),
+  require('../assets/videos/fashion_runway_05.jpg'),
+  require('../assets/videos/fashion_runway_06.jpg'),
+  require('../assets/videos/fashion_runway_07.jpg'),
+  require('../assets/videos/fashion_runway_08.jpg'),
+  require('../assets/videos/fashion_runway_09.jpg'),
+  require('../assets/videos/fashion_runway_10.jpg'),
+];
+
+function hashString(input: string): number {
+  let h = 0;
+  for (let i = 0; i < input.length; i++) h = (h * 31 + input.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function avatarUriFor(handle: string): string {
+  return Asset.fromModule(AVATAR_SOURCES[hashString(handle) % AVATAR_SOURCES.length]).uri;
+}
+
 function profile(name: string, handle: string, color?: string): ProfileSummary {
-  const avatarIds = [
-    'photo-1534528741775-53994a69daeb', 'photo-1524504388940-b1c1722653e1',
-    'photo-1500648767791-00dcc994a43e', 'photo-1531123897727-8f129e1688ce',
-    'photo-1506794778202-cad84cf45f1d', 'photo-1544005313-94ddf0286df2',
-    'photo-1527980965255-d3b416303d12', 'photo-1508214751196-bcfd4ca60f91',
-  ];
-  let avatarHash = 0;
-  for (let i = 0; i < handle.length; i++) avatarHash = (avatarHash * 31 + handle.charCodeAt(i)) >>> 0;
   return {
     userId: `preview-user-${handle}`,
     name,
     handle,
     initials: name.split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase(),
-    avatarUrl: `https://images.unsplash.com/${avatarIds[avatarHash % avatarIds.length]}?auto=format&fit=crop&w=160&h=160&q=80`,
+    avatarUrl: avatarUriFor(handle),
     accountType: null,
     suspended: false,
     deleted: false,
@@ -54,10 +74,6 @@ const POOL: { name: string; handle: string; body: string; likes: number; creator
   { name: 'Marcus Webb', handle: 'marcusw', body: 'need this in every color available', likes: 6 },
   { name: 'Ruth Adeyemi', handle: 'ruth_a', body: 'how does the fabric feel, is it stretchy at all?', likes: 4 },
   { name: 'Toby Nguyen', handle: 'tobyn', body: 'saving this for later 🔥', likes: 2 },
-  { name: 'Nia Brooks', handle: 'niab', body: 'the proportions are perfect, especially the sleeve length', likes: 11 },
-  { name: 'Oliver James', handle: 'ojames', body: 'would love to see this styled with flats too', likes: 7 },
-  { name: 'Camila Torres', handle: 'camilat', body: 'just ordered mine after seeing this ✨', likes: 19 },
-  { name: 'Elliot Park', handle: 'ellp', body: 'love finding independent labels through posts like this', likes: 4 },
 ];
 
 const CREATOR_REPLIES = [
@@ -67,12 +83,6 @@ const CREATOR_REPLIES = [
   'yes it has a little stretch, comfortable all day',
   'so glad you like it!!',
 ];
-
-function hashString(input: string): number {
-  let h = 0;
-  for (let i = 0; i < input.length; i++) h = (h * 31 + input.charCodeAt(i)) >>> 0;
-  return h;
-}
 
 function iso(minutesAgo: number): string {
   return new Date(Date.now() - minutesAgo * 60_000).toISOString();

@@ -85,6 +85,11 @@ function BuyerTabLayout() {
       <Tabs.Screen name="orders" options={{ title: 'Orders', href: null }} />
       <Tabs.Screen name="following" options={{ title: 'Following', href: null }} />
       <Tabs.Screen name="edit-profile" options={{ title: 'Edit profile', href: null }} />
+      {/* Has its own bar slot (the bell), but like the rest of this group it's
+          reached by navigating within this navigator, not by pushing the
+          root-level /activity-center route — that's what keeps the floating
+          tab bar mounted and lit up on Activity instead of disappearing. */}
+      <Tabs.Screen name="activity" options={{ title: 'Activity', href: null }} />
       {/* feed re-export kept for deep-link compatibility; Home is the index */}
       <Tabs.Screen name="feed" options={{ title: 'Home', href: null }} />
     </Tabs>

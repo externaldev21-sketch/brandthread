@@ -102,7 +102,7 @@ export function CaptionBlock({
               against bright/light footage (e.g. the Maison Vela demo
               clip's silver dress). The same text shadow as the rest of
               this block keeps it legible on light and dark video alike. */}
-          {verified && <Feather name="check-circle" size={13} color={ON_DARK} style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
+          {verified && <Feather name="check-circle" size={14} color={ON_DARK} style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
         </View>
       </TouchableOpacity>
 
@@ -172,12 +172,12 @@ const styles = StyleSheet.create({
   // up against a bright/high-key clip (e.g. Maison Vela's silver dress),
   // where the old, lighter shadow washed out to nearly nothing.
   creatorName: {
-    fontSize: FS.base + 3, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
+    fontSize: 16, fontFamily: FONT.semibold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   caption: {
-    fontSize: 14.5, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 8,
-    lineHeight: 20.5, letterSpacing: 0.1,
+    fontSize: 14, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 8,
+    lineHeight: 19, letterSpacing: 0.1,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },

@@ -48,7 +48,7 @@ export function Card({ children, onPress, elevated = false, style, testID, acces
       accessibilityHint={accessibilityHint}
       onPress={() => { hapticLight(); onPress(); }}
       onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}
+      onPressOut={() => Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       testID={testID}
     >
       <Animated.View style={[baseStyle, { transform: [{ scale }] }, style]}>{children}</Animated.View>

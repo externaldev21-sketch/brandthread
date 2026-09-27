@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Line } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -57,12 +58,7 @@ import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
 const AVATAR = 88;
 const AVATAR_OVERLAP = 36;
-const COVER_HEIGHT = 170;
-// Same reasoning as TabPageHeader: outside a real device (or a preview frame
-// that emulates one) react-native-safe-area-context's web implementation
-// reads 0 for insets.top, which used to push this bar's pills up into the
-// Dynamic Island corner in the plain web preview.
-const WEB_TOP_FALLBACK = 67;
+const COVER_HEIGHT = 140;
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -81,6 +77,31 @@ const TAB_ITEMS: ProfileTab[] = [
   { key: 'Liked', label: 'Liked', icon: 'heart' },
   { key: 'Orders', label: 'Orders', icon: 'package' },
 ];
+
+// ─── Cover grain ──────────────────────────────────────────────────────────────
+// A handful of very faint, evenly-spaced diagonal hairlines across the empty
+// cover — static (no animation, no layout dependency), just enough texture
+// that the surface doesn't read as a plain flat gradient swatch.
+const COVER_GRAIN_LINES = 14;
+function CoverGrain() {
+  return (
+    <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%">
+      {Array.from({ length: COVER_GRAIN_LINES }, (_, index) => {
+        const offset = `${(index / COVER_GRAIN_LINES) * 140 - 20}%`;
+        return (
+          <Line
+            key={index}
+            x1={offset} y1="0%"
+            x2={`${parseFloat(offset) + 30}%`} y2="100%"
+            stroke="#FFFFFF" // theme-exempt: fixed faint grain per spec
+            strokeWidth={1}
+            strokeOpacity={0.025}
+          />
+        );
+      })}
+    </Svg>
+  );
+}
 
 function savedTypeIcon(type: string): keyof typeof Feather.glyphMap {
   if (type === 'post') return 'bookmark';
@@ -140,24 +161,30 @@ function BottomSheet({
 }
 
 function SheetRow({
-  icon, label, destructive, onPress,
+  icon, label, destructive, onPress, last,
 }: {
   icon: keyof typeof Feather.glyphMap;
   label: string;
   destructive?: boolean;
   onPress: () => void;
+  /** Skips the divider under the last row in a group. */
+  last?: boolean;
 }) {
   const { theme } = useAppTheme();
   return (
-    <PressableScale style={sheetStyles.sheetRow} onPress={onPress} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={label}>
-      {(state) => (
-        <>
-          <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.md} theme={theme} />
-          <Feather name={icon} size={ICON.md} color={destructive ? theme.error : theme.text} />
-          <Text style={[sheetStyles.sheetRowText, { color: destructive ? theme.error : theme.text }]}>{label}</Text>
-        </>
-      )}
-    </PressableScale>
+    // Plain `Pressable` (not `PressableScale`, whose forced style-forwarding
+    // to an inner wrapper — see the profile header's own fixes — was
+    // silently dropping this row's real height/divider here too).
+    <Pressable
+      style={({ pressed }) => [sheetStyles.sheetRow, !last && sheetStyles.sheetRowDivider, pressed && sheetStyles.sheetRowPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Feather name={icon} size={22} color={destructive ? theme.error : theme.text} />
+      <Text style={[sheetStyles.sheetRowText, { color: destructive ? theme.error : theme.text }]}>{label}</Text>
+      {!destructive ? <Feather name="chevron-right" size={18} color={theme.subtle} style={sheetStyles.sheetRowChevron} /> : null}
+    </Pressable>
   );
 }
 
@@ -378,7 +405,7 @@ export default function ProfileScreen() {
   const listPadding = { paddingBottom: barInset + SP.lg };
   const savedColumns = layout.gridColumns >= 4 ? 3 : 2;
   const savedCellSize = Math.floor((layout.columnWidth - SP.md * 2) / savedColumns);
-  const topPad = Platform.OS === 'web' ? WEB_TOP_FALLBACK : insets.top;
+  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
 
   const accountRef = useRef(user?.id);
   accountRef.current = user?.id;
@@ -726,8 +753,11 @@ export default function ProfileScreen() {
           <ProfileHeroMedia videoUri={latestVideo?.mediaUrl ?? null} posterUri={latestPhoto?.mediaUrl ?? null} active={false} height={COVER_HEIGHT} posterOnly />
         ) : (
           <>
+            {/* Deliberately a clear step up from the near-black page
+                background (#0A0A0B) — a subtler tone here previously still
+                read as an indistinct "gray band" rather than a surface. */}
             <LinearGradient
-              colors={['#2a2a2e', '#121214']} // theme-exempt: fixed monochrome empty-cover gradient
+              colors={['#34343a', '#16161a']} // theme-exempt: fixed monochrome empty-cover gradient
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFill}
@@ -737,11 +767,15 @@ export default function ProfileScreen() {
                 fading out toward the bottom-right corner. */}
             <LinearGradient
               pointerEvents="none"
-              colors={['rgba(255,255,255,0.06)', 'rgba(255,255,255,0)']} // theme-exempt: fixed highlight per spec
+              colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0)']} // theme-exempt: fixed highlight per spec
               start={{ x: 0, y: 0 }}
               end={{ x: 0.7, y: 0.7 }}
               style={StyleSheet.absoluteFill}
             />
+            {/* Faint grain: a scatter of low-opacity hairline diagonals
+                rather than a flat fill, so the surface reads as textured
+                brand material instead of a plain gradient swatch. */}
+            <CoverGrain />
           </>
         )}
         {/* Legibility scrim for the transparent top bar's icons/text — only
@@ -809,7 +843,7 @@ export default function ProfileScreen() {
             <CompactWalletChip
               balanceLabel={formatCents(threadCashBalanceCents)}
               onPress={() => router.push('/thread-cash' as never)}
-              onLongPress={__DEV__ ? () => celebrateThreadCash({ amount: 500, from: 'Preview' }) : undefined}
+              onLongPress={__DEV__ ? () => celebrateThreadCash({ amount: 500, from: 'Daily reward' }) : undefined}
               theme={theme}
             />
           ) : null}
@@ -941,7 +975,7 @@ export default function ProfileScreen() {
         <SheetRow icon="bookmark" label="Saved" onPress={() => { setMenuOpen(false); router.push('/buyer-saved' as any); }} />
         <SheetRow icon="grid" label="QR code" onPress={() => { setMenuOpen(false); router.push('/buyer-qr-code' as any); }} />
         <SheetRow icon="image" label="Highlights" onPress={() => { setMenuOpen(false); router.push('/buyer-highlights-manager' as any); }} />
-        <SheetRow icon="settings" label="Settings" onPress={() => { setMenuOpen(false); router.push('/settings' as any); }} />
+        <SheetRow icon="settings" label="Settings" last onPress={() => { setMenuOpen(false); router.push('/settings' as any); }} />
         <View style={[sheetStyles.sheetDivider, { backgroundColor: theme.border }]} />
         <SheetRow icon="log-out" label="Sign out" destructive onPress={handleSignOut} />
       </BottomSheet>
@@ -969,7 +1003,7 @@ export default function ProfileScreen() {
       <BottomSheet visible={!!postSheet} onClose={() => setPostSheet(null)}>
         <Text style={[sheetStyles.sheetTitle, { color: theme.muted }]} numberOfLines={1}>{postSheet?.caption || 'Post'}</Text>
         <SheetRow icon="share-2" label="Share post" onPress={handleShareCurrentPost} />
-        <SheetRow icon="archive" label="Archive" onPress={handleArchivePost} />
+        <SheetRow icon="archive" label="Archive" last onPress={handleArchivePost} />
         <View style={[sheetStyles.sheetDivider, { backgroundColor: theme.border }]} />
         <SheetRow icon="trash-2" label="Delete post" destructive onPress={handleDeletePost} />
       </BottomSheet>
@@ -992,7 +1026,7 @@ function makeStyles(theme: AppThemePreset) {
       flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32,
       borderRadius: RADIUS.sm, overflow: 'hidden',
     },
-    topBarUsername: { fontFamily: FONT.semibold, fontSize: 17, flexShrink: 1, minWidth: 0 },
+    topBarUsername: { fontFamily: FONT.semibold, fontSize: 18, flexShrink: 1, minWidth: 0 },
     topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 16, flexShrink: 0 },
 
     cover: { height: COVER_HEIGHT, overflow: 'hidden', backgroundColor: theme.card },
@@ -1001,7 +1035,7 @@ function makeStyles(theme: AppThemePreset) {
     // cutting off hard — the last quarter of the cover's own height.
     coverBottomFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: COVER_HEIGHT / 4 },
     coverAdd: {
-      position: 'absolute', right: 12, bottom: 10,
+      position: 'absolute', right: 16, bottom: 12,
       flexDirection: 'row', alignItems: 'center', gap: 4,
       backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, // theme-exempt: fixed translucent pill per spec
       paddingHorizontal: 10, paddingVertical: 6,
@@ -1062,9 +1096,9 @@ const statsStyles = StyleSheet.create({
   cell: { flexDirection: 'row', alignItems: 'baseline', flexShrink: 0 },
   // Explicit margin instead of the row's `gap` — spaces every cell but the
   // first, so the total gap stays 24pt regardless of `gap` support.
-  cellSpacing: { marginLeft: 24 },
-  value: { fontFamily: FONT.bold, fontSize: 17, fontVariant: ['tabular-nums'] },
-  label: { fontFamily: FONT.medium, fontSize: 13, marginLeft: 4 },
+  cellSpacing: { marginLeft: 20 },
+  value: { fontFamily: FONT.bold, fontSize: 16, fontVariant: ['tabular-nums'] },
+  label: { fontFamily: FONT.medium, fontSize: 14, marginLeft: 4 },
 });
 
 const topBarStyles = StyleSheet.create({
@@ -1080,12 +1114,12 @@ const topBarStyles = StyleSheet.create({
 const actionStyles = StyleSheet.create({
   wrap: { flex: 1 },
   button: {
-    height: 34, borderRadius: 8, backgroundColor: '#1f1f1f', // theme-exempt: fixed dark action per spec
+    height: 40, borderRadius: 10, backgroundColor: '#1f1f1f', // theme-exempt: fixed dark action per spec
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   buttonText: { fontFamily: FONT.semibold, fontSize: 14, color: '#FFFFFF' /* theme-exempt: fixed dark action */ },
   square: {
-    width: 34, height: 34, borderRadius: 8, backgroundColor: '#1f1f1f', // theme-exempt: fixed dark action per spec
+    width: 40, height: 40, borderRadius: 10, backgroundColor: '#1f1f1f', // theme-exempt: fixed dark action per spec
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
 });
@@ -1112,7 +1146,10 @@ const sheetStyles = StyleSheet.create({
   sheetScroll: { maxHeight: '100%' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
   sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, paddingVertical: SP.sm, paddingHorizontal: SP.xs, marginBottom: SP.xs },
-  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, minHeight: 50, paddingHorizontal: SP.xs, borderRadius: RADIUS.md },
-  sheetRowText: { fontFamily: FONT.medium, fontSize: FS.base },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, height: 52, paddingHorizontal: SP.xs },
+  sheetRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' /* theme-exempt: fixed 8% white divider per spec */ },
+  sheetRowPressed: { backgroundColor: 'rgba(255,255,255,0.04)' /* theme-exempt: fixed press wash */ },
+  sheetRowText: { fontFamily: FONT.medium, fontSize: FS.base, flex: 1 },
+  sheetRowChevron: { marginLeft: 'auto' },
   sheetDivider: { height: 1, marginVertical: SP.xs },
 });

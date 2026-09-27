@@ -471,8 +471,8 @@ const sig = StyleSheet.create({
   row:    { flexDirection: 'row', alignItems: 'center' },
   sep:    { fontSize: FS.xs, fontFamily: FONT.regular },
   labelBase: { fontSize: FS.xs, fontFamily: FONT.medium },
-  barTrack: { height: 2, backgroundColor: BORDER, borderRadius: 1, overflow: 'hidden' },
-  barFill:  { height: 2, borderRadius: 1 },
+  barTrack: { height: 3, backgroundColor: BORDER, borderRadius: 1.5, overflow: 'hidden' },
+  barFill:  { height: 3, borderRadius: 1.5 },
   demandBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 7, paddingVertical: 3,

@@ -19,6 +19,7 @@ import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard, EmptyState } fro
 import { SkeletonBlock } from '@/components/ui';
 import { TABULAR_NUMS, tabularType } from '@/constants/typography';
 import { isBuyerDevPreview } from '@/lib/devPreview';
+import { PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
 import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import { ThreadCashBill, ThreadCashBillStack, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
@@ -66,26 +67,9 @@ function historyGlyph(
 // error (no backend reachable in this preview). No fake business numbers are
 // ever shown to a real signed-in buyer — this path is unreachable outside
 // __DEV__ web preview. Mirrors the existing pattern in app/boost.tsx.
-const PREVIEW_STATUS: ThreadCashStatus = {
-  balanceCents: 1845,
-  config: {
-    dailyAmountCents: 10,
-    streakBonusCents: 100,
-    streakBonusDays: 7,
-    graceHours: 20,
-    expiryDays: 180,
-    maxRedemptionPerOrderCents: 2000,
-  },
-  streak: {
-    currentStreak: 4,
-    longestStreak: 11,
-    lastCheckInDate: new Date().toISOString(),
-    timezone: 'UTC',
-    alreadyCheckedInToday: true,
-    dayInCycle: 4,
-    streakBonusDays: 7,
-  },
-};
+// The status itself is the one shared fixture in lib/previewThreadCash.ts —
+// the buyer profile's top-bar chip and streak card read the same values.
+const PREVIEW_STATUS: ThreadCashStatus = PREVIEW_THREAD_CASH_STATUS;
 const PREVIEW_HISTORY: ThreadCashEntry[] = [
   { id: 'p1', buyerId: 'preview', amountCents: 10, source: 'daily_checkin', referenceId: null, note: null, createdAt: new Date().toISOString() },
   { id: 'p2', buyerId: 'preview', amountCents: 500, source: 'send_received', referenceId: null, note: 'For the drop', createdAt: new Date(Date.now() - 864e5).toISOString() },

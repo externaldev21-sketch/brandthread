@@ -57,7 +57,7 @@ export function IconButton({
       disabled={disabled}
       onPress={() => { hapticLight(); onPress(); }}
       onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}
+      onPressOut={() => Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       testID={testID}
       style={styles.hit}

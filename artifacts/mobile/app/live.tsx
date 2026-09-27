@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   topRow: { position: 'absolute', left: 10, right: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  topIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  topIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   title: {
     position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3,

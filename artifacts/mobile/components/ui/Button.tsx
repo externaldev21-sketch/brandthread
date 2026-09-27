@@ -74,7 +74,8 @@ function usePressScale() {
     Animated.timing(pressed, { toValue: 1, duration: 90, useNativeDriver: nativeDriver }).start();
   };
   const onPressOut = () => {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start();
+    // No spring/bounce — plain timing release, the app-wide press-feedback standard.
+    Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start();
     Animated.timing(pressed, { toValue: 0, duration: 140, useNativeDriver: nativeDriver }).start();
   };
   return { scale, pressed, onPressIn, onPressOut };

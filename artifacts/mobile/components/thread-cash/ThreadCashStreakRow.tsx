@@ -34,7 +34,11 @@ export function ThreadCashStreakRow({
 
   return (
     <Pressable
-      style={[styles.wrap, { backgroundColor: '#141414' }]} // theme-exempt: fixed dark card per spec
+      style={({ pressed }) => [
+        styles.wrap,
+        { backgroundColor: '#141414' }, // theme-exempt: fixed dark card per spec
+        pressed && onPress ? styles.wrapPressed : null,
+      ]}
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
@@ -63,7 +67,7 @@ export function ThreadCashStreakRow({
                 isToday && { borderColor: theme.accent, borderWidth: 2 },
               ]}
             >
-              {claimed ? <ThreadCashBillIcon size={16} /> : (
+              {claimed ? <ThreadCashBillIcon size={32} /> : (
                 <Text style={[styles.dotText, { color: theme.subtle }]}>{day}</Text>
               )}
             </View>
@@ -78,6 +82,7 @@ const styles = StyleSheet.create({
   // Card: 16pt side gutters (matching the rest of the page), 14 radius, 12pt
   // padding, with the dots row 10pt below the title row.
   wrap: { marginHorizontal: SP.md, borderRadius: 14, padding: 12 },
+  wrapPressed: { opacity: 0.75 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   title: { fontSize: FS.sm, fontFamily: FONT.semibold },
@@ -85,6 +90,6 @@ const styles = StyleSheet.create({
   // No inter-dot `gap` — `justifyContent: 'space-between'` alone spreads all
   // 7 dots evenly across the card's full width.
   dotsRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  dot: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  dot: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   dotText: { fontSize: FS.xs, fontFamily: FONT.semibold },
 });

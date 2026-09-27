@@ -1300,7 +1300,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   commentRowPending: { opacity: 0.6 },
   commentBody: { flex: 1, minWidth: 0 },
   commentHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: 3 },
-  authorName: { fontFamily: FONT.semibold, fontSize: 13, color: '#8a8a8a', flexShrink: 1 },
+  authorName: { fontFamily: FONT.semibold, fontSize: 13, color: MUTED, flexShrink: 1 },
   creatorBadge: { fontFamily: FONT.semibold, fontSize: 13 },
   replyContext: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginBottom: 2 },
   commentTime: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },
@@ -1388,12 +1388,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   emojiRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingBottom: 10 },
   emojiBtn: { alignItems: 'center', justifyContent: 'center' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 },
-  // TikTok's composer pill: 36pt tall at rest, 18pt radius, a flat dark fill
-  // and no border at all — never the old boxy full-height field. Still
-  // allowed to grow (up to ~4 lines) as you type past one line.
+  // TikTok's composer pill: 44pt tall at rest (a real touch target, not just
+  // the surrounding row's padding), 22pt radius, a flat dark fill and no
+  // border at all — never the old boxy full-height field. Still allowed to
+  // grow (up to ~4 lines) as you type past one line.
   inputShell: {
-    flex: 1, minHeight: 36, maxHeight: 96, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#262626', borderRadius: 18, paddingLeft: 14, paddingRight: 4,
+    flex: 1, minHeight: 44, maxHeight: 104, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#262626', borderRadius: 22, paddingLeft: 14, paddingRight: 4,
   },
   input: {
     flex: 1, paddingHorizontal: 0, paddingVertical: 0, fontFamily: FONT.regular,

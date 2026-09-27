@@ -40,10 +40,11 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
-import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, GRAD_DARK_FADE, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/components/layout';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
@@ -83,7 +84,7 @@ import {
   type SuggestedPerson,
 } from '@/services/activityService';
 import { setSellerFollowing } from '@/services/socialService';
-import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-cash/ThreadCashBill';
 
 const EMPTY_ICON = 'activity' as const;
 const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
@@ -147,11 +148,12 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
           return (
             <Pressable
               key={chip.key}
-              style={[
+              style={({ pressed }) => [
                 styles.chip,
                 isSelected
                   ? { backgroundColor: theme.cardElevated, borderColor: theme.border }
                   : { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.15)' },
+                pressed && styles.chipPressed,
               ]}
               onPress={() => onSelect(chip.key)}
               accessibilityRole="button"
@@ -165,6 +167,16 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
           );
         })}
       </ScrollView>
+      {/* Hints that the row scrolls further — same right-edge fade pattern
+          used on the seller Orders filter pills — instead of the last chip
+          just cutting off with no visual cue. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={GRAD_DARK_FADE}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 0 }}
+        style={styles.chipFade}
+      />
     </View>
   );
 }
@@ -235,14 +247,29 @@ function Avatar({ actor, size, styles }: {
 }
 
 /**
- * Threads shows one avatar even for a merged row — the most recent actor,
- * with the small type badge — never a stack of overlapping circles or a
- * "+N" chip. The "and N others" part lives in the row's text
- * (`activityMessage`), not in extra avatar chrome.
+ * One actor: a single avatar with the small type badge. Exactly two actors
+ * ("Jay and Mina liked your post"): Threads-style stacked double avatars,
+ * still with the badge on the front (most recent) one. Three or more
+ * ("Jay and 12 others…"): back to a single avatar — the "and N others" part
+ * already lives in the row's text (`activityMessage`), so a deeper stack or
+ * a "+N" chip would just repeat it in the chrome.
  */
 function ActivityAvatarStack({ row, styles }: { row: ActivityRow; styles: Styles }) {
-  const first = row.actors[0];
+  const [first, second] = row.actors;
   if (!first) return null;
+  if (row.actorCount === 2 && second) {
+    return (
+      <View style={styles.leading}>
+        <View style={styles.stackBack}>
+          <Avatar actor={second} size={AVATAR_SIZE * 0.7} styles={styles} />
+        </View>
+        <View style={styles.stackFront}>
+          <Avatar actor={first} size={AVATAR_SIZE * 0.75} styles={styles} />
+          <ActivityTypeBadge row={row} styles={styles} />
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={styles.leading}>
       <Avatar actor={first} size={AVATAR_SIZE} styles={styles} />
@@ -333,7 +360,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
         no such split, so the flex sizing below now applies for real.
       */}
       <Pressable
-        style={styles.tapArea}
+        style={({ pressed }) => [styles.tapArea, pressed && styles.tapAreaPressed]}
         onPress={() => onPress(row)}
         onLongPress={longPress}
         accessibilityRole="button"
@@ -361,7 +388,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
             <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
           </Text>
           {cashAmount ? (
-            <Text style={[styles.detail, { color: theme.success, fontFamily: FONT.bold }]}>{`+${cashAmount}`}</Text>
+            <Text style={[styles.detail, { color: THREAD_CASH_GREEN_MID, fontFamily: FONT.bold }]}>{`+${cashAmount}`}</Text>
           ) : detail ? (
             <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
           ) : null}
@@ -372,9 +399,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
         <PressableScale
           style={[
             styles.followBtn,
-            alreadyFollowing || followState === 'done'
-              ? { backgroundColor: 'transparent', borderColor: theme.border }
-              : { backgroundColor: theme.accent, borderColor: theme.accent },
+            alreadyFollowing || followState === 'done' ? styles.followBtnFollowing : styles.followBtnNotFollowing,
           ]}
           disabled={alreadyFollowing || followState !== 'idle'}
           onPress={() => onFollowBack(row)}
@@ -383,10 +408,13 @@ const ActivityRowView = React.memo(function ActivityRowView({
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           {followState === 'pending' ? (
-            <ActivityIndicator size="small" color={theme.onAccent} />
+            <ActivityIndicator size="small" color={alreadyFollowing ? '#FFFFFF' : '#000000'} />
           ) : (
             <Text
-              style={[styles.followText, { color: alreadyFollowing || followState === 'done' ? theme.text : theme.onAccent }]}
+              style={[
+                styles.followText,
+                alreadyFollowing || followState === 'done' ? styles.followTextFollowing : styles.followTextNotFollowing,
+              ]}
               numberOfLines={1}
             >
               {alreadyFollowing || followState === 'done' ? 'Following' : 'Follow back'}
@@ -404,12 +432,14 @@ function SkeletonRows({ styles }: { styles: Styles }) {
       <SkeletonBlock width={72} height={12} style={{ marginBottom: SP.md }} />
       {Array.from({ length: 7 }).map((_, index) => (
         <View key={index} style={styles.skeletonRow}>
-          <SkeletonBlock width={44} height={44} radius={22} />
+          {/* Matches the real row's 40pt avatar / 44pt 8-radius thumbnail
+              exactly, so there's no size jump when the real content lands. */}
+          <SkeletonBlock width={AVATAR_SIZE} height={AVATAR_SIZE} radius={AVATAR_SIZE / 2} />
           <View style={{ flex: 1, gap: SP.xs + 2 }}>
             <SkeletonBlock width={index % 2 ? '72%' : '86%'} height={13} />
             <SkeletonBlock width={index % 3 ? '38%' : '52%'} height={11} />
           </View>
-          <SkeletonBlock width={44} height={44} radius={RADIUS.xs} />
+          <SkeletonBlock width={44} height={44} radius={8} />
         </View>
       ))}
     </View>
@@ -435,12 +465,7 @@ function SuggestedRow({ person, followState, styles, onFollow, onDismiss }: {
         <Text style={styles.detail} numberOfLines={1}>{person.reason}</Text>
       </View>
       <PressableScale
-        style={[
-          styles.followBtn,
-          followState === 'done'
-            ? { backgroundColor: 'transparent', borderColor: theme.border }
-            : { backgroundColor: theme.accent, borderColor: theme.accent },
-        ]}
+        style={[styles.followBtn, followState === 'done' ? styles.followBtnFollowing : styles.followBtnNotFollowing]}
         disabled={followState !== 'idle'}
         onPress={() => onFollow(person)}
         accessibilityRole="button"
@@ -448,9 +473,9 @@ function SuggestedRow({ person, followState, styles, onFollow, onDismiss }: {
         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       >
         {followState === 'pending' ? (
-          <ActivityIndicator size="small" color={theme.onAccent} />
+          <ActivityIndicator size="small" color="#000000" />
         ) : (
-          <Text style={[styles.followText, { color: followState === 'done' ? theme.text : theme.onAccent }]} numberOfLines={1}>
+          <Text style={[styles.followText, followState === 'done' ? styles.followTextFollowing : styles.followTextNotFollowing]} numberOfLines={1}>
             {followState === 'done' ? 'Following' : 'Follow'}
           </Text>
         )}
@@ -859,7 +884,6 @@ export default function ActivityCenterScreen() {
           keyExtractor={(row) => row.key}
           renderItem={renderItem}
           renderSectionHeader={renderSectionHeader}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
           stickySectionHeadersEnabled={false}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
@@ -885,6 +909,18 @@ export default function ActivityCenterScreen() {
           showsVerticalScrollIndicator={false}
           initialNumToRender={12}
           windowSize={9}
+        />
+      )}
+
+      {/* Same bottom fade treatment as Messages: blends the last row into
+          the floating tab bar instead of an abrupt hard edge. */}
+      {status === 'ready' && sections.length > 0 && (
+        <LinearGradient
+          pointerEvents="none"
+          colors={GRAD_DARK_FADE}
+          start={{ x: 0, y: 1 }}
+          end={{ x: 0, y: 0 }}
+          style={[styles.bottomFade, { height: screenPadding.bottom + SP.xl }]}
         />
       )}
     </View>
@@ -922,6 +958,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   chipRow: {
     height: 36 + SP.sm,
     marginHorizontal: -SP.md,
+    position: 'relative',
   },
   chipScrollContent: {
     paddingHorizontal: SP.md,
@@ -937,18 +974,32 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // A plain `Pressable` here (not `PressableScale`) has no built-in press
+  // feedback of its own — this restores a subtle dim on tap.
+  chipPressed: {
+    opacity: 0.6,
+  },
   chipText: {
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },
+  // 16pt trailing inset (matches `chipScrollContent`'s own paddingHorizontal)
+  // so the fade sits fully inside the last chip's own padding, not overlapping it.
+  chipFade: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: SP.sm,
+    width: SP.md,
+  },
   sectionHeader: {
     paddingHorizontal: SP.md,
-    paddingTop: SP.md,
+    paddingTop: 20,
     paddingBottom: SP.sm,
   },
   sectionTitle: {
     color: theme.text,
-    fontFamily: FONT.bold,
+    fontFamily: FONT.semibold,
     fontSize: FS.md,
     letterSpacing: -0.2,
   },
@@ -984,41 +1035,53 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     gap: SP.sm + 4,
   },
-  // Sibling of each row (SectionList's ItemSeparatorComponent, not a row
-  // child), so it needs the row's own left padding folded into its inset:
-  // 16pt gutter + the avatar's width + the row's gap.
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: theme.borderSubtle,
-    marginLeft: SP.md + AVATAR_SIZE + (SP.sm + 4),
+  // A plain `Pressable` (not `PressableScale`, deliberately — see the note
+  // above) has no built-in press feedback; this restores a subtle dim.
+  tapAreaPressed: {
+    opacity: 0.6,
   },
   leading: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
   },
+  // Threads-style stacked pair for a 2-actor row (see ActivityAvatarStack).
+  stackBack: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  stackFront: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+  },
+  // 16pt with a 2pt border colored to match the row background so it reads
+  // as a clean cutout of the avatar, not a hard-edged sticker — and never
+  // clipped: it's a sibling of the avatar inside `leading`/`stackFront`,
+  // neither of which sets `overflow: hidden`.
   typeBadge: {
     position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    right: -3,
+    bottom: -3,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: theme.cardElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
+    borderWidth: 2,
+    borderColor: theme.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
   typeBadgeBill: {
     position: 'absolute',
-    right: -6,
-    bottom: -4,
+    right: -8,
+    bottom: -5,
     paddingHorizontal: 2,
     paddingVertical: 2,
     borderRadius: RADIUS.xs,
     backgroundColor: theme.cardElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
+    borderWidth: 2,
+    borderColor: theme.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1062,7 +1125,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     color: theme.muted,
   },
   time: {
-    color: theme.subtle,
+    color: theme.muted,
     fontFamily: FONT.regular,
     fontSize: FS.sm,
   },
@@ -1073,33 +1136,54 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     lineHeight: 18,
   },
 
+  // Same right edge for every row whether the trailing item is this
+  // thumbnail or the Follow pill below — both render through the one
+  // sibling slot at the `row` level (see `trailingThumb` at the call site).
   thumb: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.xs,
+    width: 44,
+    height: 44,
+    borderRadius: 8,
     backgroundColor: theme.cardElevated,
   },
   thumbFallback: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.xs,
+    width: 44,
+    height: 44,
+    borderRadius: 8,
     backgroundColor: theme.card,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.borderSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Matches the shared FollowPill (components/search/PersonRow.tsx): fixed
+  // white-fill/black-text pill, dark-outlined "Following" state — a neutral
+  // follow affordance regardless of the active theme, same as everywhere
+  // else this pill appears.
   followBtn: {
-    width: 88,
+    minWidth: 88,
     height: 32,
-    borderRadius: 10,
-    borderWidth: 1,
+    paddingHorizontal: SP.md,
+    borderRadius: RADIUS.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  followBtnNotFollowing: {
+    backgroundColor: '#FFFFFF',
+  },
+  followBtnFollowing: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
   followText: {
     fontFamily: FONT.semibold,
-    fontSize: FS.sm,
+    fontSize: 14,
+  },
+  followTextNotFollowing: {
+    color: '#000000',
+  },
+  followTextFollowing: {
+    color: '#FFFFFF',
   },
   skeletonWrap: {
     paddingHorizontal: SP.md,
@@ -1145,5 +1229,12 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     height: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  bottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 });

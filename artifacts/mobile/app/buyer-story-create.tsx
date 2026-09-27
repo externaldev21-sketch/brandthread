@@ -219,6 +219,11 @@ function VideoPreview({ uri }: { uri: string }) {
 
 export default function StoryComposer() {
   const insets = useSafeAreaInsets();
+  // On web the safe-area inset can under-report how much the browser chrome
+  // (or a notch-simulating preview frame) actually occupies, which is what
+  // let the X/flash/settings row render under the notch at ~28px. Floor it
+  // at 54 on web only — native insets are already correct.
+  const topInset = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
   const router = useRouter();
   const { user } = useUser();
   const { theme } = useAppTheme();
@@ -238,6 +243,28 @@ export default function StoryComposer() {
   const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [flash, setFlash] = useState<'off' | 'on'>('off');
   const [mode, setMode] = useState<CaptureMode>('story');
+  // Underline that slides to sit beneath the active mode label (Instagram/
+  // TikTok's own capture-mode switch), instead of the active/inactive style
+  // just swapping instantly. Purely decorative — layout/positions/behavior
+  // of the row itself are unchanged.
+  const [modeLayouts, setModeLayouts] = useState<Partial<Record<CaptureMode, { x: number; width: number }>>>({});
+  const modeIndicatorX = useRef(new Animated.Value(0)).current;
+  const modeIndicatorWidth = useRef(new Animated.Value(0)).current;
+  const modeIndicatorReady = useRef(false);
+  useEffect(() => {
+    const layout = modeLayouts[mode];
+    if (!layout) return;
+    if (!modeIndicatorReady.current) {
+      modeIndicatorReady.current = true;
+      modeIndicatorX.setValue(layout.x);
+      modeIndicatorWidth.setValue(layout.width);
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(modeIndicatorX, { toValue: layout.x, duration: 150, useNativeDriver: false }),
+      Animated.timing(modeIndicatorWidth, { toValue: layout.width, duration: 150, useNativeDriver: false }),
+    ]).start();
+  }, [mode, modeLayouts, modeIndicatorX, modeIndicatorWidth]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordProgress, setRecordProgress] = useState(0);
   const [lastGalleryUri, setLastGalleryUri] = useState<string | null>(null);
@@ -490,7 +517,7 @@ export default function StoryComposer() {
         )}
 
         {/* Top bar — never under the notch */}
-        <View style={[styles.camTopBar, { paddingTop: insets.top + SP.sm }]}>
+        <View style={[styles.camTopBar, { paddingTop: topInset + SP.sm }]}>
           <TouchableOpacity style={styles.camIconBtn} onPress={closeAll} accessibilityLabel="Close" accessibilityRole="button">
             <Feather name="x" size={22} color={ON_DARK} />
           </TouchableOpacity>
@@ -513,7 +540,7 @@ export default function StoryComposer() {
         </View>
 
         {/* Left-side vertical tool rail — Create shortcut */}
-        <View style={[styles.leftRail, { top: insets.top + 90 }]}>
+        <View style={[styles.leftRail, { top: topInset + 90 }]}>
           <TouchableOpacity
             style={styles.railBtn}
             onPress={() => { hapticLight(); setStep('create'); }}
@@ -536,6 +563,10 @@ export default function StoryComposer() {
                   key={m}
                   style={styles.modeItem}
                   disabled={m === 'live'}
+                  onLayout={(e) => {
+                    const { x, width } = e.nativeEvent.layout;
+                    setModeLayouts((prev) => ({ ...prev, [m]: { x, width } }));
+                  }}
                   onPress={() => {
                     hapticToggle();
                     if (m === 'post') { router.push({ pathname: '/create-post', params: { accountType: params.accountType ?? 'buyer' } } as any); return; }
@@ -551,6 +582,13 @@ export default function StoryComposer() {
                 </TouchableOpacity>
               );
             })}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.modeIndicator,
+                { transform: [{ translateX: modeIndicatorX }], width: modeIndicatorWidth },
+              ]}
+            />
           </View>
 
           <View style={styles.controlsRow}>
@@ -559,7 +597,7 @@ export default function StoryComposer() {
               {lastGalleryUri ? (
                 <Image source={{ uri: lastGalleryUri }} style={styles.galleryThumbImg} />
               ) : (
-                <Feather name="image" size={18} color={ON_DARK} />
+                <Feather name="image" size={20} color={ON_DARK} />
               )}
             </TouchableOpacity>
 
@@ -589,7 +627,7 @@ export default function StoryComposer() {
               accessibilityLabel="Flip camera"
               accessibilityRole="button"
             >
-              <Feather name="refresh-cw" size={20} color={isRecording ? 'rgba(255,255,255,0.35)' : ON_DARK} />
+              <Feather name="refresh-cw" size={28} color={isRecording ? 'rgba(255,255,255,0.35)' : ON_DARK} />
             </TouchableOpacity>
           </View>
 
@@ -611,7 +649,7 @@ export default function StoryComposer() {
         <StatusBar style="light" />
         <LinearGradient colors={swatch.colors} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
 
-        <View style={[styles.camTopBar, { paddingTop: insets.top + SP.sm }]}>
+        <View style={[styles.camTopBar, { paddingTop: topInset + SP.sm }]}>
           <TouchableOpacity style={styles.camIconBtn} onPress={() => setStep('camera')} accessibilityLabel="Back to camera" accessibilityRole="button">
             <Feather name="arrow-left" size={22} color={swatch.id === 'off-white' ? '#000' : ON_DARK} />
           </TouchableOpacity>
@@ -722,7 +760,7 @@ export default function StoryComposer() {
       ))}
 
       {/* Top bar */}
-      <View style={[styles.camTopBar, { paddingTop: insets.top + SP.sm }]}>
+      <View style={[styles.camTopBar, { paddingTop: topInset + SP.sm }]}>
         <TouchableOpacity
           style={styles.camIconBtn}
           onPress={() => {
@@ -762,7 +800,7 @@ export default function StoryComposer() {
 
       {/* Draw sub-toolbar */}
       {drawOpen ? (
-        <View style={[styles.drawBar, { top: insets.top + 60 }]}>
+        <View style={[styles.drawBar, { top: topInset + 60 }]}>
           {['#FFFFFF', '#000000', '#F87171', '#FBBF24', '#34D399', '#60A5FA'].map((c) => (
             <TouchableOpacity key={c} style={[styles.drawColorDot, { backgroundColor: c }, drawColor === c && styles.drawColorDotActive]} onPress={() => setDrawColor(c)} accessibilityLabel={`Draw color ${c}`} accessibilityRole="button" />
           ))}
@@ -805,7 +843,7 @@ export default function StoryComposer() {
       {/* ── Text tool overlay ── */}
       <Modal visible={textToolOpen} transparent animationType="fade" onRequestClose={() => setTextToolOpen(false)}>
         <View style={styles.textToolBackdrop}>
-          <View style={[styles.textToolTop, { paddingTop: insets.top + SP.sm }]}>
+          <View style={[styles.textToolTop, { paddingTop: topInset + SP.sm }]}>
             <TouchableOpacity onPress={() => setTextToolOpen(false)} accessibilityLabel="Cancel" accessibilityRole="button">
               <Text style={styles.textToolCancel}>Cancel</Text>
             </TouchableOpacity>
@@ -1028,7 +1066,7 @@ function renderOverlayContent(ov: StoryOverlay) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   webFallback: { alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: 32 },
-  webFallbackText: { color: 'rgba(255,255,255,0.7)', fontSize: FS.sm, textAlign: 'center', lineHeight: 20 },
+  webFallbackText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
   permBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: RADIUS.md },
   permBtnText: { fontFamily: FONT.semibold, fontSize: FS.base },
 
@@ -1045,13 +1083,19 @@ const styles = StyleSheet.create({
   editToolRow: { flexDirection: 'row', gap: SP.sm },
 
   leftRail: { position: 'absolute', left: SP.md, zIndex: 20 },
-  railBtn: { alignItems: 'center', gap: 4, width: 52, minHeight: 44 },
+  // Same 44pt width as camIconBtn (the X button directly above it), sharing
+  // its left inset, so the "Aa" glyph's own center lines up exactly with
+  // the X icon's center instead of sitting ~4pt further right.
+  railBtn: { alignItems: 'center', gap: 4, width: 44, minHeight: 44 },
   railAa: { color: ON_DARK, fontSize: FS.lg, fontFamily: FONT.bold },
   railLabel: { color: 'rgba(255,255,255,0.85)', fontSize: FS.xs, fontFamily: FONT.medium },
 
   camBottom: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, alignItems: 'center' },
-  modeRow: { flexDirection: 'row', gap: SP.lg, marginBottom: SP.md },
+  modeRow: { flexDirection: 'row', gap: SP.lg, marginBottom: SP.md, position: 'relative' },
   modeItem: { minWidth: 44, minHeight: 32, alignItems: 'center', justifyContent: 'center' },
+  // Slides beneath the active label on the same 150ms timing as the app's
+  // other quick UI transitions — a plain timing, never a spring/bounce.
+  modeIndicator: { position: 'absolute', left: 0, bottom: -6, height: 2, borderRadius: 1, backgroundColor: ON_DARK },
   modeText: { color: 'rgba(255,255,255,0.5)', fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.5 },
   modeTextActive: { color: ON_DARK, fontSize: FS.base },
   modeTextDisabled: { color: 'rgba(255,255,255,0.25)' },
@@ -1066,24 +1110,33 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   galleryThumbImg: { width: '100%', height: '100%' },
-  shutterWrap: { width: 84, height: 84, alignItems: 'center', justifyContent: 'center' },
+  shutterWrap: { width: 76, height: 76, alignItems: 'center', justifyContent: 'center' },
   shutterRing: {
-    width: 80, height: 80, borderRadius: 40, borderWidth: 3.5, borderColor: ON_DARK,
+    width: 76, height: 76, borderRadius: 38, borderWidth: 4, borderColor: ON_DARK,
     alignItems: 'center', justifyContent: 'center',
   },
   progressRing: {
-    position: 'absolute', width: 80, height: 80, borderRadius: 40,
-    borderWidth: 3.5, borderColor: '#F87171', borderLeftColor: 'transparent', borderBottomColor: 'transparent',
+    position: 'absolute', width: 76, height: 76, borderRadius: 38,
+    borderWidth: 4, borderColor: '#F87171', borderLeftColor: 'transparent', borderBottomColor: 'transparent',
   },
-  shutterInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: ON_DARK },
-  flipBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  shutterInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: ON_DARK },
+  // Same translucent circle chip as every other floating control on this
+  // screen (camIconBtn, galleryThumb) — flip used to float with no backdrop
+  // at all, breaking the row's visual rhythm.
+  flipBtn: {
+    width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
   hint: { color: 'rgba(255,255,255,0.5)', fontSize: FS.xs, marginBottom: SP.xs },
 
   // Create mode
   createCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   createInput: { fontFamily: FONT.bold, minWidth: 60, textAlignVertical: 'center' },
   createToolbar: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', gap: SP.md, justifyContent: 'center', alignItems: 'center' },
-  createToolBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  // 0.45 matches every other floating chip on this screen (camIconBtn,
+  // flipBtn) — this one was a slightly lighter 0.4, an inconsistency in how
+  // "solid" the dark chrome reads from one control to the next.
+  createToolBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
   createToolAa: { color: ON_DARK, fontSize: FS.base },
   colorCircle: { width: 28, height: 28, borderRadius: 14 },
   colorCircleActive: { borderWidth: 2, borderColor: ON_DARK },

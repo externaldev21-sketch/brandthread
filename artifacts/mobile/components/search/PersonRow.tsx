@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { CachedImage } from '@/components/CachedImage';
 import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -23,6 +24,8 @@ export type SearchPerson = {
   verified?: boolean;
   /** "Buyer", or the seller's storefront name (falling back to "Seller"). */
   roleTag?: string;
+  /** Real uploaded/Clerk avatar photo; falls back to the initials circle when absent. */
+  avatarUrl?: string | null;
 };
 
 /**
@@ -63,9 +66,13 @@ export function PersonRow({
         style={styles.rowTapArea}
       >
         <Animated.View style={[styles.rowTapAreaInner, { transform: [{ scale }] }]}>
-          <View style={[styles.avatar, { backgroundColor: person.color }]}>
-            <Text style={styles.avatarText}>{person.initials}</Text>
-          </View>
+          {person.avatarUrl ? (
+            <CachedImage source={{ uri: person.avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: person.color }]}>
+              <Text style={styles.avatarText}>{person.initials}</Text>
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <View style={styles.nameRow}>
               <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{person.name}</Text>
@@ -75,8 +82,8 @@ export function PersonRow({
             </View>
             <Text style={[styles.sub, { color: theme.muted }]} numberOfLines={1}>
               {person.handle}
-              {person.roleTag ? `  ·  ${person.roleTag}` : ''}
-              {person.bio ? `  ·  ${person.bio.slice(0, 40)}` : ''}
+              {person.roleTag ? ` · ${person.roleTag}` : ''}
+              {person.bio ? ` · ${person.bio.slice(0, 40)}` : ''}
             </Text>
           </View>
         </Animated.View>

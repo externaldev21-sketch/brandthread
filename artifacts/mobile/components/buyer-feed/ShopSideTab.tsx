@@ -25,6 +25,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import ReanimatedAnimated, {
+  Easing,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
@@ -53,10 +54,11 @@ export interface ShopSideTabTag {
 const SHOP_TAB_COLLAPSE_MS = 4000;
 
 // Expand/collapse runs entirely on the UI thread via Reanimated shared
-// values (no JS-driven Animated.Value): a 220ms timing slide out from the
-// left edge into a thin horizontal strip, not a spring overshoot — "smooth",
-// not bouncy, and identical on web (Reanimated's web runtime) and native.
-const SHOP_TAB_ANIM_MS = 220;
+// values (no JS-driven Animated.Value): a 180ms ease-out timing slide out
+// from the left edge into a thin horizontal strip, never a spring — no
+// overshoot, and identical on web (Reanimated's web runtime) and native.
+const SHOP_TAB_ANIM_MS = 180;
+const SHOP_TAB_EASING = Easing.out(Easing.cubic);
 
 export function ShopSideTab({
   tag, extraCount, onPress, isActive,
@@ -82,13 +84,13 @@ export function ShopSideTab({
   const collapse = useCallback(() => {
     clearCollapseTimer();
     setExpanded(false);
-    progress.value = withTiming(0, { duration: SHOP_TAB_ANIM_MS });
+    progress.value = withTiming(0, { duration: SHOP_TAB_ANIM_MS, easing: SHOP_TAB_EASING });
   }, [progress, clearCollapseTimer]);
 
   const expand = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setExpanded(true);
-    progress.value = withTiming(1, { duration: SHOP_TAB_ANIM_MS });
+    progress.value = withTiming(1, { duration: SHOP_TAB_ANIM_MS, easing: SHOP_TAB_EASING });
     clearCollapseTimer();
     collapseTimer.current = setTimeout(collapse, SHOP_TAB_COLLAPSE_MS);
   }, [progress, clearCollapseTimer, collapse]);
@@ -189,7 +191,18 @@ export function ShopSideTab({
                 them instead of a stale gap. */}
             <View style={styles.collapsedStack}>
               <Text style={styles.label}>SHOP</Text>
-              <Feather name="shopping-bag" size={11} color={ON_DARK} />
+              {/* Product thumbnail instead of the generic bag glyph when
+                  there's an actual image to show — kept at 16pt (not the
+                  36pt/radius-8 asked for) since the collapsed tab is a
+                  28pt-wide rotated strip; a 36pt thumbnail doesn't fit
+                  without widening the strip itself, which is a layout
+                  change this polish pass isn't meant to make. Falls back
+                  to the bag glyph when there's no image, same as before. */}
+              {tag.imageUri ? (
+                <CachedImage source={{ uri: tag.imageUri }} style={styles.collapsedThumb} contentFit="cover" />
+              ) : (
+                <Feather name="shopping-bag" size={11} color={ON_DARK} />
+              )}
             </View>
           </ReanimatedAnimated.View>
           <ReanimatedAnimated.View
@@ -212,7 +225,11 @@ export function ShopSideTab({
             <Text style={styles.price} numberOfLines={1}>
               {formatCents(tag.priceCents)}{extraCount > 0 ? ` +${extraCount}` : ''}
             </Text>
-            <Feather name="chevron-right" size={12} color="rgba(255,255,255,0.75)" />
+            {/* Self-audit find #3: full white, not 75% — every other icon
+                in the feed (rail, top row, caption block) settled on pure
+                white as this polish pass's baseline; this was the one
+                holdout still reading as slightly washed out. */}
+            <Feather name="chevron-right" size={12} color={ON_DARK} />
           </ReanimatedAnimated.View>
         </TouchableOpacity>
       </ReanimatedAnimated.View>
@@ -223,6 +240,13 @@ export function ShopSideTab({
 const styles = StyleSheet.create({
   tab: {
     position: 'absolute', left: 0, height: 76,
+    // Explicit stacking above the full-screen collapse backdrop Pressable
+    // (rendered just before this in JSX, same parent) — without it, some
+    // platforms/browsers resolved a tap on the tab's own bounds to the
+    // backdrop underneath instead of the tab's TouchableOpacity, which is
+    // what made the "open Shop the Post" tap sometimes just collapse the
+    // strip instead.
+    zIndex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderTopRightRadius: 12, borderBottomRightRadius: 12,
     borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1,
@@ -244,6 +268,10 @@ const styles = StyleSheet.create({
   label: {
     color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.5,
   },
+  // 16pt, matching the collapsed label's own font weight rather than the
+  // expanded thumb's 8pt radius — small enough to sit inline with "SHOP"
+  // in the 28pt-wide collapsed strip.
+  collapsedThumb: { width: 16, height: 16, borderRadius: 4 },
   // A sleek, thin horizontal strip — fills the container's animated 54pt
   // height (see expandedHeight above), name and price sharing one line so
   // it never needs two rows of text.
@@ -253,7 +281,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 6, gap: 8,
   },
   thumb: {
-    width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
+    width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
     backgroundColor: ON_DARK, overflow: 'hidden', flexShrink: 0,
   },
   name: { flexShrink: 1, color: ON_DARK, fontFamily: FONT.semibold, fontSize: 13 },

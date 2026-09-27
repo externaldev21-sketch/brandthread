@@ -16,7 +16,7 @@
  * EngagementButton-driven icon here (like/repost/save/follow).
  */
 import React from 'react';
-import { Animated, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { Animated, Image, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
@@ -37,7 +37,7 @@ export interface RailEngagement {
 }
 
 export function RightActionRail({
-  creator, hostId, avatarColor, initials, accentColor,
+  creator, hostId, avatarColor, avatarUri, initials, accentColor,
   engagement, commentsCount, shares, saves,
   onOpenCreator, onFollow, onLike, onOpenComments, onRepost, onSave, onShare,
   heartScale, likeRing, repostSpin, repostScale, saveDrop, saveScale,
@@ -48,6 +48,10 @@ export function RightActionRail({
    *  avatar (see LiveHostRing) when that seller is currently live. */
   hostId?: string;
   avatarColor: string;
+  /** Seller avatar photo. Falls back to the initials swatch below when
+   *  absent — none of the bundled demo posts have one yet, so this is a
+   *  no-op there; real posts with a seller avatar URL will pick it up. */
+  avatarUri?: string;
   initials: string;
   accentColor: string;
   engagement: RailEngagement | undefined;
@@ -84,9 +88,13 @@ export function RightActionRail({
               the owner flagged; the ring now hugs the avatar with only a
               1.5pt gap, plus ringWidth 2. */}
           <LiveHostRing hostId={hostId} size={38} showTag={!!engagement?.following} ringGap={1.5} ringWidth={2}>
-            <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+            )}
           </LiveHostRing>
         </TouchableOpacity>
         {!engagement?.following && (
@@ -126,7 +134,7 @@ export function RightActionRail({
           icon="heart"
           solidIcon="heart"
           iconSize={26}
-          count={formatCount(engagement?.likes ?? 0)}
+          count={(engagement?.likes ?? 0) > 0 ? formatCount(engagement?.likes ?? 0) : undefined}
           active={engagement?.liked ?? false}
           activeColor="#EF4444"
           inactiveColor={ON_DARK}
@@ -149,14 +157,14 @@ export function RightActionRail({
         accessibilityLabel={`Comments, ${formatCount(commentsCount)}`}
       >
         <FontAwesome name="commenting" size={26} color={ON_DARK} style={styles.iconShadow} />
-        <Text style={styles.count}>{formatCount(commentsCount)}</Text>
+        {commentsCount > 0 && <Text style={styles.count}>{formatCount(commentsCount)}</Text>}
       </TouchableOpacity>
 
       <EngagementButton
         icon="repeat"
         solidIcon="retweet"
         iconSize={26}
-        count={formatCount(engagement?.reposts ?? 0)}
+        count={(engagement?.reposts ?? 0) > 0 ? formatCount(engagement?.reposts ?? 0) : undefined}
         active={engagement?.reposted ?? false}
         activeColor={accentColor}
         inactiveColor={ON_DARK}
@@ -174,7 +182,7 @@ export function RightActionRail({
         icon="bookmark"
         solidIcon="bookmark"
         iconSize={26}
-        count={formatCount(engagement?.saves ?? saves)}
+        count={(engagement?.saves ?? saves) > 0 ? formatCount(engagement?.saves ?? saves) : undefined}
         active={engagement?.saved ?? false}
         activeColor={GOLD}
         inactiveColor={ON_DARK}
@@ -197,7 +205,7 @@ export function RightActionRail({
         onPress={onShare}
       >
         <FontAwesome name="share" size={26} color={ON_DARK} style={styles.iconShadow} />
-        <Text style={styles.count}>{formatCount(shares)}</Text>
+        {shares > 0 && <Text style={styles.count}>{formatCount(shares)}</Text>}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -211,13 +219,20 @@ const styles = StyleSheet.create({
   rail: {
     position: 'absolute', right: 10, width: 38, alignItems: 'center', gap: 14,
   },
-  avatarWrap: { alignItems: 'center', marginBottom: 2 },
+  // marginBottom bumped 2 -> 6 (self-audit find #1): the follow badge now
+  // hangs 13.5pt below the avatar's own bottom edge (see followBadge's own
+  // math below), which only left ~2.5pt of clearance to the heart button
+  // beneath it at the rail's default 14pt gap — tight enough to read as
+  // crowded. This adds breathing room without moving the avatar itself.
+  avatarWrap: { alignItems: 'center', marginBottom: 6 },
   avatar: {
     width: 38, height: 38, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: ON_DARK,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
   },
-  avatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
+  // fontSize bumped FS.xs (11) -> FS.sm (self-audit find #2): two-letter
+  // initials read small and cramped centered in the 38pt circle at 11pt.
+  avatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
   // 16pt, black-on-white (not the seller's own accent color, which could
   // wash out or clash against any given video), positioned BELOW the ring
   // (TikTok-style) rather than on top of it.

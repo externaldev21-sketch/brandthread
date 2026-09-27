@@ -11,6 +11,7 @@ import { useAuth } from '@clerk/expo';
 import { type SearchResult, type TrendingTerm } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { CachedImage } from '@/components/CachedImage';
 import { AnimatedEntrance, EmptyState } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { FONT, GUTTER, GRID_MAX_WIDTH, RADIUS } from '@/lib/theme';
@@ -33,6 +34,32 @@ type VideoResult = Extract<SearchResult, { kind: 'video' }>;
 
 const TRENDING_FALLBACK = ['black wool coat', 'silver dress', 'Atelier Noire', 'streetwear drops'];
 const DEBOUNCE_MS = 150;
+const VIDEO_GRID_GAP = 8;
+
+/**
+ * Rejects punctuation-only fragments ("...", ",,") and anything shorter than
+ * 2 letters — guards both "You may like" (trending API terms) and recent
+ * searches against junk that slipped in from a stray keystroke or an
+ * analytics artifact upstream.
+ */
+function isMeaningfulTerm(term: string): boolean {
+  const trimmed = term.trim();
+  if (trimmed.length < 2) return false;
+  const letters = trimmed.replace(/[^\p{L}\p{N}]/gu, '');
+  return letters.length >= 2;
+}
+
+function dedupeCaseInsensitive(terms: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const term of terms) {
+    const key = term.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(term);
+  }
+  return out;
+}
 
 /** Small, clearly-fictional preview accounts so the Users tab is demoable
  * under ?bt_preview=buyer with no live backend. Only shown when the real
@@ -62,6 +89,35 @@ function mapPreviewPostToVideo(post: (typeof FASHION_PREVIEW_POSTS)[number]): Vi
 }
 
 const PREVIEW_VIDEOS: VideoResult[] = FASHION_PREVIEW_POSTS.map(mapPreviewPostToVideo);
+
+function mapPreviewPostToProduct(post: (typeof FASHION_PREVIEW_POSTS)[number]): ProductResult | null {
+  if (!post.productId || !post.productName) return null;
+  const priceCents = post.productTags?.[0]?.priceCents
+    ?? (Math.round(parseFloat(String(post.productPrice ?? '0').replace(/[^0-9.]/g, '')) * 100) || 0);
+  return {
+    id: post.productId,
+    kind: 'product',
+    productId: post.productId,
+    brand: post.creator,
+    name: post.productName,
+    priceCents,
+    color: post.avatarColor,
+    initials: post.initials,
+    imageUri: post.videoPosterUri ?? null,
+  } as ProductResult;
+}
+
+// Only entries with an actual product attached (not every fashion-preview
+// post tags one) back the "Shop" preview fallback below.
+const PREVIEW_PRODUCTS: ProductResult[] = FASHION_PREVIEW_POSTS
+  .map(mapPreviewPostToProduct)
+  .filter((p): p is ProductResult => p !== null);
+
+/** Case-insensitive substring match against any of several fields. */
+function matchesAny(fields: Array<string | null | undefined>, query: string): boolean {
+  const q = query.toLowerCase();
+  return fields.some((f) => (f ?? '').toLowerCase().includes(q));
+}
 
 export default function BuyerSearchScreen() {
   const router = useRouter();
@@ -97,9 +153,10 @@ export default function BuyerSearchScreen() {
   const recentKey = `bt:buyer-search-recent:${userId ?? 'anon'}`;
   const trimmedQuery = query.trim();
 
-  // Below the safe area, matching TabPageHeader's web fallback (no real
-  // env(safe-area-inset-top) in a plain browser preview).
-  const topPad = Platform.OS === 'web' ? 44 : insets.top;
+  // Below the safe area — a plain browser preview has no real
+  // env(safe-area-inset-top), so web guarantees at least 54pt clear of
+  // where a notch/status bar would sit (matching TabPageHeader's own gate).
+  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
 
   // Below the safe area on web preview matches every other buyer tab
   // header's fallback; autofocus a beat after mount so the keyboard doesn't
@@ -116,7 +173,10 @@ export default function BuyerSearchScreen() {
         if (cancelled || !raw) return;
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          setRecentSearches(parsed.filter((item): item is string => typeof item === 'string').slice(0, 5));
+          const cleaned = dedupeCaseInsensitive(
+            parsed.filter((item): item is string => typeof item === 'string' && isMeaningfulTerm(item)),
+          ).slice(0, 5);
+          setRecentSearches(cleaned);
         }
       })
       .catch(() => { if (!cancelled) setRecentSearches([]); });
@@ -125,7 +185,7 @@ export default function BuyerSearchScreen() {
 
   function rememberSearch(value: string) {
     const term = value.trim();
-    if (!term) return;
+    if (!isMeaningfulTerm(term)) return;
     setRecentSearches((current) => {
       const next = [term, ...current.filter((item) => item.toLowerCase() !== term.toLowerCase())].slice(0, 5);
       AsyncStorage.setItem(recentKey, JSON.stringify(next)).catch(() => {});
@@ -158,26 +218,20 @@ export default function BuyerSearchScreen() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Pad out to 4 with the fixed fallback terms whenever the trending API
-  // returns fewer (including zero), case-insensitively de-duplicated so a
-  // trending term never appears twice.
+  // Real trending terms, filtered of punctuation-only/too-short junk (an
+  // artifact of upstream analytics logging partial/incomplete queries), then
+  // padded out to 4 with the fixed fallback terms whenever fewer than 4
+  // survive that filter — case-insensitively de-duplicated throughout.
   const youMayLike = useMemo(() => {
-    const seen = new Set<string>();
-    const picked: string[] = [];
-    for (const term of trending.map((t) => t.term)) {
-      const key = term.trim().toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      picked.push(term);
-    }
+    const clean = dedupeCaseInsensitive(trending.map((t) => t.term).filter(isMeaningfulTerm));
+    if (clean.length >= 4) return clean;
+    const padded = [...clean];
     for (const term of TRENDING_FALLBACK) {
-      if (picked.length >= 4) break;
-      const key = term.trim().toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      picked.push(term);
+      if (padded.length >= 4) break;
+      if (padded.some((t) => t.toLowerCase() === term.toLowerCase())) continue;
+      padded.push(term);
     }
-    return picked;
+    return padded;
   }, [trending]);
 
   const performSearch = useCallback(async (term: string) => {
@@ -212,11 +266,17 @@ export default function BuyerSearchScreen() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [query, performSearch]);
 
-  const productResults = useMemo(() => results.filter((r): r is ProductResult => r.kind === 'product'), [results]);
+  const productResultsRaw = useMemo(() => results.filter((r): r is ProductResult => r.kind === 'product'), [results]);
   const brandResults = useMemo(() => results.filter((r): r is BrandResult => r.kind === 'brand'), [results]);
   const videoResultsRaw = useMemo(() => results.filter((r): r is VideoResult => r.kind === 'video'), [results]);
+  // Blend in bundled preview posts/products when the live API has nothing
+  // for this query — matched against name/author/brand, not just caption,
+  // so e.g. "ate" surfaces Atelier Noire's video and product alongside her
+  // account instead of leaving Top with just the one user row.
   const videoResults = videoResultsRaw.length > 0 ? videoResultsRaw
-    : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => (v.caption ?? '').toLowerCase().includes(trimmedQuery.toLowerCase())) : []);
+    : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
+  const productResults = productResultsRaw.length > 0 ? productResultsRaw
+    : (trimmedQuery.length > 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
 
   const gridColumns = useGridColumns({ phone: 2, tablet: 3, tabletLandscape: 4 });
   const { width: winWidth } = useWindowDimensions();
@@ -224,6 +284,10 @@ export default function BuyerSearchScreen() {
   const fallbackGridWidth = Math.min(winWidth, GRID_MAX_WIDTH) - GUTTER * 2;
   const effectiveGridWidth = gridWidth > 0 ? gridWidth : fallbackGridWidth;
   const gridCardWidth = Math.max(1, (effectiveGridWidth - GUTTER * (gridColumns - 1)) / gridColumns);
+  // Video tiles sit closer together (8pt) than product cards (16pt) — a
+  // dedicated card width keeps that gap accurate instead of leaving slack
+  // computed for the wider product-grid gap.
+  const videoGridCardWidth = Math.max(1, (effectiveGridWidth - VIDEO_GRID_GAP * (gridColumns - 1)) / gridColumns);
   const onGridLayout = useCallback(({ nativeEvent }: { nativeEvent: { layout: { width: number } } }) => {
     const nextWidth = Math.round(nativeEvent.layout.width);
     if (nextWidth > 0 && nextWidth !== gridWidth) setGridWidth(nextWidth);
@@ -320,10 +384,10 @@ export default function BuyerSearchScreen() {
 
   const videoGrid = (items: VideoResult[]) => (
     <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
-      <View style={styles.grid} onLayout={onGridLayout}>
+      <View style={styles.videoGrid} onLayout={onGridLayout}>
         {items.map((item, index) => (
           <AnimatedEntrance key={item.id} delay={Math.min(index, 6) * 30}>
-            <VideoTile item={item} width={gridCardWidth} onPress={() => goToVideo(item)} />
+            <VideoTile item={item} width={videoGridCardWidth} onPress={() => goToVideo(item)} />
           </AnimatedEntrance>
         ))}
       </View>
@@ -335,7 +399,16 @@ export default function BuyerSearchScreen() {
   ));
 
   // ── Live suggestions while typing ──────────────────────────────────────
-  type SuggestionRow = { key: string; icon: keyof typeof Feather.glyphMap; title: React.ReactNode; subtitle?: string; onFill: () => void; onSubmit: () => void };
+  type SuggestionRow = {
+    key: string;
+    icon: keyof typeof Feather.glyphMap;
+    /** Person suggestions show a real 28pt avatar circle instead of the icon. */
+    avatar?: { uri: string | null; color: string; initials: string };
+    title: React.ReactNode;
+    subtitle?: string;
+    onFill: () => void;
+    onSubmit: () => void;
+  };
   const suggestionRows = useMemo<SuggestionRow[]>(() => {
     if (!trimmedQuery) return [];
     const bold = (text: string) => {
@@ -353,7 +426,12 @@ export default function BuyerSearchScreen() {
       { key: 'q', icon: 'search', title: bold(trimmedQuery), onFill: () => setQuery(trimmedQuery), onSubmit: () => submitTerm(trimmedQuery) },
     ];
     for (const p of people.slice(0, 3)) {
-      rows.push({ key: `u-${p.userId}`, icon: 'user', title: bold(p.name), subtitle: p.handle, onFill: () => setQuery(p.name), onSubmit: () => handlePersonPress(p) });
+      rows.push({
+        key: `u-${p.userId}`, icon: 'user',
+        avatar: { uri: p.avatarUrl ?? null, color: p.color, initials: p.initials },
+        title: bold(p.name), subtitle: p.handle,
+        onFill: () => setQuery(p.name), onSubmit: () => handlePersonPress(p),
+      });
     }
     for (const b of brandResults.slice(0, 2)) {
       rows.push({ key: `b-${b.id}`, icon: 'tag', title: bold(b.name), subtitle: 'Brand', onFill: () => setQuery(b.name), onSubmit: () => handleResultPress(b) });
@@ -380,7 +458,17 @@ export default function BuyerSearchScreen() {
               onPress={() => { hapticSelection(); row.onSubmit(); }}
               accessibilityRole="button"
             >
-              <Feather name={row.icon} size={16} color={muted} />
+              {row.avatar ? (
+                row.avatar.uri ? (
+                  <CachedImage source={{ uri: row.avatar.uri }} style={styles.suggestionAvatar} />
+                ) : (
+                  <View style={[styles.suggestionAvatar, { backgroundColor: row.avatar.color, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={styles.suggestionAvatarText}>{row.avatar.initials}</Text>
+                  </View>
+                )
+              ) : (
+                <Feather name={row.icon} size={16} color={muted} />
+              )}
               <View style={{ flex: 1, paddingRight: 32 }}>
                 <Text style={[TYPE_SCALE.body, { color: fg }]} numberOfLines={1}>{row.title}</Text>
                 {row.subtitle ? <Text style={[TYPE_SCALE.caption, { color: muted }]} numberOfLines={1}>{row.subtitle}</Text> : null}
@@ -393,7 +481,7 @@ export default function BuyerSearchScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Fill search with ${typeof row.title === 'string' ? row.title : 'suggestion'}`}
             >
-              <Feather name="corner-up-left" size={16} color={muted} />
+              <Feather name="arrow-up-left" size={16} color={muted} />
             </TouchableOpacity>
           </View>
         ))}
@@ -403,14 +491,25 @@ export default function BuyerSearchScreen() {
   }
 
   function renderNoResults() {
+    // "Try one of these instead" — the same curated/trending terms as the
+    // empty state's "You may like", so a dead-end query always has a next
+    // step rather than just a clear-and-retry.
+    const suggestedTerms = youMayLike.filter((t) => t.toLowerCase() !== trimmedQuery.toLowerCase()).slice(0, 4);
     return (
       <View testID="buyer-search-no-results">
         <EmptyState
           icon="search"
-          title="No results — yet."
-          description={`We couldn't find anything for "${trimmedQuery}". Try a broader term.`}
+          title={`No results for "${trimmedQuery}"`}
+          description="Try a different spelling or a broader term."
           action={{ label: 'Clear search', icon: 'x-circle', onPress: () => { setQuery(''); setSubmitted(false); } }}
         />
+        {suggestedTerms.length > 0 && (
+          <View style={styles.chipRow}>
+            {suggestedTerms.map((term) => (
+              <Chip key={term} label={term} selected={false} icon="trending-up" iconColor={primary} onPress={() => submitTerm(term)} />
+            ))}
+          </View>
+        )}
       </View>
     );
   }
@@ -441,8 +540,11 @@ export default function BuyerSearchScreen() {
       );
     }
 
-    // Top — a smart-mixed short list of a few of each kind.
-    const totalCount = results.length + people.length;
+    // Top — a smart-mixed short list of a few of each kind. Counts the
+    // blended (live + preview-fallback) product/video lists, not just the
+    // raw API results, so a query matched only by a fallback post/product
+    // still renders instead of hitting the no-results state.
+    const totalCount = productResults.length + people.length + videoResults.length;
     if (totalCount === 0) return renderNoResults();
     const topPeople = people.slice(0, 3);
     const topProducts = productResults.slice(0, 6);
@@ -451,19 +553,19 @@ export default function BuyerSearchScreen() {
       <View>
         {topPeople.length > 0 && (
           <AnimatedEntrance>
-            <Text style={[styles.sectionLabel, { color: muted }]}>USERS</Text>
+            <Text style={styles.sectionLabel}>USERS</Text>
             {personRows(topPeople)}
           </AnimatedEntrance>
         )}
         {topProducts.length > 0 && (
           <AnimatedEntrance delay={40}>
-            <Text style={[styles.sectionLabel, { color: muted }]}>SHOP</Text>
+            <Text style={styles.sectionLabel}>SHOP</Text>
             {productGrid(topProducts)}
           </AnimatedEntrance>
         )}
         {topVideos.length > 0 && (
           <AnimatedEntrance delay={80}>
-            <Text style={[styles.sectionLabel, { color: muted }]}>VIDEOS</Text>
+            <Text style={styles.sectionLabel}>VIDEOS</Text>
             {videoGrid(topVideos)}
           </AnimatedEntrance>
         )}
@@ -532,7 +634,7 @@ export default function BuyerSearchScreen() {
             {recentSearches.length > 0 && (
               <AnimatedEntrance>
                 <View style={styles.sectionHeaderRow}>
-                  <Text style={[styles.sectionLabel, { color: muted, paddingHorizontal: 0 }]}>RECENT SEARCHES</Text>
+                  <Text style={[styles.sectionLabel, { paddingHorizontal: 0 }]}>RECENT SEARCHES</Text>
                   <TouchableOpacity onPress={clearRecentSearches} accessibilityRole="button" accessibilityLabel="Clear recent searches" hitSlop={12}>
                     <Text style={[styles.sectionAction, { color: fg }]}>Clear all</Text>
                   </TouchableOpacity>
@@ -546,7 +648,7 @@ export default function BuyerSearchScreen() {
             )}
 
             <AnimatedEntrance delay={30}>
-              <Text style={[styles.sectionLabel, { color: muted }]}>YOU MAY LIKE</Text>
+              <Text style={styles.sectionLabel}>YOU MAY LIKE</Text>
               <View style={styles.chipRow}>
                 {youMayLike.map((term, index) => (
                   <Chip key={`${term}-${index}`} label={term} selected={false} icon="trending-up" iconColor={primary} onPress={() => submitTerm(term)} />
@@ -555,12 +657,12 @@ export default function BuyerSearchScreen() {
             </AnimatedEntrance>
 
             <AnimatedEntrance delay={60}>
-              <Text style={[styles.sectionLabel, { color: muted }]}>WATCH SOMETHING NEW</Text>
+              <Text style={styles.sectionLabel}>WATCH SOMETHING NEW</Text>
               <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
-                <View style={styles.grid} onLayout={onGridLayout}>
+                <View style={styles.videoGrid} onLayout={onGridLayout}>
                   {PREVIEW_VIDEOS.map((item, index) => (
                     <AnimatedEntrance key={item.id} delay={Math.min(index, 8) * 20}>
-                      <VideoTile item={item} width={gridCardWidth} onPress={() => goToVideo(item)} />
+                      <VideoTile item={item} width={videoGridCardWidth} onPress={() => goToVideo(item)} />
                     </AnimatedEntrance>
                   ))}
                 </View>
@@ -592,7 +694,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   field: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
-    height: 36, borderRadius: RADIUS.sm, paddingHorizontal: SPACING.sm,
+    height: 36, borderRadius: RADIUS.sm,
+    // 10pt right padding keeps the clear (x) icon inside the field itself,
+    // clear of the "Search" button's own 8pt gap below.
+    paddingLeft: SPACING.sm, paddingRight: 10,
     marginLeft: SPACING.sm,
     // theme-exempt: fixed dark fill per spec, same pattern as profile.tsx's
     // store-details section — regardless of light/dark theme.
@@ -606,10 +711,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // react-native-web renders a default focus ring on <input>; the field's
   // own border above is the only focus affordance we want.
   fieldInputWebNoOutline: { outlineStyle: 'none', outlineWidth: 0 } as any,
-  // Explicit 12pt gap to the field, on top of the header row's own `gap` —
+  // Explicit 8pt gap to the field, on top of the header row's own `gap` —
   // guarantees a fixed gap even if a web flexbox `gap` renders inconsistently,
   // so the "Search" button never crowds the field's trailing clear button.
-  searchButton: { marginLeft: SPACING.sm },
+  searchButton: { marginLeft: 8 },
   searchButtonText: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   sectionHeaderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -617,11 +722,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   sectionAction: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, paddingTop: SPACING.md, paddingBottom: SPACING.xs - 2 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.xxs, paddingBottom: SPACING.xs },
+  // theme-exempt: fixed 70%-white on this page's fixed-dark chrome, same
+  // intentional pattern as the field's #1f1f1f fill and the Follow pill.
   sectionLabel: {
-    ...TYPE_SCALE.caption, letterSpacing: 0.4,
-    paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.lg, paddingBottom: SPACING.xs,
+    ...TYPE_SCALE.caption, fontSize: 11, letterSpacing: 1.2, fontFamily: FONT.semibold,
+    color: 'rgba(255,255,255,0.7)',
+    paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.lg, paddingBottom: 12,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
+  videoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: VIDEO_GRID_GAP },
   tabsRow: { paddingTop: SPACING.xs },
   suggestionRowWrap: { position: 'relative', justifyContent: 'center' },
   suggestionRow: {
@@ -632,4 +741,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     position: 'absolute', right: SCREEN_GUTTER, top: 0, bottom: 0,
     width: 32, alignItems: 'center', justifyContent: 'center',
   },
+  suggestionAvatar: { width: 28, height: 28, borderRadius: RADII.avatar },
+  suggestionAvatarText: { fontSize: 11, fontFamily: FONT.bold, color: '#FFFFFF' },
 });

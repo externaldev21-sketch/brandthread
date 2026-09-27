@@ -23,8 +23,9 @@ describe('buyer navigation contract', () => {
     // Search is not a Tabs.Screen and not a bottom-bar slot — it's a
     // standalone full-screen page (app/buyer-search.tsx) reachable only from
     // the feed's top-row icon and Discover. Activity (bell) takes the 4th
-    // capsule slot instead, pushing /activity-center like Search used to.
-    for (const route of ['index', 'discover', 'inbox', 'profile']) {
+    // capsule slot instead, as a Tabs.Screen (href: null, like Friends/Cart/
+    // Orders/Following/Edit profile) so the floating bar stays mounted.
+    for (const route of ['index', 'discover', 'inbox', 'profile', 'activity']) {
       expect(layout).toContain(`name="${route}"`);
     }
     expect(layout).not.toContain('name="search"');
@@ -38,8 +39,17 @@ describe('buyer navigation contract', () => {
     expect(bar).toContain('testID="buyer-tab-profile"');
   });
 
-  it('the Activity slot pushes the Activity Center instead of navigating a tab', () => {
-    expect(bar).toContain("router.push('/activity-center'");
+  it('the Activity slot navigates within the buyer Tabs navigator, not a root-level push', () => {
+    // Activity is a Tabs.Screen (app/(buyer)/activity.tsx, href: null) like
+    // Friends/Cart/Orders/Following/Edit profile — reached the same way as
+    // every other slot (navigation.navigate) so the floating tab bar stays
+    // mounted and lit up on Activity, instead of a router.push to the
+    // root-level /activity-center route replacing the whole screen (that
+    // route is unchanged and still what the seller-side ActivityBellButton
+    // instances push to).
+    expect(layout).toContain('name="activity"');
+    expect(bar).toContain("activity: 'activity'");
+    expect(bar).not.toContain("router.push('/activity-center'");
     expect(bar).not.toContain("router.push('/buyer-search'");
     expect(bar).not.toContain('MORPH_SPRING');
     expect(bar).not.toContain('useAnimatedKeyboard');

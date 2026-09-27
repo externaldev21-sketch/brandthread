@@ -11,8 +11,7 @@
  * feed. Real active streams (fetched from /api/live/active) play first; with
  * none live right now, a couple of sample rooms render instead so the screen
  * never looks empty or "under construction" — full video, full chat, full
- * chrome, just tagged with a small "Sample" mark on the host pill. There is
- * no "preview only" messaging anywhere on this screen.
+ * chrome, with no "Sample"/"Preview" label anywhere on screen.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -32,12 +31,11 @@ import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { hapticLight } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, RADIUS } from '@/lib/theme';
 import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
 import { SHEET_TIMING } from '@/constants/motion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-
-const LIVE_RED = '#FF3B30';
+import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 
 // Same sample fashion footage the For You feed uses in dev preview, reused
 // here (not modified, not shared state) so a preview room shows a real
@@ -90,7 +88,13 @@ interface LiveRoom {
 export default function LiveFeedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  // Outside a real device (or a preview frame that emulates one), the
+  // browser never fills in a non-zero `env(safe-area-inset-top)`, so
+  // insets.top reads 0 on web and the host row sat level with the Dynamic
+  // Island in a plain browser preview — same fallback every tab header and
+  // app/live.tsx already use.
+  const topInset = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const api = useApi();
   const [activeIndex, setActiveIndex] = useState(0);
   const [rooms, setRooms] = useState<LiveRoom[]>(
@@ -151,8 +155,9 @@ export default function LiveFeedScreen() {
           <LiveRoomPage
             room={item}
             isActive={index === activeIndex}
+            pageWidth={windowWidth}
             pageHeight={windowHeight}
-            insetTop={insets.top}
+            insetTop={topInset}
             insetBottom={insets.bottom}
             onClose={close}
             onJoinReal={(streamId) => router.push(`/buyer-live?streamId=${encodeURIComponent(streamId)}` as never)}
@@ -174,10 +179,11 @@ export default function LiveFeedScreen() {
 }
 
 function LiveRoomPage({
-  room, isActive, pageHeight, insetTop, insetBottom, onClose, onJoinReal,
+  room, isActive, pageWidth, pageHeight, insetTop, insetBottom, onClose, onJoinReal,
 }: {
   room: LiveRoom;
   isActive: boolean;
+  pageWidth: number;
   pageHeight: number;
   insetTop: number;
   insetBottom: number;
@@ -239,9 +245,14 @@ function LiveRoomPage({
   return (
     <View style={[styles.page, { height: pageHeight }]}>
       {room.videoSource ? (
+        // Explicit numeric width/height, not just absoluteFill: on web the
+        // style lands on a <video> element, which ignores inset-only sizing
+        // and renders at its own intrinsic size instead — left uncentered
+        // and cropped off-subject (see the same fix/comment on VideoVisual
+        // in app/(tabs)/feed.tsx, where this was first found).
         <VideoView
           player={player}
-          style={StyleSheet.absoluteFill}
+          style={[styles.video, { width: pageWidth, height: pageHeight }]}
           contentFit="cover"
           nativeControls={false}
           pointerEvents="none"
@@ -276,7 +287,6 @@ function LiveRoomPage({
           <View style={styles.hostText}>
             <View style={styles.hostNameRow}>
               <Text style={styles.hostName} numberOfLines={1}>{room.brandName}</Text>
-              {room.isSample && <Text style={styles.sampleTag}>Sample</Text>}
             </View>
             <View style={styles.liveRow}>
               <View style={styles.liveBadge}>
@@ -294,7 +304,7 @@ function LiveRoomPage({
             accessibilityRole="button"
             accessibilityLabel={following ? `Following ${room.brandName}` : `Follow ${room.brandName}`}
           >
-            <Text style={styles.followBtnText}>{following ? 'Following' : 'Follow'}</Text>
+            <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>{following ? 'Following' : 'Follow'}</Text>
           </PressableScale>
         </View>
         <PressableScale
@@ -311,23 +321,26 @@ function LiveRoomPage({
         <Text style={[styles.roomTitle, { top: insetTop + 56 }]} numberOfLines={1}>{room.title}</Text>
       )}
 
-      {/* Right action rail — same slim sizing as the feed's rail */}
-      <View style={[styles.rail, { bottom: insetBottom + 210 }]}>
+      {/* Right action rail — same slim sizing/gap/shadow/right-inset as the
+          feed's own rail (components/buyer-feed/RightActionRail.tsx), and
+          anchored to the top of the bottom chrome instead of floating at a
+          fixed mid-screen offset. */}
+      <View style={[styles.rail, { bottom: insetBottom + 56 + (room.productName != null ? 72 : 0) }]}>
         <PressableScale style={styles.railBtn} onPress={() => hapticLight()} accessibilityRole="button" accessibilityLabel="Share this live">
-          <Feather name="share" size={24} color="#fff" style={styles.railIconShadow} />
+          <Feather name="share" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
         <PressableScale style={styles.railBtn} onPress={() => hapticLight()} accessibilityRole="button" accessibilityLabel="Send Thread Cash">
           <ThreadCashBill width={28} />
         </PressableScale>
         <PressableScale style={styles.railBtn} onPress={() => hapticLight()} accessibilityRole="button" accessibilityLabel="More options">
-          <Feather name="more-vertical" size={24} color="#fff" style={styles.railIconShadow} />
+          <Feather name="more-vertical" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
       </View>
 
       {/* Bottom: chat overlay + input + pinned product */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.bottom, { paddingBottom: insetBottom + SP.sm }]}
+        style={[styles.bottom, { paddingBottom: insetBottom + 12 }]}
       >
         {(room.productName != null) && (
           <ReanimatedAnimated.View style={cardStyle}>
@@ -348,13 +361,18 @@ function LiveRoomPage({
           </ReanimatedAnimated.View>
         )}
 
-        <View style={styles.chatList} pointerEvents="none">
-          {chat.slice(-4).map((line, i) => (
-            <Text key={i} style={styles.chatLine} numberOfLines={1}>
-              <Text style={styles.chatUser}>{line.user} </Text>
-              {line.text}
-            </Text>
-          ))}
+        <View style={styles.chatWrap} pointerEvents="none">
+          {/* Soft fade at the top edge only, so the oldest visible message
+              never ends in a hard cutoff line. */}
+          <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']} style={styles.chatTopFade} />
+          <View style={styles.chatList}>
+            {chat.slice(-4).map((line, i) => (
+              <Text key={i} style={styles.chatLine} numberOfLines={1}>
+                <Text style={styles.chatUser}>{line.user} </Text>
+                {line.text}
+              </Text>
+            ))}
+          </View>
         </View>
 
         <View style={styles.inputRow}>
@@ -376,6 +394,7 @@ function LiveRoomPage({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   page: { width: '100%', backgroundColor: '#000' },
+  video: { position: 'absolute', top: 0, left: 0 },
   thumbFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
@@ -397,24 +416,22 @@ const styles = StyleSheet.create({
   hostText: { flexShrink: 1 },
   hostNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   hostName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 13, flexShrink: 1 },
-  sampleTag: {
-    color: 'rgba(255,255,255,0.75)', fontFamily: FONT.medium, fontSize: 9,
-    letterSpacing: 0.4, textTransform: 'uppercase',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', borderRadius: 4,
-    paddingHorizontal: 4, paddingVertical: 1,
-  },
-  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, height: 14 },
   liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
   liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: 9, letterSpacing: 0.8 },
-  viewerText: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 11 },
+  viewerText: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
+  // Monochrome brand: red is reserved for the LIVE badge only, so Follow is
+  // a plain white pill with black text (the "following" state drops to a
+  // translucent white outline pill instead of a second color).
   followBtn: {
-    backgroundColor: LIVE_RED, borderRadius: RADIUS.pill,
+    backgroundColor: '#fff', borderRadius: RADIUS.pill,
     paddingHorizontal: 12, paddingVertical: 7,
   },
-  followBtnActive: { backgroundColor: 'rgba(255,255,255,0.18)' },
-  followBtnText: { color: '#fff', fontFamily: FONT.bold, fontSize: 12 },
+  followBtnActive: { backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
+  followBtnText: { color: '#000', fontFamily: FONT.bold, fontSize: 12 },
+  followBtnTextActive: { color: '#fff' },
   closeBtn: {
-    width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.38)',
   },
   roomTitle: {
@@ -423,10 +440,10 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 
-  rail: { position: 'absolute', right: 10, alignItems: 'center', gap: 18 },
-  railBtn: { width: 44, alignItems: 'center', justifyContent: 'center' },
+  rail: { position: 'absolute', right: 10, width: 38, alignItems: 'center', gap: 14 },
+  railBtn: { width: 38, alignItems: 'center', justifyContent: 'center' },
   railIconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
   },
 
   bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 12, gap: 8 },
@@ -435,20 +452,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(20,20,22,0.82)', borderRadius: RADIUS.md,
     paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  productThumb: { width: 44, height: 44, borderRadius: RADIUS.sm, backgroundColor: '#33303a', overflow: 'hidden' },
+  productThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#33303a', overflow: 'hidden' },
   productInfo: { flex: 1 },
-  productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
-  productPrice: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.medium, fontSize: FS.xs, marginTop: 2 },
-  buyBtn: { backgroundColor: '#fff', borderRadius: RADIUS.pill, paddingHorizontal: 16, paddingVertical: 9 },
+  productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 14 },
+  productPrice: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
+  buyBtn: { height: 32, backgroundColor: '#fff', borderRadius: RADIUS.pill, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   buyBtnText: { color: '#151517', fontFamily: FONT.bold, fontSize: FS.xs },
 
+  chatWrap: { maxWidth: '70%' },
+  chatTopFade: { position: 'absolute', top: 0, left: 0, right: 0, height: 20 },
   chatList: { gap: 4, paddingLeft: 2 },
-  chatLine: { color: 'rgba(255,255,255,0.92)', fontFamily: FONT.regular, fontSize: 13 },
-  chatUser: { color: 'rgba(230,230,235,0.95)', fontFamily: FONT.bold, fontSize: 13 },
+  chatLine: {
+    color: 'rgba(255,255,255,0.92)', fontFamily: FONT.regular, fontSize: 13,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  chatUser: {
+    color: 'rgba(230,230,235,0.95)', fontFamily: FONT.semibold, fontSize: 13,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
 
-  inputRow: { height: 36 },
+  inputRow: { height: 44 },
   input: {
-    flex: 1, height: 36, borderRadius: 18, paddingHorizontal: 15,
+    flex: 1, height: 44, borderRadius: 22, paddingHorizontal: 16,
     backgroundColor: 'rgba(255,255,255,0.14)', color: '#fff',
     fontFamily: FONT.regular, fontSize: FS.sm,
   },

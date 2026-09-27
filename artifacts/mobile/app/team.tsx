@@ -10,6 +10,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useApi } from '@/lib/api';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { getEntitlementRejection } from '@/lib/entitlementError';
+import { FONT } from '@/lib/theme';
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -328,14 +329,14 @@ export default function TeamScreen() {
             <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
               <Feather name="alert-triangle" size={22} color={colors.mutedForeground} />
             </View>
-            <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600', textAlign: 'center' }}>Couldn't load your team</Text>
+            <Text style={{ color: colors.foreground, fontSize: 14, fontFamily: FONT.semibold, textAlign: 'center' }}>Couldn't load your team</Text>
             <TouchableOpacity
               onPress={() => { setLoading(true); load(); }}
               accessibilityRole="button"
               accessibilityLabel="Retry loading team"
               style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.primary }}
             >
-              <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '600' }}>Retry</Text>
+              <Text style={{ color: colors.primaryForeground, fontSize: 13, fontFamily: FONT.semibold }}>Retry</Text>
             </TouchableOpacity>
           </View>
         ) : currentMembers.length === 0 ? (
@@ -343,7 +344,7 @@ export default function TeamScreen() {
             <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
               <Feather name="user-plus" size={22} color={colors.mutedForeground} />
             </View>
-            <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600', textAlign: 'center' }}>No team members yet</Text>
+            <Text style={{ color: colors.foreground, fontSize: 14, fontFamily: FONT.semibold, textAlign: 'center' }}>No team members yet</Text>
             <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: 'center' }}>Invite someone to help you run your store.</Text>
             <TouchableOpacity
               onPress={openInvite}
@@ -351,7 +352,7 @@ export default function TeamScreen() {
               accessibilityLabel="Invite teammate"
               style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.primary }}
             >
-              <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '600' }}>Invite teammate</Text>
+              <Text style={{ color: colors.primaryForeground, fontSize: 13, fontFamily: FONT.semibold }}>Invite teammate</Text>
             </TouchableOpacity>
           </View>
         ) : (

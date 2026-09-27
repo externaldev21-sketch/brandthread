@@ -32,6 +32,7 @@ import { useColors } from '@/hooks/useColors';
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { undoExpiresAt } from '@/lib/undoRecovery';
+import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
 // Mutations remain responsible for their own server/local rollback. This provider
@@ -101,9 +102,10 @@ interface PressableScaleProps extends Omit<PressableProps, 'style'> {
    *  the ripple reads as an unwanted "translucent grey circle" (e.g. the
    *  buyer Messages screens). */
   rippleEnabled?: boolean;
-  /** Set false to drop the springy rebound on release — a plain, no-bounce
-   *  timing animation instead. Defaults to true (existing global behavior)
-   *  so every other call site is unaffected. */
+  /** Set true to opt IN to the old springy rebound on release. Defaults to
+   *  false: a plain, no-overshoot timing animation (PRESS_DURATION_MS, see
+   *  constants/motion.ts) — the app-wide press-feedback standard. Only set
+   *  true where a screen deliberately wants a physical, springy rebound. */
   bounce?: boolean;
   /** Opt out of the forced `minHeight: COMP.minTouchTarget` (44pt) box this
    *  component otherwise always applies last in its style array — silently
@@ -115,13 +117,15 @@ interface PressableScaleProps extends Omit<PressableProps, 'style'> {
   noMinHeight?: boolean;
 }
 
-// Press feel shared by every button and card: a quick, firm squish on touch,
-// then a springy release with a small rebound so taps feel physical.
+// Press feel shared by every button and card: a quick, firm squish on touch
+// and a plain (non-spring) release back to rest, ~PRESS_DURATION_MS — no
+// overshoot/bounce, per the app-wide press-feedback standard. `bounce: true`
+// opts a call site back into the old springy rebound below.
 const NATIVE_DRIVER = Platform.OS !== 'web';
 const PRESS_IN_SPRING = { speed: 48, bounciness: 0, useNativeDriver: NATIVE_DRIVER } as const;
 const PRESS_OUT_SPRING = { speed: 14, bounciness: 11, useNativeDriver: NATIVE_DRIVER } as const;
 
-export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.96, activeOpacity = 0.88, rippleEnabled = true, bounce = true, noMinHeight = false, ...rest }: PressableScaleProps) {
+export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = PRESS_SCALE, activeOpacity = 0.88, rippleEnabled = true, bounce = false, noMinHeight = false, ...rest }: PressableScaleProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
   const { theme } = useAppTheme();
@@ -138,8 +142,8 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
         Animated.parallel([
           bounce
             ? Animated.spring(scale, { toValue: activeScale, ...PRESS_IN_SPRING })
-            : Animated.timing(scale, { toValue: activeScale, duration: 60, useNativeDriver: NATIVE_DRIVER }),
-          Animated.timing(opacity, { toValue: activeOpacity, duration: 60, useNativeDriver: NATIVE_DRIVER }),
+            : Animated.timing(scale, { toValue: activeScale, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
+          Animated.timing(opacity, { toValue: activeOpacity, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
         ]).start();
         rest.onPressIn?.(e);
       }}
@@ -147,8 +151,8 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
         Animated.parallel([
           bounce
             ? Animated.spring(scale, { toValue: 1, ...PRESS_OUT_SPRING })
-            : Animated.timing(scale, { toValue: 1, duration: 120, useNativeDriver: NATIVE_DRIVER }),
-          Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: NATIVE_DRIVER }),
+            : Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
+          Animated.timing(opacity, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: NATIVE_DRIVER }),
         ]).start();
         rest.onPressOut?.(e);
       }}

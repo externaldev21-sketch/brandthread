@@ -27,7 +27,7 @@ export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(26, 26, 26, 0.68)'; // neut
 
 
 // ─── Borders ─────────────────────────────────────────────────────────────────
-export const BORDER          = 'rgba(255,255,255,0.07)';
+export const BORDER          = 'rgba(255,255,255,0.08)';
 export const BORDER_SUBTLE   = 'rgba(255,255,255,0.04)';
 export const BORDER_ACTIVE   = '#F7F7FA';
 export const BORDER_FOCUS    = '#F7F7FA';
@@ -194,8 +194,10 @@ export const BREAKPOINT = {
 // Heading / body type scale (paired with FS above). Use these role names
 // instead of picking raw FS.* sizes per screen.
 export const TYPE = {
-  largeTitle: { fontSize: FS.h1, fontFamily: FONT.bold, lineHeight: 42 },
-  title:      { fontSize: FS.h2, fontFamily: FONT.bold, lineHeight: 36 },
+  // Large titles get a touch of negative tracking — big Inter Bold reads
+  // slightly loose otherwise; smaller roles keep the font's natural tracking.
+  largeTitle: { fontSize: FS.h1, fontFamily: FONT.bold, lineHeight: 42, letterSpacing: -0.3 },
+  title:      { fontSize: FS.h2, fontFamily: FONT.bold, lineHeight: 36, letterSpacing: -0.3 },
   heading:    { fontSize: FS.xl, fontFamily: FONT.semibold, lineHeight: 28 },
   subheading: { fontSize: FS.lg, fontFamily: FONT.semibold, lineHeight: 24 },
   body:       { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 22 },

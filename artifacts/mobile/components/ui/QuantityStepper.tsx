@@ -6,7 +6,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticToggle } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
@@ -20,13 +19,17 @@ export interface QuantityStepperProps {
   max?: number;
   disabled?: boolean;
   testID?: string;
+  /** 'default' (40pt, existing) or 'sm' (32pt) for a tighter row, e.g. the
+   *  cart's per-item stepper. Defaults to 'default' so every existing call
+   *  site is unaffected. */
+  size?: 'default' | 'sm';
 }
 
-export function QuantityStepper({ value, onChange, min = 1, max = 99, disabled, testID }: QuantityStepperProps) {
-  const { theme } = useAppTheme();
+export function QuantityStepper({ value, onChange, min = 1, max = 99, disabled, testID, size = 'default' }: QuantityStepperProps) {
   const palette = useColors();
   const canDecrement = !disabled && value > min;
   const canIncrement = !disabled && value < max;
+  const sm = size === 'sm';
 
   const step = (delta: number) => {
     hapticToggle();
@@ -35,7 +38,7 @@ export function QuantityStepper({ value, onChange, min = 1, max = 99, disabled, 
 
   return (
     <View
-      style={[styles.root, { borderColor: palette.border, borderRadius: RADII.pill }]}
+      style={[styles.root, sm && styles.rootSm, { borderColor: palette.border, borderRadius: RADII.pill }]}
       testID={testID}
     >
       <Pressable
@@ -43,13 +46,13 @@ export function QuantityStepper({ value, onChange, min = 1, max = 99, disabled, 
         accessibilityLabel="Decrease quantity"
         disabled={!canDecrement}
         onPress={() => step(-1)}
-        style={[styles.btn, !canDecrement && styles.disabled]}
+        style={[styles.btn, sm && styles.btnSm, !canDecrement && styles.disabled]}
         hitSlop={8}
       >
-        <Feather name="minus" size={16} color={canDecrement ? palette.foreground : palette.mutedForeground} />
+        <Feather name="minus" size={sm ? 13 : 16} color={canDecrement ? palette.foreground : palette.mutedForeground} />
       </Pressable>
       <Text
-        style={[TYPE_SCALE.headline, TABULAR_NUMS, { color: palette.foreground, minWidth: 22, textAlign: 'center' }]}
+        style={[TYPE_SCALE.headline, TABULAR_NUMS, { color: palette.foreground, minWidth: sm ? 18 : 22, textAlign: 'center', fontSize: sm ? 13 : undefined }]}
         accessibilityLabel={`Quantity ${value}`}
       >
         {value}
@@ -59,10 +62,10 @@ export function QuantityStepper({ value, onChange, min = 1, max = 99, disabled, 
         accessibilityLabel="Increase quantity"
         disabled={!canIncrement}
         onPress={() => step(1)}
-        style={[styles.btn, !canIncrement && styles.disabled]}
+        style={[styles.btn, sm && styles.btnSm, !canIncrement && styles.disabled]}
         hitSlop={8}
       >
-        <Feather name="plus" size={16} color={canIncrement ? theme.accentLight : palette.mutedForeground} />
+        <Feather name="plus" size={sm ? 13 : 16} color={canIncrement ? palette.foreground : palette.mutedForeground} />
       </Pressable>
     </View>
   );
@@ -70,6 +73,8 @@ export function QuantityStepper({ value, onChange, min = 1, max = 99, disabled, 
 
 const styles = StyleSheet.create({
   root: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, paddingHorizontal: 4, height: 40 },
+  rootSm: { paddingHorizontal: 2, height: 32 },
   btn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  btnSm: { width: 26, height: 26 },
   disabled: { opacity: 0.4 },
 });
