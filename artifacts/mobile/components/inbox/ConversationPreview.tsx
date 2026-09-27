@@ -25,12 +25,18 @@ interface ConversationPreviewProps {
   isFromMe: boolean;
   color: string;
   bold: boolean;
+  /** Order context (e.g. "BT-10234") — folded inline as " · BT-10234" onto
+   *  the same 1-line preview instead of its own separate chip row, so a
+   *  conversation with order context doesn't grow a 3rd row and break the
+   *  shared ~72pt row height. */
+  orderNumber?: string;
 }
 
 /** Renders a conversation's last-message preview: plain text, or a small
  *  vector icon + label for non-text attachments (photo, voice, product…). */
-export function ConversationPreview({ text, attachmentType, isFromMe, color, bold }: ConversationPreviewProps) {
+export function ConversationPreview({ text, attachmentType, isFromMe, color, bold, orderNumber }: ConversationPreviewProps) {
   const prefix = isFromMe ? 'You: ' : '';
+  const suffix = orderNumber ? ` · ${orderNumber}` : '';
   const meta = attachmentType ? ATTACHMENT_META[attachmentType] : undefined;
   const fontFamily = bold ? FONT.bold : FONT.regular;
 
@@ -43,20 +49,20 @@ export function ConversationPreview({ text, attachmentType, isFromMe, color, bol
         ) : (
           <Feather name={meta.icon} size={13} color={color} style={styles.icon} />
         )}
-        <Text style={[styles.text, { color, fontFamily }]} numberOfLines={1}>{meta.label}</Text>
+        <Text style={[styles.text, { color, fontFamily }]} numberOfLines={1}>{meta.label}{suffix}</Text>
       </View>
     );
   }
 
   return (
     <Text style={[styles.text, { color, fontFamily }]} numberOfLines={1}>
-      {prefix}{text ?? ''}
+      {prefix}{text ?? ''}{suffix}
     </Text>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   icon: { marginRight: 4 },
-  text: { fontSize: FS.sm },
+  text: { fontSize: FS.sm, flexShrink: 1 },
 });
