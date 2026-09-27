@@ -1869,6 +1869,12 @@ export default function FeedScreen({
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRepostEducation, setShowRepostEducation] = useState(false);
   const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
+  // Following|Threads content cross-fade: a soft 150ms dissolve on the
+  // list's own opacity when the tab (and therefore its underlying data)
+  // changes, instead of the new content just popping in. Gated by
+  // `reduceMotion` (declared below) via the effect that sets it from
+  // AccessibilityInfo.
+  const feedContentOpacity = useRef(new Animated.Value(1)).current;
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
@@ -1917,6 +1923,14 @@ export default function FeedScreen({
       subscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    feedContentOpacity.setValue(0.3);
+    Animated.timing(feedContentOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    // Only the tab switch itself should trigger this fade, not every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedTab]);
 
   // First-time gesture coach — buyer home only, shown once per account (and
   // once more per FEED_GESTURES_TIP_VERSION bump). Server is the source of
@@ -2696,6 +2710,11 @@ export default function FeedScreen({
        * child modal" focus events from "genuine tab-switch-back" focus
        * events for this screen specifically.
        */}
+      {/* Wrapped in feedContentOpacity (see the effect on `feedTab` above) so
+          switching Following|Threads dissolves into the new content instead
+          of popping in — the list itself, not each cell, so the fade is one
+          motion regardless of how many rows are mounted. */}
+      <Animated.View style={[styles.feedContentFade, { opacity: feedContentOpacity }]}>
       {viewportReady && <FlatList
         ref={feedListRef}
         // The creator player remounts once its videos load so it opens at the tapped one.
@@ -2819,6 +2838,7 @@ export default function FeedScreen({
           );
         }}
       />}
+      </Animated.View>
 
       {/* ─ Legibility scrims: fixed overlay above the list (not per-cell), so
           they stay put while the video underneath swipes past. Standard
@@ -3250,6 +3270,7 @@ const styles = StyleSheet.create({
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   videoFill: { width: '100%', height: '100%' },
   letterboxBackdrop: { opacity: 0.55 },
+  feedContentFade: { flex: 1 },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   // Full-height, rightmost ~90pt only — wide enough to sit behind the
