@@ -48,7 +48,11 @@ export function EmptyState({
       </View>
       <View style={[styles.copy, compact && styles.copyCompact]}>
         {title ? <Text style={[styles.title, compact && styles.titleCompact, { color: theme.text }]} accessibilityRole="header">{title}</Text> : null}
-        <Text style={[styles.message, compact && styles.messageCompact, { color: theme.muted }]}>{message}</Text>
+        {/* The message is dropped in `compact` mode — the title alone
+            ("No posts yet") already says it, and reclaiming its height is
+            what lets the CTA below clear a floating tab bar without
+            scrolling on a screen with a tall header above it. */}
+        {compact ? null : <Text style={[styles.message, { color: theme.muted }]}>{message}</Text>}
       </View>
       {actionLabel && onAction && (
         <TouchableOpacity
@@ -73,7 +77,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.lg,
     gap: SP.md,
   },
-  wrapCompact: { paddingVertical: 12, paddingHorizontal: SP.md, gap: 12 },
+  wrapCompact: { paddingVertical: 6, paddingHorizontal: SP.md, gap: 8 },
   iconCircle: {
     width: 64,
     height: 64,
@@ -82,7 +86,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconCircleCompact: { width: 44, height: 44, borderRadius: 22 },
+  iconCircleCompact: { width: 36, height: 36, borderRadius: 18 },
   copy: { alignItems: 'center', gap: SP.xs, maxWidth: 320, alignSelf: 'center' },
   copyCompact: { maxWidth: 280 },
   title: {
@@ -98,7 +102,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flexShrink: 1,
   },
-  messageCompact: { fontSize: 14, lineHeight: 18 },
   actionBtn: {
     minHeight: 44,
     justifyContent: 'center',

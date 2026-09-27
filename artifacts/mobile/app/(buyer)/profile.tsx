@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Line } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -58,7 +57,11 @@ import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
 const AVATAR = 88;
 const AVATAR_OVERLAP = 36;
-const COVER_HEIGHT = 140;
+// Tall enough that "+ Add cover video" (anchored to this box's bottom-right)
+// clears the top bar's balance chip/icons with real room to spare — a
+// shorter cover left only a few pixels between them, which measured as a
+// real overlap on a live device.
+const COVER_HEIGHT = 160;
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -77,31 +80,6 @@ const TAB_ITEMS: ProfileTab[] = [
   { key: 'Liked', label: 'Liked', icon: 'heart' },
   { key: 'Orders', label: 'Orders', icon: 'package' },
 ];
-
-// ─── Cover grain ──────────────────────────────────────────────────────────────
-// A handful of very faint, evenly-spaced diagonal hairlines across the empty
-// cover — static (no animation, no layout dependency), just enough texture
-// that the surface doesn't read as a plain flat gradient swatch.
-const COVER_GRAIN_LINES = 14;
-function CoverGrain() {
-  return (
-    <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%">
-      {Array.from({ length: COVER_GRAIN_LINES }, (_, index) => {
-        const offset = `${(index / COVER_GRAIN_LINES) * 140 - 20}%`;
-        return (
-          <Line
-            key={index}
-            x1={offset} y1="0%"
-            x2={`${parseFloat(offset) + 30}%`} y2="100%"
-            stroke="#FFFFFF" // theme-exempt: fixed faint grain per spec
-            strokeWidth={1}
-            strokeOpacity={0.025}
-          />
-        );
-      })}
-    </Svg>
-  );
-}
 
 function savedTypeIcon(type: string): keyof typeof Feather.glyphMap {
   if (type === 'post') return 'bookmark';
@@ -432,9 +410,6 @@ export default function ProfileScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
-  // So the empty state can centre in whatever room is actually left above
-  // the tab bar, instead of guessing the header's height ahead of time.
-  const [headerHeight, setHeaderHeight] = useState(0);
 
   const loadCounts = useCallback(async () => {
     const id = user?.id;
@@ -742,7 +717,7 @@ export default function ProfileScreen() {
   ];
 
   const header = (
-    <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
+    <View>
       {/* ── Cover — runs all the way to the top, behind the transparent top
           bar, so there's no hard seam between them. A subtle dark gradient
           when empty, never a placeholder squiggle. ── */}
@@ -752,31 +727,17 @@ export default function ProfileScreen() {
         ) : (latestVideo?.mediaUrl || latestPhoto?.mediaUrl) ? (
           <ProfileHeroMedia videoUri={latestVideo?.mediaUrl ?? null} posterUri={latestPhoto?.mediaUrl ?? null} active={false} height={COVER_HEIGHT} posterOnly />
         ) : (
-          <>
-            {/* Deliberately a clear step up from the near-black page
-                background (#0A0A0B) — a subtler tone here previously still
-                read as an indistinct "gray band" rather than a surface. */}
-            <LinearGradient
-              colors={['#34343a', '#16161a']} // theme-exempt: fixed monochrome empty-cover gradient
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            {/* Soft highlight top-left so the empty cover reads as a lit
-                surface rather than a flat fill — a diagonal light wash
-                fading out toward the bottom-right corner. */}
-            <LinearGradient
-              pointerEvents="none"
-              colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0)']} // theme-exempt: fixed highlight per spec
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0.7, y: 0.7 }}
-              style={StyleSheet.absoluteFill}
-            />
-            {/* Faint grain: a scatter of low-opacity hairline diagonals
-                rather than a flat fill, so the surface reads as textured
-                brand material instead of a plain gradient swatch. */}
-            <CoverGrain />
-          </>
+          // One clean diagonal gradient, clearly a step up from the
+          // near-black page background (#0A0A0B) — a top-left highlight
+          // layer plus a scattered grain overlay were stacked on top of
+          // this in an earlier pass and, combined, read as a muddy smudge
+          // rather than a clean surface. Just the gradient, full stop.
+          <LinearGradient
+            colors={['#34343a', '#16161a']} // theme-exempt: fixed monochrome empty-cover gradient
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
         )}
         {/* Legibility scrim for the transparent top bar's icons/text — only
             needed over real cover media (a video/photo can be bright); the
@@ -935,24 +896,28 @@ export default function ProfileScreen() {
         columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
         ListHeaderComponent={header}
         ListEmptyComponent={(
-          // Centers in whatever room is actually left between the header's
-          // real (measured) height and the reserved tab-bar padding, so a
-          // fresh profile's "Post your first video" CTA sits above the
-          // floating tab bar without scrolling whenever it fits — and still
-          // scrolls fully clear of it (see `listPadding` below) when it doesn't.
-          <View style={{ minHeight: Math.max(0, layout.windowHeight - headerHeight - listPadding.paddingBottom), justifyContent: 'center' }}>
-            <ProfileGridPlaceholder
-              loading={loading}
-              error={false}
-              onRetry={loadData}
-              layout={layout}
-              icon={emptyIcon}
-              title={emptyTitle}
-              description={emptyDescription}
-              action={emptyAction}
-              compact
-            />
-          </View>
+          // A floating overlay independent of scroll (tried here first) can
+          // only ever guarantee tab-bar clearance if the header + this state
+          // both fit above the tab bar with room to spare — on a short
+          // viewport (this screen's header alone can approach 650pt) that's
+          // not always possible, and an absolutely-positioned overlay that
+          // doesn't fit just renders off-screen with no way to scroll to it,
+          // which is worse than the bug it was meant to fix. In-flow content
+          // plus a `paddingBottom` sized to the tab bar's own footprint (see
+          // `listPadding` below) instead guarantees the CTA scrolls fully
+          // clear of the bar by at least 16pt on every screen size, and sits
+          // clear of it with no scrolling at all whenever there's room.
+          <ProfileGridPlaceholder
+            loading={loading}
+            error={false}
+            onRetry={loadData}
+            layout={layout}
+            icon={emptyIcon}
+            title={emptyTitle}
+            description={emptyDescription}
+            action={emptyAction}
+            compact
+          />
         )}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: listPadding.paddingBottom }}
