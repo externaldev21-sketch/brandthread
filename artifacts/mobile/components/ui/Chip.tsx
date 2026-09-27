@@ -32,15 +32,16 @@ export interface ChipProps {
   /** Optional trailing remove control (e.g. clearing a single recent search). */
   onRemove?: () => void;
   removeAccessibilityLabel?: string;
-  /** Set false to drop the springy press-out rebound — a plain, no-bounce
-   *  release instead. Defaults to true (existing behavior everywhere else). */
+  /** Set true to opt IN to the old springy press-out rebound. Defaults to
+   *  false: a plain, no-overshoot release — the app-wide press-feedback
+   *  standard (see PressableScale in components/BrandthreadUI.tsx). */
   bounce?: boolean;
   /** 32pt tall / hairline border / 14pt text — Instagram-style quick-reply
    *  chip, instead of the default filter-chip sizing. */
   variant?: 'default' | 'quickReply';
 }
 
-export function Chip({ label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel, bounce = true, variant = 'default' }: ChipProps) {
+export function Chip({ label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel, bounce = false, variant = 'default' }: ChipProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
