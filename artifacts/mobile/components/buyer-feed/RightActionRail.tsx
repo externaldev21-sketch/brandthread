@@ -7,14 +7,12 @@
  * the same `bottomClearance` the caption block and tab bar use, so it never
  * overlaps the tab bar at any viewport.
  *
- * Sizing/placement (38pt avatar/action-column width) ported from dev PR
- * #133 ("shrink feed rail/caption below pre-#129 sizes — smaller,
- * tighter"), which supersedes PR #129's own 34pt/44pt pass and the earlier
- * PR #88 sizing this rail originally shipped with. Icons are 28pt — the
- * app-wide "action rail" size (icon-consistency pass) — up from that PR's
- * 26pt; the 38pt column comfortably clears it, so no layout changed. Icon
- * drop shadows are from PR #122 (rail icon shadows) — see `iconShadow`
- * below and `EngagementButton`'s own `iconShadow` style, applied to every
+ * Sizing/placement (26pt icons, 38pt avatar/action-column width) ported
+ * from dev PR #133 ("shrink feed rail/caption below pre-#129 sizes —
+ * smaller, tighter"), which supersedes PR #129's own 34pt/44pt pass and the
+ * earlier PR #88 sizing this rail originally shipped with. Icon drop
+ * shadows are from PR #122 (rail icon shadows) — see `iconShadow` below and
+ * `EngagementButton`'s own `iconShadow` style, applied to every
  * EngagementButton-driven icon here (like/repost/save/follow).
  */
 import React from 'react';
@@ -135,7 +133,7 @@ export function RightActionRail({
         <EngagementButton
           icon="heart"
           solidIcon="heart"
-          iconSize={28}
+          iconSize={26}
           count={(engagement?.likes ?? 0) > 0 ? formatCount(engagement?.likes ?? 0) : undefined}
           active={engagement?.liked ?? false}
           activeColor="#EF4444"
@@ -158,14 +156,14 @@ export function RightActionRail({
         accessibilityRole="button"
         accessibilityLabel={`Comments, ${formatCount(commentsCount)}`}
       >
-        <FontAwesome name="commenting" size={28} color={ON_DARK} style={styles.iconShadow} />
+        <FontAwesome name="commenting" size={26} color={ON_DARK} style={styles.iconShadow} />
         {commentsCount > 0 && <Text style={styles.count}>{formatCount(commentsCount)}</Text>}
       </TouchableOpacity>
 
       <EngagementButton
         icon="repeat"
         solidIcon="retweet"
-        iconSize={28}
+        iconSize={26}
         count={(engagement?.reposts ?? 0) > 0 ? formatCount(engagement?.reposts ?? 0) : undefined}
         active={engagement?.reposted ?? false}
         activeColor={accentColor}
@@ -183,7 +181,7 @@ export function RightActionRail({
       <EngagementButton
         icon="bookmark"
         solidIcon="bookmark"
-        iconSize={28}
+        iconSize={26}
         count={(engagement?.saves ?? saves) > 0 ? formatCount(engagement?.saves ?? saves) : undefined}
         active={engagement?.saved ?? false}
         activeColor={GOLD}
@@ -206,7 +204,7 @@ export function RightActionRail({
         accessibilityLabel="Share post"
         onPress={onShare}
       >
-        <FontAwesome name="share" size={28} color={ON_DARK} style={styles.iconShadow} />
+        <FontAwesome name="share" size={26} color={ON_DARK} style={styles.iconShadow} />
         {shares > 0 && <Text style={styles.count}>{formatCount(shares)}</Text>}
       </TouchableOpacity>
     </Animated.View>

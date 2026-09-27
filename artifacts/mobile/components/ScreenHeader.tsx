@@ -90,7 +90,7 @@ export function ScreenHeader({
           accessibilityHint={variant === 'modal' ? `Dismisses ${title}` : `Returns from ${title}`}
           testID={backTestID}
         >
-          <Feather name={variant === 'modal' ? 'x' : 'arrow-left'} size={ICON.lg} color={colors.foreground} />
+          <Feather name={variant === 'modal' ? 'x' : 'arrow-left'} size={ICON.md} color={colors.foreground} />
         </PressableScale>
 
         <View style={styles.titleBlock}>
@@ -118,7 +118,7 @@ export function ScreenHeader({
               accessibilityRole="button"
               accessibilityLabel={action.accessibilityLabel}
             >
-              <Feather name={action.icon} size={ICON.lg} color={colors.foreground} />
+              <Feather name={action.icon} size={ICON.sm} color={colors.foreground} />
               {action.badge && <View style={[styles.actionDot, { backgroundColor: colors.primary, borderColor: colors.background }]} />}
             </PressableScale>
           ))}
