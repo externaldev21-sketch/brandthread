@@ -335,10 +335,12 @@ const ebStyles = StyleSheet.create({
   // shadow, whether the count is under a bright or a dark patch of video.
   count: {
     fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
+  // Matches RightActionRail's own `iconShadow` — see that file's comment
+  // for why this was strengthened (bright/high-key clip legibility).
   iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
   },
 });
 
