@@ -79,6 +79,10 @@ vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
 }));
 
+vi.mock('expo-linear-gradient', () => ({
+  LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
+}));
+
 vi.mock('expo-router', () => ({
   useRouter: () => routerMock,
 }));
@@ -183,7 +187,7 @@ import BuyerSearchScreen from '@/app/buyer-search';
 type Person = {
   userId: string; name: string; username: string | null; handle: string;
   initials: string; color: string; bio: string | null; isFollowing: boolean;
-  accountType?: string; verified?: boolean; roleTag?: string;
+  accountType?: string; verified?: boolean; roleTag?: string; avatarUrl?: string | null;
 };
 
 function person(overrides: Partial<Person> = {}): Person {
@@ -290,6 +294,74 @@ describe('buyer full-screen search', () => {
     expect(content).toContain('black wool coat');
     expect(content).toContain('silver dress');
     expect(content).toContain('Atelier Noire');
+  });
+
+  it('filters punctuation-only/too-short junk out of "you may like", padding with fallback terms', async () => {
+    apiMock.public.trending.mockResolvedValue({
+      trending: [
+        { term: '...', type: 'query' },
+        { term: ',,', type: 'query' },
+        { term: 'a', type: 'query' },
+        { term: 'hoodie', type: 'category' },
+      ],
+    });
+    renderer = await renderScreen();
+    const content = textContent(renderer);
+    expect(content).toContain('hoodie');
+    expect(content).not.toContain('...');
+    expect(content).not.toContain(',,');
+    // Padded with fallback terms since only one real trending term survived.
+    expect(content).toContain('black wool coat');
+  });
+
+  it('shows "No results for X" with fallback suggestion chips', async () => {
+    apiMock.public.search.mockResolvedValue({ results: [] });
+    apiMock.social.search.mockResolvedValue([]);
+    apiMock.public.trending.mockResolvedValue({ trending: [] });
+
+    renderer = await renderScreen();
+    vi.useFakeTimers();
+    setField(renderer, 'zzznomatch');
+    await act(async () => {
+      vi.advanceTimersByTime(150);
+      vi.useRealTimers();
+      await flushPromises();
+    });
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'buyer-search-submit' }).props.onPress();
+      await flushPromises();
+    });
+
+    const content = textContent(renderer);
+    expect(content).toContain('No results for "zzznomatch"');
+    expect(content).toContain('black wool coat');
+  });
+
+  it('renders a person\'s real avatar image instead of the initials fallback when avatarUrl is present', async () => {
+    apiMock.public.search.mockResolvedValue({ results: [] });
+    apiMock.social.search.mockResolvedValue([person({ userId: 'p3', name: 'Robin Ito', avatarUrl: 'https://example.com/robin.jpg' })]);
+
+    renderer = await renderScreen();
+    vi.useFakeTimers();
+    setField(renderer, 'robin');
+    await act(async () => {
+      vi.advanceTimersByTime(150);
+      vi.useRealTimers();
+      await flushPromises();
+    });
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'buyer-search-submit' }).props.onPress();
+      await flushPromises();
+    });
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'search-tab-users' }).props.onPress();
+      await flushPromises();
+    });
+
+    const images = renderer.root.findAll(
+      (node) => (node.type as unknown) === 'CachedImage' && (node.props as { source?: { uri?: string } }).source?.uri === 'https://example.com/robin.jpg',
+    );
+    expect(images.length).toBeGreaterThan(0);
   });
 
   it('shows suggestions (not results tabs) immediately while typing, before Search is pressed', async () => {
