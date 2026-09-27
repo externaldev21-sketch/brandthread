@@ -3,8 +3,9 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, Pressable, TextInput, Animated, Easing,
   Dimensions, PanResponder, StyleSheet, Alert, Modal, FlatList,
-  Image, Linking, KeyboardAvoidingView, Platform, Share,
+  Image, Linking, Platform, Share,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';

@@ -10,8 +10,9 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, Image,
-  ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert, Modal, Platform,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';

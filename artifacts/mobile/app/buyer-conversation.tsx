@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, FlatList, TextInput,
-  KeyboardAvoidingView, Alert, Platform, StyleSheet, Dimensions,
-  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated,
+  View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions,
+  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard,
 } from 'react-native';
+import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard-controller';
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -178,6 +178,10 @@ function attachmentIcon(type: MessageAttachment['type']): keyof typeof Feather.g
 const SCREEN_W = Dimensions.get('window').width;
 const BUBBLE_MAX = SCREEN_W * 0.75;
 const DOUBLE_TAP_MS = 300;
+// Links the message list's KeyboardGestureArea to the composer's TextInput
+// (react-native-keyboard-controller, iOS) so a drag on the list can swipe
+// the keyboard down interactively.
+const CHAT_INPUT_NATIVE_ID = 'buyer-conversation-composer-input';
 
 // ─── Bubble column (Instagram/Threads DM layout) ───────────────────────────────
 // A 28pt avatar + 8pt gap sits to the left of every incoming bubble, but only
@@ -449,6 +453,18 @@ export default function BuyerConversationScreen() {
   useEffect(() => {
     if (voicePlayerStatus.didJustFinish) setPlayingVoiceUri(null);
   }, [voicePlayerStatus.didJustFinish]);
+
+  // Keep the last message pinned above the composer as the keyboard opens —
+  // the KeyboardAvoidingView above resizes this screen frame-by-frame with
+  // the keyboard, but doesn't itself know to keep the list scrolled to the
+  // bottom through that resize. No-ops on web (Keyboard events don't fire
+  // there, which is fine — react-native-keyboard-controller no-ops too).
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardWillShow', () => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     const showSend = text.trim().length > 0 || selectedAttachment != null;
@@ -1584,7 +1600,11 @@ export default function BuyerConversationScreen() {
         </View>
       )}
 
-      {/* Messages list */}
+      {/* Messages list — wrapped in KeyboardGestureArea so an interactive
+          drag on the list can swipe the keyboard down (iMessage-style),
+          same gesture area the composer's TextInput links to via
+          nativeID below. */}
+      <KeyboardGestureArea style={{ flex: 1 }} textInputNativeID={CHAT_INPUT_NATIVE_ID}>
       <FlatList
         ref={flatListRef}
         data={listData}
@@ -1595,6 +1615,7 @@ export default function BuyerConversationScreen() {
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         onContentSizeChange={() => {
           if (!unreadDividerId || hasScrolledToUnreadRef.current) {
             flatListRef.current?.scrollToEnd({ animated: false });
@@ -1606,6 +1627,7 @@ export default function BuyerConversationScreen() {
         // Windowing kept at RN defaults (10/21) — the history stays performant
         // without extra tuning since bubbles are lightweight rows.
       />
+      </KeyboardGestureArea>
 
       {/* Double-tap heart burst */}
       {likeBurst && (
@@ -1707,6 +1729,7 @@ export default function BuyerConversationScreen() {
                 same rounded bounds instead of floating as separate siblings. */}
             <View style={s.pill}>
               <TextInput
+                nativeID={CHAT_INPUT_NATIVE_ID}
                 style={[s.textInput, { height: composerInputHeight }]}
                 value={text}
                 onChangeText={setText}
@@ -1714,6 +1737,7 @@ export default function BuyerConversationScreen() {
                 placeholderTextColor={theme.muted}
                 multiline
                 returnKeyType="default"
+                autoCapitalize="sentences"
               />
 
               {/* Mic ⇄ Send morph, inside the pill's own bounds */}

@@ -17,9 +17,10 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, ActivityIndicator, Animated, FlatList, KeyboardAvoidingView, Platform,
+  AccessibilityInfo, ActivityIndicator, Animated, FlatList, Platform,
   Pressable, Share, StyleSheet, Text, View, type GestureResponderEvent, type ViewToken,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';

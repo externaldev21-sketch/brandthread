@@ -7,8 +7,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
-  Animated, KeyboardAvoidingView, Platform, Linking, Image, FlatList,
+  Animated, Platform, Linking, Image, FlatList,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
