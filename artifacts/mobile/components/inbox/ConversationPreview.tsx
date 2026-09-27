@@ -45,11 +45,16 @@ export function ConversationPreview({ text, attachmentType, isFromMe, color, bol
       <View style={styles.row}>
         {prefix ? <Text style={[styles.text, { color, fontFamily }]}>{prefix}</Text> : null}
         {attachmentType === 'thread_cash' ? (
+          // Icon only — a "Thread Cash" text label next to the bill's own
+          // green artwork read as green preview text at a glance; the icon
+          // alone already communicates the attachment type.
           <ThreadCashBillIcon size={13} style={styles.icon} />
         ) : (
-          <Feather name={meta.icon} size={13} color={color} style={styles.icon} />
+          <>
+            <Feather name={meta.icon} size={13} color={color} style={styles.icon} />
+            <Text style={[styles.text, { color, fontFamily }]} numberOfLines={1}>{meta.label}{suffix}</Text>
+          </>
         )}
-        <Text style={[styles.text, { color, fontFamily }]} numberOfLines={1}>{meta.label}{suffix}</Text>
       </View>
     );
   }

@@ -39,7 +39,7 @@ export function TabPageHeader({ title, actions, gutter = GUTTER, style }: TabPag
   // `insets.top` and the title sits flush at the very top of the viewport —
   // this is what pushed Discover/Messages/Activity's titles up into the
   // corner, nearly under the notch, in the plain 390x844 web preview.
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
 
   return (
     <View style={[styles.row, { paddingTop: topPad + 12, paddingHorizontal: gutter }, style]}>
