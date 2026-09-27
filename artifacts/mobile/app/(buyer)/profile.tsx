@@ -405,6 +405,9 @@ export default function ProfileScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
+  // So the empty state can centre in whatever room is actually left above
+  // the tab bar, instead of guessing the header's height ahead of time.
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   const loadCounts = useCallback(async () => {
     const id = user?.id;
@@ -712,7 +715,7 @@ export default function ProfileScreen() {
   ];
 
   const header = (
-    <View>
+    <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
       {/* ── Cover — runs all the way to the top, behind the transparent top
           bar, so there's no hard seam between them. A subtle dark gradient
           when empty, never a placeholder squiggle. ── */}
@@ -722,10 +725,24 @@ export default function ProfileScreen() {
         ) : (latestVideo?.mediaUrl || latestPhoto?.mediaUrl) ? (
           <ProfileHeroMedia videoUri={latestVideo?.mediaUrl ?? null} posterUri={latestPhoto?.mediaUrl ?? null} active={false} height={COVER_HEIGHT} posterOnly />
         ) : (
-          <LinearGradient
-            colors={['#1a1a1a', '#0a0a0a']} // theme-exempt: fixed monochrome empty-cover gradient
-            style={StyleSheet.absoluteFill}
-          />
+          <>
+            <LinearGradient
+              colors={['#2a2a2e', '#121214']} // theme-exempt: fixed monochrome empty-cover gradient
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Soft highlight top-left so the empty cover reads as a lit
+                surface rather than a flat fill — a diagonal light wash
+                fading out toward the bottom-right corner. */}
+            <LinearGradient
+              pointerEvents="none"
+              colors={['rgba(255,255,255,0.06)', 'rgba(255,255,255,0)']} // theme-exempt: fixed highlight per spec
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0.7, y: 0.7 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </>
         )}
         {/* Legibility scrim for the transparent top bar's icons/text — only
             needed over real cover media (a video/photo can be bright); the
@@ -884,17 +901,24 @@ export default function ProfileScreen() {
         columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
         ListHeaderComponent={header}
         ListEmptyComponent={(
-          <ProfileGridPlaceholder
-            loading={loading}
-            error={false}
-            onRetry={loadData}
-            layout={layout}
-            icon={emptyIcon}
-            title={emptyTitle}
-            description={emptyDescription}
-            action={emptyAction}
-            compact
-          />
+          // Centers in whatever room is actually left between the header's
+          // real (measured) height and the reserved tab-bar padding, so a
+          // fresh profile's "Post your first video" CTA sits above the
+          // floating tab bar without scrolling whenever it fits — and still
+          // scrolls fully clear of it (see `listPadding` below) when it doesn't.
+          <View style={{ minHeight: Math.max(0, layout.windowHeight - headerHeight - listPadding.paddingBottom), justifyContent: 'center' }}>
+            <ProfileGridPlaceholder
+              loading={loading}
+              error={false}
+              onRetry={loadData}
+              layout={layout}
+              icon={emptyIcon}
+              title={emptyTitle}
+              description={emptyDescription}
+              action={emptyAction}
+              compact
+            />
+          </View>
         )}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: listPadding.paddingBottom }}
