@@ -115,9 +115,12 @@ vi.mock('react-native', () => {
   };
 });
 
+const { signedInUser } = vi.hoisted(() => ({
+  signedInUser: { current: { id: 'buyer-1', firstName: 'Ava', lastName: 'Buyer', username: 'ava' } as { id: string } | null },
+}));
 vi.mock('@clerk/expo', () => ({
-  useAuth: () => ({ userId: 'buyer-1', signOut: vi.fn() }),
-  useUser: () => ({ user: { id: 'buyer-1', firstName: 'Ava', lastName: 'Buyer', username: 'ava' } }),
+  useAuth: () => ({ userId: signedInUser.current?.id, signOut: vi.fn() }),
+  useUser: () => ({ user: signedInUser.current }),
 }));
 
 vi.mock('@expo/vector-icons', () => ({
@@ -286,6 +289,23 @@ vi.mock('@/contexts/FeatureFlagContext', async (importOriginal) => ({
   useFeatureFlag: (key: string) => (key === 'threadCash' ? threadCashFlag.on : false),
 }));
 
+// vitest.config.ts sets __DEV__ to false globally, so the real
+// isPreviewThreadCashEnabled() (a bare `__DEV__` check) would never fire in
+// this suite — mocked here with its own on/off switch so the "no user" /
+// "empty streak data" fallback tests can actually exercise it.
+const { previewThreadCashEnabled } = vi.hoisted(() => ({ previewThreadCashEnabled: { on: false } }));
+vi.mock('@/lib/previewThreadCash', () => ({
+  isPreviewThreadCashEnabled: () => previewThreadCashEnabled.on,
+  PREVIEW_THREAD_CASH_STATUS: {
+    balanceCents: 480,
+    config: { dailyAmountCents: 10, streakBonusCents: 100, streakBonusDays: 7, graceHours: 0, expiryDays: null, maxRedemptionPerOrderCents: null },
+    streak: {
+      currentStreak: 3, longestStreak: 5, lastCheckInDate: '2026-01-01',
+      timezone: 'UTC', alreadyCheckedInToday: true, dayInCycle: 3, streakBonusDays: 7,
+    },
+  },
+}));
+
 vi.mock('@/components/BrandthreadUI', () => {
   const ReactActual = require('react') as typeof import('react');
   // Mocking this module wholesale (for EmptyState below) shadows every one of
@@ -386,6 +406,8 @@ describe('buyer profile tabs', () => {
     apiMock.threadCash.get.mockReset().mockResolvedValue({ balanceCents: 0 });
     getBuyerOrdersWithStatusMock.mockReset().mockResolvedValue({ orders: [], fromCache: false });
     routerMock.push.mockReset();
+    signedInUser.current = { id: 'buyer-1' };
+    previewThreadCashEnabled.on = false;
   });
 
   afterEach(async () => {
@@ -506,6 +528,40 @@ describe('buyer profile tabs', () => {
     routerMock.push.mockReset();
     await act(async () => { chip.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/thread-cash');
+    threadCashFlag.on = false;
+  });
+
+  it('shows the Thread Cash streak row (seeded preview data) when no user is signed in', async () => {
+    threadCashFlag.on = true;
+    previewThreadCashEnabled.on = true;
+    signedInUser.current = null;
+
+    renderer = await renderScreen();
+
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Thread Cash streak'),
+    ).length).toBeGreaterThan(0);
+    expect(renderer.root.findAll(
+      node => typeof node.props.accessibilityLabel === 'string'
+        && node.props.accessibilityLabel.includes('Day 3 of 7 in this Thread Cash week'),
+    ).length).toBeGreaterThan(0);
+    threadCashFlag.on = false;
+  });
+
+  it('shows the Thread Cash streak row (seeded preview data) when the API responds with no streak data', async () => {
+    threadCashFlag.on = true;
+    previewThreadCashEnabled.on = true;
+    apiMock.threadCash.get.mockResolvedValue({ balanceCents: 1200 });
+
+    renderer = await renderScreen();
+
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Thread Cash streak'),
+    ).length).toBeGreaterThan(0);
+    expect(renderer.root.findAll(
+      node => typeof node.props.accessibilityLabel === 'string'
+        && node.props.accessibilityLabel.includes('Day 3 of 7 in this Thread Cash week'),
+    ).length).toBeGreaterThan(0);
     threadCashFlag.on = false;
   });
 

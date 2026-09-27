@@ -462,21 +462,41 @@ export default function ProfileScreen() {
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    if (user?.id && threadCashEnabled) {
-      void api.threadCash.get()
-        .then(status => {
-          if (!active) return;
-          setThreadCashBalanceCents(Math.max(0, status.balanceCents));
-          setThreadCashStreak(status.streak);
-        })
-        .catch(() => {
-          // No live backend in the dev-web preview — fall back to seeded
-          // preview data so the streak row isn't silently invisible there.
-          if (!active || !isPreviewThreadCashEnabled()) return;
-          setThreadCashBalanceCents(Math.max(0, PREVIEW_THREAD_CASH_STATUS.balanceCents));
-          setThreadCashStreak(PREVIEW_THREAD_CASH_STATUS.streak);
-        });
+    if (!threadCashEnabled) return () => { active = false; };
+
+    // No live backend in the dev-web preview (and, per #151, a Clerk token
+    // that never resolves within its timeout can also leave `user` unset
+    // there) — fall back to seeded preview data so the streak row isn't
+    // silently invisible. Applied whenever there's no signed-in user id OR
+    // the real response comes back with no usable streak data (the row's
+    // own guard is `currentStreak > 0`); `isPreviewThreadCashEnabled()` is
+    // `__DEV__`-gated, so none of this ever fires in a production build.
+    const applyPreviewFallback = () => {
+      if (!active || !isPreviewThreadCashEnabled()) return;
+      setThreadCashBalanceCents(Math.max(0, PREVIEW_THREAD_CASH_STATUS.balanceCents));
+      setThreadCashStreak(PREVIEW_THREAD_CASH_STATUS.streak);
+    };
+
+    if (!user?.id) {
+      applyPreviewFallback();
+      return () => { active = false; };
     }
+
+    void api.threadCash.get()
+      .then(status => {
+        if (!active) return;
+        // The real balance is always trustworthy (even a fresh streak-less
+        // buyer can hold a nonzero balance from a gift/blast) — only the
+        // streak itself falls back when the response has nothing to show.
+        setThreadCashBalanceCents(Math.max(0, status?.balanceCents ?? 0));
+        if (status?.streak && status.streak.currentStreak > 0) {
+          setThreadCashStreak(status.streak);
+        } else {
+          applyPreviewFallback();
+        }
+      })
+      .catch(applyPreviewFallback);
+
     return () => { active = false; };
   }, [api, threadCashEnabled, user?.id]));
 
