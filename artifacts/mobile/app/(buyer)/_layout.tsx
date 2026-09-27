@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
+import { Animated, Easing, useWindowDimensions } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 
 import { useColors } from '@/hooks/useColors';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
@@ -7,6 +9,54 @@ import { BuyerTabBar } from '@/components/buyer-nav/BuyerTabBar';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
 import { getConversations, getNotifications, subscribeSocial } from '@/services/socialService';
 import { ThreadCashActiveTimeTracker } from '@/components/thread-cash/ThreadCashActiveTimeTracker';
+
+// ─── Tab switch transition ──────────────────────────────────────────────────
+// Instagram/TikTok-style directional slide: the incoming tab slides in from
+// the side of the tab bar it was tapped from, the outgoing one slides out
+// the other way. `current.progress` (from React Navigation's bottom-tabs)
+// is -1/0/1 based on the tapped screen's REGISTRATION index relative to the
+// active one — see the Tabs.Screen order below, which is deliberately kept
+// in the same left-to-right order as the capsule (Home, Discover, Inbox,
+// Activity, Profile) so that order, not just tab-bar visual position, is
+// what decides slide direction.
+const SLIDE_DURATION = 280;
+// cubic-bezier(0.2, 0.8, 0.2, 1): ease-out, no bounce/overshoot.
+const SLIDE_EASING = Easing.bezier(0.2, 0.8, 0.2, 1);
+
+const SLIDE_TRANSITION_SPEC = {
+  animation: 'timing' as const,
+  config: { duration: SLIDE_DURATION, easing: SLIDE_EASING },
+};
+
+const REDUCED_MOTION_TRANSITION_SPEC = {
+  animation: 'timing' as const,
+  config: { duration: 150, easing: Easing.linear },
+};
+
+function forDirectionalSlide(width: number) {
+  return ({ current }: { current: { progress: Animated.Value } }) => ({
+    sceneStyle: {
+      transform: [{
+        translateX: current.progress.interpolate({
+          inputRange: [-1, 0, 1],
+          outputRange: [-width, 0, width],
+        }),
+      }],
+    },
+  });
+}
+
+// Reduced-motion fallback: a plain crossfade, no positional movement at all.
+function forReducedMotionCrossfade({ current }: { current: { progress: Animated.Value } }) {
+  return {
+    sceneStyle: {
+      opacity: current.progress.interpolate({
+        inputRange: [-1, 0, 1],
+        outputRange: [0, 1, 0],
+      }),
+    },
+  };
+}
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
 // Floating capsule: Home · Discover · Inbox · Search, plus a separate Profile
@@ -18,6 +68,8 @@ import { ThreadCashActiveTimeTracker } from '@/components/thread-cash/ThreadCash
 function BuyerTabLayout() {
   const colors = useColors();
   const [inboxBadgeCount, setInboxBadgeCount] = useState(0);
+  const { width } = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
 
   const loadBadgeCount = useCallback(async () => {
     try {
@@ -65,18 +117,38 @@ function BuyerTabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
-        // No transition: the previous tab bar animation ('shift') added a
-        // sideways glide on every tab tap, which is exactly the perceptible
-        // delay the tab bar should never have now that switching is just a
-        // visibility flip between already-mounted, already-fetched screens.
-        animation: 'none',
+        // Directional slide between tabs (Instagram/TikTok-style): driven by
+        // transitionSpec + sceneStyleInterpolator rather than the 'shift'/
+        // 'fade' presets so the distance is a full screen width and the
+        // easing/duration match this round's spec exactly. `animation` is
+        // deliberately left unset — React Navigation's bottom-tabs enables
+        // per-frame animation whenever a transitionSpec is present, and
+        // leaving it out (rather than 'none') is what makes that so. Each
+        // tab keeps its own mounted state/scroll position throughout (see
+        // detachInactiveScreens/freezeOnBlur below), so this is purely a
+        // visual transition, not a remount.
+        transitionSpec: reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC,
+        sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width),
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
+      {/* Registration order matters here, not just for the capsule's visual
+          layout: React Navigation's bottom-tabs derives each screen's slide
+          direction from this order relative to the active tab (see
+          forDirectionalSlide above), so this list is kept in the exact same
+          left-to-right order as the capsule + Profile circle (Home,
+          Discover, Inbox, Activity, Profile) rather than grouping Profile
+          with the other top-level screens the way BUYER_TAB_ITEMS itself
+          doesn't need to. */}
       {/* Home — seller videos with product tagging, likes, comments, purchase */}
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarAccessibilityLabel: 'Home tab' }} />
       <Tabs.Screen name="discover" options={{ title: 'Discover', tabBarAccessibilityLabel: 'Discover tab' }} />
       <Tabs.Screen name="inbox" options={{ title: 'Inbox', tabBarAccessibilityLabel: 'Inbox tab' }} />
+      {/* Has its own bar slot (the bell), but like the rest of this group it's
+          reached by navigating within this navigator, not by pushing the
+          root-level /activity-center route — that's what keeps the floating
+          tab bar mounted and lit up on Activity instead of disappearing. */}
+      <Tabs.Screen name="activity" options={{ title: 'Activity', href: null }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarAccessibilityLabel: 'Profile tab' }} />
 
       {/* No slot of their own — reached from Home, Profile or Inbox. */}
@@ -85,11 +157,6 @@ function BuyerTabLayout() {
       <Tabs.Screen name="orders" options={{ title: 'Orders', href: null }} />
       <Tabs.Screen name="following" options={{ title: 'Following', href: null }} />
       <Tabs.Screen name="edit-profile" options={{ title: 'Edit profile', href: null }} />
-      {/* Has its own bar slot (the bell), but like the rest of this group it's
-          reached by navigating within this navigator, not by pushing the
-          root-level /activity-center route — that's what keeps the floating
-          tab bar mounted and lit up on Activity instead of disappearing. */}
-      <Tabs.Screen name="activity" options={{ title: 'Activity', href: null }} />
       {/* feed re-export kept for deep-link compatibility; Home is the index */}
       <Tabs.Screen name="feed" options={{ title: 'Home', href: null }} />
     </Tabs>
