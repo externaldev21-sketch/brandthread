@@ -71,8 +71,10 @@ export function Header({
   /**
    * A custom right-side accessory instead of plain icon `actions` — for the
    * rare case a page needs something `actions` can't express (e.g. a badged
-   * notification bell). Root pages only; rendered where the plain icons
-   * would go, same size/position, so it still reads as "the same slot".
+   * notification bell, or a text control like "Edit"). Works on both the
+   * root-page header and the pushed-screen (showBack) header; rendered
+   * where the plain icons would go, same size/position, so it still reads
+   * as "the same slot".
    */
   rightElement?: React.ReactNode;
 }) {
@@ -157,20 +159,26 @@ export function Header({
         </Animated.View>
 
         <View style={styles.actionsRow}>
-          {actions.map((action, i) => (
-            <TouchableOpacity
-              key={i}
-              accessibilityRole="button"
-              accessibilityLabel={action.accessibilityLabel}
-              disabled={action.disabled}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              onPress={action.onPress}
-              style={[styles.iconBtn, action.disabled && { opacity: 0.4 }]}
-            >
-              <Feather name={action.icon} size={ICON.md} color={theme.text} />
-            </TouchableOpacity>
-          ))}
-          {actions.length === 0 && <View style={styles.iconBtn} />}
+          {rightElement ? (
+            rightElement
+          ) : (
+            <>
+              {actions.map((action, i) => (
+                <TouchableOpacity
+                  key={i}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.accessibilityLabel}
+                  disabled={action.disabled}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={action.onPress}
+                  style={[styles.iconBtn, action.disabled && { opacity: 0.4 }]}
+                >
+                  <Feather name={action.icon} size={ICON.md} color={theme.text} />
+                </TouchableOpacity>
+              ))}
+              {actions.length === 0 && <View style={styles.iconBtn} />}
+            </>
+          )}
         </View>
       </View>
 

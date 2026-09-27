@@ -37,6 +37,12 @@ const ALLOWLIST: Record<string, string> = {
   // full-bleed camera UI, not the app's card-surface design system that
   // Button/Chip are built for.
   'app/buyer-story-create.tsx': 'PR #124 camera-first story composer — bespoke modal chrome, not migrated to the design system',
+  // The "Added to cart" toast's <Text>View</Text> is one bolded/underlined
+  // word inside a single compound label ("Added to cart · View") — the
+  // whole pill-shaped row is the tap target (same "chrome is really the
+  // whole row" exception as a list row), not a standalone "View" button
+  // that skipped components/ui/Button.
+  'components/ShopProductSheet.tsx': 'Added-to-cart toast is one compound-label row, not a standalone "View" button',
 };
 
 const TAG_NAMES = ['Pressable', 'TouchableOpacity', 'TouchableHighlight'];

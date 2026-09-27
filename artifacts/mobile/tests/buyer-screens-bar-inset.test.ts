@@ -15,12 +15,12 @@ describe('screens behind the floating buyer bar', () => {
       // `SP` alias (lib/theme.ts) to the canonical `SPACING` token
       // (constants/spacing.ts) — same 16pt value, new shared-token source.
       'app/(buyer)/friends.tsx': 'paddingBottom: barInset + SPACING.md',
-      // edit-profile.tsx is intentionally excluded: it's a pushed,
-      // modal-style screen and the floating bar is hidden on it entirely
-      // (BUYER_TAB_BAR_HIDDEN_ROUTES in components/buyer-nav/BuyerTabBar.tsx),
-      // so it pads by the safe-area bottom inset instead of the bar inset —
-      // see the dedicated assertion below.
-      'app/(buyer)/cart.tsx': 'paddingBottom: barInset + 150',
+      // edit-profile.tsx and cart.tsx are intentionally excluded: both are
+      // pushed, modal-style screens and the floating bar is hidden on them
+      // entirely (BUYER_TAB_BAR_HIDDEN_ROUTES in
+      // components/buyer-nav/BuyerTabBar.tsx), so they pad by the safe-area
+      // bottom inset instead of the bar inset — see the dedicated assertions
+      // below.
       'app/(tabs)/following.tsx': 'Math.max(120, barInset + SPACING.md)',
     };
     for (const [file, padding] of Object.entries(screens)) {
@@ -31,9 +31,16 @@ describe('screens behind the floating buyer bar', () => {
     }
   });
 
-  it('lifts the cart checkout summary above the bar', () => {
+  it('cart is a pushed screen: the floating bar is hidden and its sticky checkout bar pads by the safe-area inset instead', () => {
     const cart = read('app/(buyer)/cart.tsx');
-    expect(cart).toContain('<StickyFooter tabBarInset={barInset}>');
+    expect(cart).not.toContain("from '@/components/buyer-nav/buyerTabBarMetrics'");
+    expect(cart).not.toContain('useBuyerTabBarInset');
+    expect(cart).toContain("import { useSafeAreaInsets } from 'react-native-safe-area-context';");
+    expect(cart).toContain('const insets = useSafeAreaInsets();');
+    expect(cart).toContain('<StickyFooter style={{ paddingBottom: insets.bottom + 8 }}>');
+
+    const tabBar = read('components/buyer-nav/BuyerTabBar.tsx');
+    expect(tabBar).toContain("BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile', 'cart']);");
   });
 
   it('edit-profile hides the floating bar and pads by the safe-area inset instead', () => {
@@ -43,7 +50,7 @@ describe('screens behind the floating buyer bar', () => {
     expect(editProfile).toContain('paddingBottom: insets.bottom + SP.xl');
 
     const tabBar = read('components/buyer-nav/BuyerTabBar.tsx');
-    expect(tabBar).toContain("BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile']);");
+    expect(tabBar).toContain("BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile', 'cart']);");
     expect(tabBar).toContain('if (BUYER_TAB_BAR_HIDDEN_ROUTES.has(activeRoute)) return null;');
   });
 });
