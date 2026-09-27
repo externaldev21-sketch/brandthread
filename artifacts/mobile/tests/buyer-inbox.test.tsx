@@ -175,6 +175,24 @@ vi.mock('@/components/BrandthreadUI', () => ({
       { testID: testID ?? `primary-button-${label}`, onPress, disabled: !!disabled || !!loading },
       React.createElement('Text', {}, label),
     ),
+  useUndoToast: () => ({ showUndo: vi.fn(), dismissUndo: vi.fn() }),
+}));
+
+// Requests-tab accept/delete/block plumbing (see lib/requestActions.ts,
+// lib/pendingRequestDeletes.ts) isn't under test in this file (see
+// tests/request-actions.test.ts / request-actions-wrapper.test.ts) — stub it
+// out so InboxScreen can still mount.
+vi.mock('@/lib/requestActions', () => ({
+  scheduleDeleteConversationRequest: vi.fn(),
+  undoDeleteConversationRequest: vi.fn(),
+  blockConversationRequestUser: vi.fn(),
+}));
+vi.mock('@/lib/pendingRequestDeletes', () => ({
+  subscribePendingConversationDeletes: (cb: (ids: Set<string>) => void) => { cb(new Set()); return () => {}; },
+  isPendingConversationDelete: () => false,
+}));
+vi.mock('@/lib/actionSheet', () => ({
+  confirmDestructiveActionSheet: vi.fn().mockResolvedValue(false),
 }));
 
 // `tabDataCache` is a module-level in-memory Map (see lib/tabDataCache.ts —

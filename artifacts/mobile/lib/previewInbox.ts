@@ -24,6 +24,7 @@ import {
   type PreviewConversationSeed, type PreviewMessageSeed,
 } from './previewInboxData';
 import type { Conversation, Message, MessageAttachment, Notification } from '@/services/socialTypes';
+import { acceptConversationInList, removeConversationFromList } from './conversationListMutations';
 
 export function isPreviewInboxEnabled(): boolean {
   return isPreviewCatalogEnabled();
@@ -120,6 +121,31 @@ export function getPreviewConversations(): Conversation[] {
 
 export function getPreviewConversation(id: string): Conversation | null {
   return getPreviewConversations().find(c => c.id === id) ?? null;
+}
+
+/**
+ * Accepts a seeded message request in place: flips `isRequest` off, bumps
+ * `updatedAt` and moves it to the front of the module-level cache — mimicking
+ * what the real backend does for free (accept bumps `updatedAt`, the list
+ * endpoint sorts by `updatedAt DESC`) since there is no real backend here to
+ * refetch from. Returns the updated conversation, or `null` if `id` isn't a
+ * seeded conversation this module knows about.
+ */
+export function acceptPreviewConversationRequest(id: string): Conversation | null {
+  const list = getPreviewConversations();
+  if (!list.some(c => c.id === id)) return null;
+  cachedConversations = acceptConversationInList(list, id);
+  return cachedConversations[0];
+}
+
+/**
+ * Permanently removes a seeded conversation from the cache — the preview-mode
+ * equivalent of the real DELETE /api/conversations/:id hard delete. Used both
+ * for "Delete" and "Block" on a seeded message request, since there's no real
+ * backend block/delete record to keep in sync with.
+ */
+export function deletePreviewConversationRequest(id: string): void {
+  cachedConversations = removeConversationFromList(getPreviewConversations(), id);
 }
 
 let cachedNotifications: Notification[] | null = null;

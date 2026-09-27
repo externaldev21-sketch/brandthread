@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
-import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
+import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth } from '@clerk/expo';
@@ -27,7 +27,6 @@ import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
-import { Button } from '@/components/ui/Button';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
@@ -35,6 +34,12 @@ import {
   isPreviewInboxEnabled, isPreviewConversationId, getPreviewConversations,
   subscribePreviewTyping,
 } from '@/lib/previewInbox';
+import {
+  scheduleDeleteConversationRequest, undoDeleteConversationRequest, blockConversationRequestUser,
+} from '@/lib/requestActions';
+import { subscribePendingConversationDeletes } from '@/lib/pendingRequestDeletes';
+import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
+import { BLOCK_EXPLAINER } from '@/lib/safety';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
 
@@ -231,8 +236,15 @@ export default function InboxScreen() {
   // skeleton exactly as before.
   const cachedInbox = getCachedTabData<{ conversations: Conversation[] }>('inbox');
   const [conversations, setConversations] = useState<Conversation[]>(cachedInbox?.conversations ?? []);
-  const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(!cachedInbox);
+  // Requests deleted (or "Delete all"-ed) in this session sit in a ~4s undo
+  // window (lib/pendingRequestDeletes.ts) before the real delete actually
+  // fires. Tracked here purely to force a re-render + filter them out of
+  // every derived list — the module itself is the source of truth, not this
+  // state — so navigating away and back never resurrects a row mid-undo.
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => subscribePendingConversationDeletes(setPendingDeleteIds), []);
+  const { showUndo } = useUndoToast();
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [composeVisible, setComposeVisible] = useState(false);
@@ -374,7 +386,7 @@ export default function InboxScreen() {
   // Conversation in services/socialTypes.ts) always sorted first.
   const filteredConvs = conversations
     .filter(conv => {
-      if (conv.isArchived || conv.isRequest) return false;
+      if (conv.isArchived || conv.isRequest || pendingDeleteIds.has(conv.id)) return false;
       if (messagesSearchLower) {
         const participant = getParticipant(conv);
         const haystack = [
@@ -386,7 +398,9 @@ export default function InboxScreen() {
     })
     .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
 
-  const requestConvs = conversations.filter(conv => conv.isRequest === true && !conv.isArchived);
+  const requestConvs = conversations.filter(conv =>
+    conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id)
+  );
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -398,49 +412,58 @@ export default function InboxScreen() {
     router.push(`/buyer-conversation?id=${conv.id}` as never);
   }
 
-  async function acceptRequest(conv: Conversation) {
+  // Requests-tab row tap: opens the conversation in request mode (see
+  // buyer-conversation.tsx's isRequestMode branch — hidden composer, bottom
+  // accept/delete/block panel). Deliberately does NOT call markReadSafely —
+  // per the Instagram-style request flow, the sender shouldn't see a read
+  // receipt until the recipient actually accepts.
+  function openRequestConversation(conv: Conversation) {
     hapticPrimaryAction();
-    setRequestActionLoading(conv.id);
-    try {
-      await api.conversations.accept(conv.id);
-      // Refresh conversation list
-      const convs = await getConversations();
-      setConversations(convs);
-      setActiveTab('inbox');
-      // Open the accepted conversation
-      markReadSafely(conv.id);
-      router.push(`/buyer-conversation?id=${conv.id}` as never);
-    } catch {
-      Alert.alert('Couldn’t accept request', 'Please try again.');
-    } finally {
-      setRequestActionLoading(null);
-    }
+    router.push(`/buyer-conversation?id=${conv.id}` as never);
   }
 
-  async function declineRequest(conv: Conversation) {
+  // Delete with a real, working Undo: the row leaves the list immediately,
+  // but the real (irreversible — see conversations.ts's hard DELETE) API
+  // call is deferred ~4s behind lib/pendingRequestDeletes.ts, so "Undo" can
+  // still cancel it in time.
+  function deleteRequestConversation(conv: Conversation) {
     const participant = getParticipant(conv);
-    Alert.alert(
-      'Decline request',
-      `Remove message request from ${participant?.name ?? 'this user'}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Decline',
-          style: 'destructive',
-          onPress: async () => {
-            setRequestActionLoading(conv.id);
-            try {
-              await api.conversations.decline(conv.id);
-              setConversations(prev => prev.filter(c => c.id !== conv.id));
-            } catch {
-              Alert.alert('Couldn’t decline request', 'Please try again.');
-            } finally {
-              setRequestActionLoading(null);
-            }
-          },
-        },
-      ]
-    );
+    hapticDestructiveConfirm();
+    scheduleDeleteConversationRequest(conv.id, api);
+    showUndo({
+      message: `Deleted request from ${participant?.name ?? 'this person'}`,
+      undo: () => undoDeleteConversationRequest(conv.id),
+    });
+  }
+
+  function deleteAllRequests() {
+    if (requestConvs.length === 0) return;
+    hapticDestructiveConfirm();
+    const ids = requestConvs.map(c => c.id);
+    ids.forEach(id => scheduleDeleteConversationRequest(id, api));
+    showUndo({
+      message: ids.length === 1 ? 'Deleted 1 request' : `Deleted ${ids.length} requests`,
+      undo: () => ids.forEach(id => undoDeleteConversationRequest(id)),
+    });
+  }
+
+  async function blockRequestConversation(conv: Conversation) {
+    const participant = getParticipant(conv);
+    if (!participant) return;
+    const confirmed = await confirmDestructiveActionSheet({
+      title: `Block ${participant.name}?`,
+      message: BLOCK_EXPLAINER,
+      confirmLabel: 'Block',
+    });
+    if (!confirmed) return;
+    hapticDestructiveConfirm();
+    try {
+      await blockConversationRequestUser(conv.id, participant);
+      setConversations(prev => prev.filter(c => c.id !== conv.id));
+      showSnackbar(`Blocked ${participant.name}`);
+    } catch {
+      Alert.alert('Couldn’t block', 'Please try again.');
+    }
   }
 
   function longPressConversation(conv: Conversation) {
@@ -832,46 +855,89 @@ export default function InboxScreen() {
     );
   }
 
-  function renderRequestRow(conv: Conversation) {
+  // Requests-tab row — deliberately styled IDENTICAL to an Inbox row
+  // (renderConvRow above: same avatarContainer/avatar48 sizing, same left
+  // inset, same name/preview/time typography, same trailing unread dot).
+  // Per the redesign spec, no Accept/Decline buttons live in the list itself
+  // — tapping the row just opens the conversation in request mode; Block/
+  // Delete are reachable via swipe, matching the rest of the Messages tab's
+  // swipe-action convention (InboxSwipeRow), and Accept/Delete/Block all
+  // live in the conversation screen's own bottom panel.
+  function renderRequestRow({ item: conv, index }: { item: Conversation; index: number }) {
     const participant = getParticipant(conv);
     if (!participant) return null;
-    const isLoadingAction = requestActionLoading === conv.id;
+    const isUnread = conv.unreadCount > 0;
+
+    const swipeActions: InboxSwipeAction[] = [
+      {
+        key: 'block',
+        label: 'Block',
+        icon: 'slash',
+        color: theme.cardElevated,
+        textColor: theme.error,
+        onPress: () => blockRequestConversation(conv),
+        accessibilityLabel: `Block ${participant.name}`,
+      },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        color: theme.cardElevated,
+        textColor: theme.error,
+        onPress: () => deleteRequestConversation(conv),
+        accessibilityLabel: `Delete request from ${participant.name}`,
+      },
+    ];
+
     return (
-      <View key={conv.id} style={s.requestCard}>
-        <View style={[s.avatar56, { backgroundColor: participant.color }]}>
-          <Text style={s.avatarInitials}>{participant.initials}</Text>
-        </View>
-        <View style={s.convCenter}>
-          <View style={s.convNameRow}>
-            <Text style={[s.convName, { color: theme.text, fontFamily: FONT.semibold }]} numberOfLines={1}>{participant.name}</Text>
-            {conv.lastMessageTs ? <Text style={[s.convTime, { color: theme.muted }]}>{timeAgo(conv.lastMessageTs)}</Text> : null}
-          </View>
-          <Text style={[s.convPreview, { color: theme.muted }]} numberOfLines={1}>
-            {previewText(conv.lastMessage, 'Sent you a message')}
-          </Text>
-          <View style={s.requestActions}>
-            <Button
-              label="Accept"
-              variant="primary"
-              size="compact"
-              style={s.requestActionBtn}
-              loading={isLoadingAction}
-              disabled={isLoadingAction}
-              onPress={() => acceptRequest(conv)}
-              testID={`inbox-request-accept-${conv.id}`}
-            />
-            <Button
-              label="Decline"
-              variant="secondary"
-              size="compact"
-              style={s.requestActionBtn}
-              disabled={isLoadingAction}
-              onPress={() => declineRequest(conv)}
-              testID={`inbox-request-decline-${conv.id}`}
-            />
-          </View>
-        </View>
-      </View>
+      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
+        <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
+          <PressableScale
+            style={[s.convRow, { backgroundColor: theme.background }]}
+            onPress={() => openRequestConversation(conv)}
+            activeOpacity={0.75}
+            rippleEnabled={NO_RIPPLE}
+            testID={`inbox-request-row-${conv.id}`}
+          >
+            <View style={s.avatarContainer}>
+              {participant.avatarUri ? (
+                <Image source={{ uri: participant.avatarUri }} style={s.avatar48} testID={`inbox-request-avatar-image-${conv.id}`} />
+              ) : (
+                <View style={[s.avatar48, { backgroundColor: participant.color }]}>
+                  <Text style={s.avatarInitials}>{participant.initials}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={s.convCenter}>
+              <View style={s.convNameRow}>
+                <Text
+                  style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
+                  numberOfLines={1}
+                >
+                  {participant.name}
+                </Text>
+              </View>
+              <ConversationPreview
+                text={previewText(conv.lastMessage, 'Sent you a message')}
+                attachmentType={conv.lastMessageType}
+                isFromMe={false}
+                bold={isUnread}
+                color={isUnread ? theme.text : theme.muted}
+              />
+            </View>
+
+            <View style={s.convTrailing}>
+              {conv.lastMessageTs ? (
+                <Text style={[s.convTime, { color: theme.muted, marginLeft: 0 }]} numberOfLines={1}>{timeAgo(conv.lastMessageTs)}</Text>
+              ) : null}
+              {isUnread ? (
+                <View style={[s.unreadDotTrailing, { backgroundColor: theme.accent }]} testID={`inbox-request-unread-${conv.id}`} />
+              ) : null}
+            </View>
+          </PressableScale>
+        </InboxSwipeRow>
+      </AnimatedEntrance>
     );
   }
 
@@ -987,7 +1053,26 @@ export default function InboxScreen() {
       {requestConvs.length === 0 ? (
         <EmptyState icon="mail" illustration="envelope" title="No message requests" description="Requests from people you don't follow appear here" />
       ) : (
-        requestConvs.map(renderRequestRow)
+        <>
+          <View style={s.requestsHeaderRow}>
+            <Text style={[s.requestsHeaderText, { color: theme.muted }]}>
+              Open a chat to get info about who's messaging you. They won't know you've seen it until you accept.
+            </Text>
+            <PressableScale
+              onPress={deleteAllRequests}
+              rippleEnabled={NO_RIPPLE}
+              accessibilityRole="button"
+              accessibilityLabel="Delete all requests"
+              testID="inbox-requests-delete-all"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={[s.requestsDeleteAll, { color: theme.muted }]}>Delete all</Text>
+            </PressableScale>
+          </View>
+          {requestConvs.map((conv, index) => (
+            <React.Fragment key={conv.id}>{renderRequestRow({ item: conv, index })}</React.Fragment>
+          ))}
+        </>
       )}
     </ScrollView>
   );
@@ -1359,20 +1444,22 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   },
   aiTagText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 0.3 },
 
-  // Request card (inline in the Requests tab)
-  requestCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: SP.md,
-    gap: SP.md,
+  // Requests-tab header: a small gray explainer line + a quiet "Delete all"
+  // text action, right-aligned on its own line beneath — Instagram-style.
+  requestsHeaderRow: {
+    paddingTop: SP.sm,
+    paddingBottom: SP.md,
+    gap: SP.xs,
   },
-  requestActions: {
-    flexDirection: 'row',
-    gap: SP.sm,
-    marginTop: SP.sm,
+  requestsHeaderText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    lineHeight: 17,
   },
-  requestActionBtn: {
-    minWidth: 88,
+  requestsDeleteAll: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    alignSelf: 'flex-end',
   },
 
   // Conversation row — Threads style: no per-row hairline (rhythm from

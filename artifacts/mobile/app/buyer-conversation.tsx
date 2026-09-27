@@ -8,7 +8,7 @@ import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { Chip } from '@/components/ui/Chip';
@@ -38,6 +38,11 @@ import {
 import { useAuth } from '@clerk/expo';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
+import {
+  acceptConversationRequest, scheduleDeleteConversationRequest, undoDeleteConversationRequest,
+  blockConversationRequestUser,
+} from '@/lib/requestActions';
+import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
@@ -259,6 +264,11 @@ export default function BuyerConversationScreen() {
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
+  const { showUndo } = useUndoToast();
+  const textInputRef = useRef<TextInput>(null);
+  // Request-mode UI state (see the bottom RequestActionPanel below):
+  // in-flight Accept, so the Accept/Block/Delete row can't double-fire.
+  const [requestActionLoading, setRequestActionLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
@@ -371,7 +381,12 @@ export default function BuyerConversationScreen() {
         loadedConv = await getConversation(params.id);
         if (loadedConv) {
           unreadBeforeRead = loadedConv.unreadCount ?? 0;
-          await markConversationRead(loadedConv.id);
+          // Per the Instagram-style request flow: opening a pending request
+          // must NOT tell the sender it's been read — that only happens once
+          // the recipient actually accepts (see handleAcceptRequest below).
+          if (!loadedConv.isRequest) {
+            await markConversationRead(loadedConv.id);
+          }
         }
       } else if (params.participantId) {
         loadedConv = await createOrGetConversation({
@@ -488,7 +503,10 @@ export default function BuyerConversationScreen() {
     ?? null;
   const displayName = participant?.name ?? params.participantName ?? 'Unknown';
   const isDisabled = conv?.isFriendshipActive === false;
-  const canSend = (text.trim().length > 0 || selectedAttachment != null) && !isDisabled && !isSending;
+  // Request mode (Instagram-style): the composer is hidden and replaced with
+  // the accept/block/delete bottom panel below until the recipient accepts.
+  const isRequestMode = conv?.isRequest === true;
+  const canSend = (text.trim().length > 0 || selectedAttachment != null) && !isDisabled && !isSending && !isRequestMode;
 
   // Presence line under the header name. `isOnline`/`lastSeenAt` are the only
   // presence signals ConversationParticipant carries; the backend does not
@@ -620,6 +638,65 @@ export default function BuyerConversationScreen() {
       color: participant.color,
     });
     router.push(('/buyer-other-profile?' + qs.toString()) as never);
+  }
+
+  // ── Request mode: accept / delete / block ───────────────────────────────────
+  // Real work happens through lib/requestActions.ts, which is preview-aware —
+  // this is the single fix for the app owner's "Accept does nothing" report:
+  // the old inbox.tsx `acceptRequest` called the real API unconditionally, so
+  // every one of the 3 seeded preview requests (fake `preview-conversation-*`
+  // ids) 404'd against the real backend and silently failed.
+
+  async function handleAcceptRequest() {
+    if (!conv || requestActionLoading) return;
+    hapticPrimaryAction();
+    setRequestActionLoading(true);
+    const previousConv = conv;
+    try {
+      await acceptConversationRequest(conv.id, api);
+      hapticSuccessAction();
+      setConv({ ...previousConv, isRequest: false });
+      // Composer takes the bottom panel's place the instant isRequestMode
+      // flips false (see the render below) — hand it the keyboard right
+      // away, matching "keyboard ready" in the spec.
+      setTimeout(() => textInputRef.current?.focus(), 50);
+    } catch (e) {
+      // Roll back: the panel stays up and Accept is tappable again.
+      setConv(previousConv);
+      Alert.alert('Couldn’t accept request', apiErrorMessage(e, 'Please check your connection and try again.'));
+    } finally {
+      setRequestActionLoading(false);
+    }
+  }
+
+  function handleDeleteRequest() {
+    if (!conv) return;
+    hapticDestructiveConfirm();
+    const conversationId = conv.id;
+    const name = displayName;
+    scheduleDeleteConversationRequest(conversationId, api);
+    showUndo({
+      message: `Deleted request from ${name}`,
+      undo: () => undoDeleteConversationRequest(conversationId),
+    });
+    goBackOr(router);
+  }
+
+  async function handleBlockRequest() {
+    if (!conv || !participant) return;
+    const confirmed = await confirmDestructiveActionSheet({
+      title: `Block ${participant.name}?`,
+      message: 'They won’t be able to find your profile, see your posts, comments or stories, or message you. You won’t see theirs either. They aren’t notified.',
+      confirmLabel: 'Block',
+    });
+    if (!confirmed) return;
+    hapticDestructiveConfirm();
+    try {
+      await blockConversationRequestUser(conv.id, participant);
+      goBackOr(router);
+    } catch (e) {
+      Alert.alert('Couldn’t block', apiErrorMessage(e, 'Please check your connection and try again.'));
+    }
   }
 
   // ── Photo / video picker ──────────────────────────────────────────────────────
@@ -1539,6 +1616,36 @@ export default function BuyerConversationScreen() {
         </PressableScale>
       </View>
 
+      {/* Request-mode profile header — Instagram's message-request chat
+          leads with a bigger avatar, name, @handle and a "View profile"
+          pill before any messages, since this is often the first real
+          context the recipient has on who's messaging them. */}
+      {isRequestMode && participant && (
+        <View style={s.requestProfileHeader} testID="conversation-request-profile-header">
+          <View style={[s.requestProfileAvatar, { backgroundColor: participant.color }]}>
+            {participant.avatarUri ? (
+              <CachedImage source={{ uri: participant.avatarUri }} style={s.requestProfileAvatarImage} />
+            ) : (
+              <Text style={s.requestProfileAvatarInitials}>{participant.initials}</Text>
+            )}
+          </View>
+          <Text style={s.requestProfileName} numberOfLines={1}>{participant.name}</Text>
+          {!!participant.handle && (
+            <Text style={s.requestProfileHandle} numberOfLines={1}>{participant.handle}</Text>
+          )}
+          <PressableScale
+            rippleEnabled={false}
+            style={s.requestProfilePill}
+            onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${participant.name}'s profile`}
+            testID="conversation-request-view-profile"
+          >
+            <Text style={s.requestProfilePillText}>View profile</Text>
+          </PressableScale>
+        </View>
+      )}
+
       {/* Order context card */}
       {conv?.type === 'buyer_to_seller_order' && (
         <PressableScale rippleEnabled={false}
@@ -1651,8 +1758,18 @@ export default function BuyerConversationScreen() {
         </View>
       )}
 
-      {/* Input row */}
-      {participant && (messaging.blockedByMe || messaging.unavailable) ? (
+      {/* Input row — request mode replaces the composer entirely with the
+          accept/block/delete bottom panel (see RequestActionPanel below). */}
+      {isRequestMode && participant ? (
+        <RequestActionPanel
+          name={participant.name}
+          bottomInset={insets.bottom}
+          loading={requestActionLoading}
+          onAccept={handleAcceptRequest}
+          onDelete={handleDeleteRequest}
+          onBlock={handleBlockRequest}
+        />
+      ) : participant && (messaging.blockedByMe || messaging.unavailable) ? (
         <BlockedComposer
           counterpartName={participant.name}
           messaging={messaging}
@@ -1729,6 +1846,7 @@ export default function BuyerConversationScreen() {
                 same rounded bounds instead of floating as separate siblings. */}
             <View style={s.pill}>
               <TextInput
+                ref={textInputRef}
                 nativeID={CHAT_INPUT_NATIVE_ID}
                 style={[s.textInput, { height: composerInputHeight }]}
                 value={text}
@@ -2178,6 +2296,98 @@ function LikeBurst({ x, y, color, onDone }: { x: number; y: number; color: strin
   );
 }
 
+// ─── Request-mode bottom panel ─────────────────────────────────────────────────
+// Replaces the composer while `conv.isRequest` is true (see isRequestMode in
+// the screen above). Instagram reference: mobbin.com/screens/db4e29c8-e47e-
+// 47ce-8f01-b7a98376c6e7 (Instagram chat) — a sheet-style panel that sits
+// above the home indicator with the explainer copy and a three-way row
+// (Block / Delete / Accept), Accept as the sole filled/primary action.
+function RequestActionPanel({
+  name, bottomInset, loading, onAccept, onDelete, onBlock,
+}: {
+  name: string;
+  bottomInset: number;
+  loading: boolean;
+  onAccept: () => void;
+  onDelete: () => void;
+  onBlock: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const rs = requestPanelStyles;
+  return (
+    <View
+      style={[rs.wrap, { borderTopColor: theme.border, backgroundColor: theme.surface, paddingBottom: Math.max(bottomInset, SP.md) }]}
+      testID="conversation-request-panel"
+    >
+      <Text style={[rs.title, { color: theme.text }]}>{name} wants to send you a message</Text>
+      <Text style={[rs.subline, { color: theme.muted }]}>
+        Accepting lets them see when you’ve read their messages and message you freely.
+      </Text>
+      <View style={rs.actionsRow}>
+        <PressableScale
+          rippleEnabled={false}
+          style={rs.actionBtn}
+          onPress={onBlock}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Block ${name}`}
+          testID="conversation-request-block"
+        >
+          <Text style={[rs.actionText, { color: theme.error }]}>Block</Text>
+        </PressableScale>
+        <PressableScale
+          rippleEnabled={false}
+          style={rs.actionBtn}
+          onPress={onDelete}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete request from ${name}`}
+          testID="conversation-request-delete"
+        >
+          <Text style={[rs.actionText, { color: theme.text }]}>Delete</Text>
+        </PressableScale>
+        <PressableScale
+          rippleEnabled={false}
+          style={[rs.actionBtn, rs.acceptBtn, { backgroundColor: theme.text }]}
+          onPress={onAccept}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Accept message request from ${name}`}
+          testID="conversation-request-accept"
+        >
+          {loading ? (
+            <ActivityIndicator color={theme.background} size="small" />
+          ) : (
+            <Text style={[rs.actionText, rs.acceptText, { color: theme.background }]}>Accept</Text>
+          )}
+        </PressableScale>
+      </View>
+    </View>
+  );
+}
+
+const requestPanelStyles = StyleSheet.create({
+  wrap: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SP.md,
+    paddingTop: SP.md,
+    gap: SP.xs,
+  },
+  title: { fontFamily: FONT.semibold, fontSize: FS.sm, textAlign: 'center' },
+  subline: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, textAlign: 'center', marginBottom: SP.sm },
+  actionsRow: { flexDirection: 'row', gap: SP.sm },
+  actionBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: RADIUS.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acceptBtn: {},
+  actionText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  acceptText: {},
+});
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
@@ -2258,6 +2468,36 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.bold,
     color: '#FFFFFF',
   },
+  // Request-mode profile header (avatar / name / @handle / "View profile")
+  requestProfileHeader: {
+    alignItems: 'center',
+    paddingVertical: SP.lg,
+    paddingHorizontal: SP.lg,
+    gap: 4,
+  },
+  requestProfileAvatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: SP.sm,
+  },
+  requestProfileAvatarImage: { width: 88, height: 88 },
+  requestProfileAvatarInitials: { fontSize: FS.xl, fontFamily: FONT.bold, color: '#FFFFFF' },
+  requestProfileName: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
+  requestProfileHandle: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginBottom: SP.sm },
+  requestProfilePill: {
+    height: 34,
+    paddingHorizontal: SP.md,
+    borderRadius: RADIUS.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestProfilePillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
   headerAvatarOnlineDot: {
     position: 'absolute',
     bottom: -1,
