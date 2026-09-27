@@ -69,8 +69,8 @@ describe('No more "···" button in the row — long-press opens the menu', () 
 });
 
 describe('Time and Reply share one baseline (the 6px-higher-Reply bug)', () => {
-  it('the meta row centers its children with no extra per-item margin/padding', () => {
-    expect(comments).toContain("commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 5 },");
+  it('the meta row centers its children with no extra per-item margin/padding, 4pt below the comment text', () => {
+    expect(comments).toContain("commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 4 },");
   });
 
   it('the Reply Pressable centers its own content instead of top-aligning inside its 44pt tap-target box', () => {
@@ -128,8 +128,14 @@ describe('"View N replies" — short dash, tight spacing, chevron', () => {
     expect(comments).toContain("viewRepliesLine: { width: 20, height: 1, backgroundColor: '#3a3a3a' },");
   });
 
-  it('sits 6pt below the row above it, not a large default gap', () => {
-    expect(comments).toContain('marginTop: 6, paddingVertical: 4');
+  it('sits 8pt below the meta row above it, not a large default gap', () => {
+    expect(comments).toContain('marginTop: 8, paddingVertical: 4');
+  });
+
+  it('opts the row\'s own Pressable out of PressableScale\'s forced 44pt minHeight, which used to balloon this gap to ~60px', () => {
+    const rowStart = comments.indexOf('function ViewRepliesButton(');
+    const rowBody = comments.slice(rowStart, comments.indexOf('function AnimatedSendButton('));
+    expect(rowBody).toContain('noMinHeight');
   });
 
   it('has a chevron that flips with expanded state', () => {
@@ -138,16 +144,39 @@ describe('"View N replies" — short dash, tight spacing, chevron', () => {
 });
 
 describe('Row and username/text typography', () => {
-  it('row padding is 10pt vertical', () => {
-    expect(comments).toMatch(/commentRow: \{[\s\S]*?paddingVertical: 10,/);
+  it('row padding is 8pt vertical (16pt total between consecutive comments)', () => {
+    expect(comments).toMatch(/commentRow: \{[\s\S]*?paddingVertical: 8,/);
   });
 
   it('username is 13pt semibold gray (#8a8a8a)', () => {
     expect(comments).toContain("authorName: { fontFamily: FONT.semibold, fontSize: 13, color: '#8a8a8a'");
   });
 
-  it('comment text is 14pt regular white with lineHeight 19', () => {
-    expect(comments).toContain('commentText: { fontFamily: FONT.regular, fontSize: 14, color: FG, lineHeight: 19 },');
+  it('comment text is 15pt regular white with lineHeight 19', () => {
+    expect(comments).toContain('commentText: { fontFamily: FONT.regular, fontSize: 15, color: FG, lineHeight: 19 },');
+  });
+});
+
+describe('PressableScale opt-out fixes the hugely-spaced comment rows (round 3)', () => {
+  it('PressableScale supports a noMinHeight prop that drops its forced 44pt floor', () => {
+    const brandthreadUI = readFileSync(resolve(__dirname, '../components/BrandthreadUI.tsx'), 'utf8');
+    expect(brandthreadUI).toContain('noMinHeight');
+    expect(brandthreadUI).toMatch(/!noMinHeight && \{ minHeight: COMP\.minTouchTarget \}/);
+  });
+
+  it("the comment content's long-press Pressable opts out, so it sizes to its actual content instead of a 44pt floor", () => {
+    const rowStart = comments.indexOf('function CommentRow(');
+    const rowBody = comments.slice(rowStart, comments.indexOf('function ViewRepliesButton'));
+    const pressStart = rowBody.indexOf('style={s.commentContentPress}');
+    const pressEnd = rowBody.indexOf('>', rowBody.indexOf('rippleEnabled={false}'));
+    expect(rowBody.slice(pressStart, pressEnd)).toContain('noMinHeight');
+  });
+
+  it('the like heart Pressable opts out too, widening its tap area with hitSlop instead', () => {
+    const likeStart = comments.indexOf('function LikeHeart(');
+    const likeBody = comments.slice(likeStart, comments.indexOf('function CommentRow('));
+    expect(likeBody).toContain('noMinHeight');
+    expect(likeBody).toContain('hitSlop');
   });
 });
 
@@ -211,8 +240,12 @@ describe('TikTok-style composer pill', () => {
     expect(comments).toContain('{inputText.trim().length > 0 || sending || justSent ? (');
   });
 
-  it('uses a 28pt avatar with no ring border, matching the TikTok composer', () => {
-    expect(comments).toContain('<Avatar uri={myAvatar} initials={myInitials} size={28} ring={false} />');
+  it('uses a 32pt avatar with an explicit dark fill, not the theme-elevated color that used to be indistinguishable from the composer background', () => {
+    expect(comments).toContain('<Avatar uri={myAvatar} initials={myInitials} size={32} ring={false} backgroundColor="#2a2a2a" />');
+  });
+
+  it('the composer avatar row centers the avatar with the input pill instead of pinning it to the bottom', () => {
+    expect(comments).toContain("inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 },");
   });
 
   it('the composer area uses 8pt vertical padding plus the safe area at the call site', () => {

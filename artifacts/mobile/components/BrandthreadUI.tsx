@@ -105,6 +105,14 @@ interface PressableScaleProps extends Omit<PressableProps, 'style'> {
    *  timing animation instead. Defaults to true (existing global behavior)
    *  so every other call site is unaffected. */
   bounce?: boolean;
+  /** Opt out of the forced `minHeight: COMP.minTouchTarget` (44pt) box this
+   *  component otherwise always applies last in its style array — silently
+   *  overriding any smaller height/minHeight the caller set. Needed for
+   *  tightly-spaced rows (e.g. a comment's inline "Reply"/like/view-replies
+   *  controls) where a real 44pt floor would balloon the row far past its
+   *  visual content. Defaults to false so every other call site is
+   *  unaffected; the tap area itself can still be widened with `hitSlop`. */
+  noMinHeight?: boolean;
 }
 
 // Press feel shared by every button and card: a quick, firm squish on touch,
@@ -113,7 +121,7 @@ const NATIVE_DRIVER = Platform.OS !== 'web';
 const PRESS_IN_SPRING = { speed: 48, bounciness: 0, useNativeDriver: NATIVE_DRIVER } as const;
 const PRESS_OUT_SPRING = { speed: 14, bounciness: 11, useNativeDriver: NATIVE_DRIVER } as const;
 
-export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.96, activeOpacity = 0.88, rippleEnabled = true, bounce = true, ...rest }: PressableScaleProps) {
+export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.96, activeOpacity = 0.88, rippleEnabled = true, bounce = true, noMinHeight = false, ...rest }: PressableScaleProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
   const { theme } = useAppTheme();
@@ -147,7 +155,7 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
       style={typeof style === 'function' ? style : undefined}
     >
       {(state) => (
-        <Animated.View style={[typeof style === 'function' ? undefined : style, { minHeight: COMP.minTouchTarget, transform: [{ scale }], opacity }]}>
+        <Animated.View style={[typeof style === 'function' ? undefined : style, !noMinHeight && { minHeight: COMP.minTouchTarget }, { transform: [{ scale }], opacity }]}>
           {typeof children === 'function' ? children(state) : children}
         </Animated.View>
       )}

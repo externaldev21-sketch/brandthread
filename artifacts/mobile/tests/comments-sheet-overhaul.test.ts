@@ -17,6 +17,16 @@
  * and the emoji quick-row came back by request. The animated send button,
  * the guidelines-footer removal and the UUID/404 root-cause fix all still
  * hold from the earlier pass.
+ *
+ * Round 3: "full-size and untouched" turned out to be the bug the owner kept
+ * reporting — the <video> rendered at its own intrinsic size (e.g. 1080x1920)
+ * inside a 390pt-wide screen, `contain`-fit against an effectively unbounded
+ * box, which reads as a blown-up, blurry, zoomed-in crop instead of showing
+ * the whole subject. The fix is a correctly-sized box (screenTop → sheetTop,
+ * `overflow: hidden`) that the media scales DOWN to fill, matching real
+ * TikTok; see "Video sits in a fixed, correctly-sized box above the sheet"
+ * below. The "no scale/translate" and "no dim scrim" intent from the
+ * previous pass still holds — only the box's own size changed.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -49,30 +59,46 @@ describe('Preview posts get real seeded comments, not a dead end', () => {
   });
 });
 
-describe('Video stays full-size and completely untouched behind the sliding sheet', () => {
-  it('no longer constrains the backdrop to a fraction of the screen', () => {
-    expect(comments).not.toContain("height: '50%'");
-    expect(comments).toMatch(/mediaBackdrop: \{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0/);
+describe('Video sits in a fixed, correctly-sized box above the sheet — never rendered at its own intrinsic size', () => {
+  it('the media box is an explicitly-sized (not full-screen/absolute) container, not a percentage-only fill', () => {
+    expect(comments).toContain("mediaBox: { width: '100%', overflow: 'hidden'");
+    expect(comments).not.toMatch(/mediaBox:\s*\{[^}]*position:\s*'absolute'/);
+  });
+
+  it('the video/poster inside the box is styled to fill it (width/height 100%), so it scales down to the box instead of rendering at its own pixel resolution', () => {
+    expect(comments).toContain("mediaFill: { width: '100%', height: '100%' }");
+    const start = comments.indexOf('<Animated.View style={[s.mediaBox');
+    const end = comments.indexOf('style={s.backdrop}');
+    const mediaBlock = comments.slice(start, end);
+    expect(mediaBlock).toContain('s.mediaFill');
+    expect(mediaBlock).not.toContain('s.mediaBackdrop');
   });
 
   it('renders at contain, never cropped/zoomed beyond how the feed itself framed it', () => {
-    // Scoped to the media backdrop block, not the whole file — Avatar and
-    // other unrelated thumbnails elsewhere in this screen legitimately use
-    // "cover".
-    const start = comments.indexOf('{mediaUri ? (');
+    // Scoped to the media block, not the whole file — Avatar and other
+    // unrelated thumbnails elsewhere in this screen legitimately use "cover".
+    const start = comments.indexOf('<Animated.View style={[s.mediaBox');
     const end = comments.indexOf('style={s.backdrop}');
-    const backdropBlock = comments.slice(start, end);
-    expect(backdropBlock).toContain('contentFit="contain"');
-    expect(backdropBlock).not.toContain('contentFit="cover"');
+    const mediaBlock = comments.slice(start, end);
+    expect(mediaBlock).toContain('contentFit="contain"');
+    expect(mediaBlock).not.toContain('contentFit="cover"');
   });
 
   it('has no dim/scrim over the video — the owner explicitly rejected any darkening', () => {
     expect(comments).not.toContain('mediaScrim');
   });
 
-  it('applies no scale or translate transform to the video when the sheet opens', () => {
-    // The sheet itself may translate (drag-to-dismiss); the video backdrop must not.
-    expect(comments).not.toMatch(/mediaBackdrop[\s\S]{0,200}transform/);
+  it('the media box height is driven by an Animated value tied to the sheet height, not a plain scale/translate zoom', () => {
+    expect(comments).toContain('sheetHeightAnim');
+    expect(comments).toContain('mediaAreaHeight');
+    expect(comments).not.toMatch(/mediaBox[\s\S]{0,200}transform/);
+    expect(comments).not.toMatch(/mediaFill[\s\S]{0,200}transform/);
+  });
+
+  it('resizes on the shared non-spring SHEET_TIMING curve, never a spring', () => {
+    expect(comments).toContain("import { SHEET_EASING_BEZIER, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion';");
+    expect(comments).toContain('Easing.bezier(...SHEET_EASING_BEZIER)');
+    expect(comments).not.toMatch(/sheetHeightAnim[\s\S]{0,300}Animated\.spring/);
   });
 });
 
