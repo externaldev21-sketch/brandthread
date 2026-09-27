@@ -2661,12 +2661,20 @@ export default function FeedScreen({
           read as a visible shape: a hard-cut rectangle (`right: 76`), then a
           diagonal gradient meant to fade before the rail — the diagonal
           direction itself still drew a lighter/darker rectangle with an
-          edge next to the creator name and caption. It's now the plain
+          edge next to the creator name and caption. It's the plain
           TikTok/Instagram treatment: one full-width, straight-down (no
-          `start`/`end`) vertical gradient over the bottom ~35% of the
-          screen, transparent to a flat rgba(0,0,0,0.45) — a soft wash, not
-          a shape, and the rail's own icon drop-shadow (not this scrim) is
-          what keeps it legible. */}
+          `start`/`end`) vertical gradient, still a soft wash not a shape —
+          but a bright, high-key clip (silver/white footage, e.g. the
+          Maison Vela demo clip) needs more of it than a dark one to keep
+          the caption/sound text and the rail legible, so it now runs over
+          the bottom ~40% instead of ~35%, peaks darker (0.55, was 0.45),
+          and eases through 4 stops instead of 2 so the extra strength
+          still reads as a gradient, not a band with an edge.
+
+          The rail gets its own separate, much smaller fade — transparent
+          to rgba(0,0,0,0.25) over just the rightmost ~90pt, full height —
+          since the bottom scrim alone doesn't reach high enough up the
+          rail to help the top icons (heart, comment) on a bright clip. */}
       {isBuyerSurface && (
         <>
           <LinearGradient
@@ -2677,9 +2685,17 @@ export default function FeedScreen({
           />
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.45)']}
-            locations={[0, 1]}
-            style={[styles.bottomScrim, { height: pageHeight * 0.35 }]}
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.18)', 'rgba(0,0,0,0.38)', 'rgba(0,0,0,0.55)']}
+            locations={[0, 0.35, 0.7, 1]}
+            style={[styles.bottomScrim, { height: pageHeight * 0.4 }]}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.25)']}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.railEdgeFade}
           />
         </>
       )}
@@ -3052,6 +3068,10 @@ const styles = StyleSheet.create({
   letterboxBackdrop: { opacity: 0.55 },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  // Full-height, rightmost ~90pt only — wide enough to sit behind the
+  // 38pt-wide rail column (right inset 10) with room either side, so it
+  // reads as a soft edge fade rather than a hard-cut box.
+  railEdgeFade: { position: 'absolute', top: 0, bottom: 0, right: 0, width: 90 },
   progressHitArea: {
     position: 'absolute', left: 16, right: 16, height: 28, justifyContent: 'center',
   },
