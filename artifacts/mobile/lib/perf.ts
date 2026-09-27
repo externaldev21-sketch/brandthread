@@ -79,3 +79,24 @@ function logIfDone(entry: RoutePerfEntry) {
 export function getRecentRoutePerf(): readonly RoutePerfEntry[] {
   return recent;
 }
+
+/**
+ * Cross-platform `performance.mark`. Web's `performance` (with `.mark`) is
+ * what Chrome DevTools' Performance panel and `performance.getEntriesByType
+ * ('mark')` read from, which is how first-paint timing is measured/verified
+ * for the feed's black-screen fix (see docs in app/(tabs)/feed.tsx around
+ * `bt-first-poster-painted`). React Native's own `global.performance` on
+ * native doesn't reliably implement `.mark` (no User Timing API), so this is
+ * a no-op there rather than throwing — same "dev/web tooling only, never
+ * breaks native" spirit as the rest of this file, minus the `__DEV__` gate
+ * since this timing is also useful to check against a production build.
+ */
+export function mark(name: string): void {
+  try {
+    if (typeof performance !== 'undefined' && typeof performance.mark === 'function') {
+      performance.mark(name);
+    }
+  } catch {
+    // Never let a timing mark break the app it's measuring.
+  }
+}
