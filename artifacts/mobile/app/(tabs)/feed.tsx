@@ -834,11 +834,10 @@ function ScrubProgressBar({
    * the scrubber leaves it paused instead of resuming playback. */
   externallyPaused?: boolean;
 }) {
-  const { theme } = useAppTheme();
   const [dragging, setDragging] = useState(false);
   const [dragProgress, setDragProgress] = useState(progress);
   const [trackWidth, setTrackWidth] = useState(0);
-  const thickness = useRef(new Animated.Value(3)).current;
+  const thickness = useRef(new Animated.Value(2)).current;
   const thumbScale = useRef(new Animated.Value(0)).current;
   const trackWidthRef = useRef(0);
   const lastTickFraction = useRef(0);
@@ -881,7 +880,7 @@ function ScrubProgressBar({
         setDragging(false);
         hapticLight();
         Animated.parallel([
-          Animated.timing(thickness, { toValue: 3, duration: 150, useNativeDriver: false }),
+          Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }),
           Animated.timing(thumbScale, { toValue: 0, duration: 120, useNativeDriver: true }),
         ]).start();
         if (!externallyPaused) player.play();
@@ -889,7 +888,7 @@ function ScrubProgressBar({
       onPanResponderTerminate: () => {
         setDragging(false);
         Animated.parallel([
-          Animated.timing(thickness, { toValue: 3, duration: 150, useNativeDriver: false }),
+          Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }),
           Animated.timing(thumbScale, { toValue: 0, duration: 120, useNativeDriver: true }),
         ]).start();
         if (!externallyPaused) player.play();
@@ -918,15 +917,13 @@ function ScrubProgressBar({
           </Text>
         </View>
       )}
+      {/* Plain white fill (styles.progressFill's own backgroundColor) —
+          the LinearGradient that used to sit on top of it painted the
+          brand accent color over the whole bar, which is both an
+          unrequested color for this monochrome polish pass and not what
+          "white 90% on a 25% track" asked for. */}
       <Animated.View style={[styles.progressTrack, { height: thickness }]}>
-        <View style={[styles.progressFill, { width: `${shown * 100}%` }]}>
-          <LinearGradient
-            colors={[theme.accentLight ?? theme.accent, theme.accent]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
+        <View style={[styles.progressFill, { width: `${shown * 100}%` }]} />
       </Animated.View>
       <Animated.View
         pointerEvents="none"
@@ -934,7 +931,6 @@ function ScrubProgressBar({
           styles.scrubThumb,
           {
             left: thumbLeft,
-            backgroundColor: theme.accentLight ?? theme.accent,
             opacity: thumbScale,
             transform: [{ scale: thumbScale }],
           },
@@ -1067,6 +1063,13 @@ function LiveVideoVisual({
     if (progressBottom != null) p.timeUpdateEventInterval = 0.25;
   });
   const [hasStarted, setHasStarted] = useState(false);
+  // Kept mounted (opacity-only), not conditionally rendered — conditional
+  // mount/unmount can only pop the pause glyph in, never fade it out on
+  // release, since it's gone from the tree the instant `paused` flips back.
+  const pauseOverlayOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(pauseOverlayOpacity, { toValue: paused ? 1 : 0, duration: 180, useNativeDriver: true }).start();
+  }, [paused, pauseOverlayOpacity]);
   // `playingChange`'s `isPlaying: true` (used alone, previously) fires the
   // instant `player.play()` is *called* — on web this is wired to the
   // HTMLVideoElement's `play` event (see expo-video's VideoPlayer.web.tsx
@@ -1205,11 +1208,11 @@ function LiveVideoVisual({
           contentFit={fit}
           nativeControls={false}
         />
-        {paused && (
-          <View style={styles.pauseOverlay}>
-            <Feather name="play" size={56} color={`${ON_DARK}CC`} />
+        <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none">
+          <View style={styles.pauseOverlayCircle}>
+            <Feather name="play" size={56} color={ON_DARK} />
           </View>
-        )}
+        </Animated.View>
       </View>
       {progressBottom != null && isActive && (
         <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} externallyPaused={paused} />
@@ -1323,6 +1326,10 @@ function SpotlightPageImpl({
   const [menuOpen, setMenuOpen] = useState(false);
   const { showToast } = useFeedToast();
   const heartBurst = useRef(new Animated.Value(0)).current;
+  // Separate from `heartBurst` (which now only drives opacity/fade): the
+  // scale pop needs its own 0.8 -> 1.1 -> 1 sequence, not a value
+  // interpolated off the fade's own progress.
+  const heartBurstScale = useRef(new Animated.Value(0.8)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
   /** Ring that flashes out from behind the rail heart on like — a second,
    * smaller echo of the double-tap burst so a single tap on the rail icon
@@ -1365,7 +1372,12 @@ function SpotlightPageImpl({
 
   function burstHeart() {
     heartBurst.setValue(1);
-    Animated.timing(heartBurst, { toValue: 0, duration: 700, delay: 250, useNativeDriver: true }).start();
+    heartBurstScale.setValue(0.8);
+    Animated.sequence([
+      Animated.spring(heartBurstScale, { toValue: 1.1, useNativeDriver: true, speed: 30, bounciness: 6 }),
+      Animated.spring(heartBurstScale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 0 }),
+    ]).start();
+    Animated.timing(heartBurst, { toValue: 0, duration: 550, delay: 350, useNativeDriver: true }).start();
   }
 
   function bumpHeart() {
@@ -1500,7 +1512,7 @@ function SpotlightPageImpl({
             pointerEvents="none"
             style={[styles.heartBurst, {
               opacity: heartBurst,
-              transform: [{ scale: heartBurst.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.5] }) }],
+              transform: [{ scale: heartBurstScale }],
             }]}
           >
             <Feather name="heart" size={110} color={ON_DARK} />
@@ -1802,10 +1814,12 @@ export default function FeedScreen({
   // react-native-safe-area-context's web implementation reads 0 for
   // `insets.top` — which put the buyer top row (paddingTop:
   // previewTopInset + 4, below) flush against, and partly behind, a
-  // simulated Dynamic Island in the 390x844 web preview. 52 puts the row's
-  // own top at 56, clear of the island, while still sitting as high as the
-  // frame allows.
-  const previewTopInset = Platform.OS === 'web' ? 52 : insets.top;
+  // simulated Dynamic Island in the 390x844 web preview.
+  // `Math.max(insets.top, 54)` (this polish pass's standard notch gate,
+  // was a flat 52) still uses a real, non-zero `insets.top` when the
+  // environment actually provides one (a real device, or a preview frame
+  // that does emulate the notch) instead of always overriding it on web.
+  const previewTopInset = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
   const previewBottomInset = insets.bottom;
   const isBuyerSurface = buyerMode || showFashionPreview;
   const isCreatorFeed = !!creatorFeed;
@@ -2833,17 +2847,25 @@ export default function FeedScreen({
           rail to help the top icons (heart, comment) on a bright clip. */}
       {isBuyerSurface && (
         <>
+          {/* Polish pass: top scrim widened to a flat ~140pt band (was
+              insets.top + 90, i.e. ~124-140pt depending on device — now a
+              fixed 140 regardless of inset, per spec) so "Following" holds
+              up against bright stage-light footage; bottom scrim's peak
+              nudged 0.55 -> 0.6 and its band pinned to a flat ~260pt
+              (was pageHeight * 0.4, which ran to ~330-370pt on tall
+              screens — more than needed and inconsistent device to
+              device) for the silver-dress (Maison Vela) clip. */}
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']}
-            locations={[0, 1]}
-            style={[styles.topScrim, { height: insets.top + 90 }]}
+            colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0)']}
+            locations={[0, 0.5, 1]}
+            style={[styles.topScrim, { height: 140 }]}
           />
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.18)', 'rgba(0,0,0,0.38)', 'rgba(0,0,0,0.55)']}
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0.6)']}
             locations={[0, 0.35, 0.7, 1]}
-            style={[styles.bottomScrim, { height: pageHeight * 0.4 }]}
+            style={[styles.bottomScrim, { height: 260 }]}
           />
           <LinearGradient
             pointerEvents="none"
@@ -3217,6 +3239,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_BG },
 
   pauseOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  // 30% black circle behind the 56pt play glyph — sized with room to spare
+  // around the icon, not a tight fit.
+  pauseOverlayCircle: {
+    width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   mediaPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#17131D' },
   heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
@@ -3232,11 +3260,11 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 16, right: 16, height: 28, justifyContent: 'center',
   },
   progressTrack: {
-    borderRadius: RADII.pill, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden',
+    borderRadius: RADII.pill, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)',
   },
   progressFill: {
-    height: '100%', borderRadius: RADII.pill, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.92)',
+    height: '100%', borderRadius: RADII.pill, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.9)',
     shadowColor: '#fff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4,
   },
   scrubBubble: {
@@ -3248,7 +3276,7 @@ const styles = StyleSheet.create({
   scrubThumb: {
     position: 'absolute', top: '50%', width: 13, height: 13, borderRadius: 7,
     marginTop: -6.5, marginLeft: -6.5,
-    borderWidth: 2, borderColor: ON_DARK,
+    backgroundColor: ON_DARK, borderWidth: 2, borderColor: ON_DARK,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.4, shadowRadius: 3, elevation: 4,
   },
   speedPill: {
