@@ -52,6 +52,8 @@ describe('no outer white focus/press ring', () => {
   it('gives the profile tabs an animated sliding indicator instead of a static per-tab mark', () => {
     const controls = read('components/profile/ProfileControls.tsx');
     expect(controls).toContain('tabIndicator');
-    expect(controls).toMatch(/Animated\.spring\(indicatorX/);
+    // A plain 150ms slide, not a spring — a bouncy tab indicator read as an
+    // unpolished animation on an otherwise minimal, monochrome control.
+    expect(controls).toMatch(/Animated\.timing\(indicatorX,\s*\{\s*toValue:\s*activeIndex,\s*duration:\s*150/);
   });
 });

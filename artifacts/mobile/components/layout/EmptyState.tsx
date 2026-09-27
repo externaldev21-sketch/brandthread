@@ -46,9 +46,9 @@ export function EmptyState({
       <View style={[styles.iconCircle, compact && styles.iconCircleCompact, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <Feather name={icon} size={compact ? ICON.md : ICON.xl} color={iconColor} />
       </View>
-      <View style={styles.copy}>
-        {title ? <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{title}</Text> : null}
-        <Text style={[styles.message, { color: theme.muted }]}>{message}</Text>
+      <View style={[styles.copy, compact && styles.copyCompact]}>
+        {title ? <Text style={[styles.title, compact && styles.titleCompact, { color: theme.text }]} accessibilityRole="header">{title}</Text> : null}
+        <Text style={[styles.message, compact && styles.messageCompact, { color: theme.muted }]}>{message}</Text>
       </View>
       {actionLabel && onAction && (
         <TouchableOpacity
@@ -82,13 +82,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconCircleCompact: { width: 48, height: 48, borderRadius: 24 },
+  iconCircleCompact: { width: 44, height: 44, borderRadius: 22 },
   copy: { alignItems: 'center', gap: SP.xs, maxWidth: 320, alignSelf: 'center' },
+  copyCompact: { maxWidth: 280 },
   title: {
     fontFamily: FONT.bold,
     fontSize: FS.lg,
     textAlign: 'center',
   },
+  titleCompact: { fontSize: 18 },
   message: {
     fontFamily: FONT.medium,
     fontSize: FS.base,
@@ -96,6 +98,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flexShrink: 1,
   },
+  messageCompact: { fontSize: 14, lineHeight: 18 },
   actionBtn: {
     minHeight: 44,
     justifyContent: 'center',
