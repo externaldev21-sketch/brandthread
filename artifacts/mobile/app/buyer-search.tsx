@@ -80,6 +80,13 @@ export default function BuyerSearchScreen() {
   const previewMode = isBuyerDevPreview();
 
   const [query, setQuery] = useState('');
+  // TikTok-style two-step flow: typing only ever shows live suggestions.
+  // The tabbed results view appears only once the user explicitly submits
+  // (Search button, Enter, or tapping a suggestion) — set here, and cleared
+  // again the moment the field is edited so a new keystroke drops back to
+  // suggestions instead of staying stuck on stale results.
+  const [submitted, setSubmitted] = useState(false);
+  const [fieldFocused, setFieldFocused] = useState(false);
   const [activeTab, setActiveTab] = useState<SearchTabKey>('top');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [people, setPeople] = useState<SearchPerson[]>([]);
@@ -151,7 +158,27 @@ export default function BuyerSearchScreen() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const youMayLike = trending.length > 0 ? trending.map((t) => t.term) : TRENDING_FALLBACK;
+  // Pad out to 4 with the fixed fallback terms whenever the trending API
+  // returns fewer (including zero), case-insensitively de-duplicated so a
+  // trending term never appears twice.
+  const youMayLike = useMemo(() => {
+    const seen = new Set<string>();
+    const picked: string[] = [];
+    for (const term of trending.map((t) => t.term)) {
+      const key = term.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      picked.push(term);
+    }
+    for (const term of TRENDING_FALLBACK) {
+      if (picked.length >= 4) break;
+      const key = term.trim().toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      picked.push(term);
+    }
+    return picked;
+  }, [trending]);
 
   const performSearch = useCallback(async (term: string) => {
     const [productRes, peopleRes] = await Promise.allSettled([
@@ -264,10 +291,19 @@ export default function BuyerSearchScreen() {
     rememberSearch(term);
     setQuery(term);
     setActiveTab('top');
+    setSubmitted(true);
   }
 
   function submit() {
-    if (trimmedQuery) rememberSearch(trimmedQuery);
+    if (!trimmedQuery) return;
+    rememberSearch(trimmedQuery);
+    setActiveTab('top');
+    setSubmitted(true);
+  }
+
+  function handleChangeText(value: string) {
+    setQuery(value);
+    setSubmitted(false);
   }
 
   const productGrid = (items: ProductResult[]) => (
@@ -373,7 +409,7 @@ export default function BuyerSearchScreen() {
           icon="search"
           title="No results — yet."
           description={`We couldn't find anything for "${trimmedQuery}". Try a broader term.`}
-          action={{ label: 'Clear search', icon: 'x-circle', onPress: () => setQuery('') }}
+          action={{ label: 'Clear search', icon: 'x-circle', onPress: () => { setQuery(''); setSubmitted(false); } }}
         />
       </View>
     );
@@ -449,35 +485,43 @@ export default function BuyerSearchScreen() {
         </TouchableOpacity>
         {/* theme-exempt: fixed dark action per spec — see profile.tsx's
             #1f1f1f store-details fill for the same intentional pattern. */}
-        <View style={styles.field}>
+        <View style={[styles.field, fieldFocused && styles.fieldFocused]}>
           <Feather name="search" size={16} color="#9A9AA0" />
           <TextInput
             ref={inputRef}
             value={query}
-            onChangeText={setQuery}
+            onChangeText={handleChangeText}
             placeholder="Search"
             placeholderTextColor="#9A9AA0"
-            style={[styles.fieldInput, { color: '#FFFFFF' }]}
+            style={[styles.fieldInput, { color: '#FFFFFF' }, Platform.OS === 'web' && styles.fieldInputWebNoOutline]}
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
             onSubmitEditing={submit}
+            onFocus={() => setFieldFocused(true)}
+            onBlur={() => setFieldFocused(false)}
             testID="buyer-search-field"
             maxFontSizeMultiplier={1.3}
           />
           {query.length > 0 && (
             <TouchableOpacity
-              onPress={() => { hapticSelection(); setQuery(''); inputRef.current?.focus(); }}
+              onPress={() => { hapticSelection(); setQuery(''); setSubmitted(false); inputRef.current?.focus(); }}
               accessibilityRole="button"
               accessibilityLabel="Clear search"
-              hitSlop={8}
+              // Asymmetric — the field itself already sits inside a padded
+              // row with the "Search" button right after it, so a generous
+              // hitSlop on every side (RN Web turns this into an enlarged
+              // hit target, not just a bigger tap radius) was overlapping
+              // that neighboring button even though nothing visually
+              // touched. Keep the hit area entirely inside the field.
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 2 }}
               testID="buyer-search-clear"
             >
               <Feather name="x-circle" size={16} color="#9A9AA0" />
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity onPress={submit} accessibilityRole="button" testID="buyer-search-submit">
+        <TouchableOpacity onPress={submit} accessibilityRole="button" testID="buyer-search-submit" style={styles.searchButton}>
           <Text style={[styles.searchButtonText, { color: fg }]}>Search</Text>
         </TouchableOpacity>
       </View>
@@ -523,7 +567,7 @@ export default function BuyerSearchScreen() {
               </ResponsiveContainer>
             </AnimatedEntrance>
           </View>
-        ) : searching ? (
+        ) : !submitted ? (
           renderSuggestions()
         ) : (
           <>
@@ -543,17 +587,29 @@ export default function BuyerSearchScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: SCREEN_GUTTER, paddingBottom: SPACING.sm,
   },
   field: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
     height: 36, borderRadius: RADIUS.sm, paddingHorizontal: SPACING.sm,
+    marginLeft: SPACING.sm,
     // theme-exempt: fixed dark fill per spec, same pattern as profile.tsx's
     // store-details section — regardless of light/dark theme.
     backgroundColor: '#1f1f1f',
+    borderWidth: 1, borderColor: 'transparent',
   },
+  // A subtle 1px light border on focus instead of the browser's default
+  // thick yellow/orange outline (removed via fieldInputWebNoOutline below).
+  fieldFocused: { borderColor: 'rgba(255,255,255,0.2)' },
   fieldInput: { flex: 1, ...TYPE_SCALE.body, padding: 0 },
+  // react-native-web renders a default focus ring on <input>; the field's
+  // own border above is the only focus affordance we want.
+  fieldInputWebNoOutline: { outlineStyle: 'none', outlineWidth: 0 } as any,
+  // Explicit 12pt gap to the field, on top of the header row's own `gap` —
+  // guarantees a fixed gap even if a web flexbox `gap` renders inconsistently,
+  // so the "Search" button never crowds the field's trailing clear button.
+  searchButton: { marginLeft: SPACING.sm },
   searchButtonText: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   sectionHeaderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
