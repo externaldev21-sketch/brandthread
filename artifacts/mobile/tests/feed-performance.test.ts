@@ -51,8 +51,19 @@ describe('Feed video list virtualization bounds', () => {
     expect(feed).toContain('player.pause();');
   });
 
-  it('shows the poster immediately, swapping to live video once playback starts (instant start)', () => {
-    expect(feed).toContain('const showPoster = Boolean(posterSource || posterUri) && !hasStarted;');
+  it('shows the poster immediately, swapping to live video only once it actually has a frame ready (not just once playback was requested)', () => {
+    // `playingChange`'s `isPlaying: true` alone (the old condition) fires the
+    // instant `player.play()` is *called* — on web that's wired to the
+    // HTMLVideoElement's `play` event, which the spec fires as soon as
+    // playback is requested, not once a frame has decoded. That dismissed
+    // the poster and revealed an as-yet-blank video, which is exactly the
+    // feed's "poster gone, video still black for several seconds" bug (see
+    // the round 3 PR description). `readyToPlay` (backed by the video
+    // element's own `canplay`/readyState>=3 on web) confirms there is
+    // actually something to paint before the poster comes down.
+    expect(feed).toContain("const showPoster = Boolean(posterSource || posterUri) && !(hasStarted && readyToPlay);");
+    expect(feed).toContain("player.addListener('statusChange', ({ status }) => {");
+    expect(feed).toContain("if (status === 'readyToPlay') setReadyToPlay(true);");
   });
 
   it('caps live decoders to active ± 1 even though web mounts every row', () => {
