@@ -25,9 +25,11 @@ describe('Scrubbable video progress bar', () => {
   });
 
   it('thickens the bar while dragging', () => {
-    expect(feed).toMatch(/thickness.*=.*useRef\(new Animated\.Value\(3\)\)/);
+    // Base thickness is 2pt (polish pass — was 3), still expands to 7 while
+    // dragging and settles back to the 2pt base on release.
+    expect(feed).toMatch(/thickness.*=.*useRef\(new Animated\.Value\(2\)\)/);
     expect(feed).toContain("Animated.timing(thickness, { toValue: 7");
-    expect(feed).toContain("Animated.timing(thickness, { toValue: 3");
+    expect(feed).toContain("Animated.timing(thickness, { toValue: 2");
   });
 
   it('shows a time bubble only while dragging, with current/total time', () => {

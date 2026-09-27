@@ -198,10 +198,10 @@ function UnderlineTabs({
 
   React.useEffect(() => {
     if (!activeLayout) return;
-    // ~40% of the active word's own measured width, centered under it — not
-    // the full word width. Matches the owner's screenshot-measured TikTok
-    // reference for #88 (overriding the earlier full-width spec).
-    const underlineWidth = Math.max(10, activeLayout.width * 0.4);
+    // Matches the active label's own measured width exactly (polish pass —
+    // supersedes #88's 40%-of-label rule, which read as detached from the
+    // word it was meant to underline).
+    const underlineWidth = Math.max(10, activeLayout.width);
     const underlineX = activeLayout.x + (activeLayout.width - underlineWidth) / 2;    if (!hasMeasuredOnce.current) {
       // First measurement (mount / initial layout): snap in place instead of
       // sliding in from x=0, which read as an unintended "wipe" animation.
