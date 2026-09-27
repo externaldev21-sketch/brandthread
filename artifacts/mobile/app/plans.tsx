@@ -10,6 +10,21 @@
  * Every new subscription starts with a 5-day free trial (card required upfront).
  *
  * The recommended tier is personalized based on the seller's brand-stage answer from onboarding.
+ *
+ * Redesign notes (single-page paywall, applying Superwall "4,000 paywalls" lessons):
+ * headline → bullets → social proof → plan selector (recommended + 1, "View all plans"
+ * for the rest) → trial CTA → trial timeline → restore/legal. No comparison table.
+ * Every section below the header is a small reusable component
+ * (components/paywall/*) so variants can be A/B tested without touching this
+ * screen's purchase logic.
+ *
+ * Retention surfaces (exit drawer + one-time offer): tapping the close
+ * control opens SellerPaywallExitDrawer instead of leaving immediately. The
+ * drawer keeps the recommended plan selected and reframes its real price
+ * per week/day — no discount there. Dismissing the drawer shows
+ * SellerPaywallOneTimeOffer ONLY when `isOneTimeOfferAvailable` is true
+ * (lib/paywallRetentionConfig.ts) — off by default until a real discounted
+ * product is configured; until then dismissing the drawer just exits.
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -41,18 +56,38 @@ import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
+import { displayPriceFor } from '@/lib/sellerPlansDisplay';
 import {
-  comparisonRows,
-  displayPriceFor,
-  planIncludesFeature,
-  PLAN_FAQ,
-} from '@/lib/sellerPlansDisplay';
+  ONE_TIME_OFFER_DISCOUNT_PERCENT,
+  isOneTimeOfferAvailable,
+} from '@/lib/paywallRetentionConfig';
+import { SellerPaywallHeadline } from '@/components/paywall/SellerPaywallHeadline';
+import { SellerPaywallBullets } from '@/components/paywall/SellerPaywallBullets';
+import { SellerPaywallSocialProof } from '@/components/paywall/SellerPaywallSocialProof';
+import { SellerPlanSelector, type PlanPricing } from '@/components/paywall/SellerPlanSelector';
+import { SellerTrialTimeline, type TrialTimelineStep } from '@/components/paywall/SellerTrialTimeline';
+import { SellerPaywallCTA } from '@/components/paywall/SellerPaywallCTA';
+import { SellerPaywallExitDrawer } from '@/components/paywall/SellerPaywallExitDrawer';
+import { SellerPaywallOneTimeOffer } from '@/components/paywall/SellerPaywallOneTimeOffer';
 
-// ─── Local palette constants ──────────────────────────────────────────────────
-// (plans.tsx predates the theme migration; keep these local so the screen is
-//  self-contained and doesn't depend on the retired useColors hook)
+// ─── Benefit bullets shown above the plan selector — apply to every tier, so
+//     they're framed as "what Brandthread does for sellers", not per-plan. ──
+const BENEFIT_BULLETS = [
+  'Launch a storefront with AI-built product pages',
+  'Source and manage production through the Manufacturer Hub',
+  'Track sales, customers, and inventory in one dashboard',
+  'Grow with live shopping and promotion tools',
+];
 
-// ─── Plan catalogue ───────────────────────────────────────────────────────────
+// ─── Trial timeline steps (Blinkist-style compact vertical timeline). Day 4's
+//     reminder is label-only: no local/scheduled-notification system exists
+//     in this app today (only the server-driven "Trial reminders" toggle in
+//     Notification Settings) — see the PR description. ────────────────────
+const TRIAL_STEPS: TrialTimelineStep[] = [
+  { key: 'today', label: 'Today', detail: 'Full access unlocked', icon: 'unlock' },
+  { key: 'day4',  label: 'Day 4', detail: "We remind you before your trial ends", icon: 'bell' },
+  { key: 'day5',  label: 'Day 5', detail: 'Billing starts', icon: 'credit-card' },
+];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -74,7 +109,16 @@ export default function PlansScreen() {
   /** 'none' means no paid subscription yet — Starter must remain selectable. */
   const [currentPlanStatus, setCurrentPlanStatus] = useState<string | null>(null);
   const [pricesTimedOut,    setPricesTimedOut]    = useState(false);
-  const [openFaqIndex,      setOpenFaqIndex]      = useState<number | null>(null);
+  const [selectedId,        setSelectedId]        = useState<SellerPlanDefinition['id'] | null>(null);
+  const [exitDrawerVisible, setExitDrawerVisible] = useState(false);
+  const [offerVisible,      setOfferVisible]      = useState(false);
+  // Guards each open/close cycle of the drawer/offer sheets against the
+  // BottomSheet close callback firing twice (once on backdrop tap, once when
+  // the close animation finishes) and against the CTA path (which closes the
+  // sheet itself) re-triggering the "user dismissed" branch.
+  const exitHandledRef  = useRef(false);
+  const offerHandledRef = useRef(false);
+  const suppressExitFlowRef = useRef(false);
 
   // Native pricing comes from RevenueCat asynchronously. If packages never
   // arrive, treat it as a real failure rather than leaving the CTA active
@@ -85,7 +129,6 @@ export default function PlansScreen() {
     return () => clearTimeout(timer);
   }, [packages.length]);
 
-  const pricesLoading = Platform.OS !== 'web' && packages.length === 0 && revenueCatAvailable && !pricesTimedOut;
   const pricesFailed   = Platform.OS !== 'web' && packages.length === 0 && (!revenueCatAvailable || pricesTimedOut);
   // Whether the store actually returned a free-trial intro offer for this user
   // on ANY plan — used to avoid promising a trial that isn't really there.
@@ -108,7 +151,9 @@ export default function PlansScreen() {
       } catch {
         goals = [];
       }
-      setRecommendedId((selected[1] as SellerPlanDefinition['id'] | null) ?? recommendSellerPlan(stage[1] ?? '', goals).planId);
+      const resolvedId = (selected[1] as SellerPlanDefinition['id'] | null) ?? recommendSellerPlan(stage[1] ?? '', goals).planId;
+      setRecommendedId(resolvedId);
+      setSelectedId(resolvedId);
       // If not onboarding, load live plan so we can show CURRENT badge
       if (!isOnboarding) {
         try {
@@ -236,14 +281,64 @@ export default function PlansScreen() {
     }
   }
 
-  async function handleSkip() {
-    haptic();
+  /** The real exit — leaves the paywall. Reached only after the exit drawer
+   *  (and, if enabled, the one-time offer) has been shown and dismissed. */
+  async function performExit() {
     if (isOnboarding) {
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
       router.replace('/(tabs)/' as never);
     } else {
       goBackOr(router);
     }
+  }
+
+  /** X (settings) / "Not now" (onboarding) — opens the exit drawer instead
+   *  of leaving immediately. */
+  function requestExit() {
+    haptic();
+    exitHandledRef.current = false;
+    setExitDrawerVisible(true);
+  }
+
+  function handleExitDrawerClose() {
+    setExitDrawerVisible(false);
+    if (exitHandledRef.current) return;
+    exitHandledRef.current = true;
+    if (suppressExitFlowRef.current) {
+      suppressExitFlowRef.current = false;
+      return;
+    }
+    if (isOneTimeOfferAvailable) {
+      offerHandledRef.current = false;
+      setOfferVisible(true);
+    } else {
+      performExit();
+    }
+  }
+
+  function handleExitDrawerStartTrial() {
+    suppressExitFlowRef.current = true;
+    exitHandledRef.current = true;
+    setExitDrawerVisible(false);
+    handleSelect(selectedPlan);
+  }
+
+  function handleOfferClose() {
+    setOfferVisible(false);
+    if (offerHandledRef.current) return;
+    offerHandledRef.current = true;
+    if (suppressExitFlowRef.current) {
+      suppressExitFlowRef.current = false;
+      return;
+    }
+    performExit();
+  }
+
+  function handleOfferAccept() {
+    suppressExitFlowRef.current = true;
+    offerHandledRef.current = true;
+    setOfferVisible(false);
+    handleSelect(offerPlan);
   }
 
   // ── Full-screen "waiting for Stripe" overlay ──────────────────────────────
@@ -258,8 +353,30 @@ export default function PlansScreen() {
     );
   }
 
+  function getPricing(plan: SellerPlanDefinition): PlanPricing {
+    const revenueCatPackage = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
+    const webPrice = displayPriceFor(plan);
+    const priceLabel = Platform.OS === 'web'
+      ? webPrice.price
+      : revenueCatPackage?.product.priceString ?? null;
+    return {
+      priceLabel,
+      period: Platform.OS === 'web' ? webPrice.period : 'per month',
+      loading: Platform.OS !== 'web' && !priceLabel && !pricesFailed,
+      failed:  Platform.OS !== 'web' && !priceLabel && pricesFailed,
+    };
+  }
+
+  const selectedPlan = SELLER_PLANS.find((p) => p.id === selectedId) ?? SELLER_PLANS.find((p) => p.id === recommendedId) ?? SELLER_PLANS[0];
+  const offerPlan = SELLER_PLANS.find((p) => p.id === recommendedId) ?? selectedPlan;
+  const selectedPricing = getPricing(selectedPlan);
+  const selectedCtaDisabled = loadingId !== null
+    || (!isOnboarding && selectedPlan.id === currentPlanId && currentPlanStatus !== 'none')
+    || selectedPricing.failed;
+  const isCurrentSelected = !isOnboarding && selectedPlan.id === currentPlanId && currentPlanStatus !== 'none';
+
   // ── Layout ────────────────────────────────────────────────────────────────
-  const topPad    = insets.top;
+  const topPad    = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
   const bottomPad = insets.bottom;
 
   return (
@@ -273,7 +390,7 @@ export default function PlansScreen() {
           <TouchableOpacity
             style={styles.closeBtn}
             activeOpacity={0.7}
-            onPress={() => { haptic(); goBackOr(router); }}
+            onPress={requestExit}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Feather name="x" size={18} color={theme.text} />
@@ -289,259 +406,77 @@ export default function PlansScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 16, paddingBottom: bottomPad + 48, gap: 14 }}
+        bounces={false}
+        overScrollMode="never"
+        contentContainerStyle={{ padding: 16, paddingBottom: bottomPad + 48, gap: SP.lg }}
       >
 
-        {/* Hero */}
-        <View style={styles.hero}>
-          <LinearGradient
-            colors={theme.heroGradient as any}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={styles.heroInner}
-          >
-            <Text style={styles.heroEyebrow} allowFontScaling={false}>BRANDTHREAD FOR SELLERS</Text>
-            <Text style={styles.heroTitle} allowFontScaling={false}>
-              Everything to build, run, and grow your brand
-            </Text>
-            <Text style={styles.heroSub}>
-              {hasRealTrialOffer ? '5-day free trial on every plan · cancel anytime' : 'Pick the plan that fits your brand'}
-            </Text>
-          </LinearGradient>
-        </View>
+        {/* Product in action — phone-framed dashboard preview */}
+        <DashboardPreview theme={theme} styles={styles} />
 
-        {/* Recommendation banner */}
-        {recommendedId && (
-          <View style={styles.recBanner}>
-            <Feather name="star" size={13} color={theme.secondary} />
-            <Text style={styles.recBannerText}>
-              Based on your brand stage, we recommend{' '}
-              <Text style={{ color: theme.secondary, fontFamily: FONT.semibold }}>
-                 {SELLER_PLANS.find(p => p.id === recommendedId)?.name}
-              </Text>
-            </Text>
-          </View>
-        )}
+        <SellerPaywallHeadline
+          theme={theme}
+          eyebrow="BRANDTHREAD FOR SELLERS"
+          title="Everything to build, run, and grow your brand"
+          subtitle="One home for your storefront, production, and sales — start free."
+        />
 
-        {/* Commission note */}
-        <View style={styles.commissionNote}>
-            <Feather name="info" size={13} color={theme.muted} />
-          <Text style={styles.commissionText}>
-            All plans are subject to a{' '}
-             <Text style={{ color: theme.text, fontFamily: FONT.medium }}>5% platform commission</Text>
-            {' '}on each sale.
-          </Text>
-        </View>
+        <SellerPaywallBullets theme={theme} bullets={BENEFIT_BULLETS} />
 
-        {/* Trial callout — only claim a trial when the store actually has one to offer */}
-        {hasRealTrialOffer && (
-          <View style={styles.trialCallout}>
-            <LinearGradient
-              colors={theme.glowGradient as any}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.trialCalloutInner}
-            >
-                   <Feather name="shield" size={16} color={theme.accent} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.trialCalloutTitle}>5-day free trial on every plan</Text>
-                <Text style={styles.trialCalloutSub}>
-                  {Platform.OS === 'web'
-                    ? "Enter your card now — you won't be charged until day 6. Cancel before then for free."
-                    : "You won't be charged until your trial ends. Cancel anytime in your App Store settings."}
-                </Text>
-              </View>
-            </LinearGradient>
-          </View>
-        )}
+        <SellerPaywallSocialProof theme={theme} text="Trusted by independent brands building on Brandthread" />
 
-        {/* Plan cards */}
-        {SELLER_PLANS.map((plan) => {
-          const isRecommended = plan.id === recommendedId;
-          const isCurrent     = !isOnboarding && plan.id === currentPlanId;
-          const isLoading     = loadingId === plan.id;
-          const revenueCatPackage = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
-          // Web shows our own literal monthly price string; native purchases
-          // always use RevenueCat's real priceString for the same monthly
-          // product. No yearly option exists, so there's nothing to toggle.
-          const webPrice = displayPriceFor(plan);
-          const priceLabel = Platform.OS === 'web'
-            ? webPrice.price
-            : revenueCatPackage?.product.priceString ?? null;
-          const trial = revenueCatPackage?.product.introPrice;
-          const cardPriceLoading = Platform.OS !== 'web' && !priceLabel && !pricesFailed;
-          const cardPriceFailed  = Platform.OS !== 'web' && !priceLabel && pricesFailed;
+        <SellerPlanSelector
+          theme={theme}
+          plans={SELLER_PLANS}
+          recommendedId={recommendedId}
+          currentPlanId={currentPlanId}
+          isOnboarding={isOnboarding}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          getPricing={getPricing}
+        />
 
-          return (
-            <View
-              key={plan.id}
-              style={[
-                styles.card,
-                 plan.id === 'growth' && styles.cardHighlight,
-                isCurrent      && styles.cardCurrent,
-              ]}
-            >
-              {/* Badges row */}
-              <View style={styles.badgeRow}>
-                {isRecommended && (
-                  <View style={styles.recBadge}>
-                    <Feather name="star" size={10} color={theme.secondary} />
-                    <Text style={styles.recBadgeText}>RECOMMENDED FOR YOU</Text>
-                  </View>
-                )}
-                {plan.id === 'growth' && !isRecommended && (
-                  <View style={styles.popularBadge}>
-                    <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
-                  </View>
-                )}
-                {isCurrent && (
-                  <View style={styles.currentBadge}>
-                    <Text style={styles.currentBadgeText}>CURRENT PLAN</Text>
-                  </View>
-                )}
-              </View>
+        <SellerPaywallCTA
+          theme={theme}
+          label={
+            loadingId === selectedPlan.id
+              ? 'Starting trial…'
+              : isCurrentSelected
+                ? 'Current plan'
+                : hasRealTrialOffer
+                  ? 'Start my 5-day free trial'
+                  : `Choose ${selectedPlan.name}`
+          }
+          onPress={() => handleSelect(selectedPlan)}
+          icon={hasRealTrialOffer ? 'chevron-right' : undefined}
+          loading={loadingId === selectedPlan.id}
+          disabled={selectedCtaDisabled}
+          testID="seller-plans-start-trial"
+          subtext="No commitment. Cancel anytime."
+          billingLine={
+            hasRealTrialOffer && !selectedPricing.failed
+              ? `Free for 5 days, then ${selectedPricing.priceLabel ?? selectedPlan.priceLabel}/month`
+              : null
+          }
+        />
 
-              {/* Name + price */}
-              <View style={styles.cardTopRow}>
-                <View style={{ flex: 1 }}>
-                    <Text style={[styles.planName, plan.id === 'growth' && { color: theme.accent }]}>
-                    {plan.name}
-                  </Text>
-                  <Text style={styles.planTagline}>{plan.tagline}</Text>
-                </View>
-                <View style={styles.priceCol}>
-                  {cardPriceLoading ? (
-                    <View style={styles.priceSkeleton} />
-                  ) : (
-                    <Text style={[styles.priceLabel, plan.id === 'growth' && { color: theme.accent }]}>
-                       {cardPriceFailed ? '—' : priceLabel}
-                    </Text>
-                  )}
-                   <Text style={styles.pricePeriod}>
-                     {Platform.OS === 'web' ? webPrice.period : 'per month'}
-                   </Text>
-                </View>
-              </View>
-               {Platform.OS !== 'web' && trial && priceLabel && (() => {
-                 const isFree = /^\$?0(\.00?)?$/.test(trial.priceString.trim());
-                 const unitLabel = `${trial.periodNumberOfUnits} ${trial.periodUnit.toLowerCase()}${trial.periodNumberOfUnits === 1 ? '' : 's'}`;
-                 return (
-                   <Text style={styles.nativeTrial}>
-                     {isFree
-                       ? `Free for ${unitLabel}, then ${priceLabel}/month`
-                       : `${trial.priceString} for ${unitLabel}, then ${priceLabel}/month`}
-                   </Text>
-                 );
-               })()}
-               {cardPriceFailed && (
-                 <Text style={styles.nativeTrial}>Prices unavailable. Pull to retry.</Text>
-               )}
+        {hasRealTrialOffer && <SellerTrialTimeline theme={theme} steps={TRIAL_STEPS} />}
 
-              {/* Included features */}
-              <View style={styles.featureList}>
-                {plan.features.map((f) => (
-                  <View key={f} style={styles.featureRow}>
-                     <Feather name="check" size={13} color={plan.id === 'growth' ? theme.accent : theme.success} style={{ marginTop: 2 }} />
-                    <Text style={styles.featureText}>{f}</Text>
-                  </View>
-                ))}
-                {plan.notIncluded.map((f) => (
-                  <View key={f} style={styles.featureRow}>
-                     <Feather name="minus" size={13} color={theme.muted} style={{ marginTop: 2 }} />
-                     <Text style={[styles.featureText, { color: theme.muted }]}>{f}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* CTA */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                disabled={isCurrent || loadingId !== null || cardPriceFailed || cardPriceLoading}
-                onPress={() => handleSelect(plan)}
-                style={[
-                  styles.ctaBtn,
-                   plan.id === 'growth' ? styles.ctaBtnHighlight : styles.ctaBtnDefault,
-                  isCurrent         && styles.ctaBtnCurrent,
-                  (isCurrent || loadingId !== null || cardPriceFailed || cardPriceLoading) && { opacity: 0.5 },
-                ]}
-              >
-                {isLoading ? (
-                   <ActivityIndicator color={theme.onAccent} size="small" />
-                ) : (
-                  <Text style={[styles.ctaText, isCurrent && { color: theme.accent }]}>
-                    {isCurrent
-                      ? 'Current plan'
-                      : cardPriceFailed
-                        ? 'Prices unavailable'
-                        : isOnboarding
-                          ? (hasRealTrialOffer ? 'Start free trial' : `Choose ${plan.name}`)
-                          : `Switch to ${plan.name}`}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          );
-        })}
-
-        {/* Full comparison table */}
-        <View style={styles.compareSection} testID="seller-plans-comparison-table">
-          <Text style={styles.compareTitle}>Compare every plan</Text>
-          <View style={styles.compareHeaderRow}>
-            <View style={{ flex: 1.4 }} />
-            {SELLER_PLANS.map((plan) => (
-              <Text key={plan.id} style={styles.compareHeaderCell} numberOfLines={1}>{plan.name}</Text>
-            ))}
-          </View>
-          {comparisonRows().map((feature, index) => (
-            <View
-              key={feature}
-              style={[styles.compareRow, index % 2 === 1 && styles.compareRowAlt]}
-            >
-              <Text style={styles.compareFeatureCell} numberOfLines={2}>{feature}</Text>
-              {SELLER_PLANS.map((plan) => (
-                <View key={plan.id} style={styles.compareValueCell}>
-                  {planIncludesFeature(plan, feature) ? (
-                    <Feather name="check" size={15} color={theme.success} />
-                  ) : (
-                    <Feather name="minus" size={15} color={theme.muted} />
-                  )}
-                </View>
-              ))}
-            </View>
-          ))}
-        </View>
-
-        {/* FAQ */}
-        <View style={styles.faqSection} testID="seller-plans-faq">
-          <Text style={styles.compareTitle}>Frequently asked questions</Text>
-          {PLAN_FAQ.map((item, index) => {
-            const isOpen = openFaqIndex === index;
-            return (
-              <View key={item.question} style={styles.faqItem}>
-                <TouchableOpacity
-                  style={styles.faqQuestionRow}
-                  onPress={() => { haptic(); setOpenFaqIndex(isOpen ? null : index); }}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: isOpen }}
-                  testID={`seller-plans-faq-${index}`}
-                >
-                  <Text style={styles.faqQuestion}>{item.question}</Text>
-                  <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.muted} />
-                </TouchableOpacity>
-                {isOpen && <Text style={styles.faqAnswer}>{item.answer}</Text>}
-              </View>
-            );
-          })}
-        </View>
+        {/* Commission disclosure — small print, not part of the primary pitch */}
+        <Text style={styles.commissionNote}>
+          All plans carry a 5% platform commission on each sale.
+        </Text>
 
         {/* Skip during onboarding — Starter is a paid plan, so this must not read as "free" */}
         {isOnboarding && (
           <TouchableOpacity
             style={styles.skipRow}
-            onPress={handleSkip}
+            onPress={requestExit}
             disabled={loadingId !== null}
             activeOpacity={0.7}
           >
             <Text style={styles.skipText}>Not now</Text>
-             <Feather name="arrow-right" size={14} color={theme.muted} />
+            <Feather name="arrow-right" size={14} color={theme.muted} />
           </TouchableOpacity>
         )}
         {Platform.OS !== 'web' && (
@@ -551,7 +486,7 @@ export default function PlansScreen() {
             disabled={loadingId !== null}
             testID="seller-revenuecat-restore"
           >
-             {loadingId === 'restore' ? <ActivityIndicator color={theme.muted} size="small" /> : <Text style={styles.skipText}>Restore purchases</Text>}
+            {loadingId === 'restore' ? <ActivityIndicator color={theme.muted} size="small" /> : <Text style={styles.skipText}>Restore purchases</Text>}
           </TouchableOpacity>
         )}
 
@@ -578,6 +513,55 @@ export default function PlansScreen() {
         </View>
 
       </ScrollView>
+
+      <SellerPaywallExitDrawer
+        visible={exitDrawerVisible}
+        onClose={handleExitDrawerClose}
+        theme={theme}
+        plans={SELLER_PLANS}
+        recommendedId={recommendedId}
+        currentPlanId={currentPlanId}
+        isOnboarding={isOnboarding}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        getPricing={getPricing}
+        selectedPlan={selectedPlan}
+        hasRealTrialOffer={hasRealTrialOffer}
+        onStartTrial={handleExitDrawerStartTrial}
+        loading={loadingId === selectedPlan.id}
+        ctaDisabled={selectedCtaDisabled}
+      />
+    </View>
+  );
+}
+
+// ─── Phone-framed dashboard preview ────────────────────────────────────────
+// A static, lightweight illustration of the seller dashboard "in action" —
+// no image asset required, matches the monochrome design system.
+function DashboardPreview({ theme, styles }: { theme: ReturnType<typeof useAppTheme>['theme']; styles: ReturnType<typeof createStyles> }) {
+  const bars = [0.4, 0.65, 0.5, 0.85, 0.7, 1, 0.55];
+  return (
+    <View style={styles.phoneFrame} testID="seller-plans-dashboard-preview">
+      <View style={styles.phoneNotch} />
+      <View style={styles.phoneScreen}>
+        <View style={styles.phoneStatRow}>
+          <View style={styles.phoneStatCard}>
+            <Text style={styles.phoneStatLabel}>Revenue</Text>
+            <Text style={styles.phoneStatValue}>$4,210</Text>
+          </View>
+          <View style={styles.phoneStatCard}>
+            <Text style={styles.phoneStatLabel}>Orders</Text>
+            <Text style={styles.phoneStatValue}>86</Text>
+          </View>
+        </View>
+        <View style={styles.phoneChart}>
+          {bars.map((h, i) => (
+            <View key={i} style={[styles.phoneChartBar, { height: `${h * 100}%` }]} />
+          ))}
+        </View>
+        <View style={styles.phoneRow} />
+        <View style={[styles.phoneRow, { width: '70%' }]} />
+      </View>
     </View>
   );
 }
@@ -591,7 +575,7 @@ function capitalize(s: string) { return s ? s.charAt(0).toUpperCase() + s.slice(
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: 'transparent' },
+  root: { flex: 1, backgroundColor: theme.background ?? '#0A0A0B' },
 
   // Header
   header: {
@@ -606,93 +590,44 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   closeBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
   headerCenter:{ flex: 1, alignItems: 'center' },
   headerTitle: { fontSize: FS.lg, fontFamily: FONT.semibold, color: theme.text },
-  headerSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
 
-  // Hero
-  hero: { borderRadius: RADIUS.xl, overflow: 'hidden', borderWidth: 1, borderColor: theme.border },
-  heroInner: { padding: SP.lg, gap: 6 },
-  heroEyebrow: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.accent, letterSpacing: 1.5 },
-  heroTitle: { fontSize: 24, fontFamily: FONT.semibold, color: theme.text, letterSpacing: -0.3, lineHeight: 30 },
-  heroSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
-
-  // Recommendation banner
-  recBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: `${theme.secondary}14`, borderRadius: RADIUS.md,
-    paddingHorizontal: SP.md, paddingVertical: 10,
-    borderWidth: 1, borderColor: `${theme.secondary}30`,
-  },
-  recBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
-
-  // Commission + trial callouts
-  commissionNote: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: SP.md, paddingVertical: 10,
-    backgroundColor: theme.card, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: theme.border,
-  },
-  commissionText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
-  trialCallout:   { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: `${theme.accent}44` },
-  trialCalloutInner: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: SP.md },
-  trialCalloutTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
-  trialCalloutSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
-
-  // Cards
-  card: {
-    backgroundColor: theme.card,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: theme.border,
-    padding: SP.lg,
-    gap: SP.md,
-  },
-  cardHighlight: {
-    backgroundColor: theme.cardElevated,
-    borderColor: theme.accent,
+  // Phone-framed dashboard preview
+  phoneFrame: {
+    alignSelf: 'center',
+    width: 220,
+    borderRadius: 28,
     borderWidth: 2,
-    shadowColor: theme.shadowColor,
-    shadowOpacity: 0.32,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 7,
-    transform: [{ scale: 1.015 }],
+    borderColor: theme.border,
+    backgroundColor: theme.card,
+    padding: 8,
+    gap: 6,
   },
-  cardCurrent:   { borderColor: theme.success },
-
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  recBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: `${theme.secondary}22`, borderRadius: 20,
-    paddingHorizontal: 8, paddingVertical: 3,
+  phoneNotch: {
+    alignSelf: 'center',
+    width: 64,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.border,
+    marginBottom: 2,
   },
-   recBadgeText:     { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.secondary, letterSpacing: 0.5 },
-  popularBadge:     { backgroundColor: `${theme.accent}33`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-   popularBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.accent, letterSpacing: 0.5 },
-  currentBadge:     { backgroundColor: `${theme.success}22`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-   currentBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.success, letterSpacing: 0.5 },
-
-  cardTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
-  planName:    { fontSize: FS.xl, fontFamily: FONT.semibold, color: theme.text },
-  planTagline: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
-  priceCol:    { alignItems: 'flex-end' },
-  priceLabel:  { fontSize: 28, fontFamily: FONT.semibold, color: theme.text, letterSpacing: -0.5 },
-  pricePeriod: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
-
-  featureList: { gap: 8 },
-  featureRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  featureText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 18 },
-
-  // CTAs
-  ctaBtn: {
-    borderRadius: RADIUS.md,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+  phoneScreen: {
+    borderRadius: 20,
+    backgroundColor: theme.cardElevated,
+    padding: 12,
+    gap: 8,
   },
-  ctaBtnDefault:   { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
-  ctaBtnHighlight: { backgroundColor: theme.accent },
-  ctaBtnCurrent:   { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.success },
-  ctaText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.onAccent },
+  phoneStatRow: { flexDirection: 'row', gap: 8 },
+  phoneStatCard: { flex: 1, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, padding: 8, gap: 2 },
+  phoneStatLabel: { fontSize: 9, fontFamily: FONT.medium, color: theme.muted },
+  phoneStatValue: { fontSize: 13, fontFamily: FONT.semibold, color: theme.text },
+  phoneChart: {
+    flexDirection: 'row', alignItems: 'flex-end', gap: 4,
+    height: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, padding: 6,
+  },
+  phoneChartBar: { flex: 1, backgroundColor: theme.text, borderRadius: 2, opacity: 0.85 },
+  phoneRow: { height: 8, borderRadius: 4, backgroundColor: theme.border, width: '100%' },
+
+  commissionNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
 
   // Skip
   skipRow: {
@@ -700,34 +635,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: 6, paddingVertical: SP.lg, marginTop: 4,
   },
   skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
-   restoreRow: { alignItems: 'center', paddingVertical: SP.sm },
-   nativeTrial: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.secondary, marginTop: -SP.xs },
-   priceSkeleton: { width: 64, height: 28, borderRadius: RADIUS.xs, backgroundColor: theme.border },
+  restoreRow: { alignItems: 'center', paddingVertical: SP.sm },
 
   // Legal footer (Apple 3.1.2 — auto-renew disclosure + Terms/Privacy)
-  // Comparison table
-  compareSection: {
-    backgroundColor: theme.card, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: theme.border,
-    padding: SP.md, gap: 4,
-  },
-  compareTitle: { fontSize: FS.lg, fontFamily: FONT.semibold, color: theme.text, marginBottom: SP.sm },
-  compareHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: theme.border },
-  compareHeaderCell: { flex: 1, fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text, textAlign: 'center' },
-  compareRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderRadius: RADIUS.sm },
-  compareRowAlt: { backgroundColor: `${theme.border}30` },
-  compareFeatureCell: { flex: 1.4, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, paddingRight: 6 },
-  compareValueCell: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  // FAQ
-  faqSection: {
-    backgroundColor: theme.card, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: theme.border,
-    padding: SP.md, gap: 4,
-  },
-  faqItem: { borderTopWidth: 1, borderTopColor: theme.border, paddingVertical: SP.sm },
-  faqQuestionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
-  faqQuestion: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
-  faqAnswer: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18, marginTop: SP.xs },
-
   legalFooter: { paddingTop: SP.sm, paddingHorizontal: SP.xs, gap: 10 },
   legalFooterText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16, textAlign: 'center' },
   legalLinksRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },

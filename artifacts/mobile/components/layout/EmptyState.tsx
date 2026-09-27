@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyl
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 
 /**
  * One shared empty/error state used on every list and grid: icon in a thin
@@ -27,6 +28,8 @@ export function EmptyState({
   /** Shrinks the icon circle and vertical padding — for a screen tight on
    * height (e.g. the buyer profile's grid, above a floating tab bar). */
   compact,
+  /** One of the shared thread-motif line illustrations; falls back to `icon` when omitted. */
+  illustration,
 }: {
   icon: keyof typeof Feather.glyphMap;
   title?: string;
@@ -37,6 +40,7 @@ export function EmptyState({
   style?: StyleProp<ViewStyle>;
   testID?: string;
   compact?: boolean;
+  illustration?: ThreadMotif;
 }) {
   const { theme } = useAppTheme();
   const iconColor = variant === 'error' ? theme.error : theme.muted;
@@ -44,11 +48,19 @@ export function EmptyState({
   return (
     <View style={[styles.wrap, compact && styles.wrapCompact, style]} testID={testID}>
       <View style={[styles.iconCircle, compact && styles.iconCircleCompact, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Feather name={icon} size={compact ? ICON.md : ICON.xl} color={iconColor} />
+        {illustration && variant !== 'error' ? (
+          <ThreadIllustration motif={illustration} size={compact ? 26 : 36} color={iconColor} strokeWidth={3.5} />
+        ) : (
+          <Feather name={icon} size={compact ? ICON.md : ICON.xl} color={iconColor} />
+        )}
       </View>
       <View style={[styles.copy, compact && styles.copyCompact]}>
         {title ? <Text style={[styles.title, compact && styles.titleCompact, { color: theme.text }]} accessibilityRole="header">{title}</Text> : null}
-        <Text style={[styles.message, compact && styles.messageCompact, { color: theme.muted }]}>{message}</Text>
+        {/* The message is dropped in `compact` mode — the title alone
+            ("No posts yet") already says it, and reclaiming its height is
+            what lets the CTA below clear a floating tab bar without
+            scrolling on a screen with a tall header above it. */}
+        {compact ? null : <Text style={[styles.message, { color: theme.muted }]}>{message}</Text>}
       </View>
       {actionLabel && onAction && (
         <TouchableOpacity
@@ -73,7 +85,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.lg,
     gap: SP.md,
   },
-  wrapCompact: { paddingVertical: 12, paddingHorizontal: SP.md, gap: 12 },
+  wrapCompact: { paddingVertical: 6, paddingHorizontal: SP.md, gap: 8 },
   iconCircle: {
     width: 64,
     height: 64,
@@ -82,7 +94,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconCircleCompact: { width: 44, height: 44, borderRadius: 22 },
+  iconCircleCompact: { width: 36, height: 36, borderRadius: 18 },
   copy: { alignItems: 'center', gap: SP.xs, maxWidth: 320, alignSelf: 'center' },
   copyCompact: { maxWidth: 280 },
   title: {
@@ -98,7 +110,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flexShrink: 1,
   },
-  messageCompact: { fontSize: 14, lineHeight: 18 },
   actionBtn: {
     minHeight: 44,
     justifyContent: 'center',

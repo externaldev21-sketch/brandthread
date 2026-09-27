@@ -33,6 +33,8 @@ import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { undoExpiresAt } from '@/lib/undoRecovery';
 import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
+import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
+import { a11yHidden } from '@/lib/a11yHidden';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
 // Mutations remain responsible for their own server/local rollback. This provider
@@ -696,32 +698,23 @@ interface EmptyStateProps {
   style?: StyleProp<ViewStyle>;
   /** Drops the illustration for tight spaces, e.g. above an open keyboard. */
   compact?: boolean;
+  /** One of the shared thread-motif line illustrations; falls back to `icon` when omitted. */
+  illustration?: ThreadMotif;
 }
 
-export function EmptyState({ icon, title, description, action, secondaryAction, style, compact = false }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, secondaryAction, style, compact = false, illustration }: EmptyStateProps) {
   const { theme } = useAppTheme();
   const colors = useColors();
   return (
     <View style={[esS.root, compact && esS.rootCompact, style]}>
-      {!compact && <View style={esS.illustration} accessibilityElementsHidden>
-        <View style={[esS.orbit, { borderColor: theme.accent + '30' }]} />
-        <View style={[esS.spark, esS.sparkOne, { backgroundColor: theme.secondary }]} />
-        <View style={[esS.spark, esS.sparkTwo, { backgroundColor: theme.accentLight }]} />
-        <View style={[esS.floor, { backgroundColor: theme.accentDim }]} />
-        <LinearGradient
-          colors={[theme.accentDim, theme.secondaryDim]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[esS.artCard, { borderColor: theme.accent + '70' }]}
-        >
-          <View style={[esS.artInset, { backgroundColor: theme.accent + '18' }]}>
-            <Feather name={icon} size={34} color={theme.accentLight} />
-          </View>
-          <View style={esS.artLines}>
-            <View style={[esS.artLine, { backgroundColor: theme.accentLight + '66', width: 35 }]} />
-            <View style={[esS.artLine, { backgroundColor: theme.secondary + '55', width: 24 }]} />
-          </View>
-        </LinearGradient>
+      {!compact && <View style={esS.illustration} {...a11yHidden(true)}>
+        <View style={[esS.artCircle, { borderColor: theme.border }]}>
+          {illustration ? (
+            <ThreadIllustration motif={illustration} size={56} color={theme.muted} strokeWidth={4} />
+          ) : (
+            <Feather name={icon} size={34} color={theme.muted} />
+          )}
+        </View>
       </View>}
       <Text style={[esS.title, { color: colors.foreground }]}>{title}</Text>
       {!!description && (
@@ -743,15 +736,7 @@ const esS = StyleSheet.create({
   root:    { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, paddingVertical: SP.xxl, gap: SP.sm },
   rootCompact: { paddingVertical: SP.lg },
   illustration: { width: 150, height: 128, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
-  orbit: { position: 'absolute', width: 122, height: 122, borderRadius: 61, borderWidth: 1 },
-  floor: { position: 'absolute', bottom: 10, width: 94, height: 16, borderRadius: 12, transform: [{ scaleX: 1.2 }] },
-  artCard: { width: 91, height: 94, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-4deg' }] },
-  artInset: { width: 57, height: 57, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  artLines: { position: 'absolute', bottom: 10, right: 9, gap: 3, alignItems: 'flex-end' },
-  artLine: { height: 3, borderRadius: 2 },
-  spark: { position: 'absolute', width: 7, height: 7, borderRadius: 4 },
-  sparkOne: { top: 20, right: 14 },
-  sparkTwo: { left: 19, bottom: 27, width: 5, height: 5 },
+  artCircle: { width: 96, height: 96, borderRadius: 48, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   title:   { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center', letterSpacing: -0.2 },
   desc:    { maxWidth: 330, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 21 },
   actions: { width: '100%', gap: SP.sm, marginTop: SP.sm },

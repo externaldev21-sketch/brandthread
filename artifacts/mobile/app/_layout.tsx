@@ -4,6 +4,7 @@ import { queryClient, queryPersister } from '@/lib/queryClient';
 import { warmBuyerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -1288,6 +1289,7 @@ export default function RootLayout() {
           persistOptions={{ persister: queryPersister, maxAge: 24 * 60 * 60_000 }}
         >
           <GestureHandlerRootView style={{ flex: 1 }}>
+          <KeyboardProvider>
             <CookieConsentProvider>
             <AppThemeProvider>
               <AppIconProvider>
@@ -1311,6 +1313,7 @@ export default function RootLayout() {
               </AppIconProvider>
             </AppThemeProvider>
             </CookieConsentProvider>
+          </KeyboardProvider>
           </GestureHandlerRootView>
         </PersistQueryClientProvider>
       </ErrorBoundary>

@@ -165,4 +165,18 @@ const webPolishCss = `
   *::-webkit-scrollbar-thumb:hover {
     background-color: rgba(255,255,255,0.35);
   }
+
+  /* Buyer search page: the TikTok-style full-bleed layout has no room for
+     even the thin themed scrollbar above — it read as a stray white strip
+     down the right edge. Scoped by id (not global) so no other screen's
+     scrollbar is affected. */
+  #buyer-search-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  #buyer-search-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 `;

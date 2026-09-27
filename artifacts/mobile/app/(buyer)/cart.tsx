@@ -28,6 +28,7 @@ import {
   Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
 } from '@/services/cartTypes';
 import { useScrollReset } from '@/hooks/useScrollReset';
+import { ThreadIllustration } from '@/components/illustrations/EmptyStateArt';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
@@ -258,7 +259,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
   },
   img: {
-    width: 72, height: 96, borderRadius: RADII.card,
+    width: 72, height: 72, borderRadius: RADII.card,
     backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
@@ -442,7 +443,7 @@ function SavedItemRow({ item, onMove, onRemove }: {
 
 const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm },
-  img: { width: 56, height: 75, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  img: { width: 56, height: 70, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginBottom: 2 },
   price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
@@ -905,7 +906,7 @@ export default function CartScreen() {
         // illustration) at the requested 120pt circle / 52pt CTA sizing.
         <View style={[s.emptyWrap, { flex: 1 }]}>
           <View style={[s.emptyIconCircle, { backgroundColor: theme.cardElevatedGlass, borderColor: theme.border }]}>
-            <Feather name="shopping-bag" size={44} color={theme.muted} />
+            <ThreadIllustration motif="hanger" size={52} color={theme.muted} strokeWidth={4.5} />
           </View>
           <Text style={[s.emptyTitle, { color: theme.text }]}>Your cart is empty</Text>
           <Text style={[s.emptyDescription, { color: theme.muted }]}>Tap Shop on a post you love to add it here.</Text>
