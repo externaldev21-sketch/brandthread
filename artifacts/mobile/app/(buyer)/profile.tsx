@@ -51,6 +51,8 @@ import {
 import { profileEmptyState, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRow';
+import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
+import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
 const AVATAR = 88;
@@ -169,10 +171,17 @@ function SheetRow({
 }
 
 // ─── Top bar ──────────────────────────────────────────────────────────────────
-function CompactWalletChip({ balanceLabel, onPress, theme }: { balanceLabel: string; onPress: () => void; theme: AppThemePreset }) {
+function CompactWalletChip({ balanceLabel, onPress, onLongPress, theme }: {
+  balanceLabel: string;
+  onPress: () => void;
+  /** Dev-only: replays the money-burst celebration on demand (hidden, no visual affordance). */
+  onLongPress?: () => void;
+  theme: AppThemePreset;
+}) {
   return (
     <PressableScale
       onPress={() => { hapticSelection(); onPress(); }}
+      onLongPress={onLongPress}
       accessibilityRole="button"
       accessibilityLabel={`Thread Cash wallet, ${balanceLabel}`}
       testID="profile-wallet-chip"
@@ -364,6 +373,7 @@ export default function ProfileScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const layout = useProfileLayout();
   const threadCashEnabled = useFeatureFlag('threadCash');
+  const celebrateThreadCash = useCelebrateThreadCash();
   // Clears the floating buyer tab bar.
   const listPadding = { paddingBottom: barInset + SP.lg };
   const savedColumns = layout.gridColumns >= 4 ? 3 : 2;
@@ -459,7 +469,13 @@ export default function ProfileScreen() {
           setThreadCashBalanceCents(Math.max(0, status.balanceCents));
           setThreadCashStreak(status.streak);
         })
-        .catch(() => {});
+        .catch(() => {
+          // No live backend in the dev-web preview — fall back to seeded
+          // preview data so the streak row isn't silently invisible there.
+          if (!active || !isPreviewThreadCashEnabled()) return;
+          setThreadCashBalanceCents(Math.max(0, PREVIEW_THREAD_CASH_STATUS.balanceCents));
+          setThreadCashStreak(PREVIEW_THREAD_CASH_STATUS.streak);
+        });
     }
     return () => { active = false; };
   }, [api, threadCashEnabled, user?.id]));
@@ -749,6 +765,7 @@ export default function ProfileScreen() {
             <CompactWalletChip
               balanceLabel={formatCents(threadCashBalanceCents)}
               onPress={() => router.push('/thread-cash' as never)}
+              onLongPress={__DEV__ ? () => celebrateThreadCash({ amount: 500, from: 'Preview' }) : undefined}
               theme={theme}
             />
           ) : null}
