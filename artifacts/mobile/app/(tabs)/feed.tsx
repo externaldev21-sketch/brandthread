@@ -1750,10 +1750,11 @@ export default function FeedScreen({
   // truth so BuyerHighDemandPage's content never renders underneath it
   // (see styles.topBar / styles.buyerTopRow below).
   const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;
-  // 16pt gaps between the right cluster's 3 icons (search/bell/cart) at
-  // comfortable widths, shrinking to a 12pt floor once 6 top-row icons +
-  // the centered tabs would otherwise crowd a 375pt-wide screen.
-  const rightClusterGap = windowWidth < 380 ? 12 : 16;
+  // 14pt gaps between each cluster's icons at comfortable widths, shrinking
+  // to a 12pt floor under 380pt so the two clusters (3 left, 2 right, all
+  // 24pt) never crowd the absolutely-centered tabs — see the PR description
+  // for the exact per-width math this was sized against.
+  const topRowIconGap = windowWidth < 380 ? 12 : 14;
   const buyerBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { userId } = useAuth();
@@ -2744,9 +2745,9 @@ export default function FeedScreen({
               of glitch as the old shop pill's frosted background — see
               ShopSideTab above. */}
           <View style={styles.buyerTopRow}>
-            <View style={styles.buyerTopCluster}>
+            <View style={[styles.buyerTopCluster, { gap: topRowIconGap }]}>
               <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
+                style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -2757,10 +2758,10 @@ export default function FeedScreen({
                 hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                 testID="buyer-home-friends"
               >
-                <BuyerNavIcon name="friends" color={ON_DARK} size={22} strokeWidth={1.9} />
+                <BuyerNavIcon name="friends" color={ON_DARK} size={24} strokeWidth={1.9} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
+                style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -2771,10 +2772,10 @@ export default function FeedScreen({
                 hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                 testID="buyer-home-drops"
               >
-                <Feather name="zap" size={20} color={ON_DARK} />
+                <Feather name="zap" size={24} color={ON_DARK} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
+                style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -2785,10 +2786,18 @@ export default function FeedScreen({
                 hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                 testID="buyer-home-live"
               >
-                <Feather name="tv" size={20} color={ON_DARK} />
+                <Feather name="tv" size={24} color={ON_DARK} />
               </TouchableOpacity>
             </View>
 
+            {/* Absolutely centered on the screen (left:0/right:0), not a
+                flex sibling of the two icon clusters — a flex-centered tab
+                switcher shifts off-center whenever the two clusters aren't
+                the same width (they aren't: 3 icons left, 2 right), which
+                is exactly what put the tabs' center at ~180 instead of ~195
+                on a 390pt screen. pointerEvents box-none so it never steals
+                taps meant for the icon clusters underneath its empty
+                left/right margins. */}
             <View style={styles.buyerTabSwitcherWrap} pointerEvents="box-none">
               <SegmentedControl
                 variant="underline"
@@ -2806,12 +2815,12 @@ export default function FeedScreen({
               />
             </View>
 
-            {/* 16pt gaps at comfortable widths, shrinking to a 12pt floor
-                on a 375pt-wide screen so three icons never crowd the
-                centered tabs (see rightClusterGap below). */}
-            <View style={[styles.buyerTopCluster, { gap: rightClusterGap }]}>
+            {/* Bell dropped — Activity already has its own bell in the
+                floating tab bar, so this was a duplicate entry point and
+                the extra icon was part of why the row didn't fit. */}
+            <View style={[styles.buyerTopCluster, { gap: topRowIconGap }]}>
               <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
+                style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -2824,10 +2833,9 @@ export default function FeedScreen({
               >
                 <Feather name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
               </TouchableOpacity>
-              <ActivityBellButton color={ON_DARK} size={20} style={styles.buyerTopBtnCompact} badgeBorderColor={BG} />
-              <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtnCompact, { transform: [{ scale: cartPulse }] }]}>
+              <Animated.View ref={cartTargetRef} style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
+                style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -2836,7 +2844,7 @@ export default function FeedScreen({
                 accessibilityRole="button"
                 accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
               >
-                <Feather name="shopping-cart" size={20} color={ON_DARK} />
+                <Feather name="shopping-cart" size={24} color={ON_DARK} />
                 {cartCount > 0 && (
                   <View style={[styles.cartCountBadge, styles.buyerCartBadge, { backgroundColor: theme.accent }]}>
                     <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
@@ -3129,18 +3137,31 @@ const styles = StyleSheet.create({
 
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 10, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // `position: 'relative'` (RN's default) is what makes buyerTabSwitcherWrap
+  // below — an absolutely positioned overlay — center on *this* row instead
+  // of some other ancestor.
   buyerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TOP_TABS_ROW_HEIGHT, gap: 2 },
-  // Compact 36×36 visual footprint with 5pt hitSlop on every button above =
-  // a real 44×44+ touch target while leaving the centered pill enough room
-  // to breathe at 375pt width (each extra full-size button otherwise crowds
-  // "Following"/"Threads" onto two lines).
-  buyerTopBtnCompact: { width: 33, height: 36, alignItems: 'center', justifyContent: 'center' },
+  // 24pt icon, tight box (touch target comes from the 5pt hitSlop on every
+  // button above, same pattern as the rest of this row) — sized to match
+  // the icons exactly so the per-cluster width math in the PR description
+  // (icons + topRowIconGap) is exact, not padded by an oversized button box.
+  buyerTopIconBtn: { width: 24, height: 36, alignItems: 'center', justifyContent: 'center' },
   // Full 44x44 touch target — used by the creator-profile-videos player's
   // simpler back/cart top bar (isCreatorFeed), distinct from the compact
   // buyer Threads Home top row above which needs to fit more controls.
   buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  buyerTopCluster: { flexDirection: 'row', alignItems: 'center', gap: 0 },
-  buyerTabSwitcherWrap: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  buyerTopCluster: { flexDirection: 'row', alignItems: 'center' },
+  // Absolutely centered on the row (left:0/right:0), not a flex sibling of
+  // the icon clusters: those two clusters are different widths (3 icons
+  // left, 2 right), so centering the tabs in the flex space *between* them
+  // would put the tabs' true center off the screen's actual center by half
+  // that width difference — which is what caused the ~180-vs-195 mismatch
+  // this fixes. box-none so its empty left/right margin never intercepts
+  // taps meant for the clusters underneath.
+  buyerTabSwitcherWrap: {
+    position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+  },
   buyerCartBadge: { top: 3, right: 1 },
   // Same shadow as the rail's icons (RightActionRail's iconShadow) — the
   // top-row search icon sits directly on video with nothing behind it, so
