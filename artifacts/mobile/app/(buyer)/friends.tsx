@@ -28,6 +28,8 @@ import {
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import { PREVIEW_STORIES, PREVIEW_FOLLOWING, PREVIEW_FRIEND_ACTIVITY } from '@/lib/previewFriends';
 
 type ApiFollowing = {
   userId: string; name: string; username: string | null;
@@ -245,11 +247,22 @@ export default function FriendsScreen() {
       setApiFollowing(Array.isArray(followingRows) ? followingRows : []);
       setFeedPosts(Array.isArray(activityRows) ? activityRows : []);
     } catch (error) {
-      setLoadError(true);
-      setFriends([]);
-      setApiFollowing([]);
-      setStories([]);
-      setFeedPosts([]);
+      // No backend reachable in the dev-web preview — show the same seeded
+      // fixtures the buyer profile's Thread Cash streak uses, rather than a
+      // silently empty screen. Never reached for a real signed-in account.
+      if (isBuyerDevPreview()) {
+        setLoadError(false);
+        setFriends([]);
+        setApiFollowing(PREVIEW_FOLLOWING);
+        setStories(PREVIEW_STORIES);
+        setFeedPosts(PREVIEW_FRIEND_ACTIVITY);
+      } else {
+        setLoadError(true);
+        setFriends([]);
+        setApiFollowing([]);
+        setStories([]);
+        setFeedPosts([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -382,12 +395,17 @@ export default function FriendsScreen() {
           accessibilityLabel="Add to your story"
           onPress={() => { hapticPrimaryAction(); router.push('/buyer-story-create' as never); }}
         >
-          <View style={[s.storyCircle, { backgroundColor: theme.cardElevated, overflow: 'hidden' }]}>
-            {myAvatarUrl
-              ? <CachedImage source={{ uri: myAvatarUrl }} style={StyleSheet.absoluteFill} />
-              : <Text style={[TYPE_SCALE.body, s.storyInitials, { color: theme.text }]}>{myInitials}</Text>}
+          {/* The badge sits outside the avatar's own clipped circle — nesting
+              it inside (with the circle's `overflow: hidden`) clipped it down
+              to a stray wedge wherever it poked past the circle's edge. */}
+          <View style={s.storyCircleWrap}>
+            <View style={[s.storyCircle, { backgroundColor: theme.cardElevated, overflow: 'hidden' }]}>
+              {myAvatarUrl
+                ? <CachedImage source={{ uri: myAvatarUrl }} style={StyleSheet.absoluteFill} />
+                : <Text style={[TYPE_SCALE.body, s.storyInitials, { color: theme.text }]}>{myInitials}</Text>}
+            </View>
             <View style={[s.plusBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
-              <Feather name="plus" size={10} color={theme.onAccent} />
+              <Feather name="plus" size={12} color={theme.onAccent} />
             </View>
           </View>
           <Text style={[TYPE_SCALE.caption, s.storyLabel, { color: palette.mutedForeground }]} numberOfLines={1}>
@@ -442,23 +460,27 @@ export default function FriendsScreen() {
             contentContainerStyle={{ paddingHorizontal: SPACING.md, gap: SPACING.md, paddingBottom: SPACING.sm }}
           >
             {apiFollowing.map(f => (
-              <PressableScale
-                key={f.userId}
-                style={s.followingItem}
-                onPress={() => {
-                  hapticPrimaryAction();
-                  router.push({
-                    pathname: '/buyer-other-profile' as any,
-                    params: { userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color },
-                  });
-                }}
-              >
-                <View style={[s.storyCircle, { backgroundColor: f.color }]}>
-                  <Text style={[TYPE_SCALE.body, s.storyInitials]}>{f.initials}</Text>
-                </View>
-                <Text style={[TYPE_SCALE.caption, s.storyLabel, { color: palette.mutedForeground }]} numberOfLines={1}>
-                  {f.name.split(' ')[0]}
-                </Text>
+              // A plain View, not a Pressable — the message bubble below used
+              // to be a PressableScale nested *inside* this row's own
+              // PressableScale (a button inside a button on web).
+              <View key={f.userId} style={s.followingItem}>
+                <PressableScale
+                  style={s.followingItemTap}
+                  onPress={() => {
+                    hapticPrimaryAction();
+                    router.push({
+                      pathname: '/buyer-other-profile' as any,
+                      params: { userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color },
+                    });
+                  }}
+                >
+                  <View style={[s.storyCircle, { backgroundColor: f.color }]}>
+                    <Text style={[TYPE_SCALE.body, s.storyInitials]}>{f.initials}</Text>
+                  </View>
+                  <Text style={[TYPE_SCALE.caption, s.storyLabel, { color: palette.mutedForeground }]} numberOfLines={1}>
+                    {f.name.split(' ')[0]}
+                  </Text>
+                </PressableScale>
                 <PressableScale
                   style={[s.msgBubble, { backgroundColor: theme.accentDim }]}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -467,7 +489,7 @@ export default function FriendsScreen() {
                 >
                   <Feather name="message-circle" size={14} color={theme.accent} />
                 </PressableScale>
-              </PressableScale>
+              </View>
             ))}
           </ScrollView>
         </View>
@@ -586,6 +608,7 @@ const s = StyleSheet.create({
     alignItems: 'flex-start',
   },
   followingItem: { alignItems: 'center', gap: SPACING.xs, width: 68 },
+  followingItemTap: { alignItems: 'center', gap: SPACING.xs },
   msgBubble: {
     width: 24, height: 24, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
@@ -603,12 +626,13 @@ const s = StyleSheet.create({
   storyInitials: {
     color: '#FFFFFF', // theme-exempt: initials on a per-user identity color
   },
+  storyCircleWrap: { width: 64, height: 64 },
   plusBadge: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 18,
-    height: 18,
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
     borderRadius: RADII.pill,
     alignItems: 'center',
     justifyContent: 'center',
@@ -620,7 +644,7 @@ const s = StyleSheet.create({
 
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
     marginTop: SPACING.sm,

@@ -272,7 +272,7 @@ export function ProfileTabs({
   const indicatorX = useRef(new Animated.Value(activeIndex)).current;
 
   useEffect(() => {
-    Animated.spring(indicatorX, { toValue: activeIndex, useNativeDriver: true, speed: 18, bounciness: 6 }).start();
+    Animated.timing(indicatorX, { toValue: activeIndex, duration: 150, useNativeDriver: true }).start();
   }, [activeIndex, indicatorX]);
 
   const cellWidth = tabs.length > 0 ? rowWidth / tabs.length : 0;
@@ -300,7 +300,7 @@ export function ProfileTabs({
               {(state) => (
                 <>
                   <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
-                  <Feather name={tab.icon} size={21} color={color} />
+                  <Feather name={tab.icon} size={22} color={color} />
                   <Text style={[styles.tabLabel, { color }, selected && styles.tabLabelActive]} numberOfLines={1}>
                     {tab.label}{typeof tab.count === 'number' && tab.count > 0 ? ` ${tab.count}` : ''}
                   </Text>
@@ -487,9 +487,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.xs, position: 'relative',
   },
   tab: { minHeight: 60, alignItems: 'center', justifyContent: 'flex-end', gap: 5, paddingTop: SP.sm, paddingBottom: SP.sm, paddingHorizontal: 2 },
-  tabLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, lineHeight: 17 },
+  tabLabel: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },
   tabLabelActive: { fontFamily: FONT.bold },
-  tabIndicator: { position: 'absolute', bottom: -StyleSheet.hairlineWidth, left: 0, height: 3, borderRadius: 2 },
+  tabIndicator: { position: 'absolute', bottom: -StyleSheet.hairlineWidth, left: 0, height: 2, borderRadius: 1 },
 
   section: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: SP.md },
   sectionStitch: { flex: 1, borderTopWidth: 1, borderStyle: 'dashed' },
