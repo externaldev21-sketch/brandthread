@@ -215,10 +215,10 @@ describe('Apple-style quick-reaction emoji — bare, no chip', () => {
 });
 
 describe('TikTok-style composer pill', () => {
-  it('is 36pt tall at rest, 18pt radius, #262626 fill, no border', () => {
+  it('is 44pt tall at rest (a real touch target), 22pt radius, #262626 fill, no border', () => {
     expect(comments).toContain("backgroundColor: '#262626'");
-    expect(comments).toContain('borderRadius: 18');
-    expect(comments).toContain('minHeight: 36');
+    expect(comments).toContain('borderRadius: 22');
+    expect(comments).toContain('minHeight: 44');
     expect(comments).not.toMatch(/inputShell:\s*\{[^}]*borderWidth/);
   });
 
