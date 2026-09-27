@@ -396,7 +396,10 @@ if (FASHION_PREVIEW_VIDEO_URIS[0]) {
     .catch(() => {});
 }
 
-const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
+// Exported for the buyer search page's empty-state reference video grid,
+// which reuses these bundled 9:16 assets so it renders instantly with no
+// network/spinner.
+export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
   {
     id: 'preview-fashion-01',
     creator: 'Atelier Noire',
@@ -2993,7 +2996,7 @@ export default function FeedScreen({
                 activeOpacity={0.7}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  router.push('/(buyer)/search' as never);
+                  router.push('/buyer-search' as never);
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Search"

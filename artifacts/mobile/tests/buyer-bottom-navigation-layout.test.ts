@@ -8,8 +8,7 @@ const layout = read('app/(buyer)/_layout.tsx');
 const bar = read('components/buyer-nav/BuyerTabBar.tsx');
 const parts = read('components/tab-bar/TabBarParts.tsx');
 const sellerBar = read('components/SellerGlobalTabBar.tsx');
-const searchContext = read('contexts/BuyerSearchContext.tsx');
-const search = read('app/(buyer)/search.tsx');
+const search = read('app/buyer-search.tsx');
 const profile = read('app/(buyer)/profile.tsx');
 const feed = read('app/(tabs)/feed.tsx');
 // The feed's top bar (LIVE / Friends / tabs / search) moved into its own
@@ -21,16 +20,26 @@ const tabItemsBlock = bar.slice(bar.indexOf('export const BUYER_TAB_ITEMS'), bar
 describe('buyer navigation contract', () => {
   it('renders Home · Discover · Inbox · Search in the capsule and Profile in a separate circle', () => {
     expect(layout).toContain('<BuyerTabBar {...props} inboxBadgeCount={inboxBadgeCount} />');
-    for (const route of ['index', 'discover', 'inbox', 'search', 'profile']) {
+    // Search is no longer a Tabs.Screen — it's a standalone full-screen page
+    // (app/buyer-search.tsx) pushed from the bar's Search slot, so the bar
+    // never morphs into an inline text field over the tabs.
+    for (const route of ['index', 'discover', 'inbox', 'profile']) {
       expect(layout).toContain(`name="${route}"`);
     }
+    expect(layout).not.toContain('name="search"');
     expect(tabItemsBlock).toContain("{ route: 'index', label: 'Home', icon: 'home' }");
     expect(tabItemsBlock).toContain("{ route: 'discover', label: 'Discover', icon: 'discover' }");
     expect(tabItemsBlock).toContain("{ route: 'inbox', label: 'Inbox', icon: 'inbox' }");
     expect(tabItemsBlock).toContain("{ route: 'search', label: 'Search', icon: 'search' }");
     expect(tabItemsBlock).not.toContain('profile');
     expect(bar).toContain('testID="buyer-bottom-tab-bar"');
-    expect(bar).toContain("testID={searchActive ? 'buyer-search-close' : 'buyer-tab-profile'}");
+    expect(bar).toContain('testID="buyer-tab-profile"');
+  });
+
+  it('the Search slot pushes the standalone search page instead of navigating a tab', () => {
+    expect(bar).toContain("router.push('/buyer-search'");
+    expect(bar).not.toContain('MORPH_SPRING');
+    expect(bar).not.toContain('useAnimatedKeyboard');
   });
 
   it('names the first tab Home everywhere', () => {
@@ -88,71 +97,16 @@ describe('buyer navigation contract', () => {
   it('keeps every control at a 44pt touch target', () => {
     expect(parts).toContain('minWidth: 44');
     expect(parts).toContain('minHeight: 44');
-    // 36pt field buttons + 4pt hitSlop on every side = 44pt.
-    expect(bar).toContain('width: 36');
-    expect(bar).toContain('hitSlop={4}');
   });
 });
 
-describe('buyer search morph', () => {
-  it('keeps Home in the capsule while search is open', () => {
-    expect(bar).toContain("testID={isHome && searchActive ? 'buyer-search-home' : `buyer-tab-${item.route}`}");
-    expect(bar).toContain("const coveredBySearch = !isHome && searchActive;");
-    // Home is never wrapped in an animated style that could hide it.
-    expect(bar).toContain('if (isHome) return <View key={item.route}>{slot}</View>;');
-  });
-
-  it('slides the field out of the Search slot using measured widths, not fixed pixels', () => {
-    expect(bar).toContain('onLayout={onSlotRowLayout}');
-    expect(bar).toContain('event.nativeEvent.layout.width');
-    expect(bar).toContain('const slot = slotRowWidth.value / BUYER_TAB_SLOT_COUNT;');
-    expect(bar).toContain('const collapsedLeft = pad + slot * 3.5 - FIELD_GLYPH_CENTER;');
-    expect(bar).toContain('const expandedLeft = pad + slot + 2;');
-    expect(bar).not.toMatch(/translateX: \d{3}/);
-  });
-
-  it('cannot bounce: the spring is critically damped and clamped', () => {
-    expect(bar).toContain('overshootClamping: true');
-    expect(bar).toContain('withSpring(target, MORPH_SPRING, onDone)');
-    expect(bar).toContain('useReducedMotion()');
-  });
-
-  it('rides the keyboard on the UI thread only while search is open', () => {
-    expect(bar).toContain('useAnimatedKeyboard({');
-    expect(bar).toContain('isStatusBarTranslucentAndroid: true');
-    expect(bar).toContain('isNavigationBarTranslucentAndroid: true');
-    expect(bar).toContain('searchActive && <NativeKeyboardFollower target={keyboardHeight} />');
-    expect(bar).toContain('keyboardHeight.value + metrics.keyboardGap - metrics.bottomOffset');
-    expect(bar).not.toContain("from 'react-native-keyboard-controller'");
-  });
-
-  it('always offers clear, filters and close, and closing reverses the morph and the keyboard', () => {
-    expect(bar).toContain('testID="buyer-tab-search-input"');
-    expect(bar).toContain('accessibilityLabel="Search Brandthread"');
-    expect(bar).toContain('testID="buyer-tab-search-clear"');
-    expect(bar).toContain('testID="buyer-tab-search-filters"');
-    expect(bar).toContain("accessibilityLabel={searchActive ? 'Close search' : 'Profile tab'}");
-    const close = bar.slice(bar.indexOf('const closeSearch'), bar.indexOf('const openFilters'));
-    expect(close).toContain('dismissKeyboard()');
-    expect(close).toContain('returnRouteRef.current');
-    expect(bar).toContain('Keyboard.dismiss()');
-    // The field leaves the tree once the reverse animation finishes.
-    expect(bar).toContain('runOnJS(setFieldMounted)(false)');
-  });
-
-  it('routes the typed query through context instead of navigation params', () => {
-    expect(bar).not.toContain('setParams');
-    expect(search).not.toContain('router.setParams');
-    expect(bar).toContain('onChangeText={setQuery}');
-    expect(search).toContain('useBuyerSearch()');
-    expect(search).toContain('handledSubmitRequest');
-    expect(searchContext).toContain('keyboardHeight: SharedValue<number>');
-    expect(layout).toContain('<BuyerSearchProvider>');
-  });
-
-  it('keeps search results clear of the bar and the keyboard', () => {
-    expect(search).toContain('height: barInset + keyboardHeight.value + 16');
+describe('buyer search page', () => {
+  it('is a standalone full-screen page, not a tab-bar morph', () => {
+    expect(search).toContain('router.back()');
+    expect(search).toContain("testID=\"buyer-search-field\"");
     expect(search).toContain('keyboardDismissMode="on-drag"');
+    expect(bar).not.toContain('setFieldMounted');
+    expect(bar).not.toContain('TextInput');
   });
 });
 

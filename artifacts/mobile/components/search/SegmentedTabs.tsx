@@ -7,14 +7,14 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 
-export type SearchTabKey = 'top' | 'brands' | 'products' | 'people' | 'videos';
+export type SearchTabKey = 'top' | 'videos' | 'users' | 'shop' | 'live';
 
 export const SEARCH_TABS: Array<{ key: SearchTabKey; label: string }> = [
   { key: 'top', label: 'Top' },
-  { key: 'products', label: 'Products' },
-  { key: 'brands', label: 'Brands' },
-  { key: 'people', label: 'People' },
   { key: 'videos', label: 'Videos' },
+  { key: 'users', label: 'Users' },
+  { key: 'shop', label: 'Shop' },
+  { key: 'live', label: 'LIVE' },
 ];
 
 /**

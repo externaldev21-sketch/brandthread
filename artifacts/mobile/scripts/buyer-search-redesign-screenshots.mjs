@@ -54,13 +54,11 @@ async function main() {
     };
     const { context, page, activity } = await openContext(browser, { device, role: 'buyer', origin, images });
     try {
-      await openScreen(page, activity, origin, 'buyer', '/(buyer)/search');
+      await openScreen(page, activity, origin, 'buyer', '/buyer-search');
       if (query) {
         await page.waitForTimeout(500);
-        // The query field lives in the buyer tab bar (BuyerSearchContext),
-        // not on this screen itself — it becomes the active search field
-        // once this route is active. Type into it like a real keystroke so
-        // the screen's own 350ms debounce drives the results state.
+        // Type into the page's own search field like a real keystroke so
+        // its debounce drives the results state.
         await page.getByPlaceholder('Search').first().fill(query);
         await page.waitForTimeout(900);
       } else {

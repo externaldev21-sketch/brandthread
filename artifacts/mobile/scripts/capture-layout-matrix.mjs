@@ -50,7 +50,7 @@ const SIZES = [
 export const SCREENS = [
   { id: 'buyer-feed', role: 'buyer', path: '/(buyer)', ready: 'Drop 04 is live' },
   { id: 'discover', role: 'buyer', path: '/discover', ready: 'Heavyweight Hoodie — Ember' },
-  { id: 'search', role: 'buyer', path: '/(buyer)/search', ready: 'Search' },
+  { id: 'search', role: 'buyer', path: '/buyer-search', ready: 'Search' },
   { id: 'messages', role: 'buyer', path: '/(buyer)/inbox', ready: 'Messages' },
   { id: 'buyer-cart', role: 'buyer', path: '/cart', ready: 'Order summary' },
   { id: 'buyer-checkout', role: 'buyer', path: '/buyer-checkout?source=cart', ready: '1120 NW Everett Street' },
