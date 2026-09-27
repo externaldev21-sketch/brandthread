@@ -78,7 +78,7 @@ export function ListRow({
       disabled={disabled}
       onPress={() => { hapticLight(); onPress?.(); }}
       onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}
+      onPressOut={() => Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       testID={testID}
     >
       <Animated.View style={[styles.row, { transform: [{ scale }], opacity: disabled ? 0.5 : 1 }, style]}>

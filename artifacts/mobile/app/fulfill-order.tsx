@@ -17,7 +17,7 @@ import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, MUTED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader } from '@/components/BrandthreadUI';
 import { Header } from '@/components/layout';
@@ -704,7 +704,7 @@ export default function FulfillOrderScreen() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-      <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: '#8A8A93' }}>{label}</Text>
+      <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED }}>{label}</Text>
       <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: '#F7F7FA' }}>{value}</Text>
     </View>
   );
