@@ -1751,9 +1751,8 @@ export default function FeedScreen({
   // (see styles.topBar / styles.buyerTopRow below).
   const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;
   // 14pt gaps between each cluster's icons at comfortable widths, shrinking
-  // to a 12pt floor under 380pt so the two clusters (3 left, 2 right, all
-  // 24pt) never crowd the absolutely-centered tabs — see the PR description
-  // for the exact per-width math this was sized against.
+  // to a 12pt floor under 380pt so the compact clusters never crowd
+  // the absolutely-centered tabs.
   const topRowIconGap = windowWidth < 380 ? 12 : 14;
   const buyerBarInset = useBuyerTabBarInset();
   const router = useRouter();
@@ -2747,10 +2746,10 @@ export default function FeedScreen({
       ) : isBuyerSurface ? (
         <View style={[styles.topBar, { paddingTop: previewTopInset + 4 }]} pointerEvents="box-none">
           {/* Buyer Threads Home: For You feed chrome — one line, TikTok-
-              style: Friends/Drops/Live on the left, a centered "Following |
+              style: Friends/Live on the left, a centered "Following |
               Threads" underline switcher (real SegmentedControl from the
               shared design system — see components/ui/SegmentedControl.tsx),
-              search/activity/cart on the right. Search used to be a
+              search/cart on the right. Search used to be a
               persistent text bar of its own row; the owner wants it as a
               plain magnifying-glass icon like every other top-row icon,
               opening the dedicated search screen instead of filtering
@@ -2781,20 +2780,6 @@ export default function FeedScreen({
                 activeOpacity={0.7}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  router.push('/buyer-drops' as never);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Drops"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                testID="buyer-home-drops"
-              >
-                <Feather name="zap" size={24} color={ON_DARK} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.buyerTopIconBtn}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                   router.push('/live-feed' as never);
                 }}
                 accessibilityRole="button"
@@ -2808,10 +2793,8 @@ export default function FeedScreen({
 
             {/* Absolutely centered on the screen (left:0/right:0), not a
                 flex sibling of the two icon clusters — a flex-centered tab
-                switcher shifts off-center whenever the two clusters aren't
-                the same width (they aren't: 3 icons left, 2 right), which
-                is exactly what put the tabs' center at ~180 instead of ~195
-                on a 390pt screen. pointerEvents box-none so it never steals
+                switcher shifts off-center if the clusters have different
+                widths. pointerEvents box-none so it never steals
                 taps meant for the icon clusters underneath its empty
                 left/right margins. */}
             <View style={styles.buyerTabSwitcherWrap} pointerEvents="box-none">
@@ -3172,11 +3155,9 @@ const styles = StyleSheet.create({
   buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   buyerTopCluster: { flexDirection: 'row', alignItems: 'center' },
   // Absolutely centered on the row (left:0/right:0), not a flex sibling of
-  // the icon clusters: those two clusters are different widths (3 icons
-  // left, 2 right), so centering the tabs in the flex space *between* them
-  // would put the tabs' true center off the screen's actual center by half
-  // that width difference — which is what caused the ~180-vs-195 mismatch
-  // this fixes. box-none so its empty left/right margin never intercepts
+  // the icon clusters: centering the tabs in the flex space *between* them
+  // can shift the tabs when the clusters have different widths. box-none
+  // so its empty left/right margin never intercepts
   // taps meant for the clusters underneath.
   buyerTabSwitcherWrap: {
     position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,

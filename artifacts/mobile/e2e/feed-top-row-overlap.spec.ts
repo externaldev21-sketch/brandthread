@@ -3,7 +3,7 @@ import { clerkStubScript } from './clerkStub';
 
 /**
  * Manual/local verification that the buyer Threads Home top row (Friends/
- * Drops/Live, the centered Following|Threads switcher, Search/Cart) never
+ * Live, the centered Following|Threads switcher, Search/Cart) never
  * overlaps itself at three representative phone widths. Run the same way as
  * brandthread-agent.spec.ts (api-server + Expo web already running, see
  * that file's header comment for the exact commands) via `?bt_preview=buyer`.
@@ -31,6 +31,7 @@ for (const viewport of VIEWPORTS) {
     const live = await page.getByTestId('buyer-home-live').boundingBox();
     const search = await page.getByTestId('buyer-home-search-icon').boundingBox();
     const tabs = await page.getByTestId('buyer-home-tabs').boundingBox();
+    await expect(page.getByTestId('buyer-home-drops')).toHaveCount(0);
     expect(live).toBeTruthy();
     expect(search).toBeTruthy();
     expect(tabs).toBeTruthy();
