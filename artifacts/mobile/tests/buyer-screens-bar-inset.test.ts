@@ -70,7 +70,10 @@ describe('buyer Home feed behind the bar', () => {
     // ShopSideTab.tsx component files, ported from that PR's inline JSX.
     expect(feed).toContain('<RightActionRail\n        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}');
     expect(feed).toContain('<CaptionBlock\n        style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}');
-    expect(feed).toContain('const RAIL_BOTTOM_GAP = 16;');
+    // Round-2 feed fixes raised RAIL_BOTTOM_GAP again (16 -> 24) for more
+    // headroom above the tab bar and to track the caption block's first
+    // line rather than its last.
+    expect(feed).toContain('const RAIL_BOTTOM_GAP = 24;');
     // PR #133 shrank CAPTION_BOTTOM_GAP again (12 -> 10) on top of #129.
     expect(feed).toContain('const CAPTION_BOTTOM_GAP = 10;');
     // The shop trigger is a collapsed side tab on the left screen edge (see

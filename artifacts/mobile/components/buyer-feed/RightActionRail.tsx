@@ -79,7 +79,7 @@ export function RightActionRail({
           accessibilityRole="button"
           accessibilityLabel={`View ${creator}'s profile`}
         >
-          <LiveHostRing hostId={hostId} size={38} showTag={!!engagement?.following}>
+          <LiveHostRing hostId={hostId} size={38} showTag={!!engagement?.following} ringWidth={1.5}>
             <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
               <Text style={styles.avatarText}>{initials}</Text>
             </View>
@@ -90,8 +90,9 @@ export function RightActionRail({
             icon="plus"
             iconSize={9}
             active={false}
+            inactiveColor="#000000"
             accessibilityLabel={`Follow ${creator}`}
-            style={[styles.followBadge, { backgroundColor: accentColor }]}
+            style={[styles.followBadge, { backgroundColor: ON_DARK }]}
             onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onFollow(); }}
             testID={`follow-btn-${testIdBase}`}
           />
@@ -205,6 +206,9 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
   },
   avatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
+  // 16pt, black-on-white (not the seller's own accent color, which could
+  // wash out or clash against any given video) so it always reads clearly
+  // centered on the avatar's bottom edge.
   followBadge: {
     position: 'absolute', bottom: -6, width: 16, height: 16, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
@@ -217,9 +221,15 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 2, width: 34, height: 34, borderRadius: RADII.pill,
     borderWidth: 2, borderColor: '#EF4444',
   },
+  // 12pt semibold, pure white, one shared shadow — identical to
+  // EngagementButton's own `count` style (components/EngagementButton.tsx)
+  // so like/repost/save (EngagementButton-driven) and comment/share (plain,
+  // below) read as one consistent row instead of some counts looking
+  // brighter than others depending on how much of the legibility scrim
+  // happens to fall behind that particular icon.
   count: {
-    fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+    fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
+    textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   // Same shadow as `count` above, applied to the rail's two plain icons
   // (comment, share — the EngagementButton-driven icons get the matching

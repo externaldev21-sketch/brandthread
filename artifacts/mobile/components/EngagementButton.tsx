@@ -331,10 +331,11 @@ const ebStyles = StyleSheet.create({
   btn: { alignItems: 'center', gap: 3 },
   // Same size/weight/shadow as the rail's plain (non-EngagementButton) counts
   // — see RightActionRail's own `count` style — so every unit in the rail
-  // reads as one consistent row, not a mix of shadowed and unshadowed text.
+  // reads as one consistent row: 12pt semibold, pure white, identical
+  // shadow, whether the count is under a bright or a dark patch of video.
   count: {
-    fontSize: FS.xs, lineHeight: 13, fontFamily: FONT.semibold, textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+    fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   iconShadow: {
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,

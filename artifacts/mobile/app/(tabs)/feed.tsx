@@ -109,15 +109,18 @@ const THREAD_PAGE_SIZE = 30;
 // that same `bottomClearance` anchor, or they end up touching/overlapping
 // the bar — which is exactly what a bare `bottom: bottomClearance` on both
 // of them used to do. These two constants are that clearance:
-//   - RAIL_BOTTOM_GAP: >=16pt from the rail's last item to the bar's top.
+//   - RAIL_BOTTOM_GAP: clearance from the rail's last item (share) to the
+//     bar's top, raised from 16 to 24 so the share count clears the bar
+//     with real room and roughly tracks the caption block's first line
+//     (creator name row) rather than sitting near its own last line (the
+//     sound row) — see the PR description for the exact numbers; this was
+//     tuned from the code's own layout constants, not a rendered screen.
 //   - CAPTION_BOTTOM_GAP: >=12pt from the sound line to the bar's top.
-const RAIL_BOTTOM_GAP = 16;
+const RAIL_BOTTOM_GAP = 24;
 
 // Top chrome rhythm — measured from TikTok's For You feed (Mobbin refs cited
-// in the PR): a thin search affordance raised as high as the safe area
-// allows, then the Following/Threads tab row snug underneath it.
-const TOP_SEARCH_BAR_HEIGHT = 33;
-const TOP_SEARCH_TO_TABS_GAP = 7;
+// in the PR): one row (icons + centered Following/Threads switcher) raised
+// as high as the safe area allows.
 const TOP_TABS_ROW_HEIGHT = 34;
 // How many times a feed's content repeats (under unique keys) once it has
 // no more real pages behind it, so scrolling never dead-ends or shows an
@@ -385,7 +388,7 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     videoPosterUri: FASHION_PREVIEW_POSTER_URIS[0],
     videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[0],
     contentType: 'video',
-    caption: 'Preview · Midnight tailoring, cut for movement.',
+    caption: 'Midnight tailoring, cut for movement.',
     sound: 'After Dark · Atelier Noire',
     productName: 'Sculpted Wool Coat',
     productPrice: '$480',
@@ -414,7 +417,7 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     videoPosterUri: FASHION_PREVIEW_POSTER_URIS[1],
     videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[1],
     contentType: 'video',
-    caption: 'Preview · Silver lines and a clean architectural silhouette.',
+    caption: 'Silver lines and a clean architectural silhouette.',
     sound: 'Chrome Room · Vela Studios',
     productName: 'Liquid Silver Dress',
     productPrice: '$325',
@@ -443,7 +446,7 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     videoPosterUri: FASHION_PREVIEW_POSTER_URIS[2],
     videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[2],
     contentType: 'video',
-    caption: 'Preview · Street tailoring with couture proportions.',
+    caption: 'Street tailoring with couture proportions.',
     sound: 'Concrete Waltz · Saint Rue',
     productName: 'Oversized Tuxedo',
     productPrice: '$560',
@@ -472,7 +475,7 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     videoPosterUri: FASHION_PREVIEW_POSTER_URIS[3],
     videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[3],
     contentType: 'video',
-    caption: 'Preview · A study in ivory, volume, and soft structure.',
+    caption: 'A study in ivory, volume, and soft structure.',
     sound: 'Still Form · Orison',
     productName: 'Ivory Column Set',
     productPrice: '$410',
@@ -501,7 +504,7 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     videoPosterUri: FASHION_PREVIEW_POSTER_URIS[4],
     videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[4],
     contentType: 'video',
-    caption: 'Preview · Monochrome layers designed from every angle.',
+    caption: 'Monochrome layers designed from every angle.',
     sound: 'Parallel · Kuro Line',
     productName: 'Asymmetric Layer Jacket',
     productPrice: '$295',
@@ -530,7 +533,7 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     videoPosterUri: FASHION_PREVIEW_POSTER_URIS[5],
     videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[5],
     contentType: 'video',
-    caption: 'Preview · Draped jersey meets precision hardware.',
+    caption: 'Draped jersey meets precision hardware.',
     sound: 'Soft Machine · Forme 22',
     productName: 'Draped Hardware Gown',
     productPrice: '$375',
@@ -559,7 +562,7 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     videoPosterUri: FASHION_PREVIEW_POSTER_URIS[6],
     videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[6],
     contentType: 'video',
-    caption: 'Preview · Evening light caught in hand-finished crystal.',
+    caption: 'Evening light caught in hand-finished crystal.',
     sound: 'Glass Light · Astrae',
     productName: 'Crystal Mesh Top',
     productPrice: '$245',
@@ -588,7 +591,7 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     videoPosterUri: FASHION_PREVIEW_POSTER_URIS[7],
     videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[7],
     contentType: 'video',
-    caption: 'Preview · Archival shapes, reconstructed for now.',
+    caption: 'Archival shapes, reconstructed for now.',
     sound: 'Reissue 08 · Noma Archive',
     productName: 'Reconstructed Trench',
     productPrice: '$520',
@@ -617,7 +620,7 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     videoPosterUri: FASHION_PREVIEW_POSTER_URIS[8],
     videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[8],
     contentType: 'video',
-    caption: 'Preview · Sharp shoulders. Fluid finish. No compromise.',
+    caption: 'Sharp shoulders. Fluid finish. No compromise.',
     sound: 'Forward Motion · Echelon',
     productName: 'Satin Power Suit',
     productPrice: '$445',
@@ -646,7 +649,7 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     videoPosterUri: FASHION_PREVIEW_POSTER_URIS[9],
     videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[9],
     contentType: 'video',
-    caption: 'Preview · Closing look: black silk, sculpted by hand.',
+    caption: 'Closing look: black silk, sculpted by hand.',
     sound: 'Finale · Vale Studio',
     productName: 'Sculpted Silk Gown',
     productPrice: '$690',
@@ -1666,7 +1669,7 @@ function buildPreviewShopProduct(
     sellerName: item.creator,
     sellerHandle: item.handle,
     name: tag.productName,
-    description: item.caption.replace(/^Preview ·\s*/, ''),
+    description: item.caption,
     priceCents: tag.priceCents,
     imageUris: galleryUris,
     category: 'High Fashion',
@@ -1710,19 +1713,32 @@ export default function FeedScreen({
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
-  const previewTopInset = insets.top;
+  // Same fix as components/layout/TabPageHeader.tsx: outside of a real
+  // device (or a preview frame that actually emulates one), the browser
+  // never fills in a non-zero `env(safe-area-inset-top)`, so
+  // react-native-safe-area-context's web implementation reads 0 for
+  // `insets.top` — which put the buyer top row (paddingTop:
+  // previewTopInset + 4, below) flush against, and partly behind, a
+  // simulated Dynamic Island in the 390x844 web preview. 52 puts the row's
+  // own top at 56, clear of the island, while still sitting as high as the
+  // frame allows.
+  const previewTopInset = Platform.OS === 'web' ? 52 : insets.top;
   const previewBottomInset = insets.bottom;
   const isBuyerSurface = buyerMode || showFashionPreview;
   const isCreatorFeed = !!creatorFeed;
   const creatorSource = creatorFeed?.source;
   const creatorId = creatorFeed?.id;
   const creatorStartPostId = creatorFeed?.startPostId;
-  // Height of the floating top overlay (search bar/Following/Threads/Cart
-  // row): topBar's own paddingTop, plus the thin search bar, the gap under
-  // it, and the buyerTopRow's height. Single source of truth so
-  // BuyerHighDemandPage's content never renders underneath it (see
-  // styles.topBar / styles.buyerSearchBarThin / styles.buyerTopRow below).
-  const buyerHeaderHeight = previewTopInset + 4 + TOP_SEARCH_BAR_HEIGHT + TOP_SEARCH_TO_TABS_GAP + TOP_TABS_ROW_HEIGHT + 6;
+  // Search collapsed from its own bar row into a plain icon inside
+  // buyerTopRow (TikTok-style), so the floating top overlay is now just
+  // topBar's own paddingTop plus that one row's height — single source of
+  // truth so BuyerHighDemandPage's content never renders underneath it
+  // (see styles.topBar / styles.buyerTopRow below).
+  const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;
+  // 16pt gaps between the right cluster's 3 icons (search/bell/cart) at
+  // comfortable widths, shrinking to a 12pt floor once 6 top-row icons +
+  // the centered tabs would otherwise crowd a 375pt-wide screen.
+  const rightClusterGap = windowWidth < 380 ? 12 : 16;
   const buyerBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { userId } = useAuth();
@@ -2612,16 +2628,16 @@ export default function FeedScreen({
           caption). Both are capped low enough that they never reach up into
           the middle of the right action rail.
 
-          The bottom scrim used to stop dead at a fixed inset (`right: 76`)
-          to keep it off the rail — but a gradient with a flat cut edge reads
-          as a hard-edged dark box/column sitting behind the rail rather than
-          legibility shading on the video, which is exactly the opposite of
-          the TikTok look (icons floating directly on the video with only a
-          drop shadow). Instead it's one diagonal gradient (bottom-left,
-          under the caption, to top-right, where the rail starts) — opacity
-          falls off continuously in both directions at once, so by the time
-          it reaches the rail's column it has already faded to nothing, with
-          no straight cut line anywhere. */}
+          The bottom scrim went through two earlier attempts that both still
+          read as a visible shape: a hard-cut rectangle (`right: 76`), then a
+          diagonal gradient meant to fade before the rail — the diagonal
+          direction itself still drew a lighter/darker rectangle with an
+          edge next to the creator name and caption. It's now the plain
+          TikTok/Instagram treatment: one full-width, straight-down (no
+          `start`/`end`) vertical gradient over the bottom ~35% of the
+          screen, transparent to a flat rgba(0,0,0,0.45) — a soft wash, not
+          a shape, and the rail's own icon drop-shadow (not this scrim) is
+          what keeps it legible. */}
       {isBuyerSurface && (
         <>
           <LinearGradient
@@ -2632,11 +2648,9 @@ export default function FeedScreen({
           />
           <LinearGradient
             pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.55)']}
-            locations={[0, 0.45, 1]}
-            start={{ x: 1, y: 0 }}
-            end={{ x: 0.15, y: 1 }}
-            style={[styles.bottomScrim, { height: bottomClearance + 130 }]}
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.45)']}
+            locations={[0, 1]}
+            style={[styles.bottomScrim, { height: pageHeight * 0.35 }]}
           />
         </>
       )}
@@ -2687,45 +2701,20 @@ export default function FeedScreen({
         </View>
       ) : isBuyerSurface ? (
         <View style={[styles.topBar, { paddingTop: previewTopInset + 4 }]} pointerEvents="box-none">
-          {/* Buyer Threads Home: For You feed chrome — a persistent thin
-              search bar raised as high as the safe area allows, snug above
-              Friends/Drops entry points, a centered "Following | Threads"
-              underline switcher (real SegmentedControl from the shared
-              design system — see components/ui/SegmentedControl.tsx), a
-              LIVE jump-to button that only appears while a live stream is
-              actually mixed into the feed, activity and cart. Placement
-              measured from TikTok's For You feed (Mobbin refs in the PR):
-              squircle search affordance, tight tab row underneath, right-
-              inset cart mirroring the rail's own right inset. Solid fills
-              only, no BlurView: a live blur here would re-sample the
-              playing video behind it every frame, same class of glitch as
-              the old shop pill's frosted background — see ShopSideTab
-              above. */}
-          <View style={styles.buyerSearchBarThin}>
-            <Feather name="search" size={14} color="rgba(255,255,255,0.75)" style={{ marginLeft: 10 }} />
-            <TextInput
-              style={styles.buyerSearchBarThinInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search…"
-              placeholderTextColor="rgba(255,255,255,0.55)"
-              returnKeyType="search"
-              testID="buyer-home-search-input"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                style={styles.buyerSearchBarThinClear}
-                activeOpacity={0.7}
-                onPress={() => setSearchQuery('')}
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              >
-                <Feather name="x" size={14} color={ON_DARK} />
-              </TouchableOpacity>
-            )}
-          </View>
-
+          {/* Buyer Threads Home: For You feed chrome — one line, TikTok-
+              style: Friends/Drops/Live on the left, a centered "Following |
+              Threads" underline switcher (real SegmentedControl from the
+              shared design system — see components/ui/SegmentedControl.tsx),
+              search/activity/cart on the right. Search used to be a
+              persistent text bar of its own row; the owner wants it as a
+              plain magnifying-glass icon like every other top-row icon,
+              opening the dedicated search screen instead of filtering
+              in place — freeing up the whole row the bar used to need, so
+              this can sit higher, right below the Dynamic Island. Solid
+              icon fills only, no BlurView: a live blur here would
+              re-sample the playing video behind it every frame, same class
+              of glitch as the old shop pill's frosted background — see
+              ShopSideTab above. */}
           <View style={styles.buyerTopRow}>
             <View style={styles.buyerTopCluster}>
               <TouchableOpacity
@@ -2789,7 +2778,24 @@ export default function FeedScreen({
               />
             </View>
 
-            <View style={styles.buyerTopCluster}>
+            {/* 16pt gaps at comfortable widths, shrinking to a 12pt floor
+                on a 375pt-wide screen so three icons never crowd the
+                centered tabs (see rightClusterGap below). */}
+            <View style={[styles.buyerTopCluster, { gap: rightClusterGap }]}>
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  router.push('/(buyer)/search' as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Search"
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                testID="buyer-home-search-icon"
+              >
+                <Feather name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
+              </TouchableOpacity>
               <ActivityBellButton color={ON_DARK} size={20} style={styles.buyerTopBtnCompact} badgeBorderColor={BG} />
               <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtnCompact, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
@@ -3108,20 +3114,11 @@ const styles = StyleSheet.create({
   buyerTopCluster: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   buyerTabSwitcherWrap: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
   buyerCartBadge: { top: 3, right: 1 },
-  // Persistent thin search bar — squircle (not a full pill, not sharp),
-  // lighter/more transparent fill than a solid pill so it never darkens the
-  // video underneath. No blur: a live blur here would re-sample the playing
-  // video every frame (same class of glitch as the old shop pill).
-  buyerSearchBarThin: {
-    flexDirection: 'row', alignItems: 'center', height: TOP_SEARCH_BAR_HEIGHT,
-    borderRadius: 10, marginBottom: TOP_SEARCH_TO_TABS_GAP,
-    backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
-  },
-  buyerSearchBarThinInput: {
-    flex: 1, height: '100%', paddingHorizontal: 8, fontSize: 13, fontFamily: FONT.regular, color: ON_DARK,
-  },
-  buyerSearchBarThinClear: {
-    width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 4,
+  // Same shadow as the rail's icons (RightActionRail's iconShadow) — the
+  // top-row search icon sits directly on video with nothing behind it, so
+  // it needs the same legibility treatment.
+  topRowIconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
   topAvatarBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   topAvatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
