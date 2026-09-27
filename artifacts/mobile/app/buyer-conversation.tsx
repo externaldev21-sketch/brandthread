@@ -118,7 +118,17 @@ function formatTime(ts: number): string {
 // grouped: tighter spacing, a shared "tail" only on the run's last bubble,
 // and only the last bubble in a run carries the inline timestamp/receipt.
 const GROUP_GAP_MS = 5 * 60_000;
+// agent_card / thread_cash / quick_replies render as standalone rows with
+// their own layout, never through the avatar-bearing bubble path below — so
+// a message next to one of them must never be treated as "not last in its
+// group" (that silently ate the avatar off the preceding bubble, since the
+// special row that followed it never draws one either).
+function breaksGroup(msg: Message): boolean {
+  const t = msg.attachment?.type;
+  return t === 'agent_card' || t === 'thread_cash' || t === 'quick_replies';
+}
 function sameSenderClose(a: Message, b: Message): boolean {
+  if (breaksGroup(a) || breaksGroup(b)) return false;
   return a.fromId === b.fromId && Math.abs(a.ts - b.ts) < GROUP_GAP_MS && formatDate(a.ts) === formatDate(b.ts);
 }
 
@@ -477,6 +487,11 @@ export default function BuyerConversationScreen() {
   // clipped under the dynamic island in a device-frame screenshot — same
   // fix already applied to app/(buyer)/discover.tsx and inbox.tsx.
   const headerTopPad = Platform.OS === 'web' ? 67 : insets.top;
+  // Same reasoning at the bottom: react-native-web never fills in a real
+  // bottom safe-area inset (no home-indicator polyfill), so insets.bottom
+  // reads 0 on web and the composer sat flush against the viewport edge —
+  // a flat floor, same pattern as headerTopPad above.
+  const composerBottomPad = Platform.OS === 'web' ? 16 : insets.bottom + SP.sm;
 
   // Show "View store" button for any seller conversation (resolved or pre-created)
   const convType = conv?.type ?? params.type ?? '';
@@ -999,8 +1014,18 @@ export default function BuyerConversationScreen() {
       {
         text: 'Archive conversation',
         onPress: async () => {
-          const { archiveConversation } = await import('@/services/socialService');
-          if (conv) await archiveConversation(conv.id);
+          // A seeded preview conversation has no real backend record to
+          // archive against (archiveConversation() re-fetches the real
+          // conversation list first, which would 401 with no signed-in
+          // user) — just navigate back.
+          if (conv && !isPreviewConversationId(conv.id)) {
+            try {
+              const { archiveConversation } = await import('@/services/socialService');
+              await archiveConversation(conv.id);
+            } catch {
+              // Best-effort — the conversation simply stays un-archived.
+            }
+          }
           goBackOr(router);
         },
       },
@@ -1063,7 +1088,16 @@ export default function BuyerConversationScreen() {
     const msg = activeSheetMsg;
     closeMessageSheet();
     hapticDestructiveConfirm();
-    if (conv && msg) deleteMessageForMe(conv.id, msg.id).then(() => getMessages(conv.id).then(setMessages));
+    if (!conv || !msg) return;
+    // A seeded preview conversation has no real backend record to delete
+    // against — just drop it from local state instead of 401-ing.
+    if (isPreviewConversationId(conv.id)) {
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, deletedForMe: true } : m)));
+      return;
+    }
+    deleteMessageForMe(conv.id, msg.id)
+      .then(() => getMessages(conv.id).then(setMessages))
+      .catch(() => {});
   }
 
   function sheetReport() {
@@ -1327,7 +1361,7 @@ export default function BuyerConversationScreen() {
             {/* Failed / retry */}
             {isOwn && msg.status === 'failed' && (
               <PressableScale rippleEnabled={false}
-                onPress={() => conv && retryMessage(conv.id, msg.id)}
+                onPress={() => { if (conv) void retryMessage(conv.id, msg.id).catch(() => {}); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={s.retryRow}
               >
@@ -1386,6 +1420,14 @@ export default function BuyerConversationScreen() {
     ? (activeSheetMsg.fromId === myId || activeSheetMsg.fromId === MY_USER_ID)
     : false;
 
+  // Deterministic composer height from typed newlines — react-native-web's
+  // multiline <textarea> doesn't reliably auto-size via onContentSizeChange
+  // (its first measurement fires against the unconstrained intrinsic
+  // <textarea> size before any height is applied, ballooning the box). This
+  // keeps the composer at exactly one line (40pt pill) at rest and grows it
+  // up to COMPOSER_MAX_LINES as the user presses Enter.
+  const composerLines = Math.min(Math.max(text.split('\n').length, 1), COMPOSER_MAX_LINES);
+  const composerInputHeight = composerLines * COMPOSER_LINE_HEIGHT + COMPOSER_TEXT_V_PADDING * 2;
   const showSendButton = text.trim().length > 0 || selectedAttachment != null;
   const micOpacity = micSendMorph.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const sendOpacity = micSendMorph.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
@@ -1640,7 +1682,7 @@ export default function BuyerConversationScreen() {
               </PressableScale>
             </View>
           )}
-          <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
+          <View style={[s.inputRow, { paddingBottom: composerBottomPad }]}>
             {/* Attach — photos, video, Thread Cash (Apple-Cash-style), and
                 (for seller chats) products/posts. A plain "+" inside a
                 hairline circle, aligned to the pill's own center. */}
@@ -1665,7 +1707,7 @@ export default function BuyerConversationScreen() {
                 same rounded bounds instead of floating as separate siblings. */}
             <View style={s.pill}>
               <TextInput
-                style={s.textInput}
+                style={[s.textInput, { height: composerInputHeight }]}
                 value={text}
                 onChangeText={setText}
                 placeholder="Message…"
@@ -1823,7 +1865,7 @@ export default function BuyerConversationScreen() {
           </View>
         </View>
       ) : (
-        <View style={[s.inputRow, s.disabledInputRow, { paddingBottom: insets.bottom + SP.sm }]}>
+        <View style={[s.inputRow, s.disabledInputRow, { paddingBottom: composerBottomPad }]}>
           <Text style={s.disabledInputText}>Messaging disabled</Text>
         </View>
       )}
@@ -2535,8 +2577,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     lineHeight: COMPOSER_LINE_HEIGHT,
     fontFamily: FONT.regular,
     color: theme.text,
+    textAlignVertical: 'center',
     maxHeight: COMPOSER_MAX_INPUT_HEIGHT,
+    // A bare <textarea> on web ships its own default padding/line-height —
+    // the explicit `height` set inline on the element (from
+    // composerContentHeight) is what actually keeps it at rest/growing
+    // correctly; this minHeight is just a native-platform floor.
     minHeight: COMPOSER_CONTROL,
+    ...(Platform.OS === 'web' ? { paddingTop: COMPOSER_TEXT_V_PADDING, paddingBottom: COMPOSER_TEXT_V_PADDING } : null),
   },
   // Sits inside the pill, after mic/send and gallery.
   threadCashCoinBtn: {

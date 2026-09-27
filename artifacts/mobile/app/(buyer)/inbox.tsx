@@ -32,7 +32,7 @@ import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import {
-  isPreviewInboxEnabled, getPreviewConversations,
+  isPreviewInboxEnabled, isPreviewConversationId, getPreviewConversations,
   subscribePreviewTyping,
 } from '@/lib/previewInbox';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
@@ -179,6 +179,16 @@ function getParticipant(conv: Conversation) {
 
 function previewText(lastMessage: string | undefined, fallback: string): string {
   return lastMessage?.trim() || fallback;
+}
+
+/** Fire-and-forget "mark read" for a conversation row tap. A seeded preview
+ *  conversation (see lib/previewInbox.ts) has no real backend record, so a
+ *  real PATCH for it 401s with no signed-in user — skip the network call
+ *  entirely there, and everywhere else swallow the rejection so a slow/failed
+ *  read receipt never surfaces as an uncaught error. */
+function markReadSafely(conversationId: string): void {
+  if (isPreviewConversationId(conversationId)) return;
+  void markConversationRead(conversationId).catch(() => {});
 }
 
 // Active-people rail names must read on one line at a 64pt-avatar column
@@ -384,7 +394,7 @@ export default function InboxScreen() {
     // Don't open request conversations inline — user must accept first
     if (conv.isRequest) return;
     hapticPrimaryAction();
-    markConversationRead(conv.id);
+    markReadSafely(conv.id);
     router.push(`/buyer-conversation?id=${conv.id}` as never);
   }
 
@@ -398,7 +408,7 @@ export default function InboxScreen() {
       setConversations(convs);
       setActiveTab('inbox');
       // Open the accepted conversation
-      markConversationRead(conv.id);
+      markReadSafely(conv.id);
       router.push(`/buyer-conversation?id=${conv.id}` as never);
     } catch {
       Alert.alert('Couldn’t accept request', 'Please try again.');
@@ -442,11 +452,25 @@ export default function InboxScreen() {
   }
 
   async function swipeArchiveConversation(conv: Conversation) {
-    await archiveConversation(conv.id);
-    setConversations(prev => prev.map(item =>
-      item.id === conv.id ? { ...item, isArchived: true } : item
-    ));
-    showSnackbar('Conversation archived');
+    // archiveConversation() re-fetches the real conversation list first — a
+    // seeded preview conversation has no real backend record, so that would
+    // 401 with no signed-in user. Just update local state there instead.
+    if (isPreviewConversationId(conv.id)) {
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, isArchived: true } : item
+      ));
+      showSnackbar('Conversation archived');
+      return;
+    }
+    try {
+      await archiveConversation(conv.id);
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, isArchived: true } : item
+      ));
+      showSnackbar('Conversation archived');
+    } catch {
+      Alert.alert('Couldn’t archive', 'Please try again.');
+    }
   }
 
   // Swipe actions on a Messages-tab row: delete removes it from the inbox
@@ -477,6 +501,14 @@ export default function InboxScreen() {
 
   async function swipeMarkReadConversation(conv: Conversation) {
     if (conv.unreadCount <= 0) return;
+    // A seeded preview conversation has no real backend record to PATCH —
+    // just update local state, matching openConversation's markReadSafely.
+    if (isPreviewConversationId(conv.id)) {
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, unreadCount: 0 } : item
+      ));
+      return;
+    }
     try {
       await markConversationRead(conv.id);
       setConversations(prev => prev.map(item =>
