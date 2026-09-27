@@ -1154,7 +1154,7 @@ const makeStyles = (theme: AppThemePreset) => {
       marginTop: SP.sm, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: SP.sm,
     },
     sellerLinkText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-    itemThumb: { width: 56, height: 70, borderRadius: RADIUS.sm, overflow: 'hidden', borderWidth: 1, borderColor: theme.border },
+    itemThumb: { width: 56, height: 75, borderRadius: RADIUS.sm, overflow: 'hidden', borderWidth: 1, borderColor: theme.border },
     itemThumbFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated },
     lineItemName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
     lineItemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },

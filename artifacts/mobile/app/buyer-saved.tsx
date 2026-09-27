@@ -468,7 +468,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
     ...SHADOW_SM,
   },
   collectionCard: { width: TILE_SIZE, marginBottom: GAP, padding: 0, overflow: 'hidden', borderRadius: RADII.sheet },
-  tileImageWrap: { width: '100%', aspectRatio: 4 / 5 },
+  tileImageWrap: { width: '100%', aspectRatio: 3 / 4 },
   tileImage: { width: '100%', height: '100%' },
   tilePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   newCollectionSquare: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.accent, borderStyle: 'dashed', backgroundColor: 'transparent' },

@@ -42,7 +42,6 @@ import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatProfileCount } from '@/services/profileService';
 import { ProfileMeta } from '@/components/profile/ProfileShell';
 import { InteractionLayer, ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
-import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
@@ -206,7 +205,7 @@ function CompactWalletChip({ balanceLabel, onPress, onLongPress, theme }: {
       hitSlop={4}
       style={[topBarStyles.walletChip, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
     >
-      <ThreadCashBillIcon size={16} />
+      <Feather name="dollar-sign" size={16} color={theme.text} />
       <Text style={[topBarStyles.walletText, { color: theme.text }]} numberOfLines={1}>{balanceLabel}</Text>
     </PressableScale>
   );

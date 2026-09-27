@@ -258,7 +258,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
   },
   img: {
-    width: 72, height: 72, borderRadius: 10,
+    width: 72, height: 96, borderRadius: RADII.card,
     backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
@@ -379,7 +379,7 @@ function SellerGroup({
 
 const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: {
-    marginBottom: SP.md, borderRadius: RADIUS.xl,
+    marginBottom: SP.md, borderRadius: RADII.card,
     ...SHADOW_SM, shadowColor: theme.shadowColor, shadowOpacity: 0.12,
   },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
@@ -442,7 +442,7 @@ function SavedItemRow({ item, onMove, onRemove }: {
 
 const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm },
-  img: { width: 56, height: 70, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  img: { width: 56, height: 75, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginBottom: 2 },
   price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
@@ -1175,7 +1175,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   divider: { height: 1, backgroundColor: '#FFFFFF', opacity: 0.06, marginVertical: SP.xs },
   multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
   multiSellerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
-  loyaltyCard: { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.md, marginBottom: SP.md },
+  loyaltyCard: { backgroundColor: theme.cardGlass, borderRadius: RADII.card, borderWidth: 1, padding: SP.md, marginBottom: SP.md },
   loyaltyHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   loyaltyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },

@@ -845,9 +845,13 @@ export default function InboxScreen() {
     const isLoadingAction = requestActionLoading === conv.id;
     return (
       <View key={conv.id} style={s.requestCard}>
-        <View style={[s.avatar56, { backgroundColor: participant.color }]}>
-          <Text style={s.avatarInitials}>{participant.initials}</Text>
-        </View>
+        {participant.avatarUri ? (
+          <Image source={{ uri: participant.avatarUri }} style={s.avatar56} testID={`inbox-request-avatar-image-${conv.id}`} />
+        ) : (
+          <View style={[s.avatar56, { backgroundColor: participant.color }]}>
+            <Text style={s.avatarInitials}>{participant.initials}</Text>
+          </View>
+        )}
         <View style={s.convCenter}>
           <View style={s.convNameRow}>
             <Text style={[s.convName, { color: theme.text, fontFamily: FONT.semibold }]} numberOfLines={1}>{participant.name}</Text>

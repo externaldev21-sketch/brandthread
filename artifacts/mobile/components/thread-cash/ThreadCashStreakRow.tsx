@@ -11,7 +11,6 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
-import { ThreadCashBillIcon } from './ThreadCashBill';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
 export function ThreadCashStreakRow({
@@ -67,7 +66,7 @@ export function ThreadCashStreakRow({
                 isToday && { borderColor: theme.accent, borderWidth: 2 },
               ]}
             >
-              {claimed ? <ThreadCashBillIcon size={32} /> : (
+              {claimed ? <Feather name="dollar-sign" size={16} color={theme.accent} /> : (
                 <Text style={[styles.dotText, { color: theme.subtle }]}>{day}</Text>
               )}
             </View>
