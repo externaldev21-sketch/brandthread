@@ -710,7 +710,19 @@ export default function InboxScreen() {
             {/* Avatar — Threads-style: no unread/online dot chrome on the
                 avatar itself, unread is conveyed by the name/preview weight
                 and the trailing dot instead (see below). The LIVE ring
-                (LiveHostRing) is the only badge that still lives here. */}
+                (LiveHostRing) is the only badge that still lives here.
+
+                Every row's slot is a fixed 56x56 box (s.avatarContainer,
+                below) so the row layout never shifts based on live state.
+                The photo itself renders at 48x48, centered in that box —
+                for a live row this leaves exactly the 2pt ring + 2pt gap
+                LiveAvatarRing draws at its default ringWidth (2) and
+                ringGap={2} room to sit fully *inside* the 56 box:
+                ring outer edge = 48 + 2*ringGap(2) + 2*ringWidth(2) = 56.
+                Previously the ring was drawn *outside* a full 56x56 photo
+                (ring outer edge = 66), which is what bled past the row's
+                left edge on live rows (Atelier Noire, Maison Vela, Kuro
+                Line) while non-live rows (no ring at all) rendered fine. */}
             <View style={s.avatarContainer}>
               {conv.isOfficial ? (
                 <View style={[s.avatar56, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
@@ -719,11 +731,11 @@ export default function InboxScreen() {
               ) : (
                 // LIVE ring while this person is streaming; tapping the
                 // ringed avatar opens their live instead of the thread.
-                <LiveHostRing hostId={participant.userId} hostName={participant.name} size={56} pressToWatch>
+                <LiveHostRing hostId={participant.userId} hostName={participant.name} size={48} ringGap={2} pressToWatch>
                   {participant.avatarUri ? (
-                    <Image source={{ uri: participant.avatarUri }} style={s.avatar56} testID={`inbox-avatar-image-${conv.id}`} />
+                    <Image source={{ uri: participant.avatarUri }} style={s.avatar48} testID={`inbox-avatar-image-${conv.id}`} />
                   ) : (
-                    <View style={[s.avatar56, { backgroundColor: participant.color }]}>
+                    <View style={[s.avatar48, { backgroundColor: participant.color }]}>
                       <Text style={s.avatarInitials}>{participant.initials}</Text>
                     </View>
                   )}
@@ -731,7 +743,13 @@ export default function InboxScreen() {
               )}
             </View>
 
-            {/* Center content */}
+            {/* Center content — flex:1 + minWidth:0 (s.convCenter) so a long
+                name/preview truncates instead of pushing the trailing
+                time/dot column off the row. The order chip that used to be
+                its own row is now folded into the preview line itself
+                (ConversationPreview's orderNumber prop) — that's what kept
+                Kuro Line's row 3 lines tall instead of the shared ~72pt
+                every other row uses. */}
             <View style={s.convCenter}>
               <View style={s.convNameRow}>
                 <Text
@@ -748,15 +766,7 @@ export default function InboxScreen() {
                     </View>
                   </View>
                 )}
-                {conv.lastMessageTs ? (
-                  <Text style={[s.convTime, { color: theme.muted }]} numberOfLines={1}>{timeAgo(conv.lastMessageTs)}</Text>
-                ) : null}
               </View>
-              {conv.contextOrderNumber ? (
-                <View style={[s.orderPill, { backgroundColor: theme.accentDim }]}>
-                  <Text style={[s.orderPillText, { color: theme.accent }]}>{conv.contextOrderNumber}</Text>
-                </View>
-              ) : null}
               {isTyping ? (
                 <Text style={[s.convPreview, { color: theme.accent, fontFamily: FONT.semibold }]} testID={`inbox-typing-${conv.id}`}>
                   typing…
@@ -768,16 +778,22 @@ export default function InboxScreen() {
                   isFromMe={!!conv.lastMessageSenderId && conv.lastMessageSenderId === MY_USER_ID}
                   bold={isUnread}
                   color={isUnread ? theme.text : theme.muted}
+                  orderNumber={conv.contextOrderNumber}
                 />
               )}
             </View>
 
-            {/* Trailing: Threads-style unread indicator — a single small dot
-                at the row's right edge, nothing when read. No numeric
+            {/* Trailing column — time above, unread dot below, both
+                right-aligned to the same edge (Threads style). No numeric
                 badge, no chevron. */}
-            {isUnread ? (
-              <View style={[s.unreadDotTrailing, { backgroundColor: theme.accent }]} testID={`inbox-unread-badge-${conv.id}`} />
-            ) : null}
+            <View style={s.convTrailing}>
+              {conv.lastMessageTs ? (
+                <Text style={[s.convTime, { color: theme.muted, marginLeft: 0 }]} numberOfLines={1}>{timeAgo(conv.lastMessageTs)}</Text>
+              ) : null}
+              {isUnread ? (
+                <View style={[s.unreadDotTrailing, { backgroundColor: theme.accent }]} testID={`inbox-unread-badge-${conv.id}`} />
+              ) : null}
+            </View>
           </PressableScale>
         </InboxSwipeRow>
       </AnimatedEntrance>
@@ -1332,13 +1348,28 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     paddingVertical: SP.sm,
     minHeight: 72,
   },
+  // Fixed slot, every row: nothing (ring included) renders outside this
+  // 56x56 box, so the row's left edge never shifts based on live state.
   avatarContainer: {
+    width: 56,
+    height: 56,
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar56: {
     width: 56,
     height: 56,
     borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Live rows' photo — see the avatarContainer comment above for why this
+  // is 48 (not 56) inside the same 56x56 slot.
+  avatar48: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1363,8 +1394,13 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     fontFamily: FONT.regular,
     height: 40,
   },
+  // minWidth: 0 is required for a flex:1 row to actually truncate its text
+  // instead of growing past its share and pushing convTrailing off-row —
+  // React Native (like web flexbox) defaults a flex item's min-width to its
+  // content size, not 0.
   convCenter: {
     flex: 1,
+    minWidth: 0,
     marginLeft: SP.md,
   },
   convNameRow: {
@@ -1381,16 +1417,13 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     fontFamily: FONT.medium,
     marginLeft: SP.xs,
   },
-  orderPill: {
-    alignSelf: 'flex-start',
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.xs,
-    paddingVertical: 2,
-    marginBottom: SP.xs,
-  },
-  orderPillText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
+  // Trailing column: time above, unread dot below, right-aligned to the
+  // row's own right edge — replaces time living inline in convNameRow.
+  convTrailing: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 6,
+    marginLeft: SP.sm,
   },
   convPreview: {
     fontSize: 14,
