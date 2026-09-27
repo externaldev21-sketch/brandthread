@@ -1,11 +1,19 @@
 /**
- * LIVE ring for a creator avatar (TikTok / Instagram style): a pulsing red
- * ring drawn *outside* the avatar plus a small "LIVE" tag on its bottom
- * edge. Drawn with absolute positioning so wrapping an existing avatar never
- * changes its layout size. Renders children untouched when `live` is false.
+ * LIVE ring for a creator avatar (TikTok / Instagram style): a static red
+ * ring drawn *outside* the avatar, with a soft red glow, plus a small
+ * "LIVE" tag on its bottom edge. Drawn with absolute positioning so
+ * wrapping an existing avatar never changes its layout size. Renders
+ * children untouched when `live` is false.
+ *
+ * Deliberately no scale/size animation anywhere (the owner's explicit
+ * direction: "it can just be a red circle around the profile picture
+ * like glowing… not bouncing in and out") — the ring and avatar never
+ * change size, and nothing here ever moves the layout. The only motion is
+ * the glow's own shadow opacity gently breathing, which `reduceMotion`
+ * turns off entirely (a static glow).
  */
 import React, { useEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FONT } from '@/lib/theme';
 import { useLiveStreamForHost, useOpenLive } from '@/lib/live/useLiveDirectory';
 
@@ -33,7 +41,11 @@ export function LiveAvatarRing({
   showTag?: boolean;
   testID?: string;
 }) {
-  const pulse = useRef(new Animated.Value(0)).current;
+  // Glow shadow opacity only — never a scale/transform, so the ring and
+  // avatar never change size and the layout never moves. Starts at the
+  // brighter end of the breathing range so a freshly-mounted ring doesn't
+  // pop in dim.
+  const glowOpacity = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
     if (!live) return undefined;
@@ -42,13 +54,13 @@ export function LiveAvatarRing({
     AccessibilityInfo.isReduceMotionEnabled?.().then(reduce => {
       if (cancelled || reduce) return;
       loop = Animated.loop(Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.timing(pulse, { toValue: 0, duration: 900, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(glowOpacity, { toValue: 0.45, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+        Animated.timing(glowOpacity, { toValue: 0.8, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
       ]));
       loop.start();
     }).catch(() => {});
     return () => { cancelled = true; loop?.stop(); };
-  }, [live, pulse]);
+  }, [live, glowOpacity]);
 
   if (!live) return <>{children}</>;
 
@@ -69,8 +81,16 @@ export function LiveAvatarRing({
           borderRadius: ringSize / 2,
           top: -(ringGap + 2),
           left: -(ringGap + 2),
-          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: inset ? [1, 1] : [1, 1.06] }) }],
-          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.72] }),
+          // Soft glow around the static ring — shadow only, no transform.
+          // react-native-web translates these shadow* props to a CSS
+          // box-shadow automatically, so this covers both native (iOS —
+          // Android's View shadow is a plain elevation, uncolored, a known
+          // RN limitation) and web with one style.
+          shadowColor: LIVE_RED,
+          shadowOffset: { width: 0, height: 0 },
+          shadowRadius: 7,
+          shadowOpacity: glowOpacity,
+          elevation: 6,
         },
       ]}
     />

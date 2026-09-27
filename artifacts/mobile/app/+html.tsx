@@ -1,5 +1,16 @@
 import React from 'react';
 import { ScrollViewStyleReset } from 'expo-router/html';
+import { Asset } from 'expo-asset';
+
+// Same poster the buyer feed's very first item (FASHION_PREVIEW_POSTS[0] in
+// app/(tabs)/feed.tsx) shows. Resolved here too (Metro gives every `require`
+// of this asset the same hashed URL) so the browser can start fetching it
+// from the HTML itself, before any JS — the app's own bundle, React, expo
+// router and the module-level ExpoImage.prefetch in feed.tsx — has even
+// started downloading or running.
+const firstFeedPosterUri = Asset.fromModule(
+  require('../assets/videos/fashion_runway_01.jpg'),
+).uri;
 
 /**
  * Root HTML document for the static/dev web export (expo-router convention —
@@ -43,6 +54,15 @@ export default function Root({ children }: { children: React.ReactNode }) {
             warmed up before that JS runs, shaving time off the wait rather
             than changing the gating behavior itself. */}
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+
+        {/* First-paint target: the buyer feed's very first video's poster.
+            Requesting it from the raw HTML, before any JS has parsed or run,
+            is the earliest a browser can possibly start that fetch — see
+            app/(tabs)/feed.tsx for the matching module-load-time prefetch
+            that covers native and belt-and-suspenders this on web. */}
+        {firstFeedPosterUri ? (
+          <link rel="preload" as="image" href={firstFeedPosterUri} />
+        ) : null}
 
         <style dangerouslySetInnerHTML={{ __html: responsiveBackground }} />
         <style dangerouslySetInnerHTML={{ __html: webPolishCss }} />
