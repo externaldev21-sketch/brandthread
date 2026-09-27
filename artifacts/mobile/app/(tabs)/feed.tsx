@@ -375,6 +375,26 @@ const FASHION_PREVIEW_POSTER_URIS = FASHION_PREVIEW_POSTER_SOURCES.map(
   module => Asset.fromModule(module).uri,
 );
 
+// Kick off the very first feed item's poster (and its video) the instant this
+// module evaluates — at import time, not inside a component's useEffect. The
+// JS bundle finishing is the earliest possible moment any network request
+// can fire, and everything downstream of it (routing/redirect resolution,
+// Clerk, the tab navigator mounting, FlatList committing its first render
+// batch) previously sat in between the bundle loading and this exact
+// request going out, worth single-digit seconds on a cold load. Requesting
+// it here means it's already in flight — often already resolved — by the
+// time the feed's own <SpotlightPage> for index 0 mounts and asks for it,
+// so ExpoImage/the browser HTTP cache just serves the in-flight/completed
+// request instead of starting a fresh one.
+if (FASHION_PREVIEW_POSTER_URIS[0]) {
+  ExpoImage.prefetch(FASHION_PREVIEW_POSTER_URIS[0]).catch(() => {});
+}
+if (FASHION_PREVIEW_VIDEO_URIS[0]) {
+  Asset.fromModule(FASHION_PREVIEW_VIDEO_SOURCES[0] as number)
+    .downloadAsync()
+    .catch(() => {});
+}
+
 const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
   {
     id: 'preview-fashion-01',
