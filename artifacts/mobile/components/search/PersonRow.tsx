@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
@@ -8,7 +8,7 @@ import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
+import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export type SearchPerson = {
   userId: string;
@@ -48,7 +48,6 @@ export function PersonRow({
   const { theme } = useAppTheme();
   const styles = makeStyles(theme);
   const scale = React.useRef(new Animated.Value(1)).current;
-  const nativeDriver = Platform.OS !== 'web';
 
   // The row's own tap target (avatar + name/handle) and the Follow pill are
   // SIBLING Pressables inside a plain View, never one nested in the other —
@@ -59,8 +58,8 @@ export function PersonRow({
     <View style={styles.row}>
       <Pressable
         onPress={() => { hapticPrimaryAction(); onPress(); }}
-        onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-        onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}
+        onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
+        onPressOut={() => pressScaleAnim(scale, 1).start()}
         accessibilityRole="button"
         accessibilityLabel={`Open ${person.name}`}
         style={styles.rowTapArea}
@@ -120,13 +119,12 @@ function FollowPill({
   testID?: string;
 }) {
   const scale = React.useRef(new Animated.Value(1)).current;
-  const nativeDriver = Platform.OS !== 'web';
 
   return (
     <Pressable
       onPress={() => { if (!loading) { hapticLight(); onPress(); } }}
-      onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}
+      onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
+      onPressOut={() => pressScaleAnim(scale, 1).start()}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ busy: loading }}

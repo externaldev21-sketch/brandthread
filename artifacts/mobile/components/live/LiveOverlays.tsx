@@ -6,7 +6,7 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef,
 import {
   Animated, Easing, Platform, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, RADIUS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
@@ -21,7 +21,7 @@ const ND = Platform.OS !== 'web';
 const GLASS = 'rgba(0,0,0,0.38)';
 /** One consistent rail-icon treatment (point 4): every icon the same size on
  *  the same translucent circle — no bare icons mixed with disc'd ones. */
-const RAIL_ICON_SIZE = 26;
+const RAIL_ICON_SIZE = 28;
 const RAIL_ICON_CIRCLE = 40;
 
 // ─── Host pill (top-left) ─────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ export function LiveHostPill({
         <View style={styles.hostText}>
           <View style={styles.hostNameRow}>
             <Text style={styles.hostName} numberOfLines={1}>{host.name}</Text>
-            {host.verified && <Ionicons name="checkmark-circle" size={12} color="#fff" style={{ marginLeft: 3 }} />}
+            {host.verified && <Feather name="check-circle" size={12} color="#fff" style={{ marginLeft: 3 }} />}
           </View>
           <View style={styles.hostMetaRow}>
             <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>LIVE</Text></View>
@@ -267,7 +267,7 @@ export function LiveRail({
         label={`Like, ${formatViewerCount(likeCount)} likes`}
         count={formatViewerCount(likeCount)}
         onPress={handleLike}
-        icon={<Animated.View style={{ transform: [{ scale: pop }] }}><Ionicons name={liked ? 'heart' : 'heart-outline'} size={RAIL_ICON_SIZE} color="#fff" /></Animated.View>}
+        icon={<Animated.View style={{ transform: [{ scale: pop }] }}>{liked ? <FontAwesome name="heart" size={RAIL_ICON_SIZE} color="#fff" /> : <Feather name="heart" size={RAIL_ICON_SIZE} color="#fff" />}</Animated.View>}
       />
       <RailButton testID="live-bag" label={`Products in this live, ${productCount}`} onPress={onOpenBag} badge={productCount} icon={<Feather name="shopping-bag" size={RAIL_ICON_SIZE} color="#fff" />} />
       <RailButton testID="live-share" label="Share this live" onPress={onShare} icon={<Feather name="send" size={RAIL_ICON_SIZE} color="#fff" />} />
@@ -322,7 +322,7 @@ export const LiveHeartLayer = forwardRef<LiveHeartLayerHandle, { originOffset?: 
               ],
             }}
           >
-            <Ionicons name="heart" size={h.size} color="#fff" />
+            <FontAwesome name="heart" size={h.size} color="#fff" />
           </Animated.View>
         ))}
       </View>

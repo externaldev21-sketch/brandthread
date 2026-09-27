@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyl
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 
 /**
  * One shared empty/error state used on every list and grid: icon in a thin
@@ -27,6 +28,8 @@ export function EmptyState({
   /** Shrinks the icon circle and vertical padding — for a screen tight on
    * height (e.g. the buyer profile's grid, above a floating tab bar). */
   compact,
+  /** One of the shared thread-motif line illustrations; falls back to `icon` when omitted. */
+  illustration,
 }: {
   icon: keyof typeof Feather.glyphMap;
   title?: string;
@@ -37,6 +40,7 @@ export function EmptyState({
   style?: StyleProp<ViewStyle>;
   testID?: string;
   compact?: boolean;
+  illustration?: ThreadMotif;
 }) {
   const { theme } = useAppTheme();
   const iconColor = variant === 'error' ? theme.error : theme.muted;
@@ -44,7 +48,11 @@ export function EmptyState({
   return (
     <View style={[styles.wrap, compact && styles.wrapCompact, style]} testID={testID}>
       <View style={[styles.iconCircle, compact && styles.iconCircleCompact, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Feather name={icon} size={compact ? ICON.md : ICON.xl} color={iconColor} />
+        {illustration && variant !== 'error' ? (
+          <ThreadIllustration motif={illustration} size={compact ? 26 : 36} color={iconColor} strokeWidth={3.5} />
+        ) : (
+          <Feather name={icon} size={compact ? ICON.md : ICON.xl} color={iconColor} />
+        )}
       </View>
       <View style={[styles.copy, compact && styles.copyCompact]}>
         {title ? <Text style={[styles.title, compact && styles.titleCompact, { color: theme.text }]} accessibilityRole="header">{title}</Text> : null}

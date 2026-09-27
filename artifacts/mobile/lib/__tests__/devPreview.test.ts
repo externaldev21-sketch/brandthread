@@ -164,10 +164,10 @@ describe('isSellerDevPreview real export (module path exists)', () => {
     expect(src).toContain('export function isBuyerDevPreview');
   });
 
-  it('production guard is present in source (__DEV__ check)', () => {
+  it('production guard is present in source (__DEV__ check, ORed with the screenshot-export flag)', () => {
     const { readFileSync } = require('fs');
     const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
-    expect(src).toContain('if (!__DEV__) return false;');
+    expect(src).toContain('if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return false;');
   });
 
   it('native guard is present in source (Platform.OS check)', () => {

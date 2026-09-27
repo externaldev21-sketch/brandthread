@@ -8,7 +8,7 @@
  * Layout/interaction reference only: UNIQLO and Alta filter chips.
  */
 import React from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
@@ -17,7 +17,7 @@ import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
+import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export interface ChipProps {
   label: string;
@@ -32,20 +32,20 @@ export interface ChipProps {
   /** Optional trailing remove control (e.g. clearing a single recent search). */
   onRemove?: () => void;
   removeAccessibilityLabel?: string;
-  /** Set true to opt IN to the old springy press-out rebound. Defaults to
-   *  false: a plain, no-overshoot release — the app-wide press-feedback
-   *  standard (see PressableScale in components/BrandthreadUI.tsx). */
+  /** @deprecated no longer has any effect — every Chip now uses the same
+   *  critically damped, no-overshoot press spring (see PRESS_SPRING in
+   *  constants/motion.ts); kept only so existing call sites don't need
+   *  editing. */
   bounce?: boolean;
   /** 32pt tall / hairline border / 14pt text — Instagram-style quick-reply
    *  chip, instead of the default filter-chip sizing. */
   variant?: 'default' | 'quickReply';
 }
 
-export function Chip({ label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel, bounce = false, variant = 'default' }: ChipProps) {
+export function Chip({ label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel, variant = 'default' }: ChipProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
-  const nativeDriver = Platform.OS !== 'web';
   const contentColor = selected ? theme.onAccent : palette.mutedForeground;
   const isQuickReply = variant === 'quickReply';
 
@@ -56,12 +56,8 @@ export function Chip({ label, selected, onPress, count, disabled, testID, icon, 
       accessibilityState={{ selected, disabled: !!disabled }}
       disabled={disabled}
       onPress={() => { hapticToggle(); onPress(); }}
-      onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => (
-        bounce
-          ? Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()
-          : Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()
-      )}
+      onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
+      onPressOut={() => pressScaleAnim(scale, 1).start()}
       testID={testID}
     >
       <Animated.View

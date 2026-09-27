@@ -27,8 +27,8 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { hapticSuccess } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { ThreadCashBillIcon, THREAD_CASH_GREEN_DEEP, THREAD_CASH_GREEN_MID } from './ThreadCashBill';
@@ -291,9 +291,10 @@ export function CelebrationHost({ children }: { children: React.ReactNode }) {
     setToast(event);
     if (!reduceMotionRef.current) {
       setBurst(event);
-      if (Platform.OS !== 'web') {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
+      // hapticSuccess() is itself a safe no-op on web (expo-haptics falls
+      // back to the Vibration API / a switch-click trick there), so the
+      // `Platform.OS !== 'web'` guard this used to need is gone.
+      hapticSuccess();
     }
   }, []);
 

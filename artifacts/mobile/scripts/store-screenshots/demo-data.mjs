@@ -561,7 +561,7 @@ export function respond({ method, path, query, role, options = {} }) {
       posts: [],
     };
   }
-  if (p === '/buyer/cart') return CART;
+  if (p === '/buyer/cart') return options.emptyCart ? { items: [], savedItems: [] } : CART;
   if (p === '/buyer/notifications') return [];
   if (p === '/shipping-rates/calculate') return { shippingCents: 1200, rateName: 'Express courier (2–3 days)', isFree: false };
 

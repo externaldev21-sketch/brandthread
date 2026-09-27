@@ -897,7 +897,7 @@ export default function ActivityCenterScreen() {
           )}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
-              <EmptyState icon={EMPTY_ICON} message={EMPTY_MESSAGE} />
+              <EmptyState icon={EMPTY_ICON} illustration="bell" message={EMPTY_MESSAGE} />
             </View>
           )}
           ListFooterComponent={listFooter}

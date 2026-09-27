@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/layout/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
+import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { ProfileGridSkeleton } from './ProfileVideoGrid';
 import type { ProfileLayout } from './profileLayout';
 import { ProfileEmptyAreaContext } from './ProfileEmptyAreaContext';
@@ -22,6 +23,7 @@ export function ProfileGridPlaceholder({
   onRetry,
   layout,
   icon = 'film',
+  illustration,
   title,
   description,
   action,
@@ -33,6 +35,7 @@ export function ProfileGridPlaceholder({
   onRetry: () => void;
   layout: ProfileLayout;
   icon?: keyof typeof Feather.glyphMap;
+  illustration?: ThreadMotif;
   title: string;
   description?: string;
   action?: { label: string; onPress: () => void; icon?: keyof typeof Feather.glyphMap };
@@ -59,6 +62,7 @@ export function ProfileGridPlaceholder({
       testID={testID ?? 'profile-empty-state'}
       style={fill}
       icon={icon}
+      illustration={illustration}
       title={title}
       message={description ?? ''}
       actionLabel={action?.label}

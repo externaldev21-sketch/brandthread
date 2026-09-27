@@ -24,7 +24,7 @@ import { useRouter, useSegments } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { hapticLight, hapticTabChange } from '@/lib/haptics';
 import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import {
@@ -316,7 +316,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
               tabDef.name === 'orders' && newOrderCount > 0 && !isFocused;
 
             const onPress = () => {
-              if (!isFocused) hapticSelection();
+              if (!isFocused) hapticTabChange();
               router.replace(tabDef.destination as never);
             };
 

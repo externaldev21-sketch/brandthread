@@ -26,7 +26,7 @@ import { COMP, FONT, RED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
+import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
 /**
@@ -60,7 +60,8 @@ export interface ButtonProps {
 }
 
 /**
- * Shared press-in/out feel: a firm 0.97 scale settle plus a fill/opacity
+ * Shared press-in/out feel: a firm ~0.96 scale settle (critically damped,
+ * no overshoot — see PRESS_SPRING in constants/motion.ts) plus a fill/opacity
  * shift on the same layer (never a separate translucent circle/pill and
  * never an outer ring — see tests/no-translucent-chip-highlight.test.ts and
  * tests/no-outer-focus-ring.test.ts).
@@ -70,12 +71,11 @@ function usePressScale() {
   const pressed = React.useRef(new Animated.Value(0)).current;
   const nativeDriver = Platform.OS !== 'web';
   const onPressIn = () => {
-    Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start();
+    pressScaleAnim(scale, PRESS_SCALE).start();
     Animated.timing(pressed, { toValue: 1, duration: 90, useNativeDriver: nativeDriver }).start();
   };
   const onPressOut = () => {
-    // No spring/bounce — plain timing release, the app-wide press-feedback standard.
-    Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start();
+    pressScaleAnim(scale, 1).start();
     Animated.timing(pressed, { toValue: 0, duration: 140, useNativeDriver: nativeDriver }).start();
   };
   return { scale, pressed, onPressIn, onPressOut };

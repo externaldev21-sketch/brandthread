@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
+  Easing,
   interpolate,
   useAnimatedStyle,
   useReducedMotion,
@@ -17,6 +18,7 @@ import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { identityOrNone } from '@/lib/animationUtils';
 import { FONT } from '@/lib/theme';
 import type { TabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
 
 /**
  * Shared building blocks for the buyer and seller floating tab bars.
@@ -33,8 +35,12 @@ const PRESS_OUT = { mass: 0.6, stiffness: 420, damping: 11 } as const;
 // Selection pop: overshoot a little, then settle.
 const POP_UP = { mass: 0.5, stiffness: 650, damping: 14 } as const;
 const POP_SETTLE = { mass: 0.6, stiffness: 300, damping: 12 } as const;
-// Pill glide: a touch of overshoot so arrivals feel physical, never floaty.
-export const INDICATOR_SPRING = { mass: 0.9, stiffness: 360, damping: 26 } as const;
+// Pill glide between tabs: a plain ease-out timing, not a spring — the
+// spring this replaced (mass 0.9/stiffness 360/damping 26, damping ratio
+// ~0.72) was deliberately underdamped for "a touch of overshoot," which is
+// exactly what the "FEEL 10x better" pass's own gate rules out (no bounce/
+// overshoot anywhere). 220ms sits in the requested 200-250ms window.
+const INDICATOR_TIMING = { duration: 220, easing: Easing.out(Easing.cubic) } as const;
 const REDUCED_MOTION = { duration: 160 } as const;
 
 // ─── Glass surface ────────────────────────────────────────────────────────────
@@ -280,7 +286,7 @@ export function TabBarIndicator({
       // Appearing (e.g. back from Profile or search) fades in place; only a
       // move between tabs glides.
       if (opacity.get() < 0.5 || reduceMotion) x.set(reduceMotion ? withTiming(restingX, REDUCED_MOTION) : restingX);
-      else x.set(withSpring(restingX, INDICATOR_SPRING));
+      else x.set(withTiming(restingX, INDICATOR_TIMING));
     }
     opacity.set(withTiming(shown ? 1 : 0, { duration: 180 }));
   }, [shown, restingX, reduceMotion, x, target, opacity]);
@@ -324,6 +330,49 @@ export function TabBarIndicator({
 /** Colour for a tab icon. */
 export function tabIconColor(theme: AppThemePreset, focused: boolean) {
   return focused ? theme.accent : theme.muted;
+}
+
+// Cross-fade duration for the outline -> filled icon swap — same 220ms
+// window as the pill's own glide (INDICATOR_TIMING) so both read as one
+// motion instead of two out-of-sync ones.
+const ICON_CROSSFADE_MS = 220;
+
+/**
+ * Tab icon that cross-fades between its outline (unfocused) and filled
+ * (focused) rendering instead of `BuyerNavIcon`'s own instant `fill` swap —
+ * two stacked copies (outline always underneath, filled on top), only their
+ * opacity animated. Colour changes (muted -> accent) ride along for free
+ * since it's the same crossfade.
+ */
+export function CrossfadeNavIcon({
+  name, focused, theme, size,
+}: {
+  name: BuyerNavIconName;
+  focused: boolean;
+  theme: AppThemePreset;
+  size: number;
+}) {
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(focused ? 1 : 0);
+
+  useEffect(() => {
+    const target = focused ? 1 : 0;
+    progress.set(reduceMotion ? withTiming(target, REDUCED_MOTION) : withTiming(target, { duration: ICON_CROSSFADE_MS }));
+  }, [focused, reduceMotion, progress]);
+
+  const outlineStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.value }));
+  const filledStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+
+  return (
+    <View style={{ width: size, height: size }}>
+      <Animated.View style={[StyleSheet.absoluteFill, outlineStyle]}>
+        <BuyerNavIcon name={name} color={tabIconColor(theme, false)} focused={false} size={size} />
+      </Animated.View>
+      <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
+        <BuyerNavIcon name={name} color={tabIconColor(theme, true)} focused size={size} />
+      </Animated.View>
+    </View>
+  );
 }
 
 // Shadow lives on an unclipped wrapper; the glass inside clips to the radius.

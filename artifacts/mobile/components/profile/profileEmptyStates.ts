@@ -4,6 +4,7 @@
  *  - your own profile gets a CTA into the real creation flow for that tab;
  *  - someone else's profile gets the message only — never a CTA.
  */
+import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 
 export type ProfileEmptyTab =
   | 'buyer:posts' | 'buyer:tagged' | 'buyer:reposts' | 'buyer:saved'
@@ -18,6 +19,8 @@ export interface ProfileEmptyCopy {
   message: string;
   /** Own profile only. */
   cta?: { label: string; route: string };
+  /** One of the shared thread-motif line illustrations, when this tab has one. */
+  illustration?: ThreadMotif;
 }
 
 export function profileEmptyState(tab: ProfileEmptyTab, own: boolean): ProfileEmptyCopy {
@@ -27,6 +30,7 @@ export function profileEmptyState(tab: ProfileEmptyTab, own: boolean): ProfileEm
     title: own ? copy.title : copy.publicTitle ?? copy.title,
     message: own ? copy.message : copy.publicMessage,
     cta: own ? copy.cta : undefined,
+    illustration: copy.illustration,
   };
 }
 
@@ -37,9 +41,11 @@ const TABLE: Record<ProfileEmptyTab, {
   publicTitle?: string;
   publicMessage: string;
   cta?: { label: string; route: string };
+  illustration?: ThreadMotif;
 }> = {
   'buyer:posts': {
     icon: 'video',
+    illustration: 'spool',
     title: 'No posts yet',
     message: 'Photos and videos you post to your profile appear here.',
     publicMessage: 'Posts they share will appear here.',
@@ -60,6 +66,7 @@ const TABLE: Record<ProfileEmptyTab, {
   },
   'buyer:saved': {
     icon: 'bookmark',
+    illustration: 'bookmark',
     title: 'No saved posts yet',
     message: 'Items you save will appear here.',
     publicMessage: 'Saved items are private.',
@@ -67,12 +74,14 @@ const TABLE: Record<ProfileEmptyTab, {
   },
   'buyer:liked': {
     icon: 'heart',
+    illustration: 'heart',
     title: 'No liked posts yet',
     message: 'Posts you like will appear here.',
     publicMessage: 'Liked posts are private.',
   },
   'buyer:orders': {
     icon: 'package',
+    illustration: 'tee',
     title: 'No orders yet',
     message: 'Orders you place will appear here.',
     publicMessage: 'Orders are private.',

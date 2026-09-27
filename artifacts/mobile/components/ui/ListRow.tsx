@@ -17,7 +17,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
+import { PRESS_DURATION_MS } from '@/constants/motion';
 
 export interface ListRowProps {
   icon?: keyof typeof Feather.glyphMap;
@@ -42,7 +42,11 @@ export function ListRow({
   icon, iconColor, avatar, title, subtitle, value, chevron, toggle, right, onPress, disabled, destructive, style, testID,
 }: ListRowProps) {
   const palette = useColors();
-  const scale = React.useRef(new Animated.Value(1)).current;
+  // Rows get a subtle background highlight instead of a scale — a whole row
+  // of text shrinking on tap reads as busier than the row-level feedback
+  // this list is built from; icon buttons and primary CTAs still scale
+  // (see Button.tsx / IconButton.tsx).
+  const highlight = React.useRef(new Animated.Value(0)).current;
   const nativeDriver = Platform.OS !== 'web';
   const interactive = !!onPress && !disabled;
   const titleColor = destructive ? palette.destructive : palette.foreground;
@@ -77,19 +81,28 @@ export function ListRow({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={() => { hapticLight(); onPress?.(); }}
-      onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
+      onPressIn={() => Animated.timing(highlight, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
+      onPressOut={() => Animated.timing(highlight, { toValue: 0, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       testID={testID}
     >
-      <Animated.View style={[styles.row, { transform: [{ scale }], opacity: disabled ? 0.5 : 1 }, style]}>
+      <View style={[styles.row, { opacity: disabled ? 0.5 : 1 }, style]}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            styles.highlight,
+            { backgroundColor: palette.foreground, opacity: highlight.interpolate({ inputRange: [0, 1], outputRange: [0, 0.06] }) },
+          ]}
+        />
         {content}
-      </Animated.View>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, minHeight: 52, paddingVertical: SPACING.xs },
+  highlight: { borderRadius: RADII.chip },
   iconWrap: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minWidth: 0 },
 });

@@ -97,7 +97,10 @@ describe('buyer navigation contract', () => {
 
   it('shows a clear active state, an unread Inbox badge, haptics and tab accessibility', () => {
     expect(bar).toContain('<TabBarIndicator');
-    expect(parts).toContain('withSpring(restingX, INDICATOR_SPRING)');
+    // Motion pass: the pill's cross-tab glide is a plain ease-out timing
+    // now, not a spring (a spring here overshot, which the pass's own
+    // "no bounce/overshoot" rule rules out).
+    expect(parts).toContain('withTiming(restingX, INDICATOR_TIMING)');
     expect(bar).toContain('<TabBarBadge count={badge} theme={theme} />');
     expect(bar).toContain("unread ${badge === 1 ? 'item' : 'items'}");
     expect(bar).toContain('hapticSelection()');
