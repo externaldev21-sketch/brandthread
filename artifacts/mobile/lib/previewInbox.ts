@@ -48,7 +48,10 @@ const POSTER_SOURCES = [
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const LOGO_SOURCE = require('../assets/images/brandthread-logo.png');
 
-function posterUri(index: number): string {
+// Exported so other preview seed modules (e.g. lib/previewStories.ts, the
+// Messages stories tray) can reuse the same 10 bundled runway photos as
+// avatar/story-slide images instead of re-requiring the assets themselves.
+export function posterUri(index: number): string {
   return Asset.fromModule(POSTER_SOURCES[index]).uri;
 }
 
@@ -120,6 +123,37 @@ export function getPreviewConversations(): Conversation[] {
 
 export function getPreviewConversation(id: string): Conversation | null {
   return getPreviewConversations().find(c => c.id === id) ?? null;
+}
+
+/**
+ * Accepts a seeded message request in place: flips `isRequest` off, bumps
+ * `updatedAt` and moves it to the front of the module-level cache — mimicking
+ * what the real backend does for free (accept bumps `updatedAt`, the list
+ * endpoint sorts by `updatedAt DESC`) since there is no real backend here to
+ * refetch from. Returns the updated conversation, or `null` if `id` isn't a
+ * seeded conversation this module knows about.
+ */
+export function acceptPreviewConversationRequest(id: string): Conversation | null {
+  const list = getPreviewConversations();
+  const idx = list.findIndex(c => c.id === id);
+  if (idx < 0) return null;
+  const accepted: Conversation = { ...list[idx], isRequest: false, updatedAt: new Date().toISOString() };
+  const next = list.slice();
+  next.splice(idx, 1);
+  next.unshift(accepted);
+  cachedConversations = next;
+  return accepted;
+}
+
+/**
+ * Permanently removes a seeded conversation from the cache — the preview-mode
+ * equivalent of the real DELETE /api/conversations/:id hard delete. Used both
+ * for "Delete" and "Block" on a seeded message request, since there's no real
+ * backend block/delete record to keep in sync with.
+ */
+export function deletePreviewConversationRequest(id: string): void {
+  const list = getPreviewConversations();
+  cachedConversations = list.filter(c => c.id !== id);
 }
 
 let cachedNotifications: Notification[] | null = null;
