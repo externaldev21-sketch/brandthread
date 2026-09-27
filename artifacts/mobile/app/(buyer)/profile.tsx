@@ -673,6 +673,7 @@ export default function ProfileScreen() {
   // One table decides every tab's empty copy + CTA (own profile → CTA).
   const empty = profileEmptyState(`buyer:${activeTab.toLowerCase()}` as ProfileEmptyTab, true);
   const emptyIcon = empty.icon as keyof typeof Feather.glyphMap;
+  const emptyIllustration = empty.illustration;
   const emptyTitle = empty.title;
   const emptyDescription = empty.message;
   const emptyAction = empty.cta
@@ -913,6 +914,7 @@ export default function ProfileScreen() {
             onRetry={loadData}
             layout={layout}
             icon={emptyIcon}
+            illustration={emptyIllustration}
             title={emptyTitle}
             description={emptyDescription}
             action={emptyAction}

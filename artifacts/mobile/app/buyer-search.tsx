@@ -499,6 +499,7 @@ export default function BuyerSearchScreen() {
       <View testID="buyer-search-no-results">
         <EmptyState
           icon="search"
+          illustration="search"
           title={`No results for "${trimmedQuery}"`}
           description="Try a different spelling or a broader term."
           action={{ label: 'Clear search', icon: 'x-circle', onPress: () => { setQuery(''); setSubmitted(false); } }}

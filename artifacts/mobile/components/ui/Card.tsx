@@ -6,12 +6,12 @@
  * radius, glow option); this is the Phase 1 canonical shape for new work.
  */
 import React from 'react';
-import { Animated, Platform, Pressable, StyleProp, View, ViewStyle } from 'react-native';
+import { Animated, Pressable, StyleProp, View, ViewStyle } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
-import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
+import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export interface CardProps {
   children: React.ReactNode;
@@ -27,7 +27,6 @@ export interface CardProps {
 export function Card({ children, onPress, elevated = false, style, testID, accessibilityLabel, accessibilityHint }: CardProps) {
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
-  const nativeDriver = Platform.OS !== 'web';
 
   const baseStyle: ViewStyle = {
     backgroundColor: elevated ? palette.elevated : palette.card,
@@ -47,8 +46,8 @@ export function Card({ children, onPress, elevated = false, style, testID, acces
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       onPress={() => { hapticLight(); onPress(); }}
-      onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
+      onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
+      onPressOut={() => pressScaleAnim(scale, 1).start()}
       testID={testID}
     >
       <Animated.View style={[baseStyle, { transform: [{ scale }] }, style]}>{children}</Animated.View>

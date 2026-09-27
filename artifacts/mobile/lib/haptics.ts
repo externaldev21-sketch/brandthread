@@ -40,3 +40,5 @@ export const hapticToggle = hapticSelection;
 export const hapticSuccessAction = hapticSuccess;
 /** Destructive-confirm: delete, remove, cancel-order confirmations. */
 export const hapticDestructiveConfirm = hapticWarning;
+/** Bottom tab bar switch — a meaningful navigation change, not a selection tick. */
+export const hapticTabChange = hapticMedium;
