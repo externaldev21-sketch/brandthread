@@ -179,7 +179,9 @@ export function LivePinnedProductCard({
   const swap = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     swap.setValue(0);
-    Animated.spring(swap, { toValue: 1, speed: 16, bounciness: 6, useNativeDriver: ND }).start();
+    // withTiming/ease-out, not a spring — a bouncy overshoot here read as
+    // exactly the kind of "bounce" polish is meant to remove.
+    Animated.timing(swap, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: ND }).start();
   }, [product.productId, swap]);
   const onSale = product.compareAtPriceCents != null && product.compareAtPriceCents > product.priceCents;
   return (
@@ -248,7 +250,7 @@ export function LiveRail({
   const handleLike = () => {
     hapticLight();
     pop.setValue(0.75);
-    Animated.spring(pop, { toValue: 1, speed: 30, bounciness: 14, useNativeDriver: ND }).start();
+    Animated.timing(pop, { toValue: 1, duration: 160, easing: Easing.out(Easing.cubic), useNativeDriver: ND }).start();
     likeRef.current?.measureInWindow?.((x, y, w) => onLike({ x: x + w / 2, y }));
   };
   return (
