@@ -22,7 +22,7 @@
  *
  * Layout/interaction reference only: UNIQLO "Added to cart" sheet.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,6 +57,11 @@ export interface SheetTransition {
   /** Pan gesture for swipe-to-close: attach via `<GestureDetector gesture={panGesture}>`
    *  around the sheet's outer `Animated.View` (or a drag-handle region of it). */
   panGesture: ReturnType<typeof Gesture.Pan>;
+  /** Attach to the sheet's outer `Animated.View`'s `onLayout` so the pan
+   *  gesture's dismiss threshold (25% of the sheet's actual rendered
+   *  height) is measured, not guessed — a fixed pixel threshold felt wrong
+   *  on a short sheet and too lenient on a tall one. */
+  onSheetLayout: (event: { nativeEvent: { layout: { height: number } } }) => void;
 }
 
 /**
@@ -124,6 +129,14 @@ export function useSheetTransition(
   // Snap points/content height are never touched mid-gesture: the pan only
   // ever writes to `translateY`, nothing about layout.
   const dragStartY = useSharedValue(0);
+  // Measured via onSheetLayout below; falls back to closeDistance (a generous
+  // over-estimate) until the first layout so an extremely early drag still
+  // has a sane threshold rather than reading as `0 * 0.25 = 0` (always closes).
+  const sheetHeight = useSharedValue(closeDistance);
+  const onSheetLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
+    const { height } = event.nativeEvent.layout;
+    if (height > 0) sheetHeight.set(height);
+  }, [sheetHeight]);
 
   const panGesture = Gesture.Pan()
     .onStart(() => {
@@ -134,7 +147,10 @@ export function useSheetTransition(
       translateY.set(Math.max(0, next));
     })
     .onEnd(e => {
-      const shouldClose = e.translationY > 80 || e.velocityY > 800;
+      // Past ~25% of the sheet's own height, or a fast flick, closes it —
+      // otherwise it returns to open. Both paths are `withTiming`, never a
+      // spring, so "returns" never overshoots past its resting position.
+      const shouldClose = e.translationY > sheetHeight.value * 0.25 || e.velocityY > 800;
       if (shouldClose) {
         backdropOpacity.set(withTiming(0, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }));
         translateY.set(
@@ -151,7 +167,9 @@ export function useSheetTransition(
       }
     });
 
-  return { modalVisible, sheetStyle, backdropStyle, panGesture };
+  return {
+    modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout,
+  };
 }
 
 export interface BottomSheetProps {
@@ -170,9 +188,9 @@ export function BottomSheet({ visible, onClose, children, testID, reduceMotion }
   // desktop window instead of reading as a card. The backdrop still dims the
   // whole viewport (correct); only the sheet itself is capped and centered.
   const isWebShell = useIsWebShell();
-  const { modalVisible, sheetStyle, backdropStyle, panGesture } = useSheetTransition(visible, onClose, {
-    reduceMotion,
-  });
+  const {
+    modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout,
+  } = useSheetTransition(visible, onClose, { reduceMotion });
 
   return (
     <Modal visible={modalVisible} transparent animationType="none" onRequestClose={onClose} testID={testID}>
@@ -189,6 +207,7 @@ export function BottomSheet({ visible, onClose, children, testID, reduceMotion }
         </Animated.View>
         <GestureDetector gesture={panGesture}>
           <Animated.View
+            onLayout={onSheetLayout}
             style={[
               styles.sheet,
               isWebShell && styles.sheetWebShell,

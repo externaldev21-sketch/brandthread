@@ -347,7 +347,9 @@ export function ShopProductSheet({
   // parent's `setShopSelection(null)` (which unmounts this component) can
   // never race the animation and yank it mid-flight.
   const [sheetOpen, setSheetOpen] = useState(true);
-  const { modalVisible, sheetStyle, backdropStyle, panGesture } = useSheetTransition(
+  const {
+    modalVisible, sheetStyle, backdropStyle, panGesture, onSheetLayout,
+  } = useSheetTransition(
     sheetOpen,
     onClose,
     { reduceMotion: !shouldAnimateCartSuccess(reduceMotion) },
@@ -644,6 +646,7 @@ export function ShopProductSheet({
       <GestureDetector gesture={panGesture}>
         <ReanimatedAnimated.View
           testID="shop-product-sheet"
+          onLayout={onSheetLayout}
           style={[ss.sheet, {
             backgroundColor: theme.surface,
             borderColor: theme.border,
