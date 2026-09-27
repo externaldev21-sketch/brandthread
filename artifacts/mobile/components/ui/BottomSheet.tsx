@@ -23,7 +23,7 @@
  * Layout/interaction reference only: UNIQLO "Added to cart" sheet.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -34,7 +34,6 @@ import Animated, {
   type AnimatedStyle,
 } from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
-import { identityOrNone } from '@/lib/animationUtils';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
@@ -75,7 +74,12 @@ export function useSheetTransition(
   onClosed: () => void,
   opts?: { closeDistance?: number; reduceMotion?: boolean | null },
 ): SheetTransition {
-  const closeDistance = opts?.closeDistance ?? SHEET_OFFSCREEN_Y;
+  // Falls back to the window's own height (never a measured sheet height —
+  // this must be independent of `onSheetLayout`/`sheetHeight` below, which
+  // only ever feeds the swipe-dismiss threshold) union'd with the fixed
+  // SHEET_OFFSCREEN_Y floor, so a very short window still gets comfortable
+  // offscreen clearance.
+  const closeDistance = opts?.closeDistance ?? Math.max(Dimensions.get('window').height, SHEET_OFFSCREEN_Y);
   const reduceMotion = !!opts?.reduceMotion;
   const translateY = useSharedValue(closeDistance);
   const backdropOpacity = useSharedValue(0);
@@ -86,11 +90,18 @@ export function useSheetTransition(
   useEffect(() => {
     if (visible) {
       setModalVisible(true);
-      if (reduceMotion) {
-        translateY.set(0);
-        backdropOpacity.set(1);
-        return;
-      }
+      // Always animate via `withTiming` on the shared SHEET_TIMING curve —
+      // never a bare `.set()`/`.value =` jump straight to the target, even
+      // under reduceMotion. On web, a one-off synchronous value write with
+      // nothing else scheduling a frame after it can update the JS-side
+      // shared-value store without Reanimated ever pushing the matching DOM
+      // style patch, leaving the sheet permanently stuck at its *previous*
+      // transform (fully offscreen) even though the computed style is
+      // already correct — this was the "Shop the Post never opens" web
+      // regression. `withTiming` always goes through the same rAF-driven
+      // commit path a running animation uses, so the DOM reliably updates;
+      // 260ms is short enough that reduceMotion users aren't meaningfully
+      // affected by keeping it animated rather than instant.
       backdropOpacity.set(withTiming(1, { duration: SHEET_OPEN_MS, easing: SHEET_EASING }));
       translateY.set(withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING }));
       return;
@@ -98,13 +109,8 @@ export function useSheetTransition(
     // Closing: keep the Modal mounted until the transform finishes — this is
     // the single close timeline (sheet + backdrop share duration/easing), and
     // nothing unmounts or clears caller state until `finished` is true.
-    if (reduceMotion) {
-      translateY.set(closeDistance);
-      backdropOpacity.set(0);
-      setModalVisible(false);
-      onClosedRef.current();
-      return;
-    }
+    // Same reasoning as the open branch above: always `withTiming`, never a
+    // bare assignment, even under reduceMotion.
     backdropOpacity.set(withTiming(0, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }));
     translateY.set(
       withTiming(closeDistance, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }, finished => {
@@ -118,12 +124,18 @@ export function useSheetTransition(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, reduceMotion]);
 
-  // `identityOrNone` drops the `transform` key entirely once the sheet is
-  // fully open (translateY back at 0) instead of leaving an identity
-  // `[{ translateY: 0 }]` — on web that would otherwise permanently force
-  // this View onto its own compositing layer, softening the sheet's text if
-  // that layer doesn't land on a whole device pixel. See lib/animationUtils.ts.
-  const sheetStyle = useAnimatedStyle(() => ({ transform: identityOrNone([{ translateY: translateY.value }]) }));
+  // Plain transform, always present — NOT `identityOrNone`: that helper drops
+  // the `transform` key entirely once the value is back at its identity (0),
+  // which is a real anti-blur win when a key that's already applied just
+  // stops changing. But the very first time the sheet reaches rest, the key
+  // goes from *present* (a real offscreen offset) to *absent* in one step,
+  // and Reanimated's web DOM patcher does not reliably clear a previously
+  // applied CSS `transform` when a later style update simply omits the key —
+  // the JS-computed style is correct (no transform) but the stale transform
+  // stays painted, leaving the sheet permanently stuck offscreen. That was
+  // this bug: "Shop the Post never opens" on web. A ever-present transform
+  // key (even an identity one) always gets diffed and applied.
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
 
   // Snap points/content height are never touched mid-gesture: the pan only
