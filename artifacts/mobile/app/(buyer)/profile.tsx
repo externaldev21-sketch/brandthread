@@ -257,10 +257,19 @@ function SquareIconButton({ icon, onPress, accessibilityLabel }: {
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
+// Plain `Pressable`/`View` for every cell (not `PressableScale`, which
+// forwards a plain `style` prop onto its *inner* wrapper and leaves the
+// outer element — the actual flex child of `statsStyles.row` — unstyled).
+// With two of the three cells losing their row-item styling that way, the
+// row's flex layout became inconsistent enough that the third cell wrapped
+// onto its own line. Every cell is now the same plain, directly-styled
+// element, and cells are spaced with explicit margins rather than the flex
+// `gap` shorthand, which has been unreliable across RN Web versions.
 function TikTokStatsRow({ stats, loading, theme }: { stats: ProfileStat[]; loading?: boolean; theme: AppThemePreset }) {
   return (
     <View style={statsStyles.row}>
-      {stats.map((stat) => {
+      {stats.map((stat, index) => {
+        const cellStyle = [statsStyles.cell, index > 0 && statsStyles.cellSpacing];
         const content = (
           <>
             <Text style={[statsStyles.value, { color: loading ? theme.subtle : theme.text }]} numberOfLines={1}>
@@ -270,20 +279,20 @@ function TikTokStatsRow({ stats, loading, theme }: { stats: ProfileStat[]; loadi
           </>
         );
         return stat.onPress ? (
-          <PressableScale
+          <Pressable
             key={stat.key}
-            style={statsStyles.cell}
+            style={cellStyle}
             onPress={() => { hapticSelection(); stat.onPress?.(); }}
             accessibilityRole="button"
             accessibilityLabel={stat.accessibilityLabel ?? `${stat.value} ${stat.label}`}
             testID={`profile-stat-${stat.key}`}
           >
             {content}
-          </PressableScale>
+          </Pressable>
         ) : (
           <View
             key={stat.key}
-            style={statsStyles.cell}
+            style={cellStyle}
             accessible
             accessibilityLabel={stat.accessibilityLabel ?? `${stat.value} ${stat.label}`}
             testID={`profile-stat-${stat.key}`}
@@ -702,24 +711,24 @@ export default function ProfileScreen() {
           colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']} // theme-exempt: legibility scrim over cover media
           style={[styles.coverTopFade, { height: topPad + 60 }]}
         />
-        <View style={styles.coverAddWrap} pointerEvents="box-none">
-          <PressableScale
-            onPress={hasCover ? coverFlow.openManage : coverFlow.startAdd}
-            disabled={!!coverFlow.busy}
-            accessibilityRole="button"
-            accessibilityLabel={coverAddLabel}
-            accessibilityHint={hasCover ? 'Change or remove your profile cover video' : 'Pick or record a short video to play behind your profile'}
-            testID="profile-cover-affordance"
-          >
-            {(state) => (
-              <View style={styles.coverAdd}>
-                <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.sm} theme={{ text: '#FFFFFF', accent: '#FFFFFF' } as AppThemePreset} />
-                {showCoverPlusIcon ? <Feather name="plus" size={13} color="#FFFFFF" style={styles.coverAddIcon} /* theme-exempt: legible over cover media */ /> : null}
-                <Text style={styles.coverAddText} numberOfLines={1}>{coverAddLabel}</Text>
-              </View>
-            )}
-          </PressableScale>
-        </View>
+        {/* Plain `Pressable` (not `PressableScale`, whose forced 44pt
+            minimum touch target — appropriate for a real button — inflated
+            this small text button's box upward until it collided with the
+            top bar's icons). `hitSlop` gives it a comfortable tap area
+            without growing the visible/measured box itself. */}
+        <Pressable
+          onPress={hasCover ? coverFlow.openManage : coverFlow.startAdd}
+          disabled={!!coverFlow.busy}
+          accessibilityRole="button"
+          accessibilityLabel={coverAddLabel}
+          accessibilityHint={hasCover ? 'Change or remove your profile cover video' : 'Pick or record a short video to play behind your profile'}
+          testID="profile-cover-affordance"
+          hitSlop={10}
+          style={({ pressed }) => [styles.coverAdd, pressed && styles.coverAddPressed]}
+        >
+          {showCoverPlusIcon ? <Feather name="plus" size={13} color="#FFFFFF" style={styles.coverAddIcon} /* theme-exempt: legible over cover media */ /> : null}
+          <Text style={styles.coverAddText} numberOfLines={1}>{coverAddLabel}</Text>
+        </Pressable>
       </View>
 
       {/* ── Top bar — transparent over the cover, always clear of the
@@ -918,13 +927,14 @@ function makeStyles(theme: AppThemePreset) {
 
     cover: { height: COVER_HEIGHT, overflow: 'hidden', backgroundColor: theme.card },
     coverTopFade: { position: 'absolute', top: 0, left: 0, right: 0 },
-    coverAddWrap: { position: 'absolute', right: 12, bottom: 10 },
     coverAdd: {
-      flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.sm, overflow: 'hidden',
+      position: 'absolute', right: 12, bottom: 10,
+      flexDirection: 'row', alignItems: 'center', gap: 4,
     },
+    coverAddPressed: { opacity: 0.6 },
     coverAddIcon: { opacity: 0.85 },
     coverAddText: {
-      fontFamily: FONT.semibold, fontSize: 13, color: '#FFFFFF', opacity: 0.85, // theme-exempt: legible over cover media
+      fontFamily: FONT.semibold, fontSize: 13, lineHeight: 16, color: '#FFFFFF', opacity: 0.85, // theme-exempt: legible over cover media
       textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
     },
 
@@ -956,11 +966,14 @@ function makeStyles(theme: AppThemePreset) {
 const statsStyles = StyleSheet.create({
   row: {
     flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'flex-end', justifyContent: 'flex-start',
-    gap: 20, paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.sm,
+    paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.sm,
   },
-  cell: { flexDirection: 'row', alignItems: 'baseline', gap: 4, flexShrink: 0 },
+  cell: { flexDirection: 'row', alignItems: 'baseline', flexShrink: 0 },
+  // Explicit margin instead of the row's `gap` — spaces every cell but the
+  // first, so the total gap stays 20pt regardless of `gap` support.
+  cellSpacing: { marginLeft: 20 },
   value: { fontFamily: FONT.bold, fontSize: 17, fontVariant: ['tabular-nums'] },
-  label: { fontFamily: FONT.medium, fontSize: 13 },
+  label: { fontFamily: FONT.medium, fontSize: 13, marginLeft: 4 },
 });
 
 const topBarStyles = StyleSheet.create({
