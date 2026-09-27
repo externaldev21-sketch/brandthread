@@ -1127,6 +1127,11 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-conversation"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-other-profile"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-friend-requests"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        {/* Full-screen search — its own page (TikTok-style), not a tab-bar
+            morph: back button, search field, instant suggestions, tabbed
+            results. A sibling of (buyer), so BuyerTabBar never mounts over
+            it — the floating bar is hidden automatically. */}
+        <Stack.Screen name="buyer-search"            options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'ios_from_right' }} />

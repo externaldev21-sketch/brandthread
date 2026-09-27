@@ -1,5 +1,6 @@
 import React from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Button } from '@/components/ui';
 import { hapticPrimaryAction } from '@/lib/haptics';
@@ -18,6 +19,11 @@ export type SearchPerson = {
   color: string;
   bio: string | null;
   isFollowing: boolean;
+  /** 'buyer' | 'seller' | 'both' — real user profiles, not brand listings. */
+  accountType?: string;
+  verified?: boolean;
+  /** "Buyer", or the seller's storefront name (falling back to "Seller"). */
+  roleTag?: string;
 };
 
 /**
@@ -55,9 +61,16 @@ export function PersonRow({
           <Text style={styles.avatarText}>{person.initials}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{person.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{person.name}</Text>
+            {person.verified && (
+              <Feather name="check-circle" size={13} color={theme.accent} style={styles.verifiedBadge} />
+            )}
+          </View>
           <Text style={[styles.sub, { color: theme.muted }]} numberOfLines={1}>
-            {person.handle}{person.bio ? `  ·  ${person.bio.slice(0, 40)}` : ''}
+            {person.handle}
+            {person.roleTag ? `  ·  ${person.roleTag}` : ''}
+            {person.bio ? `  ·  ${person.bio.slice(0, 40)}` : ''}
           </Text>
         </View>
         <Button
@@ -82,6 +95,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   avatar: { width: 44, height: 44, borderRadius: RADII.avatar, alignItems: 'center', justifyContent: 'center' },
   avatarText: { ...TYPE_SCALE.footnote, fontFamily: FONT.bold, color: theme.onAccent },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  verifiedBadge: { marginTop: 1 },
   name: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   sub: { ...TYPE_SCALE.caption, marginTop: 2 },
   followBtn: { minWidth: 98, paddingHorizontal: SPACING.sm },

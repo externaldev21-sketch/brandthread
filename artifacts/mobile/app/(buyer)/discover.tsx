@@ -984,7 +984,7 @@ export default function DiscoverScreen() {
       <TabPageHeader
         title="Discover"
         actions={[
-          { name: 'search', onPress: () => router.push('/(buyer)/search' as never), accessibilityLabel: 'Search products and brands' },
+          { name: 'search', onPress: () => router.push('/buyer-search' as never), accessibilityLabel: 'Search products and brands' },
           ...(isSignedIn ? [{ name: 'bell' as const, onPress: () => router.push('/(buyer)/inbox' as never), accessibilityLabel: 'Notifications' }] : []),
         ]}
       />
@@ -1008,7 +1008,7 @@ export default function DiscoverScreen() {
               icon="package"
               title="No products available right now"
               description="New arrivals show up here as sellers add them."
-              action={{ label: 'Search products', onPress: () => router.push('/(buyer)/search' as never) }}
+              action={{ label: 'Search products', onPress: () => router.push('/buyer-search' as never) }}
             />
           </View>
         </ResponsiveContainer>
@@ -1021,7 +1021,7 @@ export default function DiscoverScreen() {
             const pid = encodeURIComponent(item.productId ?? item.id);
             push((`/thread-product-detail?productId=${pid}&productName=${encodeURIComponent(item.name)}`) as never);
           }}
-          onShopAll={() => router.push('/(buyer)/search' as never)}
+          onShopAll={() => router.push('/buyer-search' as never)}
         />
       )}
 
@@ -1042,7 +1042,7 @@ export default function DiscoverScreen() {
             icon="trending-up"
             title="No high-demand products right now"
             description="Check back soon, or browse everything sellers have listed."
-            action={{ label: 'Browse products', onPress: () => router.push('/(buyer)/search' as never) }}
+            action={{ label: 'Browse products', onPress: () => router.push('/buyer-search' as never) }}
           />
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingRight: GUTTER }}>
@@ -1089,7 +1089,7 @@ export default function DiscoverScreen() {
             icon="package"
             title="No products available right now"
             description="New arrivals show up here as sellers add them."
-            action={{ label: 'Search products', onPress: () => router.push('/(buyer)/search' as never) }}
+            action={{ label: 'Search products', onPress: () => router.push('/buyer-search' as never) }}
           />
         </ResponsiveContainer>
       ) : (
@@ -1116,7 +1116,7 @@ export default function DiscoverScreen() {
               icon="users"
               title="Follow a brand to see them here"
               description="Products from sellers you follow will show up in this row."
-              action={{ label: 'Find brands to follow', onPress: () => router.push('/(buyer)/search' as never) }}
+              action={{ label: 'Find brands to follow', onPress: () => router.push('/buyer-search' as never) }}
               compact
             />
           ) : (

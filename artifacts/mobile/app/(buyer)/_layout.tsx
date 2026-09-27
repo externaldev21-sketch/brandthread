@@ -3,7 +3,6 @@ import { Tabs } from 'expo-router';
 
 import { useColors } from '@/hooks/useColors';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
-import { BuyerSearchProvider } from '@/contexts/BuyerSearchContext';
 import { BuyerTabBar } from '@/components/buyer-nav/BuyerTabBar';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
 import { getConversations, getNotifications, subscribeSocial } from '@/services/socialService';
@@ -78,7 +77,6 @@ function BuyerTabLayout() {
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarAccessibilityLabel: 'Home tab' }} />
       <Tabs.Screen name="discover" options={{ title: 'Discover', tabBarAccessibilityLabel: 'Discover tab' }} />
       <Tabs.Screen name="inbox" options={{ title: 'Inbox', tabBarAccessibilityLabel: 'Inbox tab' }} />
-      <Tabs.Screen name="search" options={{ title: 'Search', tabBarAccessibilityLabel: 'Search tab' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarAccessibilityLabel: 'Profile tab' }} />
 
       {/* No slot of their own — reached from Home, Profile or Inbox. */}
@@ -103,12 +101,12 @@ export default function BuyerLayout() {
   }, []);
 
   return (
-    <BuyerSearchProvider>
+    <>
       <BuyerTabLayout />
       {/* Daily Thread Cash reward: silent active-time tracker, no UI of its
           own — see ThreadCashActiveTimeTracker for the 7-minute trigger and
           CelebrationHost for the money-burst it plays on a successful claim. */}
       <ThreadCashActiveTimeTracker />
-    </BuyerSearchProvider>
+    </>
   );
 }
