@@ -1,9 +1,9 @@
 import React from 'react';
-import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 export type BuyerNavIconName =
-  | 'home' | 'discover' | 'inbox' | 'search' | 'activity' | 'profile'
-  | 'close' | 'friends' | 'filters' | 'live-tv'
+  | 'home' | 'discover' | 'inbox' | 'search' | 'profile' | 'activity'
+  | 'close' | 'friends' | 'filters'
   // Seller bar
   | 'dashboard' | 'products' | 'orders' | 'studio';
 
@@ -70,11 +70,11 @@ export function BuyerNavIcon({
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
           <Path
-            d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"
+            d="M12 3.6a5.6 5.6 0 0 0-5.6 5.6v3.1c0 .6-.2 1.2-.6 1.7l-1.1 1.4a1 1 0 0 0 .8 1.6h13a1 1 0 0 0 .8-1.6l-1.1-1.4a2.7 2.7 0 0 1-.6-1.7V9.2A5.6 5.6 0 0 0 12 3.6Z"
             fill={focused ? color : 'none'}
             {...common}
           />
-          <Path d="M10 21h4" fill="none" {...common} />
+          <Path d="M9.8 19.4a2.3 2.3 0 0 0 4.4 0" fill="none" {...common} />
         </Svg>
       );
     case 'profile':
@@ -95,14 +95,6 @@ export function BuyerNavIcon({
           <Path d="M2.9 19.2c.7-3.2 3-5 6.1-5s5.4 1.8 6.1 5" fill="none" {...common} />
           <Path d="M15.2 5.4a3.2 3.2 0 0 1 0 6.3" fill="none" {...common} />
           <Path d="M17.3 14.4c2 .6 3.3 2.2 3.8 4.8" fill="none" {...common} />
-        </Svg>
-      );
-    case 'live-tv':
-      return (
-        <Svg width={size} height={size} viewBox="0 0 24 24">
-          <Rect x={2} y={4} width={20} height={14.5} rx={2.2} fill="none" {...common} />
-          <Path d="M9 21h6m-3-2.5V21" fill="none" {...common} />
-          <SvgText x={12} y={13.6} textAnchor="middle" fill={color} fontSize={6.4} fontWeight="700">LIVE</SvgText>
         </Svg>
       );
     case 'filters':

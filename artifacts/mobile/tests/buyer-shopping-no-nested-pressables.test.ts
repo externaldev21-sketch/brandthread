@@ -33,6 +33,11 @@ const FILES_TO_CHECK = [
   'app/seller-profile.tsx',
   'app/buyer-other-profile.tsx',
   'components/search/ProductTile.tsx',
+  'components/search/PersonRow.tsx',
+  'components/search/SegmentedTabs.tsx',
+  'components/search/VideoTile.tsx',
+  'components/search/BrandCard.tsx',
+  'components/search/CategoryTile.tsx',
   'components/ShopProductSheet.tsx',
 ];
 

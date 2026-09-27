@@ -282,6 +282,25 @@ describe('buyer full-screen search', () => {
     expect(textContent(renderer)).toContain('black wool coat');
   });
 
+  it('pads "you may like" up to 4 with fallback terms when trending returns fewer, without duplicates', async () => {
+    apiMock.public.trending.mockResolvedValue({ trending: [{ term: 'hoodie', type: 'category' }] });
+    renderer = await renderScreen();
+    const content = textContent(renderer);
+    expect(content).toContain('hoodie');
+    expect(content).toContain('black wool coat');
+    expect(content).toContain('silver dress');
+    expect(content).toContain('Atelier Noire');
+  });
+
+  it('shows suggestions (not results tabs) immediately while typing, before Search is pressed', async () => {
+    apiMock.public.search.mockResolvedValue({ results: [] });
+    apiMock.social.search.mockResolvedValue([]);
+    renderer = await renderScreen();
+    setField(renderer, 'v');
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-suggestions' }, { deep: false })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-results-state' }, { deep: false })).toHaveLength(0);
+  });
+
   it('clears an individual recent search and all recent searches', async () => {
     renderer = await renderScreen();
     await act(async () => {
@@ -297,7 +316,7 @@ describe('buyer full-screen search', () => {
     expect(storageMock.removeItem).toHaveBeenCalledWith('bt:buyer-search-recent:buyer-1');
   });
 
-  it('debounces typing (150ms) before calling the search and social APIs, then renders tabs', async () => {
+  it('debounces typing (150ms) before calling the search and social APIs, shows suggestions first, then renders tabs on submit', async () => {
     apiMock.public.search.mockResolvedValue({ results: [product()] });
     apiMock.social.search.mockResolvedValue([person()]);
 
@@ -315,6 +334,17 @@ describe('buyer full-screen search', () => {
 
     expect(apiMock.public.search).toHaveBeenCalledWith({ q: 'vault', limit: 30 });
     expect(apiMock.social.search).toHaveBeenCalledWith('vault', 20);
+
+    // Typing alone — before Search is pressed — shows suggestions, not the
+    // tabbed results view. The suggestion data (fetched above) is what
+    // powers the suggestion rows, but the tabs themselves stay hidden.
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-suggestions' }, { deep: false })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-results-state' }, { deep: false })).toHaveLength(0);
+
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'buyer-search-submit' }).props.onPress();
+      await flushPromises();
+    });
 
     expect(textContent(renderer)).toContain('Jordan Lee');
     expect(textContent(renderer)).toContain('Canvas Cargo Jacket');
@@ -340,6 +370,11 @@ describe('buyer full-screen search', () => {
       await flushPromises();
     });
 
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'buyer-search-submit' }).props.onPress();
+      await flushPromises();
+    });
+
     expect(renderer.root.findAllByProps({ testID: 'buyer-search-no-results' }, { deep: false })).toHaveLength(1);
   });
 
@@ -353,6 +388,11 @@ describe('buyer full-screen search', () => {
     await act(async () => {
       vi.advanceTimersByTime(150);
       vi.useRealTimers();
+      await flushPromises();
+    });
+
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'buyer-search-submit' }).props.onPress();
       await flushPromises();
     });
 

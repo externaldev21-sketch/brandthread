@@ -12,15 +12,15 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   View, Text, ScrollView, StyleSheet, Image,
-  ActivityIndicator, Alert, TextInput,
+  ActivityIndicator, Alert, TextInput, TouchableOpacity,
 } from 'react-native';
-import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, StickyFooter } from '@/components/layout';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  getCartForScreen, updateCartItemQuantity, removeCartItem, restoreCartSnapshot,
+  getCartForScreen, updateCartItemQuantity, removeCartItem, removeCartItems, restoreCartSnapshot,
   saveForLater, moveToCart, removeSavedItem,
   groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart,
 } from '@/services/cartService';
@@ -250,14 +250,14 @@ function CartItemRow({
 const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm, alignItems: 'flex-start' },
   rowBusy: { opacity: 0.7 },
-  checkbox: { width: COMP.minTouchTarget, height: 108, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
+  checkbox: { width: COMP.minTouchTarget, height: 100, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
   checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
   },
   img: {
-    width: 88, height: 108, borderRadius: RADIUS.lg,
+    width: 80, height: 100, borderRadius: 10,
     backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
@@ -316,8 +316,15 @@ function SellerGroup({
   const router = useRouter();
   return (
     <Card style={sg.root}>
-      {/* Seller header */}
-      <View style={sg.sellerRow}>
+      {/* Seller header — avatar, name, and a chevron to the store (the
+          whole row is the tap target, not a separate "Visit store" button). */}
+      <PressableScale
+        style={sg.sellerRow}
+        onPress={() => router.push(('/seller-profile?id=' + group.sellerId) as never)}
+        accessibilityRole="button"
+        accessibilityLabel={`Visit ${group.sellerName}'s store`}
+        noMinHeight
+      >
         <View style={[sg.avatar, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
           <Text style={[sg.avatarText, { color: theme.accentLight }]}>{group.sellerInitial}</Text>
         </View>
@@ -325,14 +332,8 @@ function SellerGroup({
           <Text style={sg.sellerName}>{group.sellerName}</Text>
           <Text style={sg.sellerHandle}>{group.sellerHandle}</Text>
         </View>
-        <Button
-          label="Visit store"
-          size="small"
-          variant="secondary"
-          onPress={() => router.push(('/seller-profile?id=' + group.sellerId) as never)}
-          accessibilityHint={`Opens ${group.sellerName}'s store`}
-        />
-      </View>
+        <Feather name="chevron-right" size={18} color={theme.muted} />
+      </PressableScale>
 
       {/* Items */}
       {group.items.map((item, idx) => (
@@ -501,7 +502,11 @@ const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
 
 export default function CartScreen() {
   const scrollResetRef = useScrollReset<ScrollView>();
-  const barInset = useBuyerTabBarInset();
+  // Cart is a pushed screen reached from the feed's cart icon or Shop the
+  // Post (see BUYER_TAB_BAR_HIDDEN_ROUTES in BuyerTabBar.tsx) — the floating
+  // tab bar is hidden here entirely, so content pads by the plain safe-area
+  // bottom inset instead of the bar's occupied height.
+  const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeScreenStyles(theme), [theme]);
   const router = useRouter();
@@ -530,6 +535,12 @@ export default function CartScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const knownItemIdsRef = useRef<Set<string>>(new Set());
   const [buyingItemId, setBuyingItemId] = useState<string | null>(null);
+
+  // Header "Edit" toggle — reuses the existing per-item selection checkboxes
+  // to drive a bulk "Remove selected" action instead of adding a second,
+  // parallel selection model.
+  const [editMode, setEditMode] = useState(false);
+  const [removingSelected, setRemovingSelected] = useState(false);
 
   // Per-row pending actions: itemId → action
   const [pendingByItemId, setPendingByItemId] = useState<Record<string, RowPendingAction>>({});
@@ -705,6 +716,20 @@ export default function CartScreen() {
     setCart(newCart);
   }
 
+  async function handleRemoveSelected() {
+    if (selectedIds.size === 0 || removingSelected) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setRemovingSelected(true);
+    try {
+      const newCart = await removeCartItems([...selectedIds]);
+      setCart(newCart);
+      setSelectedIds(new Set());
+      setEditMode(false);
+    } finally {
+      setRemovingSelected(false);
+    }
+  }
+
   function handleEditVariant(item: CartItem) {
     push(('/thread-product-detail?productId=' + item.productId + '&editVariantId=' + item.variantId + '&editCartItemId=' + item.id) as never);
   }
@@ -847,31 +872,32 @@ export default function CartScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Shared page header — identical large-title size/weight/offset to every other
-          tab-root page. Full-cart totals stay visible at the top too, not just the
-          footer, via belowTitle since the count badge + subtotal aren't a simple
-          icon action. */}
+      {/* Pushed-screen header: back chevron + "Cart (N)" + Edit, matching
+          every other stack screen (not the tab-root large-title header) —
+          this is a screen reached from the feed's cart icon or Shop the
+          Post, never its own tab (see BUYER_TAB_BAR_HIDDEN_ROUTES). */}
       <Header
-        title="Cart"
-        largeTitle
-        showBack={false}
-        belowTitle={hasItems ? (
-          <View style={s.headerRight}>
-            <View style={[s.headerBadge, { backgroundColor: theme.accent }]}>
-              <Text style={[s.headerBadgeText, { color: theme.onAccent }]}>{cart.items.reduce((s, i) => s + i.quantity, 0)}</Text>
-            </View>
-            <Text style={s.headerSubtotal}>{fmtPrice(summary.subtotalCents)}</Text>
-          </View>
+        title={`Cart${hasItems ? ` (${cart.items.reduce((sum, i) => sum + i.quantity, 0)})` : ''}`}
+        showBack
+        rightElement={hasItems ? (
+          <TouchableOpacity
+            onPress={() => { Haptics.selectionAsync(); setEditMode(e => !e); }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={editMode ? 'Done editing cart' : 'Edit cart'}
+          >
+            <Text style={[s.editText, { color: theme.accentLight }]}>{editMode ? 'Done' : 'Edit'}</Text>
+          </TouchableOpacity>
         ) : undefined}
       />
 
       {!hasItems && !hasSaved && !loadError ? (
         <EmptyState
           icon="shopping-bag"
-          title="Your cart is ready for something great."
-          description="Browse Home and tap Shop on the pieces you love."
+          title="Your cart is ready."
+          description="Tap Shop on a post you love to add it here."
           action={{
-            label: 'Discover Products',
+            label: 'Continue shopping',
             icon: 'compass',
             onPress: () => router.push('/(buyer)/discover' as never),
           }}
@@ -885,6 +911,22 @@ export default function CartScreen() {
         />
       ) : (
         <>
+          {hasItems && editMode && (
+            <View style={s.editBar}>
+              <Text style={s.editBarText}>
+                {selectedItems.length > 0 ? `${selectedItems.length} selected` : 'Select items to remove'}
+              </Text>
+              <Button
+                label="Remove"
+                size="compact"
+                variant="destructive"
+                onPress={handleRemoveSelected}
+                loading={removingSelected}
+                disabled={selectedItems.length === 0}
+                accessibilityHint="Removes the selected items from your cart"
+              />
+            </View>
+          )}
           {hasItems && (
             <PressableScale
               style={s.selectAllRow}
@@ -913,8 +955,9 @@ export default function CartScreen() {
             contentContainerStyle={{
               paddingHorizontal: SP.md,
               paddingTop: SP.sm,
-              // Clears the checkout summary, which itself sits above the tab bar.
-              paddingBottom: barInset + 150,
+              // Clears the sticky checkout bar, which sits above the home
+              // indicator — no floating tab bar to clear on this pushed screen.
+              paddingBottom: insets.bottom + 150,
             }}
           >
             {/* Seller groups */}
@@ -1051,27 +1094,36 @@ export default function CartScreen() {
             <RecentlyViewedRow style={{ marginTop: SP.xl }} />
           </ScrollView>
 
-          {/* Checkout button — acts on whatever's checked (all by default), Nike-bag style sticky pill */}
+          {/* Sticky checkout bar — total on the left, a white "Checkout" pill
+              on the right, pinned above the home indicator. This is a pushed
+              screen with the floating tab bar hidden (see
+              BUYER_TAB_BAR_HIDDEN_ROUTES), so it pads by insets.bottom + 8,
+              not the tab bar's occupied height. */}
           {hasItems && (
-            <StickyFooter tabBarInset={barInset}>
-              <View style={s.checkoutSummaryRow}>
-                <Text style={s.checkoutSummaryLabel}>
-                  {allSelected ? 'Total' : `${selectedItems.length} selected`}
-                </Text>
-                <Text style={s.checkoutSummaryAmount}>{fmtPrice(selectedDisplayedTotal)}</Text>
+            <StickyFooter style={{ paddingBottom: insets.bottom + 8 }}>
+              <View style={s.checkoutBarRow}>
+                <View>
+                  <Text style={s.checkoutSummaryLabel}>
+                    {allSelected ? 'Total' : `${selectedItems.length} selected`}
+                  </Text>
+                  <Text style={s.checkoutSummaryAmount}>{fmtPrice(selectedDisplayedTotal)}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleCheckoutSelected}
+                  disabled={selectedItems.length === 0 || validating}
+                  activeOpacity={0.85}
+                  style={[s.checkoutPill, (selectedItems.length === 0 || validating) && { opacity: 0.5 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Checkout"
+                  accessibilityHint="Reviews shipping and opens secure payment"
+                >
+                  {validating ? (
+                    <ActivityIndicator size="small" color="#000000" />
+                  ) : (
+                    <Text style={s.checkoutPillText}>Checkout</Text>
+                  )}
+                </TouchableOpacity>
               </View>
-              <Button
-                label={allSelected ? 'Check out' : `Check out ${selectedItems.length} selected`}
-                icon="lock"
-                onPress={handleCheckoutSelected}
-                loading={validating}
-                disabled={selectedItems.length === 0}
-                fullWidth
-                accessibilityHint="Reviews shipping and opens secure payment"
-              />
-              <Text style={s.secureNote}>
-                <Feather name="shield" size={11} color={theme.subtle} /> Secured by Brandthread
-              </Text>
             </StickyFooter>
           )}
         </>
@@ -1083,16 +1135,13 @@ export default function CartScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  headerBadge: {
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    minWidth: 24,
-    alignItems: 'center',
+  editText: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  editBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: SP.md, paddingVertical: SP.sm,
+    backgroundColor: theme.cardElevatedGlass, borderBottomWidth: 1, borderBottomColor: theme.border,
   },
-  headerBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
-  headerSubtotal: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
+  editBarText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   selectAllRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     paddingHorizontal: SP.md, paddingBottom: SP.xs,
@@ -1116,8 +1165,17 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },
   appliedPointsSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   savedHint: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
-  checkoutSummaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.xs },
+  // Sticky checkout bar: total on the left, a white pill on the right —
+  // Nike Bag / TikTok Shop checkout-bar reference, forced white/black
+  // regardless of theme so it reads as the one fixed "pay" affordance.
+  checkoutBarRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   checkoutSummaryLabel: { ...TYPE_SCALE.footnote, color: theme.muted },
   checkoutSummaryAmount: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
-  secureNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', marginTop: SP.xs },
+  checkoutPill: {
+    minWidth: 132, minHeight: COMP.buttonHSm,
+    borderRadius: RADIUS.pill, backgroundColor: '#FFFFFF',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: SP.lg,
+  },
+  checkoutPillText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#000000' },
 });

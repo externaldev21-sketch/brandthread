@@ -18,11 +18,12 @@ const feedTopBar = read('components/buyer-feed/FeedTopBar.tsx');
 const tabItemsBlock = bar.slice(bar.indexOf('export const BUYER_TAB_ITEMS'), bar.indexOf('type Slot'));
 
 describe('buyer navigation contract', () => {
-  it('renders Home · Discover · Inbox · Search in the capsule and Profile in a separate circle', () => {
+  it('renders Home · Discover · Inbox · Activity in the capsule and Profile in a separate circle', () => {
     expect(layout).toContain('<BuyerTabBar {...props} inboxBadgeCount={inboxBadgeCount} />');
-    // Search is no longer a Tabs.Screen — it's a standalone full-screen page
-    // (app/buyer-search.tsx) pushed from the bar's Search slot, so the bar
-    // never morphs into an inline text field over the tabs.
+    // Search is not a Tabs.Screen and not a bottom-bar slot — it's a
+    // standalone full-screen page (app/buyer-search.tsx) reachable only from
+    // the feed's top-row icon and Discover. Activity (bell) takes the 4th
+    // capsule slot instead, pushing /activity-center like Search used to.
     for (const route of ['index', 'discover', 'inbox', 'profile']) {
       expect(layout).toContain(`name="${route}"`);
     }
@@ -30,14 +31,16 @@ describe('buyer navigation contract', () => {
     expect(tabItemsBlock).toContain("{ route: 'index', label: 'Home', icon: 'home' }");
     expect(tabItemsBlock).toContain("{ route: 'discover', label: 'Discover', icon: 'discover' }");
     expect(tabItemsBlock).toContain("{ route: 'inbox', label: 'Inbox', icon: 'inbox' }");
-    expect(tabItemsBlock).toContain("{ route: 'search', label: 'Search', icon: 'search' }");
+    expect(tabItemsBlock).toContain("{ route: 'activity', label: 'Activity', icon: 'activity' }");
+    expect(tabItemsBlock).not.toContain("route: 'search'");
     expect(tabItemsBlock).not.toContain('profile');
     expect(bar).toContain('testID="buyer-bottom-tab-bar"');
     expect(bar).toContain('testID="buyer-tab-profile"');
   });
 
-  it('the Search slot pushes the standalone search page instead of navigating a tab', () => {
-    expect(bar).toContain("router.push('/buyer-search'");
+  it('the Activity slot pushes the Activity Center instead of navigating a tab', () => {
+    expect(bar).toContain("router.push('/activity-center'");
+    expect(bar).not.toContain("router.push('/buyer-search'");
     expect(bar).not.toContain('MORPH_SPRING');
     expect(bar).not.toContain('useAnimatedKeyboard');
   });
