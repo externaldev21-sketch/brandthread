@@ -133,11 +133,9 @@ function PostCard({
       {/* Actions */}
       <View style={s.actionRow}>
         <PressableScale style={s.actionItem} onPress={() => onLike(post)}>
-          <FontAwesome
-            name={post.likedByMe ? 'heart' : 'heart-o'}
-            size={ICON.lg}
-            color={post.likedByMe ? palette.destructive : palette.mutedForeground}
-          />
+          {post.likedByMe
+            ? <FontAwesome name="heart" size={ICON.lg} color={palette.destructive} />
+            : <Feather name="heart" size={ICON.lg} color={palette.mutedForeground} />}
           <Text style={[TYPE_SCALE.callout, s.actionCount, { color: palette.mutedForeground }, post.likedByMe && { color: palette.destructive }]}>{post.likesCount}</Text>
         </PressableScale>
         <PressableScale style={s.actionItem} onPress={() => onOpenComments(post)}>
@@ -158,7 +156,9 @@ function PostCard({
           onPress={() => onSave(post)}
           accessibilityLabel={saved ? 'Remove from saved' : 'Save post'}
         >
-          <FontAwesome name={saved ? 'bookmark' : 'bookmark-o'} size={ICON.lg} color={saved ? theme.accent : palette.mutedForeground} />
+          {saved
+            ? <FontAwesome name="bookmark" size={ICON.lg} color={theme.accent} />
+            : <Feather name="bookmark" size={ICON.lg} color={palette.mutedForeground} />}
         </PressableScale>
         <PressableScale
           style={s.actionIcon}
@@ -507,6 +507,7 @@ export default function FriendsScreen() {
       {!hasFriends && feedPosts.length === 0 && apiFollowing.length === 0 && !loading && !loadError && (
         <EmptyState
           icon="users"
+          illustration="friends"
           title="Find your crew"
           description="Add friends to see what they're copping, saving, and dropping."
           action={{ label: 'Find friends', onPress: () => { hapticPrimaryAction(); router.push('/buyer-friend-requests' as never); } }}

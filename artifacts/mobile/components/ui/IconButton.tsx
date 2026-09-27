@@ -11,7 +11,7 @@ import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
 import { COMP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
-import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
+import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
 
 export interface IconButtonProps {
   name: keyof typeof Feather.glyphMap;
@@ -45,7 +45,6 @@ export function IconButton({
 }: IconButtonProps) {
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
-  const nativeDriver = Platform.OS !== 'web';
   const resolvedColor = color ?? (variant === 'glass' ? '#FFFFFF' : palette.foreground);
 
   return (
@@ -56,8 +55,8 @@ export function IconButton({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={() => { hapticLight(); onPress(); }}
-      onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
+      onPressIn={() => pressScaleAnim(scale, PRESS_SCALE).start()}
+      onPressOut={() => pressScaleAnim(scale, 1).start()}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       testID={testID}
       style={styles.hit}

@@ -41,7 +41,7 @@ export function RightActionRail({
   engagement, commentsCount, shares, saves,
   onOpenCreator, onFollow, onLike, onOpenComments, onRepost, onSave, onShare,
   heartScale, likeRing, repostSpin, repostScale, saveDrop, saveScale,
-  style, testIdBase,
+  style, testIdBase, reduceMotion,
 }: {
   creator: string;
   /** The video's host/seller id — used to show a live ring around the
@@ -73,7 +73,52 @@ export function RightActionRail({
   saveScale: Animated.Value;
   style?: any;
   testIdBase: string;
+  /** Skips the follow badge's rotate/color-fill/fade sub-steps and just
+   *  jumps to its resting state — same "disable non-essential motion"
+   *  gate the rest of the feed's motion pass respects. */
+  reduceMotion?: boolean;
 }) {
+  const [badgeVisible, setBadgeVisible] = React.useState(!engagement?.following);
+  const [showCheck, setShowCheck] = React.useState(!!engagement?.following);
+  const wasFollowing = React.useRef(!!engagement?.following);
+  const followBadgeRotate = React.useRef(new Animated.Value(engagement?.following ? 1 : 0)).current;
+  const followBadgeColor = React.useRef(new Animated.Value(engagement?.following ? 1 : 0)).current;
+  const followBadgeOpacity = React.useRef(new Animated.Value(engagement?.following ? 0 : 1)).current;
+
+  React.useEffect(() => {
+    const isFollowing = !!engagement?.following;
+    if (isFollowing === wasFollowing.current) return;
+    wasFollowing.current = isFollowing;
+
+    if (!isFollowing) {
+      // Unfollowed again (or reset) — badge comes straight back, no replay
+      // of the follow animation.
+      setBadgeVisible(true);
+      setShowCheck(false);
+      followBadgeRotate.setValue(0);
+      followBadgeColor.setValue(0);
+      followBadgeOpacity.setValue(1);
+      return;
+    }
+
+    if (reduceMotion) {
+      setBadgeVisible(false);
+      return;
+    }
+
+    // Sub-steps per the motion pass: '+' rotates into a checkmark (150ms),
+    // the badge fills from white to black (100ms), holds briefly, then
+    // fades out (200ms) before unmounting.
+    Animated.timing(followBadgeRotate, { toValue: 1, duration: 150, useNativeDriver: true }).start(() => {
+      setShowCheck(true);
+      Animated.timing(followBadgeColor, { toValue: 1, duration: 100, useNativeDriver: false }).start(() => {
+        Animated.timing(followBadgeOpacity, { toValue: 0, duration: 200, delay: 250, useNativeDriver: true }).start(() => {
+          setBadgeVisible(false);
+        });
+      });
+    });
+  }, [engagement?.following, reduceMotion, followBadgeRotate, followBadgeColor, followBadgeOpacity]);
+
   return (
     <Animated.View style={[styles.rail, style]}>
       <View style={styles.avatarWrap}>
@@ -97,7 +142,7 @@ export function RightActionRail({
             )}
           </LiveHostRing>
         </TouchableOpacity>
-        {!engagement?.following && (
+        {badgeVisible && (
           // Plain TouchableOpacity, not EngagementButton — EngagementButton
           // applies the `style` prop passed to it to its *inner* content
           // view, not the outer touchable wrapper, so a positioning style
@@ -105,17 +150,35 @@ export function RightActionRail({
           // happened to look roughly right by flow-layout coincidence.
           // That's what let it drift onto the ring/initials; this needs
           // exact placement (see the math in the PR description), so it's
-          // a plain absolutely-positioned button instead.
-          <TouchableOpacity
-            style={styles.followBadge}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={`Follow ${creator}`}
-            onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onFollow(); }}
-            testID={`follow-btn-${testIdBase}`}
+          // a plain absolutely-positioned button instead. The animated
+          // outer View owns rotate/color/fade; the inner touchable just
+          // fills it so the tap target doesn't shrink mid-animation.
+          <Animated.View
+            style={[
+              styles.followBadge,
+              {
+                opacity: followBadgeOpacity,
+                backgroundColor: followBadgeColor.interpolate({ inputRange: [0, 1], outputRange: [ON_DARK, '#000000'] }),
+                transform: [{ rotate: followBadgeRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }],
+              },
+            ]}
           >
-            <Feather name="plus" size={11} color="#000000" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.followBadgeTouchable}
+              activeOpacity={0.8}
+              disabled={!!engagement?.following}
+              accessibilityRole="button"
+              accessibilityLabel={`Follow ${creator}`}
+              onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onFollow(); }}
+              testID={`follow-btn-${testIdBase}`}
+            >
+              <Feather
+                name={showCheck ? 'check' : 'plus'}
+                size={11}
+                color={showCheck ? ON_DARK : '#000000'}
+              />
+            </TouchableOpacity>
+          </Animated.View>
         )}
       </View>
 
@@ -248,10 +311,11 @@ const styles = StyleSheet.create({
   // centers this horizontally too since no left/right is set.
   followBadge: {
     position: 'absolute', bottom: -13.5, width: 16, height: 16, borderRadius: RADII.pill,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: ON_DARK,
+    alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: '#000',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
+  followBadgeTouchable: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },
   btn: { width: 38, alignItems: 'center', gap: 3 },
   actionContent: { width: 38, alignItems: 'center', gap: 3 },
   likeWrap: { width: 38, alignItems: 'center', justifyContent: 'center' },

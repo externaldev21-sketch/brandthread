@@ -17,6 +17,9 @@ export default defineConfig({
       // precedence over this alias.
       "react-native-reanimated": new URL("./tests/shims/reanimated.tsx", import.meta.url).pathname,
       "react-native-gesture-handler": new URL("./tests/shims/gesture-handler.tsx", import.meta.url).pathname,
+      // Same class of issue as reanimated/gesture-handler above (a
+      // Flow-annotated file the ESM resolver can't parse), not app code.
+      "react-native-svg": new URL("./tests/shims/react-native-svg.tsx", import.meta.url).pathname,
       "@": new URL(".", import.meta.url).pathname,
     },
   },
