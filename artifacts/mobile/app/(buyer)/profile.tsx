@@ -71,15 +71,6 @@ const WEB_TOP_FALLBACK = 67;
 // "Your profile" placeholder.
 const PREVIEW_NAME = 'Ava Buyer';
 const PREVIEW_HANDLE = '@ava';
-const PREVIEW_EMPTY_STREAK: ThreadCashStreakState = {
-  currentStreak: 1,
-  longestStreak: 1,
-  lastCheckInDate: null,
-  timezone: 'UTC',
-  alreadyCheckedInToday: false,
-  dayInCycle: 1,
-  streakBonusDays: 7,
-};
 
 const TABS = ['Posts', 'Saved', 'Liked', 'Orders'] as const;
 type Tab = typeof TABS[number];
@@ -685,10 +676,6 @@ export default function ProfileScreen() {
       ? 'Removing cover…'
       : hasCover ? 'Edit cover' : 'Add cover video';
   const showCoverPlusIcon = !hasCover && !coverFlow.busy;
-  // The streak card only ever has real data behind a signed-in account; the
-  // dev preview bypass has none, so it shows the same empty 7-day state a
-  // brand-new real account would see instead of rendering nothing.
-  const displayedStreak = threadCashStreak ?? (isPreviewIdentity ? PREVIEW_EMPTY_STREAK : null);
 
   const stats: ProfileStat[] = [
     {
@@ -836,7 +823,7 @@ export default function ProfileScreen() {
       </View>
 
       {threadCashEnabled ? (
-        <ThreadCashStreakRow streak={displayedStreak} onPress={() => router.push('/thread-cash' as never)} />
+        <ThreadCashStreakRow streak={threadCashStreak} onPress={() => router.push('/thread-cash' as never)} />
       ) : null}
 
       <View style={styles.tabsBlock}>
