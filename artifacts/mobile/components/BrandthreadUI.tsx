@@ -34,6 +34,7 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { undoExpiresAt } from '@/lib/undoRecovery';
 import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
 import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
+import { a11yHidden } from '@/lib/a11yHidden';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
 // Mutations remain responsible for their own server/local rollback. This provider
@@ -706,7 +707,7 @@ export function EmptyState({ icon, title, description, action, secondaryAction, 
   const colors = useColors();
   return (
     <View style={[esS.root, compact && esS.rootCompact, style]}>
-      {!compact && <View style={esS.illustration} accessibilityElementsHidden>
+      {!compact && <View style={esS.illustration} {...a11yHidden(true)}>
         <View style={[esS.artCircle, { borderColor: theme.border }]}>
           {illustration ? (
             <ThreadIllustration motif={illustration} size={56} color={theme.muted} strokeWidth={4} />

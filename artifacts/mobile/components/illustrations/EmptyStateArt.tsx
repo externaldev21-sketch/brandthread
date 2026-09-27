@@ -14,6 +14,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
 import Animated, { useAnimatedProps, useSharedValue, withTiming, Easing, cancelAnimation } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
+import { a11yHidden } from '@/lib/a11yHidden';
 
 export type ThreadMotif =
   | 'hanger'
@@ -97,7 +98,7 @@ export function ThreadIllustration({
   const AnimatedPath = getAnimatedPath();
 
   return (
-    <Svg width={size} height={size} viewBox="0 0 160 160" style={style} accessibilityElementsHidden>
+    <Svg width={size} height={size} viewBox="0 0 160 160" style={style} {...a11yHidden(true)}>
       <AnimatedPath
         d={PATHS[motif]}
         stroke={color}
