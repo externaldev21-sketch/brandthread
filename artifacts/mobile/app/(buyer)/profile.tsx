@@ -62,6 +62,23 @@ const COVER_HEIGHT = 160;
 // Dynamic Island corner in the plain web preview.
 const WEB_TOP_FALLBACK = 67;
 
+// Realistic identity shown only when there is truly no signed-in user at all
+// (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
+// authenticated user always has at least a Clerk username, so this never
+// fires in production and the screen never falls back to a generic
+// "Your profile" placeholder.
+const PREVIEW_NAME = 'Ava Buyer';
+const PREVIEW_HANDLE = '@ava';
+const PREVIEW_EMPTY_STREAK: ThreadCashStreakState = {
+  currentStreak: 1,
+  longestStreak: 1,
+  lastCheckInDate: null,
+  timezone: 'UTC',
+  alreadyCheckedInToday: false,
+  dayInCycle: 1,
+  streakBonusDays: 7,
+};
+
 const TABS = ['Posts', 'Saved', 'Liked', 'Orders'] as const;
 type Tab = typeof TABS[number];
 
@@ -550,13 +567,18 @@ export default function ProfileScreen() {
   };
 
   const clerkName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || '';
+  // Only true in the dev `?bt_preview=buyer` bypass, which never signs in
+  // through Clerk at all — a real user always has at least a username.
+  const isPreviewIdentity = !user?.id;
   const displayHandle = profile?.username
     ? `@${profile.username}`
-    : (user?.username ? `@${user.username}` : '');
+    : user?.username
+      ? `@${user.username}`
+      : (isPreviewIdentity ? PREVIEW_HANDLE : '');
   // Real display name → @username → the generic fallback, in that order —
   // never the giant hardcoded "Your profile" title unless there's truly no
   // data yet to show.
-  const displayName = profile?.name || clerkName || displayHandle || 'Your profile';
+  const displayName = profile?.name || clerkName || (isPreviewIdentity ? PREVIEW_NAME : displayHandle) || 'Your profile';
 
   // Tapping a post opens the full-screen feed player on this buyer's own
   // posts, starting at the tapped one.
@@ -636,7 +658,12 @@ export default function ProfileScreen() {
     ? 'Uploading cover…'
     : coverFlow.busy === 'removing'
       ? 'Removing cover…'
-      : hasCover ? 'Edit cover' : '+ Add cover video';
+      : hasCover ? 'Edit cover' : 'Add cover video';
+  const showCoverPlusIcon = !hasCover && !coverFlow.busy;
+  // The streak card only ever has real data behind a signed-in account; the
+  // dev preview bypass has none, so it shows the same empty 7-day state a
+  // brand-new real account would see instead of rendering nothing.
+  const displayedStreak = threadCashStreak ?? (isPreviewIdentity ? PREVIEW_EMPTY_STREAK : null);
 
   const stats: ProfileStat[] = [
     {
@@ -654,7 +681,49 @@ export default function ProfileScreen() {
 
   const header = (
     <View>
-      {/* ── Top bar — always clear of the notch/Dynamic Island ── */}
+      {/* ── Cover — runs all the way to the top, behind the transparent top
+          bar, so there's no hard seam between them. A subtle dark gradient
+          when empty, never a placeholder squiggle. ── */}
+      <View style={styles.cover}>
+        {hasCover ? (
+          <ProfileHeroMedia videoUri={coverFlow.cover.videoUrl} posterUri={coverFlow.cover.posterUrl} active height={COVER_HEIGHT} />
+        ) : (latestVideo?.mediaUrl || latestPhoto?.mediaUrl) ? (
+          <ProfileHeroMedia videoUri={latestVideo?.mediaUrl ?? null} posterUri={latestPhoto?.mediaUrl ?? null} active={false} height={COVER_HEIGHT} posterOnly />
+        ) : (
+          <LinearGradient
+            colors={['#2A2A2E', '#0B0B0D']} // theme-exempt: fixed monochrome empty-cover gradient
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+        {/* Soft top fade so the transparent top bar's icons/text stay legible
+            over whatever the cover is showing underneath. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']} // theme-exempt: legibility scrim over cover media
+          style={[styles.coverTopFade, { height: topPad + 60 }]}
+        />
+        <View style={styles.coverAddWrap} pointerEvents="box-none">
+          <PressableScale
+            onPress={hasCover ? coverFlow.openManage : coverFlow.startAdd}
+            disabled={!!coverFlow.busy}
+            accessibilityRole="button"
+            accessibilityLabel={coverAddLabel}
+            accessibilityHint={hasCover ? 'Change or remove your profile cover video' : 'Pick or record a short video to play behind your profile'}
+            testID="profile-cover-affordance"
+          >
+            {(state) => (
+              <View style={styles.coverAdd}>
+                <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.sm} theme={{ text: '#FFFFFF', accent: '#FFFFFF' } as AppThemePreset} />
+                {showCoverPlusIcon ? <Feather name="plus" size={13} color="#FFFFFF" style={styles.coverAddIcon} /* theme-exempt: legible over cover media */ /> : null}
+                <Text style={styles.coverAddText} numberOfLines={1}>{coverAddLabel}</Text>
+              </View>
+            )}
+          </PressableScale>
+        </View>
+      </View>
+
+      {/* ── Top bar — transparent over the cover, always clear of the
+          notch/Dynamic Island ── */}
       <View style={[styles.topBar, { paddingTop: topPad + 6 }]}>
         <PressableScale
           style={styles.topBarLeft}
@@ -686,31 +755,6 @@ export default function ProfileScreen() {
           <TopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" theme={theme} />
           <TopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" theme={theme} />
         </View>
-      </View>
-
-      {/* ── Cover — a subtle dark gradient when empty, never a placeholder squiggle ── */}
-      <View style={styles.cover}>
-        {hasCover ? (
-          <ProfileHeroMedia videoUri={coverFlow.cover.videoUrl} posterUri={coverFlow.cover.posterUrl} active height={COVER_HEIGHT} />
-        ) : (latestVideo?.mediaUrl || latestPhoto?.mediaUrl) ? (
-          <ProfileHeroMedia videoUri={latestVideo?.mediaUrl ?? null} posterUri={latestPhoto?.mediaUrl ?? null} active={false} height={COVER_HEIGHT} posterOnly />
-        ) : (
-          <LinearGradient
-            colors={['#2A2A2E', '#0B0B0D']} // theme-exempt: fixed monochrome empty-cover gradient
-            style={StyleSheet.absoluteFill}
-          />
-        )}
-        <PressableScale
-          onPress={hasCover ? coverFlow.openManage : coverFlow.startAdd}
-          disabled={!!coverFlow.busy}
-          accessibilityRole="button"
-          accessibilityLabel={coverAddLabel}
-          accessibilityHint={hasCover ? 'Change or remove your profile cover video' : 'Pick or record a short video to play behind your profile'}
-          testID="profile-cover-affordance"
-          style={styles.coverAdd}
-        >
-          <Text style={styles.coverAddText} numberOfLines={1}>{coverAddLabel}</Text>
-        </PressableScale>
       </View>
 
       {/* ── Identity — avatar overlapping the cover, real name, handle, tag, bio ── */}
@@ -766,7 +810,7 @@ export default function ProfileScreen() {
       </View>
 
       {threadCashEnabled ? (
-        <ThreadCashStreakRow streak={threadCashStreak} onPress={() => router.push('/thread-cash' as never)} />
+        <ThreadCashStreakRow streak={displayedStreak} onPress={() => router.push('/thread-cash' as never)} />
       ) : null}
 
       <View style={styles.tabsBlock}>
@@ -861,20 +905,26 @@ function makeStyles(theme: AppThemePreset) {
     gridRow: { gap: 1 },
 
     topBar: {
+      position: 'absolute', top: 0, left: 0, right: 0,
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: SP.md, paddingBottom: SP.sm,
+      paddingHorizontal: SP.md, paddingBottom: SP.sm, backgroundColor: 'transparent',
     },
     topBarLeft: {
-      flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32, maxWidth: '55%',
+      flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32,
       borderRadius: RADIUS.sm, overflow: 'hidden',
     },
-    topBarUsername: { fontFamily: FONT.semibold, fontSize: 17, flexShrink: 1 },
-    topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    topBarUsername: { fontFamily: FONT.semibold, fontSize: 17, flexShrink: 1, minWidth: 0 },
+    topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 16, flexShrink: 0 },
 
     cover: { height: COVER_HEIGHT, overflow: 'hidden', backgroundColor: theme.card },
-    coverAdd: { position: 'absolute', right: 12, bottom: 10 },
+    coverTopFade: { position: 'absolute', top: 0, left: 0, right: 0 },
+    coverAddWrap: { position: 'absolute', right: 12, bottom: 10 },
+    coverAdd: {
+      flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.sm, overflow: 'hidden',
+    },
+    coverAddIcon: { opacity: 0.85 },
     coverAddText: {
-      fontFamily: FONT.semibold, fontSize: 13, color: '#FFFFFF', // theme-exempt: legible over cover media
+      fontFamily: FONT.semibold, fontSize: 13, color: '#FFFFFF', opacity: 0.85, // theme-exempt: legible over cover media
       textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
     },
 
@@ -904,8 +954,11 @@ function makeStyles(theme: AppThemePreset) {
 }
 
 const statsStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-end', gap: SP.lg, paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.sm },
-  cell: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  row: {
+    flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'flex-end', justifyContent: 'flex-start',
+    gap: 20, paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.sm,
+  },
+  cell: { flexDirection: 'row', alignItems: 'baseline', gap: 4, flexShrink: 0 },
   value: { fontFamily: FONT.bold, fontSize: 17, fontVariant: ['tabular-nums'] },
   label: { fontFamily: FONT.medium, fontSize: 13 },
 });
