@@ -60,7 +60,7 @@ export default function VacationModeScreen() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
-        vacationMode ? '🏖 Vacation Mode Active' : '✅ Store Reopened',
+        vacationMode ? 'Vacation Mode Active' : 'Store Reopened',
         vacationMode
           ? 'Buyers will see an away banner on your storefront. New orders are paused.'
           : 'Your store is open again. Buyers can place new orders.',
@@ -92,7 +92,7 @@ export default function VacationModeScreen() {
           <View style={[s.statusIndicator, { backgroundColor: vacationMode ? ORANGE : SUCCESS }]} />
           <View style={{ flex: 1 }}>
             <Text style={s.statusTitle}>
-              {vacationMode ? '🏖  Currently Away' : '🟢  Store Open'}
+              {vacationMode ? 'Currently Away' : 'Store Open'}
             </Text>
             <Text style={s.statusSub}>
               {vacationMode

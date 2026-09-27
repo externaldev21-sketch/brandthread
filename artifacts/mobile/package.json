@@ -102,6 +102,8 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@expo-google-fonts/big-shoulders-display": "^0.2.3",
+    "@expo-google-fonts/fraunces": "^0.4.1",
     "@react-navigation/native": "7.3.7",
     "@sentry/react-native": "~7.11.0",
     "@shopify/flash-list": "2.0.2",

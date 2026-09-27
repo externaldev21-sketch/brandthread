@@ -341,7 +341,7 @@ export default function QuoteRequestScreen() {
       const qr = await saveQuoteRequestDraft(buildQuoteRequestPayload(effectiveManufacturerId, TOTAL_STEPS));
       await submitQuoteRequest(qr.id);
       Alert.alert(
-        'Quote Request Sent! 🎉',
+        'Quote Request Sent',
         'Your request has been submitted. The manufacturer will respond within their stated response time.',
         [{ text: 'OK', onPress: () => goBackOr(router) }]
       );

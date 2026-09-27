@@ -1065,8 +1065,10 @@ function makeStyles(theme: AppThemePreset) {
       backgroundColor: '#FFFFFF', borderColor: theme.background, // theme-exempt: fixed white badge per spec
       borderWidth: 2, alignItems: 'center', justifyContent: 'center',
     },
-    // Name → @handle: 2pt.
-    displayName: { fontFamily: FONT.bold, fontSize: 22, letterSpacing: -0.4 },
+    // Name → @handle: 2pt. Editorial display face (see
+    // docs/design/display-font-options.md) — large enough on this screen to
+    // earn a second typeface, same as Discover's section titles.
+    displayName: { fontFamily: FONT.display, fontSize: 22, letterSpacing: -0.4 },
     handle: { fontFamily: FONT.medium, fontSize: 14, marginTop: 2 },
     // @handle (or name, if no handle) → Buyer tag: 8pt.
     chipWrap: { marginTop: 8, alignItems: 'flex-start' },

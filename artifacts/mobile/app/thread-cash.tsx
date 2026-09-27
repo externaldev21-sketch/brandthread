@@ -186,7 +186,12 @@ export default function ThreadCashScreen() {
                 <ThreadCashBillStack width={280} style={styles.balanceStack} />
               </Pressable>
               <Text style={[styles.balanceLabel, { color: theme.muted }]}>Your balance</Text>
-              <Text style={[styles.balanceValue, tabularType('display'), { color: theme.text }]}>
+              {/* Editorial display face (see
+                  docs/design/display-font-options.md) — large enough here to
+                  earn a second typeface, same as Discover's section titles
+                  and the profile name. Tabular figures still apply on top so
+                  the balance doesn't shift width as it changes. */}
+              <Text style={[styles.balanceValue, tabularType('display'), { fontFamily: FONT.display, color: theme.text }]}>
                 {formatCents(status?.balanceCents ?? 0)}
               </Text>
               <Text style={[styles.balanceHint, { color: theme.subtle }]}>

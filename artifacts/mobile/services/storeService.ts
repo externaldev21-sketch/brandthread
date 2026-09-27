@@ -1556,7 +1556,7 @@ export async function saveDraft(): Promise<Storefront> {
 
 // ─── Mock AI policy generator ─────────────────────────────────────────────────
 export function generatePolicyDraft(type: StorePolicy['type'], storeName: string): string {
-  const disclaimer = '\n\n⚠️ This draft was generated for reference only and is not legal advice. Please review with a qualified professional before publishing.';
+  const disclaimer = '\n\nNote: this draft was generated for reference only and is not legal advice. Please review with a qualified professional before publishing.';
   const templates: Record<string, string> = {
     shipping: `SHIPPING POLICY\n\nWe process all orders within 2–5 business days. Shipping times vary by location.\n\nDomestic orders typically arrive in 5–10 business days. International orders may take 2–4 weeks.\n\nTracking information is emailed once your order ships.${disclaimer}`,
     return: `RETURN POLICY\n\nWe accept returns within 30 days of delivery for unworn, unwashed items in original condition with all tags attached.\n\nTo initiate a return, contact us at the email provided. Sale items are final sale and not eligible for return.${disclaimer}`,

@@ -36,8 +36,14 @@ describe('flooredFontSize', () => {
 });
 
 describe('AppTextWeight', () => {
-  it('every weight key resolves to one of Inter\'s 4 loaded font files', () => {
-    const loaded = new Set(['Inter_400Regular', 'Inter_500Medium', 'Inter_600SemiBold', 'Inter_700Bold']);
+  it('every weight key resolves to a font file actually loaded in app/_layout.tsx\'s useFonts', () => {
+    // Inter's 4 body weights, plus the extrabold used for large titles and the
+    // one editorial display face (see docs/design/display-font-options.md) —
+    // all loaded via useFonts in app/_layout.tsx.
+    const loaded = new Set([
+      'Inter_400Regular', 'Inter_500Medium', 'Inter_600SemiBold', 'Inter_700Bold', 'Inter_800ExtraBold',
+      'Fraunces_600SemiBold',
+    ]);
     const weights = Object.keys(FONT) as AppTextWeight[];
     expect(weights.length).toBeGreaterThan(0);
     for (const w of weights) {

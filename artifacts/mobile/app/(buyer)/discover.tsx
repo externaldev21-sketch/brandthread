@@ -135,7 +135,9 @@ function EditorialSectionHead({
 
 const esh = StyleSheet.create({
   kicker: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 },
-  title:  { fontSize: 28, lineHeight: 32, fontFamily: FONT.bold, letterSpacing: -0.4, textTransform: 'uppercase' },
+  // Editorial display face (see docs/design/display-font-options.md) — the
+  // one place on this screen large enough to earn a second typeface.
+  title:  { fontSize: 28, lineHeight: 32, fontFamily: FONT.display, letterSpacing: -0.4, textTransform: 'uppercase' },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     minHeight: 36, paddingHorizontal: 14, borderRadius: RADII.pill, borderWidth: 1,
@@ -1080,7 +1082,7 @@ export default function DiscoverScreen() {
         <EditorialSectionHead
           kicker="Moving fast"
           title="High Demand"
-          sub="Products moving fast across the platform"
+          sub="What everyone’s buying right now"
           theme={theme}
         />
         {highDemandLoading ? (
@@ -1181,7 +1183,7 @@ export default function DiscoverScreen() {
 
       {/* ─ Trending — engagement-ranked posts, separate from High Demand ─ */}
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
-        <EditorialSectionHead kicker="Right now" title="Trending" sub="Real-time engagement across the platform" theme={theme} />
+        <EditorialSectionHead kicker="Right now" title="Trending" sub="What everyone’s talking about" theme={theme} />
       </ResponsiveContainer>
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
         <View style={{ gap: 10 }}>
@@ -1193,7 +1195,7 @@ export default function DiscoverScreen() {
             <EmptyState
               icon="activity"
               title="No trending posts right now"
-              description="Posts with the most likes and saves across the platform show up here."
+              description="The most-loved posts land here first."
               action={{ label: 'Explore feed', onPress: () => router.push('/(buyer)/feed' as never) }}
             />
           ) : (

@@ -12,8 +12,17 @@ import {
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
+  Inter_800ExtraBold,
   useFonts,
 } from '@expo-google-fonts/inter';
+// Editorial display face for large headings only (Discover section titles,
+// profile name, Thread Cash balance) — body copy stays Inter everywhere.
+// Two options were evaluated (see docs/design/display-font-options.md for
+// the side-by-side); Fraunces shipped as the winner. Big Shoulders Display
+// stays loaded too so the alternative renders identically if anyone wants
+// to compare it live rather than only in a screenshot.
+import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces';
+import { BigShouldersDisplay_800ExtraBold } from '@expo-google-fonts/big-shoulders-display';
 import { InteractionManager, Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SystemUI from 'expo-system-ui';
@@ -1264,6 +1273,9 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    Inter_800ExtraBold,
+    Fraunces_600SemiBold,
+    BigShouldersDisplay_800ExtraBold,
   });
   const [fontGateExpired, setFontGateExpired] = useState(false);
 

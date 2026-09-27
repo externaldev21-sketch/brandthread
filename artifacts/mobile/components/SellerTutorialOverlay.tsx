@@ -60,7 +60,7 @@ export default function SellerTutorialOverlay({ visible, onDismiss }: Props) {
               <Feather name="zap" size={22} color={theme.accent} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.title}>Welcome to your workspace 👋</Text>
+              <Text style={s.title}>Welcome to your workspace</Text>
               <Text style={s.subtitle}>Here's a quick look at your key tools</Text>
             </View>
           </View>

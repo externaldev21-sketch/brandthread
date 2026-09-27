@@ -215,7 +215,7 @@ function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100, top
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
         <HighDemandSectionHead
           title="High Demand"
-          subtitle="Products moving fast across the platform"
+          subtitle="What everyone’s buying right now"
           style={{ marginBottom: 20 }}
         />
 
