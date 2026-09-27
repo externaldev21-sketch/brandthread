@@ -2040,11 +2040,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           userId: string; name: string; username: string | null; handle: string;
           initials: string; color: string; followedAt: string; isFollowingBack: boolean;
         }>>(`/api/social/followers${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`),
-      /** Search buyers by name / username */
+      /**
+       * Search real user profiles by name / username — both buyer and
+       * seller accounts (not just brands/storefronts). `roleTag` is "Buyer"
+       * for a buyer, or the seller's storefront name (falling back to
+       * "Seller") for a seller/both account.
+       */
       search: (q: string, limit = 20) =>
         get<Array<{
           userId: string; name: string; username: string | null; handle: string;
           initials: string; color: string; bio: string | null; isFollowing: boolean;
+          accountType: string; verified: boolean; roleTag: string;
         }>>(`/api/social/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 
       // ── Stories ─────────────────────────────────────────────────────────────

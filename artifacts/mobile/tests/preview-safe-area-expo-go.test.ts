@@ -31,7 +31,7 @@ describe('browser preview safe areas and Expo Go startup', () => {
       'app/_layout.tsx',
       'components/KeyboardAwareScrollViewCompat.tsx',
       'app/buyer-checkout.tsx',
-      'app/(buyer)/search.tsx',
+      'app/buyer-search.tsx',
       'app/(buyer)/_layout.tsx',
       'components/buyer-nav/BuyerTabBar.tsx',
       'app/(tabs)/feed.tsx',
