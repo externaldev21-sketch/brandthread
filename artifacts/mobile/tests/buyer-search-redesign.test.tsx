@@ -246,7 +246,9 @@ describe('buyer full-screen search', () => {
 
   beforeEach(() => {
     apiMock.public.search.mockReset().mockResolvedValue({ results: [] });
-    apiMock.public.trending.mockReset().mockResolvedValue({ trending: [{ term: 'Denim', type: 'category' }] });
+    // "You may like" no longer calls this endpoint at all (see the tests
+    // below) — mocked only so nothing throws if some other code path does.
+    apiMock.public.trending.mockReset().mockResolvedValue({ trending: [] });
     apiMock.social.search.mockReset().mockResolvedValue([]);
     apiMock.social.follow.mockReset().mockResolvedValue({ ok: true });
     apiMock.social.unfollow.mockReset().mockResolvedValue({ ok: true });
@@ -262,6 +264,18 @@ describe('buyer full-screen search', () => {
     renderer = undefined;
   });
 
+  it('hides the page scrollbar (nativeID for the scoped web CSS rule, indicator off)', async () => {
+    renderer = await renderScreen();
+    const scroll = renderer.root.findByProps({ nativeID: 'buyer-search-scroll' });
+    expect(scroll.props.showsVerticalScrollIndicator).toBe(false);
+  });
+
+  it('"You may like" scrolls horizontally in a single row instead of wrapping', async () => {
+    renderer = await renderScreen();
+    const rows = renderer.root.findAllByProps({ horizontal: true });
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
   it('pops the screen when Back is pressed', async () => {
     renderer = await renderScreen();
     act(() => {
@@ -270,54 +284,36 @@ describe('buyer full-screen search', () => {
     expect(routerMock.back).toHaveBeenCalled();
   });
 
-  it('renders recent searches and "You may like" trending in the empty state, with no results/product fetch yet', async () => {
+  it('renders recent searches and the curated "You may like" list in the empty state, with no results/product/trending fetch yet', async () => {
     renderer = await renderScreen();
     const content = textContent(renderer);
     expect(content).toContain('sneakers');
     expect(content).toContain('denim');
-    expect(content).toContain('Denim');
     expect(renderer.root.findAllByProps({ testID: 'buyer-search-empty-state' }, { deep: false })).toHaveLength(1);
     expect(apiMock.public.search).not.toHaveBeenCalled();
+    // "You may like" never calls the live trending/analytics endpoint —
+    // that's exactly what was leaking raw query fragments like "at"/"ate".
+    expect(apiMock.public.trending).not.toHaveBeenCalled();
   });
 
-  it('falls back to the fixed "you may like" terms when trending is empty', async () => {
-    apiMock.public.trending.mockResolvedValue({ trending: [] });
-    renderer = await renderScreen();
-    expect(textContent(renderer)).toContain('black wool coat');
-  });
-
-  it('pads "you may like" up to 4 with fallback terms when trending returns fewer, without duplicates', async () => {
-    apiMock.public.trending.mockResolvedValue({ trending: [{ term: 'hoodie', type: 'category' }] });
+  it('"You may like" always shows the fixed curated list, never live trending/analytics terms', async () => {
     renderer = await renderScreen();
     const content = textContent(renderer);
-    expect(content).toContain('hoodie');
     expect(content).toContain('black wool coat');
-    expect(content).toContain('silver dress');
-    expect(content).toContain('Atelier Noire');
-  });
-
-  it('filters punctuation-only/too-short junk out of "you may like", padding with fallback terms', async () => {
-    apiMock.public.trending.mockResolvedValue({
-      trending: [
-        { term: '...', type: 'query' },
-        { term: ',,', type: 'query' },
-        { term: 'a', type: 'query' },
-        { term: 'hoodie', type: 'category' },
-      ],
-    });
-    renderer = await renderScreen();
-    const content = textContent(renderer);
     expect(content).toContain('hoodie');
-    expect(content).not.toContain('...');
-    expect(content).not.toContain(',,');
-    // Padded with fallback terms since only one real trending term survived.
-    expect(content).toContain('black wool coat');
+    expect(content).toContain('runway');
+    expect(content).toContain('satin slip');
+    expect(content).toContain('streetwear');
+    // Regression guard for the exact junk fragments reported live: raw
+    // partial-typed queries must never appear in "You may like".
+    const section = content.slice(content.indexOf('YOU MAY LIKE'), content.indexOf('WATCH SOMETHING NEW'));
+    expect(section).not.toMatch(/\bat\b/);
+    expect(section).not.toMatch(/\bate\b/);
   });
 
   it('shows "No results for X" with fallback suggestion chips', async () => {
     apiMock.public.search.mockResolvedValue({ results: [] });
     apiMock.social.search.mockResolvedValue([]);
-    apiMock.public.trending.mockResolvedValue({ trending: [] });
 
     renderer = await renderScreen();
     vi.useFakeTimers();
