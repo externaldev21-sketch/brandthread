@@ -7,6 +7,7 @@
 
 export type ProfileEmptyTab =
   | 'buyer:posts' | 'buyer:tagged' | 'buyer:reposts' | 'buyer:saved'
+  | 'buyer:liked' | 'buyer:orders'
   | 'seller:post' | 'seller:draft' | 'seller:schedule' | 'seller:videos'
   | 'shop';
 
@@ -63,6 +64,19 @@ const TABLE: Record<ProfileEmptyTab, {
     message: 'Items you save will appear here.',
     publicMessage: 'Saved items are private.',
     cta: { label: 'View saved', route: '/buyer-saved' },
+  },
+  'buyer:liked': {
+    icon: 'heart',
+    title: 'No liked posts yet',
+    message: 'Posts you like will appear here.',
+    publicMessage: 'Liked posts are private.',
+  },
+  'buyer:orders': {
+    icon: 'package',
+    title: 'No orders yet',
+    message: 'Orders you place will appear here.',
+    publicMessage: 'Orders are private.',
+    cta: { label: 'Start shopping', route: '/(buyer)/discover' },
   },
   'seller:post': {
     icon: 'video',

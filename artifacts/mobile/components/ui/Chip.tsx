@@ -32,14 +32,21 @@ export interface ChipProps {
   /** Optional trailing remove control (e.g. clearing a single recent search). */
   onRemove?: () => void;
   removeAccessibilityLabel?: string;
+  /** Set false to drop the springy press-out rebound — a plain, no-bounce
+   *  release instead. Defaults to true (existing behavior everywhere else). */
+  bounce?: boolean;
+  /** 32pt tall / hairline border / 14pt text — Instagram-style quick-reply
+   *  chip, instead of the default filter-chip sizing. */
+  variant?: 'default' | 'quickReply';
 }
 
-export function Chip({ label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel }: ChipProps) {
+export function Chip({ label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel, bounce = true, variant = 'default' }: ChipProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
   const nativeDriver = Platform.OS !== 'web';
   const contentColor = selected ? theme.onAccent : palette.mutedForeground;
+  const isQuickReply = variant === 'quickReply';
 
   return (
     <Pressable
@@ -49,7 +56,11 @@ export function Chip({ label, selected, onPress, count, disabled, testID, icon, 
       disabled={disabled}
       onPress={() => { hapticToggle(); onPress(); }}
       onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}
+      onPressOut={() => (
+        bounce
+          ? Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()
+          : Animated.timing(scale, { toValue: 1, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()
+      )}
       testID={testID}
     >
       <Animated.View
@@ -59,13 +70,15 @@ export function Chip({ label, selected, onPress, count, disabled, testID, icon, 
             borderRadius: RADII.pill,
             backgroundColor: selected ? theme.accent : palette.card,
             borderColor: selected ? theme.accent : palette.border,
+            borderWidth: isQuickReply ? StyleSheet.hairlineWidth : 1,
+            height: isQuickReply ? 32 : undefined,
             opacity: disabled ? 0.5 : 1,
             transform: [{ scale }],
           },
         ]}
       >
         {icon && <Feather name={icon} size={12} color={iconColor ?? contentColor} />}
-        <Text style={[TYPE_SCALE.footnote, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }]}>
+        <Text style={[TYPE_SCALE.footnote, isQuickReply && { fontSize: 14 }, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }]}>
           {label}
         </Text>
         {count !== undefined && (

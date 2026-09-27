@@ -7,24 +7,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   getMyProfileMock,
   getMyPostsMock,
-  getMyRepostsMock,
   getSavedItemsMock,
   getPrivacySettingsMock,
   subscribeSocialMock,
   loadBuyerProfileMock,
-  loadHighlightsMock,
   routerMock,
   apiMock,
   getBuyerOrdersWithStatusMock,
 } = vi.hoisted(() => ({
   getMyProfileMock: vi.fn(),
   getMyPostsMock: vi.fn(),
-  getMyRepostsMock: vi.fn(),
   getSavedItemsMock: vi.fn(),
   getPrivacySettingsMock: vi.fn(),
   subscribeSocialMock: vi.fn(),
   loadBuyerProfileMock: vi.fn(),
-  loadHighlightsMock: vi.fn(),
   routerMock: { push: vi.fn(), replace: vi.fn() },
   apiMock: { social: { myStories: vi.fn() }, threadCash: { get: vi.fn() } },
   getBuyerOrdersWithStatusMock: vi.fn(),
@@ -32,6 +28,13 @@ const {
 
 vi.mock('@/components/profile/ProfileCover', async () =>
   (await import('./helpers/profileCoverMock')).profileCoverMockModule);
+
+// Pulls in expo-video at module scope (not parseable under Vitest's SSR
+// transform outside a Metro/RN runtime); screen tests don't exercise the
+// actual media playback, so this stands in as a plain view.
+vi.mock('@/components/profile/ProfileHeroMedia', () => ({
+  ProfileHeroMedia: () => require('react').createElement('View', { testID: 'profile-hero-media' }),
+}));
 
 vi.mock('react-native', () => {
   const React = require('react') as typeof import('react');
@@ -63,9 +66,26 @@ vi.mock('react-native', () => {
   }
   MockPressable.displayName = 'Pressable';
 
+  const FlatList = ({ data, renderItem, ListHeaderComponent, ListEmptyComponent, keyExtractor }: any) => {
+    const items = Array.isArray(data) ? data : [];
+    return React.createElement(
+      'View',
+      { testID: 'buyer-profile-list' },
+      typeof ListHeaderComponent === 'function' ? React.createElement(ListHeaderComponent) : ListHeaderComponent,
+      items.length > 0
+        ? items.map((item: unknown, index: number) => React.createElement(
+            React.Fragment,
+            { key: keyExtractor ? keyExtractor(item, index) : index },
+            renderItem({ item, index, separators: {} }),
+          ))
+        : ListEmptyComponent ?? null,
+    );
+  };
+
   return {
     View: nativeComponent('View'),
     Text: nativeComponent('Text'),
+    Image: nativeComponent('Image'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     // Use the render-prop-aware Pressable mock (plain nativeComponent() would
     // leave PressableScale's function child unrendered — see comment above).
@@ -74,6 +94,7 @@ vi.mock('react-native', () => {
     ScrollView: nativeComponent('ScrollView'),
     Modal: nativeComponent('Modal'),
     RefreshControl: nativeComponent('RefreshControl'),
+    FlatList,
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1, absoluteFill: {} },
     Alert: { alert: vi.fn() },
     Linking: { openURL: vi.fn() },
@@ -81,6 +102,8 @@ vi.mock('react-native', () => {
     Animated: {
       Value: MockAnimatedValue,
       View: nativeComponent('Animated.View'),
+      FlatList,
+      createAnimatedComponent: (component: unknown) => component,
       event: () => () => {},
       timing: () => ({ start: (cb?: () => void) => cb?.() }),
       spring: () => ({ start: (cb?: () => void) => cb?.() }),
@@ -91,11 +114,6 @@ vi.mock('react-native', () => {
     useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
-
-// The redesigned profile renders into the shared ProfileShell; its native
-// hero/scroll chrome is replaced by a slot-rendering stand-in.
-vi.mock('@/components/profile/ProfileShell', async () =>
-  (await import('./helpers/profileShellMock')).profileShellMockModule);
 
 vi.mock('@clerk/expo', () => ({
   useAuth: () => ({ userId: 'buyer-1', signOut: vi.fn() }),
@@ -190,7 +208,6 @@ vi.mock('@/lib/theme', async (importOriginal) => {
 vi.mock('@/services/socialService', () => ({
   getMyProfile: getMyProfileMock,
   getMyPosts: getMyPostsMock,
-  getMyReposts: getMyRepostsMock,
   getSavedItems: getSavedItemsMock,
   getPrivacySettings: getPrivacySettingsMock,
   archivePost: vi.fn(),
@@ -208,10 +225,6 @@ vi.mock('@/components/CachedImage', () => ({
 
 vi.mock('@/lib/buyerProfile', () => ({
   loadBuyerProfile: loadBuyerProfileMock,
-}));
-
-vi.mock('@/lib/highlightsService', () => ({
-  loadHighlights: loadHighlightsMock,
 }));
 
 vi.mock('@/services/orderService', () => ({
@@ -363,16 +376,12 @@ describe('buyer profile tabs', () => {
     getMyPostsMock.mockReset().mockResolvedValue([
       { id: 'post-1', mediaUrl: 'https://example.com/post-1.jpg', type: 'photo', isArchived: false, isDraft: false, authorName: 'Ava', authorInitials: 'AB', authorColor: '#111', caption: 'Fit check', mediaColors: ['#111', '#222'] },
     ]);
-    getMyRepostsMock.mockReset().mockResolvedValue([
-      { id: 'repost-1', originalAuthorName: 'Sample Brand', originalAuthorHandle: '@samplebrand', originalCaption: 'New drop just landed' },
-    ]);
     getSavedItemsMock.mockReset().mockResolvedValue([
       { id: 'saved-1', type: 'product', title: 'Archive Cargo Pants', subtitle: '$120' },
     ]);
     getPrivacySettingsMock.mockReset().mockResolvedValue({});
     subscribeSocialMock.mockReset().mockReturnValue(vi.fn());
     loadBuyerProfileMock.mockReset().mockResolvedValue({ avatarUri: null });
-    loadHighlightsMock.mockReset().mockResolvedValue([]);
     apiMock.social.myStories.mockReset().mockResolvedValue([]);
     apiMock.threadCash.get.mockReset().mockResolvedValue({ balanceCents: 0 });
     getBuyerOrdersWithStatusMock.mockReset().mockResolvedValue({ orders: [], fromCache: false });
@@ -389,7 +398,7 @@ describe('buyer profile tabs', () => {
   it('renders all four tabs, each selectable', async () => {
     renderer = await renderScreen();
 
-    for (const tab of ['Posts', 'Tagged', 'Reposts', 'Saved']) {
+    for (const tab of ['Posts', 'Saved', 'Liked', 'Orders']) {
       const matches = renderer.root.findAll(
         node => node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === `${tab} tab`,
       );
@@ -397,47 +406,62 @@ describe('buyer profile tabs', () => {
     }
   });
 
-  it('shows Posts content by default and swaps to Reposts content on tab switch', async () => {
+  it('shows Posts content by default and swaps to Saved content on tab switch', async () => {
     renderer = await renderScreen();
 
     // Posts tab is selected by default — the one post's image renders.
     expect(renderer.root.findAll(
       node => (node.type as unknown) === 'CachedImage' && (node.props as any).source?.uri === 'https://example.com/post-1.jpg',
     )).toHaveLength(1);
-    expect(renderer.root.findAll(
-      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Sample Brand'),
-    )).toHaveLength(0);
 
-    await pressTab(renderer, 'Reposts');
+    await pressTab(renderer, 'Saved');
 
-    // Reposts content now shows; the Posts image is gone.
+    // Saved content now shows; the Posts image is gone.
     expect(renderer.root.findAll(
-      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Sample Brand'),
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Archive Cargo Pants'),
     ).length).toBeGreaterThan(0);
     expect(renderer.root.findAll(
       node => (node.type as unknown) === 'CachedImage' && (node.props as any).source?.uri === 'https://example.com/post-1.jpg',
     )).toHaveLength(0);
   });
 
-  it('shows Saved content on the Saved tab and the empty state on Tagged', async () => {
+  it('shows an honest empty state on Liked (no fabricated engagement data)', async () => {
     renderer = await renderScreen();
 
-    await pressTab(renderer, 'Saved');
+    await pressTab(renderer, 'Liked');
     expect(renderer.root.findAll(
-      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Archive Cargo Pants'),
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('No liked posts yet'),
     ).length).toBeGreaterThan(0);
-
-    await pressTab(renderer, 'Tagged');
-    expect(renderer.root.findAll(
-      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('No tagged posts'),
-    ).length).toBeGreaterThan(0);
-    // Saved content no longer shows once switched away.
-    expect(renderer.root.findAll(
-      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Archive Cargo Pants'),
-    )).toHaveLength(0);
   });
 
-  it('keeps every hard-required action wired: account switcher, edit profile, inbox, connections, highlights', async () => {
+  it('shows the buyer\'s orders on the Orders tab, each opening its own detail page', async () => {
+    getBuyerOrdersWithStatusMock.mockResolvedValue({
+      orders: [
+        {
+          id: 'order-active', orderNumber: 'BT-2001', sellerId: 's1', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
+          status: 'shipped', paymentStatus: 'paid', fulfillmentStatus: 'fulfilled',
+          lineItems: [{ productName: 'Cargo Jacket', variant: 'M', quantity: 1, unitPriceCents: 12000 }],
+          shippingAddress: { name: '', line1: '', city: '', state: '', zip: '', country: 'US' },
+          payment: { subtotalCents: 12000, shippingTotalCents: 0, taxTotalCents: 0, totalCents: 12000 },
+          isPreOrder: false, hasReturnRequest: false, createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      fromCache: false,
+    });
+
+    renderer = await renderScreen();
+    await pressTab(renderer, 'Orders');
+
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('BT-2001'),
+    ).length).toBeGreaterThan(0);
+
+    const card = renderer.root.findByProps({ accessibilityLabel: 'Order BT-2001, shipped' });
+    await act(async () => { card.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-order-detail?id=order-active');
+  });
+
+  it('keeps every hard-required action wired: account switcher, edit profile, connections', async () => {
     renderer = await renderScreen();
 
     const switcher = renderer.root.findByProps({ testID: 'buyer-profile-account-switcher' });
@@ -446,9 +470,6 @@ describe('buyer profile tabs', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/account-switcher');
 
     routerMock.push.mockReset();
-    // The Phase 2 pass migrated this button from TouchableOpacity to the
-    // shared PressableScale primitive (which renders as the mocked
-    // `Pressable` host type here) and its copy to sentence case.
     const editProfileBtns = renderer.root.findAll(
       node => (node.type as unknown) === 'Pressable'
         && typeof node.props.onPress === 'function'
@@ -488,49 +509,6 @@ describe('buyer profile tabs', () => {
     threadCashFlag.on = false;
   });
 
-  it('shows a My Orders card for the latest active order, with a working See all link', async () => {
-    getBuyerOrdersWithStatusMock.mockResolvedValue({
-      orders: [
-        {
-          id: 'order-active', orderNumber: 'BT-2001', sellerId: 's1', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
-          status: 'shipped', paymentStatus: 'paid', fulfillmentStatus: 'fulfilled',
-          lineItems: [{ productName: 'Cargo Jacket', variant: 'M', quantity: 1, unitPriceCents: 12000 }],
-          shippingAddress: { name: '', line1: '', city: '', state: '', zip: '', country: 'US' },
-          payment: { subtotalCents: 12000, shippingTotalCents: 0, taxTotalCents: 0, totalCents: 12000 },
-          isPreOrder: false, hasReturnRequest: false, createdAt: '2026-01-01T00:00:00.000Z',
-        },
-        {
-          id: 'order-old', orderNumber: 'BT-1001', sellerId: 's1', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
-          status: 'delivered', paymentStatus: 'paid', fulfillmentStatus: 'fulfilled',
-          lineItems: [{ productName: 'Tee', variant: 'S', quantity: 1, unitPriceCents: 3000 }],
-          shippingAddress: { name: '', line1: '', city: '', state: '', zip: '', country: 'US' },
-          payment: { subtotalCents: 3000, shippingTotalCents: 0, taxTotalCents: 0, totalCents: 3000 },
-          isPreOrder: false, hasReturnRequest: false, createdAt: '2025-12-01T00:00:00.000Z',
-        },
-      ],
-      fromCache: false,
-    });
-
-    renderer = await renderScreen();
-
-    // The most recent still-active order (shipped, not the older delivered one) is featured.
-    expect(renderer.root.findAll(
-      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('BT-2001'),
-    ).length).toBeGreaterThan(0);
-    expect(renderer.root.findAll(
-      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('timeline:shipped'),
-    ).length).toBeGreaterThan(0);
-
-    const seeAll = renderer.root.findByProps({ accessibilityLabel: 'See all orders' });
-    await act(async () => { seeAll.props.onPress(); });
-    expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/orders');
-
-    routerMock.push.mockReset();
-    const card = renderer.root.findByProps({ accessibilityLabel: 'Order BT-2001, shipped' });
-    await act(async () => { card.props.onPress(); });
-    expect(routerMock.push).toHaveBeenCalledWith('/buyer-order-detail?id=order-active');
-  });
-
   it('opens the full-screen feed player on the buyer\'s own posts, starting at the tapped one', async () => {
     renderer = await renderScreen();
     const tile = renderer.root.findAll(
@@ -556,13 +534,5 @@ describe('buyer profile tabs', () => {
     expect(textContent(cta.props.children)).toContain('Post your first video');
     await act(async () => { cta.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/create-post?accountType=buyer');
-  });
-
-  it('renders no My Orders section when the buyer has no orders', async () => {
-    getBuyerOrdersWithStatusMock.mockResolvedValue({ orders: [], fromCache: false });
-    renderer = await renderScreen();
-    expect(renderer.root.findAll(
-      node => (node.type as unknown) === 'Text' && textContent(node.props.children) === 'My Orders',
-    )).toHaveLength(0);
   });
 });

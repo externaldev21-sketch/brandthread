@@ -58,6 +58,7 @@ import {
   parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed,
   type AgentQuickReply,
 } from '@/lib/agentChat';
+import { EMOJI_FONT_STACK } from '@/lib/appleEmoji';
 
 /** Well-known clerkId of the official Brandthread Agent account — matches
  *  the preview seed (lib/previewInboxData.ts) and the api-server system
@@ -121,7 +122,7 @@ function sameSenderClose(a: Message, b: Message): boolean {
   return a.fromId === b.fromId && Math.abs(a.ts - b.ts) < GROUP_GAP_MS && formatDate(a.ts) === formatDate(b.ts);
 }
 
-type DateRow = { type: 'date'; date: string; key: string };
+type DateRow = { type: 'date'; date: string; ts: number; key: string };
 type UnreadRow = { type: 'unread'; key: string };
 type MsgRow = { type: 'message'; msg: Message; isFirstInGroup: boolean; isLastInGroup: boolean };
 type ListRow = DateRow | UnreadRow | MsgRow;
@@ -135,7 +136,7 @@ function buildListRows(msgs: Message[], unreadDividerId: string | null): ListRow
       rows.push({ type: 'unread', key: `unread-${msg.id}` });
     }
     if (d !== lastDate) {
-      rows.push({ type: 'date', date: d, key: `date-${d}-${i}` });
+      rows.push({ type: 'date', date: d, ts: msg.ts, key: `date-${d}-${i}` });
       lastDate = d;
     }
     const prev = msgs[i - 1];
@@ -168,11 +169,23 @@ const SCREEN_W = Dimensions.get('window').width;
 const BUBBLE_MAX = SCREEN_W * 0.75;
 const DOUBLE_TAP_MS = 300;
 
+// ─── Bubble column (Instagram/Threads DM layout) ───────────────────────────────
+// A 28pt avatar + 8pt gap sits to the left of every incoming bubble, but only
+// next to the LAST bubble of a consecutive group (see msgAvatarSpacer below).
+// Every incoming bubble, card and quick-reply row shares this same left edge —
+// msgOuter's own SP.md horizontal padding plus this avatar+gap offset.
+const AVATAR_SIZE = 28;
+const AVATAR_GAP = SP.sm;
+const BUBBLE_COLUMN_LEFT = SP.md + AVATAR_SIZE + AVATAR_GAP;
+
 // ─── Composer sizing ────────────────────────────────────────────────────────────
 // One consistent size for every circular control in the composer row (the
 // "+" attach button, the in-pill Thread Cash coin, and the mic⇄send morph) —
 // the previous 44/36/44 mix is exactly what read as mismatched.
 const COMPOSER_CONTROL = 36;
+// Mic / gallery / Thread Cash bill inside the pill are all this size, evenly
+// spaced — per the Instagram/Threads composer reference.
+const COMPOSER_ICON = 22;
 // The pill grows with the TextInput up to ~5 lines, then scrolls internally.
 const COMPOSER_LINE_HEIGHT = 20;
 const COMPOSER_MAX_LINES = 5;
@@ -206,10 +219,8 @@ export default function BuyerConversationScreen() {
   }>();
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
-  // Per-message-id scroll refs/widths for the quick-reply chip rows, so an
-  // overflowing row can open pre-scrolled to its right (most relevant) end.
+  // Per-message-id scroll refs for the quick-reply chip rows.
   const quickReplyScrollRefs = useRef<Record<string, ScrollView | null>>({});
-  const quickReplyScrollWidths = useRef<Record<string, number>>({});
   const api = useApi();
   const { userId } = useAuth();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
@@ -459,8 +470,8 @@ export default function BuyerConversationScreen() {
   // omitted rather than fabricating an "online"/"typing…" state from nothing.
   const isAgentConv = !!conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID;
   const statusLine = isAgentConv
-    ? (agentTyping ? 'typing…' : 'Online · AI')
-    : statusLineFor(participant);
+    ? (agentTyping ? 'typing…' : 'AI assistant')
+    : (participant?.isOnline ? 'Active now' : statusLineFor(participant));
   // react-native-web doesn't fill in a real top safe-area inset (no notch/
   // dynamic-island polyfill), so insets.top reads 0 on web and the header
   // clipped under the dynamic island in a device-frame screenshot — same
@@ -1072,11 +1083,10 @@ export default function BuyerConversationScreen() {
 
   function renderItem({ item }: ListRenderItemInfo<ListRow>) {
     if (item.type === 'date') {
+      // Plain small gray centered text, like Instagram/Threads — no pill.
       return (
         <View style={s.dateSeparatorWrap}>
-          <View style={s.dateSeparator}>
-            <Text style={s.dateSeparatorText}>{item.date}</Text>
-          </View>
+          <Text style={s.dateSeparatorText}>{item.date} {formatTime(item.ts)}</Text>
         </View>
       );
     }
@@ -1118,24 +1128,15 @@ export default function BuyerConversationScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            // Starts flush with the bubble column (contentInset-style left
+            // padding) instead of being clipped or right-anchored — nothing
+            // is cut off at rest, and it scrolls right if it overflows.
             contentContainerStyle={s.quickReplyScrollContent}
-            // Right-aligned like iMessage/Instagram suggested replies:
-            // `justifyContent: 'flex-end'` alone only right-aligns a row
-            // that already fits without scrolling — when the chips overflow
-            // (the one-scroll-row fallback), open already scrolled to the
-            // end so the row still reads right-anchored on first paint.
-            onContentSizeChange={(contentWidth) => {
-              const viewportWidth = quickReplyScrollWidths.current[msg.id] ?? 0;
-              if (contentWidth > viewportWidth) {
-                quickReplyScrollRefs.current[msg.id]?.scrollToEnd({ animated: false });
-              }
-            }}
-            onLayout={(e) => { quickReplyScrollWidths.current[msg.id] = e.nativeEvent.layout.width; }}
             ref={(ref) => { quickReplyScrollRefs.current[msg.id] = ref; }}
           >
             {options.map((opt) => (
               <View key={opt.label} style={s.quickReplyChipWrap}>
-                <Chip label={opt.label} selected={false} onPress={() => sendQuickReply(opt)} testID={`quick-reply-${opt.label}`} />
+                <Chip label={opt.label} selected={false} onPress={() => sendQuickReply(opt)} testID={`quick-reply-${opt.label}`} bounce={false} variant="quickReply" />
               </View>
             ))}
           </ScrollView>
@@ -1152,8 +1153,9 @@ export default function BuyerConversationScreen() {
       const deepLink = att.meta?.deepLink;
       const cardKind = att.meta?.cardKind;
       return (
-        <View style={{ marginTop: isFirstInGroup ? 12 : 2, paddingHorizontal: SP.md }}>
+        <View style={{ marginTop: isFirstInGroup ? 12 : 2, paddingLeft: BUBBLE_COLUMN_LEFT, paddingRight: SP.md }}>
           <PressableScale rippleEnabled={false}
+            bounce={false}
             style={[s.agentCardOuter, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
             activeOpacity={deepLink ? 0.7 : 1}
             onPress={() => { if (deepLink) router.push(deepLink as never); }}
@@ -1194,7 +1196,7 @@ export default function BuyerConversationScreen() {
       const amountCents = Number(msg.attachment.meta?.amountCents ?? 0);
       const status = threadCashOverrides[transferId] ?? ((msg.attachment.meta?.status as ThreadCashTransferStatus) ?? 'pending');
       return (
-        <View style={{ marginTop: isFirstInGroup ? 12 : 2, paddingHorizontal: SP.md }}>
+        <View style={{ marginTop: isFirstInGroup ? 12 : 2, paddingLeft: BUBBLE_COLUMN_LEFT, paddingRight: SP.md }}>
           <ThreadCashMessageCard
             amountCents={amountCents}
             note={msg.attachment.meta?.note || null}
@@ -1257,6 +1259,7 @@ export default function BuyerConversationScreen() {
         <View style={{ maxWidth: BUBBLE_MAX }}>
           {/* Bubble */}
           <PressableScale rippleEnabled={false}
+            bounce={false}
             testID={`conversation-bubble-${msg.id}`}
             activeOpacity={0.88}
             onPress={(e) => handleBubblePress(msg, e)}
@@ -1269,10 +1272,13 @@ export default function BuyerConversationScreen() {
               s.bubble,
               {
                 backgroundColor: isOwn ? theme.accent : theme.cardElevated,
-                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.lg,
-                borderTopRightRadius: (isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.lg,
-                borderBottomRightRadius: isOwn ? (isLastInGroup ? 6 : RADIUS.lg) : RADIUS.lg,
-                borderBottomLeftRadius: !isOwn ? (isLastInGroup ? 6 : RADIUS.lg) : RADIUS.lg,
+                // IG-style grouping: the corner touching an adjacent bubble
+                // in the same group (same side as the avatar column) is
+                // reduced to 6pt; every outer corner stays the full 18pt.
+                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? 6 : RADIUS.lg,
+                borderTopRightRadius: (isOwn && !isFirstInGroup) ? 6 : RADIUS.lg,
+                borderBottomRightRadius: (isOwn && !isLastInGroup) ? 6 : RADIUS.lg,
+                borderBottomLeftRadius: (!isOwn && !isLastInGroup) ? 6 : RADIUS.lg,
                 alignSelf: isOwn ? 'flex-end' : 'flex-start',
                 shadowColor: theme.shadowColor,
                 shadowOffset: { width: 0, height: 2 },
@@ -1434,7 +1440,7 @@ export default function BuyerConversationScreen() {
               <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
               {isAgentConv && (
                 <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
-                  <Feather name="check-circle" size={13} color={theme.accent} style={{ marginLeft: 4 }} />
+                  <Feather name="check-circle" size={14} color={theme.accent} style={{ marginLeft: 4 }} />
                   <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
                     <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
                   </View>
@@ -1636,11 +1642,12 @@ export default function BuyerConversationScreen() {
           )}
           <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
             {/* Attach — photos, video, Thread Cash (Apple-Cash-style), and
-                (for seller chats) products/posts. A single plain "+" — no
-                filled blob — matching the restraint of iMessage/Snapchat. */}
+                (for seller chats) products/posts. A plain "+" inside a
+                hairline circle, aligned to the pill's own center. */}
             <PressableScale rippleEnabled={false}
+              bounce={false}
               onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
-              style={s.roundInputBtn}
+              style={[s.roundInputBtn, { backgroundColor: theme.cardElevated, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border }]}
               disabled={isUploading || isSending}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="conversation-attach"
@@ -1667,6 +1674,62 @@ export default function BuyerConversationScreen() {
                 returnKeyType="default"
               />
 
+              {/* Mic ⇄ Send morph, inside the pill's own bounds */}
+              <View style={s.morphContainer}>
+                <Animated.View
+                  pointerEvents={showSendButton ? 'none' : 'auto'}
+                  style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
+                >
+                  <PressableScale rippleEnabled={false}
+                    bounce={false}
+                    onPressIn={startRecording}
+                    onPressOut={stopRecording}
+                    disabled={isUploading || isSending}
+                    style={s.morphFaceInner}
+                    testID="conversation-mic"
+                    accessibilityRole="button"
+                    accessibilityLabel="Record voice message"
+                  >
+                    <Feather name={isRecording ? 'stop-circle' : 'mic'} size={COMPOSER_ICON} color={isRecording ? theme.error : theme.muted} />
+                  </PressableScale>
+                </Animated.View>
+                <Animated.View
+                  pointerEvents={showSendButton ? 'auto' : 'none'}
+                  style={[
+                    StyleSheet.absoluteFill, s.morphFace,
+                    { opacity: sendOpacity, transform: [{ scale: sendScale }], backgroundColor: canSend ? theme.accent : theme.cardElevated },
+                  ]}
+                >
+                  <PressableScale rippleEnabled={false}
+                    bounce={false}
+                    onPress={() => { hapticPrimaryAction(); handleSend(); }}
+                    disabled={!canSend}
+                    style={s.morphFaceInner}
+                    activeOpacity={0.8}
+                    testID="conversation-send"
+                    accessibilityRole="button"
+                    accessibilityLabel="Send message"
+                  >
+                    <Feather name="send" size={COMPOSER_ICON} color={canSend ? theme.onAccent : theme.muted} />
+                  </PressableScale>
+                </Animated.View>
+              </View>
+
+              {/* Gallery quick-attach — evenly spaced with mic and the
+                  Thread Cash bill, per the Instagram/Threads composer. */}
+              <PressableScale rippleEnabled={false}
+                bounce={false}
+                onPress={handlePickPhoto}
+                style={s.composerIconBtn}
+                disabled={isUploading || isSending}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="conversation-gallery"
+                accessibilityRole="button"
+                accessibilityLabel="Photo library"
+              >
+                <Feather name="image" size={COMPOSER_ICON} color={theme.muted} />
+              </PressableScale>
+
               {/* Minimal Thread Cash entry — works for any conversation
                   participant (buyer-to-buyer friends included). Always
                   rendered once the feature flag is on: disabled with an
@@ -1686,6 +1749,7 @@ export default function BuyerConversationScreen() {
                   disabledReason={threadCashDisabledReason}
                   renderTrigger={(open) => (
                     <PressableScale rippleEnabled={false}
+                      bounce={false}
                       onPress={() => {
                         // Still checking mutual-follow status — silent no-op.
                         // Never surface a "checking…" string to the user.
@@ -1706,7 +1770,7 @@ export default function BuyerConversationScreen() {
                       accessibilityLabel={threadCashMutual !== true ? `Thread Cash — ${threadCashDisabledReason}` : 'Send Thread Cash'}
                       accessibilityState={{ disabled: threadCashMutual !== true }}
                     >
-                      <ThreadCashBillMark size={ICON.md} color={theme.text} accent={theme.accent} disabled={threadCashMutual !== true} />
+                      <ThreadCashBillMark size={COMPOSER_ICON} color={theme.text} accent={theme.accent} disabled={threadCashMutual !== true} />
                     </PressableScale>
                   )}
                   onSent={async ({ transferId, amountCents, note }) => {
@@ -1755,45 +1819,6 @@ export default function BuyerConversationScreen() {
                   }}
                 />
               ) : null}
-
-              {/* Mic ⇄ Send morph, inside the pill's own bounds */}
-              <View style={s.morphContainer}>
-                <Animated.View
-                  pointerEvents={showSendButton ? 'none' : 'auto'}
-                  style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
-                >
-                  <PressableScale rippleEnabled={false}
-                    onPressIn={startRecording}
-                    onPressOut={stopRecording}
-                    disabled={isUploading || isSending}
-                    style={s.morphFaceInner}
-                    testID="conversation-mic"
-                    accessibilityRole="button"
-                    accessibilityLabel="Record voice message"
-                  >
-                    <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.sm} color={isRecording ? theme.error : theme.muted} />
-                  </PressableScale>
-                </Animated.View>
-                <Animated.View
-                  pointerEvents={showSendButton ? 'auto' : 'none'}
-                  style={[
-                    StyleSheet.absoluteFill, s.morphFace,
-                    { opacity: sendOpacity, transform: [{ scale: sendScale }], backgroundColor: canSend ? theme.accent : theme.cardElevated },
-                  ]}
-                >
-                  <PressableScale rippleEnabled={false}
-                    onPress={() => { hapticPrimaryAction(); handleSend(); }}
-                    disabled={!canSend}
-                    style={s.morphFaceInner}
-                    activeOpacity={0.8}
-                    testID="conversation-send"
-                    accessibilityRole="button"
-                    accessibilityLabel="Send message"
-                  >
-                    <Feather name="send" size={ICON.sm} color={canSend ? theme.onAccent : theme.muted} />
-                  </PressableScale>
-                </Animated.View>
-              </View>
             </View>
           </View>
         </View>
@@ -2128,8 +2153,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
   },
   headerName: {
-    fontSize: FS.md,
-    fontFamily: FONT.bold,
+    fontSize: 16,
+    fontFamily: FONT.semibold,
     color: theme.text,
     letterSpacing: -0.2,
   },
@@ -2238,25 +2263,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingBottom: SP.md,
   },
 
-  // Date separator
+  // Date separator — plain small gray centered text, no pill (IG-style).
   dateSeparatorWrap: {
     alignItems: 'center',
     marginVertical: SP.lg,
   },
-  dateSeparator: {
-    backgroundColor: theme.cardElevated,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: theme.border,
-    paddingHorizontal: SP.md,
-    paddingVertical: 6,
-  },
   dateSeparatorText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
+    fontSize: 12,
+    fontFamily: FONT.medium,
     color: theme.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
   },
 
   // Unread divider
@@ -2287,18 +2302,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginBottom: 3,
   },
   msgAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SP.sm,
+    marginRight: AVATAR_GAP,
     marginBottom: 2,
   },
   msgAvatarOfficial: { borderWidth: 1 },
   msgAvatarSpacer: {
-    width: 30,
-    marginRight: SP.sm,
+    width: AVATAR_SIZE,
+    marginRight: AVATAR_GAP,
   },
   msgAvatarInitials: {
     fontSize: 11,
@@ -2359,21 +2374,21 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // payment card below.
   agentCardOuter: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.sm, width: '100%',
+    borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth,
+    padding: SP.sm, width: '100%', maxWidth: BUBBLE_MAX, alignSelf: 'flex-start',
   },
   agentCardIconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  // Quick replies: standalone chips below the last bubble, right-aligned
-  // like iMessage/Instagram suggested replies — never inside a bubble.
+  // Quick replies: standalone chips below the last bubble, on the same
+  // left edge as every incoming bubble/card — never inside a bubble.
   quickReplyOuterRow: {
-    paddingHorizontal: SP.md,
+    paddingLeft: BUBBLE_COLUMN_LEFT,
   },
   quickReplyScrollContent: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    flexGrow: 1,
+    paddingRight: SP.md,
   },
   quickReplyChipWrap: {
-    marginLeft: SP.xs,
+    marginRight: SP.xs,
   },
   attachTitle: {
     fontSize: FS.sm,
@@ -2407,11 +2422,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginTop: 1,
   },
 
-  // Message text
+  // Message text — 15pt per spec; emoji font stack biases toward Apple's own
+  // emoji glyphs on web instead of the OS-default Noto/Segoe blobs.
   msgText: {
-    fontSize: FS.base,
+    fontSize: 15,
     fontFamily: FONT.regular,
     lineHeight: 21,
+    ...(Platform.OS === 'web' ? { fontFamily: `${FONT.regular}, ${EMOJI_FONT_STACK}` } : null),
   },
 
   // Quoted reply snippet
@@ -2521,8 +2538,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     maxHeight: COMPOSER_MAX_INPUT_HEIGHT,
     minHeight: COMPOSER_CONTROL,
   },
-  // Sits inside the pill, left of the mic/send control.
+  // Sits inside the pill, after mic/send and gallery.
   threadCashCoinBtn: {
+    width: COMPOSER_CONTROL,
+    height: COMPOSER_CONTROL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SP.xs,
+  },
+  // Gallery quick-attach — same touch target as the other pill controls.
+  composerIconBtn: {
     width: COMPOSER_CONTROL,
     height: COMPOSER_CONTROL,
     alignItems: 'center',

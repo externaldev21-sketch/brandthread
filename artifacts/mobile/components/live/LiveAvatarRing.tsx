@@ -16,6 +16,7 @@ export function LiveAvatarRing({
   size,
   children,
   ringGap = 3,
+  ringWidth = 2,
   showTag = true,
   testID,
 }: {
@@ -26,6 +27,9 @@ export function LiveAvatarRing({
   /** Space between avatar edge and ring. -2 draws the ring on the avatar's
    *  own edge (nothing outside its box) for clipping containers. */
   ringGap?: number;
+  /** Ring stroke width. Defaults to 2 (existing call sites); the feed rail
+   *  passes 1.5 for a thinner ring at its small 38pt avatar size. */
+  ringWidth?: number;
   showTag?: boolean;
   testID?: string;
 }) {
@@ -57,7 +61,8 @@ export function LiveAvatarRing({
       pointerEvents="none"
       style={[
         styles.ring,
-        inset && { borderWidth: 2.5 },
+        { borderWidth: ringWidth },
+        inset && { borderWidth: ringWidth + 0.5 },
         {
           width: ringSize,
           height: ringSize,
@@ -92,12 +97,13 @@ export function LiveAvatarRing({
  * wrap their existing avatar JSX.
  */
 export function LiveHostRing({
-  hostId, size, children, ringGap, showTag, testID, pressToWatch = false, hostName,
+  hostId, size, children, ringGap, ringWidth, showTag, testID, pressToWatch = false, hostName,
 }: {
   hostId: string | null | undefined;
   size: number;
   children: React.ReactNode;
   ringGap?: number;
+  ringWidth?: number;
   showTag?: boolean;
   testID?: string;
   /** While live, the avatar itself becomes a button that opens the stream
@@ -112,6 +118,7 @@ export function LiveHostRing({
       live={!!streamId}
       size={size}
       ringGap={ringGap}
+      ringWidth={ringWidth}
       showTag={showTag}
       testID={streamId ? testID ?? `live-ring-${hostId}` : undefined}
     >

@@ -126,8 +126,8 @@ export function CaptionBlock({
         accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
         accessibilityState={{ checked: soundOn }}
       >
-        <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={12} color={`${ON_DARK}CC`} />
-        <Text style={styles.soundText} numberOfLines={1}>{sound}</Text>
+        <Feather name="music" size={12} color={`${ON_DARK}E6`} />
+        <Text style={styles.soundText} numberOfLines={1} ellipsizeMode="tail">{sound}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -178,5 +178,5 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start', paddingHorizontal: 9, borderRadius: RADII.pill,
     backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
-  soundText: { fontSize: FS.xs, fontFamily: FONT.medium, color: `${ON_DARK}D9`, flexShrink: 1 },
+  soundText: { fontSize: 12, fontFamily: FONT.medium, color: `${ON_DARK}E6`, flexShrink: 1 },
 });
