@@ -33,16 +33,16 @@ export function isPreviewInboxEnabled(): boolean {
 // stand-in conversation avatars/attachment thumbnails so the whole buyer
 // preview reads as one consistent world instead of two unrelated fake sets.
 const POSTER_SOURCES = [
-  require('../assets/videos/fashion_runway_01.png'),
-  require('../assets/videos/fashion_runway_02.png'),
-  require('../assets/videos/fashion_runway_03.png'),
-  require('../assets/videos/fashion_runway_04.png'),
-  require('../assets/videos/fashion_runway_05.png'),
-  require('../assets/videos/fashion_runway_06.png'),
-  require('../assets/videos/fashion_runway_07.png'),
-  require('../assets/videos/fashion_runway_08.png'),
-  require('../assets/videos/fashion_runway_09.png'),
-  require('../assets/videos/fashion_runway_10.png'),
+  require('../assets/videos/fashion_runway_01.jpg'),
+  require('../assets/videos/fashion_runway_02.jpg'),
+  require('../assets/videos/fashion_runway_03.jpg'),
+  require('../assets/videos/fashion_runway_04.jpg'),
+  require('../assets/videos/fashion_runway_05.jpg'),
+  require('../assets/videos/fashion_runway_06.jpg'),
+  require('../assets/videos/fashion_runway_07.jpg'),
+  require('../assets/videos/fashion_runway_08.jpg'),
+  require('../assets/videos/fashion_runway_09.jpg'),
+  require('../assets/videos/fashion_runway_10.jpg'),
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires

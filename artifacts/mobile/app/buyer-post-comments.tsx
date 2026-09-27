@@ -24,7 +24,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Modal, Pressable, PanResponder,
-  KeyboardAvoidingView, Platform, StyleSheet, Animated, Keyboard, useWindowDimensions,
+  KeyboardAvoidingView, Platform, StyleSheet, Animated, Easing, Keyboard, useWindowDimensions,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -36,6 +36,7 @@ import {
   FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { SHEET_EASING_BEZIER, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion';
 import { RADII } from '@/constants/radii';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -160,14 +161,14 @@ const csk = StyleSheet.create({
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
-function Avatar({ uri, initials, size = 38, ring = true }: { uri?: string | null; initials: string; size?: number; ring?: boolean }) {
+function Avatar({ uri, initials, size = 38, ring = true, backgroundColor }: { uri?: string | null; initials: string; size?: number; ring?: boolean; backgroundColor?: string }) {
   const { theme } = useAppTheme();
   if (uri) {
     return <CachedImage source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" />;
   }
   return (
     <View style={{
-      width: size, height: size, borderRadius: size / 2, backgroundColor: theme.cardElevated,
+      width: size, height: size, borderRadius: size / 2, backgroundColor: backgroundColor ?? theme.cardElevated,
       borderWidth: ring ? 1 : 0, borderColor: theme.border, alignItems: 'center', justifyContent: 'center',
     }}>
       <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: size > 34 ? FS.xs : 10 }}>{initials}</Text>
@@ -214,6 +215,8 @@ function LikeHeart({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      noMinHeight
     >
       <Animated.View style={[s.commentLikeIconWrap, { transform: [{ scale: pop }] }]}>
         <Ionicons name={liked ? 'heart' : 'heart-outline'} size={16} color={liked ? theme.error : MUTED} />
@@ -269,6 +272,7 @@ function CommentRow({
           accessibilityActions={[{ name: 'longpress', label: 'Comment options' }]}
           onAccessibilityAction={() => { if (!isPending) onMore(comment); }}
           rippleEnabled={false}
+          noMinHeight
         >
           <View style={s.commentHeader}>
             <Text style={s.authorName} numberOfLines={1}>{comment.author.name}</Text>
@@ -306,7 +310,13 @@ function CommentRow({
         <View style={s.commentMeta}>
           <Text style={s.commentTime}>{isPending ? 'Posting…' : shortRelativeTime(comment.createdAt)}</Text>
           {!isPending && !comment.pendingReview && (
-            <PressableScale style={s.replyBtn} onPress={() => { hapticLight(); onReply(comment); }} accessibilityRole="button">
+            <PressableScale
+              style={s.replyBtn}
+              onPress={() => { hapticLight(); onReply(comment); }}
+              accessibilityRole="button"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              noMinHeight
+            >
               <Text style={s.replyLabel}>Reply</Text>
             </PressableScale>
           )}
@@ -340,6 +350,8 @@ function ViewRepliesButton({ count, expanded, onToggle }: { count: number; expan
       onPress={() => { hapticLight(); onToggle(); }}
       accessibilityRole="button"
       accessibilityLabel={expanded ? 'Hide replies' : `View ${count} ${count === 1 ? 'reply' : 'replies'}`}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      noMinHeight
     >
       <View style={s.viewRepliesLine} />
       <Text style={s.viewRepliesText}>
@@ -543,6 +555,34 @@ export default function BuyerPostCommentsScreen() {
   const sheetBaseHeight = windowHeight * 0.65;
   const sheetMaxHeight = windowHeight * 0.92;
   const sheetHeight = Math.min(sheetBaseHeight + keyboardHeight, sheetMaxHeight);
+
+  /**
+   * The sheet's height (and the media box's height, which is always
+   * `windowHeight - sheetHeight`) resizes smoothly on the app's shared
+   * SHEET_TIMING curve whenever the keyboard opens/closes — never an
+   * instant jump, and never a spring (a spring on the media box would read
+   * as the video "zooming" as it overshoots). `useNativeDriver: false` is
+   * required since height can't run on the native driver, but this is a
+   * once-per-keyboard-event animation, not a per-frame gesture.
+   */
+  const sheetHeightAnim = useRef(new Animated.Value(sheetBaseHeight)).current;
+  const prevSheetHeight = useRef(sheetBaseHeight);
+  const sheetEasing = useRef(Easing.bezier(...SHEET_EASING_BEZIER)).current;
+  useEffect(() => {
+    if (prevSheetHeight.current === sheetHeight) return;
+    const opening = sheetHeight > prevSheetHeight.current;
+    prevSheetHeight.current = sheetHeight;
+    Animated.timing(sheetHeightAnim, {
+      toValue: sheetHeight,
+      duration: opening ? SHEET_OPEN_MS : SHEET_CLOSE_MS,
+      easing: sheetEasing,
+      useNativeDriver: false,
+    }).start();
+  }, [sheetHeight, sheetHeightAnim, sheetEasing]);
+  const mediaAreaHeight = useMemo(
+    () => Animated.subtract(windowHeight, sheetHeightAnim),
+    [windowHeight, sheetHeightAnim],
+  );
 
   // Drag-to-dismiss: the sheet follows the finger via `dragY` and springs
   // back to 0 (no overshoot — matches the app's low-bounce spring standard
@@ -926,46 +966,49 @@ export default function BuyerPostCommentsScreen() {
 
   return (
     <View style={s.overlay}>
-      {/* The video plays at its exact normal size/position, completely
-          untouched — no scale, no translate, no crop, no dim scrim. Real
-          TikTok: the sheet simply slides up and covers the lower portion of
-          the video from the bottom; the video itself never changes.
-          contentFit="contain" (not "cover") guarantees this screen's own
-          backdrop copy of the clip can never appear more cropped/zoomed
-          than however the feed itself was already framing it. */}
-      {mediaUri ? (
-        postType === 'video' ? (
-          <>
-            {posterUri && (!videoPlaying || videoErrored) ? (
-              <CachedImage
-                source={{ uri: posterUri }}
-                style={s.mediaBackdrop}
-                contentFit="contain"
-                testID="comments-video-poster"
-              />
-            ) : null}
-            {!videoErrored && (
-              <VideoView
-                player={mediaPlayer}
-                style={[s.mediaBackdrop, posterUri && !videoPlaying && { opacity: 0 }]}
-                contentFit="contain"
-                nativeControls={false}
-                testID="comments-video-preview"
-              />
-            )}
-          </>
-        ) : (
-          <CachedImage source={{ uri: mediaUri }} style={s.mediaBackdrop} contentFit="contain" />
-        )
-      ) : null}
-      <PressableScale
-        style={s.backdrop}
-        activeOpacity={1}
-        onPress={() => { hapticLight(); goBackOr(router); }}
-        accessibilityRole="button"
-        accessibilityLabel="Close comments"
-      />
-      <Animated.View style={[s.sheet, { height: sheetHeight, transform: [{ translateY: dragY }] }]}>
+      {/* Media lives in its own fixed box spanning screenTop → sheetTop —
+          never the full screen — so the video/poster shrinks DOWN to fit
+          inside it (contentFit="contain", centered) like real TikTok, instead
+          of rendering at its own intrinsic pixel size (e.g. 1080x1920) inside
+          a 390pt box and showing a blown-up crop. The box resizes with the
+          sheet on the same non-spring SHEET_TIMING curve as the keyboard
+          opens/closes — it only ever shrinks/grows in place, never zooms. */}
+      <Animated.View style={[s.mediaBox, { height: mediaAreaHeight }]}>
+        {mediaUri ? (
+          postType === 'video' ? (
+            <>
+              {posterUri && (!videoPlaying || videoErrored) ? (
+                <CachedImage
+                  source={{ uri: posterUri }}
+                  style={s.mediaFill}
+                  contentFit="contain"
+                  testID="comments-video-poster"
+                />
+              ) : null}
+              {!videoErrored && (
+                <VideoView
+                  player={mediaPlayer}
+                  style={[s.mediaFill, posterUri && !videoPlaying && { opacity: 0 }]}
+                  contentFit="contain"
+                  nativeControls={false}
+                  testID="comments-video-preview"
+                />
+              )}
+            </>
+          ) : (
+            <CachedImage source={{ uri: mediaUri }} style={s.mediaFill} contentFit="contain" />
+          )
+        ) : null}
+        <PressableScale
+          style={s.backdrop}
+          activeOpacity={1}
+          onPress={() => { hapticLight(); goBackOr(router); }}
+          accessibilityRole="button"
+          accessibilityLabel="Close comments"
+          noMinHeight
+        />
+      </Animated.View>
+      <Animated.View style={[s.sheet, { height: sheetHeightAnim, transform: [{ translateY: dragY }] }]}>
         <KeyboardAvoidingView
           style={s.sheetInner}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1132,7 +1175,7 @@ export default function BuyerPostCommentsScreen() {
                   as you type — never a boxy full-height field. The send
                   arrow only exists once there's something to send. */}
               <View style={s.inputRow}>
-                <Avatar uri={myAvatar} initials={myInitials} size={28} ring={false} />
+                <Avatar uri={myAvatar} initials={myInitials} size={32} ring={false} backgroundColor="#2a2a2a" />
                 <View style={s.inputShell}>
                   <TextInput
                     ref={inputRef}
@@ -1202,15 +1245,16 @@ export default function BuyerPostCommentsScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: 'flex-end',
     backgroundColor: 'transparent',
   },
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  // Full-size, in its normal position, completely untouched — no scale, no
-  // translate, no crop, and (per the owner's explicit correction) no dim
-  // scrim either. The sheet simply slides up and covers the lower portion
-  // of the video from the bottom; the video underneath never changes.
-  mediaBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: '#000' },
+  // A fixed-size box (width 100%, height screenTop→sheetTop) with
+  // overflow hidden — the video/poster inside is centered and scaled DOWN
+  // to fit (contentFit "contain" on mediaFill below), never cropped/zoomed
+  // and never scaled up past its own resolution. No dim scrim (per the
+  // owner's explicit correction) — just the media, centered.
+  mediaBox: { width: '100%', overflow: 'hidden', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  mediaFill: { width: '100%', height: '100%' },
   sheet: {
     overflow: 'hidden',
     backgroundColor: CARD,
@@ -1243,9 +1287,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   mutedNoteText: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs },
 
   // Comment rows
+  // 8pt top + 8pt bottom = 16pt between consecutive comments (TikTok
+  // spacing) — was 10+10=20pt, and the real gap used to balloon far past
+  // that because PressableScale's forced 44pt minHeight boxes (now opted
+  // out of via `noMinHeight` on this row's inner Pressables) inflated the
+  // row's own height well beyond its actual content.
   commentRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    paddingHorizontal: SP.md, paddingVertical: 10,
+    paddingHorizontal: SP.md, paddingVertical: 8,
   },
   commentRowIndented: { paddingLeft: SP.md + 48 },
   commentRowPending: { opacity: 0.6 },
@@ -1256,7 +1305,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   replyContext: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginBottom: 2 },
   commentTime: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },
   pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE, marginLeft: 2 },
-  commentText: { fontFamily: FONT.regular, fontSize: 14, color: FG, lineHeight: 19 },
+  commentText: { fontFamily: FONT.regular, fontSize: 15, color: FG, lineHeight: 19 },
   commentTextHeld: { color: MUTED },
   reviewPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
@@ -1269,8 +1318,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   commentContentPress: { alignItems: 'flex-start' },
   // Time and Reply are both plain, unpadded, same-size/same-lineHeight
   // children of one centered row — no minHeight tap-target box around
-  // either one, which is what used to float Reply above Time.
-  commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 5 },
+  // either one, which is what used to float Reply above Time. 4pt below the
+  // comment text, per TikTok's own comment-row spacing.
+  commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 4 },
+  // `noMinHeight` on the Reply Pressable itself (a wider tap area comes from
+  // `hitSlop` instead) — otherwise PressableScale's forced 44pt-tall box
+  // stretches this whole meta row to 44pt regardless of the 12pt text inside it.
   replyBtn: { justifyContent: 'center' },
   replyLabel: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },
   // Its own right-hand column, top-aligned ~4pt below the username line
@@ -1278,14 +1331,20 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // to the meta row. No overflow:hidden anywhere in this chain, and the icon
   // wrap is taller than the glyph itself, so the like-pop spring (which
   // briefly scales past 1.0) always has headroom instead of getting clipped.
+  // `noMinHeight` on the LikeHeart Pressable itself (see LikeHeart) so this
+  // column stays its actual content height instead of the row growing to
+  // PressableScale's forced 44pt floor.
   commentLike: {
     width: 28, marginTop: 23, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 2,
   },
   commentLikeIconWrap: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { fontFamily: FONT.regular, fontSize: 11, color: MUTED, textAlign: 'center' },
+  // 8pt below the meta row above it, per TikTok's own spacing. `noMinHeight`
+  // on this row's Pressable (see ViewRepliesButton) keeps this tight instead
+  // of the ~60pt gap PressableScale's forced 44pt box used to create here.
   viewRepliesRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingLeft: SP.md + 48, marginTop: 6, paddingVertical: 4, minHeight: 28,
+    paddingLeft: SP.md + 48, marginTop: 8, paddingVertical: 4, minHeight: 20,
   },
   viewRepliesLine: { width: 20, height: 1, backgroundColor: '#3a3a3a' },
   viewRepliesText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED },
@@ -1328,7 +1387,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // background — sitting directly above the composer.
   emojiRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingBottom: 10 },
   emojiBtn: { alignItems: 'center', justifyContent: 'center' },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingBottom: 6 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 },
   // TikTok's composer pill: 36pt tall at rest, 18pt radius, a flat dark fill
   // and no border at all — never the old boxy full-height field. Still
   // allowed to grow (up to ~4 lines) as you type past one line.

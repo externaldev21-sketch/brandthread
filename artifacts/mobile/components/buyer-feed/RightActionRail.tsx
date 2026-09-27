@@ -229,14 +229,15 @@ const styles = StyleSheet.create({
   // happens to fall behind that particular icon.
   count: {
     fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
-    textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
-  // Same shadow as `count` above, applied to the rail's two plain icons
-  // (comment, share — the EngagementButton-driven icons get the matching
-  // `iconShadow` style inside EngagementButton.tsx itself). Without it,
-  // comment and share's outline-ish glyph strokes wash out against bright
-  // footage even at full white/opacity 1. (PR #122.)
+  // Stronger drop shadow (was 0.5/radius 2) applied to the rail's two plain
+  // icons (comment, share — the EngagementButton-driven icons get the
+  // matching `iconShadow` style inside EngagementButton.tsx itself), tuned
+  // against a bright/high-key clip (e.g. Maison Vela's silver dress) where
+  // the previous, lighter shadow washed out to nearly nothing. (PR #122,
+  // strengthened for feed legibility round.)
   iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
   },
 });

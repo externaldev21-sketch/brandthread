@@ -283,11 +283,25 @@ const authTokenCache = new WeakMap<
   { token: string | null; expiresAt: number; inFlight: Promise<string | null> | null }
 >();
 
+/**
+ * Ceiling on how long a single request will wait for Clerk's getToken() to
+ * settle. getToken() is expected to resolve almost instantly (it reads a
+ * cached JWT or does a fast refresh), but a hung session-bootstrap/network
+ * path on cold start can leave it pending far longer than that — with
+ * nothing racing it, every request made through createApi() would hang
+ * indefinitely along with it, including the very first paint's data fetch.
+ * On timeout we proceed with no token, same as the existing "signed out"
+ * path (request() already sends no Authorization header when token is
+ * null) — an authenticated call still fails normally downstream (401) if a
+ * token was actually required, instead of the whole app hanging.
+ */
+const AUTH_TOKEN_WAIT_TIMEOUT_MS = 1_800;
+
 async function getCachedToken(getToken: GetToken): Promise<string | null> {
   const now = Date.now();
   const entry = authTokenCache.get(getToken);
   if (entry) {
-    if (entry.inFlight) return entry.inFlight;
+    if (entry.inFlight) return raceAuthTokenTimeout(entry.inFlight);
     if (entry.expiresAt > now) return entry.token;
   }
   const inFlight = getToken().then(
@@ -301,7 +315,36 @@ async function getCachedToken(getToken: GetToken): Promise<string | null> {
     },
   );
   authTokenCache.set(getToken, { token: entry?.token ?? null, expiresAt: 0, inFlight });
-  return inFlight;
+  // Every caller (including later ones that arrive while this is still
+  // in-flight, via the entry.inFlight branch above) races the SAME
+  // in-flight promise against its own timeout — the getToken() call itself
+  // is still shared/de-duped exactly as before; only the wait is bounded.
+  return raceAuthTokenTimeout(inFlight);
+}
+
+function raceAuthTokenTimeout(inFlight: Promise<string | null>): Promise<string | null> {
+  return new Promise<string | null>((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(null);
+    }, AUTH_TOKEN_WAIT_TIMEOUT_MS);
+    inFlight.then(
+      (token) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(token);
+      },
+      () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(null);
+      },
+    );
+  });
 }
 
 // Two screens (or a screen re-rendering mid-fetch) that ask for the same GET

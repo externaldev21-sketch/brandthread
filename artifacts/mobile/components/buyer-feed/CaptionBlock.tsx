@@ -98,7 +98,11 @@ export function CaptionBlock({
       >
         <View style={styles.creatorRow}>
           <Text style={styles.creatorName} numberOfLines={1}>{creator}</Text>
-          {verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
+          {/* White, not the usual brand blue — blue nearly disappears
+              against bright/light footage (e.g. the Maison Vela demo
+              clip's silver dress). The same text shadow as the rest of
+              this block keeps it legible on light and dark video alike. */}
+          {verified && <Feather name="check-circle" size={13} color={ON_DARK} style={[styles.iconTextShadow, { marginLeft: 4 }]} />}
         </View>
       </TouchableOpacity>
 
@@ -126,7 +130,7 @@ export function CaptionBlock({
         accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
         accessibilityState={{ checked: soundOn }}
       >
-        <Feather name="music" size={12} color={`${ON_DARK}E6`} />
+        <Feather name="music" size={12} color={`${ON_DARK}E6`} style={styles.iconTextShadow} />
         <Text style={styles.soundText} numberOfLines={1} ellipsizeMode="tail">{sound}</Text>
       </TouchableOpacity>
     </Animated.View>
@@ -163,20 +167,32 @@ const styles = StyleSheet.create({
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   creatorRow: { minHeight: 30, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  // Shared legibility shadow for every text overlay in this block (name,
+  // caption, sound) plus the verified badge glyph — strong enough to hold
+  // up against a bright/high-key clip (e.g. Maison Vela's silver dress),
+  // where the old, lighter shadow washed out to nearly nothing.
   creatorName: {
     fontSize: FS.base + 3, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1, letterSpacing: 0.1,
-    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   caption: {
-    fontSize: 14.5, fontFamily: FONT.medium, color: ON_DARK, marginBottom: 8,
+    fontSize: 14.5, fontFamily: FONT.medium, color: `${ON_DARK}F2`, marginBottom: 8,
     lineHeight: 20.5, letterSpacing: 0.1,
-    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
+  // Same shadow, for icon glyphs (Feather renders as a text font, so
+  // textShadow applies) — used by the verified badge above.
+  iconTextShadow: {
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
   soundRow: {
     height: 24, flexDirection: 'row', alignItems: 'center', gap: 6,
     alignSelf: 'flex-start', paddingHorizontal: 9, borderRadius: RADII.pill,
     backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
-  soundText: { fontSize: 12, fontFamily: FONT.medium, color: `${ON_DARK}E6`, flexShrink: 1 },
+  soundText: {
+    fontSize: 12, fontFamily: FONT.medium, color: `${ON_DARK}E6`, flexShrink: 1,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
 });
