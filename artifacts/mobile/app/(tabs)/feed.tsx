@@ -1750,10 +1750,9 @@ export default function FeedScreen({
   // truth so BuyerHighDemandPage's content never renders underneath it
   // (see styles.topBar / styles.buyerTopRow below).
   const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;
-  // 14pt gaps between each cluster's icons at comfortable widths, shrinking
-  // to a 12pt floor under 380pt so the compact clusters never crowd
-  // the absolutely-centered tabs.
-  const topRowIconGap = windowWidth < 380 ? 12 : 14;
+  // Equal spacing in each two-icon cluster, without crowding the centered tabs
+  // on narrower phones.
+  const topRowIconGap = windowWidth < 380 ? 12 : 16;
   const buyerBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { userId } = useAuth();
@@ -2773,7 +2772,7 @@ export default function FeedScreen({
                 hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                 testID="buyer-home-friends"
               >
-                <BuyerNavIcon name="friends" color={ON_DARK} size={24} strokeWidth={1.9} />
+                <Feather name="users" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.buyerTopIconBtn}
@@ -2787,7 +2786,7 @@ export default function FeedScreen({
                 hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                 testID="buyer-home-live"
               >
-                <Feather name="tv" size={24} color={ON_DARK} />
+                <Feather name="tv" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
               </TouchableOpacity>
             </View>
 
@@ -2842,8 +2841,10 @@ export default function FeedScreen({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                testID="buyer-home-cart"
               >
-                <Feather name="shopping-cart" size={24} color={ON_DARK} />
+                <Feather name="shopping-cart" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
                 {cartCount > 0 && (
                   <View style={[styles.cartCountBadge, styles.buyerCartBadge, { backgroundColor: theme.accent }]}>
                     <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
@@ -3164,9 +3165,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   buyerCartBadge: { top: 3, right: 1 },
-  // Same shadow as the rail's icons (RightActionRail's iconShadow) — the
-  // top-row search icon sits directly on video with nothing behind it, so
-  // it needs the same legibility treatment.
+  // Same shadow as the rail's icons (RightActionRail's iconShadow) so all
+  // four top-row icons stay legible over bright video.
   topRowIconShadow: {
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
