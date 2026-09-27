@@ -7,6 +7,7 @@ import Animated from 'react-native-reanimated';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticSelection } from '@/lib/haptics';
+import { useActivityUnreadCount } from '@/components/ActivityBellButton';
 import {
   TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, tabIconColor,
 } from '@/components/tab-bar/TabBarParts';
@@ -16,24 +17,25 @@ import { useBuyerTabBarMetrics } from './buyerTabBarMetrics';
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 // ─── Navigation contract ──────────────────────────────────────────────────────
-// Capsule: Home · Discover · Inbox · Search, plus a separate Profile circle.
-// Search is its own full-screen page (see app/buyer-search.tsx), pushed onto
-// the root stack like TikTok's search — tapping its slot never opens a tab or
-// morphs the bar into a text field; it just navigates there directly, the
-// same as every other icon in this bar.
+// Capsule: Home · Discover · Inbox · Activity, plus a separate Profile
+// circle. Activity opens /activity-center, pushed onto the root stack —
+// tapping its slot never opens a tab, same as every other icon in this bar.
+// Search lives only as its own full-screen page (see app/buyer-search.tsx),
+// reachable from the feed's top-row icon and Discover — it does NOT get a
+// slot here, so there's exactly one way into it, not two.
 
 export const BUYER_TAB_ITEMS: readonly {
-  route: 'index' | 'discover' | 'inbox' | 'search';
+  route: 'index' | 'discover' | 'inbox' | 'activity';
   label: string;
   icon: BuyerNavIconName;
 }[] = [
   { route: 'index', label: 'Home', icon: 'home' },
   { route: 'discover', label: 'Discover', icon: 'discover' },
   { route: 'inbox', label: 'Inbox', icon: 'inbox' },
-  { route: 'search', label: 'Search', icon: 'search' },
+  { route: 'activity', label: 'Activity', icon: 'activity' },
 ] as const;
 
-type Slot = 'index' | 'discover' | 'inbox' | 'search' | 'profile';
+type Slot = 'index' | 'discover' | 'inbox' | 'activity' | 'profile';
 
 /** Which bar control lights up for each buyer route, including hidden ones. */
 export const BUYER_ROUTE_SLOT: Record<string, Slot> = {
@@ -43,7 +45,6 @@ export const BUYER_ROUTE_SLOT: Record<string, Slot> = {
   cart: 'index',
   discover: 'discover',
   inbox: 'inbox',
-  search: 'search',
   profile: 'profile',
   orders: 'profile',
   following: 'profile',
@@ -66,15 +67,16 @@ export function BuyerTabBar({
   const metrics = useBuyerTabBarMetrics();
   const { theme } = useAppTheme();
   const router = useRouter();
+  const activityUnread = useActivityUnreadCount();
 
   const activeRoute = state.routes[state.index]?.name ?? 'index';
   const activeSlot = BUYER_ROUTE_SLOT[activeRoute] ?? null;
   const activeIndex = BUYER_TAB_ITEMS.findIndex(item => item.route === activeSlot);
 
   const openRoute = React.useCallback((routeName: string) => {
-    if (routeName === 'search') {
+    if (routeName === 'activity') {
       hapticSelection();
-      router.push('/buyer-search' as never);
+      router.push('/activity-center' as never);
       return;
     }
     const route = state.routes.find(candidate => candidate.name === routeName);
@@ -157,7 +159,8 @@ export function BuyerTabBar({
         >
           {BUYER_TAB_ITEMS.map((item) => {
             const focused = activeSlot === item.route;
-            const badge = item.route === 'inbox' ? inboxBadgeCount : 0;
+            const badge = item.route === 'inbox' ? inboxBadgeCount : item.route === 'activity' ? activityUnread : 0;
+            const hasBadge = item.route === 'inbox' || item.route === 'activity';
             const label = badge > 0
               ? `${item.label} tab, ${badge} unread ${badge === 1 ? 'item' : 'items'}`
               : `${item.label} tab`;
@@ -171,7 +174,7 @@ export function BuyerTabBar({
                 onLongPress={() => onLongPress(item.route)}
                 testID={`buyer-tab-${item.route}`}
                 accessibilityLabel={label}
-                badge={item.route === 'inbox' ? <TabBarBadge count={badge} theme={theme} /> : null}
+                badge={hasBadge ? <TabBarBadge count={badge} theme={theme} /> : null}
               >
                 <BuyerNavIcon
                   name={item.icon}

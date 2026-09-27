@@ -2,7 +2,7 @@ import React from 'react';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 export type BuyerNavIconName =
-  | 'home' | 'discover' | 'inbox' | 'search' | 'profile'
+  | 'home' | 'discover' | 'inbox' | 'search' | 'profile' | 'activity'
   | 'close' | 'friends' | 'filters'
   // Seller bar
   | 'dashboard' | 'products' | 'orders' | 'studio';
@@ -64,6 +64,17 @@ export function BuyerNavIcon({
         <Svg width={size} height={size} viewBox="0 0 24 24">
           <Circle cx={10.8} cy={10.8} r={6.6} fill="none" {...common} strokeWidth={strokeWidth + (focused ? 0.5 : 0)} />
           <Line x1={15.6} y1={15.6} x2={20.2} y2={20.2} {...common} strokeWidth={strokeWidth + (focused ? 0.5 : 0)} />
+        </Svg>
+      );
+    case 'activity':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path
+            d="M12 3.6a5.6 5.6 0 0 0-5.6 5.6v3.1c0 .6-.2 1.2-.6 1.7l-1.1 1.4a1 1 0 0 0 .8 1.6h13a1 1 0 0 0 .8-1.6l-1.1-1.4a2.7 2.7 0 0 1-.6-1.7V9.2A5.6 5.6 0 0 0 12 3.6Z"
+            fill={focused ? color : 'none'}
+            {...common}
+          />
+          <Path d="M9.8 19.4a2.3 2.3 0 0 0 4.4 0" fill="none" {...common} />
         </Svg>
       );
     case 'profile':
