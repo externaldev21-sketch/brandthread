@@ -1876,10 +1876,10 @@ export default function FeedScreen({
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRepostEducation, setShowRepostEducation] = useState(false);
   const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
-  // Following|Threads content cross-fade: a soft dissolve on the list's own
-  // opacity when the tab (and therefore its underlying data) changes,
-  // instead of the new content just popping in. `reduceMotion` (declared
-  // below) gates it — see the effect that sets `reduceMotion` from
+  // Following|Threads content cross-fade: a soft 150ms dissolve on the
+  // list's own opacity when the tab (and therefore its underlying data)
+  // changes, instead of the new content just popping in. Gated by
+  // `reduceMotion` (declared below) via the effect that sets it from
   // AccessibilityInfo.
   const feedContentOpacity = useRef(new Animated.Value(1)).current;
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
@@ -1888,7 +1888,7 @@ export default function FeedScreen({
   useEffect(() => {
     if (reduceMotion) return;
     feedContentOpacity.setValue(0.3);
-    Animated.timing(feedContentOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    Animated.timing(feedContentOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
     // Only the tab switch itself should trigger this fade, not every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedTab]);
@@ -1937,6 +1937,14 @@ export default function FeedScreen({
       subscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    feedContentOpacity.setValue(0.3);
+    Animated.timing(feedContentOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    // Only the tab switch itself should trigger this fade, not every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedTab]);
 
   // First-time gesture coach — buyer home only, shown once per account (and
   // once more per FEED_GESTURES_TIP_VERSION bump). Server is the source of
@@ -2716,10 +2724,10 @@ export default function FeedScreen({
        * child modal" focus events from "genuine tab-switch-back" focus
        * events for this screen specifically.
        */}
-      {/* Wrapped in feedContentOpacity (see the effect on `feedTab` above)
-          so switching Following|Threads dissolves into the new content
-          instead of popping in — the list itself, not each cell, so the
-          fade is one motion regardless of how many rows are mounted. */}
+      {/* Wrapped in feedContentOpacity (see the effect on `feedTab` above) so
+          switching Following|Threads dissolves into the new content instead
+          of popping in — the list itself, not each cell, so the fade is one
+          motion regardless of how many rows are mounted. */}
       <Animated.View style={[styles.feedContentFade, { opacity: feedContentOpacity }]}>
       {viewportReady && <FlatList
         ref={feedListRef}

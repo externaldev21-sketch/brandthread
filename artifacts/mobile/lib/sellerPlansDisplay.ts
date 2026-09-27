@@ -26,6 +26,25 @@ export function displayPriceFor(plan: SellerPlanDefinition): {
   return { price: plan.priceLabel, period: '/mo', note: null };
 }
 
+/**
+ * Simple per-week equivalent of a monthly price, e.g. "$29/mo" → "~$6.69/wk".
+ * Uses the real billed price (priceCents) — never an invented number.
+ */
+export function weeklyEquivalentFor(plan: SellerPlanDefinition): string {
+  const perWeek = plan.priceCents / 100 / 4.345;
+  return `~$${perWeek.toFixed(2)}/wk`;
+}
+
+/**
+ * Per-day equivalent, only returned when it reads as a "clean" small number
+ * (under $10/day) — otherwise callers should fall back to the weekly framing.
+ */
+export function dailyEquivalentFor(plan: SellerPlanDefinition): string | null {
+  const perDay = plan.priceCents / 100 / 30.44;
+  if (perDay >= 10) return null;
+  return `~$${perDay.toFixed(2)}/day`;
+}
+
 /** Every distinct feature across all tiers, in first-appearance order, for the comparison table. */
 export function comparisonRows(plans: SellerPlanDefinition[] = SELLER_PLANS): string[] {
   const seen = new Set<string>();
