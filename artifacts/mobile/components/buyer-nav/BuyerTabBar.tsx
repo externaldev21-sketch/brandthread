@@ -56,8 +56,13 @@ export const BUYER_ROUTE_SLOT: Record<string, Slot> = {
  * (kept as Tabs.Screen entries with href: null so the bar stays mounted
  * behind them for a nice cross-fade, per the layout comment) but that must
  * not show the floating tab bar over their own content/keyboard/footer.
+ *
+ * 'cart' is a pushed screen (reached from the feed's cart icon or Shop the
+ * Post, never its own tab slot) — showing the floating capsule underneath it
+ * used to both cover its sticky checkout bar and light up "Home" as if Cart
+ * were a tab, with no way to tell it was actually a pushed screen.
  */
-const BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile']);
+const BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile', 'cart']);
 
 export function BuyerTabBar({
   state,

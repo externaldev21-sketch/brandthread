@@ -555,13 +555,17 @@ export function ShopProductSheet({
       return;
     }
     setVariantError('');
-    if (selection.previewProduct) {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setPhase('added');
-      void flyProductToCart(qty);
-      return;
-    }
     setPhase('adding');
+    // Root cause fix: this used to short-circuit for selection.previewProduct
+    // (the preview-mode "Shop the Post" flow) and only play the fly-to-cart
+    // animation without ever calling addToCart() — so the item never touched
+    // the AsyncStorage-backed cart the Cart screen actually reads, and the
+    // preview cart always looked empty. addToCart() is a local-first,
+    // AsyncStorage-backed write (services/cartService.ts) that never depends
+    // on the product having a real server-side row, so the preview product
+    // built in feed.tsx's buildPreviewShopProduct() goes through the exact
+    // same path as a real catalog product — it always lands in the cart, and
+    // only best-effort syncs to the API in the background when signed in.
     try {
       const result = await addToCart({ product, variant, quantity: qty, attribution });
       const newCount = getSuccessfulCartCount(result);
@@ -570,7 +574,7 @@ export function ShopProductSheet({
         setVariantError(result.message ?? 'Could not add to cart.');
         return;
       }
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setPhase('added');
       void flyProductToCart(newCount);
     } catch {
@@ -1006,16 +1010,25 @@ export function ShopProductSheet({
         </Animated.View>
       )}
 
+      {/* Small, non-blocking toast — sits above the sticky action bar and
+          never dims or intercepts touches on the rest of the sheet/feed
+          behind it (only the toast row itself is tappable). Tapping "View"
+          jumps straight to the cart, same destination as the sticky bar's
+          own "View cart" state. */}
       {showAddedConfirmation && (
-        <View style={ss.addedConfirmationOverlay} pointerEvents="none" accessibilityLiveRegion="polite">
-          <View style={ss.addedConfirmationContent}>
-            {/* Monochrome brand accent circle, not a green/generic icon —
-                same success-moment language as SuccessCheck elsewhere. */}
-            <View style={[ss.addedConfirmationBadge, { backgroundColor: theme.accent }]}>
-              <Feather name="check" size={26} color={theme.onAccent} />
-            </View>
-            <Text style={ss.addedConfirmationText}>Added to cart</Text>
-          </View>
+        <View style={ss.addedToastWrap} pointerEvents="box-none" accessibilityLiveRegion="polite">
+          <TouchableOpacity
+            style={[ss.addedToast, { backgroundColor: theme.text }]}
+            onPress={() => { setShowAddedConfirmation(false); handleViewCart(); }}
+            activeOpacity={0.9}
+            accessibilityRole="button"
+            accessibilityLabel="Added to cart. View cart"
+          >
+            <Feather name="check" size={15} color={theme.background} />
+            <Text style={[ss.addedToastText, { color: theme.background }]}>Added to cart</Text>
+            <Text style={[ss.addedToastDivider, { color: theme.background }]}>·</Text>
+            <Text style={[ss.addedToastView, { color: theme.background }]}>View</Text>
+          </TouchableOpacity>
         </View>
       )}
     </Modal>
@@ -1285,26 +1298,43 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addedConfirmationOverlay: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 30,
+  addedToastWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    // 76 clears the sheet's own sticky Add to cart/Buy Now bar (its
+    // paddingTop + the 50pt buttons + their bottom margin) so the toast
+    // floats just above it instead of overlapping.
+    bottom: 76,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.42)',
+    zIndex: 25,
   },
-  addedConfirmationContent: {
+  addedToast: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
+    gap: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: RADIUS.pill,
+    shadowColor: '#000',
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
   },
-  addedConfirmationBadge: {
-    width: 56, height: 56, borderRadius: 28,
-    alignItems: 'center', justifyContent: 'center',
+  addedToastText: {
+    fontFamily: FONT.medium,
+    fontSize: FS.sm,
   },
-  addedConfirmationText: {
-    color: ON_DARK,
+  addedToastDivider: {
+    fontFamily: FONT.regular,
+    fontSize: FS.sm,
+    opacity: 0.5,
+  },
+  addedToastView: {
     fontFamily: FONT.bold,
-    fontSize: FS.lg,
+    fontSize: FS.sm,
+    textDecorationLine: 'underline',
   },
   backdrop: {
     ...StyleSheet.absoluteFill,
