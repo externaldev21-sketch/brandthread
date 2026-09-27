@@ -85,6 +85,16 @@ function LivePage({
     Animated.timing(exit, { toValue: ending ? 1 : 0, duration: LIVE_END_ANIMATION_MS, useNativeDriver: ND }).start();
   }, [ending, exit]);
 
+  // Poster/video fade in together as soon as this page mounts, instead of
+  // popping straight from the page's own background color — the poster (or
+  // the host's own color, see the page's backgroundColor below) is visible
+  // immediately and the media just gets more opaque on top of it, never a
+  // hard cut from a blank frame.
+  const mediaFade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(mediaFade, { toValue: 1, duration: 280, useNativeDriver: ND }).start();
+  }, [mediaFade]);
+
   const viewerCount = rt?.viewerCount ?? stream.viewerCount;
   const likeCount = rt?.likeCount ?? stream.likeCount;
   const pinnedId = rt?.pinnedProductId ?? stream.pinnedProductId;
@@ -107,19 +117,22 @@ function LivePage({
   return (
     <Animated.View
       style={{
-        width: pageWidth, height: pageHeight, backgroundColor: '#000', overflow: 'hidden',
+        width: pageWidth, height: pageHeight, backgroundColor: stream.host.avatarColor, overflow: 'hidden',
         opacity: exit.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
         transform: [{ scale: exit.interpolate({ inputRange: [0, 1], outputRange: [1, 0.94] }) }],
       }}
       testID={`live-page-${stream.id}`}
     >
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: mediaFade }]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onVideoPress} accessible={false}>
         {video.kind === 'video' ? (
           <>
           {/* Poster underlay: VideoVisual drops its own poster on the
               `play` event, a beat before the first frame paints — without
-              this the page's black background flashed for a frame as each
-              stream became active. */}
+              this the page's own background flashed for a frame as each
+              stream became active. Never conditionally unmounted on
+              `hasStarted` here — it stays put the whole time so the media
+              fade above never crossfades against a blank layer. */}
           {(video.posterSource || video.posterUri) ? (
             <CachedImage
               source={video.posterSource ?? { uri: video.posterUri! }}
@@ -155,6 +168,7 @@ function LivePage({
           </View>
         )}
       </Pressable>
+      </Animated.View>
 
       {/* Legibility scrims */}
       <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']} style={[styles.topScrim, { height: topInset + 110 }]} />
@@ -418,7 +432,7 @@ const styles = StyleSheet.create({
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   topRow: { position: 'absolute', left: 10, right: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   topIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   title: {
     position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,

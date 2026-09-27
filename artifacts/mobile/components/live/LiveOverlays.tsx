@@ -143,13 +143,16 @@ function ChatRow({ msg, opacity }: { msg: LiveChatMessage; opacity: number }) {
   }
   return (
     <Animated.View style={animatedStyle}>
-      <View style={styles.chatLine}>
+      {/* One nested-Text tree, not a row View splitting username/tag/message
+          into separate flex items — a row wraps each item as a whole to the
+          next line (the username+tag stranded on their own line, the message
+          starting a new line with the row's gap read as leading spaces).
+          Nested Text reflows word by word like any other inline text. */}
+      <Text style={styles.chatText} numberOfLines={3}>
         <Text style={styles.chatUser}>{msg.username}</Text>
-        {msg.kind === 'host' && (
-          <View style={styles.hostTag}><Text style={styles.hostTagText}>HOST</Text></View>
-        )}
-        <Text style={styles.chatText} numberOfLines={3}>  {msg.text}</Text>
-      </View>
+        {msg.kind === 'host' && <Text style={styles.hostTagText}> HOST </Text>}
+        {' '}{msg.text}
+      </Text>
     </Animated.View>
   );
 }
@@ -214,13 +217,15 @@ export function LivePinnedProductCard({
 
 // ─── Right rail ──────────────────────────────────────────────────────────────
 
-function RailButton({
-  icon, label, count, onPress, testID, badge,
-}: {
+// forwardRef so the like button can be measured for the heart-burst origin
+// without wrapping it in an extra plain View — every rail item (mute, heart,
+// cart, share) is now built through this exact same call, with no
+// per-item structural difference that could make one look inconsistent.
+const RailButton = forwardRef<View, {
   icon: React.ReactNode; label: string; count?: string; onPress: () => void; testID?: string; badge?: number;
-}) {
+}>(function RailButton({ icon, label, count, onPress, testID, badge }, ref) {
   return (
-    <Pressable onPress={onPress} style={styles.railBtn} accessibilityRole="button" accessibilityLabel={label} testID={testID} hitSlop={4}>
+    <Pressable ref={ref} onPress={onPress} style={styles.railBtn} accessibilityRole="button" accessibilityLabel={label} testID={testID} hitSlop={4}>
       <View style={styles.railIcon}>
         {icon}
         {badge != null && badge > 0 && (
@@ -230,7 +235,7 @@ function RailButton({
       {count != null && <Text style={[styles.railCount, TABULAR_NUMS]}>{count}</Text>}
     </Pressable>
   );
-}
+});
 
 export function LiveRail({
   likeCount, liked, productCount, muted, onLike, onShare, onOpenBag, onToggleSound,
@@ -254,15 +259,14 @@ export function LiveRail({
         onPress={onToggleSound}
         icon={<Feather name={muted ? 'volume-x' : 'volume-2'} size={RAIL_ICON_SIZE} color="#fff" />}
       />
-      <View ref={likeRef} collapsable={false}>
-        <RailButton
-          testID="live-like"
-          label={`Like, ${formatViewerCount(likeCount)} likes`}
-          count={formatViewerCount(likeCount)}
-          onPress={handleLike}
-          icon={<Animated.View style={{ transform: [{ scale: pop }] }}><Ionicons name={liked ? 'heart' : 'heart-outline'} size={RAIL_ICON_SIZE} color="#fff" /></Animated.View>}
-        />
-      </View>
+      <RailButton
+        ref={likeRef}
+        testID="live-like"
+        label={`Like, ${formatViewerCount(likeCount)} likes`}
+        count={formatViewerCount(likeCount)}
+        onPress={handleLike}
+        icon={<Animated.View style={{ transform: [{ scale: pop }] }}><Ionicons name={liked ? 'heart' : 'heart-outline'} size={RAIL_ICON_SIZE} color="#fff" /></Animated.View>}
+      />
       <RailButton testID="live-bag" label={`Products in this live, ${productCount}`} onPress={onOpenBag} badge={productCount} icon={<Feather name="shopping-bag" size={RAIL_ICON_SIZE} color="#fff" />} />
       <RailButton testID="live-share" label="Share this live" onPress={onShare} icon={<Feather name="send" size={RAIL_ICON_SIZE} color="#fff" />} />
     </View>
@@ -406,10 +410,15 @@ const styles = StyleSheet.create({
   followBtnOn: { backgroundColor: 'rgba(255,255,255,0.18)', minWidth: 34, paddingHorizontal: 0, width: 28 },
   followText: { color: '#000', fontFamily: FONT.bold, fontSize: 12 },
 
-  viewerStack: { flexDirection: 'row', alignItems: 'center' },
+  // Fixed width (24 + 2×16 = 56 for up to 3 overlapping 24pt avatars, each
+  // overlapping the last by 8) and flexShrink: 0 so the flex row never
+  // compresses it — without an explicit width the row shrank to fit
+  // whatever space the host pill left, clipping/squishing the last avatar
+  // against the viewer count next to it.
+  viewerStack: { flexDirection: 'row', alignItems: 'center', width: 56, flexShrink: 0 },
   viewerDot: {
     width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden',
+    borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden', flexShrink: 0,
   },
   viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: 9 },
   viewerCountPill: { marginLeft: 6 },
@@ -420,7 +429,6 @@ const styles = StyleSheet.create({
   // style), and one consistent subtle pill for system/purchase events only.
   chatList: { gap: 5, justifyContent: 'flex-end', maxWidth: '70%', alignSelf: 'flex-start' },
   chatRow: { alignSelf: 'flex-start', maxWidth: '100%' },
-  chatLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   chatText: {
     color: '#fff', fontFamily: FONT.regular, fontSize: 13, lineHeight: 17,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
@@ -429,11 +437,12 @@ const styles = StyleSheet.create({
     color: '#fff', fontFamily: FONT.semibold, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
-  hostTag: {
-    backgroundColor: '#fff', borderRadius: 3, paddingHorizontal: 4, marginLeft: 6,
-    alignItems: 'center', justifyContent: 'center', height: 14,
+  // Nested inside the chat Text (not a row View) so "username HOST message"
+  // flows and wraps as one line of text instead of the tag forcing a break.
+  hostTagText: {
+    color: '#000', backgroundColor: '#fff', fontFamily: FONT.bold, fontSize: 9, letterSpacing: 0.6,
+    borderRadius: 3,
   },
-  hostTagText: { color: '#000', fontFamily: FONT.bold, fontSize: 9, letterSpacing: 0.6 },
   eventPill: {
     backgroundColor: 'rgba(0,0,0,0.32)', borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5,
   },
