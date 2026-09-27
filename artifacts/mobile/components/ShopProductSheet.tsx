@@ -330,6 +330,17 @@ export function ShopProductSheet({
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [qty, setQty] = useState(1);
   const [variantError, setVariantError] = useState('');
+  // The sheet opens scrolled to the top (hero image + name/price + sticky
+  // Add to cart/Buy now bar), with the size/color chips and this error
+  // further down the scrollable content. Tapping Add to cart before
+  // scrolling used to fail with only that inline message, entirely
+  // off-screen and invisible — indistinguishable from the tap doing
+  // nothing at all. contentScrollRef lets a failed validation scroll the
+  // option chips into view; the message itself also now renders in the
+  // always-visible sticky bar (see stickyActionsWrap below) so it can never
+  // be scrolled out of sight.
+  const contentScrollRef = useRef<ScrollView>(null);
+  const optionsSectionY = useRef(0);
   const [flyingToCart, setFlyingToCart] = useState(false);
   const [showAddedConfirmation, setShowAddedConfirmation] = useState(false);
   const [cartTarget, setCartTarget] = useState<CartFlightPoint | null>(null);
@@ -541,18 +552,39 @@ export function ShopProductSheet({
   };
 
   // Add to cart
+  /**
+   * Real root cause of "I tapped Add to cart and nothing happened": the
+   * sheet opens scrolled to the top (hero image, name/price, the sticky
+   * Add to cart/Buy now bar) — the size/color chips this validation is
+   * about sit further down the scrollable content, off-screen until the
+   * buyer scrolls. Tapping Add to cart before ever scrolling hit exactly
+   * this early return: no exception, no console error, nothing written to
+   * storage (there was nothing to write — addToCart() was never called),
+   * and the only feedback was a small inline message rendered below the
+   * fold, invisible at the scroll position the buyer was actually at. From
+   * their side that reads as "the button does nothing." This scrolls the
+   * option chips into view and mirrors the message into the always-visible
+   * sticky action bar (see stickyActionsWrap) so it can't be missed again.
+   */
+  function rejectMissingVariant(message: string) {
+    setVariantError(message);
+    requestAnimationFrame(() => {
+      contentScrollRef.current?.scrollTo({ y: Math.max(0, optionsSectionY.current - 12), animated: true });
+    });
+  }
+
   async function handleAddToCart() {
     if (!product) return;
     if (!allOptionsSelected) {
-      setVariantError('Please select all options before adding to cart.');
+      rejectMissingVariant('Please select all options before adding to cart.');
       return;
     }
     if (!variant) {
-      setVariantError('Please select a valid combination.');
+      rejectMissingVariant('Please select a valid combination.');
       return;
     }
     if (!variant.isAvailable) {
-      setVariantError('This combination is out of stock.');
+      rejectMissingVariant('This combination is out of stock.');
       return;
     }
     setVariantError('');
@@ -588,11 +620,11 @@ export function ShopProductSheet({
   async function handleBuyNow() {
     if (!product) return;
     if (!allOptionsSelected) {
-      setVariantError('Please select all options.');
+      rejectMissingVariant('Please select all options.');
       return;
     }
     if (!variant || !variant.isAvailable) {
-      setVariantError('The selected variant is not available.');
+      rejectMissingVariant('The selected variant is not available.');
       return;
     }
     setVariantError('');
@@ -784,6 +816,7 @@ export function ShopProductSheet({
             // visually overlap the sticky Add to Cart/Buy Now bar below.
             // flex: 1 bounds it to the remaining sheet height so it scrolls
             // internally instead.
+            ref={contentScrollRef}
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -812,6 +845,7 @@ export function ShopProductSheet({
             </View>
 
             {/* Variant options */}
+            <View onLayout={e => { optionsSectionY.current = e.nativeEvent.layout.y; }}>
             {product.options.map((option: BuyerProductOption) => (
               <View key={option.id} style={ss.optionSection}>
                 <View style={ss.optionHeader}>
@@ -849,6 +883,7 @@ export function ShopProductSheet({
                 </View>
               </View>
             ))}
+            </View>
 
             {/* Qty + stock */}
             <View style={ss.qtyRow}>
@@ -901,6 +936,15 @@ export function ShopProductSheet({
         {/* Sticky Add to Cart + Buy Now — always reachable, never scrolls away */}
         {(phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
           <View style={[ss.stickyActionsWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+            {/* Mirrors the inline variantError message (rendered next to the
+                size/color chips) into the one part of the sheet that's
+                always on screen — see rejectMissingVariant's comment. */}
+            {!!variantError && (
+              <View style={ss.stickyVariantError} accessibilityRole="alert" accessibilityLiveRegion="polite">
+                <Feather name="alert-circle" size={13} color={theme.error} />
+                <Text style={ss.variantErrorText}>{variantError}</Text>
+              </View>
+            )}
             <View style={ss.actions}>
               <TouchableOpacity
                 onPress={phase === 'added' ? handleViewCart : handleAddToCart}
@@ -1601,6 +1645,15 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     fontFamily: FONT.regular,
     color: theme.error,
     flex: 1,
+  },
+  // Same message, rendered inside the sticky action bar (always on screen)
+  // instead of the scrollable content — see rejectMissingVariant.
+  stickyVariantError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
 
   // Status banner
