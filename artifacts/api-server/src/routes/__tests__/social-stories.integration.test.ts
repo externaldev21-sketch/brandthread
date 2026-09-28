@@ -131,6 +131,35 @@ describe("stories", () => {
     const entry = (tray.body as any[]).find((e: any) => e.authorId === authorId);
     expect(entry).toBeTruthy();
     expect(entry.seen).toBe(true); // this follower already viewed it in the prior test
+    expect(entry.closeFriendsOnly).toBe(false); // posted with default (public) visibility
+  });
+
+  it("flags a Close Friends story with closeFriendsOnly on the story object and the author's own tray entry", async () => {
+    const res = await request("/api/social/stories", authorId, {
+      method: "POST",
+      body: JSON.stringify({
+        media: [{ type: "text", text: "close friends only" }],
+        privacy: { visibility: "friends" },
+      }),
+    });
+    expect(res.status).toBe(201);
+    expect((res.body as any).privacy.closeFriendsOnly).toBe(true);
+    storyIds.push((res.body as any).id);
+
+    // The author's own tray entry carries closeFriendsOnly for their ring badge.
+    const authorTray = await request("/api/social/stories/following", authorId);
+    expect(authorTray.status).toBe(200);
+    const ownEntry = (authorTray.body as any[]).find((e: any) => e.authorId === authorId);
+    expect(ownEntry).toBeTruthy();
+    expect(ownEntry.closeFriendsOnly).toBe(true);
+
+    // Existing simplification (unrelated to this change): the tray hides
+    // any "friends"-visibility story from non-authors outright, rather than
+    // checking actual close-friend membership — so it never appears in the
+    // follower's tray here.
+    const followerTray = await request("/api/social/stories/following", followerId);
+    expect(followerTray.status).toBe(200);
+    expect((followerTray.body as any[]).find((e: any) => e.authorId === authorId)).toBeFalsy();
   });
 
   it("lets the author delete their own story early", async () => {
