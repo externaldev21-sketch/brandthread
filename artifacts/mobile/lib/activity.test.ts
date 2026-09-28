@@ -396,6 +396,29 @@ describe('filter chips', () => {
     expect(new Set(messages).size).toBe(ACTIVITY_CHIPS.length);
     expect(activityChipEmpty('thread_cash').message).toContain('Thread Cash');
   });
+
+  it('gives every chip a title, for both roles, and phrases follows/orders for a seller', () => {
+    for (const role of ['buyer', 'seller'] as const) {
+      const titles = ACTIVITY_CHIPS.map((c) => activityChipEmpty(c.key, role).title);
+      expect(titles.every((t) => t.length > 0)).toBe(true);
+      expect(new Set(titles).size).toBe(ACTIVITY_CHIPS.length);
+    }
+    expect(activityChipEmpty('orders', 'seller').message).toContain('buys from your store');
+    expect(activityChipEmpty('orders', 'buyer').message).not.toContain('your store');
+    expect(activityChipEmpty('follows', 'seller').message).toContain('your store');
+  });
+
+  it('offers one next step only where there is a real one', () => {
+    expect(activityChipEmpty('all').action).toEqual({ label: 'Find people to follow', href: '/buyer-search' });
+    expect(activityChipEmpty('follows', 'seller').action).toEqual({ label: 'Share your store', href: '/share-store' });
+    expect(activityChipEmpty('orders').action?.href).toBe('/(buyer)/discover');
+    expect(activityChipEmpty('orders', 'seller').action?.href).toBe('/share-store');
+    expect(activityChipEmpty('thread_cash', 'seller').action?.href).toBe('/thread-cash');
+    for (const role of ['buyer', 'seller'] as const) {
+      expect(activityChipEmpty('likes', role).action).toBeUndefined();
+      expect(activityChipEmpty('comments', role).action).toBeUndefined();
+    }
+  });
 });
 
 describe('aggregateActivity — reposts and story likes', () => {

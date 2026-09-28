@@ -432,6 +432,9 @@ export interface BuyerProduct {
   variants: BuyerProductVariant[];
   isActive: boolean;
   tags: string[];
+  /** A photo of the seller's own size chart. Absent means no "Size guide"
+   *  link shows — never a placeholder. */
+  sizeChartImageUrl?: string | null;
 }
 
 export interface BuyerProductOption {
