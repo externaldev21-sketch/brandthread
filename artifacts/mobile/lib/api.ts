@@ -1515,7 +1515,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Unauthenticated public endpoints — no Authorization header needed. */
     /**
-     * Profile cover video (buyer + seller). The server enforces ≤30s and one
+     * Profile cover video (buyer + seller). The server enforces ≤25s and one
      * change per 24h (setting and removing both count); a 429 ApiError's
      * message is the user-facing "You can change your cover again in X hours".
      */

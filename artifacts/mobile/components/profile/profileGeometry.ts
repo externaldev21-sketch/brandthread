@@ -29,7 +29,16 @@ export interface ProfileLayout {
   windowHeight: number;
 }
 
-export function computeProfileLayout(width: number, height: number, os: string): ProfileLayout {
+/** Grid tile shapes: height ÷ width. 9:16 video wall (default) or Instagram's 4:5 own-profile grid. */
+export const TILE_ASPECT_9_16 = 16 / 9;
+export const TILE_ASPECT_4_5 = 5 / 4;
+
+export function computeProfileLayout(
+  width: number,
+  height: number,
+  os: string,
+  { tileAspect = TILE_ASPECT_9_16 }: { tileAspect?: number } = {},
+): ProfileLayout {
   // Inside the web shell the profile fills the shell's column — it never
   // adds a second, narrower column of its own.
   const isDesktopWeb = os === 'web' && width >= WEB_SHELL_BREAKPOINT_MIRROR;
@@ -41,7 +50,7 @@ export function computeProfileLayout(width: number, height: number, os: string):
       : width;
   const gridColumns = isTablet ? (width > height ? 5 : 4) : 3;
   const tileWidth = Math.floor((columnWidth - PROFILE_GRID_GAP * (gridColumns - 1)) / gridColumns);
-  const tileHeight = Math.round((tileWidth * 16) / 9);
+  const tileHeight = Math.round(tileWidth * tileAspect);
   // A dominant, full-bleed hero (~62% of the screen). The name/avatar are set
   // *inside* its bottom edge, so even a 375×667 phone shows identity and the
   // stats row above the fold; clamped for tablets/desktop.

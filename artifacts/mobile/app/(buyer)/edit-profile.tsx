@@ -23,6 +23,8 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { isBuyerDevPreview } from '@/lib/devPreview';
+import { CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia } from '@/components/profile/ProfileCover';
+import { COVER_MAX_SECONDS } from '@/components/profile/profileCoverRules';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Prefer not to say', 'Custom'] as const;
 const BIO_MAX = 150;
@@ -99,7 +101,7 @@ export default function BuyerEditProfileScreen() {
   const navigation = useNavigation();
   const { theme } = useAppTheme();
   const api = useApi();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   // Dev-web preview (?bt_preview=buyer): there is no signed-in Clerk user, so
   // every real network call below 401s. Route those specific calls through a
   // local-only path instead so the whole screen — including username
@@ -123,6 +125,10 @@ export default function BuyerEditProfileScreen() {
   const [avatarProgress, setAvatarProgress] = useState(0);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [genderPickerOpen, setGenderPickerOpen] = useState(false);
+  // Profile video (the looping video behind the profile header) — the same
+  // pick → trim → upload flow the profile screen uses.
+  const [serverCover, setServerCover] = useState<CoverMedia>({ videoUrl: null, posterUrl: null });
+  const coverFlow = useProfileCover({ own: false, cover: serverCover, userId });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof CoreFields, string>>>({});
 
@@ -254,6 +260,18 @@ export default function BuyerEditProfileScreen() {
   }, []);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
+
+  // Current profile video, so the entry reads "Add" vs "Change".
+  useEffect(() => {
+    if (!userId || preview) return;
+    let alive = true;
+    api.social.profile(userId)
+      .then((data: any) => {
+        if (alive && data) setServerCover({ videoUrl: data.coverVideoUrl ?? null, posterUrl: data.coverPosterUrl ?? null });
+      })
+      .catch(() => { /* the entry still offers "Add profile video" */ });
+    return () => { alive = false; };
+  }, [api, preview, userId]);
 
   const isDirty = useMemo(
     () => fields.name !== initial.name || fields.username !== initial.username
@@ -456,6 +474,28 @@ export default function BuyerEditProfileScreen() {
             )}
           </View>
 
+          {/* Profile video */}
+          <View style={styles.coverSection}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={coverFlow.hasCover ? coverFlow.openManage : coverFlow.startAdd}
+              disabled={!!coverFlow.busy}
+              accessibilityRole="button"
+              testID="edit-profile-video"
+            >
+              <Text style={[styles.editPhotoLink, { color: theme.accentLight }]}>
+                {coverFlow.busy === 'uploading'
+                  ? 'Uploading profile video…'
+                  : coverFlow.busy === 'removing'
+                    ? 'Removing profile video…'
+                    : coverFlow.hasCover ? 'Change profile video' : 'Add profile video'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={[styles.coverHint, { color: theme.muted }]}>
+              Up to {COVER_MAX_SECONDS} seconds. Plays muted on a loop behind your profile.
+            </Text>
+          </View>
+
           {/* Core fields */}
           <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View>
@@ -645,6 +685,8 @@ export default function BuyerEditProfileScreen() {
           onClose={() => setGenderPickerOpen(false)}
           theme={theme}
         />
+        <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
+        <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
       </View>
     </KeyboardAvoidingView>
   );
@@ -675,6 +717,8 @@ const styles = StyleSheet.create({
   },
   avatarOverlayText: { color: '#FFF', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   editPhotoLink: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  coverSection: { alignItems: 'center', gap: 4, paddingBottom: 12 },
+  coverHint: { fontSize: 12.5, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 20 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
   errorText: { fontSize: 12.5, fontFamily: 'Inter_400Regular' },
   retryLink: { fontSize: 12.5, fontFamily: 'Inter_600SemiBold' },

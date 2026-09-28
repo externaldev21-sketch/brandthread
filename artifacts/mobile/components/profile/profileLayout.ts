@@ -11,11 +11,12 @@ import { computeProfileLayout, type ProfileLayout } from './profileGeometry';
  *    1440px browser (tiles and hero keep their phone proportions).
  */
 export {
-  PROFILE_GRID_GAP, PROFILE_WEB_COLUMN, SHOP_PILL_HEIGHT, computeProfileLayout,
+  PROFILE_GRID_GAP, PROFILE_WEB_COLUMN, SHOP_PILL_HEIGHT, TILE_ASPECT_4_5, TILE_ASPECT_9_16, computeProfileLayout,
   type ProfileLayout,
 } from './profileGeometry';
 
-export function useProfileLayout(): ProfileLayout {
+/** `tileAspect` (height ÷ width) defaults to the 9:16 video wall; own profiles pass 4:5. */
+export function useProfileLayout(options?: { tileAspect?: number }): ProfileLayout {
   const { width, height } = useWindowDimensions();
-  return computeProfileLayout(width, height, Platform.OS);
+  return computeProfileLayout(width, height, Platform.OS, options);
 }
