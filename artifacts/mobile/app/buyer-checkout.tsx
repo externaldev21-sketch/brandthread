@@ -34,12 +34,15 @@ import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
+import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@clerk/expo';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
+import { ThreadCashCard } from '@/components/checkout/ThreadCashCard';
+import { useCheckoutThreadCash } from '@/hooks/useCheckoutThreadCash';
+import { threadCashCeilingCents, withThreadCashRedemption } from '@/lib/threadCashCheckout';
 import {
   applyDiscount, createCheckoutSession,
   getCart, getCheckoutSession, removeCartItems, removeDiscount, saveCheckoutProgress, validateCart,
@@ -272,11 +275,37 @@ export default function BuyerCheckoutScreen() {
 
   const persist = async (next: CheckoutSession) => {
     const snapshot = mergeCheckoutFormState(next, contact, address);
+    sessionRef.current = snapshot;
     setSession(snapshot);
     await saveCheckoutProgress(snapshot);
   };
 
   const current = session as CheckoutSession;
+
+  // ── Thread Cash (item 109) ──────────────────────────────────────────────
+  // Single-seller, signed-in orders only (a token discounts one Stripe
+  // session), behind the OFF-by-default 'threadCashCheckoutDiscount' flag.
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const threadCashEligible = !!session && !!isSignedIn && threadCashCheckoutEnabled
+    && session.deliveryGroups.length === 1 && session.step !== 'confirmation';
+  const liveTotals = session ? getCheckoutDisplayTotals(session) : null;
+  const threadCash = useCheckoutThreadCash({
+    enabled: threadCashEligible,
+    redemption: session?.threadCashRedemption ?? null,
+    ceilingCents: session && liveTotals
+      ? threadCashCeilingCents({
+          subtotalCents: liveTotals.subtotalCents,
+          shippingCents: liveTotals.shippingCents,
+          promoCents: liveTotals.promoCents,
+          loyaltyCents: session.loyaltyRedemption?.discountCents ?? 0,
+        })
+      : 0,
+    onChange: async (redemption) => {
+      if (!sessionRef.current) return;
+      await persist(withThreadCashRedemption(sessionRef.current, redemption, `ck_${randomUUID()}`));
+    },
+  });
 
   const validateServerCart = async () => {
     if (!isSignedIn) return true;
@@ -355,11 +384,9 @@ export default function BuyerCheckoutScreen() {
               ...(current.loyaltyRedemption && current.deliveryGroups.length === 1
                 ? { loyaltyToken: current.loyaltyRedemption.token }
                 : {}),
-              // THREAD CASH HOOK POINT: server currently rejects this token
-              // outright (see routes/buyer.ts) until checkout can fund the
-              // discount without changing seller payout — see
-              // docs/payments/thread-cash-checkout-todo.md. Wired here so the
-              // rest of the flow needs no changes once that lands.
+              // Thread Cash (item 109): the server reserves this token after
+              // the promo code, charges the card the rest, and tops the seller
+              // up by the Thread Cash amount (lib/threadCash/checkoutTopup.ts).
               ...(current.threadCashRedemption && current.deliveryGroups.length === 1
                 ? { threadCashToken: current.threadCashRedemption.token }
                 : {}),
@@ -589,7 +616,7 @@ export default function BuyerCheckoutScreen() {
   const isConfirmation = current.step === 'confirmation';
   const totals = getCheckoutDisplayTotals(current);
   const itemCount = current.deliveryGroups.reduce((sum, group) => sum + group.items.reduce((n, item) => n + item.quantity, 0), 0);
-  const ready = getCheckoutBlockingSection(contact, address, current) === null;
+  const ready = getCheckoutBlockingSection(contact, address, current) === null && !(threadCashEligible && threadCash.busy);
   const nextStep = getCheckoutNextStepHint(contact, address, current);
   const multiSeller = current.deliveryGroups.length > 1;
   const preorderAcks = current.acknowledgments;
@@ -690,33 +717,24 @@ export default function BuyerCheckoutScreen() {
           onApply={async (code): Promise<CheckoutDiscount> => {
             const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts);
             // Only a server-validated code is kept (the server takes one code per order).
-            if (discount.isValid) await persist({ ...current, discounts: [discount] });
+            // A new code is a new order total: start a new payment attempt so a
+            // payment opened earlier (with the old total) isn't reused.
+            if (discount.isValid) await persist({ ...current, discounts: [discount], idempotencyKey: `ck_${randomUUID()}` });
             return discount;
           }}
           onRemove={code =>
             void removeDiscount(code, current.discounts).then(discounts =>
-              persist({ ...current, discounts }),
+              persist({ ...current, discounts, idempotencyKey: `ck_${randomUUID()}` }),
             )
           }
         />
 
-        {/* THREAD CASH HOOK POINT: same self-contained card cart.tsx uses,
-            gated behind the same OFF-by-default 'threadCashCheckoutDiscount'
-            flag. See components/thread-cash/UseThreadCashCard.tsx and
-            docs/payments/thread-cash-checkout-todo.md — no checkout money
-            logic is touched here. Hidden while the flag is off (like the
-            cart does) — a disabled "Coming soon" toggle was a dead control
-            on the one screen where every row must do something. */}
-        {isSignedIn && !multiSeller && threadCashCheckoutEnabled && (
-          <View style={{ marginBottom: SP.sm + 4 }}>
-            <UseThreadCashCard
-              maxDiscountCents={Math.max(0, current.summary.subtotalCents + current.summary.shippingTotalCents - 1)}
-              redemption={current.threadCashRedemption ?? null}
-              onApply={(redemption) => void persist({ ...current, threadCashRedemption: redemption })}
-              onRemove={() => void persist({ ...current, threadCashRedemption: undefined })}
-            />
-          </View>
-        )}
+        {/* Thread Cash (item 109): one on/off row after the promo code. It
+            stacks after the code and follows the total live (see
+            hooks/useCheckoutThreadCash.ts). Hidden while the
+            'threadCashCheckoutDiscount' flag is off, for guests, and for
+            multi-seller orders. */}
+        {threadCashEligible && <ThreadCashCard state={threadCash} />}
 
         {/* Pre-order disclosures stay explicit, required checkboxes. */}
         {preorderAcks.length > 0 && (

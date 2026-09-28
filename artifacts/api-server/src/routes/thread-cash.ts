@@ -44,6 +44,8 @@ import {
   cancelThreadCashRedemption,
   listOpenThreadCashRedemptions,
 } from "../lib/threadCash/wallet";
+import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
+import { stripe } from "../lib/stripe";
 
 const router = Router();
 router.use(requireAuth);
@@ -332,11 +334,23 @@ router.post("/redeem", async (req, res) => {
 
 // ─── POST /api/thread-cash/redeem/:token/cancel ─────────────────────────────
 // Returns a redemption the buyer no longer wants to their balance. Not behind
-// the checkout flag: turning the flag off must never strand a balance.
+// the checkout flag: turning the flag off must never strand a balance. A
+// token still held by an unpaid, abandoned Stripe session is freed first
+// (lib/threadCash/checkoutRelease.ts); a paid one is never touched.
 router.post("/redeem/:token/cancel", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
+  const token = String(req.params.token ?? "");
   try {
-    const result = await cancelThreadCashRedemption(buyerId, String(req.params.token ?? ""));
+    let result: Awaited<ReturnType<typeof cancelThreadCashRedemption>>;
+    try {
+      result = await cancelThreadCashRedemption(buyerId, token);
+    } catch (error) {
+      // Held by a payment the buyer walked away from (closed Stripe's page):
+      // expire that unpaid session, release the token, then cancel it.
+      if (!(error instanceof ThreadCashError) || error.code !== "THREAD_CASH_TOKEN_RESERVED") throw error;
+      await releaseThreadCashFromAbandonedCheckout(stripe, buyerId, token);
+      result = await cancelThreadCashRedemption(buyerId, token);
+    }
     res.json({ ok: true, ...result });
   } catch (error) {
     if (error instanceof ThreadCashError) {
