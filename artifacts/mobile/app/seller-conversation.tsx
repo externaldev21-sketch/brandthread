@@ -57,6 +57,7 @@ import {
 } from '@/lib/chatGrouping';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
+import { ChatAttachmentCard } from '@/components/chat/ChatAttachmentCard';
 import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuItem } from '@/components/chat/ReactionOverlay';
 import { ReactionGlyph } from '@/components/chat/ReactionBar';
 import { applyOptimisticReaction, myReactionIn, groupReactionCounts } from '@/lib/reactionMutations';
@@ -411,6 +412,11 @@ export default function SellerConversationScreen() {
   const receivedTextColor = convTheme?.receivedText ?? FG;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
+  // Whether the composer actually has something to send — drives whether
+  // the send button shows at all (see the input row below), independent of
+  // `canSend`'s isSending/id gating so the button doesn't flicker away
+  // mid-send.
+  const hasComposerContent = text.trim().length > 0 || pendingAttachment != null;
   // Seen receipt: id of MY (the seller's) most recent message in this
   // thread — "Seen" only ever renders under that one message. See
   // lib/chatGrouping.ts's doc comment on the real, honest granularity this
@@ -721,95 +727,11 @@ export default function SellerConversationScreen() {
         />
       );
     }
-    // Product share card (item 70) — same treatment as buyer-conversation.tsx
-    // so a shared product card looks identical from both sides of the DM: a
-    // real image thumbnail, live name/price (or "No longer available" — kept
-    // fresh server-side, see api-server's lib/productAttachmentInfo.ts), and
-    // an explicit "View" chip. It's a single tap target — no nested
-    // pressable inside the bubble's own long-press/swipe handlers.
-    if (att.type === 'product') {
-      const unavailable = att.meta?.unavailable === 'true';
-      return (
-        <PressableScale
-          style={s.productCard}
-          activeOpacity={0.7}
-          accessibilityLabel={`${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`}
-          testID="product-card-attachment"
-          onPress={() => {
-            const pid = att.meta?.productId;
-            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
-          }}
-        >
-          <View style={[s.productCardImage, unavailable && s.productCardImageDim]}>
-            {att.uri ? (
-              <CachedImage source={{ uri: att.uri }} style={s.productCardImageFill} recyclingKey={att.uri} />
-            ) : (
-              <Feather name="shopping-bag" size={ICON.md} color={MUTED} />
-            )}
-          </View>
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Product'}</Text>
-            <Text style={[s.attachSubtitle, unavailable && s.productUnavailableText]} numberOfLines={1}>
-              {unavailable ? 'No longer available' : (att.subtitle ?? 'Product')}
-            </Text>
-          </View>
-          <View style={s.productViewChip}>
-            <Text style={s.productViewChipText}>View</Text>
-            <Feather name="chevron-right" size={ICON.xs} color={FG} />
-          </View>
-        </PressableScale>
-      );
-    }
-    // Order status card (item 71) — same treatment as buyer-conversation.tsx
-    // so the order card the seller sent looks identical from both sides of
-    // the DM: a status badge (matching the order detail screen's own badge
-    // colors/labels, see lib/orderStatusAdapter.ts) and a real Track/View
-    // action, both kept live server-side (see api-server's
-    // lib/orderAttachmentInfo.ts) rather than the value cached at send time
-    // — the seller's own "order shipped" update must show up here right
-    // away, not just on order-detail. Single tap target — see the product
-    // card above for why the chip isn't a second Pressable.
-    if (att.type === 'order') {
-      const orderId = att.meta?.orderId;
-      const rawStatus = att.meta?.status;
-      const uiStatus = rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
-      const trackingNumber = att.meta?.trackingNumber;
-      const trackingUrl = trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
-      const chipLabel = trackingUrl ? 'Track' : 'View';
-      return (
-        <PressableScale
-          style={s.orderMsgCard}
-          activeOpacity={0.7}
-          accessibilityLabel={`${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${chipLabel}`}
-          testID="order-card-attachment"
-          onPress={() => {
-            if (trackingUrl) {
-              Linking.openURL(trackingUrl).catch(() => {});
-            } else {
-              router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
-            }
-          }}
-        >
-          <View style={s.orderMsgCardIconCircle}>
-            <Feather name="package" size={ICON.md} color={PURPLE} />
-          </View>
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Order'}</Text>
-            {uiStatus ? (
-              <View style={s.orderMsgCardBadgeRow}>
-                <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
-              </View>
-            ) : (
-              <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle ?? 'Order'}</Text>
-            )}
-          </View>
-          <View style={s.productViewChip}>
-            <Text style={s.productViewChipText}>{chipLabel}</Text>
-            <Feather name={trackingUrl ? 'external-link' : 'chevron-right'} size={ICON.xs} color={FG} />
-          </View>
-        </PressableScale>
-      );
-    }
+    // 'product', 'order' and 'thread_cash' are handled standalone in
+    // renderItem() before this function is ever called for them — see its
+    // product/order branch (matches app/buyer-conversation.tsx's identical
+    // standalone treatment, so a card looks identical from both sides of
+    // the DM).
     return (
       <PressableScale
         style={s.attachCard}
@@ -1076,6 +998,66 @@ export default function SellerConversationScreen() {
       );
     }
 
+    // Standalone product/order card (Dev's chat-card-redesign feedback) —
+    // NEVER rendered inside the text-message bubble, same standalone
+    // treatment as app/buyer-conversation.tsx so the card looks identical
+    // from both sides of the DM. See components/chat/ChatAttachmentCard.tsx.
+    if (msg.attachment?.type === 'product' || msg.attachment?.type === 'order') {
+      const att = msg.attachment;
+      const isProduct = att.type === 'product';
+      const unavailable = isProduct && att.meta?.unavailable === 'true';
+      const orderId = att.meta?.orderId;
+      const rawStatus = att.meta?.status;
+      const uiStatus = !isProduct && rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
+      const trackingNumber = att.meta?.trackingNumber;
+      const trackingUrl = !isProduct && trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
+      const footerLabel = isProduct ? 'View' : (trackingUrl ? 'Track' : 'View');
+      const footerIcon = !isProduct && trackingUrl ? 'external-link' : 'chevron-right';
+      const accessibilityLabel = isProduct
+        ? `${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`
+        : `${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${footerLabel}`;
+      return (
+        <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? SP.sm : 2 }]}>
+          {!isOwn && (
+            isLastInGroup ? (
+              <View style={[s.msgAvatar, { backgroundColor: msg.fromColor || PURPLE }]}>
+                <Text style={s.msgAvatarInitials}>{msg.fromInitials || (msg.fromName?.[0] ?? '?')}</Text>
+              </View>
+            ) : <View style={s.msgAvatarSpacer} />
+          )}
+          <ChatAttachmentCard
+            theme={theme}
+            isMe={isOwn}
+            imageUri={isProduct ? att.uri : undefined}
+            icon={isProduct ? 'shopping-bag' : 'package'}
+            iconColor={PURPLE}
+            title={att.title || (isProduct ? 'Product' : 'Order')}
+            priceLabel={isProduct ? att.subtitle : undefined}
+            statusBadge={!isProduct && uiStatus ? (
+              <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+            ) : (!isProduct && !uiStatus && att.subtitle ? (
+              <Text style={[s.attachSubtitle, { marginTop: 0 }]} numberOfLines={1}>{att.subtitle}</Text>
+            ) : undefined)}
+            unavailable={unavailable}
+            footerLabel={footerLabel}
+            footerIcon={footerIcon}
+            testID={isProduct ? 'product-card-attachment' : 'order-card-attachment'}
+            accessibilityLabel={accessibilityLabel}
+            onPress={() => {
+              if (isProduct) {
+                const pid = att.meta?.productId;
+                if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
+              } else if (trackingUrl) {
+                Linking.openURL(trackingUrl).catch(() => {});
+              } else {
+                router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
+              }
+            }}
+          />
+        </View>
+      );
+    }
+
     const removed = (msg as { removedByModeration?: boolean }).removedByModeration === true;
     const isRead = msg.status === 'read' || !!msg.readAt;
     return (
@@ -1119,16 +1101,15 @@ export default function SellerConversationScreen() {
               },
             ]}
             accessibilityHint="Touch and hold to react or see more options"
-            // Voice, product and order attachments each render their own
-            // interactive control inside this bubble — PressableScale defaults
-            // to rendering an actual <button> on web, which cannot legally
-            // contain other interactive controls. Drop the role for all three
-            // so it's a plain, still fully long-pressable <div> instead. See
-            // buyer-conversation.tsx.
+            // Voice attachments render their own interactive control inside
+            // this bubble — PressableScale defaults to rendering an actual
+            // <button> on web, which cannot legally contain other
+            // interactive controls. Drop the role so it's a plain, still
+            // fully long-pressable <div> instead. Product/order cards no
+            // longer render inside this bubble at all — see renderItem's
+            // standalone product/order branch. See buyer-conversation.tsx.
             accessibilityRole={
               msg.attachment?.type === 'voice'
-              || msg.attachment?.type === 'product'
-              || msg.attachment?.type === 'order'
                 ? 'none' : undefined
             }
           >
@@ -1235,7 +1216,7 @@ export default function SellerConversationScreen() {
       )}
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
+      <View style={[s.header, { paddingTop: insets.top + SP.sm, paddingRight: SP.md + insets.right }]}>
         <PressableScale
           onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
           style={s.headerBack}
@@ -1570,21 +1551,27 @@ export default function SellerConversationScreen() {
           multiline
           returnKeyType="default"
         />
-        <PressableScale
-          style={[
-            s.sendBtn,
-            canSend
-              ? { backgroundColor: PURPLE, borderColor: PURPLE }
-              : { backgroundColor: CARD, borderColor: BORDER },
-          ]}
-          onPress={() => { hapticPrimaryAction(); handleSend(); }}
-          disabled={!canSend}
-          accessibilityRole="button"
-          accessibilityLabel="Send message"
-          activeOpacity={0.8}
-        >
-          <Feather name="send" size={ICON.sm} color={canSend ? ON_DARK : MUTED} />
-        </PressableScale>
+        {/* Send only appears once there's actually something to send —
+            matches app/buyer-conversation.tsx's mic⇄send morph condition
+            (showSendButton), instead of always showing a disabled send
+            button next to an empty input. */}
+        {hasComposerContent ? (
+          <PressableScale
+            style={[
+              s.sendBtn,
+              canSend
+                ? { backgroundColor: PURPLE, borderColor: PURPLE }
+                : { backgroundColor: CARD, borderColor: BORDER },
+            ]}
+            onPress={() => { hapticPrimaryAction(); handleSend(); }}
+            disabled={!canSend}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            activeOpacity={0.8}
+          >
+            <Feather name="send" size={ICON.sm} color={canSend ? ON_DARK : MUTED} />
+          </PressableScale>
+        ) : null}
         </>)}
       </View>
       )}
@@ -1811,7 +1798,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   header: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: BG,
-    paddingHorizontal: SP.md, paddingBottom: SP.sm,
+    // Right edge padding is set inline (needs insets.right) — see the
+    // header's own JSX. Mobbin: Instagram DM header
+    // (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — the call/
+    // video/overflow icons sit inset from the screen edge, evenly spaced,
+    // never flush against it.
+    paddingLeft: SP.md, paddingBottom: SP.sm,
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   headerBack: { marginRight: SP.sm },
@@ -1823,7 +1815,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerCenterRow: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   headerCenter: { flex: 1 },
   headerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  headerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  headerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
   orderCard: {
     flexDirection: 'row', alignItems: 'center',
@@ -1832,7 +1824,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER,
   },
   orderNumber: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  orderProduct: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  orderProduct: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
   orderBadge: {
     backgroundColor: PURPLE_DIM, borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm, paddingVertical: SP.xs,
@@ -1908,41 +1900,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER,
   },
   attachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  attachSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  attachSubtitle: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
-  // Product share card (item 70) — see buyer-conversation.tsx's matching styles.
-  productCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: BG, borderRadius: RADIUS.md,
-    padding: SP.sm, marginBottom: 2,
-    borderWidth: 1, borderColor: BORDER,
-  },
-  productCardImage: {
-    width: 44, height: 44, borderRadius: RADIUS.sm,
-    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-  },
-  productCardImageDim: { opacity: 0.5 },
-  productCardImageFill: { width: '100%', height: '100%' },
-  productUnavailableText: { fontFamily: FONT.medium },
-  productViewChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 2,
-    borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill,
-    paddingVertical: 4, paddingHorizontal: SP.xs, marginLeft: SP.xs,
-  },
-  productViewChipText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG },
-
-  // Order status card (item 71) — see buyer-conversation.tsx's matching styles.
-  orderMsgCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: BG, borderRadius: RADIUS.md,
-    padding: SP.sm, marginBottom: 2,
-    borderWidth: 1, borderColor: BORDER,
-  },
-  orderMsgCardIconCircle: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center',
-  },
-  orderMsgCardBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
+  // Product/order chat cards (item 70/71) moved to the standalone
+  // ChatAttachmentCard component (components/chat/ChatAttachmentCard.tsx) —
+  // no bubble, no border, own the tap target. See renderItem's product/
+  // order branch.
 
   pendingAttachRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -1952,7 +1915,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },
   pendingAttachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  pendingAttachSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  pendingAttachSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end',
@@ -1970,7 +1933,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flex: 1, backgroundColor: CARD, borderRadius: RADIUS.xl,
     borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    fontSize: FS.base, fontFamily: FONT.regular, color: FG, maxHeight: 120,
+    fontSize: FS.base, fontFamily: FONT.regular, color: FG,
+    // ~44pt at rest for a single line (matches buyer-conversation.tsx's
+    // pill height) — only grows past that as the user types more lines,
+    // never fixed-tall. Symmetric vertical padding keeps the placeholder
+    // centered within that height on every platform (textAlignVertical is
+    // Android-only).
+    minHeight: 44,
+    maxHeight: 120,
+    textAlignVertical: 'center',
   },
   sendBtn: {
     width: 36, height: 36, borderRadius: 18,
@@ -2004,7 +1975,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
   },
   sheetOptionLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  sheetOptionDesc: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  sheetOptionDesc: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
 
   // Product picker sheet
   productSheet: {
@@ -2028,12 +1999,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginRight: SP.sm,
   },
   productName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  productPrice: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  productPrice: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
   emptyState: { alignItems: 'center', paddingVertical: SP.xxl },
   emptyText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
 
   // ── Call + media styles ──────────────────────────────────────────────────────
-  headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: SP.xs },
+  headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: SP.sm },
   recordingBtn:  { backgroundColor: 'rgba(255,59,48,0.12)', borderRadius: RADIUS.pill },
 
   // Photo grid

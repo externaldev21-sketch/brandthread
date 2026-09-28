@@ -467,7 +467,8 @@ const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 const qs = StyleSheet.create({
   root: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   label: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  stock: { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE },
+  // Monochrome: urgency is carried by weight, not an orange tone.
+  stock: { fontSize: FS.meta, fontFamily: FONT.semibold, color: FG },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -1085,9 +1086,18 @@ export default function BuyerProductDetailScreen() {
 
           {/* Stock status */}
           {allSelected && variant && (
-            <View style={s.stockRow}>
-              <View style={[s.stockDot, { backgroundColor: variant.isAvailable ? SUCCESS : RED }]} />
-              <Text style={[s.stockText, { color: variant.isAvailable ? SUCCESS : RED }]}>
+            <View style={s.stockRow} testID="product-stock-line">
+              {/* Monochrome (no green/red): low stock is white and bold,
+                  plain in-stock and sold-out are grey. */}
+              <View style={[s.stockDot, {
+                backgroundColor: variant.isAvailable && variant.inventoryQuantity <= 5 ? FG : variant.isAvailable ? MUTED : SUBTLE,
+              }]} />
+              <Text style={[
+                s.stockText,
+                variant.isAvailable && variant.inventoryQuantity <= 5
+                  ? { color: FG, fontFamily: FONT.bold }
+                  : { color: MUTED },
+              ]}>
                 {variant.isAvailable
                   ? variant.inventoryQuantity <= 5
                     ? `Only ${variant.inventoryQuantity} left in stock`
