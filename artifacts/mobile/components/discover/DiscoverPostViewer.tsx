@@ -50,9 +50,16 @@ function ViewerPage({
   const hasTags = (post.productTags?.length ?? 0) > 0;
 
   return (
-    <View style={{ width: '100%', height: WINDOW_HEIGHT }}>
+    <View style={{ width: '100%', height: WINDOW_HEIGHT, backgroundColor: '#000' }}>
       {post.imageUri ? (
-        <CachedImage source={{ uri: post.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        // Video stays full-bleed cover (9:16 rule, unchanged). Photos show
+        // the creator's chosen 3:4 crop uncropped — letterboxed on black
+        // rather than cover-cropped to fill the taller viewer frame.
+        <CachedImage
+          source={{ uri: post.imageUri }}
+          style={StyleSheet.absoluteFill}
+          contentFit={post.media === 'video' ? 'cover' : 'contain'}
+        />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.fallback]} />
       )}
