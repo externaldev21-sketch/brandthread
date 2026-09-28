@@ -16,6 +16,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { File, Paths } from 'expo-file-system';
 
@@ -228,6 +229,7 @@ export default function AddProductScreen() {
   const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
+  const [sizeChartUploadStatus, setSizeChartUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [collections, setCollections] = useState<ProductCollection[]>([]);
@@ -698,6 +700,7 @@ export default function AddProductScreen() {
       tags:        productPayload.tags ?? [],
       styleTags:   productPayload.styleTags ?? [],
       variants:    productVariantsForServer,
+      sizeChartImageUrl: productPayload.sizeChartImageUrl ?? undefined,
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
@@ -711,6 +714,7 @@ export default function AddProductScreen() {
       images:      (productPayload.media ?? []).map((m: any) => m.uri ?? m.url ?? '').filter(Boolean),
       tags:        productPayload.tags ?? [],
       styleTags:   productPayload.styleTags ?? [],
+      sizeChartImageUrl: productPayload.sizeChartImageUrl ?? null,
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
@@ -753,6 +757,58 @@ export default function AddProductScreen() {
     } catch {
       setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'error' } }));
     }
+  }
+
+  // ── Size chart photo (item: size chart photo) ────────────────────────────
+  // Same upload pipeline as product photos (api.products.uploadImage), one
+  // optional image rather than a media array.
+  async function uploadSizeChartPhoto(localUri: string) {
+    setSizeChartUploadStatus('uploading');
+    patchDraft({ sizeChartImageUrl: localUri });
+    try {
+      const uploaded = await api.products.uploadImage({ uri: localUri });
+      const remoteUri = (uploaded as any)?.objectPath || (uploaded as any)?.url || localUri;
+      setSizeChartUploadStatus('idle');
+      setDraftData(prev => ({ ...prev, sizeChartImageUrl: remoteUri }));
+    } catch {
+      setSizeChartUploadStatus('error');
+    }
+  }
+
+  function pickSizeChartPhoto() {
+    showActionSheet('Size chart photo', undefined, [
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert('Camera access needed', 'Allow camera access in Settings to take a photo.');
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+          if (!result.canceled && result.assets[0]) void uploadSizeChartPhoto(result.assets[0].uri);
+        },
+      },
+      {
+        text: 'Choose from Library',
+        onPress: async () => {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+          if (!result.canceled && result.assets[0]) void uploadSizeChartPhoto(result.assets[0].uri);
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  function removeSizeChartPhoto() {
+    hapticToggle();
+    setSizeChartUploadStatus('idle');
+    patchDraft({ sizeChartImageUrl: null });
   }
 
   // ── Photos: reorder / set cover / crop / background removal ──────────────────
@@ -1511,6 +1567,44 @@ export default function AddProductScreen() {
             })}
           </>
         )}
+
+        {/* Size chart photo — optional, right under Sizes/variants (item:
+            size chart photo). Uploads through the same api.products.uploadImage
+            pipeline as product photos. */}
+        <SectionHeader title="Size chart" style={s.sectionHdr} />
+        {draftData.sizeChartImageUrl ? (
+          <View style={s.sizeChartRow}>
+            <View style={s.sizeChartThumbWrap}>
+              <Image source={{ uri: draftData.sizeChartImageUrl }} style={s.sizeChartThumb} resizeMode="cover" />
+              {sizeChartUploadStatus === 'uploading' && (
+                <View style={s.mediaUploadOverlay}>
+                  <ActivityIndicator color={ON_DARK} />
+                </View>
+              )}
+              {sizeChartUploadStatus === 'error' && (
+                <TouchableOpacity style={s.mediaUploadOverlay} onPress={pickSizeChartPhoto} accessibilityLabel="Retry size chart photo upload">
+                  <Feather name="refresh-cw" size={16} color={ON_DARK} />
+                  <Text style={s.mediaRetryLabel}>Retry upload</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={s.sizeChartActions}>
+              <SecondaryButton label="Replace" icon="image" onPress={pickSizeChartPhoto} />
+              <TouchableOpacity style={s.deleteOptionBtn} onPress={removeSizeChartPhoto}>
+                <Feather name="trash-2" size={14} color={RED} />
+                <Text style={s.deleteOptionText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <GradientCard onPress={pickSizeChartPhoto} style={s.uploadZone}>
+            <View style={s.uploadInner}>
+              <Feather name="grid" size={28} color={PURPLE_LIGHT} />
+              <Text style={s.uploadLabel}>Add a size chart photo</Text>
+              <Text style={s.uploadHint}>Optional · Shown to buyers as "Size guide"</Text>
+            </View>
+          </GradientCard>
+        )}
       </>
     );
   }
@@ -2151,6 +2245,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
   mediaRetryLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK },
+  sizeChartRow: { flexDirection: 'row', gap: SP.md, alignItems: 'flex-start' },
+  sizeChartThumbWrap: {
+    width: 100, height: 130, borderRadius: RADIUS.sm,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    overflow: 'hidden', position: 'relative',
+  },
+  sizeChartThumb: { width: '100%', height: '100%' },
+  sizeChartActions: { flex: 1, gap: SP.sm, justifyContent: 'center' },
   mediaCoverBadge: {
     position: 'absolute', bottom: 4, left: 4,
     backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2,
@@ -2221,7 +2323,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   customValueInput: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: FG },
   customValueAdd: { padding: SP.xs },
-  deleteOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, alignSelf: 'flex-start', marginTop: SP.xs },
+  deleteOptionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.xs, alignSelf: 'flex-start', marginTop: SP.xs,
+  },
   deleteOptionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: RED },
   variantCount: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   variantsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.xs },
