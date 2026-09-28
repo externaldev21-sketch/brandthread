@@ -44,8 +44,10 @@ import { getConversationTheme } from '@/lib/conversationThemes';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   formatDate as sharedFormatDate, formatTime, groupFlags,
-  groupCornerRadii, lastOwnMessageId,
+  groupCornerRadii, lastOwnMessageId, messagePreviewText,
 } from '@/lib/chatGrouping';
+import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
+import { ReplyBanner } from '@/components/chat/ReplyBanner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +80,12 @@ interface Msg {
    *  message. Same field the API returns on app/buyer-conversation.tsx's
    *  Message type; see lib/chatGrouping.ts. */
   readAt?: string;
+  /** Swipe-to-reply — same shape as app/buyer-conversation.tsx's Message,
+   *  resolved server-side (see api-server's adaptMessage/loadReplyPreviews)
+   *  so both sides of a thread render the identical quoted context. */
+  replyToId?: string;
+  replyPreview?: string;
+  replyToAuthorName?: string;
 }
 interface SellerProduct {
   id: string; name: string; priceCents?: number; status?: string;
@@ -196,6 +204,7 @@ export default function SellerConversationScreen() {
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
+  const [replyTo, setReplyTo] = useState<Msg | null>(null);
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
   const voiceRecorder = useVoiceRecorder(uploadMedia, handleVoiceRecorded);
@@ -661,13 +670,16 @@ export default function SellerConversationScreen() {
     if (!id || !canSend) return;
     const t = text.trim();
     const att = pendingAttachment;
+    const replyingTo = replyTo;
     setText('');
     setPendingAttachment(null);
+    setReplyTo(null);
     setIsSending(true);
     try {
       const msg = await api.conversations.send(id, {
         text: t,
         attachment: att ?? undefined,
+        replyToId: replyingTo?.id,
       });
       setMessages((prev) => [...prev, msg as Msg]);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
@@ -681,6 +693,7 @@ export default function SellerConversationScreen() {
       Alert.alert('Not sent', friendly);
       setText(t);
       setPendingAttachment(att);
+      setReplyTo(replyingTo);
     } finally {
       setIsSending(false);
     }
@@ -733,6 +746,13 @@ export default function SellerConversationScreen() {
           ) : <View style={s.msgAvatarSpacer} />
         )}
         <View style={{ maxWidth: BUBBLE_MAX }}>
+          <SwipeToReplyBubble
+            testID={`seller-conversation-bubble-swipe-${msg.id}`}
+            disabled={removed || messagingBlocked}
+            iconColor={MUTED}
+            iconBg={CARD}
+            onReply={() => { setReplyTo(msg); }}
+          >
           <PressableScale
             activeOpacity={0.9}
             disabled={isOwn || removed || !other}
@@ -767,6 +787,17 @@ export default function SellerConversationScreen() {
             // still fully long-pressable <div> instead. See buyer-conversation.tsx.
             accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : undefined}
           >
+            {/* Quoted reply — same inline-quote-strip treatment as
+                app/buyer-conversation.tsx, so a thread reads identically from
+                both sides. */}
+            {msg.replyToId && !removed ? (
+              <View style={[s.replyQuote, { borderLeftColor: isOwn ? ON_DARK : PURPLE }]}>
+                <Text style={[s.replyQuoteText, { color: isOwn ? `${ON_DARK}CC` : MUTED }]} numberOfLines={1}>
+                  {msg.replyPreview ?? messagePreviewText(messages.find(m => m.id === msg.replyToId) ?? {})}
+                </Text>
+              </View>
+            ) : null}
+
             {/* Attachment */}
             {msg.attachment && renderMsgAttachment(msg.attachment, isOwn)}
             {/* Text — hide the single-space placeholder */}
@@ -794,6 +825,7 @@ export default function SellerConversationScreen() {
               </View>
             )}
           </PressableScale>
+          </SwipeToReplyBubble>
 
           {/* Seen receipt — real backend readAt, same as
               app/buyer-conversation.tsx; see lib/chatGrouping.ts. */}
@@ -959,6 +991,19 @@ export default function SellerConversationScreen() {
             <Feather name="x" size={ICON.sm} color={MUTED} />
           </PressableScale>
         </View>
+      )}
+
+      {/* Reply preview — mirrors app/buyer-conversation.tsx's own
+          ReplyBanner (Mobbin: Instagram "Replying to a message",
+          mobbin.com/flows/c973fada-0946-4bf2-b821-8a2b37958685). */}
+      {replyTo && !messagingBlocked && (
+        <ReplyBanner
+          testID="seller-conversation-reply-banner"
+          theme={theme}
+          fromName={replyTo.fromName}
+          previewText={messagePreviewText(replyTo)}
+          onCancel={() => setReplyTo(null)}
+        />
       )}
 
       {/* Input row */}
@@ -1278,6 +1323,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   msgAvatarSpacer: { width: 32, marginRight: SP.sm },
   bubble: { borderWidth: 1, borderRadius: RADIUS.lg, padding: SP.md },
   msgText: { fontSize: FS.base, fontFamily: FONT.regular, color: FG, marginTop: 4 },
+  // Quoted reply snippet — same shape as app/buyer-conversation.tsx.
+  replyQuote: {
+    borderLeftWidth: 2,
+    paddingLeft: 8,
+    marginBottom: 4,
+  },
+  replyQuoteText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+  },
   bubbleMeta: {
     flexDirection: 'row',
     alignItems: 'center',

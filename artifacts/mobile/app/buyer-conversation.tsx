@@ -60,6 +60,8 @@ import {
   ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
 } from '@/components/chat/ReactionBar';
 import { SystemLine } from '@/components/chat/SystemLine';
+import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
+import { ReplyBanner } from '@/components/chat/ReplyBanner';
 import { getConversationTheme } from '@/lib/conversationThemes';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -73,7 +75,7 @@ import {
 import { EMOJI_FONT_STACK } from '@/lib/appleEmoji';
 import {
   formatDate as sharedFormatDate, formatTime as sharedFormatTime,
-  sameSenderClose, groupCornerRadii, lastOwnMessageId,
+  sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
 } from '@/lib/chatGrouping';
 
 /** Well-known clerkId of the official Brandthread Agent account — matches
@@ -1215,6 +1217,37 @@ export default function BuyerConversationScreen() {
       return;
     }
 
+    // Preview conversations have no real backend to post to (see the other
+    // isPreviewConversationId(conv.id) branches throughout this file, e.g.
+    // handleVoiceRecorded/handleQuickToggleDisappearing) — this covers the
+    // remaining case those didn't: a plain text/attachment send that also
+    // carries a reply (or an attachment, so it skipped the agent branch
+    // above). Appends locally, with the same replyToId/replyPreview shape
+    // the real API returns, so swipe-to-reply is fully demoable in preview.
+    if (isPreviewConversationId(conv.id)) {
+      const localMsg: Message = {
+        id: `local-${Date.now()}`,
+        conversationId: conv.id,
+        fromId: myId,
+        fromName: 'You',
+        fromInitials: MY_INITIALS,
+        fromColor: theme.accent,
+        text: t,
+        attachment: att ?? undefined,
+        replyToId: replyingTo?.id,
+        replyPreview: replyingTo?.text,
+        replyToAuthorName: replyingTo?.fromName,
+        reactions: [],
+        status: 'sent',
+        ts: Date.now(),
+        deletedForMe: false,
+      };
+      appendPreviewMessage(conv.id, localMsg);
+      setMessages((prev) => [...prev, localMsg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      return;
+    }
+
     setIsSending(true);
     try {
       await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
@@ -1539,7 +1572,16 @@ export default function BuyerConversationScreen() {
         )}
 
         <View style={{ maxWidth: BUBBLE_MAX }}>
-          {/* Bubble */}
+          {/* Bubble — wrapped in a short swipe-right-to-reply gesture (see
+              SwipeToReplyBubble's own doc comment for the tap/long-press
+              disambiguation, borrowed from components/inbox/InboxSwipeRow.tsx). */}
+          <SwipeToReplyBubble
+            testID={`conversation-bubble-swipe-${msg.id}`}
+            disabled={isDisabled || isRequestMode || messaging.blockedByMe || messaging.unavailable}
+            iconColor={theme.muted}
+            iconBg={theme.cardElevated}
+            onReply={() => { setReplyTo(msg); }}
+          >
           <PressableScale rippleEnabled={false}
             bounce={false}
             testID={`conversation-bubble-${msg.id}`}
@@ -1581,7 +1623,7 @@ export default function BuyerConversationScreen() {
             {msg.replyToId ? (
               <View style={[s.replyQuote, { borderLeftColor: isOwn ? theme.onAccent : theme.accent }]}>
                 <Text style={[s.replyQuoteText, { color: isOwn ? `${theme.onAccent}CC` : theme.muted }]} numberOfLines={1}>
-                  {msg.replyPreview ?? messages.find(m => m.id === msg.replyToId)?.text ?? 'Message'}
+                  {msg.replyPreview ?? messagePreviewText(messages.find(m => m.id === msg.replyToId) ?? {})}
                 </Text>
               </View>
             ) : null}
@@ -1625,6 +1667,7 @@ export default function BuyerConversationScreen() {
               </PressableScale>
             )}
           </PressableScale>
+          </SwipeToReplyBubble>
 
           {/* Reaction chip summary */}
           {reactionEntries.length > 0 && (
@@ -1942,21 +1985,18 @@ export default function BuyerConversationScreen() {
         <LikeBurst key={likeBurst.key} x={likeBurst.x} y={likeBurst.y} color={theme.accent} onDone={() => setLikeBurst(null)} />
       )}
 
-      {/* Reply preview */}
-      {replyTo && (
-        <View style={s.replyBar}>
-          <Feather name="corner-up-left" size={ICON.sm} color={theme.accent} />
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.replyFromName}>{replyTo.fromName}</Text>
-            <Text style={s.replyPreviewText} numberOfLines={1}>{replyTo.text}</Text>
-          </View>
-          <PressableScale rippleEnabled={false}
-            onPress={() => setReplyTo(null)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={s.replyClose}>×</Text>
-          </PressableScale>
-        </View>
+      {/* Reply preview — Mobbin: Instagram "Replying to a message"
+          (mobbin.com/flows/c973fada-0946-4bf2-b821-8a2b37958685). Fades/
+          slides in (ReplyBanner), never bounces — this is UI chrome, not
+          the swipe gesture that (usually) triggers it. */}
+      {replyTo && !isRequestMode && !messaging.blockedByMe && !messaging.unavailable && (
+        <ReplyBanner
+          testID="conversation-reply-banner"
+          theme={theme}
+          fromName={replyTo.fromName}
+          previewText={messagePreviewText(replyTo)}
+          onCancel={() => setReplyTo(null)}
+        />
       )}
 
       {/* Input row — request mode replaces the composer entirely with the
