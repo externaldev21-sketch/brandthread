@@ -945,20 +945,6 @@ export const recentlyViewedProducts = pgTable('recently_viewed_products', {
   userViewedIdx: index('recently_viewed_products_user_viewed_idx').on(table.userId, table.viewedAt),
 }));
 
-// ─── Search history (per-user, server-side) ────────────────────────────────────
-// One row per (user, term); a repeat search upserts searched_at rather than
-// duplicating the row. Case-insensitive de-dupe is enforced at write time in
-// the route (a plain unique index can't express LOWER(term) through the
-// query builder), matching the migration's `LOWER(term)` unique index.
-export const searchHistory = pgTable('search_history', {
-  id:         uuid('id').primaryKey().defaultRandom(),
-  userId:     text('user_id').notNull(),
-  term:       text('term').notNull(),
-  searchedAt: timestamp('searched_at').defaultNow().notNull(),
-}, (table) => ({
-  userSearchedIdx: index('search_history_user_searched_at_idx').on(table.userId, table.searchedAt),
-}));
-
 // ─── Server-side cart (full-replace sync model) ───────────────────────────────
 
 export const cartItems = pgTable('cart_items', {

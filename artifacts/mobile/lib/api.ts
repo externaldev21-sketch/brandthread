@@ -1382,15 +1382,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           post<any>('/api/buyer/saved', body),
         remove: (targetId: string) => del<any>(`/api/buyer/saved/${encodeURIComponent(targetId)}`),
       },
-      /** Per-user search history — server-side (replaces the old local
-       *  AsyncStorage-only recent-searches list). */
-      searchHistory: {
-        list:   () => get<Array<{ term: string; searchedAt: string }>>('/api/buyer/search-history'),
-        remember: (term: string) =>
-          post<Array<{ term: string; searchedAt: string }>>('/api/buyer/search-history', { term }),
-        remove: (term: string) => del<{ ok: boolean }>(`/api/buyer/search-history/${encodeURIComponent(term)}`),
-        clear:  () => del<{ ok: boolean }>('/api/buyer/search-history'),
-      },
       /** Server-side cart — full-replace sync model. */
       cart: {
         load: () => get<{ items: any[]; savedItems: any[] }>('/api/buyer/cart'),
@@ -1603,6 +1594,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/public/search/recent?limit=${encodeURIComponent(String(limit))}`
         ),
       clearRecent: () => del<{ ok: boolean }>('/api/public/search/recent'),
+      /** Remove a single term from this buyer's recent searches. */
+      removeRecent: (term: string) => del<{ ok: boolean }>(`/api/public/search/recent/${encodeURIComponent(term)}`),
       /** Suggested brands + products for the search empty state. */
       suggested: (limit = 6) =>
         get<{

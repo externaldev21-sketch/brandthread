@@ -898,6 +898,21 @@ router.delete("/search/recent", requireAuth, async (req, res) => {
   }
 });
 
+// ─── DELETE /api/public/search/recent/:term — remove one recent search ────────
+// Matches by the same normalization `/search` logs against, so removing
+// "Hoodie" also clears "hoodie"/"HOODIE" rows for this user.
+router.delete("/search/recent/:term", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).clerkUserId as string;
+    const normalized = normalizeSearchTerm(req.params.term);
+    await db.delete(searchLog).where(and(eq(searchLog.userId, userId), eq(searchLog.normalized, normalized)));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to remove recent search");
+    res.status(500).json({ error: "Failed to remove recent search" });
+  }
+});
+
 // ─── GET /api/public/search/suggested — suggested brands/products (empty state) ─
 // Suggested brands = most-followed sellers; suggested products = most
 // recently listed active products. Both are cheap, already-indexed queries
