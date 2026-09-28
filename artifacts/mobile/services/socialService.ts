@@ -7,6 +7,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { emitProfileEvent } from '@/lib/profileEvents';
+import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
@@ -400,7 +401,7 @@ function toLegacyComment(comment: ServerComment, parent?: ServerComment): Commen
     authorName: comment.author.name,
     authorHandle: comment.author.handle,
     authorInitials: comment.author.initials,
-    authorColor: '#27272A',
+    authorColor: pickAvatarColor(comment.author.userId),
     text: comment.body,
     replyToId: parent?.id,
     replyToAuthorName: parent?.author.name,
@@ -771,14 +772,13 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
  * grid and the feed player read one shape.
  */
 export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
-  const ACCENT_POOL = ['#7C3AED','#0F766E','#BE185D','#B45309','#1D4ED8','#0891B2','#059669'];
   const now = iso();
   const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
   const authorHandle   = '@' + (typeof p.seller?.username === 'string' && p.seller.username
     ? p.seller.username
     : authorName.toLowerCase().replace(/[^a-z0-9]/g, ''));
   const authorInitials = authorName.slice(0, 2).toUpperCase();
-  const authorColor    = ACCENT_POOL[idx % ACCENT_POOL.length];
+  const authorColor    = pickAvatarColor(p.userId ?? authorName);
   return {
     id:                p.id,
     authorId:          p.userId,
@@ -866,14 +866,24 @@ export async function setSellerFollowing(
   sellerId: string,
   following: boolean,
 ): Promise<SellerFollowState> {
-  const state = await serviceRequest<SellerFollowState>(
-    following
-      ? '/api/social/follow'
-      : `/api/social/follow/${encodeURIComponent(sellerId)}`,
-    following
-      ? { method: 'POST', body: JSON.stringify({ userId: sellerId }) }
-      : { method: 'DELETE' },
-  );
+  let state: SellerFollowState;
+  try {
+    state = await serviceRequest<SellerFollowState>(
+      following
+        ? '/api/social/follow'
+        : `/api/social/follow/${encodeURIComponent(sellerId)}`,
+      following
+        ? { method: 'POST', body: JSON.stringify({ userId: sellerId }) }
+        : { method: 'DELETE' },
+    );
+  } catch (err) {
+    // Dev-web preview (no account, so the API 401s): seeded `preview-*`
+    // people keep their follow state in memory instead of rolling back —
+    // see lib/previewFollowStore.ts. Never applies to a real account's id.
+    if (!canUsePreviewFollow(sellerId)) throw err;
+    state = { isFollowing: following };
+  }
+  if (canUsePreviewFollow(sellerId)) setPreviewFollowing(sellerId, state?.isFollowing ?? following);
   // Every screen showing this seller's follower count (or the viewer's
   // following count) updates from the server-confirmed state.
   emitProfileEvent({

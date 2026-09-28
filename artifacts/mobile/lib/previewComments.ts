@@ -139,3 +139,54 @@ export function buildPreviewComments(postId: string, creatorName: string): Previ
 
   return roots;
 }
+
+/** The Activity notification a preview comment deep link came from. */
+export interface PreviewNotificationComment {
+  commentId: string;
+  postId: string;
+  type: string;
+  body: string;
+  actorName: string;
+  createdAt: string;
+}
+
+/**
+ * The comment(s) a seeded preview Activity row is about, so tapping
+ * "Forme 22 commented on your post" / "… replied to your comment" /
+ * "… mentioned you" opens the comments on exactly that comment — it has to
+ * exist in the sheet to be scrolled to and highlighted. A reply also gets the
+ * viewer's own comment it answers, as its parent.
+ */
+export function previewNotificationComments(note: PreviewNotificationComment, viewerName: string): PreviewComment[] {
+  const handle = note.actorName.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const base = {
+    postId: note.postId,
+    createdAt: note.createdAt,
+    likesCount: 0,
+    likedByMe: false,
+    isMine: false,
+    canDelete: false,
+    pendingReview: false,
+    replies: [] as PreviewComment[],
+  };
+  const actorComment: PreviewComment = {
+    ...base,
+    id: note.commentId,
+    parentId: null,
+    body: note.body,
+    author: profile(note.actorName, handle),
+  };
+  if (note.type !== 'comment_reply') return [actorComment];
+  const parentId = `${note.commentId}-parent`;
+  return [{
+    ...base,
+    id: parentId,
+    parentId: null,
+    body: 'okay this one might be my favorite drop yet',
+    createdAt: new Date(new Date(note.createdAt).getTime() - 30 * 60_000).toISOString(),
+    author: profile(viewerName, viewerName.toLowerCase().replace(/[^a-z0-9]+/g, '') || 'you'),
+    isMine: true,
+    canDelete: true,
+    replies: [{ ...actorComment, parentId }],
+  }];
+}
