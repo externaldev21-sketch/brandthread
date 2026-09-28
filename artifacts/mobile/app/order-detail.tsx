@@ -23,6 +23,8 @@ import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getInitials } from '@/lib/format';
 import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryClient';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -432,9 +434,15 @@ export default function OrderDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const queryClient = useQueryClient();
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Stale-while-revalidate: the seller Orders list (app/(tabs)/orders.tsx)
+  // seeds this same cache entry from data it already fetched, and warms it
+  // further on press-in. When it's there, paint it immediately instead of
+  // the spinner below — `load` still runs on focus and refreshes silently.
+  const cachedOrder = id ? queryClient.getQueryData<any>(queryKeys.order(id)) : undefined;
+  const [order, setOrder] = useState<Order | null>(() => (cachedOrder ? adaptApiOrder(cachedOrder) : null));
+  const [loading, setLoading] = useState(!cachedOrder);
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>((tab as Tab) || 'overview');
 
@@ -465,7 +473,7 @@ export default function OrderDetailScreen() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const generationRef = useRef(0);
   const requestGenerationRef = useRef<number | null>(null);
-  const hasLoadedRef = useRef(false);
+  const hasLoadedRef = useRef(!!cachedOrder);
 
   const load = useCallback(async (generation: number) => {
     // Keep one request in flight per focus cycle. Without this guard, a slow
@@ -478,6 +486,7 @@ export default function OrderDetailScreen() {
       const raw = await api.orders.get(id);
       if (generationRef.current !== generation) return; // stale focus cycle
       setOrder(adaptApiOrder(raw));
+      queryClient.setQueryData(queryKeys.order(id), raw);
       setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
     } catch {
@@ -500,7 +509,7 @@ export default function OrderDetailScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [id, api]);
+  }, [id, api, queryClient]);
 
   // Poll every 15 s while focused so status updates surface quickly.
   // After 3 consecutive failures the interval clears to avoid hammering a
