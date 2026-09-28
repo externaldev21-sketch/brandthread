@@ -135,9 +135,7 @@ function EditorialSectionHead({
 
 const esh = StyleSheet.create({
   kicker: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 },
-  // Editorial display face (see docs/design/display-font-options.md) — the
-  // one place on this screen large enough to earn a second typeface.
-  title:  { fontSize: 28, lineHeight: 32, fontFamily: FONT.display, letterSpacing: -0.4, textTransform: 'uppercase' },
+  title:  { fontSize: 28, lineHeight: 32, fontFamily: FONT.bold, letterSpacing: -0.4, textTransform: 'uppercase' },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     minHeight: 36, paddingHorizontal: 14, borderRadius: RADII.pill, borderWidth: 1,

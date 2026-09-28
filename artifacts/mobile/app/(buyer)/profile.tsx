@@ -1032,13 +1032,8 @@ function makeStyles(theme: AppThemePreset) {
       backgroundColor: '#FFFFFF', borderColor: theme.background, // theme-exempt: fixed white badge per spec
       borderWidth: 2, alignItems: 'center', justifyContent: 'center',
     },
-    // Name → @handle: 2pt. Editorial display face (see
-    // docs/design/display-font-options.md) — large enough on this screen to
-    // earn a second typeface, same as Discover's section titles. lineHeight
-    // is pinned explicitly (not left to the font's own metrics) so swapping
-    // from Inter to Fraunces' taller serif line box can't grow this row and
-    // push the handle/chip/stats below it — same box height either font.
-    displayName: { fontFamily: FONT.display, fontSize: 22, lineHeight: 26, letterSpacing: -0.4 },
+    // Name → @handle: 2pt.
+    displayName: { fontFamily: FONT.bold, fontSize: 22, letterSpacing: -0.4 },
     handle: { fontFamily: FONT.medium, fontSize: 14, marginTop: 2 },
     // @handle (or name, if no handle) → Buyer tag: 8pt.
     chipWrap: { marginTop: 8, alignItems: 'flex-start' },

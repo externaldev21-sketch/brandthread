@@ -90,12 +90,7 @@ export const FONT = {
   medium:   'Inter_500Medium'   as const,
   semibold: 'Inter_600SemiBold' as const,
   bold:     'Inter_700Bold'     as const,
-  extrabold:'Inter_800ExtraBold' as const,
-  // Editorial display face — large headings only (Discover section titles,
-  // profile name, Thread Cash balance). Never body copy. See
-  // docs/design/display-font-options.md for the two options evaluated
-  // (Fraunces vs. Big Shoulders Display) and why this one won.
-  display:  'Fraunces_600SemiBold' as const,
+  extrabold:'Inter_700Bold'     as const,
 } as const;
 
 export const FS = {
