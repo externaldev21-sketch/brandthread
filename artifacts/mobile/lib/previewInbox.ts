@@ -176,6 +176,25 @@ export function setPreviewConversationDisappearing(id: string, enabled: boolean)
   cachedConversations = next;
 }
 
+/**
+ * Inbox swipe-row > Pin (item 62), in preview mode: same module-level-cache
+ * trick as setPreviewConversationTheme/setPreviewConversationDisappearing
+ * above — there's no real backend to persist to, but the mutation is visible
+ * to every screen reading getPreviewConversations() in this session, so
+ * "Pin" is fully demoable under `?bt_preview=buyer`. The seeded Brandthread
+ * Agent thread is always pinned already (see its seed data) and this never
+ * un-pins it, matching the real backend's isAgentThread-always-pinned rule.
+ */
+export function setPreviewConversationPinned(id: string, pinned: boolean): void {
+  const list = getPreviewConversations();
+  const idx = list.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  if (list[idx].isOfficial) return; // agent thread: always pinned, not user-toggleable
+  const next = list.slice();
+  next[idx] = { ...next[idx], isPinned: pinned };
+  cachedConversations = next;
+}
+
 let cachedNotifications: Notification[] | null = null;
 
 /** Seeded "new follower" notifications for the redesigned inbox's Follows
