@@ -636,9 +636,10 @@ export default function SellerHomeCommerceDashboard({
                   <Text
                     style={[
                       styles.heroDelta,
-                      { color: deltaLine.direction === 'up' ? theme.success : deltaLine.direction === 'down' ? theme.error : theme.muted },
+                      { color: deltaLine.direction === 'flat' ? theme.muted : theme.text },
                     ]}
                   >
+                    {deltaLine.direction === 'up' ? '↑ ' : deltaLine.direction === 'down' ? '↓ ' : ''}
                     {deltaLine.label}
                   </Text>
                 ) : (
@@ -656,6 +657,7 @@ export default function SellerHomeCommerceDashboard({
                 onRangeChange={(next) => { setRange(next); setScrubIndex(null); }}
                 onScrub={setScrubIndex}
                 isEmpty={isEmptyChart}
+                formatValue={(v) => formatMetricValue(metric, v)}
               />
 
               {/* ── Stat tile grid ───────────────────────────────────────── */}

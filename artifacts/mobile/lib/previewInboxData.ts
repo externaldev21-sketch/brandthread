@@ -45,11 +45,13 @@ export type PreviewConversationSeed = {
   isRequest: boolean;
   contextOrderNumber?: string;
   contextProductName?: string;
-  /** Marked on exactly one seeded thread — the inbox screen simulates a
+  /** Marked ONLY on `BRANDTHREAD_AGENT_SEED` — the inbox screen simulates a
    *  transient local "typing…" state for it (preview-only, see
-   *  lib/previewInbox.ts's typing-simulation helper). Not a real presence
-   *  signal — see the `ConversationParticipant.isOnline` comment in
-   *  services/socialTypes.ts. */
+   *  lib/previewInbox.ts's typing-simulation helper). This mirrors the real
+   *  `agentTyping` field on Conversation (services/socialTypes.ts), which the
+   *  backend also only ever sets for the Brandthread Agent's thread — it is
+   *  not a general per-conversation presence signal, so no ordinary
+   *  buyer<->seller seed sets this. */
   simulateTyping?: boolean;
   messages?: PreviewMessageSeed[];
 };
@@ -73,6 +75,12 @@ export const BRANDTHREAD_AGENT_SEED: PreviewConversationSeed = {
   minutesAgo: 3,
   unreadCount: 1,
   isRequest: false,
+  // The ONLY seeded thread that simulates "typing…" — this mirrors the real
+  // backend, where `agentTyping` (services/socialTypes.ts) is only ever set
+  // for the Brandthread Agent's conversation (see agentTypingUntil in
+  // api-server's conversations.ts). An ordinary buyer<->seller thread has no
+  // real typing signal today, so preview never fakes one there either.
+  simulateTyping: true,
   messages: [
     {
       id: 'preview-msg-brandthread-1',
@@ -132,9 +140,15 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     minutesAgo: 6,
     unreadCount: 2,
     isRequest: false,
+    // Two consecutive-and-close messages on each side (items 1-2 "them",
+    // 3-4 "me") demonstrate the grouped-corner rendering (item 67); the
+    // last "me" message picks up a "Seen" receipt from the seeded readAt
+    // set in lib/previewInbox.ts.
     messages: [
-      { id: 'preview-msg-01-1', fromOfficialOrParticipant: 'them', text: 'Hey! Thanks for your interest in the coat.', minutesAgo: 40 },
+      { id: 'preview-msg-01-1', fromOfficialOrParticipant: 'them', text: 'Hey! Thanks for your interest in the coat.', minutesAgo: 41 },
+      { id: 'preview-msg-01-1b', fromOfficialOrParticipant: 'them', text: 'It just got restocked in a couple sizes.', minutesAgo: 40 },
       { id: 'preview-msg-01-2', fromOfficialOrParticipant: 'me', text: 'Do you have it in size M?', minutesAgo: 20 },
+      { id: 'preview-msg-01-2b', fromOfficialOrParticipant: 'me', text: 'Asking for a friend too — size S?', minutesAgo: 19.5 },
       { id: 'preview-msg-01-3', fromOfficialOrParticipant: 'them', text: 'Just restocked the Sculpted Wool Coat in your size!', minutesAgo: 6 },
     ],
   },
@@ -257,7 +271,6 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     minutesAgo: 1,
     unreadCount: 1,
     isRequest: false,
-    simulateTyping: true,
     messages: [
       { id: 'preview-msg-07-1', fromOfficialOrParticipant: 'me', text: 'Does the mesh top run small?', minutesAgo: 2 },
       { id: 'preview-msg-07-2', fromOfficialOrParticipant: 'them', text: 'Let me check on that for you', minutesAgo: 1 },

@@ -71,7 +71,12 @@ export function ProfileStoriesRow({
           >
             {(state) => (
               <>
-                <View style={[styles.circle, { borderColor: theme.accent, backgroundColor: item.coverColor ?? theme.cardElevated }]}>
+                {/* Instagram's own highlight ring is a plain neutral outline —
+                    the colour ring is reserved for an unseen story. The
+                    theme accent here would misread as "unread" on every
+                    saturated theme, so highlights use the same neutral
+                    border every other profile chrome does. */}
+                <View style={[styles.circle, { borderColor: theme.border, backgroundColor: item.coverColor ?? theme.cardElevated }]}>
                   {item.emoji ? <Text style={styles.emoji}>{item.emoji}</Text> : <Feather name="star" size={18} color={theme.text} />}
                 </View>
                 <Text style={[styles.label, { color: theme.muted }]} numberOfLines={1}>{item.label}</Text>

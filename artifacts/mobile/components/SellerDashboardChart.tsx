@@ -6,11 +6,14 @@ import Animated, {
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
+import { Glass } from '@/components/ui/Glass';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
+import { TAB_INDICATOR_SPRING } from '@/constants/motion';
 import { layoutSeriesPoints, smoothPath } from '@/lib/svgSmoothPath';
 import { BORDER_SUBTLE, FONT, FS, SP } from '@/lib/theme';
 
@@ -34,6 +37,7 @@ export function SellerDashboardChart({
   onRangeChange,
   onScrub,
   isEmpty,
+  formatValue,
 }: {
   values: number[];
   labels: string[];
@@ -43,14 +47,44 @@ export function SellerDashboardChart({
   /** Called with the scrubbed bucket index, or null when the finger lifts. */
   onScrub: (index: number | null) => void;
   isEmpty: boolean;
+  /** Formats a raw bucket value for the in-chart scrub tooltip (defaults to a plain string). */
+  formatValue?: (value: number) => string;
 }) {
   const [width, setWidth] = useState(0);
+  const [rangeRowWidth, setRangeRowWidth] = useState(0);
+  const [tooltipIndex, setTooltipIndex] = useState<number | null>(null);
   const lastHapticIndex = React.useRef<number | null>(null);
 
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const next = event.nativeEvent.layout.width;
     setWidth((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
   }, []);
+
+  const onRangeRowLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.width;
+    setRangeRowWidth((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
+  }, []);
+
+  // Sliding glass-pill active-range indicator: one equal-width segment per
+  // range tab (gap already subtracted so the pill lands exactly on a tab).
+  const rangeSegmentGap = SP.xs;
+  const rangeSegmentWidth = rangeRowWidth > 0
+    ? (rangeRowWidth - rangeSegmentGap * (DASHBOARD_RANGES.length - 1)) / DASHBOARD_RANGES.length
+    : 0;
+  const activeRangeIndex = DASHBOARD_RANGES.findIndex((item) => item.id === range);
+  const rangeIndicatorX = useSharedValue(0);
+  React.useEffect(() => {
+    if (rangeSegmentWidth <= 0 || activeRangeIndex < 0) return;
+    rangeIndicatorX.value = withSpring(
+      activeRangeIndex * (rangeSegmentWidth + rangeSegmentGap),
+      TAB_INDICATOR_SPRING,
+    );
+  }, [activeRangeIndex, rangeSegmentGap, rangeSegmentWidth, rangeIndicatorX]);
+  const rangeIndicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: rangeIndicatorX.value }],
+    width: rangeSegmentWidth > 0 ? rangeSegmentWidth : 0,
+    opacity: rangeSegmentWidth > 0 ? 1 : 0,
+  }));
 
   // A flat baseline for the empty/new-seller state — never fabricate activity.
   const series = isEmpty || values.length === 0 ? values.map(() => 0) : values;
@@ -72,11 +106,13 @@ export function SellerDashboardChart({
       lastHapticIndex.current = index;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
+    setTooltipIndex(index);
     onScrub(index);
   }, [onScrub]);
 
   const handleScrubEnd = useCallback(() => {
     lastHapticIndex.current = null;
+    setTooltipIndex(null);
     onScrub(null);
   }, [onScrub]);
 
@@ -174,10 +210,37 @@ export function SellerDashboardChart({
               <Animated.View pointerEvents="none" style={[styles.cursorDot, { backgroundColor: theme.accent, borderColor: theme.background }, dotStyle]} />
             </>
           )}
+          {!isEmpty && tooltipIndex !== null && points[tooltipIndex] && (
+            <View
+              pointerEvents="none"
+              testID="seller-dashboard-chart-tooltip"
+              style={[
+                styles.tooltip,
+                {
+                  left: Math.max(4, Math.min(width - 4, points[tooltipIndex].x)),
+                  top: Math.max(0, points[tooltipIndex].y - 34),
+                },
+              ]}
+            >
+              <Glass variant="regular" radius={10} style={StyleSheet.absoluteFill} />
+              <Text style={[styles.tooltipText, { color: theme.text }]} numberOfLines={1}>
+                {(formatValue ?? String)(values[tooltipIndex] ?? 0)}
+              </Text>
+            </View>
+          )}
         </View>
       </GestureDetector>
 
-      <View style={styles.rangeRow} testID="seller-dashboard-range-pills">
+      <View style={styles.rangeRow} onLayout={onRangeRowLayout} testID="seller-dashboard-range-pills">
+        {rangeSegmentWidth > 0 && (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.rangeIndicatorWrap, rangeIndicatorStyle]}
+            testID="seller-dashboard-range-indicator"
+          >
+            <Glass variant="pressed" radius={999} style={StyleSheet.absoluteFill} />
+          </Animated.View>
+        )}
         {DASHBOARD_RANGES.map((item) => {
           const selected = item.id === range;
           return (
@@ -185,10 +248,7 @@ export function SellerDashboardChart({
               key={item.id}
               onPress={() => onRangeChange(item.id)}
               activeOpacity={0.75}
-              style={[
-                styles.rangePill,
-                selected && { backgroundColor: theme.accentDim },
-              ]}
+              style={styles.rangePill}
               accessibilityRole="button"
               accessibilityLabel={`Show ${item.label}`}
               accessibilityState={{ selected }}
@@ -202,9 +262,21 @@ export function SellerDashboardChart({
       </View>
 
       {labels.length > 0 && !isEmpty && (
-        <View style={styles.axisRow} pointerEvents="none">
-          <Text style={[styles.axisLabel, { color: theme.subtle }]}>{labels[0]}</Text>
-          <Text style={[styles.axisLabel, { color: theme.subtle }]}>{labels[labels.length - 1]}</Text>
+        <View style={styles.axisRow} pointerEvents="none" testID="seller-dashboard-chart-axis">
+          {labels.map((label, index) => (
+            <Text
+              key={`${label}-${index}`}
+              style={[
+                styles.axisLabel,
+                { color: theme.subtle },
+                index === 0 && styles.axisLabelFirst,
+                index === labels.length - 1 && styles.axisLabelLast,
+              ]}
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+          ))}
         </View>
       )}
     </View>
@@ -229,10 +301,34 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 2,
   },
+  tooltip: {
+    position: 'absolute',
+    minWidth: 64,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 6,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ translateX: -32 }],
+  },
+  tooltipText: {
+    fontFamily: FONT.semibold,
+    fontSize: FS.xs,
+    fontVariant: ['tabular-nums'],
+  },
   rangeRow: {
     flexDirection: 'row',
     gap: SP.xs,
     marginTop: SP.sm,
+    position: 'relative',
+  },
+  rangeIndicatorWrap: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 999,
+    overflow: 'hidden',
   },
   rangePill: {
     flex: 1,
@@ -251,7 +347,15 @@ const styles = StyleSheet.create({
     marginTop: SP.xs,
   },
   axisLabel: {
+    flex: 1,
     fontFamily: FONT.regular,
-    fontSize: FS.xs,
+    fontSize: 9,
+    textAlign: 'center',
+  },
+  axisLabelFirst: {
+    textAlign: 'left',
+  },
+  axisLabelLast: {
+    textAlign: 'right',
   },
 });

@@ -252,13 +252,16 @@ export interface Conversation {
   contextProductName?: string;
   contextSellerName?: string;
   updatedAt: string;
-  /** Placeholder extension point for the official "Brandthread Agent" AI
-   *  friend account (pinned welcome thread), which is being wired up to a
-   *  real backend in a separate change. Not populated by the current
-   *  backend/API — only set by the seeded dev/preview inbox today (see
-   *  lib/previewInbox.ts). `isPinned` conversations should render above the
-   *  rest of the list; `isOfficial` marks the row for a verified badge + a
-   *  small "AI" tag instead of an ordinary avatar/initials treatment. */
+  /** True when the CURRENT viewer has pinned this conversation — either via
+   *  the inbox swipe row's Pin action (backend-driven, per-viewer, derived
+   *  from `conversationParticipants.pinnedAt` — see
+   *  PATCH /api/conversations/:id/pin) or because it's the official
+   *  "Brandthread Agent" welcome thread, which is always pinned regardless
+   *  of real pin state (see buildConversationView in
+   *  artifacts/api-server/src/routes/conversations.ts). `isPinned`
+   *  conversations should render above the rest of the list; `isOfficial`
+   *  marks the row for a verified badge + a small "AI" tag instead of an
+   *  ordinary avatar/initials treatment. */
   isPinned?: boolean;
   isOfficial?: boolean;
   /** True while the Brandthread Agent is generating a reply in this
