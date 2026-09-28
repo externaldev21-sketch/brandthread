@@ -42,7 +42,7 @@ export function SuccessSheet({
   return (
     <BottomSheet visible={visible} onClose={onClose} testID={testID}>
       <View style={styles.content}>
-        <SuccessCheck />
+        <SuccessCheck variant="draw" size={72} />
         <Text style={[TYPE_SCALE.title2, styles.title, { color: theme.text }]}>{title}</Text>
         {subtitle ? (
           <Text style={[TYPE_SCALE.body, styles.subtitle, { color: theme.muted }]}>{subtitle}</Text>
