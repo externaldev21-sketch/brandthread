@@ -18,12 +18,20 @@ export type PreviewMessageAttachmentSeed = {
   meta?: Record<string, string>;
 };
 
+/** One reaction seeded on a preview message — `type` is a `ReactionType`
+ *  (kept as a plain string here so this file stays free of any real-code
+ *  imports, per its own doc comment above). */
+export type PreviewReactionSeed = { type: string; from: 'me' | 'them' };
+
 export type PreviewMessageSeed = {
   id: string;
   fromOfficialOrParticipant: 'me' | 'them';
   text: string;
   attachment?: PreviewMessageAttachmentSeed;
   minutesAgo: number;
+  /** Reactions already on this message when the thread first loads — item
+   *  68 (chat reactions glass), demoable under ?bt_preview=buyer. */
+  reactionSeed?: PreviewReactionSeed[];
 };
 
 export type PreviewConversationSeed = {
@@ -138,9 +146,19 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     // set in lib/previewInbox.ts.
     messages: [
       { id: 'preview-msg-01-1', fromOfficialOrParticipant: 'them', text: 'Hey! Thanks for your interest in the coat.', minutesAgo: 41 },
-      { id: 'preview-msg-01-1b', fromOfficialOrParticipant: 'them', text: 'It just got restocked in a couple sizes.', minutesAgo: 40 },
+      {
+        id: 'preview-msg-01-1b', fromOfficialOrParticipant: 'them', text: 'It just got restocked in a couple sizes.', minutesAgo: 40,
+        // I reacted to their message — demonstrates the glass reaction
+        // overlay + pill on an incoming bubble.
+        reactionSeed: [{ type: 'love', from: 'me' }],
+      },
       { id: 'preview-msg-01-2', fromOfficialOrParticipant: 'me', text: 'Do you have it in size M?', minutesAgo: 20 },
-      { id: 'preview-msg-01-2b', fromOfficialOrParticipant: 'me', text: 'Asking for a friend too — size S?', minutesAgo: 19.5 },
+      {
+        id: 'preview-msg-01-2b', fromOfficialOrParticipant: 'me', text: 'Asking for a friend too — size S?', minutesAgo: 19.5,
+        // They reacted to my message — same data path, other direction, for
+        // buyer↔seller cohesion.
+        reactionSeed: [{ type: 'like', from: 'them' }],
+      },
       { id: 'preview-msg-01-3', fromOfficialOrParticipant: 'them', text: 'Just restocked the Sculpted Wool Coat in your size!', minutesAgo: 6 },
     ],
   },

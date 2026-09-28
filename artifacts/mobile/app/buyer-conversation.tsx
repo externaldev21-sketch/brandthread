@@ -56,9 +56,9 @@ import MediaViewer from '@/components/chat/MediaViewer';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashBillMark } from '@/components/thread-cash/ChatAttachThreadCash';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
-import {
-  ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
-} from '@/components/chat/ReactionBar';
+import { ReactionGlyph, reactionAuthorName } from '@/components/chat/ReactionBar';
+import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuItem } from '@/components/chat/ReactionOverlay';
+import { applyOptimisticReaction, myReactionIn, groupReactionCounts } from '@/lib/reactionMutations';
 import { SystemLine } from '@/components/chat/SystemLine';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
@@ -66,7 +66,7 @@ import { getConversationTheme } from '@/lib/conversationThemes';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   isPreviewConversationId, getPreviewConversation, getPreviewMessages,
-  setPreviewConversationDisappearing, appendPreviewMessage,
+  setPreviewConversationDisappearing, appendPreviewMessage, reactToPreviewMessage,
 } from '@/lib/previewInbox';
 import {
   parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed,
@@ -294,6 +294,12 @@ export default function BuyerConversationScreen() {
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
   const [activeSheetMsg, setActiveSheetMsg]   = useState<Message | null>(null);
+  // The long-pressed bubble's on-screen position, measured right before the
+  // Glass reaction overlay opens (components/chat/ReactionOverlay.tsx) — one
+  // ref per message id so a recycled FlatList row always measures the right
+  // node. Cleared alongside activeSheetMsg.
+  const bubbleAnchorRefs = useRef<Record<string, View | null>>({});
+  const [reactionAnchor, setReactionAnchor] = useState<ReactionOverlayAnchor | null>(null);
   const [viewerUri, setViewerUri]             = useState<string | null>(null);
   const [likeBurst, setLikeBurst] = useState<{ key: number; x: number; y: number } | null>(null);
   const voicePlayer = useAudioPlayer(null);
@@ -946,19 +952,27 @@ export default function BuyerConversationScreen() {
   // ── Reactions ──────────────────────────────────────────────────────────────────
 
   function myReaction(msg: Message): ReactionType | null {
-    const mine = msg.reactions.find(r => reactionAuthorId(r) === myId || reactionAuthorId(r) === MY_USER_ID);
-    return mine ? reactionKind(mine) : null;
+    return myReactionIn(msg.reactions, myId) ?? myReactionIn(msg.reactions, MY_USER_ID);
   }
 
+  // Optimistic add/remove: the tapped emoji shows immediately (and the row's
+  // own selection state updates), then the real network call runs in the
+  // background — rolled back to the pre-tap message list if it fails, so a
+  // reaction never silently "sticks" client-side when the server rejected it.
   async function handleReact(msg: Message, type: ReactionType) {
     if (!conv) return;
     hapticSelection();
+    const prevMessages = messages;
+    const { next } = applyOptimisticReaction(msg.reactions, myId, MY_NAME, type);
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, reactions: next } : m)));
     try {
+      if (isPreviewConversationId(conv.id)) {
+        reactToPreviewMessage(conv.id, msg.id, type, myId, MY_NAME);
+        return;
+      }
       await addReaction(conv.id, msg.id, type);
-      const msgs = await getMessages(conv.id);
-      setMessages(msgs);
     } catch {
-      // Best-effort — the reaction bar/summary simply won't reflect it.
+      setMessages(prevMessages);
     }
   }
 
@@ -1323,8 +1337,37 @@ export default function BuyerConversationScreen() {
 
   // ── Message long press → reaction bar + actions sheet ───────────────────────
 
+  /** A short label for the elevated bubble clone when a long-pressed message
+   *  has no plain text (an image/voice/product card etc.) — the overlay only
+   *  needs to read recognizably as "the same bubble", not fully re-render
+   *  every attachment type. */
+  function sheetAttachmentLabel(msg: Message): string {
+    switch (msg.attachment?.type) {
+      case 'image': return 'Photo';
+      case 'video': return 'Video';
+      case 'voice': return 'Voice message';
+      case 'product': return msg.attachment.title ?? 'Product';
+      case 'order': return msg.attachment.title ?? 'Order';
+      case 'post': return msg.attachment.title ?? 'Post';
+      default: return '';
+    }
+  }
+
   function closeMessageSheet() {
     setActiveSheetMsg(null);
+    setReactionAnchor(null);
+  }
+
+  /** Measures the long-pressed bubble's window position, then opens the
+   *  Glass reaction overlay anchored to it. */
+  function openReactionOverlay(msg: Message) {
+    hapticSelection();
+    const node = bubbleAnchorRefs.current[msg.id];
+    if (!node) { setActiveSheetMsg(msg); return; }
+    node.measureInWindow((x, y, width, height) => {
+      setReactionAnchor({ x, y, width, height });
+      setActiveSheetMsg(msg);
+    });
   }
 
   function sheetReply() {
@@ -1420,13 +1463,7 @@ export default function BuyerConversationScreen() {
     }
 
     // Group reactions by kind for the chip summary under the bubble.
-    const grouped = new Map<ReactionType, number>();
-    for (const r of msg.reactions) {
-      const kind = reactionKind(r);
-      if (!kind) continue;
-      grouped.set(kind, (grouped.get(kind) ?? 0) + 1);
-    }
-    const reactionEntries = Array.from(grouped.entries());
+    const reactionEntries = groupReactionCounts(msg.reactions);
     const mine = myReaction(msg);
     const topReactor = msg.reactions[msg.reactions.length - 1];
 
@@ -1571,7 +1608,11 @@ export default function BuyerConversationScreen() {
           ) : <View style={s.msgAvatarSpacer} />
         )}
 
-        <View style={{ maxWidth: BUBBLE_MAX }}>
+        <View
+          style={{ maxWidth: BUBBLE_MAX }}
+          collapsable={false}
+          ref={(r) => { bubbleAnchorRefs.current[msg.id] = r; }}
+        >
           {/* Bubble — wrapped in a short swipe-right-to-reply gesture (see
               SwipeToReplyBubble's own doc comment for the tap/long-press
               disambiguation, borrowed from components/inbox/InboxSwipeRow.tsx). */}
@@ -1587,7 +1628,7 @@ export default function BuyerConversationScreen() {
             testID={`conversation-bubble-${msg.id}`}
             activeOpacity={0.88}
             onPress={(e) => handleBubblePress(msg, e)}
-            onLongPress={() => { hapticSelection(); setActiveSheetMsg(msg); }}
+            onLongPress={() => openReactionOverlay(msg)}
             delayLongPress={280}
             // Voice messages render their own play/scrub/speed/transcription
             // buttons inside this bubble (see VoiceMessageBubble) — on web,
@@ -2459,47 +2500,40 @@ export default function BuyerConversationScreen() {
         </View>
       </Modal>
 
-      {/* Long-press reactions + actions sheet */}
-      <Modal
+      {/* Long-press reactions — Glass overlay. Mobbin: Instagram DM "Tap and
+          hold to super react" (mobbin.com/screens/5d13fdd9-75ad-43d6-9089-
+          7b236e362b73) — dims/blurs the thread, floats 6 emoji above the
+          elevated bubble with a hint label, and shows this same context
+          menu below the bubble at the same time. */}
+      <ReactionOverlay
         visible={activeSheetMsg != null}
-        transparent
-        animationType="fade"
-        onRequestClose={closeMessageSheet}
-      >
-        <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={closeMessageSheet} />
-        <SheetRise style={s.reactionSheet}>
-          <View style={s.mediaSheetHandle} />
-          <ReactionChipsRow
-            selected={myReactionOnSheet}
-            testIDPrefix="reaction-bar"
-            onSelect={(type) => {
-              if (activeSheetMsg) void handleReact(activeSheetMsg, type);
-              closeMessageSheet();
-            }}
-          />
-          <View style={s.sheetDivider} />
-          <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetReply}>
-            <Feather name="corner-up-left" size={ICON.sm} color={theme.text} />
-            <Text style={s.sheetActionText}>Reply</Text>
-          </PressableScale>
-          <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetCopy}>
-            <Feather name="copy" size={ICON.sm} color={theme.text} />
-            <Text style={s.sheetActionText}>Copy</Text>
-          </PressableScale>
-          {isOwnSheetMsg ? (
-            <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetDelete}>
-              <Feather name="trash-2" size={ICON.sm} color={theme.error} />
-              <Text style={[s.sheetActionText, { color: theme.error }]}>Delete for me</Text>
-            </PressableScale>
-          ) : (
-            <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetReport}>
-              <Feather name="flag" size={ICON.sm} color={theme.error} />
-              <Text style={[s.sheetActionText, { color: theme.error }]}>Report message</Text>
-            </PressableScale>
-          )}
-          <View style={{ height: 12 }} />
-        </SheetRise>
-      </Modal>
+        anchor={reactionAnchor}
+        isOwn={isOwnSheetMsg}
+        bubbleStyle={activeSheetMsg ? [
+          s.bubble,
+          { backgroundColor: isOwnSheetMsg ? sentBubbleColor : receivedBubbleColor, borderRadius: RADIUS.lg },
+        ] : undefined}
+        bubbleContent={activeSheetMsg ? (
+          <Text style={[s.msgText, { color: isOwnSheetMsg ? sentTextColor : receivedTextColor }]}>
+            {activeSheetMsg.text || sheetAttachmentLabel(activeSheetMsg)}
+          </Text>
+        ) : null}
+        selected={myReactionOnSheet}
+        onSelectReaction={(type) => {
+          if (activeSheetMsg) void handleReact(activeSheetMsg, type);
+          closeMessageSheet();
+        }}
+        menuItems={activeSheetMsg ? (
+          [
+            { key: 'reply', label: 'Reply', icon: 'corner-up-left', onPress: sheetReply },
+            { key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy },
+            isOwnSheetMsg
+              ? { key: 'delete', label: 'Delete for me', icon: 'trash-2', destructive: true, onPress: sheetDelete }
+              : { key: 'report', label: 'Report message', icon: 'flag', destructive: true, onPress: sheetReport },
+          ] as ReactionOverlayMenuItem[]
+        ) : []}
+        onClose={closeMessageSheet}
+      />
 
       <MediaViewer visible={viewerUri != null} uri={viewerUri} onClose={() => setViewerUri(null)} />
 
