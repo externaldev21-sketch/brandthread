@@ -24,9 +24,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ReanimatedAnimated from 'react-native-reanimated';
+import ReanimatedAnimated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -86,6 +86,13 @@ export interface ShopSheetSelection {
   tags: ShopTag[];
   activeTagIndex: number;
   previewProduct?: BuyerProduct;
+  /** The POSTING creator/brand's display name — whoever posted the video,
+   *  not necessarily whoever owns every tagged product on it (see the
+   *  header's "Shop with {Brand}" — SpotlightItem.creator at the feed.tsx
+   *  call site). Header falls back to the old generic "Shop the post" copy
+   *  when this isn't available (e.g. a caller outside the feed). */
+  postCreatorName?: string;
+  postCreatorVerified?: boolean;
 }
 
 interface ShopProductSheetProps {
@@ -345,17 +352,48 @@ export function ShopProductSheet({
   const router = useRouter();
   const { push } = useThreadPull();
 
-  // Photo cap (item 1): the sheet itself is capped at maxHeight: '85%' (see
-  // ss.sheet) — the hero photo is capped at ~45% of THAT height, not of the
-  // raw window, so price/size/details still sit above the fold across
-  // viewport sizes instead of a fixed aspect ratio eating most of the
-  // screen on shorter devices.
-  const sheetHeightBudget = windowHeight * 0.85;
-  const imageMaxHeight = Math.round(sheetHeightBudget * 0.45);
-
+  // Gallery aspect (photo audit follow-up): always a full-width 3:4
+  // portrait frame now, never a capped near-square crop — see
+  // ProductImageCarousel below, which shows the whole image
+  // (`contentFit="contain"`, letterboxed on `theme.cardElevated` rather
+  // than cropped) instead of the old `cover`-fit-into-a-45%-height-cap
+  // treatment that could cut off a differently-shaped seller photo. The
+  // content area around it is a `flex:1` ScrollView (see below) and the
+  // sticky Add to cart/Buy now bar is its own sibling OUTSIDE that
+  // ScrollView, so a taller gallery just scrolls under the fold instead of
+  // ever pushing the CTA bar off-screen or behind it.
   const [activeTagIdx, setActiveTagIdx] = useState(selection.activeTagIndex);
   const activeTag = selection.tags[activeTagIdx];
   const hasMultipleTags = selection.tags.length > 1;
+
+  // LIST step sheet height (item: half-height-or-taller, drag-to-expand up
+  // to 90%): opens at a real 55% of window height — not a bare `maxHeight`
+  // (which only caps a content-driven height, so a short 2-row list opened
+  // bottom-hugging-short instead of at 55% as intended) — and is draggable
+  // up to 90%, TikTok Shop / eBay "Item lineup" style. A dedicated Pan
+  // gesture on just the handle (not the whole sheet, which already owns a
+  // drag-DOWN-to-close gesture via `panGesture`/`useSheetTransition`) so an
+  // upward drag resizes instead of being swallowed by the close gesture's
+  // own `Math.max(0, ...)` clamp. DETAIL step is unaffected — it keeps the
+  // existing `maxHeight: '85%'` content-driven sizing (`ss.sheet`).
+  const listSheetMinHeight = windowHeight * 0.55;
+  const listSheetMaxHeight = windowHeight * 0.90;
+  const listSheetHeight = useSharedValue(listSheetMinHeight);
+  const listSheetDragStart = useSharedValue(0);
+  const listResizeGesture = Gesture.Pan()
+    .onStart(() => {
+      listSheetDragStart.value = listSheetHeight.value;
+    })
+    .onUpdate((e) => {
+      const next = listSheetDragStart.value - e.translationY;
+      listSheetHeight.value = Math.min(listSheetMaxHeight, Math.max(listSheetMinHeight, next));
+    });
+  // `maxHeight: listSheetMaxHeight` overrides `ss.sheet`'s own blanket 85%
+  // cap (meant for the DETAIL step) — the LIST step's own max is 90%.
+  const listSheetAnimatedStyle = useAnimatedStyle(() => ({
+    height: listSheetHeight.value,
+    maxHeight: listSheetMaxHeight,
+  }));
 
   // Two-step TikTok-Shop-style flow (rebuild): a post with 2+ tagged
   // products opens on a LIST step (a vertical row per product — no giant
@@ -915,7 +953,7 @@ export function ShopProductSheet({
           onLayout={onSheetLayout}
           style={[
             ss.sheet,
-            sheetStep === 'list' && ss.sheetHalf,
+            sheetStep === 'list' && listSheetAnimatedStyle,
             {
               backgroundColor: theme.surface,
               borderColor: theme.border,
@@ -924,10 +962,25 @@ export function ShopProductSheet({
             sheetStyle,
           ]}
         >
-        {/* ─ Handle ─ */}
-        <View style={ss.handle} />
+        {/* ─ Handle — draggable up to 90% on the LIST step only (see
+            `listResizeGesture` above); a plain static grabber on DETAIL. ─ */}
+        {sheetStep === 'list' ? (
+          <GestureDetector gesture={listResizeGesture}>
+            <View style={ss.handle} hitSlop={{ top: 10, bottom: 10 }} />
+          </GestureDetector>
+        ) : (
+          <View style={ss.handle} />
+        )}
 
-        {/* ─ Header ─ */}
+        {/* ─ Header — "Shop with {Brand}" (the POSTING creator/brand, not
+            necessarily every tagged product's own seller — selection.
+            postCreatorName, set at the feed.tsx call site from
+            SpotlightItem.creator), with a small avatar + white verified
+            check reusing the exact same pattern as `SellerRow` below, and
+            a quiet "{N} products" subline (only when there's more than one
+            tagged product) in place of the old shouty "Products in this
+            post (N)" line. Same header for both LIST and DETAIL steps —
+            this is one shared row above both. ─ */}
         <View style={ss.header}>
           <View style={ss.headerLeft}>
             {/* Back to the product LIST — only when there IS a list to go
@@ -945,7 +998,22 @@ export function ShopProductSheet({
                 <Feather name="chevron-left" size={18} color={theme.text} />
               </TouchableOpacity>
             )}
-            <Text style={ss.eyebrow}>SHOP THE POST</Text>
+            <View style={ss.headerBrandCol}>
+              <View style={ss.headerBrandRow}>
+                {!!selection.postCreatorName && (
+                  <Avatar name={selection.postCreatorName} size={24} />
+                )}
+                <Text style={ss.headerBrandName} numberOfLines={1}>
+                  {selection.postCreatorName ? `Shop with ${selection.postCreatorName}` : 'Shop the post'}
+                </Text>
+                {selection.postCreatorVerified && (
+                  <Feather name="check-circle" size={13} color={theme.text} style={ss.headerBrandVerified} />
+                )}
+              </View>
+              {hasMultipleTags && (
+                <Text style={ss.headerSubline}>{selection.tags.length} products</Text>
+              )}
+            </View>
           </View>
           <TouchableOpacity
             onPress={handleClose}
@@ -962,7 +1030,6 @@ export function ShopProductSheet({
             photo here, just a 72pt thumbnail per row. ─ */}
         {hasMultipleTags && sheetStep === 'list' && (
           <>
-            <Text style={ss.listTitle}>Products in this post ({selection.tags.length})</Text>
             <ScrollView
               style={{ flex: 1 }}
               showsVerticalScrollIndicator={false}
@@ -1069,7 +1136,7 @@ export function ShopProductSheet({
                 details sit above the fold without scrolling. */}
             {/* Measured at Add-to-cart time: the flight lifts off this photo. */}
             <View ref={productPhotoRef} collapsable={false}>
-              <ProductImageCarousel imageUris={product.imageUris} maxHeight={imageMaxHeight} />
+              <ProductImageCarousel imageUris={product.imageUris} />
             </View>
 
             {/* Product title/price row — the WHOLE row is the tap target to
@@ -1625,22 +1692,23 @@ function FullScreenImageViewer({
   );
 }
 
-// ─── Product image carousel — near-square, capped, swipeable, dot indicator ──
-// Capped at `maxHeight` (item 1 — ~45% of the sheet's own height, computed
-// by the caller) instead of a fixed 4:5 aspect ratio, so the photo can never
-// eat most of the sheet regardless of viewport size. Never letterboxed:
-// every frame is `cover`-fit inside that capped window on a dark backdrop,
-// so a differently-shaped seller photo fills the frame (cropped) instead of
-// showing as a boxed-in image on a solid color. Tap opens the full-screen
+// ─── Product image carousel — full sheet-width 3:4, swipeable, dot indicator ──
+// Photo audit follow-up ("all these screens where you're swiping should be
+// 3x4 instead of 9x16, I don't like how it cuts off the image at all."):
+// always a fixed 3:4 portrait frame at the sheet's own width — never a
+// near-square height cap — and `contentFit="contain"` rather than `cover`,
+// so a differently-shaped seller photo is letterboxed on `theme.
+// cardElevated` (visible, but never crops/cuts off real photo content)
+// instead of being cropped to fill the box. Tap opens the full-screen
 // viewer for a closer look. Page dots only — no numeric "1/N" badge (item
 // 3); the full-screen viewer (a separate, immersive view) keeps its own.
 
-function ProductImageCarousel({ imageUris, maxHeight }: { imageUris: string[]; maxHeight: number }) {
+function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
   const { theme } = useAppTheme();
   const ss = useMemo(() => makeSheetStyles(theme), [theme]);
   const { width: windowWidth } = useWindowDimensions();
   const pageWidth = Math.min(windowWidth, 520);
-  const pageHeight = Math.max(160, Math.min(pageWidth, maxHeight)); // near-square, capped
+  const pageHeight = Math.round(pageWidth * (4 / 3)); // fixed 3:4 portrait, full sheet width
   const [index, setIndex] = useState(0);
   const [fullScreen, setFullScreen] = useState(false);
   const images = imageUris.length > 0 ? imageUris : [''];
@@ -1649,7 +1717,7 @@ function ProductImageCarousel({ imageUris, maxHeight }: { imageUris: string[]; m
     return (
       <View style={[ss.carouselWrap, { height: pageHeight }]}>
         {images[0] ? (
-          <CachedImage source={{ uri: images[0] }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <CachedImage source={{ uri: images[0] }} style={StyleSheet.absoluteFill} contentFit="contain" />
         ) : (
           <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
             <Feather name="image" size={28} color={theme.subtle} />
@@ -1681,7 +1749,7 @@ function ProductImageCarousel({ imageUris, maxHeight }: { imageUris: string[]; m
             {images.map((uri, i) => (
               <View key={`${uri}-${i}`} style={{ width: pageWidth, height: pageHeight }}>
                 {uri ? (
-                  <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                  <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
                 ) : (
                   <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
                     <Feather name="image" size={28} color={theme.subtle} />
@@ -1814,10 +1882,11 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     maxHeight: '85%',
     overflow: 'hidden',
   },
-  // LIST step (item: two-step list → detail rebuild) — a half-height sheet,
-  // per the TikTok Shop / eBay Item-lineup reference: a compact product
-  // picker, not a nearly-full-screen surface.
-  sheetHalf: { maxHeight: '55%' },
+  // LIST step (item: two-step list → detail rebuild) — a draggable
+  // 55%-90% sheet now (see `listSheetAnimatedStyle`/`listResizeGesture`
+  // above), per the TikTok Shop / eBay Item-lineup reference: a compact
+  // product picker by default, not a nearly-full-screen surface, but
+  // resizable for a longer product list.
   handle: {
     width: 36,
     height: 5,
@@ -1834,7 +1903,23 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // flexShrink so the brand name truncates instead of pushing into (or
+  // wrapping under) the close button — see headerBrandName's numberOfLines.
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
+  headerBrandCol: { flexShrink: 1, minWidth: 0, gap: 1 },
+  headerBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerBrandName: {
+    fontSize: FS.base,
+    fontFamily: FONT.semibold,
+    color: theme.text,
+    flexShrink: 1,
+  },
+  headerBrandVerified: { marginLeft: -2 },
+  headerSubline: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: theme.muted,
+  },
   backBtn: {
     width: 32,
     height: 32,
@@ -1842,12 +1927,6 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     backgroundColor: theme.cardElevated,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  eyebrow: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
-    color: theme.muted,
-    letterSpacing: 1.2,
   },
   closeBtn: {
     width: 32,
@@ -1860,14 +1939,9 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
 
   // LIST step — vertical rows, one per tagged product (TikTok Shop /
   // eBay "Item lineup" reference — see the ProductListRow module comment).
-  listTitle: {
-    fontSize: FS.base,
-    fontFamily: FONT.semibold,
-    color: theme.text,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  listContent: { paddingBottom: 12 },
+  // The step's own title line was demoted into the shared header's
+  // `headerSubline` ("N products") — see the header JSX above.
+  listContent: { paddingTop: 8, paddingBottom: 12 },
   listRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

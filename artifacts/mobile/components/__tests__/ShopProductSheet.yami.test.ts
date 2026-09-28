@@ -1,9 +1,14 @@
 /**
  * Structure tests for the Yami-style product sheet additions: a swipeable,
- * height-capped image carousel with dot-only paging (no numeric "1/N"
+ * fixed-3:4-aspect image carousel with dot-only paging (no numeric "1/N"
  * badge — removed in the single-product rework, item 3), bold-border-
  * selected / dashed-border-unavailable variant chips, and a sticky
  * (never-scrolls-away) Add to Cart + Buy Now bar.
+ *
+ * Photo audit follow-up: the carousel used to be `cover`-fit and capped
+ * near-square (~45% of the sheet's own height) — now it's always a full
+ * sheet-width 3:4 portrait frame, `contentFit="contain"` (letterboxed, not
+ * cropped) — see the module comment above ProductImageCarousel.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -12,9 +17,11 @@ import { describe, expect, it } from 'vitest';
 const sheet = readFileSync(resolve(__dirname, '../ShopProductSheet.tsx'), 'utf8');
 
 describe('Swipeable image carousel, dot-only paging (no numeric badge)', () => {
-  it('renders a horizontal, paged gallery of every product image, capped to a max height', () => {
+  it('renders a horizontal, paged gallery of every product image, at a fixed 3:4 aspect', () => {
     expect(sheet).toContain('function ProductImageCarousel(');
-    expect(sheet).toContain('<ProductImageCarousel imageUris={product.imageUris} maxHeight={imageMaxHeight} />');
+    expect(sheet).toContain('<ProductImageCarousel imageUris={product.imageUris} />');
+    expect(sheet).toContain('const pageHeight = Math.round(pageWidth * (4 / 3));');
+    expect(sheet).toContain('contentFit="contain"');
     expect(sheet).toContain('pagingEnabled');
   });
 
