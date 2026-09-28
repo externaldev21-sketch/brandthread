@@ -201,7 +201,7 @@ chat-details screen) is used as the pattern reference:
 
 ### Backend (real, not stubbed)
 
-New migration `lib/db/migrations/095_conversation_nicknames_and_mute.sql`:
+New migration `lib/db/migrations/096_conversation_nicknames_and_mute.sql`:
 - `conversations.nicknames` — a `jsonb` map keyed `"<viewerUserId>:<targetUserId>"`
   → nickname string. Conversation-scoped (not global), matching Instagram's
   model, and one map serves every participant's settings for every other

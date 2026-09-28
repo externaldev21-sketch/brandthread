@@ -1,4 +1,4 @@
--- 095: Chat details — nicknames and per-participant mute (DM flows PR 2).
+-- 096: Chat details — nicknames and per-participant mute (DM flows PR 2).
 --
 -- Nicknames are conversation-scoped, keyed by "<viewerUserId>:<targetUserId>"
 -- in a jsonb map on the conversation itself (one map serves every
