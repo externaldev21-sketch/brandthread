@@ -28,13 +28,12 @@ import type {
 import { useApi } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
   useAudioPlayer,
   useAudioPlayerStatus,
-  useAudioRecorder,
 } from 'expo-audio';
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
+import { VoiceMessageBubble } from '@/components/chat/VoiceMessageBubble';
 import { useAuth } from '@clerk/expo';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
@@ -265,16 +264,16 @@ export default function BuyerConversationScreen() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
-  const [isRecording, setIsRecording]         = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
+  const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
   const [activeSheetMsg, setActiveSheetMsg]   = useState<Message | null>(null);
   const [viewerUri, setViewerUri]             = useState<string | null>(null);
   const [likeBurst, setLikeBurst] = useState<{ key: number; x: number; y: number } | null>(null);
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
+  const voiceRecorder = useVoiceRecorder(uploadMedia, handleVoiceRecorded);
 
   // Unread-on-open divider: computed once from the conversation's unreadCount
   // *before* markConversationRead() clears it server-side, then held fixed for
@@ -680,50 +679,57 @@ export default function BuyerConversationScreen() {
     finally { setIsUploading(false); }
   }
 
-  // ── Voice recording (hold-to-record) ──────────────────────────────────────────
-
-  async function startRecording() {
-    if (isRecording || isUploading || isSending) return;
+  // ── Voice recording ────────────────────────────────────────────────────────────
+  // Instagram DM "Sending an audio message" (mobbin.com/flows/125d5a4c-31d5-
+  // 4b05-8f08-2de2c6860c23): recording sends the voice note directly the
+  // instant it's released/tapped-send — it doesn't stage into the composer
+  // like a photo/video attachment does. See docs/dm-flows.md.
+  async function handleVoiceRecorded(result: { uri: string; durationSec: number; waveform: number[] }) {
+    if (!conv) return;
+    hapticSuccessAction();
+    const attachment: MessageAttachment = {
+      type: 'voice',
+      uri: result.uri,
+      title: 'Voice message',
+      meta: { duration: String(result.durationSec), waveform: JSON.stringify(result.waveform) },
+    };
+    // Preview conversations have no real backend to post to — append a
+    // local mock message directly, the same way Thread Cash / the agent
+    // reply flow above does.
+    if (isPreviewConversationId(conv.id)) {
+      setMessages((prev) => [...prev, {
+        id: `local-voice-${Date.now()}`,
+        conversationId: conv.id,
+        fromId: myId,
+        fromName: 'You',
+        fromInitials: 'Y',
+        fromColor: theme.accent,
+        text: '',
+        attachment,
+        reactions: [],
+        status: 'sent',
+        ts: Date.now(),
+        deletedForMe: false,
+      }]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      return;
+    }
+    setIsSending(true);
     try {
-      const permission = await requestRecordingPermissionsAsync();
-      if (!permission.granted) throw new Error('Microphone permission denied');
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      await recorder.prepareToRecordAsync();
-      recorder.record();
-      setIsRecording(true);
-    } catch { Alert.alert('Mic unavailable', 'Could not access microphone. Check permissions in Settings.'); }
-  }
-
-  async function stopRecording() {
-    if (!isRecording) return;
-    setIsRecording(false);
-    try {
-      await recorder.stop();
-      const status = recorder.getStatus();
-      const uri = recorder.uri ?? status.url;
-      if (!uri) return;
-      setIsUploading(true);
-      const response = await fetch(uri);
-      const buf = await response.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      let binary = '';
-      const CHUNK = 8192;
-      for (let i = 0; i < bytes.byteLength; i += CHUNK) {
-        binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.byteLength)));
-      }
-      const url = await uploadMedia(btoa(binary), 'audio/m4a', 'm4a');
-      const dur = Math.round(status.durationMillis / 1000);
-      setSelectedAttachment({ type: 'voice', uri: url, title: 'Voice message', meta: { duration: String(dur) } });
-    } catch { Alert.alert('Recording error', 'Could not save voice message. Please try again.'); }
-    finally {
-      setIsUploading(false);
-      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      await sendMessage(conv.id, '', attachment);
+      const msgs = await getMessages(conv.id);
+      setMessages(msgs);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch (e) {
+      Alert.alert('Voice message not sent', apiErrorMessage(e, 'Please check your connection and try again.'));
+    } finally {
+      setIsSending(false);
     }
   }
 
   // ── Voice playback ────────────────────────────────────────────────────────────
 
-  async function handlePlayVoice(uri: string) {
+  async function handlePlayVoice(uri: string, rate: number) {
     if (playingVoiceUri === uri) {
       voicePlayer.pause();
       await voicePlayer.seekTo(0).catch(() => {});
@@ -734,8 +740,21 @@ export default function BuyerConversationScreen() {
     try {
       setPlayingVoiceUri(uri);
       voicePlayer.replace({ uri });
+      voicePlayer.playbackRate = rate;
       voicePlayer.play();
     } catch { setPlayingVoiceUri(null); }
+  }
+
+  function handleSeekVoice(uri: string, fraction: number, durationSec: number) {
+    if (playingVoiceUri !== uri || !durationSec) return;
+    void voicePlayer.seekTo(fraction * durationSec).catch(() => {});
+  }
+
+  function handleVoiceSpeedChange(uri: string, rate: number) {
+    setVoiceSpeed(rate);
+    if (playingVoiceUri === uri) {
+      try { voicePlayer.playbackRate = rate; } catch { /* best-effort */ }
+    }
   }
 
   // ── Reactions ──────────────────────────────────────────────────────────────────
@@ -775,7 +794,7 @@ export default function BuyerConversationScreen() {
 
   // ── Attachment renderer (handles image / video / voice inline) ────────────────
 
-  function renderAttachment(att: MessageAttachment) {
+  function renderAttachment(att: MessageAttachment, isOwn: boolean) {
     if (att.type === 'image') {
       let uris: string[] = [];
       try { uris = JSON.parse(att.meta?.photoUris ?? '[]'); } catch {}
@@ -809,19 +828,25 @@ export default function BuyerConversationScreen() {
       );
     }
     if (att.type === 'voice') {
+      const durationSec = Number(att.meta?.duration ?? 0);
+      let waveform: number[] = [];
+      try { waveform = JSON.parse(att.meta?.waveform ?? '[]'); } catch {}
+      const isPlaying = !!att.uri && playingVoiceUri === att.uri;
+      const progress = isPlaying && voicePlayerStatus.duration
+        ? Math.max(0, Math.min(1, voicePlayerStatus.currentTime / voicePlayerStatus.duration))
+        : 0;
       return (
-        <PressableScale rippleEnabled={false} style={s.voiceRow} activeOpacity={0.8}
-          onPress={() => att.uri && handlePlayVoice(att.uri)}>
-          <View style={[s.voicePlayBtn, playingVoiceUri === att.uri && s.voicePlayBtnActive]}>
-            <Feather name={playingVoiceUri === att.uri ? 'square' : 'play'} size={14} color="#fff" />
-          </View>
-          <View style={s.voiceWave}>
-            {[...Array(12)].map((_, i) => (
-              <View key={i} style={[s.voiceBar, { height: 4 + Math.abs(Math.sin(i * 0.8)) * 14 }]} />
-            ))}
-          </View>
-          <Text style={s.voiceDur}>{att.meta?.duration ? `${att.meta.duration}s` : '…'}</Text>
-        </PressableScale>
+        <VoiceMessageBubble
+          theme={theme}
+          waveform={waveform}
+          durationSec={durationSec}
+          isPlaying={isPlaying}
+          progress={progress}
+          isOwn={isOwn}
+          onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
+          onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
+          onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+        />
       );
     }
     // 'thread_cash', 'quick_replies' and 'agent_card' are handled in
@@ -1315,7 +1340,14 @@ export default function BuyerConversationScreen() {
             onPress={(e) => handleBubblePress(msg, e)}
             onLongPress={() => { hapticSelection(); setActiveSheetMsg(msg); }}
             delayLongPress={280}
-            accessibilityRole="button"
+            // Voice messages render their own play/scrub/speed/transcription
+            // buttons inside this bubble (see VoiceMessageBubble) — on web,
+            // accessibilityRole="button" makes react-native-web render an
+            // actual <button>, and a <button> cannot legally contain other
+            // interactive controls (the HTML nested-button rule). Drop the
+            // role only for voice bubbles so it renders as a plain, still
+            // fully tappable/long-pressable <div> instead.
+            accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : 'button'}
             accessibilityLabel={isOwn ? 'Your message' : `Message from ${msg.fromName}`}
             accessibilityHint="Double tap to like, or touch and hold for more actions"
             style={[
@@ -1348,7 +1380,7 @@ export default function BuyerConversationScreen() {
             ) : null}
 
             {/* Attachment */}
-            {msg.attachment && renderAttachment(msg.attachment)}
+            {msg.attachment && renderAttachment(msg.attachment, isOwn)}
 
             {/* Text */}
             {msg.text ? (
@@ -1705,6 +1737,20 @@ export default function BuyerConversationScreen() {
             </View>
           )}
           <View style={[s.inputRow, { paddingBottom: composerBottomPad }]}>
+            {voiceRecorder.phase !== 'idle' ? (
+              <VoiceRecordingBar
+                theme={theme}
+                phase={voiceRecorder.phase}
+                elapsedMs={voiceRecorder.elapsedMs}
+                waveform={voiceRecorder.waveform}
+                dragX={voiceRecorder.dragX}
+                dragY={voiceRecorder.dragY}
+                isWeb={voiceRecorder.isWeb}
+                onCancel={voiceRecorder.cancel}
+                onLock={voiceRecorder.lock}
+                onSend={() => { void voiceRecorder.finish(); }}
+              />
+            ) : (<>
             {/* Attach — photos, video, Thread Cash (Apple-Cash-style), and
                 (for seller chats) products/posts. A plain "+" inside a
                 hairline circle, aligned to the pill's own center. */}
@@ -1746,18 +1792,33 @@ export default function BuyerConversationScreen() {
                   pointerEvents={showSendButton ? 'none' : 'auto'}
                   style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
                 >
-                  <PressableScale rippleEnabled={false}
-                    bounce={false}
-                    onPressIn={startRecording}
-                    onPressOut={stopRecording}
-                    disabled={isUploading || isSending}
-                    style={s.morphFaceInner}
-                    testID="conversation-mic"
-                    accessibilityRole="button"
-                    accessibilityLabel="Record voice message"
-                  >
-                    <Feather name={isRecording ? 'stop-circle' : 'mic'} size={COMPOSER_ICON} color={isRecording ? theme.error : theme.muted} />
-                  </PressableScale>
+                  {/* Native: press-and-hold starts recording, then slide-to-
+                      cancel/lock via the same gesture (see useVoiceRecorder).
+                      Web has no press-hold-and-drag parity, so a tap toggles
+                      recording instead — see docs/dm-flows.md. */}
+                  {voiceRecorder.isWeb ? (
+                    <PressableScale rippleEnabled={false}
+                      bounce={false}
+                      onPress={() => { void voiceRecorder.startWeb(); }}
+                      disabled={isUploading || isSending}
+                      style={s.morphFaceInner}
+                      testID="conversation-mic"
+                      accessibilityRole="button"
+                      accessibilityLabel="Record voice message"
+                    >
+                      <Feather name="mic" size={COMPOSER_ICON} color={theme.muted} />
+                    </PressableScale>
+                  ) : (
+                    <View
+                      {...voiceRecorder.panHandlers}
+                      style={s.morphFaceInner}
+                      testID="conversation-mic"
+                      accessibilityRole="button"
+                      accessibilityLabel="Record voice message"
+                    >
+                      <Feather name="mic" size={COMPOSER_ICON} color={theme.muted} />
+                    </View>
+                  )}
                 </Animated.View>
                 <Animated.View
                   pointerEvents={showSendButton ? 'auto' : 'none'}
@@ -1886,6 +1947,7 @@ export default function BuyerConversationScreen() {
                 />
               ) : null}
             </View>
+            </>)}
           </View>
         </View>
       ) : (
