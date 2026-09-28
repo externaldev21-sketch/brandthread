@@ -19,7 +19,6 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { hapticDestructiveConfirm, hapticWarning } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-import { RADII } from '@/constants/radii';
 
 export default function MutedAccountsScreen() {
   const { theme } = useAppTheme();
@@ -120,10 +119,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   intro: { padding: SPACING.md },
   introText: { color: theme.muted, ...TYPE_SCALE.footnote, lineHeight: 19 },
   search: {
+    // Overnight batch item 37: filled, no border at rest or focus.
     flexDirection: 'row', alignItems: 'center', gap: 10,
     marginHorizontal: SPACING.md, marginBottom: SPACING.sm,
-    backgroundColor: theme.card, borderRadius: RADII.input, borderWidth: 1,
-    borderColor: theme.border, paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 12, borderWidth: 0,
+    paddingHorizontal: 12, paddingVertical: 10,
   },
   searchInput: { flex: 1, color: theme.text, ...TYPE_SCALE.body },
 });
