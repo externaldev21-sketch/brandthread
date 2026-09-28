@@ -929,6 +929,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     orders: {
       list:           ()                       => quietGet('/api/orders'),
+      /** Item 144 (seller chat buyer context panel): this buyer's order
+       * history with the current seller — server scopes it to the caller's
+       * own orders (see api-server's GET /api/orders `buyerId` filter), so
+       * this can never return another seller's orders for that buyer. */
+      listForBuyer:   (buyerId: string)        => quietGet(`/api/orders?buyerId=${encodeURIComponent(buyerId)}`),
       get:            (id: string)             => get(`/api/orders/${id}`),
       create:         (body: unknown)          => post('/api/orders', body),
       updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
