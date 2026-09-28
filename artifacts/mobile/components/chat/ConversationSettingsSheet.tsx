@@ -65,8 +65,8 @@ export function ConversationSettingsSheet({
     setBusy(true);
     setError('');
     try {
-      const result = await api.conversations.mute(conversationId, !isMuted);
-      onMutedChange(result.muted);
+      const result = await api.conversations.mute(conversationId, isMuted ? null : -1);
+      onMutedChange(result.mutedUntil !== null);
     } catch (e) {
       setError(apiErrorMessage(e, 'Could not update this conversation. Try again.'));
     } finally {
