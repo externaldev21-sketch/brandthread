@@ -84,7 +84,11 @@ export default function SignInScreen() {
   function finalizeSignIn() {
     return signIn.finalize({
       navigate: ({ decorateUrl }) => {
-        const destination = isAddAccount ? '/account-switcher' : '/';
+        // The account switcher is a sheet on the profile screen now (see
+        // components/AccountSwitcherSheet.tsx), not its own route — landing
+        // on '/' after an add-account sign-in shows the newly-active
+        // account's profile, where the switcher can be reopened at any time.
+        const destination = '/';
         const url = decorateUrl(destination);
         if (url.startsWith('http') && typeof window !== 'undefined') {
           window.location.href = url;
@@ -161,10 +165,10 @@ export default function SignInScreen() {
       if (createdSessionId && setActive) {
         // Existing user — activate the session; AuthGate will route by user_role
         await setActive({ session: createdSessionId });
-        if (isAddAccount) router.replace('/account-switcher' as never);
+        if (isAddAccount) router.replace('/' as never);
       } else if (ssoSignIn?.status === 'complete' || ssoSignUp?.status === 'complete') {
         // Session was created by Clerk automatically — AuthGate picks it up
-        if (isAddAccount) router.replace('/account-switcher' as never);
+        if (isAddAccount) router.replace('/' as never);
       } else if (ssoSignUp) {
         // Brand-new user with no account yet — send them through onboarding
         router.replace('/onboarding' as never);
