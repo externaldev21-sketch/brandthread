@@ -197,11 +197,11 @@ export function RightActionRail({
           icon="heart"
           solidIcon="heart"
           iconSize={26}
-          count={(engagement?.likes ?? 0) > 0 ? formatCount(engagement?.likes ?? 0) : undefined}
+          count={formatCount(engagement?.likes ?? 0)}
           active={engagement?.liked ?? false}
           activeColor="#EF4444"
           inactiveColor={ON_DARK}
-          accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${formatCount(engagement?.likes ?? 0)} likes`}
+          accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${engagement?.likes ?? 0} likes`}
           accessibilityState={{ checked: engagement?.liked ?? false }}
           scaleAnim={heartScale}
           style={styles.actionContent}
@@ -217,21 +217,21 @@ export function RightActionRail({
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
         onPress={onOpenComments}
         accessibilityRole="button"
-        accessibilityLabel={`Comments, ${formatCount(commentsCount)}`}
+        accessibilityLabel={`Comments, ${commentsCount}`}
       >
         <FontAwesome name="commenting" size={26} color={ON_DARK} style={styles.iconShadow} />
-        {commentsCount > 0 && <Text style={styles.count}>{formatCount(commentsCount)}</Text>}
+        <Text style={styles.count}>{formatCount(commentsCount)}</Text>
       </TouchableOpacity>
 
       <EngagementButton
         icon="repeat"
         solidIcon="retweet"
         iconSize={26}
-        count={(engagement?.reposts ?? 0) > 0 ? formatCount(engagement?.reposts ?? 0) : undefined}
+        count={formatCount(engagement?.reposts ?? 0)}
         active={engagement?.reposted ?? false}
         activeColor={accentColor}
         inactiveColor={ON_DARK}
-        accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${formatCount(engagement?.reposts ?? 0)} reposts`}
+        accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${engagement?.reposts ?? 0} reposts`}
         accessibilityState={{ checked: engagement?.reposted ?? false }}
         style={styles.actionContent}
         rotateAnim={repostSpin}
@@ -245,11 +245,11 @@ export function RightActionRail({
         icon="bookmark"
         solidIcon="bookmark"
         iconSize={26}
-        count={(engagement?.saves ?? saves) > 0 ? formatCount(engagement?.saves ?? saves) : undefined}
+        count={formatCount(engagement?.saves ?? saves)}
         active={engagement?.saved ?? false}
         activeColor={GOLD}
         inactiveColor={ON_DARK}
-        accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${formatCount(engagement?.saves ?? saves)} saves`}
+        accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${engagement?.saves ?? saves} saves`}
         accessibilityState={{ checked: engagement?.saved ?? false }}
         style={styles.actionContent}
         translateYAnim={saveDrop}
@@ -268,7 +268,7 @@ export function RightActionRail({
         onPress={onShare}
       >
         <FontAwesome name="share" size={26} color={ON_DARK} style={styles.iconShadow} />
-        {shares > 0 && <Text style={styles.count}>{formatCount(shares)}</Text>}
+        <Text style={styles.count}>{formatCount(shares)}</Text>
       </TouchableOpacity>
     </Animated.View>
   );

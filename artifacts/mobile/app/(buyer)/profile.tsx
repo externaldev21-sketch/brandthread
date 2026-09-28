@@ -859,6 +859,7 @@ export default function ProfileScreen() {
             description={emptyDescription}
             action={emptyAction}
             actionStyle="text"
+            showGridPreview={activeTab === 'Posts'}
           />
         )}
         showsVerticalScrollIndicator={false}
