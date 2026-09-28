@@ -334,6 +334,11 @@ export default function ProfileScreen() {
   const [postFilter, setPostFilter] = useState<'Published' | 'Drafts'>('Published');
   const [refreshing, setRefreshing] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  // Set only when the buyer has a moving profile picture — the poster frame
+  // above (`avatarUri`) always stays in sync too, so every OTHER screen that
+  // just shows a static avatar (feed, chat, calls) never needs to know this
+  // exists; only the profile header plays it.
+  const [avatarVideoUri, setAvatarVideoUri] = useState<string | null>(null);
   const [myOrders, setMyOrders] = useState<BuyerOrderView[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -393,6 +398,7 @@ export default function ProfileScreen() {
       setSavedItems(sv);
       setPrivacySettings(pr);
       setAvatarUri(bp.avatarUri || null);
+      setAvatarVideoUri(bp.avatarVideoUri || null);
       setMyOrders(ordersResult.orders);
     } catch (error) {
       setLoadError(true);
@@ -766,6 +772,7 @@ export default function ProfileScreen() {
         avatar={(
           <ProfileStoryAvatar
             uri={avatarUri}
+            videoUri={avatarVideoUri}
             initials={avatarInitials}
             hasActiveStory={hasActiveStory}
             accessibilityLabel={hasActiveStory ? 'View your story' : 'Create a story'}

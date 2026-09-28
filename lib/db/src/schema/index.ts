@@ -102,6 +102,15 @@ export const users = pgTable('users', {
   // First-visit coach mark ("add a cover video") — shown exactly once per
   // account, server-side so it survives reinstalls and other devices.
   coverCoachmarkSeenAt:       timestamp('cover_coachmark_seen_at', { withTimezone: true }),
+  // Avatar video (moving profile picture) — separate from both the plain
+  // avatar photo (profileImageUrl) and the cover video above. Server-render
+  // a center-cropped square, always-muted, <=10s clip + poster frame, both
+  // public object paths served via /api/profile/avatar-media. `avatarUrl`/
+  // `profileImageUrl` still hold the poster-equivalent for every screen that
+  // only ever shows a static avatar.
+  avatarVideoUrl:       text('avatar_video_url'),
+  avatarPosterUrl:      text('avatar_poster_url'),
+  avatarVideoUpdatedAt: timestamp('avatar_video_updated_at', { withTimezone: true }),
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
   // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
   username: text('username').unique(),

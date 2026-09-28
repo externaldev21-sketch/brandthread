@@ -31,6 +31,34 @@ export async function pickFromLibrary(aspect: [number, number]): Promise<ImagePi
 }
 
 /**
+ * Opens the video library for an avatar video pick. No `allowsEditing` (RN's
+ * video trim UI is unreliable across platforms) — the caller checks
+ * `asset.duration` (ms) against the 10s avatar-video limit itself and shows
+ * its own "too long" message; the server re-validates and rejects again
+ * regardless, so a client bypass can never actually land a longer clip.
+ */
+export async function pickVideoFromLibrary(): Promise<ImagePicker.ImagePickerAsset | null> {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) {
+    Alert.alert('Permission needed', 'Allow photo library access to choose a video.');
+    return null;
+  }
+  const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], quality: 1 });
+  return res.canceled || !res.assets[0] ? null : res.assets[0];
+}
+
+/** Records a fresh avatar video, capped at the source (camera can enforce this directly). */
+export async function recordAvatarVideo(maxDurationSeconds: number): Promise<ImagePicker.ImagePickerAsset | null> {
+  const perm = await ImagePicker.requestCameraPermissionsAsync();
+  if (!perm.granted) {
+    Alert.alert('Permission needed', 'Allow camera access to record a video.');
+    return null;
+  }
+  const res = await ImagePicker.launchCameraAsync({ mediaTypes: ['videos'], quality: 1, videoMaxDuration: maxDurationSeconds });
+  return res.canceled || !res.assets[0] ? null : res.assets[0];
+}
+
+/**
  * @deprecated The source choice ("Take Photo" / "Choose from Library") is
  * now presented as a real `<BottomSheet>` — see `useImageSourceSheet` in
  * components/profile/ImageSourceSheet.tsx — because `Alert.alert` with
