@@ -271,6 +271,11 @@ export interface Conversation {
    *  conversation — polled via GET /api/conversations/:id (no websocket
    *  layer exists for DMs yet). Only ever set for the agent's conversation. */
   agentTyping?: boolean;
+  /** True while the OTHER participant in an ordinary (non-agent)
+   *  conversation is actively composing — polled via GET /api/conversations
+   *  (no websocket layer exists for DMs yet), same mechanism as agentTyping
+   *  above. Set with PATCH /api/conversations/:id/typing. */
+  otherTyping?: boolean;
   /** Chat details > Mute: ISO timestamp this conversation is muted until, for
    *  the current viewer. Absent/undefined means not muted. */
   mutedUntil?: string;
