@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import FollowButton from '@/components/social/FollowButton';
 import type { DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
@@ -27,7 +27,7 @@ export function DiscoverBrandCard({ brand }: { brand: BrandCardData }) {
       )}
       <View style={styles.nameRow}>
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{brand.name}</Text>
-        {brand.verified && <Feather name="check-circle" size={13} color={theme.accent} />}
+        {brand.verified && <Feather name="check-circle" size={14} color={ON_DARK} />}
       </View>
       {!!brand.followersLabel && (
         <Text style={[styles.followers, { color: theme.muted }]} numberOfLines={1}>{brand.followersLabel}</Text>
