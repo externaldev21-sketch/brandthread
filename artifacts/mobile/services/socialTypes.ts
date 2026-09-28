@@ -392,6 +392,22 @@ export interface Story {
   expiresAt: number;         // createdAt + 24h
 }
 
+// ─── Notes (bubble above story-tray avatars, IG-style) ───────────────────────
+// Short-lived (24h TTL, same pattern as Story.expiresAt), one active note per
+// author — posting a new one replaces the old.
+export const NOTE_MAX_CHARS = 60;
+
+export interface Note {
+  authorId: string;
+  authorName: string;
+  authorHandle: string;
+  authorInitials: string;
+  authorColor: string;
+  text: string;
+  createdAt: number;   // Unix ms
+  expiresAt: number;   // createdAt + 24h
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export type NotificationCategory =
