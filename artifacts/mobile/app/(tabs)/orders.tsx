@@ -12,7 +12,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRAD_DARK_FADE } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRAD_DARK_FADE, WEB_SAFE_AREA_TOP } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, SearchBar } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
@@ -1159,8 +1159,10 @@ export default function OrdersScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
+  // Overnight batch item 40: shared WEB_SAFE_AREA_TOP (lib/theme.ts), not a
+  // hardcoded 67 — see its own comment.
   return (
-    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? 67 : insets.top) + 12, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top) + 12, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
       {/* ── Fixed header ── */}
       <View style={s.header}>
         {/* Title row */}

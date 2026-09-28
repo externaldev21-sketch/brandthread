@@ -14,7 +14,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, WEB_SAFE_AREA_TOP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, SearchBar, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
@@ -627,7 +627,9 @@ export default function ProductsScreen() {
   return (
     <View style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
       {/* ── Fixed header ── */}
-      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? 67 : insets.top) + 12, backgroundColor: palette.surface ?? BG }]}>
+      {/* Overnight batch item 40: shared WEB_SAFE_AREA_TOP (lib/theme.ts),
+          not a hardcoded 67 — see its own comment. */}
+      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top) + 12, backgroundColor: palette.surface ?? BG }]}>
         {/* Title row */}
         <View style={s.titleRow}>
           <PressableScale
