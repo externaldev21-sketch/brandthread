@@ -115,7 +115,7 @@ router.post("/", async (req, res) => {
 
     const alertMap: Record<string, { type: string; title: string; body: string; targetType: string } | undefined> = {
       delivered: {
-        type: "order_delivered", title: "Your order was delivered! 📦",
+        type: "order_delivered", title: "Your order was delivered!",
         body: `Order #${updated.orderNumber} has been delivered.`, targetType: "order",
       },
       exception: {

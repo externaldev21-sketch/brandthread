@@ -16,7 +16,8 @@ import { EditorialTile, TileRailSkeleton, type EditorialTileItem } from './Edito
 import { DiscoverTileView, DiscoverTileSkeleton } from './DiscoverTileView';
 import { DiscoverPeopleRow } from './DiscoverPeopleRow';
 import { DiscoverShopTheLookRail } from './DiscoverShopTheLookRail';
-import type { DiscoverPost, DiscoverPersonSuggestion } from '@/lib/discoverFeed';
+import { DiscoverTrendingBrandsRail } from './DiscoverTrendingBrandsRail';
+import type { DiscoverPost, DiscoverPersonSuggestion, DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 import { buildGridRows, type GridRow } from '@/lib/discoverGridPacking';
 
 export type { GridRow } from '@/lib/discoverGridPacking';
@@ -41,6 +42,7 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   highDemandItems?: EditorialTileItem[];
   shopTheLookPosts?: DiscoverPost[];
   onOpenShopTheLook?: (post: DiscoverPost) => void;
+  trendingBrands?: BrandCardData[];
   people?: DiscoverPersonSuggestion[];
   showRails?: boolean;
   onEndReached?: () => void;
@@ -56,6 +58,7 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   highDemandItems = [],
   shopTheLookPosts = [],
   onOpenShopTheLook,
+  trendingBrands = [],
   people = [],
   showRails = true,
   onEndReached,
@@ -83,10 +86,20 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
       showRails,
       hasJustDropped: justDroppedItems.length > 0,
       hasHighDemand: highDemandItems.length > 0,
+      hasTrendingBrands: trendingBrands.length > 0,
       hasShopTheLook: shopTheLookPosts.length > 0,
       hasPeople: people.length > 0,
     });
-  }, [posts, loading, showRails, justDroppedItems.length, highDemandItems.length, shopTheLookPosts.length, people.length]);
+  }, [
+    posts,
+    loading,
+    showRails,
+    justDroppedItems.length,
+    highDemandItems.length,
+    trendingBrands.length,
+    shopTheLookPosts.length,
+    people.length,
+  ]);
 
   return (
     <FlatList
@@ -157,6 +170,9 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
         }
         if (row.type === 'people') {
           return <DiscoverPeopleRow people={people} />;
+        }
+        if (row.kind === 'trendingBrands') {
+          return <DiscoverTrendingBrandsRail brands={trendingBrands} />;
         }
         if (row.kind === 'shopTheLook') {
           return <DiscoverShopTheLookRail posts={shopTheLookPosts} onPress={onOpenShopTheLook ?? (() => {})} />;

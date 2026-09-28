@@ -17,6 +17,7 @@ import {
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { refundOrder, RefundError } from "../lib/money/refunds";
+import { notifyBuyerOrderCancelled, notifySellerOrderCancelledByBuyer } from "../lib/orderNotifications";
 import { withItemProductIds } from "../lib/orderItemProducts";
 import {
   bindLoyaltyRedemptionToCheckout,
@@ -1488,6 +1489,23 @@ router.post("/orders/:id/cancel", validateRequest({ params: uuidParamsSchema }),
         }, tx);
       },
     });
+
+    // Both sides get an Activity row for the same event, once (a retried
+    // cancel reuses the idempotency key and comes back `duplicate`).
+    if (!result.duplicate) {
+      const [cancelled] = await db.select({ ownerId: orders.ownerId })
+        .from(orders).where(eq(orders.id, id)).limit(1);
+      void notifyBuyerOrderCancelled({
+        buyerId, orderId: id, orderNumber: order.orderNumber,
+        refundedCents: result.amountCents, reason: "buyer_cancelled",
+      });
+      if (cancelled?.ownerId) {
+        void notifySellerOrderCancelledByBuyer({
+          sellerId: cancelled.ownerId, buyerId, orderId: id,
+          orderNumber: order.orderNumber, refundedCents: result.amountCents,
+        });
+      }
+    }
 
     res.json({ cancelled: true, refunded: result.amountCents > 0, orderNumber: order.orderNumber });
   } catch (err: any) {

@@ -87,6 +87,7 @@ function mapToEditorialTile(prefix: string, row: LiveProduct, i: number): Editor
     initials: (row.name ?? 'P')[0].toUpperCase(),
     priceCents: row.currentPriceCents ?? fallbackPrice,
     isUrgent: remaining > 0 && remaining <= 4,
+    endsAt: row.endsAt,
   };
 }
 
@@ -159,6 +160,9 @@ export default function DiscoverScreen() {
   const fitsLimit = useRef(30);
 
   const [brands, setBrands] = useState<BrandCardData[]>([]);
+  // Top slice of the same real brand data the Brands filter's own grid
+  // shows — the For You rail is deliberately not a separate ranking.
+  const trendingBrands = useMemo(() => brands.slice(0, 8), [brands]);
   const [brandsLoading, setBrandsLoading] = useState(true);
   const [brandsFetched, setBrandsFetched] = useState(false);
 
@@ -252,6 +256,10 @@ export default function DiscoverScreen() {
     fetchHighDemand();
     fetchPeople();
     fetchForYou();
+    // Same fetch the Brands filter's own grid uses (composeDiscoverBrands) —
+    // the "Trending Brands" rail below is just the top slice of that same
+    // real data, not a second brand data source.
+    fetchBrands();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -322,6 +330,7 @@ export default function DiscoverScreen() {
           loading={forYouLoading}
           loadingMore={forYouLoadingMore}
           justDroppedItems={justDroppedItems}
+          trendingBrands={trendingBrands}
           highDemandItems={highDemandItems}
           shopTheLookPosts={shopTheLookPosts}
           onOpenShopTheLook={openShopTheLook}

@@ -25,7 +25,12 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
+import Reanimated, {
+  Easing as ReanimatedEasing, useAnimatedStyle, useSharedValue, withSequence, withTiming,
+} from 'react-native-reanimated';
 import type { FeatherNames } from '@/lib/featherNames';
+import { TickingCount } from '@/components/ui/TickingCount';
+import { IconFillTransition } from '@/components/ui/IconFillTransition';
 import {
   FONT,
   FS,
@@ -179,8 +184,16 @@ export interface EngagementButtonProps {
    *  output directly, including the empty string it returns for 0).
    *  Passing a string (even "") always reserves the count row's layout
    *  space; omit the prop entirely only when this button has no count
-   *  concept at all. */
+   *  concept at all. Ignored when `value` is also passed — see below. */
   count?: string;
+  /** Raw (unformatted) count. When present, the count renders through
+   *  TickingCount instead of a plain Text — a Reanimated odometer-style
+   *  roll plays whenever this changes (e.g. a like/save toggling the
+   *  count by ±1), instead of an instant text swap. `count` is still
+   *  required for accessibility/layout purposes but its string is not
+   *  displayed directly in this case (TickingCount formats `value` itself
+   *  so it can diff the previous/next display strings). */
+  value?: number;
   /** Whether the button is in the "active" (liked/saved/reposted/following) state */
   active?: boolean;
   /** Color of the icon when active. Defaults to '#FFFFFF'. */
@@ -209,7 +222,24 @@ export interface EngagementButtonProps {
   translateYAnim?: Animated.Value;
   /** testID for automated tests */
   testID?: string;
+  /** Plays a Reanimated 0.85 -> 1.1 -> 1 squash/overshoot/settle spring on
+   *  the icon once per accepted press (i.e. once per actual like action,
+   *  not on every press-down/press-up — this is separate from any general
+   *  press-feedback scale a wrapping Pressable might apply). Scoped to the
+   *  like button; this specific overshoot is a deliberate exception to the
+   *  app's general no-bounce rule, not a violation of it.
+   *  Mobbin reference: Instagram, "Liking a post" flow —
+   *  https://mobbin.com/flows/44abedc0-7d76-410b-9db0-5f1f4be27414 */
+  tapSpring?: boolean;
+  /** Crossfades between `icon` (outline) and `solidIcon` (solid) on
+   *  `active` change instead of swapping instantly — see
+   *  IconFillTransition. Requires both `icon` and `solidIcon`. */
+  iconFillTransition?: boolean;
 }
+
+const LIKE_SPRING_DOWN_MS = 70;
+const LIKE_SPRING_UP_MS = 110;
+const LIKE_SPRING_SETTLE_MS = 130;
 
 /**
  * Self-contained rail button with:
@@ -223,6 +253,7 @@ export function EngagementButton({
   activeIcon,
   solidIcon,
   count,
+  value,
   active = false,
   activeColor = '#FFFFFF',
   inactiveColor = '#FFFFFF',
@@ -237,11 +268,31 @@ export function EngagementButton({
   rotateAnim,
   translateYAnim,
   testID,
+  tapSpring = false,
+  iconFillTransition = false,
 }: EngagementButtonProps) {
   const inflight = useRef(false);
   const [pending, setPending] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseRef = useRef<Animated.CompositeAnimation | null>(null);
+  // Like-icon-only spring (see `tapSpring` doc above). Reanimated shared
+  // value, driven on the UI thread — independent of `pulseAnim`/`scaleAnim`
+  // above, which are the classic-Animated pending-pulse and parent-driven
+  // heart-burst effects respectively.
+  const likeSpringScale = useSharedValue(1);
+  // Deliberately NOT identityOrNone here: this transform continuously moves
+  // through non-identity values before returning to identity, and on web
+  // that "undefined transform key at rest" optimization can leave the last
+  // real (near-but-not-exactly-1) value stuck in the DOM instead of
+  // resolving to a clean identity — Reanimated's web style patcher treats
+  // an `undefined` style value as "leave whatever's already applied," not
+  // "clear it." RightActionRail's existing classic-Animated icon wrappers
+  // (heartScale/repostScale/saveScale) already carry a plain
+  // `transform: scale(1)` at rest with no ill effect, so this matches that
+  // established convention instead.
+  const likeSpringStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: likeSpringScale.value }],
+  }));
 
   // Pulse opacity while pending
   useEffect(() => {
@@ -264,13 +315,29 @@ export function EngagementButton({
     if (inflight.current) return;
     inflight.current = true;
     setPending(true);
+    // Fires once per accepted press — before awaiting the async action, so
+    // it reads as instant/optimistic like the rest of the rail's tap
+    // feedback — never on the underlying Pressable's own down/up events.
+    if (tapSpring) {
+      likeSpringScale.value = withSequence(
+        withTiming(0.85, { duration: LIKE_SPRING_DOWN_MS, easing: ReanimatedEasing.in(ReanimatedEasing.quad) }),
+        withTiming(1.1, { duration: LIKE_SPRING_UP_MS, easing: ReanimatedEasing.out(ReanimatedEasing.quad) }),
+        // Snaps to exactly 1 once the settle leg reports finished — guards
+        // against the sub-percent residual a JS-driven, rAF-stepped easing
+        // curve can otherwise leave behind at rest (seen on web).
+        withTiming(1, { duration: LIKE_SPRING_SETTLE_MS, easing: ReanimatedEasing.out(ReanimatedEasing.cubic) }, (finished) => {
+          'worklet';
+          if (finished) likeSpringScale.value = 1;
+        }),
+      );
+    }
     try {
       await onPress();
     } finally {
       inflight.current = false;
       setPending(false);
     }
-  }, [onPress]);
+  }, [onPress, tapSpring, likeSpringScale]);
 
   const displayIcon = active && activeIcon ? activeIcon : icon;
   const iconColor = active ? activeColor : inactiveColor;
@@ -279,9 +346,27 @@ export function EngagementButton({
   // outlines against bright footage even at full white/opacity 1, while
   // bulkier glyphs like heart happen to still read fine unshadowed. Applying
   // it to every rail icon keeps all five visually consistent.
-  const iconNode = solidIcon
-    ? <FontAwesome name={solidIcon} size={iconSize} color={iconColor} style={ebStyles.iconShadow} />
-    : <Feather name={displayIcon} size={iconSize} color={iconColor} style={ebStyles.iconShadow} />;
+  let iconNode: React.ReactNode;
+  if (iconFillTransition && solidIcon) {
+    iconNode = (
+      <IconFillTransition
+        outlineName={icon}
+        solidName={solidIcon}
+        size={iconSize}
+        active={active}
+        activeColor={activeColor}
+        inactiveColor={inactiveColor}
+        style={ebStyles.iconShadow}
+      />
+    );
+  } else {
+    iconNode = solidIcon
+      ? <FontAwesome name={solidIcon} size={iconSize} color={iconColor} style={ebStyles.iconShadow} />
+      : <Feather name={displayIcon} size={iconSize} color={iconColor} style={ebStyles.iconShadow} />;
+  }
+  if (tapSpring) {
+    iconNode = <Reanimated.View style={likeSpringStyle}>{iconNode}</Reanimated.View>;
+  }
 
   const iconTransform: (
     | { scale: Animated.Value }
@@ -307,7 +392,9 @@ export function EngagementButton({
       ) : (
         iconNode
       )}
-      {count !== undefined && (
+      {value !== undefined ? (
+        <TickingCount value={value} style={[ebStyles.count, { color: '#FFFFFF' }]} />
+      ) : count !== undefined && (
         <Text style={[ebStyles.count, { color: '#FFFFFF' }]}>{count}</Text>
       )}
     </Animated.View>
