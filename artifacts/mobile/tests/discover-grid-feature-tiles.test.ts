@@ -80,3 +80,29 @@ describe('DiscoverGrid buildGridRows — Trending Brands rail (item 47)', () => 
     expect(rows.some((r) => r.type === 'rail')).toBe(false);
   });
 });
+
+describe('DiscoverGrid buildGridRows — Shop the Look rail (item 48)', () => {
+  // shopTheLook chains after trendingBrands (same "each rail requires the
+  // previous one" convention justDropped/highDemand/trendingBrands already
+  // use), so hasTrendingBrands must also be true for it to ever fire.
+  const RAILS_BASE = { showRails: true, hasJustDropped: true, hasHighDemand: true, hasTrendingBrands: true, hasPeople: false };
+
+  it('inserts the shopTheLook rail after trendingBrands once enough rows have accumulated', () => {
+    const posts = Array.from({ length: 40 }, (_, i) => post(String(i)));
+    const rows = buildGridRows(posts, { ...RAILS_BASE, hasShopTheLook: true });
+    const kinds = rows.filter((r) => r.type === 'rail').map((r) => r.kind);
+    expect(kinds).toEqual(['justDropped', 'highDemand', 'trendingBrands', 'shopTheLook']);
+  });
+
+  it('never inserts the shopTheLook rail when hasShopTheLook is false', () => {
+    const posts = Array.from({ length: 40 }, (_, i) => post(String(i)));
+    const rows = buildGridRows(posts, { ...RAILS_BASE, hasShopTheLook: false });
+    expect(rows.some((r) => r.type === 'rail' && r.kind === 'shopTheLook')).toBe(false);
+  });
+
+  it('never inserts any rail when showRails is false, even with hasShopTheLook true', () => {
+    const posts = Array.from({ length: 40 }, (_, i) => post(String(i)));
+    const rows = buildGridRows(posts, { ...RAILS_BASE, showRails: false, hasShopTheLook: true });
+    expect(rows.some((r) => r.type === 'rail')).toBe(false);
+  });
+});

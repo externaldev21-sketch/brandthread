@@ -263,6 +263,23 @@ function toAttachment(seed: PreviewMessageSeed['attachment'], conv: PreviewConve
   // through). meta.duration is stamped from the real bundled clip's actual
   // length (VOICE_NOTE_DURATION_SEC) so the label and the live
   // audio-time-driven progress bar never disagree.
+  // Photo/video messages (item 74, upload progress ring): reuse the same
+  // bundled poster photos as the real thumbnail — for an image message this
+  // is genuinely what the attachment shows (photoUris drives the sent
+  // bubble's photo grid, see renderAttachment in app/buyer-conversation.tsx
+  // and renderMsgAttachment in app/seller-conversation.tsx). For a video
+  // message, the sent bubble already renders `uri` as the thumbnail image
+  // (not a real extracted video frame — see MediaUploadThumb.tsx's doc
+  // comment on that pre-existing gap), so a real bundled jpg poster here is
+  // honest and consistent with that existing contract.
+  if (seed.type === 'image' && typeof conv.posterIndex === 'number') {
+    const uri = posterUri(conv.posterIndex);
+    attachment.uri = uri;
+    attachment.meta = { ...attachment.meta, photoUris: JSON.stringify([uri]) };
+  }
+  if (seed.type === 'video' && typeof conv.posterIndex === 'number') {
+    attachment.uri = posterUri(conv.posterIndex);
+  }
   if (seed.type === 'voice') {
     attachment.uri = voiceNoteUri();
     attachment.meta = {
