@@ -9,7 +9,7 @@
  * this is the shared, general version for anything (now or later) that needs
  * more than one revealed button.
  */
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { hapticLight } from '@/lib/haptics';
@@ -40,10 +40,15 @@ export default function SwipeableActions({
   const revealWidth = actions.length * ACTION_WIDTH;
   const translateX = useRef(new Animated.Value(0)).current;
   const openRef = useRef(false);
+  // Do not mount the colored action layer while closed. Even a correctly
+  // stacked front can leave a subpixel strip under a row on some renderers.
+  const [actionsVisible, setActionsVisible] = useState(false);
 
   const animateTo = (toValue: number) => {
-    Animated.spring(translateX, { toValue, useNativeDriver: true, damping: 22, stiffness: 240 }).start();
     openRef.current = toValue !== 0;
+    Animated.spring(translateX, { toValue, useNativeDriver: true, damping: 22, stiffness: 240 }).start(({ finished }) => {
+      if (finished && !openRef.current) setActionsVisible(false);
+    });
   };
 
   // True once this gesture is a horizontal swipe (vs a tap or a vertical scroll).
@@ -70,6 +75,7 @@ export default function SwipeableActions({
       if (!swipingRef.current) {
         if (!isHorizontal(gesture.dx, gesture.dy)) return;
         swipingRef.current = true;
+        setActionsVisible(true);
       }
       const base = openRef.current ? -revealWidth : 0;
       translateX.setValue(Math.max(-revealWidth, Math.min(0, base + gesture.dx)));
@@ -102,19 +108,21 @@ export default function SwipeableActions({
 
   return (
     <View style={[styles.clip, backgroundColor ? { backgroundColor } : null]}>
-      <View style={[styles.actionsRow, { width: revealWidth }]}>
-        {actions.map((action) => (
-          <Pressable
-            key={action.key}
-            style={[styles.action, { backgroundColor: action.color, width: ACTION_WIDTH }]}
-            onPress={() => { close(); action.onPress(); }}
-            accessibilityRole="button"
-            accessibilityLabel={action.accessibilityLabel}
-          >
-            <Feather name={action.icon} size={18} color={action.iconColor} />
-          </Pressable>
-        ))}
-      </View>
+      {actionsVisible && (
+        <View style={[styles.actionsRow, { width: revealWidth }]}>
+          {actions.map((action) => (
+            <Pressable
+              key={action.key}
+              style={[styles.action, { backgroundColor: action.color, width: ACTION_WIDTH }]}
+              onPress={() => { close(); action.onPress(); }}
+              accessibilityRole="button"
+              accessibilityLabel={action.accessibilityLabel}
+            >
+              <Feather name={action.icon} size={18} color={action.iconColor} />
+            </Pressable>
+          ))}
+        </View>
+      )}
       <Animated.View style={[styles.front, backgroundColor ? { backgroundColor } : null, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
         {children}
       </Animated.View>

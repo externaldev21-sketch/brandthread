@@ -89,3 +89,4 @@
 - [Expo screen layouts and route context](expo-screen-layout-route-context.md) — screenLayout wrappers render outside per-screen route context; pass the route argument explicitly.
 - [Concurrent Git rebase](concurrent-git-rebase.md) — a shared checkout can be rebased by another session; protect the original branch and conflict worktree before aborting.
 - [GitHub design merge priority](github-design-merge-priority.md) — reviewed origin/dev UI files take precedence in sync conflicts; retain nonconflicting local runtime fixes.
+- [Swipe action color bleed](swipe-action-color-bleed.md) — colored actions behind Activity rows can appear as thin lines on device even when web looks clean; closed rows must not mount them.
