@@ -88,7 +88,6 @@ import {
   type SuggestedPerson,
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
-import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-cash/ThreadCashBill';
 
 const EMPTY_ICON = 'activity' as const;
 const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
@@ -200,17 +199,19 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
 
 function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }) {
   const { theme } = useAppTheme();
+  // Monochrome like every other type badge — the green bill artwork was one
+  // of the Activity screen's only non-LIVE colour accents.
   if (row.type === 'thread_cash_received') {
     return (
-      <View style={styles.typeBadgeBill}>
-        <ThreadCashBillIcon size={20} />
+      <View style={styles.typeBadge}>
+        <Feather name="dollar-sign" size={10} color={theme.accentLight} />
       </View>
     );
   }
   let icon: string | null = null;
   let color = theme.accentLight;
   if (FOLLOW_ROW_TYPES.has(row.type)) icon = 'user-plus';
-  else if (LIKE_ROW_TYPES.has(row.type)) { icon = 'heart'; color = theme.error; }
+  else if (LIKE_ROW_TYPES.has(row.type)) icon = 'heart';
   else if (COMMENT_ROW_TYPES.has(row.type)) icon = 'message-circle';
   if (!icon) return null;
   return (
@@ -327,7 +328,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
   const showFollowControl = followBack || isSingleFollowRow;
   const sentence = parts.map((p) => p.text).join('');
   // "$5.00 · tap to view" → "+$5.00": the amount is the whole point of a
-  // Thread Cash row, so it gets its own bold green line instead of reading
+  // Thread Cash row, so it gets its own bold line (monochrome, theme text) instead of reading
   // like an ordinary detail caption.
   const cashAmount = row.type === 'thread_cash_received' ? row.body?.match(/\$[\d,.]+/)?.[0] : null;
 
@@ -410,11 +411,9 @@ const ActivityRowView = React.memo(function ActivityRowView({
         ) : (
           <View style={styles.leading}>
             <View style={styles.iconCircle}>
-              {row.type === 'thread_cash_received' ? (
-                <ThreadCashBillIcon size={ICON.md} />
-              ) : (
-                <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
-              )}
+              {/* Thread Cash included — activityIcon gives it a monochrome
+                  dollar-sign, not the green bill artwork. */}
+              <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
             </View>
           </View>
         )}
@@ -427,7 +426,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
             <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
           </Text>
           {cashAmount ? (
-            <Text style={[styles.detail, { color: THREAD_CASH_GREEN_MID, fontFamily: FONT.bold }]}>{`+${cashAmount}`}</Text>
+            <Text style={[styles.detail, styles.cashAmount]}>{`+${cashAmount}`}</Text>
           ) : detail ? (
             <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
           ) : null}
@@ -1243,19 +1242,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  typeBadgeBill: {
-    position: 'absolute',
-    right: -8,
-    bottom: -5,
-    paddingHorizontal: 2,
-    paddingVertical: 2,
-    borderRadius: RADIUS.xs,
-    backgroundColor: theme.cardElevated,
-    borderWidth: 2,
-    borderColor: theme.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   avatar: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1305,6 +1291,12 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontFamily: FONT.regular,
     fontSize: FS.sm,
     lineHeight: 18,
+  },
+  // Thread Cash "+$5.00": bold, theme text colour — never green (the only
+  // colour accents allowed are LIVE red and end-call red).
+  cashAmount: {
+    color: theme.text,
+    fontFamily: FONT.bold,
   },
 
   // Same right edge for every row whether the trailing item is this
