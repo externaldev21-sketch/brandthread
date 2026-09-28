@@ -21,6 +21,7 @@ import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
+import { hapticLight } from '@/lib/haptics';
 import { FONT, FS, GOLD, ON_DARK } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
@@ -220,7 +221,13 @@ export function RightActionRail({
           accessibilityState={{ checked: engagement?.liked ?? false }}
           scaleAnim={heartScale}
           style={styles.actionContent}
-          onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onLike(); }}
+          // "Light" tier per the haptics tokens in lib/haptics.ts — unchanged
+          // from earlier polish rounds. Fires synchronously here, in the
+          // same tick EngagementButton's tapSpring kicks off (both happen
+          // before `onLike` is awaited), so the haptic and the icon's
+          // squash-overshoot-settle spring read as one moment.
+          onPress={async () => { hapticLight(); await onLike(); }}
+          tapSpring
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           testID={`like-btn-${testIdBase}`}
         />
@@ -270,6 +277,7 @@ export function RightActionRail({
         style={styles.actionContent}
         translateYAnim={saveDrop}
         scaleAnim={saveScale}
+        iconFillTransition
         onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onSave(); }}
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
         testID={`save-btn-${testIdBase}`}
