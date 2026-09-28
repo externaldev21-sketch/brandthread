@@ -20,7 +20,6 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
-import { Glass } from '@/components/ui/Glass';
 import { AppleEmoji } from '@/components/ui/AppleEmoji';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -803,70 +802,75 @@ export default function BuyerStoryViewer() {
           <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
             {!currentStory.repliesDisabled ? (
               <>
-                <Glass variant="regular" radius={RADII.pill} style={styles.replyInputGlass}>
+                <View style={styles.replyInputPill}>
                   <TextInput
                     style={styles.replyInput}
                     value={inputText}
                     onChangeText={setInputText}
                     placeholder={`Reply to ${currentStory.authorName}…`}
-                    placeholderTextColor="rgba(255,255,255,0.65)"
+                    placeholderTextColor="rgba(255,255,255,0.8)"
                     onFocus={() => {
                       if (replyBlurTimer.current) { clearTimeout(replyBlurTimer.current); replyBlurTimer.current = null; }
                       setIsPaused(true);
                       setReplyFocused(true);
                     }}
                     onBlur={() => {
-                      setIsPaused(false);
-                      replyBlurTimer.current = setTimeout(() => setReplyFocused(false), 200);
+                      replyBlurTimer.current = setTimeout(() => { setIsPaused(false); setReplyFocused(false); }, 200);
                     }}
                     onSubmitEditing={() => handleSendReply()}
                     returnKeyType="send"
                     editable={!sendingReply}
                   />
-                </Glass>
-                {inputText.trim().length > 0 && (
+                </View>
+                {inputText.trim().length > 0 ? (
+                  // Instagram shows a text "Send" button in place of
+                  // heart+share once there's text to send — not an extra
+                  // icon alongside them.
                   <PressableScale
                     onPress={() => handleSendReply()}
-                    style={styles.likeBtn}
+                    style={styles.sendTextBtn}
                     disabled={sendingReply}
                     accessibilityRole="button"
                     accessibilityLabel="Send reply"
                   >
-                    <Feather name="send" size={ICON.md} color={sendingReply ? 'rgba(255,255,255,0.4)' : ON_DARK} />
+                    <Text style={styles.sendTextBtnLabel}>{sendingReply ? 'Sending…' : 'Send'}</Text>
                   </PressableScale>
+                ) : (
+                  <>
+                    <PressableScale
+                      onPress={() => { hapticLight(); handleLike(); }}
+                      style={styles.likeBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
+                    >
+                      <Feather
+                        name="heart"
+                        size={ICON.lg}
+                        color={likedSet.has(currentStory.id) ? '#EF4444' : ON_DARK}
+                        style={likedSet.has(currentStory.id) ? styles.heartFilled : undefined}
+                      />
+                      {(likesCounts[currentStory.id] ?? 0) > 0 && (
+                        <Text style={styles.likesCountText}>
+                          {likesCounts[currentStory.id]}
+                        </Text>
+                      )}
+                    </PressableScale>
+                    <PressableScale
+                      onPress={() => {
+                        hapticLight();
+                        setIsPaused(true);
+                        Share.share({ message: `Check out ${currentStory.authorName}'s story on Brandthread` })
+                          .catch(() => {})
+                          .finally(() => setIsPaused(false));
+                      }}
+                      style={styles.likeBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel="Share this story"
+                    >
+                      <Feather name="send" size={ICON.lg} color={ON_DARK} />
+                    </PressableScale>
+                  </>
                 )}
-                <PressableScale
-                  onPress={() => { hapticLight(); handleLike(); }}
-                  style={styles.likeBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
-                >
-                  <Feather
-                    name="heart"
-                    size={ICON.lg}
-                    color={likedSet.has(currentStory.id) ? '#EF4444' : ON_DARK}
-                    style={likedSet.has(currentStory.id) ? styles.heartFilled : undefined}
-                  />
-                  {(likesCounts[currentStory.id] ?? 0) > 0 && (
-                    <Text style={styles.likesCountText}>
-                      {likesCounts[currentStory.id]}
-                    </Text>
-                  )}
-                </PressableScale>
-                <PressableScale
-                  onPress={() => {
-                    hapticLight();
-                    setIsPaused(true);
-                    Share.share({ message: `Check out ${currentStory.authorName}'s story on Brandthread` })
-                      .catch(() => {})
-                      .finally(() => setIsPaused(false));
-                  }}
-                  style={styles.likeBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel="Share this story"
-                >
-                  <Feather name="send" size={ICON.lg} color={ON_DARK} />
-                </PressableScale>
               </>
             ) : (
               <Text style={styles.repliesDisabled}>Replies disabled</Text>
@@ -1091,17 +1095,34 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: SP.md,
     paddingBottom: SP.sm,
   },
-  replyInputGlass: {
+  // A plain transparent pill, not the shared frosted <Glass> — Dev's exact
+  // ask after the glass material's blur/specular layers were reading as an
+  // opaque grey blob that hid the typed text underneath it.
+  replyInputPill: {
     flex: 1,
     height: 44,
+    borderRadius: RADII.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
   },
   replyInput: {
     height: 44,
     paddingHorizontal: SP.md,
-    fontSize: FS.sm,
+    fontSize: 15,
     fontFamily: FONT.regular,
     color: ON_DARK,
+  },
+  sendTextBtn: {
+    paddingHorizontal: SP.sm,
+    height: 44,
+    justifyContent: 'center',
+  },
+  sendTextBtnLabel: {
+    color: ON_DARK,
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
   },
   ownStoryBar: {
     paddingHorizontal: SP.md,
