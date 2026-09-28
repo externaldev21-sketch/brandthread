@@ -79,9 +79,17 @@ export interface DashboardActionCounts {
   toAnswer: number;
   lowStock: number;
   returns: number;
+  /** Payouts currently in flight to the seller's bank (Stripe "pending"/processing cash-out) — real count from `api.finance.balance()`, never fabricated. */
+  pendingPayouts: number;
 }
 
-/** True when there is nothing to review — the section should collapse to "You're all caught up". */
+/**
+ * True when there is nothing to review — the section should collapse to
+ * "You're all caught up". Deliberately excludes `pendingPayouts`: money
+ * already on its way to the bank isn't something the seller needs to
+ * act on, so it never blocks the caught-up state — it still renders as
+ * its own row below when present (see SellerDashboardActionNeeded).
+ */
 export function hasNoActionNeeded(counts: DashboardActionCounts): boolean {
   return counts.toShip <= 0 && counts.toAnswer <= 0 && counts.lowStock <= 0 && counts.returns <= 0;
 }
