@@ -315,12 +315,157 @@ in the "Sending an audio message" flow screens ("You turned on disappearing
 messages. New messages and reactions will disappear 24 hours after everyone
 has seen them. Change" / "You turned off disappearing messages. Turn on").
 
-**Skin swap to apply**: Instagram's per-theme colored Apply button and
-selection state (e.g. the green/blue Apply buttons seen in the theme
-previews) → Brandthread's shared `Button` component styled as the app's
-primary white pill, never theme-colored or Instagram-blue.
+**Skin swap applied**: Instagram's per-theme colored Apply button (the
+green/blue Apply buttons seen in the two reference previews above) →
+Brandthread's shared `Button` component, `variant="primary"` — the app's
+monochrome white pill, identical regardless of which theme is being
+previewed, never theme-colored or Instagram-blue.
 
-This section will be filled in with the full theme catalog (8 originals:
-Runway, Denim, Satin, Noir, Chrome, Linen, Street, Archive), the
-apply/persist implementation, and the disappearing-messages toggle +
-system-line implementation when PR 3 is built.
+| Step | Mobbin reference | Brandthread screen |
+|---|---|---|
+| 1. Chat details, Theme row (name + "New" pill) | [04bcd22a](https://mobbin.com/screens/04bcd22a-412d-4ca5-a8fe-7d3d2fc6f6f4) | `conversation-details.tsx`'s Theme row (built in PR 2, wired here) |
+| 2. Theme picker | closest available: [chat-theme picker](https://mobbin.com/screens/011094db-35cc-4c17-b6ad-6f3dc28a01c4) (Instagram's own is a scrollable radio list, not a tile grid — see divergence below) | `components/chat/ThemePickerSheet.tsx` — bottom sheet, grid of tiles |
+| 3. "Previewing [Name]" + sample bubbles + Cancel/Apply | [7d276c82](https://mobbin.com/screens/7d276c82-caa4-4b53-b442-e03657240fd4) / [8f3cbab8](https://mobbin.com/screens/8f3cbab8-57f8-4ab6-a9c2-1b0631274c0d) | `components/chat/ThemePreviewScreen.tsx` — same 4-bubble sample copy, same "Tap Apply to choose this theme or Cancel to preview others" line |
+| 4. Applied theme + system line | [7d276c82](https://mobbin.com/screens/7d276c82-caa4-4b53-b442-e03657240fd4) (the "You changed the theme to Shape Friends. Change" line) | `components/chat/SystemLine.tsx`'s `theme_changed` case |
+| 5. "Change" reopens the picker | same screen | tapping "Change" navigates to `conversation-details` with `openTheme=1`, which opens `ThemePickerSheet` immediately on mount, pre-selected to the current theme |
+
+**Side-by-side reference-vs-ours screenshots** for every step above, at
+390×844, are in `docs/pr-review/dm-themes/` (paired `mobbin-*.png` /
+`ours-*.png` files per step) — captured per the owner's harder bar for this
+PR specifically.
+
+**Theme catalog** (`lib/conversationThemes.ts`) — 8 originals for a fashion
+brand, each a 2-stop background gradient + sent/received bubble color pair,
+all original assets (no Instagram gradients/stickers reused):
+
+| Theme | Background | Sent bubble | Received bubble |
+|---|---|---|---|
+| Runway | charcoal → graphite gradient | off-white | dark gray |
+| Denim | midnight indigo → slate blue | pale chambray | deep indigo |
+| Satin | wine → burgundy | blush pink | deep plum |
+| Noir | true black → near-black | dark charcoal | near-black |
+| Chrome | mid gray → light silver | white | silver |
+| Linen | warm cream → ivory | espresso brown | white |
+| Street | black → acid yellow-green | acid yellow-green | near-black |
+| Archive | umber → tan | parchment | dark umber |
+
+`null`/unset `themeId` (`DEFAULT_THEME`) is intentionally **not** in the
+catalog — it's Brandthread's existing monochrome look, and applying it back
+is just clearing `themeId`, so an un-themed chat is completely unaffected by
+this feature ever having shipped.
+
+**Applying a theme is a real, persisted, conversation-level property** —
+`conversations.theme_id` (migration `097_conversation_theme_and_disappearing.sql`;
+see the numbering note below), read by both participants identically via
+`buildConversationView()`. `PATCH /api/conversations/:id/theme` validates
+against the 8 known ids (or `null`), updates the row, and inserts a real
+`system`-attachment message ("You changed the theme to [Name]. Change") that
+both participants see in their own message history — not a client-only
+toast. Applying re-colors the chat background (`LinearGradient` behind the
+message list — header/composer chrome stay the app's normal color, matching
+Instagram's own treatment) and every sent/received bubble, for both
+buyer-conversation.tsx and seller-conversation.tsx.
+
+### Disappearing messages — wired to actually work
+
+The chat-details toggle (built as a UI-only stub in PR 2) now calls
+`PATCH /api/conversations/:id/disappearing` and posts the matching system
+line, exactly the copy pattern in the brief:
+- Turning on: "You turned on disappearing messages. New messages will
+  disappear after they've been seen. **Change**"
+- Turning off: "You turned off disappearing messages. **Change**"
+- The system line's tappable word ("Change"/"Turn on") is a **direct
+  quick-toggle** — tapping it flips the setting immediately and posts the
+  next system line, rather than navigating anywhere (matches the brief's own
+  "Turn on' as a quick-toggle affordance" instruction).
+
+**What the actual auto-deletion does, and why (documented per the brief, same
+disclosure standard as PR 1's transcription stub)**: this is an
+**opportunistic sweep, not a real-time or cron-scheduled delete**.
+- `messages.disappear_at` (nullable timestamp) is set on a message the
+  moment it's marked read (`PATCH /:id/read`) **while** the conversation has
+  disappearing messages on — 24 hours from that read time, matching
+  Instagram's own copy exactly.
+- `GET /:id/messages` (the normal message-list fetch) hard-deletes any of
+  that conversation's messages whose `disappear_at` has passed, before
+  returning results.
+- **Limitation**: since there's no background job runner wired up for this,
+  a message only actually disappears the next time someone fetches that
+  conversation's messages after the 24h window closes — not the instant it
+  elapses. For a DM inbox (opened far more often than once a day in
+  practice) this reads as correct to a user, but it is not a true real-time
+  delete. A production version would add a scheduled job (this codebase
+  already has a `jobs/` folder with a similar pattern for seller-ranking
+  cache refresh) that sweeps `disappear_at` server-wide on a timer instead of
+  piggybacking on the next fetch.
+
+### Migration numbering (a mid-task collision, fixed)
+
+While PR 3 was in progress, PR #201 (unrelated, already landed on `dev`)
+turned out to have also claimed migration number `095` — colliding with PR
+2's own `095_conversation_nicknames_and_mute.sql`. Fixed by renumbering PR
+2's migration to `096` (its own commit on the PR 2 branch, no other
+migration touched) and this PR's own migration to `097` — both merged
+`origin/dev` again afterward and verified clean. Called out here for a
+future reader who sees non-sequential-looking PR-local history.
+
+### Divergences (documented, with reasons)
+
+- **Theme picker is a grid of tiles, not Instagram's actual list.** The
+  owner's brief explicitly specified "a bottom sheet with a grid of theme
+  tiles" — Instagram's own comparable screens in Mobbin's index for this
+  account show a scrollable radio-button **list** (icon + name + radio
+  button per row), not a tile grid, for its equivalent "Chat theme" screen.
+  Built to the brief's explicit words rather than that list layout.
+- **No exact Mobbin capture of the intermediate grid/list screen itself**
+  for the named 5-screen "Changing theme" flow — its 5 screens (per Mobbin's
+  own position ordering) are chat details, two different accounts' entry
+  into "Previewing [Theme]", and the applied result; the picker step itself
+  wasn't separately captured for this account's Mobbin index. The picker's
+  own visual language (grid tiles, checkmark on the selected tile) is
+  therefore built to the brief's spec rather than traced from a Mobbin
+  screenshot — every other step (chat details, the preview screen's exact
+  sample-bubble copy, the applied system line's exact copy) is traced
+  directly from the flow's actual screens.
+- **Header and composer chrome don't re-color with the theme.** Only the
+  message-list area (background + bubbles) changes, matching Instagram's
+  real behavior — the header stays the app's normal background color in
+  both Instagram and here.
+
+### Verification
+
+`expo start --web` + Playwright at 375×667/390×844/430×932 against
+`?bt_preview=buyer`. Screenshotted the full flow: theme grid (Default
+checked), tapping a tile → full-screen preview (Runway), Apply → back in the
+thread with the new background/bubbles/system line, tapping "Change" →
+picker reopens pre-selected to the applied theme, and the disappearing-
+messages toggle → its own system line stacking under the theme one. Zero
+console errors across the run. `tsc --noEmit` clean on both packages,
+matching this branch's own post-merge baseline exactly (26 pre-existing e2e
+errors from already-merged unrelated PRs, same before and after this PR's
+changes). Full test suites: same pre-existing failures as PR 1/PR 2's
+confirmed baseline, nothing new.
+
+Seller-side theme/disappearing verification hits the same pre-existing gap
+noted in PR 1/PR 2's sections — the seller conversation screen has no seeded
+preview conversation data, so its chat-details entry point never activates
+in this web-preview harness. The underlying code (theme background,
+bubble colors, system-line rendering, quick-toggle) is identical to the
+buyer side and applies to seller-conversation.tsx the same as buyer-
+conversation.tsx.
+
+---
+
+## Task complete
+
+All three PRs are open against `dev`, none merged:
+- PR 1 — [#205](https://github.com/externaldev21-sketch/brandthread/pull/205) — Voice messages
+- PR 2 — [#211](https://github.com/externaldev21-sketch/brandthread/pull/211) — Chat details, nicknames, mute, search-in-chat
+- PR 3 — themes + disappearing messages (this PR)
+
+PR 3 is branched from PR 2's branch (not fresh off `dev`), since it needs
+PR 2's actual chat-details screen and its Theme/Disappearing-messages stub
+rows to wire into — unlike PR 1 and PR 2, which are independent features
+that could be (and were) built as separate branches off the same `dev`
+commit. Once PR 1 and PR 2 merge, PR 3's diff against `dev` will shrink to
+just this PR's own changes.

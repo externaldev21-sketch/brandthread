@@ -169,7 +169,13 @@ export type MessageAttachmentType =
   // (Thread Cash explainer, product, brand/profile, "Go to Discover" — see
   // meta.cardKind / meta.deepLink); `quick_replies` renders a row of tappable
   // reply chips (meta.optionsJson: JSON-encoded {label,value}[]).
-  | 'agent_card' | 'quick_replies';
+  | 'agent_card' | 'quick_replies'
+  // Chat details (DM flows PR 3): a centered system line in the thread, not
+  // a bubble — "You changed the theme to [Name]. Change" / "You turned
+  // on/off disappearing messages. Change"/"Turn on". `title` is one of
+  // 'theme_changed' | 'disappearing_on' | 'disappearing_off'; `meta.actorId`
+  // and (for theme_changed) `meta.themeId` drive the exact copy client-side.
+  | 'system';
 
 export interface MessageAttachment {
   type: MessageAttachmentType;
@@ -262,6 +268,13 @@ export interface Conversation {
   /** Chat details > Mute: ISO timestamp this conversation is muted until, for
    *  the current viewer. Absent/undefined means not muted. */
   mutedUntil?: string;
+  /** Chat details > Theme — a conversation-level property (both participants
+   *  see the same background/bubble colors). Undefined/null = default
+   *  monochrome look. One of lib/conversationThemes.ts's CONVERSATION_THEMES ids. */
+  themeId?: string;
+  /** Chat details > Disappearing messages — conversation-level, identical
+   *  for every participant. */
+  disappearingEnabled?: boolean;
 }
 
 // ─── Story ────────────────────────────────────────────────────────────────────

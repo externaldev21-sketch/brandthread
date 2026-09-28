@@ -40,6 +40,9 @@ import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import type { CallLogEntry } from '@/lib/calls/types';
+import { SystemLine } from '@/components/chat/SystemLine';
+import { getConversationTheme } from '@/lib/conversationThemes';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,9 +56,11 @@ interface ConvView {
   id: string; type: string; participants: Participant[];
   contextOrderId?: string; contextOrderNumber?: string; contextOrderStatus?: string;
   contextProductId?: string; contextProductName?: string;
+  /** Chat details > Theme / Disappearing messages (conversation-level). */
+  themeId?: string; disappearingEnabled?: boolean;
 }
 interface MsgAttachment {
-  type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice';
+  type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice' | 'system';
   uri?: string;
   title?: string;
   subtitle?: string;
@@ -266,6 +271,14 @@ export default function SellerConversationScreen() {
   // Chat details > Nicknames: once set, the nickname replaces the real name
   // in the header, matching buyer-conversation.tsx.
   const displayName = other?.nickname || other?.name || 'Buyer';
+  // Chat details > Theme: a conversation-level property — same background
+  // and bubble colors for both participants. Null = the app's existing
+  // default monochrome look, completely unchanged.
+  const convTheme = getConversationTheme(conv?.themeId);
+  const sentBubbleColor = convTheme?.sentBubble ?? PURPLE;
+  const sentTextColor = convTheme?.sentText ?? ON_DARK;
+  const receivedBubbleColor = convTheme?.receivedBubble ?? CARD;
+  const receivedTextColor = convTheme?.receivedText ?? FG;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
 
@@ -348,6 +361,35 @@ export default function SellerConversationScreen() {
       participantNickname: other.nickname ?? '',
     });
     router.push(('/conversation-details?' + qs.toString()) as never);
+  }
+
+  // Theme system line's "Change" — reopens the picker directly.
+  function openThemePicker() {
+    if (!id || !other) return;
+    const qs = new URLSearchParams({
+      id, role: 'seller', openTheme: '1',
+      participantUserId: other.userId,
+      participantName: other.name,
+      participantInitials: other.initials ?? '',
+      participantColor: other.color ?? PURPLE,
+    });
+    router.push(('/conversation-details?' + qs.toString()) as never);
+  }
+
+  // Disappearing-messages system line's "Change"/"Turn on" — a direct
+  // quick-toggle, not a navigation.
+  async function handleQuickToggleDisappearing() {
+    if (!id || !conv) return;
+    const next = !conv.disappearingEnabled;
+    hapticSelection();
+    try {
+      const result = await api.conversations.setDisappearing(id, next);
+      setConv((prev) => prev ? { ...prev, disappearingEnabled: next } : prev);
+      setMessages((prev) => [...prev, result.message]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch {
+      Alert.alert('Couldn’t update disappearing messages', 'Please try again.');
+    }
   }
 
   // ── Photo / video picker ──────────────────────────────────────────────────────
@@ -634,6 +676,17 @@ export default function SellerConversationScreen() {
     }
     const { msg } = item;
     const isOwn = msg.fromId === myId;
+    if (msg.attachment?.type === 'system') {
+      return (
+        <SystemLine
+          msg={msg}
+          isOwn={isOwn}
+          theme={theme}
+          onOpenThemePicker={openThemePicker}
+          onQuickToggleDisappearing={handleQuickToggleDisappearing}
+        />
+      );
+    }
     const removed = (msg as { removedByModeration?: boolean }).removedByModeration === true;
     return (
       <PressableScale
@@ -662,8 +715,8 @@ export default function SellerConversationScreen() {
           style={[
             s.bubble,
             {
-              backgroundColor: isOwn ? PURPLE : CARD,
-              borderColor: isOwn ? PURPLE : BORDER,
+              backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor,
+              borderColor: isOwn ? sentBubbleColor : BORDER,
               borderBottomRightRadius: isOwn ? 4 : RADIUS.lg,
               borderBottomLeftRadius: isOwn ? RADIUS.lg : 4,
               maxWidth: BUBBLE_MAX,
@@ -674,9 +727,9 @@ export default function SellerConversationScreen() {
           {msg.attachment && renderMsgAttachment(msg.attachment)}
           {/* Text — hide the single-space placeholder */}
           {removed ? (
-            <Text style={[s.msgText, { color: isOwn ? ON_DARK : MUTED, fontStyle: 'italic' }]}>{REMOVED_MESSAGE_TEXT}</Text>
+            <Text style={[s.msgText, { color: isOwn ? sentTextColor : MUTED, fontStyle: 'italic' }]}>{REMOVED_MESSAGE_TEXT}</Text>
           ) : msg.text && msg.text.trim().length > 0 && (
-            <Text style={[s.msgText, isOwn && { color: ON_DARK }]}>{msg.text}</Text>
+            <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
           )}
         </View>
       </PressableScale>
@@ -691,6 +744,12 @@ export default function SellerConversationScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
+      {/* Chat details > Theme: only rendered when a theme is actually
+          applied — an un-themed chat's background is untouched. */}
+      {convTheme && (
+        <LinearGradient colors={convTheme.gradient} style={StyleSheet.absoluteFill} testID="conversation-theme-background" />
+      )}
+
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <PressableScale
@@ -1074,6 +1133,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   header: {
     flexDirection: 'row', alignItems: 'center',
+    backgroundColor: BG,
     paddingHorizontal: SP.md, paddingBottom: SP.sm,
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
