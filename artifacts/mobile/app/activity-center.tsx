@@ -70,7 +70,7 @@ import {
   matchesActivityChip,
   type ActivityChip,
   activityDetail,
-  activityHref,
+  activityRowHref,
   activityIcon,
   followControlState,
   activityKind,
@@ -78,9 +78,7 @@ import {
   applyRead,
   buildActivitySections,
   createReadTracker,
-  groupedPeopleHref,
   isFollowBackRow,
-  isGroupedRow,
   relativeTime,
   type ActivityActor,
   type ActivityItem,
@@ -396,6 +394,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
         style={({ pressed }) => [styles.tapArea, pressed && styles.tapAreaPressed]}
         onPress={() => onPress(row)}
         onLongPress={longPress}
+        testID={`activity-row-${row.key}`}
         accessibilityRole="button"
         accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
       >
@@ -802,7 +801,8 @@ export default function ActivityCenterScreen() {
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
     // A merged row ("Jay and 12 others liked your post") opens the list of
     // those people — Instagram's "View likes" pattern, see app/activity-people.tsx.
-    const href = isGroupedRow(row) ? groupedPeopleHref(row) : activityHref(row, role);
+    // Merged comment rows open the comments themselves (activityRowHref).
+    const href = activityRowHref(row, role);
     if (href) router.push(href as never);
   }, [api, role, router, tracker, user?.id]);
 
