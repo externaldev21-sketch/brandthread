@@ -5,10 +5,15 @@ import {
   activityKind,
   activityMessage,
   aggregateActivity,
+  followControlState,
   applyRead,
   buildActivitySections,
   createReadTracker,
   groupByRecency,
+  groupedPeopleHref,
+  groupedPeopleTitle,
+  GROUPED_PEOPLE_MAX_IDS,
+  isGroupedRow,
   isFollowBackRow,
   newFollowersSummary,
   relativeTime,
@@ -313,6 +318,41 @@ describe('aggregateActivity — reposts and story likes', () => {
   });
 });
 
+describe('follow row inline pill', () => {
+  const follow = (name: string, overrides: Partial<ActivityItem> = {}) => item({
+    type: 'new_follower', title: `${name} started following you`,
+    actorId: `u_${name}`, actorName: name, targetId: `u_${name}`, targetType: 'user', cta: 'Follow back',
+    ...overrides,
+  });
+
+  it('offers Follow back while the viewer does not follow them', () => {
+    const [row] = aggregateActivity([follow('Jay', { isFollowingActor: false })]);
+    expect(followControlState(row)).toEqual({ userId: 'u_Jay', following: false });
+    expect(isFollowBackRow(row)).toBe(true);
+  });
+
+  it('reads Following once the server says the viewer follows them, even with a stale cta', () => {
+    const [row] = aggregateActivity([follow('Jay', { isFollowingActor: true })]);
+    expect(followControlState(row)).toEqual({ userId: 'u_Jay', following: true });
+    // No longer a pinned Highlights follow-back.
+    expect(isFollowBackRow(row)).toBe(false);
+  });
+
+  it('falls back to the stored cta when the server sends no live state', () => {
+    const [pending] = aggregateActivity([follow('Jay')]);
+    expect(followControlState(pending)?.following).toBe(false);
+    const [mutual] = aggregateActivity([follow('Mina', { cta: undefined, title: 'Mina followed you back' })]);
+    expect(followControlState(mutual)?.following).toBe(true);
+  });
+
+  it('has no pill on merged or non-follow rows', () => {
+    const [merged] = aggregateActivity([follow('Jay'), follow('Mina')]);
+    expect(followControlState(merged)).toBeNull();
+    const [liked] = aggregateActivity([like('Jay', 'post1')]);
+    expect(followControlState(liked)).toBeNull();
+  });
+});
+
 describe('newFollowersSummary', () => {
   it('returns null when there are no follow events', () => {
     expect(newFollowersSummary([like('Jay', 'post1')])).toBeNull();
@@ -328,5 +368,39 @@ describe('newFollowersSummary', () => {
     expect(summary!.count).toBe(2);
     expect(summary!.actors.map((a) => a.name)).toEqual(['Jay', 'Mina']);
     expect(summary!.hasUnread).toBe(true);
+  });
+});
+
+describe('grouped rows → people list', () => {
+  it('treats a merged row of 2+ people as grouped, never a single-actor or order row', () => {
+    const [merged] = aggregateActivity([like('Jay', 'post1'), like('Mina', 'post1'), like('Ola', 'post1')]);
+    expect(merged.actorCount).toBe(3);
+    expect(isGroupedRow(merged)).toBe(true);
+    const [single] = aggregateActivity([like('Jay', 'post2')]);
+    expect(isGroupedRow(single)).toBe(false);
+    expect(isGroupedRow({ type: 'order_shipped', actorCount: 2 })).toBe(false);
+  });
+
+  it("links to the people list with the row's own feed ids and type", () => {
+    const [merged] = aggregateActivity([like('Jay', 'post1'), like('Mina', 'post1')]);
+    const href = groupedPeopleHref(merged);
+    expect(href.startsWith('/activity-people?')).toBe(true);
+    const params = new URLSearchParams(href.split('?')[1]);
+    expect(params.get('type')).toBe('post_like');
+    expect(params.get('ids')!.split(',')).toEqual(merged.ids);
+  });
+
+  it('caps the ids a link carries', () => {
+    const ids = Array.from({ length: GROUPED_PEOPLE_MAX_IDS + 20 }, (_, i) => `n${i}`);
+    const params = new URLSearchParams(groupedPeopleHref({ type: 'post_like', ids }).split('?')[1]);
+    expect(params.get('ids')!.split(',')).toHaveLength(GROUPED_PEOPLE_MAX_IDS);
+  });
+
+  it('titles the list by what the people did', () => {
+    expect(groupedPeopleTitle('post_like')).toBe('Likes');
+    expect(groupedPeopleTitle('story_like')).toBe('Likes');
+    expect(groupedPeopleTitle('post_comment')).toBe('Comments');
+    expect(groupedPeopleTitle('repost')).toBe('Reposts');
+    expect(groupedPeopleTitle('new_follower')).toBe('New followers');
   });
 });

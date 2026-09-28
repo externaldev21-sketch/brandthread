@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import type { FeatherNames } from '@/lib/featherNames';
+import { TickingCount } from '@/components/ui/TickingCount';
 import {
   FONT,
   FS,
@@ -179,8 +180,16 @@ export interface EngagementButtonProps {
    *  output directly, including the empty string it returns for 0).
    *  Passing a string (even "") always reserves the count row's layout
    *  space; omit the prop entirely only when this button has no count
-   *  concept at all. */
+   *  concept at all. Ignored when `value` is also passed — see below. */
   count?: string;
+  /** Raw (unformatted) count. When present, the count renders through
+   *  TickingCount instead of a plain Text — a Reanimated odometer-style
+   *  roll plays whenever this changes (e.g. a like/save toggling the
+   *  count by ±1), instead of an instant text swap. `count` is still
+   *  required for accessibility/layout purposes but its string is not
+   *  displayed directly in this case (TickingCount formats `value` itself
+   *  so it can diff the previous/next display strings). */
+  value?: number;
   /** Whether the button is in the "active" (liked/saved/reposted/following) state */
   active?: boolean;
   /** Color of the icon when active. Defaults to '#FFFFFF'. */
@@ -223,6 +232,7 @@ export function EngagementButton({
   activeIcon,
   solidIcon,
   count,
+  value,
   active = false,
   activeColor = '#FFFFFF',
   inactiveColor = '#FFFFFF',
@@ -307,7 +317,9 @@ export function EngagementButton({
       ) : (
         iconNode
       )}
-      {count !== undefined && (
+      {value !== undefined ? (
+        <TickingCount value={value} style={[ebStyles.count, { color: '#FFFFFF' }]} />
+      ) : count !== undefined && (
         <Text style={[ebStyles.count, { color: '#FFFFFF' }]}>{count}</Text>
       )}
     </Animated.View>
