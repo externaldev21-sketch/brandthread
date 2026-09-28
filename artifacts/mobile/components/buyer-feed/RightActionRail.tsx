@@ -16,7 +16,7 @@
  * EngagementButton-driven icon here (like/repost/save/follow).
  */
 import React from 'react';
-import { Animated, Image, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { Animated, Image, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
@@ -363,20 +363,39 @@ const styles = StyleSheet.create({
   // below) read as one consistent row instead of some counts looking
   // brighter than others depending on how much of the legibility scrim
   // happens to fall behind that particular icon.
-  count: {
-    fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
-    textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
-  },
-  // Stronger drop shadow (was 0.5/radius 2, then 0.45/radius 4) applied to
-  // the rail's two plain icons (comment, share — the EngagementButton-
-  // driven icons get the matching `iconShadow` style inside
-  // EngagementButton.tsx itself, kept identical to this one), tuned against
-  // a bright/high-key clip (e.g. Maison Vela's silver dress) where the
-  // previous shadow still washed out to nearly nothing for thinner-stroke
-  // glyphs (repost/share) even though it read fine on bold ones (heart,
-  // comment). (PR #122, strengthened for feed legibility round, strengthened
-  // again in the urgent rail-fixes pass.)
-  iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6,
-  },
+  //
+  // TikTok two-layer shadow pass (still-washed-out round — see this same
+  // block's comment in EngagementButton.tsx's `count`/`iconShadow` for the
+  // full reasoning): web gets a tight-plus-wide stacked `textShadow`, native
+  // keeps the single strongest shadow RN's Text props can express. Kept in
+  // sync with EngagementButton.tsx's matching styles, per that file's own
+  // convention.
+  count: Platform.select({
+    web: {
+      fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
+      textShadow: '0px 1px 1px rgba(0,0,0,0.9), 0px 1px 6px rgba(0,0,0,0.55)',
+    } as object,
+    default: {
+      fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
+      textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
+    },
+  }),
+  // Stronger drop shadow (was 0.5/radius 2, then 0.45/radius 4, then
+  // 0.7/radius 6) applied to the rail's two plain icons (comment, share —
+  // the EngagementButton-driven icons get the matching `iconShadow` style
+  // inside EngagementButton.tsx itself, kept identical to this one), tuned
+  // against a bright/high-key clip (Atelier Noire's runway floor, live
+  // Replit preview at 390x844) where the previous shadow still washed out
+  // for thinner-stroke glyphs (repost/save/share) even though it read fine
+  // on bold ones (heart, comment). (PR #122, strengthened for feed
+  // legibility round, strengthened again in the urgent rail-fixes pass
+  // (#324), strengthened again here with a real two-layer shadow on web.)
+  iconShadow: Platform.select({
+    web: {
+      textShadow: '0px 1px 2px rgba(0,0,0,0.9), 0px 2px 10px rgba(0,0,0,0.6)',
+    } as object,
+    default: {
+      textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8,
+    },
+  }),
 });
