@@ -20,8 +20,11 @@ import {
   getConversation, createOrGetConversation, getMessages,
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
   markConversationRead, subscribeSocial,
-  MY_USER_ID,
+  MY_USER_ID, MY_NAME, MY_INITIALS,
 } from '@/services/socialService';
+import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
+import { CallLogBubble } from '@/components/calls/CallLogBubble';
+import type { CallLogEntry } from '@/lib/calls/types';
 import type {
   Conversation, Message, MessageAttachment, ConversationParticipant, ReactionType,
 } from '@/services/socialTypes';
@@ -135,7 +138,35 @@ function sameSenderClose(a: Message, b: Message): boolean {
 type DateRow = { type: 'date'; date: string; ts: number; key: string };
 type UnreadRow = { type: 'unread'; key: string };
 type MsgRow = { type: 'message'; msg: Message; isFirstInGroup: boolean; isLastInGroup: boolean };
-type ListRow = DateRow | UnreadRow | MsgRow;
+type CallLogRow = { type: 'call_log'; entry: CallLogEntry; key: string };
+type ListRow = DateRow | UnreadRow | MsgRow | CallLogRow;
+
+/** Interleaves the (client-only, PR1) call log into the already-built message
+ *  rows by timestamp, inserting a date separator when a call falls on a day
+ *  not otherwise represented — see CallSessionContext's own doc comment on
+ *  why this log isn't backend-persisted yet. */
+function mergeCallLogRows(rows: ListRow[], callLog: CallLogEntry[]): ListRow[] {
+  if (callLog.length === 0) return rows;
+  const merged = [...rows];
+  const rowTs = (r: ListRow): number => (
+    r.type === 'message' ? r.msg.ts : r.type === 'call_log' ? r.entry.startedAt : r.type === 'date' ? r.ts : -Infinity
+  );
+  for (const entry of [...callLog].sort((a, b) => a.startedAt - b.startedAt)) {
+    let insertAt = merged.length;
+    for (let i = 0; i < merged.length; i++) {
+      if (rowTs(merged[i]) > entry.startedAt) { insertAt = i; break; }
+    }
+    const d = formatDate(entry.startedAt);
+    const precedingDate = [...merged.slice(0, insertAt)].reverse().find((r): r is DateRow => r.type === 'date');
+    const toInsert: ListRow[] = [];
+    if (!precedingDate || precedingDate.date !== d) {
+      toInsert.push({ type: 'date', date: d, ts: entry.startedAt, key: `date-call-${entry.id}` });
+    }
+    toInsert.push({ type: 'call_log', entry, key: `call-${entry.id}` });
+    merged.splice(insertAt, 0, ...toInsert);
+  }
+  return merged;
+}
 
 function buildListRows(msgs: Message[], unreadDividerId: string | null): ListRow[] {
   const rows: ListRow[] = [];
@@ -237,6 +268,7 @@ export default function BuyerConversationScreen() {
   const quickReplyScrollRefs = useRef<Record<string, ScrollView | null>>({});
   const api = useApi();
   const { userId } = useAuth();
+  const { startCall } = useCallSession();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   // A sent/claimed/cancelled Thread Cash bubble's status is set once, in the
   // message's own attachment meta, at send time — it never gets rewritten
@@ -257,6 +289,7 @@ export default function BuyerConversationScreen() {
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
   const [conv, setConv] = useState<Conversation | null>(null);
+  const callLog = useCallLog(conv?.id ?? params.id ?? '');
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -601,14 +634,19 @@ export default function BuyerConversationScreen() {
   function handleStartCall(mode: 'voice' | 'video') {
     if (!conv) { Alert.alert('Not ready', 'Wait for the conversation to load.'); return; }
     const p = participant;
-    const qs = new URLSearchParams({
+    void startCall({
       conversationId: conv.id,
-      participantName: displayName,
-      participantInitials: p?.initials ?? '?',
-      participantColor: p?.color ?? theme.accent,
+      surface: 'buyer',
       mode,
+      peer: {
+        id: p?.userId ?? '',
+        name: displayName,
+        initials: p?.initials ?? '?',
+        color: p?.color ?? theme.accent,
+        avatarUri: p?.avatarUri ?? null,
+      },
+      me: { id: myId, name: MY_NAME, initials: MY_INITIALS, color: theme.accent },
     });
-    router.push(('/call-screen?' + qs.toString()) as never);
   }
 
   // ── Other-participant profile ─────────────────────────────────────────────────
@@ -1160,6 +1198,14 @@ export default function BuyerConversationScreen() {
       );
     }
 
+    if (item.type === 'call_log') {
+      return (
+        <View style={[s.msgOuter, { justifyContent: 'flex-start', marginTop: 12 }]}>
+          <CallLogBubble entry={item.entry} onCallBack={() => handleStartCall(item.entry.mode)} />
+        </View>
+      );
+    }
+
     const { msg, isFirstInGroup, isLastInGroup } = item;
     const isOwn = msg.fromId === myId || msg.fromId === MY_USER_ID;
 
@@ -1426,7 +1472,7 @@ export default function BuyerConversationScreen() {
   // ── Main render ─────────────────────────────────────────────────────────────
 
   const visibleMessages = messages.filter(m => !m.deletedForMe);
-  const listData = buildListRows(visibleMessages, unreadDividerId);
+  const listData = mergeCallLogRows(buildListRows(visibleMessages, unreadDividerId), callLog);
 
   useEffect(() => {
     if (!unreadDividerId || hasScrolledToUnreadRef.current) return;
@@ -1535,6 +1581,18 @@ export default function BuyerConversationScreen() {
             accessibilityLabel="Voice call"
           >
             <Feather name="phone" size={ICON.sm} color={theme.muted} />
+          </PressableScale>
+        )}
+        {conv && !isAgentConv && (
+          <PressableScale rippleEnabled={false}
+            style={s.roundBtn}
+            onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            testID="conversation-call-video"
+            accessibilityRole="button"
+            accessibilityLabel="Video call"
+          >
+            <Feather name="video" size={ICON.sm} color={theme.muted} />
           </PressableScale>
         )}
         <PressableScale rippleEnabled={false}

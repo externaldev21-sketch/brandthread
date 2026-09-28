@@ -64,6 +64,8 @@ import { RevenueCatProvider } from '@/lib/revenueCat';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
 import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
 import { UndoToastProvider } from '@/components/BrandthreadUI';
+import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
+import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
@@ -1301,7 +1303,10 @@ export default function RootLayout() {
                           <CelebrationHost>
                             <RuntimeThemeShell>
                               <ThreadPullProvider>
-                                <RootLayoutNav />
+                                <CallSessionProvider>
+                                  <RootLayoutNav />
+                                  <GlobalCallOverlay />
+                                </CallSessionProvider>
                               </ThreadPullProvider>
                             </RuntimeThemeShell>
                           </CelebrationHost>

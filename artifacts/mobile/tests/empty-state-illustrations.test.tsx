@@ -52,7 +52,7 @@ describe('each named screen wires its thread-motif illustration through the shar
     ['../components/profile/profileEmptyStates.ts', "illustration: 'spool'"],
     ['../app/(buyer)/friends.tsx', 'illustration="friends"'],
     ['../app/buyer-search.tsx', 'illustration="search"'],
-    ['../app/(buyer)/discover.tsx', 'illustration="trending"'],
+    ['../components/discover/DiscoverGrid.tsx', 'illustration="trending"'],
     ['../app/(buyer)/inbox.tsx', 'illustration="envelope"'],
     ['../app/activity-center.tsx', 'illustration="bell"'],
     ['../app/(buyer)/orders.tsx', 'illustration="tee"'],
