@@ -5,13 +5,14 @@
  * PressableScale press-feel with design-system tokens (RADII.chip, SPACING).
  */
 import React from 'react';
-import { Animated, Platform, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Animated, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
 import { COMP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { Glass } from '@/components/ui/Glass';
 
 export interface IconButtonProps {
   name: keyof typeof Feather.glyphMap;
@@ -73,10 +74,7 @@ export function IconButton({
         ]}
       >
         {variant === 'glass' && (
-          <>
-            {Platform.OS !== 'android' && <GlassBlur style={StyleSheet.absoluteFill} />}
-            <View style={[StyleSheet.absoluteFill, styles.glassTint]} />
-          </>
+          <Glass variant="regular" tint="dark" radius={RADII.pill} style={StyleSheet.absoluteFill} />
         )}
         <Feather name={name} size={size} color={resolvedColor} />
         {typeof badge === 'number' && badge > 0 && (
@@ -91,26 +89,9 @@ export function IconButton({
   );
 }
 
-/**
- * Requires expo-blur lazily, at first render of a glass-variant button,
- * instead of at module load — so screens/tests that never render a glass
- * IconButton (the common case) don't pull the native blur module into their
- * bundle/module graph at all.
- */
-function GlassBlur({ style }: { style: StyleProp<ViewStyle> }) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { BlurView } = require('expo-blur') as { BlurView: typeof import('expo-blur').BlurView };
-    return <BlurView intensity={50} tint="dark" style={style} />;
-  } catch {
-    return null;
-  }
-}
-
 const styles = StyleSheet.create({
   hit: { width: COMP.iconBtn, height: COMP.iconBtn, alignItems: 'center', justifyContent: 'center' },
   root: { width: COMP.iconBtn, height: COMP.iconBtn, alignItems: 'center', justifyContent: 'center' },
-  glassTint: { backgroundColor: 'rgba(10,10,11,0.35)' },
   badge: {
     position: 'absolute',
     top: -4,

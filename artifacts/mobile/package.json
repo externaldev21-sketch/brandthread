@@ -133,6 +133,14 @@
     "react-native-qrcode-svg": "^6.3.21",
     "react-native-share": "^12.0.9",
     "react-native-view-shot": "5.1.0",
-    "react-native-webview": "^13.16.1"
+    "react-native-webview": "^13.16.1",
+    "upload-live-activity": "file:./modules/upload-live-activity"
+  },
+  "expo": {
+    "autolinking": {
+      "searchPaths": [
+        "./modules"
+      ]
+    }
   }
 }
