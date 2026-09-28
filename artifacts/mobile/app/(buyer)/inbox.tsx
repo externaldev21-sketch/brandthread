@@ -1266,9 +1266,9 @@ export default function InboxScreen() {
                 {
                   // Focused state stays the same pill as unfocused — no
                   // border/box appears on focus, only a very subtle fill
-                  // change (never anything boxy).
-                  backgroundColor: messagesSearchFocused ? 'rgba(255,255,255,0.12)' : theme.cardElevated,
-                  borderColor: 'transparent',
+                  // change (never anything boxy). borderWidth is 0 on the
+                  // base style itself (searchRow) at both rest and focus.
+                  backgroundColor: messagesSearchFocused ? 'rgba(255,255,255,0.10)' : theme.cardElevated,
                 },
               ]}
             >
@@ -1786,8 +1786,8 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     marginBottom: SP.md,
     paddingHorizontal: SP.md,
     height: 44,
-    borderRadius: RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    borderWidth: 0,
   },
   // The header's search-open state: the field sits inline with Cancel
   // instead of stacked full-width below a title, so it drops searchRow's own

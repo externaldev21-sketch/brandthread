@@ -334,10 +334,10 @@ function makeCardStyles(colors: Colors) {
     profileEditText: { fontSize: 12, fontFamily: FONT.semibold, color: colors.foreground },
 
     // Search
-    searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.secondary, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 20, borderWidth: 1, borderColor: 'transparent' },
+    searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.secondary, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 20, borderWidth: 0 },
     // Focused state stays the same pill as unfocused — no border/box
     // appears, only a very subtle fill change.
-    searchWrapFocused: { backgroundColor: 'rgba(255,255,255,0.12)' },
+    searchWrapFocused: { backgroundColor: 'rgba(255,255,255,0.10)' },
     searchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: colors.foreground },
 
     // Section
