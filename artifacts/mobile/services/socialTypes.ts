@@ -165,6 +165,10 @@ export interface ConversationParticipant {
 export type MessageAttachmentType =
   | 'image' | 'video' | 'voice'
   | 'product' | 'post' | 'order' | 'profile' | 'thread_cash'
+  // A reply sent from the story viewer (text or a tapped quick-reaction
+  // emoji) — `uri` is the replied-to slide's image, `meta.storyId` names the
+  // story. Renders as a small thumbnail + "Replied to your story", IG style.
+  | 'story_reply'
   // Brandthread Agent only. `agent_card` is a generic deep-linking card
   // (Thread Cash explainer, product, brand/profile, "Go to Discover" — see
   // meta.cardKind / meta.deepLink); `quick_replies` renders a row of tappable
@@ -271,6 +275,11 @@ export interface Conversation {
    *  conversation — polled via GET /api/conversations/:id (no websocket
    *  layer exists for DMs yet). Only ever set for the agent's conversation. */
   agentTyping?: boolean;
+  /** True while the OTHER participant in an ordinary (non-agent)
+   *  conversation is actively composing — polled via GET /api/conversations
+   *  (no websocket layer exists for DMs yet), same mechanism as agentTyping
+   *  above. Set with PATCH /api/conversations/:id/typing. */
+  otherTyping?: boolean;
   /** Chat details > Mute: ISO timestamp this conversation is muted until, for
    *  the current viewer. Absent/undefined means not muted. */
   mutedUntil?: string;

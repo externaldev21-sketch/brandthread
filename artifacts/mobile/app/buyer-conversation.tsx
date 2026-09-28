@@ -73,7 +73,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   isPreviewConversationId, getPreviewConversation, getPreviewMessages,
   setPreviewConversationDisappearing, appendPreviewMessage, reactToPreviewMessage,
-  isPreviewInboxEnabled, posterUri,
+  isPreviewInboxEnabled, posterUri, previewAutoReplyText, previewAutoReplyDelayMs,
 } from '@/lib/previewInbox';
 import {
   parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed,
@@ -334,6 +334,12 @@ export default function BuyerConversationScreen() {
   // whatever the composer is showing by the time it resolves. uploadMedia()
   // has no real cancel/abort — this only makes the UI stop listening to it.
   const mediaUploadTokenRef = useRef(0);
+  // Real-time "X is typing…": true once we've told the server we're
+  // composing (PATCH /api/conversations/:id/typing), so handleChangeText
+  // doesn't re-send it on every keystroke, and a timer that clears it after
+  // a pause, since the server-side window (8s) is a safety net, not the UX.
+  const isTypingSentRef = useRef(false);
+  const typingClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Item 74 verification aid — NOT a real feature. The upload-in-progress
   // ring is inherently transient (uploadMedia() resolves/rejects as soon as
@@ -515,6 +521,25 @@ export default function BuyerConversationScreen() {
     return () => clearInterval(interval);
   }, [conv?.id]));
 
+  // The "X is typing…" signal (conv.otherTyping) needs a noticeably tighter
+  // cadence than the 12s message poll above to read as live — same 3s
+  // cadence lib/live/apiLiveProvider.ts already uses for live-chat polling.
+  // Merges just otherTyping into the existing conv object rather than
+  // replacing it wholesale, so it never clobbers an in-flight local update
+  // (e.g. the optimistic theme/disappearing toggles elsewhere in this file).
+  // Skipped for the agent thread (its own agentTyping is client-driven, see
+  // sendToAgent) and for a seeded preview thread (no real backend to poll).
+  useFocusEffect(useCallback(() => {
+    if (!conv?.id || isPreviewConversationId(conv.id) || conv.isOfficial) return;
+    const interval = setInterval(() => {
+      getConversation(conv.id).then((fresh) => {
+        if (!fresh) return;
+        setConv((prev) => (prev && prev.id === fresh.id ? { ...prev, otherTyping: fresh.otherTyping } : prev));
+      }).catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [conv?.id, conv?.isOfficial]));
+
   // Scroll to end after messages load — unless there's an unread divider we
   // still need to scroll to first (handled by the effect below).
   useEffect(() => {
@@ -526,6 +551,12 @@ export default function BuyerConversationScreen() {
   useEffect(() => {
     if (voicePlayerStatus.didJustFinish) setPlayingVoiceUri(null);
   }, [voicePlayerStatus.didJustFinish]);
+
+  // Clears the pending "typing…" timeout on unmount/navigation-away — leaving
+  // the chat mid-type shouldn't leave a dangling timer.
+  useEffect(() => () => {
+    if (typingClearTimerRef.current) clearTimeout(typingClearTimerRef.current);
+  }, []);
 
   // Keep the last message pinned above the composer as the keyboard opens —
   // the KeyboardAvoidingView above resizes this screen frame-by-frame with
@@ -590,12 +621,15 @@ export default function BuyerConversationScreen() {
 
   // Presence line under the header name. `isOnline`/`lastSeenAt` are the only
   // presence signals ConversationParticipant carries; the backend does not
-  // currently populate them (see socialTypes.ts), so this line is simply
-  // omitted rather than fabricating an "online"/"typing…" state from nothing.
+  // currently populate them (see socialTypes.ts), so that part is simply
+  // omitted. "typing…" IS real for an ordinary conversation now — see
+  // conv.otherTyping (PATCH/GET /api/conversations/:id/typing) — populated
+  // the same way agentTyping is for the agent thread, just from the OTHER
+  // human participant's own typing signal instead of a client-local flag.
   const isAgentConv = !!conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID;
   const statusLine = isAgentConv
     ? (agentTyping ? 'typing…' : 'AI assistant')
-    : (participant?.isOnline ? 'Active now' : statusLineFor(participant));
+    : (conv?.otherTyping ? 'typing…' : (participant?.isOnline ? 'Active now' : statusLineFor(participant)));
   // react-native-web doesn't fill in a real top safe-area inset (no notch/
   // dynamic-island polyfill), so insets.top reads 0 on web and the header
   // clipped under the dynamic island in a device-frame screenshot — same
@@ -1133,6 +1167,25 @@ export default function BuyerConversationScreen() {
         />
       );
     }
+    // Story reply (Mobbin: Instagram "Replying to a story") — a small
+    // square thumbnail of the replied-to slide + "Replied to your story",
+    // then the actual reply text renders below as the bubble's own text
+    // (unchanged rendering, same as every other message).
+    if (att.type === 'story_reply') {
+      return (
+        <View style={s.storyReplyCard}>
+          {att.uri ? (
+            <CachedImage source={{ uri: att.uri }} style={s.storyReplyThumb} recyclingKey={att.uri} />
+          ) : (
+            <View style={[s.storyReplyThumb, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Feather name="camera" size={ICON.sm} color={theme.muted} />
+            </View>
+          )}
+          <Text style={s.storyReplyLabel} numberOfLines={1}>{att.title || 'Replied to your story'}</Text>
+        </View>
+      );
+    }
+
     // 'thread_cash', 'quick_replies', 'agent_card', 'product' and 'order'
     // are all handled in renderItem() before this function is ever called
     // for them — they're standalone rows, not content that belongs inside a
@@ -1297,6 +1350,36 @@ export default function BuyerConversationScreen() {
     void sendToAgent(reply.value);
   }
 
+  /** Real-time "X is typing…": tells the server I'm composing (once per burst
+   *  of keystrokes, not per keystroke) and schedules clearing it after a
+   *  short pause — same idea as any chat app's typing indicator, just
+   *  polled instead of pushed (see PATCH /api/conversations/:id/typing).
+   *  No-ops for a seeded preview thread (no real backend/counterpart) and
+   *  the agent thread (its "typing…" is the AI's own, client-driven —
+   *  see sendToAgent/setAgentTyping). */
+  function sendTypingSignal(hasText: boolean) {
+    if (!conv?.id || isPreviewConversationId(conv.id) || conv.isOfficial) return;
+    if (typingClearTimerRef.current) { clearTimeout(typingClearTimerRef.current); typingClearTimerRef.current = null; }
+    if (hasText) {
+      if (!isTypingSentRef.current) {
+        isTypingSentRef.current = true;
+        api.conversations.setTyping(conv.id, true).catch(() => {});
+      }
+      typingClearTimerRef.current = setTimeout(() => {
+        isTypingSentRef.current = false;
+        if (conv?.id) api.conversations.setTyping(conv.id, false).catch(() => {});
+      }, 3000);
+    } else if (isTypingSentRef.current) {
+      isTypingSentRef.current = false;
+      api.conversations.setTyping(conv.id, false).catch(() => {});
+    }
+  }
+
+  function handleChangeText(next: string) {
+    setText(next);
+    sendTypingSignal(next.trim().length > 0);
+  }
+
   async function handleSend() {
     if (!conv || !canSend) return;
     const t = text.trim();
@@ -1305,6 +1388,7 @@ export default function BuyerConversationScreen() {
     setText('');
     setSelectedAttachment(null);
     setReplyTo(null);
+    sendTypingSignal(false);
 
     if (isAgentConv && !att && !replyingTo) {
       await sendToAgent(t);
@@ -1339,6 +1423,28 @@ export default function BuyerConversationScreen() {
       appendPreviewMessage(conv.id, localMsg);
       setMessages((prev) => [...prev, localMsg]);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      // Preview-only: the other (simulated) side sends back exactly one
+      // short reply so the thread reads as live during a demo — see
+      // previewAutoReplyText's own doc comment in lib/previewInbox.ts.
+      const convIdAtSend = conv.id;
+      setTimeout(() => {
+        const reply: Message = {
+          id: `local-reply-${Date.now()}`,
+          conversationId: convIdAtSend,
+          fromId: participant?.userId ?? conv.participants[0]?.userId ?? 'preview-participant',
+          fromName: displayName,
+          fromInitials: participant?.initials ?? 'B',
+          fromColor: participant?.color ?? theme.cardElevated,
+          text: previewAutoReplyText(),
+          reactions: [],
+          status: 'sent',
+          ts: Date.now(),
+          deletedForMe: false,
+        };
+        appendPreviewMessage(convIdAtSend, reply);
+        setMessages((prev) => [...prev, reply]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      }, previewAutoReplyDelayMs());
       return;
     }
 
@@ -2339,7 +2445,7 @@ export default function BuyerConversationScreen() {
                 nativeID={CHAT_INPUT_NATIVE_ID}
                 style={[s.textInput, { height: composerInputHeight }]}
                 value={text}
-                onChangeText={setText}
+                onChangeText={handleChangeText}
                 placeholder="Message…"
                 placeholderTextColor={theme.muted}
                 multiline
@@ -3038,8 +3144,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: theme.text,
   },
   orderCardProduct: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    fontSize: FS.meta,
+    fontFamily: FONT.medium,
     color: theme.muted,
     marginTop: 2,
   },
@@ -3189,6 +3295,23 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // ChatAttachmentCard component (components/chat/ChatAttachmentCard.tsx) —
   // no bubble, no border, own the tap target. See renderItem's product/
   // order branch.
+  storyReplyCard: {
+    alignItems: 'center',
+    marginBottom: SP.xs,
+  },
+  storyReplyThumb: {
+    width: 72,
+    height: 108,
+    borderRadius: RADIUS.md,
+    backgroundColor: theme.cardElevated,
+    overflow: 'hidden',
+  },
+  storyReplyLabel: {
+    marginTop: 4,
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: theme.muted,
+  },
   // A standalone agent info/deep-link card — full width, coin/icon-in-a-
   // circle, bold title, subtitle, chevron. Same row shape as the Thread Cash
   // payment card below.
@@ -3216,8 +3339,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: theme.text,
   },
   attachSubtitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    fontSize: FS.meta,
+    fontFamily: FONT.medium,
     color: theme.muted,
     marginTop: 1,
   },
@@ -3563,7 +3686,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   mediaSheetOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.md, gap: SP.sm },
   mediaSheetIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
   mediaSheetLabel:  { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
-  mediaSheetDesc:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+  mediaSheetDesc:   { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
 
   // Photo grid
   photoGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 2, borderRadius: RADIUS.md, overflow: 'hidden' },

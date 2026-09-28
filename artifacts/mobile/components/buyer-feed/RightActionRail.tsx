@@ -26,6 +26,7 @@ import { FONT, FS, GOLD, ON_DARK } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
+import { useLiveStreamForHost } from '@/lib/live/useLiveDirectory';
 
 export interface RailEngagement {
   liked?: boolean;
@@ -79,6 +80,16 @@ export function RightActionRail({
    *  gate the rest of the feed's motion pass respects. */
   reduceMotion?: boolean;
 }) {
+  // Bug fix (urgent rail-fixes pass): when this creator is currently live,
+  // the small "LIVE" pill from LiveHostRing/LiveAvatarRing (PR #288) sits
+  // anchored at the ring's bottom edge — the same spot the follow "+"
+  // badge below used to occupy, so the two collided/stacked when a live
+  // creator wasn't yet followed. IG's own avatar treatment doesn't show a
+  // competing follow badge over a live ring, so the "+" badge is simply
+  // suppressed for the duration this creator is live — the LIVE pill's own
+  // position/styling (from #288) is untouched, and the badge reappears in
+  // its normal spot the moment the stream ends.
+  const isLive = !!useLiveStreamForHost(hostId);
   const [badgeVisible, setBadgeVisible] = React.useState(!engagement?.following);
   const [showCheck, setShowCheck] = React.useState(!!engagement?.following);
   const wasFollowing = React.useRef(!!engagement?.following);
@@ -157,7 +168,7 @@ export function RightActionRail({
             )}
           </LiveHostRing>
         </TouchableOpacity>
-        {badgeVisible && (
+        {badgeVisible && !isLive && (
           // Plain TouchableOpacity, not EngagementButton — EngagementButton
           // applies the `style` prop passed to it to its *inner* content
           // view, not the outer touchable wrapper, so a positioning style
@@ -277,7 +288,6 @@ export function RightActionRail({
         style={styles.actionContent}
         translateYAnim={saveDrop}
         scaleAnim={saveScale}
-        iconFillTransition
         onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onSave(); }}
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
         testID={`save-btn-${testIdBase}`}
@@ -355,15 +365,18 @@ const styles = StyleSheet.create({
   // happens to fall behind that particular icon.
   count: {
     fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+    textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
-  // Stronger drop shadow (was 0.5/radius 2) applied to the rail's two plain
-  // icons (comment, share — the EngagementButton-driven icons get the
-  // matching `iconShadow` style inside EngagementButton.tsx itself), tuned
-  // against a bright/high-key clip (e.g. Maison Vela's silver dress) where
-  // the previous, lighter shadow washed out to nearly nothing. (PR #122,
-  // strengthened for feed legibility round.)
+  // Stronger drop shadow (was 0.5/radius 2, then 0.45/radius 4) applied to
+  // the rail's two plain icons (comment, share — the EngagementButton-
+  // driven icons get the matching `iconShadow` style inside
+  // EngagementButton.tsx itself, kept identical to this one), tuned against
+  // a bright/high-key clip (e.g. Maison Vela's silver dress) where the
+  // previous shadow still washed out to nearly nothing for thinner-stroke
+  // glyphs (repost/share) even though it read fine on bold ones (heart,
+  // comment). (PR #122, strengthened for feed legibility round, strengthened
+  // again in the urgent rail-fixes pass.)
   iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
+    textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6,
   },
 });
