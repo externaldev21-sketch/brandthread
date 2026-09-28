@@ -58,6 +58,24 @@ Legend: **PR** = which PR ships it. **Role** = buyer / seller / both.
 | 9 | Posting progress — slim row at top of feed, thumbnail + real progress bar | [11b-posting-progress](polish/screenshots/creation-flow/mobbin-reference/11b-posting-progress.webp) | new component mounted at top of `app/(tabs)/feed.tsx`'s data layer (not the feed UI itself) | both | 2 |
 | 10 | Post-share prompt — "Done posting. Want to send it directly to friends?" + Send; congrats screen | [11-posting-toast-send](polish/screenshots/creation-flow/mobbin-reference/11-posting-toast-send.webp), [10-congrats](polish/screenshots/creation-flow/mobbin-reference/10-congrats.webp) | reuses existing `ThreadShareSheet` | both | 2 |
 | 11 | Tag products (seller) — search products, pin on media, up to 5, price/link | [12-tag-products-shopee](polish/screenshots/creation-flow/mobbin-reference/12-tag-products-shopee.webp), [12b-tag-products-pinterest](polish/screenshots/creation-flow/mobbin-reference/12b-tag-products-pinterest.webp) | extends existing `PostProductTag` / `tagProduct()` already in `create-post.tsx`, small pin-placement interface for PR B (buyer discover/tagging session) to wire into | seller only | 3 |
+| 12 | Upload progress in Dynamic Island + Lock Screen Live Activity — compact (thumbnail + % ring), expanded (thumbnail + "uploading…" + big ring), Lock Screen card, complete/failed states | [island-compact](polish/screenshots/upload-live-activity/mobbin-reference/01-island-compact.webp), [island-expanded](polish/screenshots/upload-live-activity/mobbin-reference/02-island-expanded-uploading.webp), [island-complete](polish/screenshots/upload-live-activity/mobbin-reference/04-island-compact-complete.webp), [lockscreen-uploading](polish/screenshots/upload-live-activity/mobbin-reference/06-lockscreen-uploading.webp), [lockscreen-complete](polish/screenshots/upload-live-activity/mobbin-reference/07-lockscreen-complete.webp) | new iOS-only Expo config plugin + ActivityKit widget extension (Swift/SwiftUI), exposing `startUploadActivity`/`updateUploadActivity`/`endUploadActivity` from `lib/uploadLiveActivity.ts` for both this flow and the stories session's upload plumbing to call; no-op on Android/web | both (and stories) | 4 |
+
+### PR 4 brand adaptation (Live Activity specific)
+
+Instagram's ring is a pink/orange/purple gradient and its complete-state check
+is green — ours is **monochrome only**: black/white/gray ring and checkmark,
+no gradient, no green. Copy uses the app's real naming per content type:
+"Your Thread is uploading…" → "Your Thread is posted." for a photo/video/
+slideshow post (Brandthread has no separate "reel" content type — everything
+in this flow is one Thread), "Your story is uploading…" → "Your story is
+posted." for the separate story-creation flow, and "Upload failed. Tap to
+retry." for a failure, deep-linking back to a retry route. PR 4 is
+native-iOS-only (ActivityKit, iOS 16.1+) and cannot be exercised in this
+sandbox (no macOS/Xcode/simulator) — its PR includes SwiftUI source for
+review plus exact EAS dev-build steps instead of live screenshots, and lists
+upfront anything the owner must provide (Apple Developer capabilities, and
+whether a push certificate is needed — only required for server-driven
+remote updates, not for the local-only in-app progress this v1 implements).
 
 ## Can't match 1:1 (running list — appended to per PR)
 
