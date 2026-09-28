@@ -28,7 +28,7 @@ export interface RepostFriend {
 }
 
 export function CaptionBlock({
-  creator, verified, caption, sound, soundOn, onToggleSound,
+  creator, verified, caption, taggedPeople, sound, soundOn, onToggleSound,
   friendReposts, hasRepostIdentity, repostLabel, onOpenRepostIdentity,
   captionExpanded, onToggleCaptionExpanded,
   onOpenCreator,
@@ -37,6 +37,10 @@ export function CaptionBlock({
   creator: string;
   verified: boolean;
   caption: string;
+  /** People tagged on this post — both buyer and seller posts can carry
+   *  these (unlike product tags, which are seller-only). Rendered the same
+   *  way on every screen that shows a post's tags, buyer or seller side. */
+  taggedPeople?: Array<{ userId: string; displayName: string }>;
   sound: string;
   soundOn: boolean;
   onToggleSound: () => void;
@@ -121,6 +125,12 @@ export function CaptionBlock({
         </Text>
       </TouchableOpacity>
 
+      {!!taggedPeople?.length && (
+        <Text style={styles.taggedPeople} numberOfLines={1} ellipsizeMode="tail">
+          with {taggedPeople.map(p => `@${p.displayName}`).join(', ')}
+        </Text>
+      )}
+
       <TouchableOpacity
         style={styles.soundRow}
         onPress={onToggleSound}
@@ -181,6 +191,10 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   moreText: { fontFamily: FONT.bold, color: ON_DARK },
+  taggedPeople: {
+    fontSize: 12, fontFamily: FONT.medium, color: `${ON_DARK}CC`, marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
   // Same shadow, for icon glyphs (Feather renders as a text font, so
   // textShadow applies) — used by the verified badge above.
   iconTextShadow: {

@@ -1962,6 +1962,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             id: string; text: string; x: number; y: number; color: string;
             fontStyle: string; align: string; bgStyle: string; fontSize: number;
           }>;
+          filter?: 'none' | 'warm' | 'cool' | 'mono';
         }>;
       }) => post<{
         mediaPaths: string[];

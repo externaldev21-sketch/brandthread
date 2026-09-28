@@ -337,6 +337,10 @@ interface SpotlightItem {
   /** Who posted it — decides which profile the avatar/name opens. Feed posts default to seller. */
   authorAccountType?: 'seller' | 'buyer';
   productTags?: { productId: string; productName: string; priceCents: number; imageUri?: string }[];
+  /** People tagged on this post — both buyer and seller posts can carry
+   *  these (unlike productTags, which is seller-only). Rendered by
+   *  CaptionBlock exactly the same on the buyer and seller side. */
+  taggedPeople?: { userId: string; displayName: string; avatarUrl?: string }[];
   /** Authoritative comment count from the server (preferred over local comments array length) */
   commentsCount?: number;
 }
@@ -1683,6 +1687,7 @@ function SpotlightPageImpl({
         creator={item.creator}
         verified={!!item.verified}
         caption={item.caption}
+        taggedPeople={item.taggedPeople}
         sound={item.sound}
         soundOn={soundOn}
         onToggleSound={onToggleSound}
@@ -1793,6 +1798,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     sellerId: post.authorId,
     authorAccountType: post.authorAccountType === 'buyer' ? 'buyer' : 'seller',
     productTags: post.productTags ?? [],
+    taggedPeople: post.taggedPeople ?? [],
     commentsCount: post.commentsCount,
   };
 }

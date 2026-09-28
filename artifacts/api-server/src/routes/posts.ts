@@ -9,8 +9,8 @@
  */
 import { Router } from "express";
 import {
-  db, posts, postTaggedProducts, products, productVariants, users, interactions, follows, boosts, blocks,
-  savedItems, orders,
+  db, posts, postTaggedProducts, postTaggedPeople, products, productVariants, users, interactions, follows,
+  boosts, blocks, savedItems, orders,
 } from "@workspace/db";
 import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -22,7 +22,7 @@ import postVideoRouter, {
 } from "./post-video";
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
-import { notifyPostLike, notifyRepost } from "../lib/activityEvents";
+import { notifyPostLike, notifyRepost, notifyPostTag } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
@@ -38,6 +38,36 @@ import {
 const router = Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Tagging people is available to both buyer and seller posts (unlike product
+// tagging, which is seller-only) — mirrors post_tagged_products' cap since
+// the products model has no documented cap of its own.
+const MAX_TAGGED_PEOPLE = 10;
+
+interface TaggedPersonInput { userId: string; x: number; y: number; slideIndex: number }
+
+/** Validates the raw taggedPersonIds payload shape, caps count, dedupes by
+ *  (taggedUserId, slideIndex) matching the DB's unique constraint. Does not
+ *  check the users table — callers do that once against the resolved ids. */
+function parseTaggedPeopleInput(raw: unknown): { ok: true; people: TaggedPersonInput[] } | { ok: false; error: string } {
+  if (raw === undefined) return { ok: true, people: [] };
+  if (!Array.isArray(raw)) return { ok: false, error: "taggedPersonIds must be an array" };
+  if (raw.length > MAX_TAGGED_PEOPLE) return { ok: false, error: `taggedPersonIds: max ${MAX_TAGGED_PEOPLE} entries` };
+  const seen = new Set<string>();
+  const people: TaggedPersonInput[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") return { ok: false, error: "Each tagged person must be an object" };
+    const { userId, x, y, slideIndex } = entry as Record<string, unknown>;
+    if (typeof userId !== "string" || !userId) return { ok: false, error: "Each tagged person needs a userId" };
+    const nx = typeof x === "number" && Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0.5;
+    const ny = typeof y === "number" && Number.isFinite(y) ? Math.min(1, Math.max(0, y)) : 0.5;
+    const si = typeof slideIndex === "number" && Number.isFinite(slideIndex) ? Math.max(0, Math.trunc(slideIndex)) : 0;
+    const key = `${userId}:${si}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    people.push({ userId, x: nx, y: ny, slideIndex: si });
+  }
+  return { ok: true, people };
+}
 const POST_STATUSES = ["draft", "scheduled", "published", "archived", "deleted"] as const;
 type PostStatus = typeof POST_STATUSES[number];
 const OBJECT_PATH_RE = /^\/objects\/uploads\/[A-Za-z0-9._/-]+$/;
@@ -240,7 +270,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
   if (postRows.length === 0) return [];
   const postIds = postRows.map((post) => post.id);
   const sellerIds = [...new Set(postRows.map((post) => post.userId))];
-  const [sellerRows, tagRows, likeRows, repostRows, commentRows] = await Promise.all([
+  const [sellerRows, tagRows, personTagRows, likeRows, repostRows, commentRows] = await Promise.all([
     db.select({
       clerkId: users.clerkId,
       displayName: users.displayName,
@@ -260,6 +290,17 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
       .leftJoin(products, eq(products.id, postTaggedProducts.productId))
       .where(inArray(postTaggedProducts.postId, postIds))
       .orderBy(postTaggedProducts.position),
+    db.select({
+      postId: postTaggedPeople.postId,
+      userId: postTaggedPeople.taggedUserId,
+      x: postTaggedPeople.x,
+      y: postTaggedPeople.y,
+      slideIndex: postTaggedPeople.slideIndex,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+    }).from(postTaggedPeople)
+      .leftJoin(users, eq(users.clerkId, postTaggedPeople.taggedUserId))
+      .where(inArray(postTaggedPeople.postId, postIds)),
     db.select({ postId: interactions.postId, cnt: count() }).from(interactions)
       .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "like")))
       .groupBy(interactions.postId),
@@ -271,6 +312,8 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
   const sellerById = new Map(sellerRows.map((seller) => [seller.clerkId, seller]));
   const tagsByPost: Record<string, typeof tagRows> = {};
   for (const tag of tagRows) (tagsByPost[tag.postId] ??= []).push(tag);
+  const personTagsByPost: Record<string, typeof personTagRows> = {};
+  for (const tag of personTagRows) (personTagsByPost[tag.postId] ??= []).push(tag);
   const minPriceByProduct = await productMinPrices(tagRows.map((tag) => tag.productId));
   const countByPost = (rows: Array<{ postId: string | null; cnt: number }>) =>
     Object.fromEntries(rows.filter((row) => row.postId).map((row) => [row.postId, Number(row.cnt)]));
@@ -296,6 +339,14 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
         name: tag.name,
         images: tag.images,
         priceCents: minPriceByProduct[tag.productId] ?? 0,
+      })),
+      taggedPeople: (personTagsByPost[post.id] ?? []).map((tag) => ({
+        userId: tag.userId,
+        x: tag.x,
+        y: tag.y,
+        slideIndex: tag.slideIndex,
+        displayName: tag.displayName ?? "Member",
+        avatarUrl: tag.avatarUrl ?? null,
       })),
       likesCount: post.visibility?.showLikeCount === false ? null : likesByPost[post.id] ?? 0,
       repostsCount: repostsByPost[post.id] ?? 0,
@@ -374,8 +425,8 @@ router.get("/feed", requireAuth, async (req, res) => {
 
     const postIds = rows.map((r) => r.id);
 
-    // 3. Fetch tagged products and interaction counts in parallel
-    const [tagRows, likeRows, repostRows, commentRows] = await Promise.all([
+    // 3. Fetch tagged products, tagged people and interaction counts in parallel
+    const [tagRows, personTagRows, likeRows, repostRows, commentRows] = await Promise.all([
       db
         .select({
           postId:    postTaggedProducts.postId,
@@ -388,6 +439,20 @@ router.get("/feed", requireAuth, async (req, res) => {
         .leftJoin(products, eq(products.id, postTaggedProducts.productId))
         .where(inArray(postTaggedProducts.postId, postIds))
         .orderBy(postTaggedProducts.position),
+
+      db
+        .select({
+          postId: postTaggedPeople.postId,
+          userId: postTaggedPeople.taggedUserId,
+          x: postTaggedPeople.x,
+          y: postTaggedPeople.y,
+          slideIndex: postTaggedPeople.slideIndex,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+        })
+        .from(postTaggedPeople)
+        .leftJoin(users, eq(users.clerkId, postTaggedPeople.taggedUserId))
+        .where(inArray(postTaggedPeople.postId, postIds)),
 
       db
         .select({ postId: interactions.postId, cnt: count() })
@@ -409,6 +474,11 @@ router.get("/feed", requireAuth, async (req, res) => {
     for (const t of tagRows) {
       if (!tagsByPost[t.postId]) tagsByPost[t.postId] = [];
       tagsByPost[t.postId].push(t);
+    }
+    const personTagsByPost: Record<string, typeof personTagRows> = {};
+    for (const t of personTagRows) {
+      if (!personTagsByPost[t.postId]) personTagsByPost[t.postId] = [];
+      personTagsByPost[t.postId].push(t);
     }
     const minPriceByProduct = await productMinPrices(tagRows.map((t) => t.productId));
     const likesByPost: Record<string, number> = {};
@@ -467,6 +537,14 @@ router.get("/feed", requireAuth, async (req, res) => {
         images:    t.images,
         priceCents: minPriceByProduct[t.productId] ?? 0,
       })),
+      taggedPeople: (personTagsByPost[p.id] ?? []).map((t) => ({
+        userId: t.userId,
+        x: t.x,
+        y: t.y,
+        slideIndex: t.slideIndex,
+        displayName: t.displayName ?? "Member",
+        avatarUrl: t.avatarUrl ?? null,
+      })),
       likesCount:    p.visibility?.showLikeCount === false ? null : likesByPost[p.id] ?? 0,
       repostsCount:  repostsByPost[p.id]  ?? 0,
       commentsCount: commentsByPost[p.id] ?? 0,
@@ -514,7 +592,7 @@ router.post("/", requireAuth, async (req, res) => {
     mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath, thumbnailPath,
     mediaPaths: requestedMediaPaths, slideOverlays: requestedSlideOverlays,
     mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
-    sound, visibility, taggedProductIds, isDraft, scheduledAt,
+    sound, visibility, taggedProductIds, taggedPersonIds, isDraft, scheduledAt,
   } = req.body as {
     mediaUrl?:          string;
     thumbnailUrl?:      string;
@@ -531,9 +609,16 @@ router.post("/", requireAuth, async (req, res) => {
     sound?:             typeof posts.$inferInsert.sound;
     visibility?:        typeof posts.$inferInsert.visibility;
     taggedProductIds?:  string[];
+    /** Tagging people is available to both buyer and seller posts. */
+    taggedPersonIds?:   unknown;
     isDraft?:           boolean;
     scheduledAt?:       string | null;
   };
+
+  const taggedPeopleResult = parseTaggedPeopleInput(taggedPersonIds);
+  if (!taggedPeopleResult.ok) {
+    return res.status(400).json({ error: taggedPeopleResult.error });
+  }
 
   const restriction = await publishingRestriction(clerkId);
   if (restriction) return res.status(restriction.status).json(restriction.body);
@@ -730,9 +815,40 @@ router.post("/", requireAuth, async (req, res) => {
     }
   }
 
+  // Validate + tag people — both buyer and seller posts may tag people (no
+  // account-type gate, unlike product tagging above). taggedUserId must be a
+  // real user in the users table, any account type.
+  const taggedPeople: any[] = [];
+  if (taggedPeopleResult.people.length > 0) {
+    const requestedUserIds = [...new Set(taggedPeopleResult.people.map((p) => p.userId))];
+    const realUsers = await db
+      .select({ clerkId: users.clerkId, displayName: users.displayName, avatarUrl: users.avatarUrl })
+      .from(users)
+      .where(inArray(users.clerkId, requestedUserIds));
+    const realUserIds = new Set(realUsers.map((u) => u.clerkId));
+    const userById = new Map(realUsers.map((u) => [u.clerkId, u]));
+    const toInsert = taggedPeopleResult.people.filter((p) => realUserIds.has(p.userId));
+    if (toInsert.length > 0) {
+      await db.insert(postTaggedPeople).values(
+        toInsert.map((p) => ({
+          postId: post.id, taggedUserId: p.userId, x: p.x, y: p.y, slideIndex: p.slideIndex,
+        })),
+      );
+      for (const p of toInsert) {
+        const u = userById.get(p.userId);
+        taggedPeople.push({
+          userId: p.userId, x: p.x, y: p.y, slideIndex: p.slideIndex,
+          displayName: u?.displayName ?? "Member", avatarUrl: u?.avatarUrl ?? null,
+        });
+        void notifyPostTag({ postId: post.id, taggerId: clerkId, taggedUserId: p.userId });
+      }
+    }
+  }
+
   return res.status(201).json({
     ...post,
     taggedProducts,
+    taggedPeople,
     moderation: captionHeld
       ? { status: "held", message: "Your caption is in review. The post stays hidden from others until a moderator approves it." }
       : { status: "visible" },
@@ -958,6 +1074,12 @@ router.patch("/:id", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "taggedProductIds must be an array of strings" });
   }
 
+  const taggedPersonIds = (body as any).taggedPersonIds;
+  const taggedPeopleResult = parseTaggedPeopleInput(taggedPersonIds);
+  if (!taggedPeopleResult.ok) {
+    return res.status(400).json({ error: taggedPeopleResult.error });
+  }
+
   try {
     // Demote before the database transition; promote only after it. This keeps
     // failures closed rather than exposing unpublished composed objects.
@@ -965,6 +1087,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (!shouldBePublic) {
       await setComposedMediaVisibility(clerkId, nextMediaPaths, "private");
     }
+    let newlyTaggedUserIds: string[] = [];
     const updated = await db.transaction(async (tx) => {
       const [post] = await tx.update(posts).set(updates).where(eq(posts.id, id)).returning();
       if (taggedProductIds !== undefined) {
@@ -980,8 +1103,27 @@ router.patch("/:id", requireAuth, async (req, res) => {
           );
         }
       }
+      if (taggedPersonIds !== undefined) {
+        const requestedUserIds = [...new Set(taggedPeopleResult.people.map((p) => p.userId))];
+        const realUsers = requestedUserIds.length > 0
+          ? await tx.select({ clerkId: users.clerkId }).from(users)
+            .where(inArray(users.clerkId, requestedUserIds))
+          : [];
+        const realUserIds = new Set(realUsers.map((u) => u.clerkId));
+        const toInsert = taggedPeopleResult.people.filter((p) => realUserIds.has(p.userId));
+        await tx.delete(postTaggedPeople).where(eq(postTaggedPeople.postId, id));
+        if (toInsert.length > 0) {
+          await tx.insert(postTaggedPeople).values(
+            toInsert.map((p) => ({ postId: id, taggedUserId: p.userId, x: p.x, y: p.y, slideIndex: p.slideIndex })),
+          );
+          newlyTaggedUserIds = toInsert.map((p) => p.userId);
+        }
+      }
       return post;
     });
+    for (const taggedUserId of newlyTaggedUserIds) {
+      void notifyPostTag({ postId: id, taggerId: clerkId, taggedUserId });
+    }
     if (shouldBePublic) {
       await setComposedMediaVisibility(clerkId, nextMediaPaths, "public");
     }
@@ -1171,7 +1313,7 @@ router.get("/:id", async (req, res) => {
     return res.status(404).json({ error: "Post not found" });
   }
 
-  const [sellerRows, tags, likeRows, repostRows] = await Promise.all([
+  const [sellerRows, tags, personTags, likeRows, repostRows] = await Promise.all([
     db.select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified })
       .from(users).where(eq(users.clerkId, post.userId)).limit(1),
     db.select({
@@ -1183,6 +1325,16 @@ router.get("/:id", async (req, res) => {
       .leftJoin(products, eq(products.id, postTaggedProducts.productId))
       .where(eq(postTaggedProducts.postId, id))
       .orderBy(postTaggedProducts.position),
+    db.select({
+      userId: postTaggedPeople.taggedUserId,
+      x: postTaggedPeople.x,
+      y: postTaggedPeople.y,
+      slideIndex: postTaggedPeople.slideIndex,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+    }).from(postTaggedPeople)
+      .leftJoin(users, eq(users.clerkId, postTaggedPeople.taggedUserId))
+      .where(eq(postTaggedPeople.postId, id)),
     db.select({ count: count() }).from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, "like"))),
     db.select({ count: count() }).from(interactions)
@@ -1194,6 +1346,10 @@ router.get("/:id", async (req, res) => {
     ...post,
     seller:       sellerRows[0] ?? null,
     taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),
+    taggedPeople: personTags.map((t) => ({
+      userId: t.userId, x: t.x, y: t.y, slideIndex: t.slideIndex,
+      displayName: t.displayName ?? "Member", avatarUrl: t.avatarUrl ?? null,
+    })),
     likeCount:    post.visibility?.showLikeCount === false ? null : likeRows[0]?.count ?? 0,
     repostCount:  repostRows[0]?.count ?? 0,
   });

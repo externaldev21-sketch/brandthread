@@ -135,6 +135,12 @@ export interface EditablePhotoSlide {
   uploadState: 'idle' | 'uploading' | 'uploaded' | 'error';
   /** Error message if uploadState === 'error' */
   uploadError?: string;
+  /** Colour filter applied server-side (ffmpeg) when this slide is rendered
+   *  by compose-slideshow — mirrors VideoClip['filter'] exactly, same 4 IDs.
+   *  Crop is applied immediately (client-side, via expo-image-manipulator) in
+   *  the photo-crop step, so cropping rewrites `uri` in place rather than
+   *  needing its own field here. */
+  filter: 'none' | 'warm' | 'cool' | 'mono';
 }
 
 /** Per-slide overlay entry as persisted in the DB / sent to the API */
@@ -154,7 +160,7 @@ export interface ComposedSlideshowResult {
 
 /** Create a new editable photo slide from a local URI */
 export function createPhotoSlide(id: string, uri: string, mimeType?: string): EditablePhotoSlide {
-  return { id, uri, mimeType, overlays: [], uploadState: 'idle' };
+  return { id, uri, mimeType, overlays: [], uploadState: 'idle', filter: 'none' };
 }
 
 /** Set the upload state for a specific slide */
@@ -211,10 +217,19 @@ export function moveSlide(
 /** Convert slides to the API payload for compose-slideshow */
 export function slidesToComposePayload(
   slides: EditablePhotoSlide[],
-): Array<{ objectPath: string; overlays: TextOverlay[] }> {
+): Array<{ objectPath: string; overlays: TextOverlay[]; filter: EditablePhotoSlide['filter'] }> {
   return slides
     .filter((s) => s.objectPath)
-    .map((s) => ({ objectPath: s.objectPath!, overlays: s.overlays }));
+    .map((s) => ({ objectPath: s.objectPath!, overlays: s.overlays, filter: s.filter }));
+}
+
+/** Set the colour filter for a specific slide (Effects tool, slide-edit step). */
+export function updateSlideFilter(
+  slides: EditablePhotoSlide[],
+  id: string,
+  filter: EditablePhotoSlide['filter'],
+): EditablePhotoSlide[] {
+  return slides.map((s) => s.id === id ? { ...s, filter } : s);
 }
 
 /** Convert persisted slideOverlays from DB into a map keyed by slideIndex */

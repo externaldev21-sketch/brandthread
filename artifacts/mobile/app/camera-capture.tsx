@@ -245,13 +245,18 @@ export default function CameraCapture() {
     try {
       const result = await cameraRef.current.takePictureAsync({ quality: 0.9 });
       if (result?.uri) {
-        (global as any).__cameraCaptureResult = { uri: result.uri, type: 'photo' };
+        // The chosen filter is applied for real later — compose-slideshow
+        // (server-side ffmpeg) renders it into the final slide, same as a
+        // video clip's filter is applied by compose-video. Carrying it here
+        // means a camera photo doesn't silently lose the filter the user
+        // picked, matching what a library-picked photo now supports too.
+        (global as any).__cameraCaptureResult = { uri: result.uri, type: 'photo', filter };
         goBackOr(router);
       }
     } catch {
       setCaptureError('Could not capture that photo. Please try again.');
     }
-  }, []);
+  }, [filter]);
 
   const cycleSpeed = useCallback(() => {
     const idx = SPEEDS.indexOf(speed);

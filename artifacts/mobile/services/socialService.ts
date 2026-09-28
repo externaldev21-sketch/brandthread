@@ -449,6 +449,18 @@ export interface SellerPostProductTag {
   timestamp?:  number;
 }
 
+/** A person tagged on a Thread — both buyer and seller posts can carry these
+ *  (only product tagging is seller-only). Mirrors SellerPostProductTag's
+ *  shape: a normalized x/y position on the tagged slide. */
+export interface SellerPostPersonTag {
+  userId:      string;
+  displayName: string;
+  avatarUrl?:  string;
+  slideIndex?: number;
+  x:           number;
+  y:           number;
+}
+
 export interface SellerPostSound {
   soundId:    string;
   soundTitle: string;
@@ -482,6 +494,7 @@ export interface SellerThreadPost {
   isDeleted:         boolean;
   sound?:            SellerPostSound;
   productTags:       SellerPostProductTag[];
+  taggedPeople:      SellerPostPersonTag[];
   visibility:        { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
   scheduledAt:       string | null;
   publishedAt?:      string;
@@ -566,6 +579,14 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
       slideIndex: tag.slideIndex,
       timestamp: tag.timestamp,
     })),
+    taggedPeople: (Array.isArray(p.taggedPeople) ? p.taggedPeople : []).map((tag: any) => ({
+      userId: tag.userId,
+      displayName: tag.displayName ?? 'Member',
+      avatarUrl: tag.avatarUrl ?? undefined,
+      slideIndex: tag.slideIndex,
+      x: typeof tag.x === 'number' ? tag.x : 0.5,
+      y: typeof tag.y === 'number' ? tag.y : 0.5,
+    })),
     visibility:      p.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:     p.scheduledAt ?? null,
     publishedAt:     p.publishedAt ?? (status === 'published' ? p.createdAt ?? now : undefined),
@@ -601,6 +622,7 @@ export async function createSellerPost(params: {
   productTags?: SellerPostProductTag[];
   /** @deprecated use productTags instead */
   productTagIds?: string[];
+  taggedPeople?: SellerPostPersonTag[];
   sound?: SellerPostSound | null;
   visibility?: { allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
   isDraft?: boolean;
@@ -632,6 +654,9 @@ export async function createSellerPost(params: {
       taggedProductIds: (params.productTags ?? [])
         .map(t => t.productId)
         .filter(id => /^[0-9a-f-]{36}$/i.test(id)),
+      taggedPersonIds: (params.taggedPeople ?? []).map(t => ({
+        userId: t.userId, x: t.x, y: t.y, slideIndex: t.slideIndex ?? 0,
+      })),
       isDraft: params.isDraft === true,
       scheduledAt: params.isDraft ? null : (params.scheduledAt ?? null),
     }),
@@ -648,6 +673,7 @@ export async function createSellerPost(params: {
     styleTags: params.styleTags ?? [],
     sound: params.sound ?? undefined,
     productTags: params.productTags ?? [],
+    taggedPeople: params.taggedPeople ?? [],
     visibility: params.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     mediaPaths: params.mediaPaths,
     slideOverlays: params.slideOverlays,
@@ -662,7 +688,7 @@ export async function updateSellerPost(
   patch: Partial<Pick<SellerThreadPost,
     'caption' | 'hashtags' | 'styleTags' | 'mediaUris' | 'thumbnailUri' | 'aspectRatio' |
     'contentType' | 'postStatus' | 'isDraft' | 'isArchived' | 'isDeleted' |
-    'sound' | 'productTags' | 'visibility' | 'scheduledAt' | 'publishedAt'
+    'sound' | 'productTags' | 'taggedPeople' | 'visibility' | 'scheduledAt' | 'publishedAt'
   >>,
 ): Promise<SellerThreadPost> {
   const k = K();
@@ -679,6 +705,9 @@ export async function updateSellerPost(
       sound: patch.sound,
       visibility: patch.visibility,
       taggedProductIds: patch.productTags?.map(tag => tag.productId),
+      taggedPersonIds: patch.taggedPeople?.map(tag => ({
+        userId: tag.userId, x: tag.x, y: tag.y, slideIndex: tag.slideIndex ?? 0,
+      })),
       isDraft: patch.isDraft,
       postStatus: patch.postStatus,
       scheduledAt: patch.scheduledAt,
@@ -692,6 +721,7 @@ export async function updateSellerPost(
     ...canonical,
     mediaUris: patch.mediaUris ?? canonical.mediaUris,
     productTags: patch.productTags ?? canonical.productTags,
+    taggedPeople: patch.taggedPeople ?? canonical.taggedPeople,
     aspectRatio: patch.aspectRatio ?? canonical.aspectRatio,
     styleTags: patch.styleTags ?? canonical.styleTags,
     sound: patch.sound ?? (idx >= 0 ? posts[idx].sound : canonical.sound),
@@ -791,6 +821,14 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
       productName: t.name ?? '',
       priceCents: typeof t.priceCents === 'number' ? t.priceCents : 0,
       imageUri: Array.isArray(t.images) ? t.images[0] : t.imageUri,
+    })),
+    taggedPeople:      (Array.isArray(p.taggedPeople) ? p.taggedPeople : []).map((t: any) => ({
+      userId: t.userId,
+      displayName: t.displayName ?? 'Member',
+      avatarUrl: t.avatarUrl ?? undefined,
+      slideIndex: t.slideIndex,
+      x: typeof t.x === 'number' ? t.x : 0.5,
+      y: typeof t.y === 'number' ? t.y : 0.5,
     })),
     visibility:    p.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:   null,

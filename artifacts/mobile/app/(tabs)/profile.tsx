@@ -94,7 +94,7 @@ const POST_FILTERS = ['Published', 'Drafts', 'Scheduled'] as const;
 type PostFilter = typeof POST_FILTERS[number];
 
 function shopTile(product: ShopProduct): ProfileGridItem {
-  return { id: product.id, kind: 'photo', posterUri: product.imageUri, caption: product.name, productCount: 0 };
+  return { id: product.id, kind: 'photo', posterUri: product.imageUri, caption: product.name, productCount: 0, peopleTaggedCount: 0 };
 }
 
 // ─── Screen ─────────────────────────────────────────────────────────────────

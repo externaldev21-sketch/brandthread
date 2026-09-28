@@ -25,6 +25,9 @@ export interface ProfileGridItem {
   viewsCount?: number;
   likesCount?: number;
   productCount: number;
+  /** People tagged on this post — both buyer and seller posts can carry
+   *  these (unlike productCount, which is seller-only tagging). */
+  peopleTaggedCount: number;
   /** Owner-only lifecycle label, e.g. Draft / Scheduled. */
   statusLabel?: string;
 }
@@ -49,6 +52,7 @@ export function gridItemFromThreadPost(post: SellerThreadPost): ProfileGridItem 
     viewsCount: post.viewsCount,
     likesCount: post.likesCount,
     productCount: post.productTags?.length ?? 0,
+    peopleTaggedCount: post.taggedPeople?.length ?? 0,
     statusLabel,
   };
 }
@@ -63,6 +67,7 @@ export function gridItemFromBuyerPost(post: BuyerPost): ProfileGridItem {
     caption: post.caption ?? '',
     likesCount: post.likesCount,
     productCount: 0,
+    peopleTaggedCount: 0,
   };
 }
 
@@ -71,6 +76,7 @@ function tileLabel(item: ProfileGridItem): string {
   const parts = [`Play ${noun}`];
   if (typeof item.viewsCount === 'number') parts.push(`${formatProfileCount(item.viewsCount)} views`);
   if (item.productCount > 0) parts.push(`${item.productCount} product${item.productCount === 1 ? '' : 's'} tagged`);
+  if (item.peopleTaggedCount > 0) parts.push(`${item.peopleTaggedCount} people tagged`);
   if (item.statusLabel) parts.push(item.statusLabel);
   if (item.caption) parts.push(item.caption.slice(0, 80));
   return parts.join(', ');
@@ -144,6 +150,11 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
                 <Feather name="shopping-bag" size={11} color="#FFFFFF" /* theme-exempt: over media */ />
               </View>
             ) : null}
+            {item.peopleTaggedCount > 0 ? (
+              <View style={[styles.bagBadge, item.productCount > 0 && styles.peopleBadgeStacked]} pointerEvents="none">
+                <Feather name="user" size={11} color="#FFFFFF" /* theme-exempt: over media */ />
+              </View>
+            ) : null}
             {item.statusLabel ? (
               <View style={[styles.status, { backgroundColor: theme.cardGlass, borderColor: theme.warning }]} pointerEvents="none">
                 <Text style={[styles.statusText, { color: theme.warning }]}>{item.statusLabel}</Text>
@@ -190,6 +201,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)', // theme-exempt: scrim over media
     alignItems: 'center', justifyContent: 'center',
   },
+  peopleBadgeStacked: { left: 32 },
   status: {
     position: 'absolute', bottom: 6, right: 6, borderWidth: 1, borderRadius: RADIUS.pill,
     paddingHorizontal: 6, paddingVertical: 1,
