@@ -73,8 +73,9 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 let mockUserId: string | null = 'seller-1';
+let mockAuthLoaded = true;
 vi.mock('@clerk/expo', () => ({
-  useAuth: () => ({ userId: mockUserId, isLoaded: true, isSignedIn: !!mockUserId }),
+  useAuth: () => ({ userId: mockUserId, isLoaded: mockAuthLoaded, isSignedIn: !!mockUserId }),
 }));
 
 vi.mock('@/components/BrandthreadUI', () => ({
@@ -220,6 +221,7 @@ function apiOrderRow(overrides: Record<string, unknown> = {}) {
 describe('seller Orders screen states', () => {
   afterEach(() => {
     mockUserId = 'seller-1';
+    mockAuthLoaded = true;
   });
 
   it('shows skeleton rows while the initial request is in flight', async () => {
@@ -287,5 +289,38 @@ describe('seller Orders screen states', () => {
     const empty = renderer.root.findAll((node: any) => node.type === 'EmptyState');
     expect(empty.length).toBe(1);
     expect(empty[0].props.variant).toBe('error');
+  });
+
+  // Item 127: the Orders tab spun its loading skeleton forever when Clerk's
+  // async auth finished loading AFTER this tab was already focused (a real
+  // race on cold start / a deep link straight into Orders) — useFocusEffect
+  // only re-runs its callback on an actual focus event, not when a
+  // dependency changes while already focused, so the request never fired.
+  // This mock's useFocusEffect deliberately mirrors that real limitation
+  // (see the comment on the mock above): it only runs its callback once, on
+  // mount — exactly the failure condition — so this test only passes with
+  // the safety-net effect in place.
+  it('recovers once auth finishes loading, even though the tab was already "focused" first (item 127)', async () => {
+    mockAuthLoaded = false;
+    mockOrdersList = async () => [apiOrderRow({ orderNumber: 'BT-3003' })];
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<OrdersScreen />);
+    });
+    await flush();
+
+    // Still waiting on auth: skeleton up, nothing fetched yet.
+    expect(renderer.root.findAll((node: any) => node.type === 'SkeletonBlock').length).toBeGreaterThan(0);
+
+    // Auth finishes loading — no re-focus event follows, only a re-render.
+    mockAuthLoaded = true;
+    await act(async () => {
+      renderer.update(<OrdersScreen />);
+    });
+    await flush();
+
+    expect(renderer.root.findAll((node: any) => node.type === 'SkeletonBlock').length).toBe(0);
+    expect(textContent(renderer)).toContain('BT-3003');
   });
 });

@@ -3,7 +3,7 @@
  * Shopify-pattern layout: persistent search row, status pills, date-grouped divider rows.
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
@@ -814,6 +814,29 @@ export default function OrdersScreen() {
       };
     }, [authLoaded, isSignedIn, loadData, userId])
   );
+
+  // Safety net for a real race: useFocusEffect above only re-runs its
+  // callback on an actual navigation focus event — it does NOT re-run
+  // merely because authLoaded/isSignedIn/userId changed while this tab was
+  // already focused (e.g. this tab is focused at cold start, before
+  // Clerk's async `isLoaded` flips true). If that happens, the effect
+  // above sets loading=true and returns, and — since a tab screen never
+  // unmounts and no further focus event follows — nothing else ever calls
+  // loadData: the skeleton spins forever (item 127). This plain effect
+  // closes that one gap: it only fires once auth has just become ready and
+  // nothing has loaded yet, so it never duplicates the normal focus-driven
+  // poll once that has started.
+  useEffect(() => {
+    if (!authLoaded || !isSignedIn || !userId) return;
+    if (hasLoadedRef.current || timerRef.current !== null) return;
+    clearBadge(userId);
+    const generation = ++generationRef.current;
+    consecutiveFailuresRef.current = 0;
+    setUpdatesPaused(false);
+    setLoading(true);
+    loadData(generation);
+    timerRef.current = setInterval(() => loadData(generation), 30_000);
+  }, [authLoaded, isSignedIn, loadData, userId]);
 
   const retryUpdates = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

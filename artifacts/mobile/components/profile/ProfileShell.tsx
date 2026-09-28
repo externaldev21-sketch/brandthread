@@ -41,7 +41,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, ON_DARK, RADIUS, SP } from '@/lib/theme';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { TYPE_SCALE } from '@/constants/typography';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
@@ -385,7 +385,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         </LiveAvatarRing>
       )}
       name={identity.name}
-      nameAccessory={identity.verified ? <Feather name="check-circle" size={16} color={theme.accent} accessibilityLabel="Verified" /> : null}
+      nameAccessory={identity.verified ? <Feather name="check-circle" size={16} color={ON_DARK} accessibilityLabel="Verified" /> : null}
       handle={identity.handle ?? null}
       chip={<ProfileChip label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />}
       meta={meta}
@@ -450,7 +450,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
             {identity.verified ? (
               <Text>
                 {'\u00A0'}
-                <Feather name="check-circle" size={26} color={theme.accent} accessibilityLabel="Verified" />
+                <Feather name="check-circle" size={26} color={ON_DARK} accessibilityLabel="Verified" />
               </Text>
             ) : null}
           </Text>
@@ -541,7 +541,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
                   )}
                 </View>
                 <Text style={styles.compactName} numberOfLines={1}>{identity.name}</Text>
-                {identity.verified ? <Feather name="check-circle" size={15} color={theme.accent} /> : null}
+                {identity.verified ? <Feather name="check-circle" size={15} color={ON_DARK} /> : null}
               </>
             ) : null}
           </View>
