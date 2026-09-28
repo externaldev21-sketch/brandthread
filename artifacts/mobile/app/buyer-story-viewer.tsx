@@ -8,7 +8,7 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -143,6 +143,9 @@ export default function BuyerStoryViewer() {
   // sandbox artifact. Delaying the hide lets an in-flight press land first;
   // refocusing (tapping back into the input) cancels the pending hide.
   const replyBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Same pop used by the live-stream like button (components/live/LiveOverlays.tsx)
+  // — scale down then settle back with a timing ease, no spring/bounce.
+  const heartPop = useRef(new Animated.Value(1)).current;
 
   const progress = useRef(new Animated.Value(0)).current;
   const ids = allStoryIds ? allStoryIds.split(',').filter(Boolean) : storyId ? [storyId] : [];
@@ -222,6 +225,10 @@ export default function BuyerStoryViewer() {
     if (!currentStory) return;
     const sid = currentStory.id;
     const wasLiked = likedSet.has(sid);
+    if (!wasLiked) {
+      heartPop.setValue(0.75);
+      Animated.timing(heartPop, { toValue: 1, duration: 160, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    }
     // Optimistic update
     setLikedSet(prev => { const n = new Set(prev); wasLiked ? n.delete(sid) : n.add(sid); return n; });
     setLikesCounts(prev => ({ ...prev, [sid]: Math.max(0, (prev[sid] ?? 0) + (wasLiked ? -1 : 1)) }));
@@ -843,12 +850,13 @@ export default function BuyerStoryViewer() {
                       accessibilityRole="button"
                       accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
                     >
-                      <Feather
-                        name="heart"
-                        size={ICON.lg}
-                        color={likedSet.has(currentStory.id) ? '#EF4444' : ON_DARK}
-                        style={likedSet.has(currentStory.id) ? styles.heartFilled : undefined}
-                      />
+                      <Animated.View style={{ transform: [{ scale: heartPop }] }}>
+                        {likedSet.has(currentStory.id) ? (
+                          <FontAwesome name="heart" size={ICON.lg} color={ON_DARK} />
+                        ) : (
+                          <Feather name="heart" size={ICON.lg} color={ON_DARK} />
+                        )}
+                      </Animated.View>
                       {(likesCounts[currentStory.id] ?? 0) > 0 && (
                         <Text style={styles.likesCountText}>
                           {likesCounts[currentStory.id]}
@@ -1276,9 +1284,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 4,
-  },
-  heartFilled: {
-    // tintColor applied via color prop above
   },
   likesCountText: {
     color: ON_DARK,
