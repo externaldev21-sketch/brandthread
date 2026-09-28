@@ -1175,6 +1175,25 @@ export async function getMyStories(k: SocialKeys = K()): Promise<Story[]> {
   const remote = await serviceRequest<Story[]>('/api/social/stories/me');
   return Array.isArray(remote) ? remote : [];
 }
+/**
+ * Merges freshly-fetched `Story` objects (from `api.social.myStories()` /
+ * `api.social.storiesForUser()` / preview fixtures) into the local cache
+ * `getStories()` reads from — this is what lets `app/buyer-story-viewer.tsx`
+ * resolve a `storyId` it was navigated to with, since that screen has always
+ * read purely from local storage rather than hitting the network itself.
+ * The Messages stories tray (app/(buyer)/inbox.tsx) calls this right after
+ * building the tray, before any circle can be tapped. Dedupes by id and
+ * prunes anything already expired; never removes stories this call doesn't
+ * know about (e.g. ones created elsewhere this session).
+ */
+export async function cacheStoriesForViewer(stories: Story[], k: SocialKeys = K()): Promise<void> {
+  if (!stories.length) return;
+  const existing = await load<Story[]>(k.stories, []);
+  const byId = new Map(existing.map(s => [s.id, s]));
+  for (const story of stories) byId.set(story.id, story);
+  const now = Date.now();
+  await save(k.stories, Array.from(byId.values()).filter(s => s.expiresAt > now));
+}
 export async function createStory(params: { media: StoryMedia[]; privacy: StoryPrivacySettings; repliesDisabled: boolean; }): Promise<Story> {
   const k = K();
   const profile = await getMyProfile(k);

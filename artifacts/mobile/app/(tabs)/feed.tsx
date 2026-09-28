@@ -1769,6 +1769,11 @@ function buildPreviewShopProduct(
     sellerId: item.sellerId ?? `preview-seller-${item.id}`,
     sellerName: item.creator,
     sellerHandle: item.handle,
+    // Preview posts don't have a separate seller-profile photo asset — the
+    // post's own poster is a real, already-loaded image for this fixture,
+    // and a reasonable stand-in so the cart's seller-group header shows a
+    // real avatar instead of always falling back to the initial.
+    sellerAvatarUri: item.videoPosterUri,
     name: tag.productName,
     description: item.caption,
     priceCents: tag.priceCents,

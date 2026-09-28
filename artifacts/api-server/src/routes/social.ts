@@ -982,6 +982,17 @@ router.get("/stories/following", async (req, res) => {
     byAuthor.get(row.authorId)!.push(row);
   }
 
+  // Real profile photos for the tray (the stories table only stores the
+  // fallback initials/color captured at post time) — one extra lookup,
+  // keyed by clerkId, no new table.
+  const authorRows = await db.select({
+    clerkId: users.clerkId, profileImageUrl: users.profileImageUrl, avatarUrl: users.avatarUrl,
+  }).from(users).where(inArray(users.clerkId, Array.from(byAuthor.keys())));
+  const avatarByAuthor = new Map(authorRows.map((u) => [
+    u.clerkId,
+    (typeof u.profileImageUrl === "string" && u.profileImageUrl.startsWith("http") ? u.profileImageUrl : u.avatarUrl) ?? null,
+  ]));
+
   const result = Array.from(byAuthor.entries()).map(([authorId, authorStories]) => {
     const latest = authorStories[0];
     return {
@@ -991,6 +1002,7 @@ router.get("/stories/following", async (req, res) => {
       authorInitials:    latest.authorInitials ?? "",
       authorColor:       latest.authorColor ?? "#8B5CF6",
       authorAccountType: latest.authorAccountType,
+      avatarUrl:         avatarByAuthor.get(authorId) ?? null,
       isMe:              authorId === myId,
       storyIds:          authorStories.map((s) => s.id),
       seen:              authorStories.every((s) => viewedSet.has(s.id)),

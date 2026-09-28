@@ -15,6 +15,9 @@ export interface CartItem {
   sellerId: string;
   sellerName: string;
   sellerHandle: string;
+  /** The seller's real profile photo — shown in the cart's seller-group
+   *  header instead of the initials fallback when present. */
+  sellerAvatarUri?: string;
   priceCents: number;
   compareAtPriceCents?: number;
   quantity: number;
@@ -39,6 +42,8 @@ export interface CartSellerGroup {
   sellerName: string;
   sellerHandle: string;
   sellerInitial: string;
+  /** Falls back to sellerInitial when the seller has no avatar photo. */
+  sellerAvatarUri?: string;
   items: CartItem[];
   subtotalCents: number;
   hasPreOrder: boolean;
@@ -400,6 +405,7 @@ export interface BuyerProduct {
   sellerId: string;
   sellerName: string;
   sellerHandle: string;
+  sellerAvatarUri?: string;
   name: string;
   description: string;
   priceCents: number;

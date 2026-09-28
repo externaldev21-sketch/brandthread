@@ -54,6 +54,14 @@ import { formatCents } from '@/lib/money';
 
 const fmtPrice = formatCents;
 
+// Sticky checkout bar's own fixed height (excluding the safe-area padding,
+// which is added separately wherever this is used) — StickyFooter's
+// paddingTop (SP.sm) plus the Checkout pill's height (COMP.buttonH), the
+// tallest thing in that row. Used to size the scroll content's own bottom
+// padding so the last line of content always clears the bar, instead of a
+// guessed magic number.
+const STICKY_BAR_CONTENT_HEIGHT = SP.sm + COMP.buttonH;
+
 // ─── Row pending state tracker ────────────────────────────────────────────────
 // Tracks which action is in-flight per item ID so the row can show a localized
 // spinner without blocking the whole cart.
@@ -202,47 +210,57 @@ function CartItemRow({
           </View>
         </View>
 
-        {/* Actions — Remove and Save for later are optional, never required to buy */}
+        {/* Actions — Remove and Save for later are optional, never required to
+            buy. Save/Remove sit on the left (16pt apart); Buy is right-
+            aligned on the same row via justify-content: space-between —
+            never a flex-spacer + oversized shared Button, which is what let
+            Buy stick out past the card's own edge. */}
         <View style={ir.actions}>
-          <PressableScale
-            style={ir.actionBtn}
-            onPress={onSaveForLater}
-            disabled={isRowBusy}
-            accessibilityLabel={`Save ${item.productName} for later`}
-            accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'save' }}
-          >
-             {pendingAction === 'save'
-               ? <ActivityIndicator size="small" color={theme.muted} style={{ width: 12, height: 12 }} />
-               : <Feather name="bookmark" size={12} color={theme.muted} />}
-            <Text style={ir.actionText}>Save</Text>
-          </PressableScale>
-          <View style={ir.actionDivider} />
-          <PressableScale
-            style={ir.actionBtn}
-            onPress={onRemove}
-            disabled={isRowBusy}
-            accessibilityLabel={`Remove ${item.productName} from cart`}
-            accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'remove' }}
-          >
-             {pendingAction === 'remove'
-               ? <ActivityIndicator size="small" color={theme.error} style={{ width: 12, height: 12 }} />
-               : <Feather name="trash-2" size={12} color={theme.error} />}
-             <Text style={[ir.actionText, { color: theme.error }]}>Remove</Text>
-          </PressableScale>
-          <View style={{ flex: 1 }} />
+          <View style={ir.actionsLeft}>
+            <PressableScale
+              style={ir.actionBtn}
+              onPress={onSaveForLater}
+              disabled={isRowBusy}
+              accessibilityLabel={`Save ${item.productName} for later`}
+              accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'save' }}
+            >
+               {pendingAction === 'save'
+                 ? <ActivityIndicator size="small" color={theme.muted} style={{ width: 12, height: 12 }} />
+                 : <Feather name="bookmark" size={12} color={theme.muted} />}
+              <Text style={ir.actionText}>Save</Text>
+            </PressableScale>
+            <PressableScale
+              style={ir.actionBtn}
+              onPress={onRemove}
+              disabled={isRowBusy}
+              accessibilityLabel={`Remove ${item.productName} from cart`}
+              accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'remove' }}
+            >
+               {pendingAction === 'remove'
+                 ? <ActivityIndicator size="small" color={theme.error} style={{ width: 12, height: 12 }} />
+                 : <Feather name="trash-2" size={12} color={theme.error} />}
+               <Text style={[ir.actionText, { color: theme.error }]}>Remove</Text>
+            </PressableScale>
+          </View>
           {/* Buys just this line — its own variant + qty — through the shared
               Buy Now flow. It never touches, or requires touching, the rest
-              of the cart. */}
-          <Button
-            label="Buy"
-            size="small"
-            variant="primary"
+              of the cart. A bespoke pill (not the shared Button, which
+              forces a wider min-width/padding than fits this row at 375pt)
+              sized exactly like a secondary action. */}
+          <PressableScale
+            style={[ir.buyBtn, (isRowBusy || !item.isAvailable) && ir.buyBtnDisabled]}
             onPress={onBuyNow}
-            loading={buyingNow}
             disabled={isRowBusy || !item.isAvailable}
+            accessibilityRole="button"
+            accessibilityLabel="Buy"
             accessibilityHint={`Buy just ${item.productName} now, ${fmtPrice(lineTotal)}`}
-            style={ir.buyBtn}
-          />
+            accessibilityState={{ disabled: isRowBusy || !item.isAvailable, busy: buyingNow }}
+            noMinHeight
+          >
+            {buyingNow
+              ? <ActivityIndicator size="small" color={theme.onAccent} />
+              : <Text style={ir.buyBtnText}>Buy</Text>}
+          </PressableScale>
         </View>
       </View>
     </View>
@@ -289,14 +307,22 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   comparePrice: { fontSize: FS.xs, ...TABULAR_NUMS, fontFamily: FONT.regular, color: theme.subtle, textDecorationLine: 'line-through' },
   price: { fontSize: FS.md, ...TABULAR_NUMS, fontFamily: FONT.bold, color: theme.text },
   priceDiscounted: { color: theme.success },
-  actions: { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: COMP.minTouchTarget, paddingVertical: 4, paddingHorizontal: 8 },
-  actionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
-  // Softened to match the header's own subtle hairline (see Header.tsx's
-  // dividerVariant="subtle") instead of the full-strength theme.border —
-  // a decorative in-row separator, not a meaningful content divide.
-  actionDivider: { width: 1, height: 14, backgroundColor: '#FFFFFF', opacity: 0.06 },
-  buyBtn: { minWidth: 72 },
+  // justify-content: space-between (not a flex-spacer + a full shared
+  // Button) keeps Save/Remove flush left and Buy flush right without ever
+  // letting Buy's own intrinsic width push it past the card's edge.
+  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.xs },
+  actionsLeft: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 32 },
+  actionText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
+  // Sized like a secondary action — height 32, 14pt horizontal padding,
+  // 14pt semibold — not the shared Button's larger min-width/padding, which
+  // is what let this pill stick out past the card's own 16pt inner edge.
+  buyBtn: {
+    height: 32, paddingHorizontal: 14, borderRadius: RADII.pill,
+    backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center',
+  },
+  buyBtnDisabled: { opacity: 0.5 },
+  buyBtnText: { fontSize: 14, fontFamily: FONT.semibold, color: theme.onAccent },
 });
 
 // ─── Seller Group ─────────────────────────────────────────────────────────────
@@ -331,7 +357,11 @@ function SellerGroup({
         noMinHeight
       >
         <View style={[sg.avatar, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
-          <Text style={[sg.avatarText, { color: theme.accentLight }]}>{group.sellerInitial}</Text>
+          {group.sellerAvatarUri ? (
+            <Image source={{ uri: group.sellerAvatarUri }} style={sg.avatarImage} resizeMode="cover" />
+          ) : (
+            <Text style={[sg.avatarText, { color: theme.accentLight }]}>{group.sellerInitial}</Text>
+          )}
         </View>
         <View style={{ flex: 1 }}>
           <Text style={sg.sellerName}>{group.sellerName}</Text>
@@ -384,7 +414,8 @@ const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
     ...SHADOW_SM, shadowColor: theme.shadowColor, shadowOpacity: 0.12,
   },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  avatar: { width: 38, height: 38, borderRadius: RADII.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 38, height: 38, borderRadius: RADII.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImage: { width: '100%', height: '100%' },
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   sellerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
@@ -893,6 +924,10 @@ export default function CartScreen() {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
             accessibilityLabel={editMode ? 'Done editing cart' : 'Edit cart'}
+            // Header's compact row already contributes SP.sm (8pt) of its own
+            // paddingHorizontal; this adds the remaining 8pt so Edit's right
+            // inset totals 16pt — the same as the back chevron's left inset.
+            style={s.editBtn}
           >
             <Text style={[s.editText, { color: theme.accentLight }]}>{editMode ? 'Done' : 'Edit'}</Text>
           </TouchableOpacity>
@@ -970,9 +1005,11 @@ export default function CartScreen() {
             contentContainerStyle={{
               paddingHorizontal: SP.md,
               paddingTop: SP.sm,
-              // Clears the sticky checkout bar, which sits above the home
-              // indicator — no floating tab bar to clear on this pushed screen.
-              paddingBottom: insets.bottom + 150,
+              // Sticky bar's own height + the safe-area inset it pads by +
+              // 16pt breathing room, so the last line of content (the saved-
+              // for-later hint) is never left peeking out from behind the
+              // bar — no floating tab bar to clear on this pushed screen.
+              paddingBottom: STICKY_BAR_CONTENT_HEIGHT + insets.bottom + SP.md,
             }}
           >
             {/* Seller groups */}
@@ -1158,6 +1195,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   emptyTitle: { fontSize: FS.lg, fontFamily: FONT.bold, textAlign: 'center' },
   emptyDescription: { fontSize: FS.base, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 21, maxWidth: 280 },
   emptyCta: { marginTop: SP.md },
+  editBtn: { paddingRight: SP.sm },
   editText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   editBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
