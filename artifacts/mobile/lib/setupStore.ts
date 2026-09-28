@@ -153,12 +153,19 @@ export interface SetupStateOptions {
 function normalizeState(value: unknown): SetupState {
   const parsed = value && typeof value === 'object' ? value as Partial<SetupState> : {};
   const persistedTasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
-  const validIds = new Set(DEFAULT_TASKS.map(t => t.id));
+  const defById = new Map(DEFAULT_TASKS.map(t => [t.id, t]));
+  // Only completed/skipped are read back from storage — label/description/icon
+  // always come from DEFAULT_TASKS, never the persisted copy. A stored task
+  // can be a bare {id, completed} shorthand (this is what the seller-preview
+  // seed writes) or simply predate a copy change to DEFAULT_TASKS; either way
+  // trusting its own label/description would show stale or blank text instead
+  // of today's real copy.
   const validTasks = persistedTasks
-    .filter(t => t && typeof t === 'object' && validIds.has((t as SetupTask).id))
+    .filter(t => t && typeof t === 'object' && defById.has((t as SetupTask).id))
     .map(t => {
       const task = t as Partial<SetupTask>;
-      return { ...task, completed: task.completed === true, skipped: task.skipped === true } as SetupTask;
+      const def = defById.get(task.id!)!;
+      return { ...def, completed: task.completed === true, skipped: task.skipped === true };
     });
   const existingIds = new Set(validTasks.map(t => t.id));
   const newTasks = DEFAULT_TASKS
