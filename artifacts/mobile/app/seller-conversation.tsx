@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView } from 'react-native';
+import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Linking } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,7 +14,8 @@ import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, StatusBadge } from '@/components/BrandthreadUI';
+import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { hapticPrimaryAction, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
@@ -27,6 +28,7 @@ import {
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import { VoiceMessageBubble } from '@/components/chat/VoiceMessageBubble';
+import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
 import { confirmUnblock } from '@/lib/safety';
@@ -38,14 +40,29 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import {
+  isSellerPreviewConversationId,
+  getSellerPreviewConversation, getSellerPreviewMessages,
+} from '@/lib/previewInbox';
 import type { CallLogEntry } from '@/lib/calls/types';
 import { SystemLine } from '@/components/chat/SystemLine';
 import { getConversationTheme } from '@/lib/conversationThemes';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   formatDate as sharedFormatDate, formatTime, groupFlags,
-  groupCornerRadii, lastOwnMessageId,
+  groupCornerRadii, lastOwnMessageId, messagePreviewText,
 } from '@/lib/chatGrouping';
+import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
+import { ReplyBanner } from '@/components/chat/ReplyBanner';
+import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuItem } from '@/components/chat/ReactionOverlay';
+import { ReactionGlyph } from '@/components/chat/ReactionBar';
+import { applyOptimisticReaction, myReactionIn, groupReactionCounts } from '@/lib/reactionMutations';
+import type { MessageReaction, ReactionType } from '@/services/socialTypes';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashBillMark } from '@/components/thread-cash/ChatAttachThreadCash';
+import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
+import { Snackbar } from '@/components/ui/Snackbar';
+import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,7 +80,7 @@ interface ConvView {
   themeId?: string; disappearingEnabled?: boolean;
 }
 interface MsgAttachment {
-  type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice' | 'system';
+  type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice' | 'system' | 'thread_cash';
   uri?: string;
   title?: string;
   subtitle?: string;
@@ -78,6 +95,18 @@ interface Msg {
    *  message. Same field the API returns on app/buyer-conversation.tsx's
    *  Message type; see lib/chatGrouping.ts. */
   readAt?: string;
+  /** Swipe-to-reply — same shape as app/buyer-conversation.tsx's Message,
+   *  resolved server-side (see api-server's adaptMessage/loadReplyPreviews)
+   *  so both sides of a thread render the identical quoted context. */
+  replyToId?: string;
+  replyPreview?: string;
+  replyToAuthorName?: string;
+  /** Item 68 (chat reactions glass) — the API already returns this for
+   *  every message regardless of caller role (see loadReactionsByMessage in
+   *  artifacts/api-server/src/routes/conversations.ts); previously just
+   *  unread here. Same MessageReaction shape app/buyer-conversation.tsx
+   *  renders, so both sides of a thread share one reaction data model. */
+  reactions?: MessageReaction[];
 }
 interface SellerProduct {
   id: string; name: string; priceCents?: number; status?: string;
@@ -180,6 +209,12 @@ export default function SellerConversationScreen() {
   const myId = user?.id ?? '';
   const { id } = useLocalSearchParams<{ id?: string }>();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
+  // The dev-web ?bt_preview=seller bypass never signs in through Clerk (see
+  // lib/devPreview.ts), so `myId` is '' in that mode — getSellerPreviewMessages
+  // (lib/previewInbox.ts) marks the SELLER's own seeded messages with
+  // fromId 'me', so "own message" bubbles must compare against 'me' here
+  // instead of an empty myId. Never taken for a real signed-in account.
+  const effectiveMyId = myId || (isSellerPreviewConversationId(id ?? '') ? 'me' : myId);
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -196,6 +231,13 @@ export default function SellerConversationScreen() {
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
+  const [replyTo, setReplyTo] = useState<Msg | null>(null);
+  // Item 68 (chat reactions glass) — long-pressed message + its measured
+  // on-screen position, feeding the shared ReactionOverlay (see
+  // app/buyer-conversation.tsx's identical pattern).
+  const [activeSheetMsg, setActiveSheetMsg] = useState<Msg | null>(null);
+  const [reactionAnchor, setReactionAnchor] = useState<ReactionOverlayAnchor | null>(null);
+  const bubbleAnchorRefs = useRef<Record<string, View | null>>({});
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
   const voiceRecorder = useVoiceRecorder(uploadMedia, handleVoiceRecorded);
@@ -211,6 +253,14 @@ export default function SellerConversationScreen() {
 
   const loadMessages = useCallback(async (generation: number) => {
     if (!id) return;
+    // Dev/preview only: a seeded thread from lib/previewInbox.ts has no
+    // real backend record — skip the network call entirely rather than
+    // relying on its error path, same as app/buyer-conversation.tsx's
+    // identical isPreviewConversationId guard.
+    if (isSellerPreviewConversationId(id)) {
+      setMessages(getSellerPreviewMessages(id) as Msg[]);
+      return;
+    }
     // Prevent a slow poll from overlapping the next tick in the same focus
     // cycle. This keeps failures attributable to the current request stream.
     if (requestGenerationRef.current === generation) return;
@@ -236,6 +286,13 @@ export default function SellerConversationScreen() {
 
   const loadAll = useCallback(async (generation: number) => {
     if (!id) { setIsLoading(false); return; }
+    if (isSellerPreviewConversationId(id)) {
+      setConv(getSellerPreviewConversation(id) as unknown as ConvView);
+      setMessaging({ blockedByMe: false, unavailable: false });
+      await loadMessages(generation);
+      if (generationRef.current === generation) setIsLoading(false);
+      return;
+    }
     try {
       const [c] = await Promise.all([
         api.conversations.get(id),
@@ -258,7 +315,7 @@ export default function SellerConversationScreen() {
     // Mark the thread as read as soon as it opens. This is intentionally
     // independent of loading the conversation/messages so a slow or failed
     // read request cannot leave the seller's inbox badge stale.
-    if (id) {
+    if (id && !isSellerPreviewConversationId(id)) {
       api.conversations.markRead(id).catch(() => {
         notifyConversationReadFailure(id);
       });
@@ -286,6 +343,36 @@ export default function SellerConversationScreen() {
   // ── Derived ─────────────────────────────────────────────────────────────────
 
   const other = conv?.participants.find((p) => p.userId !== myId) ?? null;
+  // Item 72 (Thread Cash send in chat): the entry point always renders once
+  // the feature flag is on, disabled with an explanation rather than
+  // hidden — same affordance-check-only pattern as
+  // app/buyer-conversation.tsx, including a mirrored mutual-follow check;
+  // the server independently re-validates mutual follow at send AND claim.
+  const threadCashSendEnabled = useFeatureFlag('threadCashSend');
+  const [threadCashOverrides, setThreadCashOverrides] = useState<Record<string, ThreadCashTransferStatus>>({});
+  const [threadCashMutual, setThreadCashMutual] = useState<boolean | null>(null);
+  const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
+  const celebrateThreadCash = useCelebrateThreadCash();
+  const threadCashDisabledReason = 'You can send Thread Cash to people who follow you back';
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!threadCashSendEnabled || !other?.userId) {
+      setThreadCashMutual(null);
+      return;
+    }
+    // Preview conversations have no real backend to check against — the
+    // whole flow must be clickable end-to-end there, so treat them as an
+    // already-confirmed mutual follow, same as the buyer screen.
+    if (isSellerPreviewConversationId(id ?? '')) {
+      setThreadCashMutual(true);
+      return;
+    }
+    api.social.status(other.userId)
+      .then((status) => { if (!cancelled) setThreadCashMutual(status.isMutual); })
+      .catch(() => { if (!cancelled) setThreadCashMutual(false); });
+    return () => { cancelled = true; };
+  }, [threadCashSendEnabled, other?.userId, id, api]);
   // Chat details > Nicknames: once set, the nickname replaces the real name
   // in the header, matching buyer-conversation.tsx.
   const displayName = other?.nickname || other?.name || 'Buyer';
@@ -580,18 +667,101 @@ export default function SellerConversationScreen() {
         />
       );
     }
+    // Product share card (item 70) — same treatment as buyer-conversation.tsx
+    // so a shared product card looks identical from both sides of the DM: a
+    // real image thumbnail, live name/price (or "No longer available" — kept
+    // fresh server-side, see api-server's lib/productAttachmentInfo.ts), and
+    // an explicit "View" chip. It's a single tap target — no nested
+    // pressable inside the bubble's own long-press/swipe handlers.
+    if (att.type === 'product') {
+      const unavailable = att.meta?.unavailable === 'true';
+      return (
+        <PressableScale
+          style={s.productCard}
+          activeOpacity={0.7}
+          accessibilityLabel={`${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`}
+          testID="product-card-attachment"
+          onPress={() => {
+            const pid = att.meta?.productId;
+            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
+          }}
+        >
+          <View style={[s.productCardImage, unavailable && s.productCardImageDim]}>
+            {att.uri ? (
+              <CachedImage source={{ uri: att.uri }} style={s.productCardImageFill} recyclingKey={att.uri} />
+            ) : (
+              <Feather name="shopping-bag" size={ICON.md} color={MUTED} />
+            )}
+          </View>
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Product'}</Text>
+            <Text style={[s.attachSubtitle, unavailable && s.productUnavailableText]} numberOfLines={1}>
+              {unavailable ? 'No longer available' : (att.subtitle ?? 'Product')}
+            </Text>
+          </View>
+          <View style={s.productViewChip}>
+            <Text style={s.productViewChipText}>View</Text>
+            <Feather name="chevron-right" size={ICON.xs} color={FG} />
+          </View>
+        </PressableScale>
+      );
+    }
+    // Order status card (item 71) — same treatment as buyer-conversation.tsx
+    // so the order card the seller sent looks identical from both sides of
+    // the DM: a status badge (matching the order detail screen's own badge
+    // colors/labels, see lib/orderStatusAdapter.ts) and a real Track/View
+    // action, both kept live server-side (see api-server's
+    // lib/orderAttachmentInfo.ts) rather than the value cached at send time
+    // — the seller's own "order shipped" update must show up here right
+    // away, not just on order-detail. Single tap target — see the product
+    // card above for why the chip isn't a second Pressable.
+    if (att.type === 'order') {
+      const orderId = att.meta?.orderId;
+      const rawStatus = att.meta?.status;
+      const uiStatus = rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
+      const trackingNumber = att.meta?.trackingNumber;
+      const trackingUrl = trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
+      const chipLabel = trackingUrl ? 'Track' : 'View';
+      return (
+        <PressableScale
+          style={s.orderMsgCard}
+          activeOpacity={0.7}
+          accessibilityLabel={`${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${chipLabel}`}
+          testID="order-card-attachment"
+          onPress={() => {
+            if (trackingUrl) {
+              Linking.openURL(trackingUrl).catch(() => {});
+            } else {
+              router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
+            }
+          }}
+        >
+          <View style={s.orderMsgCardIconCircle}>
+            <Feather name="package" size={ICON.md} color={PURPLE} />
+          </View>
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Order'}</Text>
+            {uiStatus ? (
+              <View style={s.orderMsgCardBadgeRow}>
+                <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+              </View>
+            ) : (
+              <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle ?? 'Order'}</Text>
+            )}
+          </View>
+          <View style={s.productViewChip}>
+            <Text style={s.productViewChipText}>{chipLabel}</Text>
+            <Feather name={trackingUrl ? 'external-link' : 'chevron-right'} size={ICON.xs} color={FG} />
+          </View>
+        </PressableScale>
+      );
+    }
     return (
       <PressableScale
         style={s.attachCard}
-        activeOpacity={att.type === 'product' || att.type === 'order' || att.type === 'post' ? 0.7 : 1}
+        activeOpacity={att.type === 'post' ? 0.7 : 1}
         onPress={() => {
-          if (att.type === 'product') {
-            const pid = att.meta?.productId;
-            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
-          } else if (att.type === 'order') {
-            const orderId = att.meta?.orderId;
-            router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
-          } else if (att.type === 'post') {
+          if (att.type === 'post') {
             const postId = att.meta?.postId;
             if (postId) {
               const qs = [
@@ -612,7 +782,7 @@ export default function SellerConversationScreen() {
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
-        {(att.type === 'product' || att.type === 'order' || att.type === 'post') && (
+        {att.type === 'post' && (
           <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
         )}
       </PressableScale>
@@ -661,13 +831,16 @@ export default function SellerConversationScreen() {
     if (!id || !canSend) return;
     const t = text.trim();
     const att = pendingAttachment;
+    const replyingTo = replyTo;
     setText('');
     setPendingAttachment(null);
+    setReplyTo(null);
     setIsSending(true);
     try {
       const msg = await api.conversations.send(id, {
         text: t,
         attachment: att ?? undefined,
+        replyToId: replyingTo?.id,
       });
       setMessages((prev) => [...prev, msg as Msg]);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
@@ -681,10 +854,81 @@ export default function SellerConversationScreen() {
       Alert.alert('Not sent', friendly);
       setText(t);
       setPendingAttachment(att);
+      setReplyTo(replyingTo);
     } finally {
       setIsSending(false);
     }
   }
+
+  // ── Reactions (item 68: chat reactions glass) ───────────────────────────────
+  // Same data model/endpoint app/buyer-conversation.tsx uses (the reaction
+  // rows/route are conversation-scoped, not buyer- or seller-specific — see
+  // loadReactionsByMessage in artifacts/api-server/src/routes/conversations.ts)
+  // — a seller reacting here shows up on the buyer's own thread view and
+  // vice versa, with no separate implementation.
+
+  function closeMessageSheet() {
+    setActiveSheetMsg(null);
+    setReactionAnchor(null);
+  }
+
+  function openReactionOverlay(msg: Msg) {
+    hapticSelection();
+    const node = bubbleAnchorRefs.current[msg.id];
+    if (!node) { setActiveSheetMsg(msg); return; }
+    node.measureInWindow((x, y, width, height) => {
+      setReactionAnchor({ x, y, width, height });
+      setActiveSheetMsg(msg);
+    });
+  }
+
+  /** Optimistic add/remove with rollback — same reducer + call shape as
+   *  app/buyer-conversation.tsx's handleReact, just against api.conversations
+   *  directly (this screen doesn't go through services/socialService). */
+  async function handleReact(msg: Msg, type: ReactionType) {
+    if (!id) return;
+    hapticSelection();
+    const prevMessages = messages;
+    const { next, isToggleOff } = applyOptimisticReaction(msg.reactions ?? [], myId, user?.fullName || user?.username || 'You', type);
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, reactions: next } : m)));
+    try {
+      if (isToggleOff) await api.conversations.removeReaction(id, msg.id);
+      else await api.conversations.addReaction(id, msg.id, type);
+    } catch {
+      setMessages(prevMessages);
+    }
+  }
+
+  function sheetCopy() {
+    if (activeSheetMsg?.text) {
+      Clipboard.setStringAsync(activeSheetMsg.text);
+      hapticSuccessAction();
+    }
+    closeMessageSheet();
+  }
+
+  function sheetReport() {
+    const msg = activeSheetMsg;
+    closeMessageSheet();
+    if (!msg || !other) return;
+    openMessageOptions({ router, messageId: msg.id, text: msg.text, counterpart: { userId: other.userId, name: other.name } });
+  }
+
+  function sheetAttachmentLabel(msg: Msg): string {
+    switch (msg.attachment?.type) {
+      case 'image': return 'Photo';
+      case 'video': return 'Video';
+      case 'voice': return 'Voice message';
+      case 'product': return msg.attachment.title ?? 'Product';
+      case 'order': return msg.attachment.title ?? 'Order';
+      case 'post': return msg.attachment.title ?? 'Post';
+      case 'thread_cash': return 'Thread Cash';
+      default: return '';
+    }
+  }
+
+  const myReactionOnSheet = activeSheetMsg ? myReactionIn(activeSheetMsg.reactions ?? [], myId) : null;
+  const isOwnSheetMsg = activeSheetMsg ? activeSheetMsg.fromId === effectiveMyId : false;
 
   // ── Render helpers ──────────────────────────────────────────────────────────
 
@@ -707,7 +951,7 @@ export default function SellerConversationScreen() {
       );
     }
     const { msg, isFirstInGroup, isLastInGroup } = item;
-    const isOwn = msg.fromId === myId;
+    const isOwn = msg.fromId === effectiveMyId;
     if (msg.attachment?.type === 'system') {
       return (
         <SystemLine
@@ -719,6 +963,65 @@ export default function SellerConversationScreen() {
         />
       );
     }
+    // A Thread Cash send is its own standalone row — not chat text, so it
+    // never gets the colored bubble treatment, and it owns its own
+    // Accept/Cancel controls, so it must never end up nested inside the
+    // PressableScale bubble below (no nested pressables). Same early-return
+    // pattern as app/buyer-conversation.tsx's identical case.
+    if (msg.attachment?.type === 'thread_cash') {
+      const transferId = msg.attachment.meta?.transferId ?? '';
+      const senderId = msg.attachment.meta?.senderId ?? '';
+      const amountCents = Number(msg.attachment.meta?.amountCents ?? 0);
+      const status = threadCashOverrides[transferId] ?? ((msg.attachment.meta?.status as ThreadCashTransferStatus) ?? 'pending');
+      return (
+        <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? SP.sm : 2 }]}>
+          {!isOwn && (
+            isLastInGroup ? (
+              <View style={[s.msgAvatar, { backgroundColor: msg.fromColor || PURPLE }]}>
+                <Text style={s.msgAvatarInitials}>{msg.fromInitials || (msg.fromName?.[0] ?? '?')}</Text>
+              </View>
+            ) : <View style={s.msgAvatarSpacer} />
+          )}
+          <View style={{ maxWidth: BUBBLE_MAX }}>
+            <ThreadCashMessageCard
+              amountCents={amountCents}
+              note={msg.attachment.meta?.note || null}
+              status={status}
+              isRecipient={senderId !== effectiveMyId}
+              isSender={senderId === effectiveMyId}
+              onClaim={async () => {
+                try {
+                  if (isSellerPreviewConversationId(id ?? '')) {
+                    setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
+                  } else {
+                    await api.threadCash.claim({ transferId });
+                    setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
+                  }
+                  celebrateThreadCash({ amount: amountCents, from: msg.fromName || displayName });
+                } catch (e: any) {
+                  Alert.alert('Could not claim', e?.message ?? 'Please try again.');
+                  throw e;
+                }
+              }}
+              onCancel={senderId === effectiveMyId ? async () => {
+                try {
+                  if (isSellerPreviewConversationId(id ?? '')) {
+                    setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
+                  } else {
+                    await api.threadCash.cancel({ transferId });
+                    setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
+                  }
+                } catch (e: any) {
+                  Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
+                  throw e;
+                }
+              } : undefined}
+            />
+          </View>
+        </View>
+      );
+    }
+
     const removed = (msg as { removedByModeration?: boolean }).removedByModeration === true;
     const isRead = msg.status === 'read' || !!msg.readAt;
     return (
@@ -732,20 +1035,22 @@ export default function SellerConversationScreen() {
             </View>
           ) : <View style={s.msgAvatarSpacer} />
         )}
-        <View style={{ maxWidth: BUBBLE_MAX }}>
+        <View style={{ maxWidth: BUBBLE_MAX }} collapsable={false} ref={(r) => { bubbleAnchorRefs.current[msg.id] = r; }}>
+          <SwipeToReplyBubble
+            testID={`seller-conversation-bubble-swipe-${msg.id}`}
+            disabled={removed || messagingBlocked}
+            iconColor={MUTED}
+            iconBg={CARD}
+            onReply={() => { setReplyTo(msg); }}
+          >
           <PressableScale
             activeOpacity={0.9}
-            disabled={isOwn || removed || !other}
-            onLongPress={() => {
-              if (!other) return;
-              hapticSelection();
-              openMessageOptions({
-                router,
-                messageId: msg.id,
-                text: msg.text,
-                counterpart: { userId: other.userId, name: other.name },
-              });
-            }}
+            disabled={removed}
+            // Long-press always opens the reactions overlay (own or
+            // incoming message); Report stays incoming-only inside that
+            // overlay's own menu (see sheetReport below) — same one gesture
+            // now covers both, instead of a second competing long-press.
+            onLongPress={() => openReactionOverlay(msg)}
             delayLongPress={350}
             style={[
               s.bubble,
@@ -759,7 +1064,7 @@ export default function SellerConversationScreen() {
                 ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, RADIUS.lg, 4),
               },
             ]}
-            accessibilityHint={isOwn ? undefined : 'Long press to report this message'}
+            accessibilityHint="Touch and hold to react or see more options"
             // Voice messages render their own play/scrub/speed/transcription
             // buttons inside this bubble — PressableScale defaults to rendering
             // an actual <button> on web, which cannot legally contain other
@@ -767,6 +1072,17 @@ export default function SellerConversationScreen() {
             // still fully long-pressable <div> instead. See buyer-conversation.tsx.
             accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : undefined}
           >
+            {/* Quoted reply — same inline-quote-strip treatment as
+                app/buyer-conversation.tsx, so a thread reads identically from
+                both sides. */}
+            {msg.replyToId && !removed ? (
+              <View style={[s.replyQuote, { borderLeftColor: isOwn ? ON_DARK : PURPLE }]}>
+                <Text style={[s.replyQuoteText, { color: isOwn ? `${ON_DARK}CC` : MUTED }]} numberOfLines={1}>
+                  {msg.replyPreview ?? messagePreviewText(messages.find(m => m.id === msg.replyToId) ?? {})}
+                </Text>
+              </View>
+            ) : null}
+
             {/* Attachment */}
             {msg.attachment && renderMsgAttachment(msg.attachment, isOwn)}
             {/* Text — hide the single-space placeholder */}
@@ -794,6 +1110,34 @@ export default function SellerConversationScreen() {
               </View>
             )}
           </PressableScale>
+          </SwipeToReplyBubble>
+
+          {/* Reaction pill row — same summary treatment as
+              app/buyer-conversation.tsx (emoji + count, mine highlighted). */}
+          {(() => {
+            const reactionEntries = groupReactionCounts(msg.reactions ?? []);
+            const mine = myReactionIn(msg.reactions ?? [], myId);
+            if (reactionEntries.length === 0) return null;
+            return (
+              <View style={[s.reactionsRow, isOwn ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }]}>
+                {reactionEntries.map(([kind, count]) => (
+                  <PressableScale rippleEnabled={false}
+                    key={kind}
+                    style={[
+                      s.reactionChip,
+                      { backgroundColor: mine === kind ? PURPLE_DIM : CARD, borderColor: mine === kind ? PURPLE : BORDER },
+                    ]}
+                    onPress={() => handleReact(msg, kind)}
+                    activeOpacity={0.7}
+                    testID={`reaction-chip-${msg.id}-${kind}`}
+                  >
+                    <ReactionGlyph type={kind} size={12} />
+                    <Text style={[s.reactionCount, { color: mine === kind ? PURPLE : MUTED }]}>{count}</Text>
+                  </PressableScale>
+                ))}
+              </View>
+            );
+          })()}
 
           {/* Seen receipt — real backend readAt, same as
               app/buyer-conversation.tsx; see lib/chatGrouping.ts. */}
@@ -961,6 +1305,19 @@ export default function SellerConversationScreen() {
         </View>
       )}
 
+      {/* Reply preview — mirrors app/buyer-conversation.tsx's own
+          ReplyBanner (Mobbin: Instagram "Replying to a message",
+          mobbin.com/flows/c973fada-0946-4bf2-b821-8a2b37958685). */}
+      {replyTo && !messagingBlocked && (
+        <ReplyBanner
+          testID="seller-conversation-reply-banner"
+          theme={theme}
+          fromName={replyTo.fromName}
+          previewText={messagePreviewText(replyTo)}
+          onCancel={() => setReplyTo(null)}
+        />
+      )}
+
       {/* Input row */}
       {messagingBlocked && other ? (
         <BlockedComposer
@@ -1031,6 +1388,86 @@ export default function SellerConversationScreen() {
         >
           <Feather name="mic" size={ICON.md} color={MUTED} />
         </PressableScale>
+
+        {/* Item 72 — same Thread Cash entry point as
+            app/buyer-conversation.tsx, works identically from the seller
+            side of a thread. Always rendered once the feature flag is on;
+            disabled with an explanation rather than hidden until mutual
+            follow is confirmed. */}
+        {threadCashSendEnabled && other?.userId ? (
+          <ThreadCashAttachButton
+            recipientId={other.userId}
+            recipientName={other.name}
+            recipientHandle={other.handle}
+            conversationId={id ?? ''}
+            disabled={threadCashMutual !== true}
+            disabledReason={threadCashDisabledReason}
+            renderTrigger={(open) => (
+              <PressableScale
+                style={s.attachBtn}
+                onPress={() => {
+                  // Still checking mutual-follow status — silent no-op,
+                  // never a "checking…" string (see the disabled state's
+                  // own comment above).
+                  if (threadCashMutual === null) return;
+                  if (threadCashMutual === false) {
+                    setThreadCashNotice(threadCashDisabledReason);
+                    return;
+                  }
+                  open();
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="seller-conversation-thread-cash"
+                accessibilityRole="button"
+                accessibilityLabel={threadCashMutual !== true ? `Thread Cash — ${threadCashDisabledReason}` : 'Send Thread Cash'}
+                accessibilityState={{ disabled: threadCashMutual !== true }}
+              >
+                <ThreadCashBillMark size={ICON.md} color={FG} accent={PURPLE} disabled={threadCashMutual !== true} />
+              </PressableScale>
+            )}
+            onSent={async ({ transferId, amountCents, note }) => {
+              if (!id) return;
+              const attachment: MsgAttachment = {
+                type: 'thread_cash',
+                title: 'Thread Cash',
+                meta: {
+                  transferId,
+                  senderId: myId || 'me',
+                  amountCents: String(amountCents),
+                  status: 'pending',
+                  ...(note ? { note } : {}),
+                },
+              };
+              // Preview conversations have no real backend to post to —
+              // append a local mock message, same as the media/voice
+              // handlers above.
+              if (isSellerPreviewConversationId(id)) {
+                setMessages((prev) => [...prev, {
+                  id: `local-thread-cash-${transferId}`,
+                  conversationId: id,
+                  fromId: effectiveMyId,
+                  fromName: 'You',
+                  fromInitials: 'Y',
+                  fromColor: PURPLE,
+                  text: '',
+                  attachment,
+                  reactions: [],
+                  status: 'sent',
+                  ts: Date.now(),
+                }]);
+                setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+                return;
+              }
+              try {
+                const msg = await api.conversations.send(id, { text: '', attachment });
+                setMessages((prev) => [...prev, msg as Msg]);
+                setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+              } catch (e: any) {
+                Alert.alert('Sent, but the chat message failed', e?.message ?? 'The Thread Cash send went through — refresh to see it in chat.');
+              }
+            }}
+          />
+        ) : null}
 
         <TextInput
           style={s.textInput}
@@ -1200,6 +1637,57 @@ export default function SellerConversationScreen() {
           )}
         </SheetRise>
       </Modal>
+
+      {/* Long-press reactions — Glass overlay, same component/behavior as
+          app/buyer-conversation.tsx (Mobbin: Instagram DM "Tap and hold to
+          super react" — mobbin.com/screens/5d13fdd9-75ad-43d6-9089-
+          7b236e362b73). */}
+      <ReactionOverlay
+        visible={activeSheetMsg != null}
+        anchor={reactionAnchor}
+        isOwn={isOwnSheetMsg}
+        bubbleStyle={activeSheetMsg ? [
+          s.bubble,
+          { backgroundColor: isOwnSheetMsg ? sentBubbleColor : receivedBubbleColor, borderRadius: RADIUS.lg },
+        ] : undefined}
+        bubbleContent={activeSheetMsg ? (
+          <Text style={[s.msgText, { color: isOwnSheetMsg ? sentTextColor : receivedTextColor }]}>
+            {activeSheetMsg.text || sheetAttachmentLabel(activeSheetMsg)}
+          </Text>
+        ) : null}
+        selected={myReactionOnSheet}
+        onSelectReaction={(type) => {
+          if (activeSheetMsg) void handleReact(activeSheetMsg, type);
+          closeMessageSheet();
+        }}
+        menuItems={activeSheetMsg ? (
+          [
+            { key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy },
+            !isOwnSheetMsg && other
+              ? { key: 'report', label: 'Report message', icon: 'flag', destructive: true, onPress: sheetReport }
+              : null,
+          ].filter(Boolean) as ReactionOverlayMenuItem[]
+        ) : []}
+        onClose={closeMessageSheet}
+      />
+
+      <Snackbar
+        visible={threadCashNotice != null}
+        message={threadCashNotice ?? ''}
+        actionLabel="Follow"
+        onAction={async () => {
+          setThreadCashNotice(null);
+          if (!other?.userId) return;
+          try {
+            await api.social.follow(other.userId);
+            hapticSuccessAction();
+          } catch {
+            // Best-effort — the composer button stays disabled until the
+            // next mutual-follow check confirms it either way.
+          }
+        }}
+        onDismiss={() => setThreadCashNotice(null)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -1278,6 +1766,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   msgAvatarSpacer: { width: 32, marginRight: SP.sm },
   bubble: { borderWidth: 1, borderRadius: RADIUS.lg, padding: SP.md },
   msgText: { fontSize: FS.base, fontFamily: FONT.regular, color: FG, marginTop: 4 },
+  // Quoted reply snippet — same shape as app/buyer-conversation.tsx.
+  replyQuote: {
+    borderLeftWidth: 2,
+    paddingLeft: 8,
+    marginBottom: 4,
+  },
+  replyQuoteText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+  },
   bubbleMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1287,6 +1785,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   bubbleTime: { fontSize: 10, fontFamily: FONT.regular },
   receiptChecks: { flexDirection: 'row', marginLeft: 2 },
+  // Reaction pill row (item 68) — same treatment as buyer-conversation.tsx.
+  reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  reactionChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: 1,
+  },
+  reactionCount: { fontSize: 11, fontFamily: FONT.semibold },
   // Seen receipt (Instagram DM "Seen just now" reference) — small muted
   // text under the sender's own last message.
   seenReceipt: {
@@ -1306,6 +1811,40 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   attachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   attachSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+
+  // Product share card (item 70) — see buyer-conversation.tsx's matching styles.
+  productCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: BG, borderRadius: RADIUS.md,
+    padding: SP.sm, marginBottom: 2,
+    borderWidth: 1, borderColor: BORDER,
+  },
+  productCardImage: {
+    width: 44, height: 44, borderRadius: RADIUS.sm,
+    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  productCardImageDim: { opacity: 0.5 },
+  productCardImageFill: { width: '100%', height: '100%' },
+  productUnavailableText: { fontFamily: FONT.medium },
+  productViewChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill,
+    paddingVertical: 4, paddingHorizontal: SP.xs, marginLeft: SP.xs,
+  },
+  productViewChipText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG },
+
+  // Order status card (item 71) — see buyer-conversation.tsx's matching styles.
+  orderMsgCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: BG, borderRadius: RADIUS.md,
+    padding: SP.sm, marginBottom: 2,
+    borderWidth: 1, borderColor: BORDER,
+  },
+  orderMsgCardIconCircle: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center',
+  },
+  orderMsgCardBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
 
   pendingAttachRow: {
     flexDirection: 'row', alignItems: 'center',
