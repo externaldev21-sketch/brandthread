@@ -1246,8 +1246,8 @@ function RootLayoutNav() {
         <Stack.Screen name="shopping-preferences"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="account-type-settings"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="login-methods"           options={{ headerShown: false, animation: 'ios_from_right' }} />
-        {/* Account management */}
-        <Stack.Screen name="account-switcher"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        {/* Account switching is a sheet on the profile screen now — see
+            components/AccountSwitcherSheet.tsx — not a pushed route. */}
       </Stack>
         </View>
       </Pressable>

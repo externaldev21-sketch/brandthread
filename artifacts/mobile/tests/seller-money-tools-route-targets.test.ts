@@ -18,7 +18,6 @@ const mobileRoot = path.resolve(__dirname, '..');
 const appDir = path.join(mobileRoot, 'app');
 
 const AREA_FILES = [
-  'app/account-switcher.tsx',
   'app/account-type-settings.tsx',
   'app/account-type.tsx',
   'app/ai-assistant.tsx',
