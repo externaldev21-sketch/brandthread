@@ -18,8 +18,15 @@ export interface BuyerProfileFields {
   gender: string;
   phone: string;
   aiCreator: boolean;
-  /** Local URI of the picked avatar image; persisted so it survives screen nav. */
+  /**
+   * Local URI of the picked avatar image OR, when a video avatar is set, the
+   * video's poster frame — every screen that just shows a static avatar
+   * (feed, chat, calls) reads this one field and never needs to know a video
+   * exists. Persisted so it survives screen nav.
+   */
   avatarUri: string;
+  /** Set only when the avatar is a moving profile picture; empty for a plain photo. */
+  avatarVideoUri: string;
 }
 
 export const DEFAULT_BUYER_PROFILE: BuyerProfileFields = {
@@ -33,6 +40,7 @@ export const DEFAULT_BUYER_PROFILE: BuyerProfileFields = {
   phone: '',
   aiCreator: false,
   avatarUri: '',
+  avatarVideoUri: '',
 };
 
 function str(v: unknown, fallback: string): string {
@@ -53,6 +61,7 @@ function sanitize(raw: unknown): BuyerProfileFields {
     phone:     str(obj.phone, DEFAULT_BUYER_PROFILE.phone),
     aiCreator: typeof obj.aiCreator === 'boolean' ? obj.aiCreator : DEFAULT_BUYER_PROFILE.aiCreator,
     avatarUri: str(obj.avatarUri, DEFAULT_BUYER_PROFILE.avatarUri),
+    avatarVideoUri: str(obj.avatarVideoUri, DEFAULT_BUYER_PROFILE.avatarVideoUri),
   };
 }
 

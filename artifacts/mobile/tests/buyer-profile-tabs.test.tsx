@@ -40,6 +40,16 @@ vi.mock('@/components/profile/ProfileHeroMedia', () => ({
   ProfileHeroMedia: () => require('react').createElement('View', { testID: 'profile-hero-media' }),
 }));
 
+// ProfileStoryAvatar also imports expo-video directly (for a moving avatar)
+// — mock the module itself, not the component, so the avatar's own real
+// geometry/story-ring/badge structure (asserted on below) still renders;
+// none of these tests set a video avatar, so the fake player is never
+// actually exercised.
+vi.mock('expo-video', () => ({
+  useVideoPlayer: () => ({ loop: false, muted: false, play: () => {}, pause: () => {}, addListener: () => ({ remove: () => {} }) }),
+  VideoView: () => require('react').createElement('View', { testID: 'profile-avatar-video' }),
+}));
+
 vi.mock('react-native', () => {
   const React = require('react') as typeof import('react');
   const nativeComponent = (name: string) => {
