@@ -27,9 +27,9 @@ export function SellerDashboardStatGrid({
     <View style={styles.grid} testID="seller-dashboard-stat-grid">
       {tiles.map((tile) => {
         const selected = tile.key === activeKey;
-        const deltaColor = tile.deltaDirection === 'up' ? theme.success
-          : tile.deltaDirection === 'down' ? theme.error
-          : theme.muted;
+        // Monochrome brand: direction is conveyed by the arrow glyph, never by color.
+        const deltaColor = tile.deltaDirection === 'flat' ? theme.muted : theme.text;
+        const deltaArrow = tile.deltaDirection === 'up' ? '↑ ' : tile.deltaDirection === 'down' ? '↓ ' : '';
         return (
           <TouchableOpacity
             key={tile.key}
@@ -58,7 +58,7 @@ export function SellerDashboardStatGrid({
             </Text>
             {tile.deltaLabel ? (
               <Text style={[styles.delta, { color: deltaColor }]} numberOfLines={1} maxFontSizeMultiplier={1.6}>
-                {tile.deltaLabel}
+                {deltaArrow}{tile.deltaLabel}
               </Text>
             ) : null}
           </TouchableOpacity>
