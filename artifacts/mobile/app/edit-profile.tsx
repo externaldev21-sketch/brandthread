@@ -16,7 +16,7 @@ import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { NavigationCard } from '@/components/BrandthreadUI';
-import { pickProfileImage } from '@/lib/pickProfileImage';
+import { useImageSourceSheet } from '@/components/profile/ImageSourceSheet';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
@@ -88,6 +88,7 @@ export default function EditProfileScreen() {
   const [uploadError, setUploadError] = useState<Record<ImageSlotKey, string | null>>({ avatar: null, logo: null, banner: null });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
+  const { open: openImageSheet, sheet: imageSourceSheet } = useImageSourceSheet();
 
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'ok' | 'taken' | 'invalid'>('idle');
   const [usernameError, setUsernameError] = useState('');
@@ -213,7 +214,7 @@ export default function EditProfileScreen() {
     responseKey: 'profileImageUrl' | 'logoUrl' | 'bannerUrl',
     setupTaskOnSuccess?: boolean,
   ) {
-    const asset = await pickProfileImage({ aspect, title });
+    const asset = await openImageSheet({ aspect });
     if (!asset) return;
     setUploadError(prev => ({ ...prev, [key]: null }));
     setUploading(prev => ({ ...prev, [key]: true }));
@@ -563,6 +564,7 @@ export default function EditProfileScreen() {
         </View>
       </ScrollView>
       )}
+      {imageSourceSheet}
     </KeyboardAvoidingView>
   );
 }

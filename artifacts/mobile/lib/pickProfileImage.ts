@@ -6,43 +6,46 @@
 import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
+/** Opens the camera and returns the captured asset, or null if cancelled/denied. */
+export async function pickFromCamera(aspect: [number, number]): Promise<ImagePicker.ImagePickerAsset | null> {
+  const perm = await ImagePicker.requestCameraPermissionsAsync();
+  if (!perm.granted) {
+    Alert.alert('Permission needed', 'Allow camera access to take a photo.');
+    return null;
+  }
+  const res = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect, quality: 0.9 });
+  return res.canceled || !res.assets[0] ? null : res.assets[0];
+}
+
+/** Opens the photo library and returns the chosen asset, or null if cancelled/denied. */
+export async function pickFromLibrary(aspect: [number, number]): Promise<ImagePicker.ImagePickerAsset | null> {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) {
+    Alert.alert('Permission needed', 'Allow photo library access to choose a photo.');
+    return null;
+  }
+  const res = await ImagePicker.launchImageLibraryAsync({
+    allowsEditing: true, aspect, quality: 0.9, mediaTypes: ['images'],
+  });
+  return res.canceled || !res.assets[0] ? null : res.assets[0];
+}
+
+/**
+ * @deprecated The source choice ("Take Photo" / "Choose from Library") is
+ * now presented as a real `<BottomSheet>` — see `useImageSourceSheet` in
+ * components/profile/ImageSourceSheet.tsx — because `Alert.alert` with
+ * multiple buttons is a silent no-op on react-native-web, which made this
+ * a dead tap on web. Kept only for any native-only caller; every screen in
+ * this app now uses the sheet.
+ */
 export async function pickProfileImage(opts: {
   aspect: [number, number];
   title?: string;
 }): Promise<ImagePicker.ImagePickerAsset | null> {
   return new Promise((resolve) => {
-    const openLibrary = async () => {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('Permission needed', 'Allow photo library access to choose a photo.');
-        resolve(null);
-        return;
-      }
-      const res = await ImagePicker.launchImageLibraryAsync({
-        allowsEditing: true,
-        aspect: opts.aspect,
-        quality: 0.9,
-        mediaTypes: ['images'],
-      });
-      resolve(res.canceled || !res.assets[0] ? null : res.assets[0]);
-    };
-    const openCamera = async () => {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('Permission needed', 'Allow camera access to take a photo.');
-        resolve(null);
-        return;
-      }
-      const res = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: opts.aspect,
-        quality: 0.9,
-      });
-      resolve(res.canceled || !res.assets[0] ? null : res.assets[0]);
-    };
     Alert.alert(opts.title ?? 'Update photo', undefined, [
-      { text: 'Take Photo', onPress: () => { void openCamera(); } },
-      { text: 'Choose from Library', onPress: () => { void openLibrary(); } },
+      { text: 'Take Photo', onPress: () => { void pickFromCamera(opts.aspect).then(resolve); } },
+      { text: 'Choose from Library', onPress: () => { void pickFromLibrary(opts.aspect).then(resolve); } },
       { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
     ]);
   });
