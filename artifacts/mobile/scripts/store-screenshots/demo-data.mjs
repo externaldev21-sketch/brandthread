@@ -57,8 +57,8 @@ export const BUYER_USER = {
 // ─── Brands and catalogue ────────────────────────────────────────────────────
 
 const BRANDS = {
-  northline: { id: 'seller_northline', clerkId: SELLER_USER.id, name: 'Northline Studio', handle: 'northlinestudio', avatar: img('portrait-rust') },
-  ember: { id: 'seller_ember', clerkId: 'user_ember', name: 'Ember & Ash', handle: 'emberandash', avatar: img('texture-ember') },
+  northline: { id: 'seller_northline', clerkId: SELLER_USER.id, name: 'Northline Studio', handle: 'northlinestudio', avatar: img('portrait-rust'), verified: true },
+  ember: { id: 'seller_ember', clerkId: 'user_ember', name: 'Ember & Ash', handle: 'emberandash', avatar: img('texture-ember'), verified: true },
   field: { id: 'seller_field', clerkId: 'user_field', name: 'Field Office', handle: 'fieldoffice', avatar: img('look-mono') },
   quiet: { id: 'seller_quiet', clerkId: 'user_quiet', name: 'Quiet Hours', handle: 'quiethours', avatar: img('texture-mono') },
 };
@@ -93,6 +93,7 @@ function publicProduct(item, index = 0) {
     sellerDisplayName: brand.name,
     sellerHandle: brand.handle,
     sellerAvatarUrl: brand.avatar,
+    sellerVerified: brand.verified === true,
     priceCents: item.priceCents,
     currentPriceCents: item.priceCents,
     currency: 'usd',

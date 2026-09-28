@@ -445,6 +445,22 @@ router.get("/products/:id", async (req, res) => {
       .limit(1);
     const vacation = await getSellerVacationStatus(product.ownerId);
 
+    // Real "sold" count — same paid-order-quantity aggregation the bulk
+    // qualifying-products listing above already computes (claimedUnits),
+    // now also on the single-product route so the Shop sheet's multi-
+    // product list rows (ShopProductSheet.tsx) can show a real sold count
+    // instead of inventing one.
+    const [claimedRow] = await db
+      .select({ claimedUnits: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int` })
+      .from(orderItems)
+      .innerJoin(productVariants, eq(orderItems.variantId, productVariants.id))
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(and(
+        eq(productVariants.productId, product.id),
+        isNotNull(orders.paidAt),
+        notInArray(orders.status, ["cancelled", "refund_pending", "refunded"]),
+      ));
+
     res.json({
       ...product,
       sellerDisplayName: seller?.displayName ?? null,
@@ -452,6 +468,7 @@ router.get("/products/:id", async (req, res) => {
       sellerVacationMode: vacation.active,
       sellerVacationMessage: vacation.active ? vacation.message : null,
       sellerVacationUntil: vacation.until?.toISOString() ?? null,
+      claimedUnits: Math.max(0, Number(claimedRow?.claimedUnits ?? 0)),
       variants,
     });
   } catch (err) {

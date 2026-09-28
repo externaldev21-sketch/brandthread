@@ -406,6 +406,17 @@ export interface BuyerProduct {
   sellerName: string;
   sellerHandle: string;
   sellerAvatarUri?: string;
+  /** Real seller-verification status (GET /api/public/products/:id already
+   *  returns `sellerVerified`, derived server-side from the seller's user
+   *  row — see deriveSellerVerified in api-server/src/routes/public.ts).
+   *  Wired through here so the Shop sheet's seller row can show the same
+   *  verified badge other seller surfaces already show, instead of a fake
+   *  always-on checkmark. */
+  sellerVerified?: boolean;
+  /** Real "sold" count — sum of paid-order quantities for this product,
+   *  computed server-side (GET /api/public/products/:id). Used by the Shop
+   *  sheet's product-list rows; never a fake/random number. */
+  claimedUnits?: number;
   name: string;
   description: string;
   priceCents: number;
