@@ -22,8 +22,9 @@ import {
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
   markConversationRead, subscribeSocial,
   setConversationTheme, setConversationDisappearing,
-  MY_USER_ID, MY_NAME, MY_INITIALS,
+  MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
+import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import type { CallLogEntry } from '@/lib/calls/types';
@@ -704,7 +705,7 @@ export default function BuyerConversationScreen() {
       participantName: participant.name,
       participantHandle: participant.handle ?? '',
       participantInitials: participant.initials ?? '',
-      participantColor: participant.color ?? '#8B5CF6',
+      participantColor: participant.color ?? pickAvatarColor(participant.userId ?? participant.name),
       participantAvatarUri: participant.avatarUri ?? '',
       participantNickname: participant.nickname ?? '',
     });
@@ -720,7 +721,7 @@ export default function BuyerConversationScreen() {
       participantUserId: participant.userId,
       participantName: participant.name,
       participantInitials: participant.initials ?? '',
-      participantColor: participant.color ?? '#8B5CF6',
+      participantColor: participant.color ?? pickAvatarColor(participant.userId ?? participant.name),
       participantAvatarUri: participant.avatarUri ?? '',
     });
     router.push(('/conversation-details?' + qs.toString()) as never);
@@ -1233,7 +1234,7 @@ export default function BuyerConversationScreen() {
       fromId: MY_USER_ID,
       fromName: 'You',
       fromInitials: 'Y',
-      fromColor: '#8B5CF6',
+      fromColor: MY_COLOR,
       text: messageText,
       reactions: [],
       status: 'sent',

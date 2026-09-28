@@ -23,17 +23,36 @@ export interface QuantityStepperProps {
    *  cart's per-item stepper. Defaults to 'default' so every existing call
    *  site is unaffected. */
   size?: 'default' | 'sm';
+  /** Opt-in: at `min`, the − button turns into a trash icon and calls this
+   *  instead of being disabled (foodpanda / Thrive Market cart pattern — the
+   *  buyer can take a line to zero right from the stepper). Omit it and the
+   *  stepper behaves exactly as before. */
+  onRemoveAtMin?: () => void;
+  /** Accessible name for the item, used in the remove label. */
+  itemLabel?: string;
 }
 
-export function QuantityStepper({ value, onChange, min = 1, max = 99, disabled, testID, size = 'default' }: QuantityStepperProps) {
+export function QuantityStepper({
+  value, onChange, min = 1, max = 99, disabled, testID, size = 'default', onRemoveAtMin, itemLabel,
+}: QuantityStepperProps) {
   const palette = useColors();
-  const canDecrement = !disabled && value > min;
+  const removeMode = !!onRemoveAtMin && value <= min;
+  const canDecrement = !disabled && (value > min || removeMode);
   const canIncrement = !disabled && value < max;
   const sm = size === 'sm';
 
   const step = (delta: number) => {
     hapticToggle();
     onChange(Math.min(max, Math.max(min, value + delta)));
+  };
+
+  const decrement = () => {
+    if (removeMode) {
+      hapticToggle();
+      onRemoveAtMin?.();
+      return;
+    }
+    step(-1);
   };
 
   return (
@@ -43,13 +62,14 @@ export function QuantityStepper({ value, onChange, min = 1, max = 99, disabled, 
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Decrease quantity"
+        accessibilityLabel={removeMode ? `Remove${itemLabel ? ` ${itemLabel}` : ''} from cart` : 'Decrease quantity'}
         disabled={!canDecrement}
-        onPress={() => step(-1)}
+        onPress={decrement}
         style={[styles.btn, sm && styles.btnSm, !canDecrement && styles.disabled]}
         hitSlop={8}
+        testID={testID ? `${testID}-decrement` : undefined}
       >
-        <Feather name="minus" size={sm ? 13 : 16} color={canDecrement ? palette.foreground : palette.mutedForeground} />
+        <Feather name={removeMode ? 'trash-2' : 'minus'} size={sm ? 13 : 16} color={canDecrement ? palette.foreground : palette.mutedForeground} />
       </Pressable>
       <Text
         style={[TYPE_SCALE.headline, TABULAR_NUMS, { color: palette.foreground, minWidth: sm ? 18 : 22, textAlign: 'center', fontSize: sm ? 13 : undefined }]}
@@ -64,6 +84,7 @@ export function QuantityStepper({ value, onChange, min = 1, max = 99, disabled, 
         onPress={() => step(1)}
         style={[styles.btn, sm && styles.btnSm, !canIncrement && styles.disabled]}
         hitSlop={8}
+        testID={testID ? `${testID}-increment` : undefined}
       >
         <Feather name="plus" size={sm ? 13 : 16} color={canIncrement ? palette.foreground : palette.mutedForeground} />
       </Pressable>

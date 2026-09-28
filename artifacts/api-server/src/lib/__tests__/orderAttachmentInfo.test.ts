@@ -124,7 +124,13 @@ describe("enrichOrderAttachments", () => {
       id: "o1", orderNumber: "BT-10234", status: "delivered",
       trackingNumber: "1Z1", carrier: "UPS", trackingStatus: "delivered", estimatedDelivery: null,
     }];
-    const messages = [
+    // Loosely typed like the other ad-hoc fixtures in this file (see the
+    // `: any` product/order literals above) — these are plain test fixtures
+    // mutated in place by enrichOrderAttachments, not real Message shapes,
+    // so a strict inferred type (meta narrowed to just `{ orderId: string }`
+    // from this literal) only fights the assertions below that read the
+    // fields the function is expected to have added.
+    const messages: any[] = [
       { attachment: { type: "order", title: "stale", meta: { orderId: "o1" } } },
       { attachments: [{ type: "order", title: "stale2", meta: { orderId: "o1" } }] },
       { attachment: { type: "voice", title: "voice msg" } }, // untouched
