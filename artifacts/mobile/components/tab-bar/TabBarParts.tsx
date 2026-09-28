@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
   interpolate,
+  useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -21,6 +22,7 @@ import { a11yHidden } from '@/lib/a11yHidden';
 import { FONT } from '@/lib/theme';
 import type { TabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
+import { Glass } from '@/components/ui/Glass';
 
 /**
  * Shared building blocks for the buyer and seller floating tab bars.
@@ -37,12 +39,12 @@ const PRESS_OUT = { mass: 0.6, stiffness: 420, damping: 11 } as const;
 // Selection pop: overshoot a little, then settle.
 const POP_UP = { mass: 0.5, stiffness: 650, damping: 14 } as const;
 const POP_SETTLE = { mass: 0.6, stiffness: 300, damping: 12 } as const;
-// Pill glide between tabs: a plain ease-out timing, not a spring — the
-// spring this replaced (mass 0.9/stiffness 360/damping 26, damping ratio
-// ~0.72) was deliberately underdamped for "a touch of overshoot," which is
-// exactly what the "FEEL 10x better" pass's own gate rules out (no bounce/
-// overshoot anywhere). 220ms sits in the requested 200-250ms window.
-const INDICATOR_TIMING = { duration: 220, easing: Easing.out(Easing.cubic) } as const;
+// Pill glide between tabs, and the selected icon's pop — one spring drives
+// both so they read as a single coordinated motion instead of two out-of-sync
+// ones. `overshootClamping` keeps it from ever ringing past its target (the
+// "FEEL 10x better" pass's own gate rules out bounce/overshoot on the pill),
+// while still settling briskly.
+export const INDICATOR_SPRING = { mass: 1, stiffness: 220, damping: 20, overshootClamping: true } as const;
 const REDUCED_MOTION = { duration: 160 } as const;
 
 // Wraps Pressable so it can take a Reanimated-driven `style` (the buyer bar's
@@ -142,19 +144,43 @@ export function TabBarBadge({ count, theme }: { count: number; theme: AppThemePr
 // ─── Squishy press + selection pop ────────────────────────────────────────────
 
 /** Scale/translate driven by press state and by becoming selected. */
-function useTabMotion(focused: boolean) {
+function useTabMotion(
+  focused: boolean,
+  /** The shared pill-target position and this slot's own index (see
+   *  `useTabBarActiveIndex`) — when given, the pop fires the instant a press
+   *  sets `pillTarget` to `pillIndex`, on the UI thread, in the same frame
+   *  the pill's own spring kicks off, rather than waiting for `focused` to
+   *  flip after React commits the real navigation state. */
+  pillTarget?: SharedValue<number>,
+  pillIndex?: number,
+) {
   const reduceMotion = useReducedMotion();
   const press = useSharedValue(0);
   const pop = useSharedValue(1);
   const wasFocused = useRef(focused);
 
+  const popIn = useCallback(() => {
+    pop.set(withSequence(withSpring(1.18, INDICATOR_SPRING), withSpring(1, INDICATOR_SPRING)));
+  }, [pop]);
+
   useEffect(() => {
-    // Only a change *to* selected pops — never on first mount.
-    if (focused && !wasFocused.current && !reduceMotion) {
-      pop.set(withSequence(withSpring(1.18, POP_UP), withSpring(1, POP_SETTLE)));
-    }
+    // Correctness fallback for a focus change that never went through a
+    // press below (back button, deep link, programmatic navigation). Only a
+    // change *to* selected pops — never on first mount.
+    if (focused && !wasFocused.current && !reduceMotion) popIn();
     wasFocused.current = focused;
-  }, [focused, reduceMotion, pop]);
+  }, [focused, reduceMotion, popIn]);
+
+  useAnimatedReaction(
+    () => (pillTarget !== undefined && pillIndex !== undefined ? pillTarget.value === pillIndex : false),
+    (isTarget, wasTarget) => {
+      if (pillTarget === undefined || pillIndex === undefined || reduceMotion) return;
+      if (isTarget && wasTarget === false) {
+        pop.set(withSequence(withSpring(1.18, INDICATOR_SPRING), withSpring(1, INDICATOR_SPRING)));
+      }
+    },
+    [pillIndex, reduceMotion],
+  );
 
   const onPressIn = () => {
     if (reduceMotion) return;
@@ -177,13 +203,18 @@ function useTabMotion(focused: boolean) {
 // ─── Icon-only tab slot ───────────────────────────────────────────────────────
 
 export function TabBarSlot({
-  focused, width, height, onPress, onLongPress, testID, accessibilityLabel, hidden = false, badge, children,
-  animatedStyle, hitSlop,
+  focused, width, height, onPress, onPressIn: onExternalPressIn, onLongPress, testID, accessibilityLabel, hidden = false, badge, children,
+  animatedStyle, hitSlop, pillTarget, pillIndex,
 }: {
   focused: boolean;
   width: number;
   height: number;
   onPress: () => void;
+  /** Fires before `onPress`/the real navigation commit — the tab bars use
+   *  this to kick the pill's spring and this slot's own pop immediately on
+   *  touch-down (see `pillTarget`/`pillIndex`), so the glide starts the same
+   *  frame the finger lands instead of waiting on React + the screen swap. */
+  onPressIn?: () => void;
   onLongPress?: () => void;
   testID: string;
   accessibilityLabel: string;
@@ -200,8 +231,17 @@ export function TabBarSlot({
    *  this in compact mode so the tappable area never shrinks below 44pt even
    *  though the visual glyph does. */
   hitSlop?: { top?: number; bottom?: number; left?: number; right?: number };
+  /** This slot's shared pill-target position and its own index — see
+   *  `useTabMotion`'s eager pop. Omitted where there's no pill (none
+   *  currently — both bars' capsule slots pass these). */
+  pillTarget?: SharedValue<number>;
+  pillIndex?: number;
 }) {
-  const { onPressIn, onPressOut, iconStyle } = useTabMotion(focused);
+  const { onPressIn, onPressOut, iconStyle } = useTabMotion(focused, pillTarget, pillIndex);
+  const handlePressIn = () => {
+    onExternalPressIn?.();
+    onPressIn();
+  };
   return (
     <AnimatedPressable
       accessibilityRole="tab"
@@ -211,7 +251,7 @@ export function TabBarSlot({
       {...a11yHidden(hidden)}
       onPress={onPress}
       onLongPress={onLongPress}
-      onPressIn={onPressIn}
+      onPressIn={handlePressIn}
       onPressOut={onPressOut}
       testID={testID}
       hitSlop={hitSlop}
@@ -228,13 +268,17 @@ export function TabBarSlot({
 // ─── Side circle (Profile / Close, Studio, AI) ───────────────────────────────
 
 export function TabBarCircle({
-  theme, size, active = false, onPress, onLongPress, testID, accessibilityLabel, accessibilityRole = 'button',
+  theme, size, active = false, onPress, onPressIn: onExternalPressIn, onLongPress, testID, accessibilityLabel, accessibilityRole = 'button',
   selected, children, animatedStyle, hitSlop, glassAnimatedStyle,
 }: {
   theme: AppThemePreset;
   size: number;
   active?: boolean;
   onPress: () => void;
+  /** Fires before `onPress` — the buyer bar's Profile circle uses this to
+   *  eagerly hide the capsule's pill (see `useTabBarActiveIndex.hide`) the
+   *  instant it's pressed, since Profile isn't one of the pill's slots. */
+  onPressIn?: () => void;
   onLongPress?: () => void;
   testID: string;
   accessibilityLabel: string;
@@ -252,6 +296,10 @@ export function TabBarCircle({
   glassAnimatedStyle?: object;
 }) {
   const { onPressIn, onPressOut, iconStyle } = useTabMotion(active);
+  const handlePressIn = () => {
+    onExternalPressIn?.();
+    onPressIn();
+  };
   const inset = 5;
   return (
     <AnimatedPressable
@@ -261,7 +309,7 @@ export function TabBarCircle({
       aria-selected={selected}
       onPress={onPress}
       onLongPress={onLongPress}
-      onPressIn={onPressIn}
+      onPressIn={handlePressIn}
       onPressOut={onPressOut}
       testID={testID}
       hitSlop={hitSlop}
@@ -289,15 +337,80 @@ export function TabBarCircle({
 // ─── Gliding active pill ──────────────────────────────────────────────────────
 
 /**
- * The pill behind the active icon. It glides on a lightly under-damped spring
- * and stretches toward where it's heading while in flight, then snaps back to
- * its resting size, so switching tabs feels like dragging a drop of liquid.
+ * Owns the pill's position, so a tab bar can kick the glide from a press
+ * *before* React commits the real navigation state — call `press(index)`
+ * from a slot's `onPressIn`. `x`/`target`/`opacity` feed `TabBarIndicator`
+ * directly, and the same `target` also drives each slot's eager icon pop
+ * (see `useTabMotion`'s `pillTarget`/`pillIndex`), so the pill and the icon
+ * move as one motion from the same frame.
+ *
+ * The `useEffect` below is the correctness fallback for a focus change that
+ * never went through `press()` — back button, deep link, programmatic
+ * navigation, or a press that got cancelled before `onPress` fired.
+ */
+export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean) {
+  const restingX = Math.max(activeIndex, 0);
+  const shown = activeIndex >= 0;
+  // Tracked in slot-index "units" rather than raw pixels so the resting/glide
+  // position stays correct while `itemWidth` itself is also animating
+  // between its regular and compact values (see TabBarIndicator's style
+  // worklet) — a pixel-space position computed against one fixed itemWidth
+  // would no longer line up once the capsule has resized.
+  const x = useSharedValue(restingX);
+  const target = useSharedValue(restingX);
+  const opacity = useSharedValue(shown ? 1 : 0);
+  const committedIndex = useRef(restingX);
+  const committedShown = useRef(shown);
+
+  useEffect(() => {
+    opacity.set(withTiming(shown ? 1 : 0, { duration: 180 }));
+    if (committedShown.current !== shown) {
+      // Appearing (e.g. back from Profile or search) or hiding fades in
+      // place — only a move between tabs glides.
+      committedShown.current = shown;
+      committedIndex.current = restingX;
+      target.set(restingX);
+      x.set(restingX);
+      return;
+    }
+    if (committedIndex.current === restingX) return;
+    committedIndex.current = restingX;
+    target.set(restingX);
+    x.set(reduceMotion ? restingX : withSpring(restingX, INDICATOR_SPRING));
+  }, [shown, restingX, reduceMotion, x, target, opacity]);
+
+  const press = useCallback((index: number) => {
+    committedShown.current = true;
+    committedIndex.current = index;
+    opacity.set(withTiming(1, { duration: 180 }));
+    target.set(index);
+    x.set(reduceMotion ? index : withSpring(index, INDICATOR_SPRING));
+  }, [reduceMotion, x, target, opacity]);
+
+  /** For a side circle (e.g. buyer Profile) that isn't one of the pill's own
+   *  slots — hides the pill the instant that circle is pressed. */
+  const hide = useCallback(() => {
+    committedShown.current = false;
+    opacity.set(withTiming(0, { duration: 180 }));
+  }, [opacity]);
+
+  return { x, target, opacity, press, hide };
+}
+
+/**
+ * The pill behind the active icon. It glides on a critically-damped,
+ * non-overshooting spring and stretches toward where it's heading while in
+ * flight, then snaps back to its resting size, so switching tabs feels like
+ * dragging a drop of liquid. Position and size are driven by
+ * `useTabBarActiveIndex`, owned by the tab bar so a press can kick the glide
+ * ahead of the real navigation — see that hook's doc.
  */
 export function TabBarIndicator({
-  activeIndex, visible, metrics, theme, progress, compactMetrics,
+  x, target, opacity, metrics, theme, progress, compactMetrics,
 }: {
-  activeIndex: number;
-  visible: boolean;
+  x: SharedValue<number>;
+  target: SharedValue<number>;
+  opacity: SharedValue<number>;
   metrics: TabBarMetrics;
   theme: AppThemePreset;
   /** 0 (regular) → 1 (compact) — only the buyer bar passes this, to shrink
@@ -307,29 +420,6 @@ export function TabBarIndicator({
   /** The compact-mode counterpart of `metrics`, required alongside `progress`. */
   compactMetrics?: TabBarMetrics;
 }) {
-  const reduceMotion = useReducedMotion();
-  // Tracked in slot-index "units" rather than raw pixels so the resting/glide
-  // position stays correct while `itemWidth` itself is also animating
-  // between its regular and compact values (see the style worklet below) —
-  // a pixel-space position computed against one fixed itemWidth would no
-  // longer line up once the capsule has resized.
-  const restingX = Math.max(activeIndex, 0);
-  const x = useSharedValue(restingX);
-  const target = useSharedValue(restingX);
-  const opacity = useSharedValue(visible && activeIndex >= 0 ? 1 : 0);
-  const shown = visible && activeIndex >= 0;
-
-  useEffect(() => {
-    if (shown) {
-      target.set(restingX);
-      // Appearing (e.g. back from Profile or search) fades in place; only a
-      // move between tabs glides.
-      if (opacity.get() < 0.5 || reduceMotion) x.set(reduceMotion ? withTiming(restingX, REDUCED_MOTION) : restingX);
-      else x.set(withTiming(restingX, INDICATOR_TIMING));
-    }
-    opacity.set(withTiming(shown ? 1 : 0, { duration: 180 }));
-  }, [shown, restingX, reduceMotion, x, target, opacity]);
-
   const style = useAnimatedStyle(() => {
     const p = progress && compactMetrics ? progress.value : 0;
     const itemWidth = compactMetrics ? interpolate(p, [0, 1], [metrics.itemWidth, compactMetrics.itemWidth]) : metrics.itemWidth;
@@ -352,22 +442,30 @@ export function TabBarIndicator({
       height: indicatorHeight,
       top: (capsuleHeight - indicatorHeight) / 2,
       borderRadius: indicatorHeight / 2,
-      left: pad + center - width / 2,
-      transform: [{ scaleY: 1 - Math.min(stretch / maxStretch, 1) * 0.12 }],
+      // `translateX`, not `left` — a layout property like `left` forces a
+      // reflow every frame (especially costly on react-native-web, where
+      // this bar is verified at 390x844), while `transform` is
+      // compositor-only. Only `width` (unavoidable for the liquid stretch)
+      // still triggers layout.
+      transform: [
+        { translateX: pad + center - width / 2 },
+        { scaleY: 1 - Math.min(stretch / maxStretch, 1) * 0.12 },
+      ],
     };
   });
 
   return (
     <Animated.View
-      style={[
-        styles.indicator,
-        {
-          backgroundColor: `${theme.accent}26`,
-          borderColor: `${theme.accent}59`,
-        },
-        style,
-      ]}
-    />
+      style={[styles.indicator, { borderWidth: 0, overflow: 'hidden' }, style]}
+    >
+      {/* Real glass (folded in from #225's overnight-batch item 21), not a
+          flat tinted fill — `noBlur` because this sits inside the tab bar's
+          own already-blurred `TabBarGlass` surface: a second live blur
+          stacked directly on top of the first would double the cost for no
+          visible gain. The specular edge + border still read as glass on
+          their own, on top of the bar's already-refracted backdrop. */}
+      <Glass variant="regular" tint="dark" radius={metrics.indicatorHeight / 2} noBlur style={StyleSheet.absoluteFill} />
+    </Animated.View>
   );
 }
 
@@ -376,9 +474,10 @@ export function tabIconColor(theme: AppThemePreset, focused: boolean) {
   return focused ? theme.accent : theme.muted;
 }
 
-// Cross-fade duration for the outline -> filled icon swap — same 220ms
-// window as the pill's own glide (INDICATOR_TIMING) so both read as one
-// motion instead of two out-of-sync ones.
+// Cross-fade duration for the outline -> filled icon swap. Deliberately kept
+// tied to the real, committed focus change (not the pill's eager press-in
+// start) — reverting a filled icon back to outline if a press gets cancelled
+// before it becomes a real navigation would itself read as a glitch.
 const ICON_CROSSFADE_MS = 220;
 
 /**
@@ -437,6 +536,11 @@ const styles = StyleSheet.create({
   },
   indicator: {
     position: 'absolute',
+    // Fixed at the origin — the animated style's own `transform: translateX`
+    // (not `left`) does all the horizontal positioning, so this never
+    // triggers a layout reflow as the pill moves.
+    left: 0,
+    top: 0,
     pointerEvents: 'none',
     borderWidth: StyleSheet.hairlineWidth,
   },

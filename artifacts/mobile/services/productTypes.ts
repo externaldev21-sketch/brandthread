@@ -66,6 +66,15 @@ export interface ProductMedia {
   useCutout?: boolean;
   /** Background-removal processing state for this image. */
   bgRemovalStatus?: 'none' | 'processing' | 'done' | 'failed';
+
+  // ── Crop (app-wide 3:4 media aspect-ratio system) ─────────────────────────
+  /** The uncropped source photo, kept so "Edit crop" always re-crops from
+   *  the original rather than re-cropping an already-cropped image. */
+  originalUri?: string;
+  /** The saved crop, normalized against `originalUri`'s pixel dimensions —
+   *  present once the creator has cropped this photo; absent means it
+   *  predates the crop system (falls back to a centered 3:4 crop). */
+  cropRect?: { x: number; y: number; width: number; height: number };
 }
 
 // ─── Options & Variants ─────────────────────────────────────────────────────

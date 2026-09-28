@@ -27,16 +27,16 @@
  * seller product tag.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
-import { FONT, FS, SP } from '@/lib/theme';
+import { SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useAuth } from '@clerk/expo';
 import { ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { DiscoverSearchHeader } from '@/components/discover/DiscoverSearchHeader';
-import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { ThemedRefreshControl } from '@/components/ui';
 import { hapticLight } from '@/lib/haptics';
@@ -47,8 +47,8 @@ import { DiscoverGrid } from '@/components/discover/DiscoverGrid';
 import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
 import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { DiscoverBrandCard } from '@/components/discover/DiscoverBrandCard';
+import { DiscoverPersonCard } from '@/components/discover/DiscoverPersonCard';
 import { DiscoverDropRow } from '@/components/discover/DiscoverDropRow';
-import FollowButton from '@/components/social/FollowButton';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { getFriendSuggestions, muteUser } from '@/services/socialService';
 import {
@@ -89,38 +89,6 @@ function mapToEditorialTile(prefix: string, row: LiveProduct, i: number): Editor
     isUrgent: remaining > 0 && remaining <= 4,
     endsAt: row.endsAt,
   };
-}
-
-// ─── People list row (People filter — one per row, not the horizontal card) ───
-
-function PersonListRow({ person }: { person: DiscoverPersonSuggestion }) {
-  const router = useRouter();
-  const { theme } = useAppTheme();
-  // Two SIBLING tap targets, never nested — see DiscoverPeopleRow's own
-  // comment on why (a Pressable inside a Pressable is invalid on web and
-  // the press handlers fight each other). See
-  // tests/discover-no-nested-pressables.test.ts.
-  return (
-    <View style={styles.personRow}>
-      <PressableScale
-        onPress={() => router.push(`/buyer-other-profile?userId=${encodeURIComponent(person.userId)}&name=${encodeURIComponent(person.name)}&handle=${encodeURIComponent(person.handle)}&initials=${encodeURIComponent(person.initials)}` as never)}
-        style={styles.personRowTapArea}
-      >
-        {person.avatarUrl ? (
-          <Image source={{ uri: person.avatarUrl }} style={styles.personAvatar} />
-        ) : (
-          <View style={[styles.personAvatar, { backgroundColor: person.color, alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={styles.personInitials}>{person.initials}</Text>
-          </View>
-        )}
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.personName, { color: theme.text }]} numberOfLines={1}>{person.name}</Text>
-          <Text style={[styles.personReason, { color: theme.muted }]} numberOfLines={1}>{person.reason}</Text>
-        </View>
-      </PressableScale>
-      <FollowButton userId={person.userId} initial={{ isFollowing: person.isFollowing, isFollowedBy: false, isMutual: false }} size="compact" />
-    </View>
-  );
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -395,10 +363,12 @@ export default function DiscoverScreen() {
           ref={listRef as never}
           data={people}
           keyExtractor={(p) => p.userId}
-          contentContainerStyle={{ paddingBottom: barInset + SP.md }}
+          numColumns={2}
+          columnWrapperStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}
+          contentContainerStyle={{ gap: SP.sm, paddingBottom: barInset + SP.md }}
           ListHeaderComponent={header}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-          renderItem={({ item }) => <PersonListRow person={item} />}
+          renderItem={({ item }) => <DiscoverPersonCard person={item} />}
           ListEmptyComponent={peopleLoading ? (
             <ResponsiveContainer style={{ paddingHorizontal: SP.md, marginTop: SP.md }}>
               <ListSkeleton rows={4} />
@@ -475,11 +445,3 @@ export default function DiscoverScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  personRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  personRowTapArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  personAvatar: { width: 48, height: 48, borderRadius: 24 },
-  personInitials: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.sm },
-  personName: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  personReason: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-});

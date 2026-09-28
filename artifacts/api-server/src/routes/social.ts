@@ -815,7 +815,13 @@ router.get("/suggested", async (req, res) => {
     })
     .from(follows)
     .innerJoin(users, eq(users.clerkId, follows.followerId))
-    .where(and(inArray(follows.followerId, followingIds), ne(follows.followingId, myId)))
+    .where(and(
+      inArray(follows.followerId, followingIds),
+      ne(follows.followingId, myId),
+      // A self-follow row must never count as a "mutual" — otherwise a
+      // candidate can be shown as "Followed by <candidate's own name>".
+      ne(follows.followerId, follows.followingId),
+    ))
     .groupBy(follows.followingId)
     .orderBy(desc(sql`count(*)`))
     .limit(limit * 2);

@@ -8,10 +8,13 @@
  * pill-shaped sound row below — see the PR description for the full
  * measurement list.
  *
- * The shop tag used to be a `shopPill` slot at the top of this stack; it's
- * now the screen-edge ShopSideTab rendered as its own sibling in feed.tsx
- * (see app/(tabs)/feed.tsx), so this stack starts straight at the
- * repost/creator row with no leftover gap where the pill used to sit.
+ * `topSlot` (resting-pill redesign): the Shop tag pill (components/
+ * buyer-feed/ShopSideTab.tsx's `ShopTagPill`) renders here again — back at
+ * the top of this stack, directly above the creator name, left-aligned
+ * with it, ~8px gap below — instead of floating as its own screen-edge
+ * sibling. Generic (`ReactNode`, not shop-specific) so this block doesn't
+ * need to know anything about Shop tags itself; feed.tsx composes the pill
+ * and passes it in.
  */
 import React from 'react';
 import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -43,6 +46,7 @@ export function CaptionBlock({
   onOpenCreator,
   style,
   onHeightChange,
+  topSlot,
 }: {
   creator: string;
   verified: boolean;
@@ -66,6 +70,10 @@ export function CaptionBlock({
    *  this measured height, not the nominal constants, to actually guarantee
    *  no overlap. */
   onHeightChange?: (height: number) => void;
+  /** Rendered as the first item of this stack, above the creator name, with
+   *  an 8px gap below it — see the module comment above. `undefined` when
+   *  this post has no tagged product (no leftover gap in that case). */
+  topSlot?: React.ReactNode;
 }) {
   const handleLayout = onHeightChange
     ? (e: LayoutChangeEvent) => onHeightChange(e.nativeEvent.layout.height)
@@ -76,6 +84,7 @@ export function CaptionBlock({
       pointerEvents="box-none"
       onLayout={handleLayout}
     >
+      {!!topSlot && <View style={styles.topSlotWrap}>{topSlot}</View>}
       {hasRepostIdentity && (
         <TouchableOpacity
           style={styles.repostIdentity}
@@ -173,6 +182,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   rootWithRepost: { minHeight: CAPTION_BLOCK_HEIGHT_WITH_REPOST },
+  // 8px gap above the creator name (or repost row) below it — see the
+  // module comment's `topSlot` note.
+  topSlotWrap: { marginBottom: 8 },
   repostIdentity: {
     alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,

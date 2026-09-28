@@ -20,6 +20,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
+import { useReducedMotion } from 'react-native-reanimated';
 
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
@@ -30,6 +31,7 @@ import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { TabBarGlassZone } from '@/components/buyer-nav/TabBarGlassZone';
 import {
   TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, tabIconColor,
+  useTabBarActiveIndex,
 } from '@/components/tab-bar/TabBarParts';
 import {
   getLastViewedAt,
@@ -188,6 +190,12 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
   const { width } = useWindowDimensions();
 
   const activeTab = getActiveTab(segments as string[]);
+  const activeIndex = TABS.findIndex((tabDef) => tabDef.name === activeTab);
+  const reducedMotion = useReducedMotion();
+  // Owns the pill's position so a tab press can kick the glide immediately,
+  // before the screen swap — see the hook's doc in TabBarParts.
+  const { x: indicatorX, target: indicatorTarget, opacity: indicatorOpacity, press: pressIndicator } =
+    useTabBarActiveIndex(activeIndex, reducedMotion);
 
   const [newOrderCount, setNewOrderCount] = useState(() =>
     getSellerOrderBadgeCount(userId),
@@ -278,8 +286,6 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
     onOpenStudio();
   };
 
-  const activeIndex = TABS.findIndex((tabDef) => tabDef.name === activeTab);
-
   return (
     <View
       style={[styles.bar, { bottom: metrics.bottomOffset, gap: metrics.gap }]}
@@ -322,13 +328,13 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
         ]}
       >
         <TabBarGlass theme={theme} radius={metrics.capsuleHeight / 2} />
-        <TabBarIndicator activeIndex={activeIndex} visible metrics={metrics} theme={theme} />
+        <TabBarIndicator x={indicatorX} target={indicatorTarget} opacity={indicatorOpacity} metrics={metrics} theme={theme} />
 
         <View
           accessibilityRole="tablist"
           style={[styles.slotRow, { marginLeft: metrics.capsulePadding }]}
         >
-          {TABS.map((tabDef) => {
+          {TABS.map((tabDef, index) => {
             const isFocused = activeTab === tabDef.name;
             const showOrderBadge =
               tabDef.name === 'orders' && newOrderCount > 0 && !isFocused;
@@ -350,8 +356,11 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
                     : `${tabDef.label} tab`
                 }
                 onPress={onPress}
+                onPressIn={() => pressIndicator(index)}
                 testID={`seller-tab-${tabDef.name}`}
                 badge={showOrderBadge ? <TabBarBadge count={newOrderCount} theme={theme} /> : null}
+                pillTarget={indicatorTarget}
+                pillIndex={index}
               >
                 <BuyerNavIcon
                   name={tabDef.icon}
