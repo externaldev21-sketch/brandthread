@@ -141,6 +141,11 @@ export default function CameraCapture() {
   const [activeDuration, setActiveDuration] = useState(0);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
+  // ── Left tool-rail UI state (restyle-only; no new capture behavior) ──
+  const [railExpanded, setRailExpanded] = useState(true);
+  const [activePanel, setActivePanel] = useState<'effects' | 'length' | null>(null);
+  const [showRemaining, setShowRemaining] = useState(true);
+
   const cameraRef = useRef<CameraView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingRef = useRef(false);
@@ -248,6 +253,12 @@ export default function CameraCapture() {
     }
   }, []);
 
+  const cycleSpeed = useCallback(() => {
+    const idx = SPEEDS.indexOf(speed);
+    void Haptics.selectionAsync();
+    setSpeed(SPEEDS[(idx + 1) % SPEEDS.length]);
+  }, [speed]);
+
   const pinchResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: (event) => event.nativeEvent.touches.length >= 2,
     onMoveShouldSetPanResponder: (event) => event.nativeEvent.touches.length >= 2,
@@ -320,8 +331,8 @@ export default function CameraCapture() {
       {/* Corner framing brackets */}
       <FramingBrackets />
 
-      {/* ── Progress track ─────────────────────────────────────────────── */}
-      <View style={[s.progressTrack, { top: insets.top + SP.xs }]}>
+      {/* ── Progress track (recorded clips + live segment) ───────────────── */}
+      <View style={[s.progressTrack, { top: insets.top + 2 }]}>
         {clips.map((clip) => (
           <View
             key={clip.id}
@@ -337,65 +348,195 @@ export default function CameraCapture() {
         <View style={{ flex: Math.max(0.02, 1 - displayedDuration / durationMode) }} />
       </View>
 
-      {/* ── Top bar ────────────────────────────────────────────────────── */}
-      <View style={[s.topBar, { paddingTop: insets.top + SP.sm }]}>
-        {/* Close / discard */}
-        <TouchableOpacity
-          style={s.iconBtn}
-          onPress={() => {
-            if (clips.length === 0) goBackOr(router);
-            else Alert.alert('Discard clips?', 'Your recorded clips will be lost.', [
-              { text: 'Keep editing', style: 'cancel' },
-              { text: 'Discard', style: 'destructive', onPress: () => goBackOr(router) },
-            ]);
-          }}
-          accessibilityLabel="Close camera"
-        >
-          <Feather name="x" size={20} color={FG} />
-        </TouchableOpacity>
+      {/* ── Top chrome: close / gear, flash·speed·timer row, Add audio pill ── */}
+      <View style={[s.topChrome, { paddingTop: insets.top + SP.sm + 6 }]}>
+        <View style={s.topRow}>
+          {/* Close / discard */}
+          <TouchableOpacity
+            style={s.iconBtn}
+            onPress={() => {
+              if (clips.length === 0) goBackOr(router);
+              else Alert.alert('Discard clips?', 'Your recorded clips will be lost.', [
+                { text: 'Keep editing', style: 'cancel' },
+                { text: 'Discard', style: 'destructive', onPress: () => goBackOr(router) },
+              ]);
+            }}
+            accessibilityLabel="Close camera"
+          >
+            <Feather name="x" size={20} color={FG} />
+          </TouchableOpacity>
 
-        {/* Timer pill */}
+          {/* Flash · speed · timer mini row */}
+          <View style={s.miniRow}>
+            <TouchableOpacity
+              style={s.miniRowItem}
+              onPress={() => setFlash((v) => v === 'off' ? 'on' : 'off')}
+              accessibilityLabel={flash === 'off' ? 'Turn flash on' : 'Turn flash off'}
+            >
+              <Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={16} color={flash === 'on' ? '#FBBF24' : FG} />
+            </TouchableOpacity>
+
+            {captureMode === 'video' ? (
+              <TouchableOpacity style={s.miniRowItem} onPress={cycleSpeed} accessibilityLabel="Change recording speed">
+                <Text style={s.miniRowSpeedText}>{speed}x</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity
+              style={s.miniRowItem}
+              onPress={() => setActivePanel((v) => v === 'length' ? null : 'length')}
+              accessibilityLabel="Open length and timer options"
+            >
+              <Feather name="clock" size={16} color={activePanel === 'length' ? ACCENT : FG} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Settings (placeholder — no dedicated settings screen exists yet) */}
+          <TouchableOpacity
+            style={s.iconBtn}
+            onPress={() => void Haptics.selectionAsync()}
+            accessibilityLabel="Camera settings"
+          >
+            <Feather name="settings" size={19} color={FG} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Elapsed / remaining readout */}
         <View style={[s.timerPill, isRecording && s.timerPillActive]}>
           {isRecording ? <View style={s.timerDot} /> : null}
           <Text style={s.timerText}>{formatTime(displayedDuration)}</Text>
-          <Text style={s.timerRemaining}> / {formatTime(durationMode)}</Text>
+          {showRemaining ? <Text style={s.timerRemaining}> / {formatTime(durationMode)}</Text> : null}
         </View>
 
-        {/* Flash toggle */}
+        {/* Add audio pill (placeholder — no audio-library feature exists yet) */}
         <TouchableOpacity
-          style={s.iconBtn}
-          onPress={() => setFlash((v) => v === 'off' ? 'on' : 'off')}
-          accessibilityLabel={flash === 'off' ? 'Turn flash on' : 'Turn flash off'}
+          style={s.addAudioPill}
+          onPress={() => void Haptics.selectionAsync()}
+          accessibilityLabel="Add audio"
         >
-          <Feather
-            name={flash === 'off' ? 'zap-off' : 'zap'}
-            size={20}
-            color={flash === 'on' ? '#FBBF24' : FG}
-          />
+          <Feather name="music" size={13} color={FG} />
+          <Text style={s.addAudioText}>Add audio</Text>
         </TouchableOpacity>
+
+        {/* Zoom readout — only while pinched away from 0 */}
+        {zoom > 0.01 ? (
+          <View style={s.zoomBadge}>
+            <Text style={s.zoomBadgeText}>{(zoom * 9 + 1).toFixed(1)}x</Text>
+          </View>
+        ) : null}
       </View>
 
-      {/* ── Right-side vertical tool rail ──────────────────────────────── */}
-      <View style={[s.rightRail, { top: insets.top + 80 }]}>
-        {/* Flip camera */}
+      {/* ── Left tool rail: Audio · Effects · Layout · Length · Timer ────── */}
+      <View style={[s.leftRail, { top: insets.top + 150 }]}>
         <TouchableOpacity
-          style={[s.railBtn, isRecording && s.railBtnDisabled]}
-          disabled={isRecording}
-          onPress={() => setFacing((v) => v === 'back' ? 'front' : 'back')}
-          accessibilityLabel="Flip camera"
+          style={s.railChevron}
+          onPress={() => setRailExpanded((v) => !v)}
+          accessibilityLabel={railExpanded ? 'Collapse tools' : 'Expand tools'}
         >
-          <Feather name="refresh-cw" size={20} color={isRecording ? MUTED : FG} />
-          <Text style={[s.railLabel, isRecording && { color: MUTED }]}>Flip</Text>
+          <Feather name={railExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={FG} />
         </TouchableOpacity>
 
-        {/* Zoom indicator */}
-        <View style={s.railBtn}>
-          <Feather name="zoom-in" size={20} color={FG} />
-          <Text style={s.railLabel}>{Math.round(zoom * 9 + 1)}x</Text>
+        {railExpanded ? (
+          <>
+            {/* Audio — placeholder, no audio-library feature exists yet */}
+            <TouchableOpacity style={s.railBtn} onPress={() => void Haptics.selectionAsync()} accessibilityLabel="Audio tools">
+              <Feather name="music" size={19} color={FG} />
+              <Text style={s.railLabel}>Audio</Text>
+            </TouchableOpacity>
+
+            {/* Effects — filters + speed */}
+            <TouchableOpacity
+              style={s.railBtn}
+              onPress={() => setActivePanel((v) => v === 'effects' ? null : 'effects')}
+              accessibilityLabel="Effects: filters and speed"
+            >
+              <Feather name="sliders" size={19} color={activePanel === 'effects' ? ACCENT : FG} />
+              <Text style={[s.railLabel, activePanel === 'effects' && { color: ACCENT }]}>Effects</Text>
+            </TouchableOpacity>
+
+            {/* Layout — placeholder, no multi-photo layout feature exists yet */}
+            <TouchableOpacity style={s.railBtn} onPress={() => void Haptics.selectionAsync()} accessibilityLabel="Layout">
+              <Feather name="grid" size={19} color={FG} />
+              <Text style={s.railLabel}>Layout</Text>
+            </TouchableOpacity>
+
+            {/* Length — clip duration mode */}
+            <TouchableOpacity
+              style={s.railBtn}
+              onPress={() => setActivePanel((v) => v === 'length' ? null : 'length')}
+              accessibilityLabel="Clip length"
+              disabled={isRecording}
+            >
+              <Feather name="film" size={19} color={activePanel === 'length' ? ACCENT : (isRecording ? MUTED : FG)} />
+              <Text style={[s.railLabel, activePanel === 'length' && { color: ACCENT }]}>Length</Text>
+            </TouchableOpacity>
+
+            {/* Timer — toggles the "/ total" readout in the top row */}
+            <TouchableOpacity
+              style={s.railBtn}
+              onPress={() => setShowRemaining((v) => !v)}
+              accessibilityLabel={showRemaining ? 'Hide remaining time' : 'Show remaining time'}
+            >
+              <Feather name="clock" size={19} color={showRemaining ? ACCENT : FG} />
+              <Text style={[s.railLabel, showRemaining && { color: ACCENT }]}>Timer</Text>
+            </TouchableOpacity>
+          </>
+        ) : null}
+      </View>
+
+      {/* ── Effects / Length flyout panel (from left rail) ────────────────── */}
+      {activePanel === 'effects' && !isRecording ? (
+        <View style={[s.panel, { top: insets.top + 150 }]}>
+          <View style={s.filterStrip}>
+            {FILTERS.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[s.filterChip, filter === item.id && s.filterChipActive]}
+                onPress={() => setFilter(item.id)}
+              >
+                <Text style={[s.filterText, filter === item.id && s.filterTextActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {captureMode === 'video' ? (
+            <View style={[s.filterStrip, { marginTop: SP.xs }]}>
+              {SPEEDS.map((value) => (
+                <TouchableOpacity
+                  key={value}
+                  style={[s.filterChip, speed === value && s.filterChipActive]}
+                  onPress={() => setSpeed(value)}
+                >
+                  <Text style={[s.filterText, speed === value && s.filterTextActive]}>{value}x</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
         </View>
-      </View>
+      ) : null}
 
-      {/* ── Bottom bar ─────────────────────────────────────────────────── */}
+      {activePanel === 'length' && !isRecording ? (
+        <View style={[s.panel, { top: insets.top + 150 }]}>
+          {clips.length === 0 ? (
+            <View style={s.durationRow}>
+              {([15, 30, 60, 600] as DurationMode[]).map((value) => (
+                <TouchableOpacity
+                  key={value}
+                  style={[s.durationBtn, durationMode === value && s.durationBtnActive]}
+                  onPress={() => setDurationMode(value)}
+                >
+                  <Text style={[s.durationText, durationMode === value && s.durationTextActive]}>
+                    {DURATION_LABELS[value]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <Text style={s.panelHint}>Length is locked to {DURATION_LABELS[durationMode]} for this recording.</Text>
+          )}
+        </View>
+      ) : null}
+
+      {/* ── Bottom chrome ──────────────────────────────────────────────────── */}
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
 
         {/* Error banner */}
@@ -409,97 +550,75 @@ export default function CameraCapture() {
           </View>
         ) : null}
 
-        {/* Clip chips / duration selector */}
-        {captureMode === 'video' && !isRecording ? (
-          <>
-            {clips.length > 0 ? (
-              <View style={s.clipRow}>
-                {clips.map((clip, index) => (
-                  <TouchableOpacity
-                    key={clip.id}
-                    style={s.clipChip}
-                    onPress={() => {
-                      void Haptics.selectionAsync();
-                      setClips((current) => removeVideoClip(current, clip.id));
-                    }}
-                    accessibilityLabel={`Delete clip ${index + 1}`}
-                  >
-                    <Text style={s.clipChipText}>{index + 1} · {effectiveClipDuration(clip).toFixed(1)}s</Text>
-                    <Feather name="trash-2" size={11} color={ERROR} />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
-              <View style={s.durationRow}>
-                {([15, 30, 60, 600] as DurationMode[]).map((value) => (
-                  <TouchableOpacity
-                    key={value}
-                    style={[s.durationBtn, durationMode === value && s.durationBtnActive]}
-                    onPress={() => setDurationMode(value)}
-                  >
-                    <Text style={[s.durationText, durationMode === value && s.durationTextActive]}>
-                      {DURATION_LABELS[value]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </>
-        ) : null}
-
-        {/* Filter / mode selector strip */}
-        {!isRecording ? (
-          <View style={s.filterStrip}>
-            {FILTERS.map((item) => (
+        {/* Clip chips (delete a recorded clip) */}
+        {captureMode === 'video' && !isRecording && clips.length > 0 ? (
+          <View style={s.clipRow}>
+            {clips.map((clip, index) => (
               <TouchableOpacity
-                key={item.id}
-                style={[s.filterChip, filter === item.id && s.filterChipActive]}
-                onPress={() => setFilter(item.id)}
+                key={clip.id}
+                style={s.clipChip}
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  setClips((current) => removeVideoClip(current, clip.id));
+                }}
+                accessibilityLabel={`Delete clip ${index + 1}`}
               >
-                <Text style={[s.filterText, filter === item.id && s.filterTextActive]}>
-                  {item.label}
-                </Text>
+                <Text style={s.clipChipText}>{index + 1} · {effectiveClipDuration(clip).toFixed(1)}s</Text>
+                <Feather name="trash-2" size={11} color={ERROR} />
               </TouchableOpacity>
             ))}
-
-            {/* Speed chips */}
-            {captureMode === 'video' ? (
-              <>
-                <View style={s.filterDivider} />
-                {SPEEDS.map((value) => (
-                  <TouchableOpacity
-                    key={value}
-                    style={[s.filterChip, speed === value && s.filterChipActive]}
-                    onPress={() => setSpeed(value)}
-                  >
-                    <Text style={[s.filterText, speed === value && s.filterTextActive]}>{value}x</Text>
-                  </TouchableOpacity>
-                ))}
-              </>
-            ) : null}
           </View>
         ) : null}
 
-        {/* Main controls row */}
-        <View style={s.controlsRow}>
-          {/* Mode toggle */}
+        {/* Tag Product Listing entry — unchanged handoff */}
+        {captureMode === 'video' && clips.length > 0 && !isRecording ? (
           <TouchableOpacity
-            style={[s.sideBtn, (isRecording || clips.length > 0) && s.sideBtnDisabled]}
-            disabled={isRecording || clips.length > 0}
+            style={s.tagProductBtn}
+            onPress={() => {
+              (global as any).__cameraCaptureResult = {
+                type: 'video',
+                clips,
+                duration: totalClipDuration(clips),
+              };
+              goBackOr(router);
+            }}
+            accessibilityLabel="Tag product listing"
+          >
+            <Feather name="tag" size={14} color={ACCENT} />
+            <Text style={s.tagProductText}>Tag Product Listing</Text>
+            <Feather name="chevron-right" size={14} color={ACCENT} />
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Photo / Video capture-mode toggle */}
+        {!isRecording ? (
+          <TouchableOpacity
+            style={[s.captureModeToggle, clips.length > 0 && s.captureModeToggleDisabled]}
+            disabled={clips.length > 0}
             onPress={() => setCaptureMode((v) => v === 'video' ? 'picture' : 'video')}
             accessibilityLabel={captureMode === 'video' ? 'Switch to photo' : 'Switch to video'}
           >
             <Feather
               name={captureMode === 'video' ? 'camera' : 'video'}
-              size={22}
-              color={isRecording || clips.length > 0 ? MUTED : FG}
+              size={14}
+              color={clips.length > 0 ? MUTED : FG}
             />
-            <Text style={[s.sideBtnLabel, (isRecording || clips.length > 0) && { color: MUTED }]}>
-              {captureMode === 'video' ? 'Photo' : 'Video'}
+            <Text style={[s.captureModeToggleText, clips.length > 0 && { color: MUTED }]}>
+              {captureMode === 'video' ? 'Switch to Photo' : 'Switch to Video'}
             </Text>
           </TouchableOpacity>
+        ) : null}
 
-          {/* Shutter */}
+        {/* Shutter row: gallery thumbnail · shutter · flip camera */}
+        <View style={s.shutterRow}>
+          <TouchableOpacity
+            style={s.galleryThumb}
+            onPress={() => goBackOr(router)}
+            accessibilityLabel="Back to gallery"
+          >
+            <Feather name="image" size={18} color={FG} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[s.shutter, isRecording && s.shutterRecording]}
             activeOpacity={0.82}
@@ -519,48 +638,23 @@ export default function CameraCapture() {
             )}
           </TouchableOpacity>
 
-          {/* Use / Tag product */}
-          {captureMode === 'video' ? (
-            <TouchableOpacity
-              style={[s.sideBtn, (clips.length === 0 || isRecording) && s.sideBtnDisabled]}
-              disabled={clips.length === 0 || isRecording}
-              onPress={() => {
-                (global as any).__cameraCaptureResult = {
-                  type: 'video',
-                  clips,
-                  duration: totalClipDuration(clips),
-                };
-                goBackOr(router);
-              }}
-              accessibilityLabel="Use clips"
-            >
-              <Feather name="check" size={22} color={clips.length === 0 || isRecording ? MUTED : FG} />
-              <Text style={[s.sideBtnLabel, (clips.length === 0 || isRecording) && { color: MUTED }]}>Use</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={s.sideBtn} />
-          )}
+          <TouchableOpacity
+            style={[s.flipBtn, isRecording && s.railBtnDisabled]}
+            disabled={isRecording}
+            onPress={() => setFacing((v) => v === 'back' ? 'front' : 'back')}
+            accessibilityLabel="Flip camera"
+          >
+            <Feather name="refresh-cw" size={22} color={isRecording ? MUTED : FG} />
+          </TouchableOpacity>
         </View>
 
-        {/* Tag Product Listing entry */}
-        {captureMode === 'video' && clips.length > 0 && !isRecording ? (
-          <TouchableOpacity
-            style={s.tagProductBtn}
-            onPress={() => {
-              (global as any).__cameraCaptureResult = {
-                type: 'video',
-                clips,
-                duration: totalClipDuration(clips),
-              };
-              goBackOr(router);
-            }}
-            accessibilityLabel="Tag product listing"
-          >
-            <Feather name="tag" size={14} color={ACCENT} />
-            <Text style={s.tagProductText}>Tag Product Listing</Text>
-            <Feather name="chevron-right" size={14} color={ACCENT} />
+        {/* Thread / Story mode-switcher row */}
+        <View style={s.modeSwitchRow}>
+          <Text style={[s.modeSwitchLabel, s.modeSwitchLabelActive]}>Thread</Text>
+          <TouchableOpacity onPress={() => router.replace('/buyer-story-create' as never)} accessibilityLabel="Switch to Story">
+            <Text style={s.modeSwitchLabel}>Story</Text>
           </TouchableOpacity>
-        ) : null}
+        </View>
 
         {/* Gesture hint */}
         <Text style={s.gestureHint}>
@@ -593,17 +687,29 @@ const s = StyleSheet.create({
   },
   progressSegment: { height: 3, minWidth: 3, borderRadius: 1 },
 
-  // ── Top bar ──
-  topBar: {
+  // ── Top chrome ──
+  topChrome: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    alignItems: 'center', gap: SP.xs,
     paddingHorizontal: SP.md,
+  },
+  topRow: {
+    width: '100%', flexDirection: 'row',
+    justifyContent: 'space-between', alignItems: 'center',
   },
   iconBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: GLASS,
     justifyContent: 'center', alignItems: 'center',
   },
+  miniRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4,
+    backgroundColor: GLASS_LT,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm + 2, paddingVertical: 6,
+  },
+  miniRowItem: { alignItems: 'center', justifyContent: 'center', minWidth: 20 },
+  miniRowSpeedText: { color: FG, fontSize: FS.xs, fontFamily: FONT.bold },
   timerPill: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: GLASS,
@@ -614,15 +720,42 @@ const s = StyleSheet.create({
   timerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: ERROR, marginRight: 5 },
   timerText: { color: FG, fontSize: FS.sm, fontFamily: FONT.bold },
   timerRemaining: { color: MUTED, fontSize: FS.xs },
+  addAudioPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: GLASS,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.md, paddingVertical: 7,
+  },
+  addAudioText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
+  zoomBadge: {
+    backgroundColor: GLASS_LT, borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm, paddingVertical: 3,
+  },
+  zoomBadgeText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
 
-  // ── Right rail ──
-  rightRail: {
-    position: 'absolute', right: SP.md, zIndex: 20,
-    gap: SP.md + SP.xs,
+  // ── Left tool rail ──
+  leftRail: {
+    position: 'absolute', left: SP.md, zIndex: 20,
+    alignItems: 'center', gap: SP.md,
+  },
+  railChevron: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: GLASS_LT,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: SP.xs,
   },
   railBtn: { alignItems: 'center', gap: 4 },
   railBtnDisabled: { opacity: 0.38 },
   railLabel: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
+
+  // ── Effects / Length flyout panel ──
+  panel: {
+    position: 'absolute', left: SP.md + 56, right: SP.md, zIndex: 19,
+    backgroundColor: GLASS,
+    borderRadius: RADIUS.md,
+    padding: SP.sm,
+  },
+  panelHint: { color: MUTED, fontSize: FS.xs, textAlign: 'center' },
 
   // ── Framing brackets ──
   framingBox: {
@@ -674,7 +807,6 @@ const s = StyleSheet.create({
   filterChipActive: { borderColor: ACCENT, backgroundColor: `${ACCENT}22` },
   filterText: { color: 'rgba(255,255,255,0.72)', fontSize: FS.xs, fontFamily: FONT.semibold },
   filterTextActive: { color: FG },
-  filterDivider: { width: 1, height: 14, backgroundColor: 'rgba(255,255,255,0.18)', marginHorizontal: 2 },
 
   // ── Clip chips ──
   clipRow: {
@@ -690,14 +822,32 @@ const s = StyleSheet.create({
   },
   clipChipText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
 
-  // ── Controls row ──
-  controlsRow: {
+  // ── Photo / Video capture-mode toggle ──
+  captureModeToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: SP.sm + 2, paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: GLASS_LT,
+  },
+  captureModeToggleDisabled: { opacity: 0.4 },
+  captureModeToggleText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
+
+  // ── Shutter row: gallery thumbnail · shutter · flip camera ──
+  shutterRow: {
     width: '100%', flexDirection: 'row',
     alignItems: 'center', justifyContent: 'space-around',
   },
-  sideBtn: { alignItems: 'center', gap: 5, width: 64, minHeight: 44 },
-  sideBtnDisabled: { opacity: 0.35 },
-  sideBtnLabel: { color: FG, fontSize: FS.xs, fontFamily: FONT.medium },
+  galleryThumb: {
+    width: 44, height: 44, borderRadius: RADIUS.sm,
+    backgroundColor: GLASS_LT,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  flipBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: GLASS_LT,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   // Shutter button — large white circle
   shutter: {
@@ -709,6 +859,11 @@ const s = StyleSheet.create({
   shutterRecording: { borderColor: ERROR },
   shutterInner: { width: 62, height: 62, borderRadius: 31 },
   stopIcon: { width: 24, height: 24, borderRadius: 5, backgroundColor: ERROR },
+
+  // ── Thread / Story mode-switcher row ──
+  modeSwitchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.lg },
+  modeSwitchLabel: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.semibold },
+  modeSwitchLabelActive: { color: FG, fontFamily: FONT.bold },
 
   // ── Tag Product Listing ──
   tagProductBtn: {
