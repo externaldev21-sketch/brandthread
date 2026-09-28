@@ -15,6 +15,7 @@ const ATTACHMENT_META: Record<MessageAttachmentType, { icon: keyof typeof Feathe
   order: { icon: 'package', label: 'Order' },
   profile: { icon: 'user', label: 'Profile' },
   thread_cash: { icon: 'dollar-sign', label: 'Thread Cash' },
+  story_reply: { icon: 'camera', label: 'Replied to your story' },
   agent_card: { icon: 'square', label: 'Card' },
   quick_replies: { icon: 'message-circle', label: 'Quick replies' },
   system: { icon: 'info', label: 'Chat settings changed' },

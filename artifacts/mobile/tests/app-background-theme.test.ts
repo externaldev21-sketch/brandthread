@@ -28,7 +28,9 @@ describe('app background theme', () => {
     expect(ACCENT_LIGHT).toBe('#FFFFFF');
     expect(colors.dark.primary).toBe(ACCENT);
     expect(colors.dark.primaryForeground).toBe(BG);
-    expect(colors.dark.info).toBe('rgba(247,247,250,0.50)');
+    // SUBTLE is now a solid opaque grey, not an alpha blend — see the
+    // "fix the type system" fine-print pass in lib/theme.ts.
+    expect(colors.dark.info).toBe('#8A8A93');
   });
 
   it('isolates every root stack scene on an opaque background plane', () => {

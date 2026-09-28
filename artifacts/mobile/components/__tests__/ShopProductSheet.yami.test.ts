@@ -1,8 +1,9 @@
 /**
- * Structure tests for the Yami-style product sheet additions: a swipeable
- * image carousel with a 1/N counter, bold-border-selected / dashed-border-
- * unavailable variant chips, and a sticky (never-scrolls-away) Add to
- * Cart + Buy Now bar.
+ * Structure tests for the Yami-style product sheet additions: a swipeable,
+ * height-capped image carousel with dot-only paging (no numeric "1/N"
+ * badge — removed in the single-product rework, item 3), bold-border-
+ * selected / dashed-border-unavailable variant chips, and a sticky
+ * (never-scrolls-away) Add to Cart + Buy Now bar.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -10,16 +11,24 @@ import { describe, expect, it } from 'vitest';
 
 const sheet = readFileSync(resolve(__dirname, '../ShopProductSheet.tsx'), 'utf8');
 
-describe('Swipeable image carousel with a 1/N counter', () => {
-  it('renders a horizontal, paged gallery of every product image', () => {
+describe('Swipeable image carousel, dot-only paging (no numeric badge)', () => {
+  it('renders a horizontal, paged gallery of every product image, capped to a max height', () => {
     expect(sheet).toContain('function ProductImageCarousel(');
-    expect(sheet).toContain('<ProductImageCarousel imageUris={product.imageUris} />');
+    expect(sheet).toContain('<ProductImageCarousel imageUris={product.imageUris} maxHeight={imageMaxHeight} />');
     expect(sheet).toContain('pagingEnabled');
   });
 
-  it('shows a 1/N counter that tracks the current page', () => {
-    expect(sheet).toContain('ss.carouselCounter');
-    expect(sheet).toContain('{index + 1}/{images.length}');
+  it('shows page dots but no numeric "1/N" counter badge in the sheet\'s own carousel', () => {
+    expect(sheet).toContain('ss.dotsRow');
+    expect(sheet).toContain('i === index && ss.dotActive');
+    // The sheet's inline carousel counter pill is gone; only the separate
+    // full-screen viewer (FullScreenImageViewer) still shows one.
+    expect(sheet).not.toContain('ss.carouselCounter}');
+    const carouselFnBody = sheet.slice(
+      sheet.indexOf('function ProductImageCarousel('),
+      sheet.indexOf('// ─── Trust cue pill'),
+    );
+    expect(carouselFnBody).not.toContain('{index + 1}/{images.length}');
   });
 });
 

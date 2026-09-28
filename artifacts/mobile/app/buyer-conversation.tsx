@@ -1167,6 +1167,25 @@ export default function BuyerConversationScreen() {
         />
       );
     }
+    // Story reply (Mobbin: Instagram "Replying to a story") — a small
+    // square thumbnail of the replied-to slide + "Replied to your story",
+    // then the actual reply text renders below as the bubble's own text
+    // (unchanged rendering, same as every other message).
+    if (att.type === 'story_reply') {
+      return (
+        <View style={s.storyReplyCard}>
+          {att.uri ? (
+            <CachedImage source={{ uri: att.uri }} style={s.storyReplyThumb} recyclingKey={att.uri} />
+          ) : (
+            <View style={[s.storyReplyThumb, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Feather name="camera" size={ICON.sm} color={theme.muted} />
+            </View>
+          )}
+          <Text style={s.storyReplyLabel} numberOfLines={1}>{att.title || 'Replied to your story'}</Text>
+        </View>
+      );
+    }
+
     // 'thread_cash', 'quick_replies', 'agent_card', 'product' and 'order'
     // are all handled in renderItem() before this function is ever called
     // for them — they're standalone rows, not content that belongs inside a
@@ -3125,8 +3144,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: theme.text,
   },
   orderCardProduct: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    fontSize: FS.meta,
+    fontFamily: FONT.medium,
     color: theme.muted,
     marginTop: 2,
   },
@@ -3276,6 +3295,23 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // ChatAttachmentCard component (components/chat/ChatAttachmentCard.tsx) —
   // no bubble, no border, own the tap target. See renderItem's product/
   // order branch.
+  storyReplyCard: {
+    alignItems: 'center',
+    marginBottom: SP.xs,
+  },
+  storyReplyThumb: {
+    width: 72,
+    height: 108,
+    borderRadius: RADIUS.md,
+    backgroundColor: theme.cardElevated,
+    overflow: 'hidden',
+  },
+  storyReplyLabel: {
+    marginTop: 4,
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: theme.muted,
+  },
   // A standalone agent info/deep-link card — full width, coin/icon-in-a-
   // circle, bold title, subtitle, chevron. Same row shape as the Thread Cash
   // payment card below.
@@ -3303,8 +3339,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: theme.text,
   },
   attachSubtitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    fontSize: FS.meta,
+    fontFamily: FONT.medium,
     color: theme.muted,
     marginTop: 1,
   },
@@ -3650,7 +3686,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   mediaSheetOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.md, gap: SP.sm },
   mediaSheetIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
   mediaSheetLabel:  { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
-  mediaSheetDesc:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+  mediaSheetDesc:   { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
 
   // Photo grid
   photoGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 2, borderRadius: RADIUS.md, overflow: 'hidden' },

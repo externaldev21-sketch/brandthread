@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     // so web doesn't draw a second ring outside the box.
     ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
   },
-  fieldError: { fontFamily: FONT.medium, fontSize: FS.xs + 1, marginTop: 6 },
-  fieldHint: { fontFamily: FONT.regular, fontSize: FS.xs + 1, marginTop: 6 },
+  fieldError: { fontFamily: FONT.medium, fontSize: FS.meta, marginTop: 6 },
+  fieldHint: { fontFamily: FONT.medium, fontSize: FS.meta, marginTop: 6 },
   hairline: { height: StyleSheet.hairlineWidth, marginVertical: SP.sm + 4 },
 });

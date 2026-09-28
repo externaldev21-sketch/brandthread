@@ -135,16 +135,67 @@ function toConversation(seed: PreviewConversationSeed): Conversation {
 
 let cachedConversations: Conversation[] | null = null;
 
+// Conversations created at runtime (not part of the fixed seed list) — e.g.
+// replying to a story tray author (lib/previewStories.ts) who has no
+// pre-seeded thread of their own. Same lifetime/sharing model as
+// previewExtraMessages below: module-level, cleared on reload.
+const runtimeConversations = new Map<string, Conversation>();
+
 /** The full seeded preview inbox (Brandthread Agent pinned first, then 10
- *  ordinary threads) — sorted pinned-first, otherwise unchanged. Callers
- *  must still gate on `isPreviewInboxEnabled()` and prefer real API data. */
+ *  ordinary threads), plus any runtime ones from `upsertPreviewConversation`
+ *  — runtime threads first (most-recently-replied), matching how a real
+ *  inbox sorts by `updatedAt`. Callers must still gate on
+ *  `isPreviewInboxEnabled()` and prefer real API data. */
 export function getPreviewConversations(): Conversation[] {
   if (!cachedConversations) cachedConversations = allSeeds().map(toConversation);
-  return cachedConversations;
+  const runtime = [...runtimeConversations.values()].sort((a, b) => (b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0));
+  return [...runtime, ...cachedConversations];
 }
 
 export function getPreviewConversation(id: string): Conversation | null {
-  return getPreviewConversations().find(c => c.id === id) ?? null;
+  return runtimeConversations.get(id) ?? getPreviewConversations().find(c => c.id === id) ?? null;
+}
+
+/** Finds an existing preview conversation for `authorId` (seeded or
+ *  runtime), or creates a fresh runtime one for it — used by the story
+ *  viewer so replying to any tray author (not just the pre-seeded ones)
+ *  actually lands somewhere real in the preview inbox. */
+export function getOrCreatePreviewConversationForAuthor(author: {
+  authorId: string; authorName: string; authorHandle: string; authorInitials: string; authorColor: string; avatarUri?: string;
+}): Conversation {
+  const existing = getPreviewConversations().find(c => c.participants[0]?.userId === author.authorId);
+  if (existing) return existing;
+  const id = `${ID_PREFIX}story-${author.authorId}`;
+  const conv: Conversation = {
+    id,
+    type: 'buyer_to_seller',
+    participants: [{
+      userId: author.authorId,
+      name: author.authorName,
+      handle: author.authorHandle,
+      initials: author.authorInitials,
+      color: author.authorColor,
+      accountType: 'seller',
+      avatarUri: author.avatarUri,
+    }],
+    unreadCount: 0,
+    isFriendshipActive: true,
+    isArchived: false,
+    isRequest: false,
+    updatedAt: new Date().toISOString(),
+  };
+  runtimeConversations.set(id, conv);
+  return conv;
+}
+
+/** Bumps a runtime conversation's preview/timestamp after a new message —
+ *  mirrors what appendPreviewMessage's seeded-conversation counterpart gets
+ *  from the real backend for free. No-op for seeded conversations (their
+ *  preview is derived from `toConversation`, not mutated here). */
+export function touchPreviewConversation(conversationId: string, lastMessage: string, ts: number): void {
+  const conv = runtimeConversations.get(conversationId);
+  if (!conv) return;
+  runtimeConversations.set(conversationId, { ...conv, lastMessage, lastMessageTs: ts, lastMessageSenderId: 'me', updatedAt: new Date(ts).toISOString() });
 }
 
 /**

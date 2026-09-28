@@ -5,10 +5,11 @@
  * screens on Mobbin.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { CachedImage } from '@/components/CachedImage';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
@@ -92,7 +93,7 @@ export default function ProductReviewsScreen() {
               <View style={s.card}>
                 <View style={s.headerRow}>
                   {item.buyerAvatar ? (
-                    <Image source={{ uri: item.buyerAvatar }} style={s.avatar} />
+                    <CachedImage source={{ uri: item.buyerAvatar }} style={s.avatar} recyclingKey={item.id} />
                   ) : (
                     <View style={s.avatar}>
                       <Text style={s.avatarText}>{(item.buyerName?.[0] ?? '?').toUpperCase()}</Text>
@@ -127,7 +128,7 @@ export default function ProductReviewsScreen() {
                 {!!item.photos?.length && (
                   <View style={s.photoRow}>
                     {item.photos.map((uri, i) => (
-                      <Image key={uri + i} source={{ uri }} style={s.photoThumb} />
+                      <CachedImage key={uri + i} source={{ uri }} style={s.photoThumb} recyclingKey={uri} />
                     ))}
                   </View>
                 )}
@@ -156,10 +157,10 @@ function Chip({ label, active, onPress, accent }: { label: string; active: boole
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
-  muted: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm },
+  muted: { color: SUBTLE, fontFamily: FONT.medium, fontSize: FS.sm },
   chipsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: BORDER_SUBTLE },
-  chipText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED },
+  chipText: { fontSize: FS.meta, fontFamily: FONT.semibold, color: MUTED },
   card: { paddingBottom: SP.md, marginBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 },
   avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
@@ -167,11 +168,12 @@ const s = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 },
   name: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
   verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  verifiedText: { fontSize: 10, fontFamily: FONT.semibold },
-  date: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  // Was fontSize: 10 (below the 11pt floor).
+  verifiedText: { fontSize: FS.meta, fontFamily: FONT.semibold },
+  date: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
   fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },
-  fitChipText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  body: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20, marginBottom: 8 },
+  fitChipText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
+  body: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 20, marginBottom: 8 },
   photoRow: { flexDirection: 'row', gap: 6 },
   photoThumb: { width: 56, height: 56, borderRadius: 6, backgroundColor: CARD_ELEVATED },
 });

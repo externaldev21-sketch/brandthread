@@ -27,19 +27,35 @@ export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(26, 26, 26, 0.68)'; // neut
 
 
 // ─── Borders ─────────────────────────────────────────────────────────────────
+// Borders/washes stay translucent on purpose (they sit on top of varying
+// card/image content) — only TEXT colors were the "blurry fine print" bug.
 export const BORDER          = 'rgba(255,255,255,0.08)';
 export const BORDER_SUBTLE   = 'rgba(255,255,255,0.04)';
 export const BORDER_ACTIVE   = '#F7F7FA';
 export const BORDER_FOCUS    = '#F7F7FA';
+// Translucent washes for the handful of non-text call sites (dot/timeline
+// backgrounds, a hairline border) that legitimately want the old
+// see-through look. Never use these for `color:` — see MUTED/SUBTLE below.
+export const MUTED_WASH  = 'rgba(247,247,250,0.58)';
+export const SUBTLE_WASH = 'rgba(247,247,250,0.50)';
 
 // ─── Text ─────────────────────────────────────────────────────────────────────
+// Every text color here is a SOLID opaque grey, not an alpha blend. A
+// translucent small glyph on a near-black background subpixel-antialiases
+// against whatever's underneath instead of rendering as one crisp color —
+// that's what made every secondary/meta label (review body text, "Helpful
+// (N)", dates, "Verified buyer", drop timers, unfocused tab labels, …)
+// read as soft/smudgy no matter the font size. Fixed opaque greys read
+// crisp at any size. Never reintroduce `rgba(..., <1)` for a text color —
+// use SUBTLE_WASH/MUTED_WASH (above) only for non-text backgrounds/borders.
 export const FG      = '#F7F7FA';
-export const MUTED   = 'rgba(247,247,250,0.58)';
-// 50% white on the black background clears the 4.5:1 readable-text target
-// while remaining visibly dimmer than MUTED.
-export const SUBTLE  = 'rgba(247,247,250,0.50)';
+export const TEXT_PRIMARY   = FG;
+export const TEXT_SECONDARY = '#B4B4BC';
+export const TEXT_TERTIARY  = '#8A8A93';
+export const MUTED   = TEXT_SECONDARY;
+export const SUBTLE  = TEXT_TERTIARY;
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
-export const ON_DARK_MUTED = 'rgba(255,255,255,0.72)';   // secondary text on gradient/colored bg
+export const ON_DARK_MUTED = '#C7C7CE';   // secondary text on gradient/colored bg — solid, not alpha
 
 // ─── Primary Emphasis ─────────────────────────────────────────────────────────
 export const ACCENT        = '#F7F7FA';
@@ -94,7 +110,11 @@ export const FONT = {
 } as const;
 
 export const FS = {
+  // 11 is the absolute floor — badges/chips only, never body copy. Any
+  // secondary/meta/caption text (review "Helpful (N)", dates, "Verified
+  // buyer", card fine print, …) belongs at `meta` (12) or above.
   xs:   11,
+  meta: 12,
   sm:   13,
   base: 15,
   md:   17,
@@ -222,4 +242,8 @@ export const TYPE = {
   bodyMedium: { fontSize: FS.base, fontFamily: FONT.medium, lineHeight: 22 },
   caption:    { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   label:      { fontSize: FS.xs, fontFamily: FONT.semibold, lineHeight: 14 },
+  // Fine print at 12-13px needs medium (500) weight to hold up as a solid
+  // shape on a near-black background — regular weight's thin strokes are
+  // what read as "smudgy" even once the color itself is opaque.
+  meta:       { fontSize: FS.meta, fontFamily: FONT.medium, lineHeight: 16 },
 } as const;

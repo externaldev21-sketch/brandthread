@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
+  FG, MUTED, SUBTLE, SUBTLE_WASH, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -87,7 +87,7 @@ const tlS = StyleSheet.create({
   dot:        { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   dotDone:    { backgroundColor: SUCCESS },
   dotCurrent: { backgroundColor: PURPLE, borderWidth: 2, borderColor: PURPLE },
-  dotFuture:  { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: SUBTLE },
+  dotFuture:  { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: SUBTLE_WASH },
   line:       { flex: 1, width: 1.5, backgroundColor: BORDER, marginTop: 2 },
   label:      { fontSize: FS.sm, fontFamily: FONT.regular, paddingTop: 2 },
   labelDone:  { color: SUCCESS },

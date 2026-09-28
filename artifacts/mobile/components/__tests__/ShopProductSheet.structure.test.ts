@@ -12,21 +12,27 @@ const cartSource = readFileSync(
 );
 
 describe('Thread shop drawer purchase actions', () => {
-  it('labels cart and direct checkout as distinct actions with distinct icons', () => {
+  it('labels cart with its icon; Buy now is text-only (no icon)', () => {
     expect(sheetSource).toContain("phase === 'added' ? 'View cart' : 'Add to cart'");
     expect(sheetSource).toContain('<Feather name="shopping-cart"');
     expect(sheetSource).toContain('<Text style={[ss.buyBtnText, { color: theme.onAccent }]}>Buy now</Text>');
-    expect(sheetSource).toContain('<Feather name="arrow-right-circle"');
+    // Buy now dropped its circle-arrow icon — text only (single-product
+    // rework item 6). Add to cart keeps shopping-cart above.
+    expect(sheetSource).not.toContain('<Feather name="arrow-right-circle"');
   });
 
-  it('shows the full description before variant and quantity controls', () => {
+  it('shows size chips directly under the price, then the description, then any remaining options and quantity', () => {
+    const priceRowIndex = sheetSource.indexOf('onViewDetail={handleViewDetail}\n              showImage={false}');
+    const sizeChipsIndex = sheetSource.indexOf('{sizeOption && (');
     const descriptionIndex = sheetSource.indexOf("product.description.trim() || 'Product details are not available.'");
-    const optionsIndex = sheetSource.indexOf('{product.options.map');
+    const nonSizeOptionsIndex = sheetSource.indexOf('{nonSizeOptions.length > 0 && (');
     const quantityIndex = sheetSource.indexOf('<QtyControl');
 
-    expect(descriptionIndex).toBeGreaterThan(0);
-    expect(descriptionIndex).toBeLessThan(optionsIndex);
-    expect(optionsIndex).toBeLessThan(quantityIndex);
+    expect(priceRowIndex).toBeGreaterThan(0);
+    expect(priceRowIndex).toBeLessThan(sizeChipsIndex);
+    expect(sizeChipsIndex).toBeLessThan(descriptionIndex);
+    expect(descriptionIndex).toBeLessThan(nonSizeOptionsIndex);
+    expect(nonSizeOptionsIndex).toBeLessThan(quantityIndex);
   });
 
   it('routes Buy now through a direct checkout session without updating the cart badge', () => {

@@ -33,6 +33,6 @@ export function CheckoutTermsLine({ actionLabel = 'placing your order' }: { acti
 }
 
 const styles = StyleSheet.create({
-  text: { fontFamily: FONT.regular, fontSize: FS.xs + 1, lineHeight: 17, textAlign: 'center' },
+  text: { fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 17, textAlign: 'center' },
   link: { fontFamily: FONT.medium, textDecorationLine: 'underline' },
 });

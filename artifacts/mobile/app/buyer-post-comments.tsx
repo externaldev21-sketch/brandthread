@@ -33,7 +33,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import {
   SURFACE, CARD, BORDER,
-  FG, MUTED, SUBTLE,
+  FG, MUTED, SUBTLE, SUBTLE_WASH,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { SHEET_EASING_BEZIER, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion';
@@ -1392,7 +1392,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   creatorBadge: { fontFamily: FONT.semibold, fontSize: 13 },
   replyContext: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginBottom: 2 },
   commentTime: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },
-  pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE, marginLeft: 2 },
+  pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE_WASH, marginLeft: 2 },
   commentText: { fontFamily: FONT.regular, fontSize: 15, color: FG, lineHeight: 19 },
   commentTextHeld: { color: MUTED },
   reviewPill: {

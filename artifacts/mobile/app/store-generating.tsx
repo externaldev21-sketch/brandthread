@@ -11,7 +11,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, SUBTLE_WASH } from '@/lib/theme';
 import { loadDraftAnswers, generateStoreFromAnswers, applyGenerationResult, clearDraftAnswers } from '@/services/storeService';
 import { StoreGenerationAnswers } from '@/services/storeTypes';
 
@@ -352,7 +352,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: SUBTLE,
+    backgroundColor: SUBTLE_WASH,
     borderWidth: 1,
     borderColor: BORDER,
   },

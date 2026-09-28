@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import {
-  BG, BORDER, CARD, FG, MUTED, ORANGE, RED, SUBTLE, SUCCESS,
+  BG, BORDER, CARD, FG, MUTED, ORANGE, RED, SUCCESS,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
@@ -410,7 +410,10 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   progressTrack: {
     height: 5,
     borderRadius: RADIUS.pill,
-    backgroundColor: SUBTLE + '55',
+    // Same wash SUBTLE_WASH gives at ~1/3 alpha (was `SUBTLE + '55'`, which
+    // broke silently once SUBTLE became a solid hex — non-text background,
+    // stays translucent on purpose).
+    backgroundColor: 'rgba(247,247,250,0.17)',
     marginTop: SP.md,
     overflow: 'hidden',
   },
