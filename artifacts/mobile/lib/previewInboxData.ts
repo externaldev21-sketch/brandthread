@@ -64,6 +64,22 @@ export type PreviewConversationSeed = {
    *  buyer<->seller seed sets this. */
   simulateTyping?: boolean;
   messages?: PreviewMessageSeed[];
+  /** Item 144 (seller chat buyer context panel) — SELLER-side seeds only:
+   *  this buyer's other real-shaped order history with this seller, for the
+   *  panel to demo a populated state under ?bt_preview=seller. Omitted
+   *  entirely on a seed (as on preview-seller-conversation-02) to demo the
+   *  panel's real empty state instead — never present-but-empty just to
+   *  "look complete". */
+  buyerOrders?: PreviewBuyerOrderSeed[];
+};
+
+/** One row of a SELLER preview seed's `buyerOrders` — same shape the real
+ *  GET /api/orders?buyerId= endpoint returns (see api-server's
+ *  routes/orders.ts), so the preview panel and the real one render
+ *  identically. */
+export type PreviewBuyerOrderSeed = {
+  id: string; orderNumber: string; status: string; totalCents: number;
+  itemCount: number; daysAgo: number;
 };
 
 // The official "Brandthread Agent" AI friend account — pinned above every
@@ -482,6 +498,14 @@ export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     unreadCount: 0,
     isRequest: false,
     contextOrderNumber: 'BT-10234',
+    // Item 144 — Ava's order history with this seller: the jacket order
+    // this thread is about (shipped, matches the order-card attachment
+    // below) plus one earlier delivered order, so the buyer context panel
+    // has more than a single row to demo.
+    buyerOrders: [
+      { id: 'preview-order-bt-10234', orderNumber: 'BT-10234', status: 'shipped', totalCents: 18800, itemCount: 1, daysAgo: 2 },
+      { id: 'preview-order-bt-10112', orderNumber: 'BT-10112', status: 'delivered', totalCents: 6400, itemCount: 2, daysAgo: 34 },
+    ],
     messages: [
       { id: 'preview-seller-msg-01-1', fromOfficialOrParticipant: 'them', text: 'Hi! Just checking on my jacket order 🙂', minutesAgo: 240 },
       {

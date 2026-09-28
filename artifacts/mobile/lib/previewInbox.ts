@@ -22,7 +22,7 @@ import { isPreviewCatalogEnabled } from './previewCatalog';
 import {
   BRANDTHREAD_AGENT_SEED, PREVIEW_CONVERSATION_SEEDS, PREVIEW_FOLLOWER_SEEDS,
   SELLER_PREVIEW_CONVERSATION_SEEDS,
-  type PreviewConversationSeed, type PreviewMessageSeed,
+  type PreviewConversationSeed, type PreviewMessageSeed, type PreviewBuyerOrderSeed,
 } from './previewInboxData';
 import type {
   Conversation, Message, MessageAttachment, MessageReaction, Notification, ReactionType,
@@ -517,6 +517,23 @@ export function getSellerPreviewMessages(conversationId: string): Message[] {
       deletedForMe: false,
     };
   });
+}
+
+/** Item 144 (seller chat buyer context panel) — this seed's real-shaped
+ *  order-history rows for its buyer, in the same shape the real
+ *  GET /api/orders?buyerId= endpoint returns. `[]` (a seed with no
+ *  `buyerOrders`, or an unknown id) is the honest empty state, not an error
+ *  — matches getSellerPreviewMessages' identical "seed or []" contract. */
+export function getSellerPreviewBuyerOrders(conversationId: string): Array<{
+  id: string; orderNumber: string; status: string; totalCents: number; itemCount: number; createdAt: string;
+}> {
+  const seed = sellerSeedById(conversationId);
+  const rows: PreviewBuyerOrderSeed[] = seed?.buyerOrders ?? [];
+  return rows.map((r) => ({
+    id: r.id, orderNumber: r.orderNumber, status: r.status, totalCents: r.totalCents,
+    itemCount: r.itemCount,
+    createdAt: new Date(Date.now() - r.daysAgo * 86_400_000).toISOString(),
+  }));
 }
 
 // ─── Transient "typing…" simulation (preview-only, demonstrates the real
