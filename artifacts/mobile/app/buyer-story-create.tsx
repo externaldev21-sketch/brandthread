@@ -41,6 +41,7 @@ import { Button } from '@/components/ui/Button';
 import { hapticLight, hapticToggle, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { TEXT_FONTS, storyFontFamily, loadStoryFontsAsync, type StoryFontKey } from '@/lib/storyFonts';
+import { startUploadActivity, updateUploadActivity, endUploadActivity } from '@/lib/uploadLiveActivity';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -766,7 +767,14 @@ export default function StoryComposer() {
     setIsPosting(true);
     setPostingPercent(0);
     postingProgress.setValue(0);
-    const progressListener = postingProgress.addListener(({ value }) => setPostingPercent(Math.round(value)));
+    // Drives the in-app "uploading… NN%" pill everywhere, plus the iOS Dynamic
+    // Island / Lock Screen Live Activity on 16.1+ (no-op elsewhere/on Expo Go).
+    const activityId = `story_${Date.now()}`;
+    startUploadActivity({ kind: 'story', id: activityId, thumbnailUri: payload.uri });
+    const progressListener = postingProgress.addListener(({ value }) => {
+      setPostingPercent(Math.round(value));
+      updateUploadActivity(activityId, value / 100);
+    });
     Animated.timing(postingProgress, { toValue: 96, duration: 1100, useNativeDriver: false }).start();
     try {
       const media: StoryMedia[] = [{
@@ -806,6 +814,7 @@ export default function StoryComposer() {
         Animated.timing(postingProgress, { toValue: 100, duration: 180, useNativeDriver: false }).start(() => resolve());
       });
       postingProgress.removeListener(progressListener);
+      endUploadActivity(activityId, { status: 'success' });
       await showArchiveNoticeOnce();
       setShareSheetOpen(false);
       setPendingSharePayload(null);
@@ -814,6 +823,7 @@ export default function StoryComposer() {
       setAlsoShareOpen(true);
     } catch {
       postingProgress.removeListener(progressListener);
+      endUploadActivity(activityId, { status: 'failed' });
       Alert.alert("Couldn't share your story", 'Try again.');
       setIsPosting(false);
     }
