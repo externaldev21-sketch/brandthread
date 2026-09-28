@@ -38,6 +38,7 @@ import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
+import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
 import { getBuyerOrdersWithStatus } from '@/services/orderService';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
@@ -353,6 +354,7 @@ export default function ProfileScreen() {
 
   // Sheets
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
 
   const loadCounts = useCallback(async () => {
@@ -718,7 +720,7 @@ export default function ProfileScreen() {
         style={styles.topBarLeft}
         onPress={() => {
           hapticLight();
-          router.push('/account-switcher' as never);
+          setAccountSwitcherOpen(true);
         }}
         activeOpacity={0.75}
         accessibilityRole="button"
@@ -951,6 +953,8 @@ export default function ProfileScreen() {
           topPosts: publishedPosts.slice(0, 3).map(p => ({ id: p.id, uri: p.mediaUrl })),
         }}
       />
+
+      <AccountSwitcherSheet visible={accountSwitcherOpen} onClose={() => setAccountSwitcherOpen(false)} />
 
       {/* ── Post Long-Press Sheet ── */}
       <BottomSheet visible={!!postSheet} onClose={() => setPostSheet(null)}>

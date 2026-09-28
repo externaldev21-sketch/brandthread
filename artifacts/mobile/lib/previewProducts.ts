@@ -165,6 +165,7 @@ export function previewBuyerProductFromCatalog(row: PreviewCatalogProduct): Buye
     variants,
     isActive: true,
     tags: row.tags,
+    sizeChartImageUrl: row.sizeChartImageUrl,
   };
 }
 

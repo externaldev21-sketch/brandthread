@@ -42,6 +42,19 @@ function posterUri(index: number): string {
   return Asset.fromModule(POSTER_SOURCES[index]).uri;
 }
 
+// A photo of the seller's own size chart (item: size chart photo) — seeded
+// on two preview products so the buyer-side "Size guide" link has something
+// real to show without a live backend.
+const SIZE_CHART_SOURCES: Record<string, any> = {
+  'wool-coat':    require('../assets/images/size-charts/wool-coat-size-chart.png'),
+  'tuxedo':       require('../assets/images/size-charts/tuxedo-size-chart.png'),
+};
+
+function sizeChartUri(key: string | undefined): string | null {
+  if (!key) return null;
+  return Asset.fromModule(SIZE_CHART_SOURCES[key]).uri;
+}
+
 export interface PreviewCatalogProduct {
   id: string;
   productId: string;
@@ -59,6 +72,7 @@ export interface PreviewCatalogProduct {
   remainingUnits: number;
   demandCount: number;
   tags: string[];
+  sizeChartImageUrl: string | null;
 }
 
 // Same brand/product names + prices as the FASHION_PREVIEW_POSTS feed demo
@@ -82,10 +96,10 @@ export interface PreviewCatalogProduct {
 // thumbnail fell back to the post's own poster image, the same one the
 // first tagged product ("Sculpted Wool Coat") already shows. Now id
 // `preview-product-11`, matching this array's normal auto-id convention.
-const SEED: Array<Omit<PreviewCatalogProduct, 'images' | 'cutoutUri' | 'id' | 'productId' | 'sellerId'> & { posterIndex: number }> = [
-  { posterIndex: 0, name: 'Sculpted Wool Coat', sellerDisplayName: 'Atelier Noire', category: 'Outerwear', currentPriceCents: 48000, compareAtPriceCents: null, priceCents: 48000, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 18, remainingUnits: 6, demandCount: 142, tags: ['coat', 'wool', 'tailoring'] },
+const SEED: Array<Omit<PreviewCatalogProduct, 'images' | 'cutoutUri' | 'id' | 'productId' | 'sellerId' | 'sizeChartImageUrl'> & { posterIndex: number; sizeChartKey?: string }> = [
+  { posterIndex: 0, name: 'Sculpted Wool Coat', sellerDisplayName: 'Atelier Noire', category: 'Outerwear', currentPriceCents: 48000, compareAtPriceCents: null, priceCents: 48000, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 18, remainingUnits: 6, demandCount: 142, tags: ['coat', 'wool', 'tailoring'], sizeChartKey: 'wool-coat' },
   { posterIndex: 1, name: 'Liquid Silver Dress', sellerDisplayName: 'Maison Vela', category: 'Dresses', currentPriceCents: 32500, compareAtPriceCents: 39000, priceCents: 32500, sizes: ['XS', 'S', 'M'], claimedUnits: 24, remainingUnits: 4, demandCount: 210, tags: ['dress', 'evening'] },
-  { posterIndex: 2, name: 'Oversized Tuxedo', sellerDisplayName: 'Saint Rue', category: 'Suiting', currentPriceCents: 56000, compareAtPriceCents: null, priceCents: 56000, sizes: ['S', 'M', 'L', 'XL'], claimedUnits: 9, remainingUnits: 11, demandCount: 88, tags: ['suit', 'tuxedo'] },
+  { posterIndex: 2, name: 'Oversized Tuxedo', sellerDisplayName: 'Saint Rue', category: 'Suiting', currentPriceCents: 56000, compareAtPriceCents: null, priceCents: 56000, sizes: ['S', 'M', 'L', 'XL'], claimedUnits: 9, remainingUnits: 11, demandCount: 88, tags: ['suit', 'tuxedo'], sizeChartKey: 'tuxedo' },
   { posterIndex: 3, name: 'Ivory Column Set', sellerDisplayName: 'Orison', category: 'Sets', currentPriceCents: 41000, compareAtPriceCents: null, priceCents: 41000, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 12, remainingUnits: 8, demandCount: 96, tags: ['set', 'bridal'] },
   { posterIndex: 4, name: 'Asymmetric Layer Jacket', sellerDisplayName: 'Kuro Line', category: 'Outerwear', currentPriceCents: 29500, compareAtPriceCents: 35000, priceCents: 29500, sizes: ['S', 'M', 'L'], claimedUnits: 31, remainingUnits: 3, demandCount: 260, tags: ['jacket'] },
   { posterIndex: 5, name: 'Draped Hardware Gown', sellerDisplayName: 'Forme 22', category: 'Dresses', currentPriceCents: 37500, compareAtPriceCents: null, priceCents: 37500, sizes: ['XS', 'S', 'M'], claimedUnits: 15, remainingUnits: 9, demandCount: 121, tags: ['gown', 'evening'] },
@@ -119,6 +133,7 @@ export function getPreviewCatalog(): PreviewCatalogProduct[] {
     remainingUnits: row.remainingUnits,
     demandCount: row.demandCount,
     tags: row.tags,
+    sizeChartImageUrl: sizeChartUri(row.sizeChartKey),
   }));
   return cached;
 }
