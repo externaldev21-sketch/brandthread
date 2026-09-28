@@ -1,7 +1,6 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { Tabs } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated from 'react-native-reanimated';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -12,6 +11,7 @@ import {
 } from '@/components/tab-bar/TabBarParts';
 import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { useBuyerTabBarMetrics } from './buyerTabBarMetrics';
+import { TabBarGlassZone } from './TabBarGlassZone';
 
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -77,6 +77,7 @@ export function BuyerTabBar({
   const metrics = useBuyerTabBarMetrics();
   const { theme } = useAppTheme();
   const activityUnread = useActivityUnreadCount();
+  const { width } = useWindowDimensions();
 
   const activeRoute = state.routes[state.index]?.name ?? 'index';
   const activeSlot = BUYER_ROUTE_SLOT[activeRoute] ?? null;
@@ -106,16 +107,6 @@ export function BuyerTabBar({
   // the bar itself mounts/unmounts as the user navigates in and out.
   if (BUYER_TAB_BAR_HIDDEN_ROUTES.has(activeRoute)) return null;
 
-  // The feed (Home) is full-bleed video edge to edge — a solid-color fade
-  // behind the bar would paint a visible box over it. Every other screen
-  // (Discover, Inbox, Activity, Profile, …) is an ordinary scrolling list
-  // over the theme background, where content otherwise shows through
-  // between the bar's capsule/circle with no transition. `BuyerTabBar` is
-  // the one shared tab-bar container mounted for the whole buyer navigator,
-  // so gating this here (rather than per-screen) is what gets every one of
-  // those screens the same treatment automatically.
-  const isFeedRoute = activeRoute === 'index' || activeRoute === 'feed';
-
   return (
     <Animated.View
       testID="buyer-bottom-tab-bar"
@@ -124,22 +115,29 @@ export function BuyerTabBar({
         { bottom: metrics.bottomOffset, gap: metrics.gap },
       ]}
     >
-      {!isFeedRoute && (
-        // `bar`'s own coordinate origin is already offset by
-        // `metrics.bottomOffset` from the true screen bottom (see the
-        // `bottom` set on `styles.bar` above), so this needs the negative
-        // of that same offset to actually reach the screen's bottom edge
-        // and fade upward from there — a plain `bottom: 0` would stop
-        // short by exactly `metrics.bottomOffset` and leave a hard edge.
-        <LinearGradient
-          testID="buyer-tab-bar-fade"
-          pointerEvents="none"
-          colors={['transparent', theme.background]}
-          locations={[0, 1]}
-          style={[styles.fade, { bottom: -metrics.bottomOffset, height: metrics.occupiedHeight + 20 }]}
-        />
-      )}
-
+      {/* Frosted glass over whatever's actually rendered behind the bar —
+          the feed's full-bleed video, or an ordinary scrolling list on
+          Discover/Inbox/Activity/Profile. `BuyerTabBar` is the one shared
+          tab-bar container mounted for the whole buyer navigator (see
+          app/(buyer)/_layout.tsx's `tabBar` prop), so rendering it here
+          once — instead of each screen wiring its own copy — is what gets
+          every one of those screens the same live-sampled treatment
+          automatically, feed included.
+          `bar`'s own coordinate origin is already offset by
+          `metrics.bottomOffset` from the true screen bottom (see the
+          `bottom` set on `styles.bar` above), so this needs the negative
+          of that same offset to actually reach the screen's bottom edge —
+          a plain `bottom: 0` would stop short by exactly that offset and
+          leave a hard, unblurred edge below the glass. The height is
+          `barTopInset` (not the more generous `occupiedHeight`) so the
+          glass's own top edge lands exactly on the bar's top pixel, with
+          no gap of sharp content between them. */}
+      <TabBarGlassZone
+        height={metrics.barTopInset}
+        width={width}
+        tint="dark"
+        style={{ bottom: -metrics.bottomOffset }}
+      />
 
       {/* ── Capsule ─────────────────────────────────────────────────────── */}
       <Animated.View
@@ -224,11 +222,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     pointerEvents: 'box-none',
   },
-  // Full-width backdrop fade so scrolling content behind the bar (row text,
-  // avatars) fades into the screen background instead of showing through
-  // between the capsule and the side circle. See the render-site comment
-  // for why `bottom`/`height` are computed there instead of hardcoded here.
-  fade: { position: 'absolute', left: 0, right: 0 },
   // Shadow lives on an unclipped wrapper; the glass inside clips to the radius.
   shadow: TAB_BAR_SHADOW,
   slotRow: {

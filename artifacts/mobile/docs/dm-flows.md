@@ -176,18 +176,129 @@ instruction to call these out rather than silently skip them):
 
 ## PR 2 — Chat details, nicknames, mute, search-in-chat (pattern reference, not forced 1:1)
 
-No single Mobbin flow was named by the owner for this PR. Reference screens
+No single Mobbin flow was named by the owner for this PR. Reference screen
 pulled while researching PR 3 (the "Changing theme" flow starts from the
-chat-details screen) are reused here as the strongest available pattern:
+chat-details screen) is used as the pattern reference:
 
 - [Chat details — Profile / Search / Mute / Options + Theme / Nicknames /
   Disappearing messages / Privacy & safety / Create a group chat / Something
   isn't working](https://mobbin.com/screens/04bcd22a-412d-4ca5-a8fe-7d3d2fc6f6f4)
   (flow: [Changing theme](https://mobbin.com/flows/7bcc8b1f-13b7-4656-bb0f-fd5a4fa75108))
 
-This section will be filled in with the full row-by-row implementation notes
-(search-in-chat, mute duration sheet, nicknames editor + thread display,
-privacy & safety, group chat creation, report flow) when PR 2 is built.
+| Row / action | Mobbin reference | Brandthread screen | Buyer | Seller |
+|---|---|---|---|---|
+| Tap header name → chat details | same screen as above | `app/conversation-details.tsx` | ✅ | ✅ |
+| Profile | "Profile" action | reuses existing `/buyer-other-profile` navigation | ✅ | ✅ |
+| Search | "Search" action | `app/conversation-search.tsx` — real search over `GET /api/conversations/:id/messages?q=` | ✅ | ✅ |
+| Mute | "Mute" action → duration sheet | in-screen sheet in `conversation-details.tsx`; `PATCH /api/conversations/:id/mute` | ✅ | ✅ |
+| Options | "Options" action | reuses the existing Block/Unblock Alert pattern | ✅ | ✅ |
+| Theme row | Theme row (name + "New" pill) | **UI stub** — shows "Default" + "New" pill; tapping shows a placeholder alert. Real picker/apply lands in PR 3. | ✅ | ✅ |
+| Nicknames | Nicknames row | `app/conversation-nicknames.tsx`; `PATCH /api/conversations/:id/nickname` | ✅ | ✅ |
+| Disappearing messages | row + Off/On | **UI stub** — a real `Switch` that flips local Off/On state; no persistence or auto-delete logic yet (PR 3). | ✅ | ✅ |
+| Privacy & safety | row | `app/conversation-privacy-safety.tsx` — real Block/Unblock + Report | ✅ | ✅ |
+| Create a group chat | row | `app/conversation-group-create.tsx` — real, minimal (see below) | ✅ | ✅ |
+| Something isn't working | row | reuses the existing `/buyer-report` flow via `reportHref()` | ✅ | ✅ |
+
+### Backend (real, not stubbed)
+
+New migration `lib/db/migrations/096_conversation_nicknames_and_mute.sql`:
+- `conversations.nicknames` — a `jsonb` map keyed `"<viewerUserId>:<targetUserId>"`
+  → nickname string. Conversation-scoped (not global), matching Instagram's
+  model, and one map serves every participant's settings for every other
+  participant without a join table — it also just works for a future group
+  chat with no further schema change.
+- `conversation_participants.muted_until` — nullable timestamp on the
+  existing per-membership row (same place `unread_count`/`last_read_at`
+  already live): `null` = not muted, a timestamp = muted until then, a
+  far-future sentinel (`9999-12-31`) = "Until I turn it back on".
+
+New endpoints in `artifacts/api-server/src/routes/conversations.ts`:
+- `PATCH /api/conversations/:id/mute` — `{ durationMinutes }` (`-1` = forever,
+  `null`/`0` = unmute).
+- `PATCH /api/conversations/:id/nickname` — `{ targetUserId, nickname }`.
+- `GET /api/conversations/:id/messages?q=` — search-in-chat, scoped to that
+  conversation's own messages only (`ilike` on `body`), never global search.
+- `POST /api/conversations` now also accepts `participants: [...]` (2+) for a
+  minimal group-chat create path, alongside the existing single-`participant`
+  1:1 path.
+
+**Mute actually suppresses notifications** (not just a cosmetic toggle): the
+new-message notification fan-out in `POST /:id/messages` now looks up each
+recipient's `mutedUntil` and skips `publishNotification()` for anyone
+currently muted.
+
+`buildConversationView()` now resolves each participant's `nickname` (the
+current viewer's own nickname for them — never another viewer's) and the
+current viewer's own `mutedUntil`, so a single `GET /api/conversations/:id`
+carries everything chat details needs.
+
+### Client wiring
+
+- `services/socialTypes.ts`: `ConversationParticipant.nickname?`,
+  `Conversation.mutedUntil?`.
+- `services/socialService.ts`: `searchConversationMessages`,
+  `muteConversation`, `setConversationNickname` (buyer path, via the
+  cached-request `serviceRequest` helper — same pattern as
+  `markConversationRead`).
+- `lib/api.ts`: `api.conversations.searchMessages/mute/setNickname/createGroup`
+  (seller path, and reused directly by the new shared screens).
+- **Nickname actually renders in the thread**: `buyer-conversation.tsx`'s
+  `displayName` and `seller-conversation.tsx`'s new `displayName` both prefer
+  `participant.nickname` over the real name — this drives the header title
+  (the main place a 1:1 DM's thread ever shows the counterpart's name).
+
+### Divergences / documented scope decisions
+
+- **No "Restrict" row.** Instagram's Privacy & safety includes Restrict
+  (limits a person's visibility without a hard block); Brandthread's backend
+  has no such concept, only a hard block. Adding a Restrict-labeled row with
+  no real effect behind it would fail the "every row must actually function"
+  standard, so Privacy & safety here surfaces exactly the two real actions
+  the app can back: Block/Unblock and Report.
+- **Group chat is intentionally minimal.** No group name/photo, no
+  add/remove-member-after-creation, no admin roles — just "pick 2+ people you
+  follow, create, land in the same 1:1-style conversation screen". The
+  conversation screen's header still shows only "the other participant"
+  (`.find(p => p.userId !== myId)`), so a 3+-person group's header will show
+  a single name rather than every member — a known rough edge of reusing the
+  1:1 screen unchanged, called out here rather than silently shipped.
+  `POST /api/conversations`'s new `participants` array path also skips the
+  1:1-specific checks (DM-privacy preference, seller vacation status,
+  dedup-against-existing) since those don't apply to a multiple-person
+  create.
+- **Seller screen still has no seeded preview conversation data** (same
+  pre-existing gap noted in PR 1's section) — chat details itself opens fine
+  from the seller screen once a real `other` participant exists, but in this
+  web-preview harness (no real backend) `other` is always null there, so the
+  header-name button (`disabled={!other}`) never activates in the seller
+  screenshots. Confirmed the underlying code path is identical to the buyer
+  side; this is a preview-data gap, not a chat-details bug.
+- **Options row keeps its own local block-state** (seeded once, via an
+  `isBlocked` query param from the calling screen) rather than live-syncing
+  with the calling screen while chat details is open — acceptable since the
+  calling screen already refetches conversation state on focus, so returning
+  from chat details always shows the current truth.
+
+### Verification
+
+`expo start --web` + Playwright at 375×667/390×844/430×932, `?bt_preview=buyer`
+and the seller equivalent. Screenshotted: chat details (all rows + avatar/
+name/handle), the mute sheet, muted state (Mute → Unmute), disappearing-
+messages toggle (Off → On), search (empty state → typed query → filtered
+results from the conversation's own messages), nicknames (blank → filled),
+privacy & safety, group-create (empty-follows state, since this harness has
+no real backend to seed a following list from), and the theme stub row. No
+console errors in any run. `tsc --noEmit` clean on both packages (matching
+the untouched e2e/pre-existing-file baselines exactly). Full test suites:
+same pre-existing failures as PR 1's baseline, nothing new.
+
+Note: PR 2 was branched fresh from `origin/dev` (not stacked on PR 1's
+branch, since PR 1 isn't merged yet, per the owner's instruction that each
+PR stay independently reviewable) — so this branch's `buyer-conversation.tsx`/
+`seller-conversation.tsx` do not include PR 1's voice-message composer yet.
+Once both PRs land on `dev`, the two features coexist in the same files
+without conflict (PR 1 touches the composer/mic area and message-attachment
+rendering; PR 2 touches the header/name tap and adds new standalone screens).
 
 ---
 

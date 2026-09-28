@@ -1,0 +1,99 @@
+/**
+ * Privacy & safety — chat details > Privacy & safety. Real, functioning
+ * actions: Block/Unblock (reuses lib/safety.ts's confirmBlock/confirmUnblock,
+ * the same flow used everywhere else in the app) and Report. Brandthread has
+ * no "Restrict" (limited-visibility) concept in its backend — only a hard
+ * block — so this screen doesn't fabricate a non-functional Restrict row;
+ * see docs/dm-flows.md for this documented scope decision.
+ */
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT, FS, SP, ICON } from '@/lib/theme';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
+import { confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
+import { useApi } from '@/lib/api';
+import { goBackOr } from '@/lib/navigation/goBackOr';
+
+export default function ConversationPrivacySafetyScreen() {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeStyles(), []);
+  const insets = useSafeAreaInsets();
+  const headerTopPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const router = useRouter();
+  const api = useApi();
+  const params = useLocalSearchParams<{ id: string; participantUserId: string; participantName: string }>();
+  const [isBlocked, setIsBlocked] = useState(false);
+
+  async function toggleBlock() {
+    hapticSelection();
+    const subject = { userId: params.participantUserId, name: params.participantName };
+    const ok = isBlocked
+      ? await confirmUnblock(subject, api.social.unblock)
+      : await confirmBlock(subject, api.social.block);
+    if (ok) setIsBlocked((v) => !v);
+  }
+
+  function report() {
+    hapticSelection();
+    router.push(reportHref({
+      targetType: 'profile',
+      targetId: params.participantUserId,
+      ownerId: params.participantUserId,
+      ownerName: params.participantName,
+    }) as never);
+  }
+
+  return (
+    <View style={[s.root, { backgroundColor: theme.background }]}>
+      <View style={[s.header, { paddingTop: headerTopPad + SP.xs }]}>
+        <PressableScale rippleEnabled={false}
+          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
+          style={s.roundBtn}
+          testID="privacy-safety-back"
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+        </PressableScale>
+        <Text style={[s.headerTitle, { color: theme.text }]}>Privacy & safety</Text>
+        <View style={s.roundBtn} />
+      </View>
+
+      <View style={[s.list, { borderColor: theme.border }]}>
+        <PressableScale rippleEnabled={false} onPress={toggleBlock} testID="privacy-safety-block">
+          <View style={[s.row, { borderBottomColor: theme.border }]}>
+            <Feather name="slash" size={ICON.md} color={theme.error} style={{ width: 28 }} />
+            <Text style={[s.rowTitle, { color: theme.error }]}>{isBlocked ? `Unblock ${params.participantName}` : `Block ${params.participantName}`}</Text>
+          </View>
+        </PressableScale>
+        <PressableScale rippleEnabled={false} onPress={report} testID="privacy-safety-report">
+          <View style={s.row}>
+            <Feather name="alert-circle" size={ICON.md} color={theme.text} style={{ width: 28 }} />
+            <Text style={[s.rowTitle, { color: theme.text }]}>Report {params.participantName}</Text>
+          </View>
+        </PressableScale>
+      </View>
+
+      <Text style={[s.explainer, { color: theme.muted }]}>
+        Blocking stops {params.participantName} from finding your profile, seeing your posts, comments or
+        stories, or messaging you. You won’t see theirs either. They aren’t notified.
+      </Text>
+    </View>
+  );
+}
+
+const makeStyles = () => StyleSheet.create({
+  root: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm },
+  roundBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: FONT.semibold, fontSize: FS.md },
+  list: { marginTop: SP.md, borderTopWidth: StyleSheet.hairlineWidth },
+  row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth },
+  rowTitle: { fontSize: FS.base, fontFamily: FONT.medium },
+  explainer: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, paddingHorizontal: SP.md, marginTop: SP.md },
+});
