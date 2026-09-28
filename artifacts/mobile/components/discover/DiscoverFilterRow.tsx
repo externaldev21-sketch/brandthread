@@ -83,7 +83,9 @@ export function DiscoverFilterRow({
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  wrap: { position: 'relative' },
+  // The extra bottom margin keeps the grid's first row from starting flush
+  // against the chip row (item 46: "grid starts cleanly below the chips").
+  wrap: { position: 'relative', marginBottom: 8 },
   track: {
     flexDirection: 'row', gap: SPACING.xs,
     paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.sm,
