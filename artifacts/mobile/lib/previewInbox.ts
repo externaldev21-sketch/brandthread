@@ -230,6 +230,7 @@ export function getPreviewMessages(conversationId: string): Message[] {
   const seed = seedById(conversationId);
   const base: Message[] = !seed?.messages ? [] : seed.messages.map((m): Message => {
     const isMe = m.fromOfficialOrParticipant === 'me';
+    const ts = Date.now() - m.minutesAgo * 60_000;
     return {
       id: m.id,
       conversationId,
@@ -241,7 +242,15 @@ export function getPreviewMessages(conversationId: string): Message[] {
       attachment: toAttachment(m.attachment),
       reactions: [],
       status: 'read',
-      ts: Date.now() - m.minutesAgo * 60_000,
+      // Real conversations get `readAt` from the backend once the other
+      // participant marks the thread read (see
+      // artifacts/api-server/src/routes/conversations.ts). This seeded
+      // preview thread has no backend, so it approximates the same
+      // real-world shape — my own message read shortly after I sent it —
+      // purely so the "Seen" receipt (app/buyer-conversation.tsx) has
+      // something honest to render in preview mode.
+      readAt: isMe ? new Date(ts + 45_000).toISOString() : undefined,
+      ts,
       deletedForMe: false,
     };
   });

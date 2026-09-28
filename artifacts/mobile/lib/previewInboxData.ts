@@ -132,9 +132,15 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     minutesAgo: 6,
     unreadCount: 2,
     isRequest: false,
+    // Two consecutive-and-close messages on each side (items 1-2 "them",
+    // 3-4 "me") demonstrate the grouped-corner rendering (item 67); the
+    // last "me" message picks up a "Seen" receipt from the seeded readAt
+    // set in lib/previewInbox.ts.
     messages: [
-      { id: 'preview-msg-01-1', fromOfficialOrParticipant: 'them', text: 'Hey! Thanks for your interest in the coat.', minutesAgo: 40 },
+      { id: 'preview-msg-01-1', fromOfficialOrParticipant: 'them', text: 'Hey! Thanks for your interest in the coat.', minutesAgo: 41 },
+      { id: 'preview-msg-01-1b', fromOfficialOrParticipant: 'them', text: 'It just got restocked in a couple sizes.', minutesAgo: 40 },
       { id: 'preview-msg-01-2', fromOfficialOrParticipant: 'me', text: 'Do you have it in size M?', minutesAgo: 20 },
+      { id: 'preview-msg-01-2b', fromOfficialOrParticipant: 'me', text: 'Asking for a friend too — size S?', minutesAgo: 19.5 },
       { id: 'preview-msg-01-3', fromOfficialOrParticipant: 'them', text: 'Just restocked the Sculpted Wool Coat in your size!', minutesAgo: 6 },
     ],
   },
