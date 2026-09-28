@@ -773,15 +773,6 @@ router.get("/search", async (req, res): Promise<void> => {
     const total = results.length;
     const limited = results.slice(off, off + lim);
 
-    // Fire-and-forget query log — backs /search/recent and /search/trending.
-    // Never blocks or fails the response.
-    db.insert(searchLog).values({
-      userId: viewerId ?? null,
-      query: searchQuery.slice(0, 200),
-      normalized: term,
-      resultCount: total,
-    }).catch((err) => req.log.error({ err }, "Failed to log search query"));
-
     res.json({
       results: limited,
       pagination: paginationMetadata({ limit: lim, offset: off }, limited.length, total),
@@ -789,6 +780,29 @@ router.get("/search", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "Public search failed");
     res.status(500).json({ error: "Search failed" });
+  }
+});
+
+// ─── POST /api/public/search/log — record an explicitly-submitted search ──────
+// Deliberately separate from GET /search itself: that endpoint also serves
+// live-as-you-type suggestions (a call per keystroke), and logging every one
+// of those would flood /search/recent and /search/trending with query
+// fragments ("h", "ho", "hoo", ...) instead of the terms someone actually
+// searched — the same per-keystroke-junk problem the client's own
+// YOU_MAY_LIKE_CURATED comment already flagged for trending data. The client
+// calls this once, only when a search is actually submitted.
+router.post("/search/log", async (req, res) => {
+  try {
+    const viewerId = optionalViewerId(req);
+    const raw = typeof req.body?.query === "string" ? req.body.query : "";
+    const query = raw.trim().slice(0, 200);
+    if (!query) { res.status(400).json({ error: "query required" }); return; }
+    const normalized = normalizeSearchTerm(query);
+    await db.insert(searchLog).values({ userId: viewerId ?? null, query, normalized });
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to log search query");
+    res.status(500).json({ error: "Failed to log search query" });
   }
 });
 
