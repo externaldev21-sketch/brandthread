@@ -43,6 +43,7 @@ import {
   Manufacturer, ManufacturerRelationship, QuoteRequest, Quote, Sample,
   ProductionOrder, ManufacturerConversation, PRODUCTION_STAGES,
 } from '@/services/manufacturerTypes';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
 
@@ -557,7 +558,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         </TouchableOpacity>
         {searchActive && (
           <TextInput
-            style={s.searchInput}
+            style={[s.searchInput, WEB_INPUT_RESET]}
             value={searchQuery}
             onChangeText={onSearch}
             placeholder="Search manufacturers…"

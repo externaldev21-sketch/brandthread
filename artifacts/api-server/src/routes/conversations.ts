@@ -30,6 +30,8 @@ import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { isAgentUserId } from "../lib/brandthreadAgent";
+import { enrichProductAttachments } from "../lib/productAttachmentInfo";
+import { enrichOrderAttachments } from "../lib/orderAttachmentInfo";
 
 const router = Router();
 router.use(requireAuth);
@@ -140,7 +142,13 @@ type ReactionView = {
   createdAt: string;
 };
 
-function adaptMessage(m: typeof messages.$inferSelect, reactions: ReactionView[] = []) {
+type ReplyPreviewView = { text: string; authorName: string };
+
+function adaptMessage(
+  m: typeof messages.$inferSelect,
+  reactions: ReactionView[] = [],
+  replyPreview?: ReplyPreviewView,
+) {
   return {
     id:             m.id,
     conversationId: m.conversationId,
@@ -154,7 +162,11 @@ function adaptMessage(m: typeof messages.$inferSelect, reactions: ReactionView[]
     attachment:     m.moderationStatus === "removed" ? undefined : (m.attachment as any) ?? undefined,
     attachments:    m.moderationStatus === "removed" ? [] : (m.attachments as any[]) ?? [],
     replyToId:      m.replyToId ?? undefined,
-    replyPreview:   undefined,
+    // Swipe-to-reply: the quoted message's own text/sender, so the client can
+    // render the "Replying to …" quote strip without a second fetch — even
+    // once the original message scrolls out of the currently-loaded page.
+    replyPreview:      replyPreview?.text,
+    replyToAuthorName: replyPreview?.authorName,
     reactions,
     status:         m.status,
     deliveredAt:    m.deliveredAt?.toISOString() ?? undefined,
@@ -163,6 +175,30 @@ function adaptMessage(m: typeof messages.$inferSelect, reactions: ReactionView[]
     ts:             new Date(m.createdAt!).getTime(),
     deletedForMe:   false,
   };
+}
+
+// Batch-resolves the quoted text/sender for a set of replyToId values, for
+// the swipe-to-reply quote strip — one query for a whole page of messages
+// rather than N+1. Moderator-removed originals resolve to a neutral
+// placeholder rather than leaking removed content into the quote.
+async function loadReplyPreviews(replyToIds: string[]): Promise<Map<string, ReplyPreviewView>> {
+  const byId = new Map<string, ReplyPreviewView>();
+  const ids = [...new Set(replyToIds)].filter(Boolean);
+  if (ids.length === 0) return byId;
+  const rows = await db.select({
+    id: messages.id,
+    body: messages.body,
+    senderName: messages.senderName,
+    attachment: messages.attachment,
+    moderationStatus: messages.moderationStatus,
+  }).from(messages).where(inArray(messages.id, ids));
+  for (const row of rows) {
+    const text = row.moderationStatus === "removed"
+      ? "Message removed"
+      : (getMessagePreview(row.body, row.attachment) ?? "Message").slice(0, 120);
+    byId.set(row.id, { text, authorName: row.senderName ?? "" });
+  }
+  return byId;
 }
 
 // Fetches reactions for a set of messages and groups them, resolving display
@@ -501,8 +537,23 @@ router.get("/:id/messages", async (req, res) => {
   const parts = await db.select().from(conversationParticipants)
     .where(eq(conversationParticipants.conversationId, id));
   const reactionsByMessage = await loadReactionsByMessage(msgs.map((m) => m.id), parts);
+  const replyPreviewById = await loadReplyPreviews(
+    msgs.map((m) => m.replyToId).filter((v): v is string => !!v),
+  );
 
-  return res.json(msgs.reverse().map((m) => adaptMessage(m, reactionsByMessage.get(m.id) ?? [])));
+  const adapted = msgs.reverse().map((m) => adaptMessage(
+    m,
+    reactionsByMessage.get(m.id) ?? [],
+    m.replyToId ? replyPreviewById.get(m.replyToId) : undefined,
+  ));
+  // Product cards (item 70): always show the CURRENT price/name/image, or an
+  // honest "No longer available" state — never the stale value cached on the
+  // message at send time. See lib/productAttachmentInfo.ts.
+  await enrichProductAttachments(adapted);
+  // Order cards (item 71): always show the CURRENT status/tracking, not the
+  // value cached at send time — see lib/orderAttachmentInfo.ts.
+  await enrichOrderAttachments(adapted);
+  return res.json(adapted);
 });
 
 // ─── POST /api/conversations/:id/messages ────────────────────────────────────
@@ -701,6 +752,19 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
   const bodyText = text?.trim() ?? "";
   const previewText = getMessagePreview(bodyText, primaryAttachment, attachmentItems) ?? "Attachment";
 
+  // Swipe-to-reply: only accept a replyToId that actually names a message in
+  // THIS conversation — silently drop anything else (wrong thread, deleted,
+  // spoofed) rather than surfacing a confusing quote or a 400 for a client
+  // race (e.g. the quoted message got deleted between swipe and send).
+  let validReplyToId: string | null = null;
+  if (replyToId) {
+    const [original] = await db.select({ id: messages.id })
+      .from(messages)
+      .where(and(eq(messages.id, replyToId), eq(messages.conversationId, id)))
+      .limit(1);
+    validReplyToId = original ? replyToId : null;
+  }
+
   const [msg] = await db.insert(messages).values({
     conversationId: id,
     senderId:       userId,
@@ -710,7 +774,7 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
     body:           bodyText,
     attachment:     primaryAttachment ?? null,
     attachments:    attachmentItems,
-    replyToId:      replyToId ?? null,
+    replyToId:      validReplyToId,
     status:         "sent",
     deliveredAt:    new Date(),
   }).returning();
@@ -765,7 +829,13 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
     })();
   }
 
-  return res.status(201).json(adaptMessage(msg));
+  const replyPreview = msg.replyToId
+    ? (await loadReplyPreviews([msg.replyToId])).get(msg.replyToId)
+    : undefined;
+  const adapted = adaptMessage(msg, [], replyPreview);
+  await enrichProductAttachments([adapted]);
+  await enrichOrderAttachments([adapted]);
+  return res.status(201).json(adapted);
 });
 
 // ─── PUT /api/conversations/:id/messages/:messageId/reactions ────────────────

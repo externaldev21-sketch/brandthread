@@ -53,6 +53,7 @@ import { MediaGrid, type MediaGridAsset } from '@/components/create-post/MediaGr
 import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
 import { FADE_MS } from '@/constants/motion';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -2197,7 +2198,7 @@ function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setS
         </View>
         <View style={ms.searchWrap}>
           <Feather name="search" size={14} color={MUTED} style={{ marginRight: 8 }} />
-          <TextInput style={ms.searchInput} value={soundSearch} onChangeText={setSoundSearch} placeholder="Search sounds..." placeholderTextColor={MUTED} />
+          <TextInput style={[ms.searchInput, WEB_INPUT_RESET]} value={soundSearch} onChangeText={setSoundSearch} placeholder="Search sounds..." placeholderTextColor={MUTED} />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 44 }}>
           <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, alignItems: 'center' }}>
@@ -2276,7 +2277,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
         )}
         <View style={[ms.searchWrap, { marginTop: 8 }]}>
           <Feather name="search" size={14} color={MUTED} style={{ marginRight: 8 }} />
-          <TextInput style={ms.searchInput} value={productSearch} onChangeText={setProductSearch} placeholder="Search products..." placeholderTextColor={MUTED} />
+          <TextInput style={[ms.searchInput, WEB_INPUT_RESET]} value={productSearch} onChangeText={setProductSearch} placeholder="Search products..." placeholderTextColor={MUTED} />
         </View>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }}>
           {filtered.length === 0 ? (

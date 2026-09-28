@@ -60,8 +60,14 @@ import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { isPreviewActivityEnabled, getPreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri } from '@/lib/previewActivity';
+import { Chip } from '@/components/ui/Chip';
 import {
   ACTIVITY_PAGE_SIZE,
+  ACTIVITY_CHIPS,
+  activityCategory,
+  activityChipEmpty,
+  matchesActivityChip,
+  type ActivityChip,
   activityDetail,
   activityHref,
   activityIcon,
@@ -92,7 +98,6 @@ import {
   type SuggestedPerson,
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
-import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-cash/ThreadCashBill';
 
 const EMPTY_ICON = 'activity' as const;
 const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
@@ -111,78 +116,51 @@ const DISPLAY_TITLES: Record<DisplaySectionKey, string> = {
 };
 
 // ─── Filter chips ───────────────────────────────────────────────────────────
-// A horizontally scrolling row of pill chips below the header, mirroring
-// Threads' Activity tab. Selection is component state only (not persisted).
+// A horizontally scrolling row of pill chips below the header — Threads'
+// Activity tab (All / Replies / Mentions… over one feed:
+// https://mobbin.com/screens/cb296e3d-df9e-4c48-a030-0f08248197d5,
+// filtered: https://mobbin.com/screens/f19ed0eb-9ad1-4579-aa5f-dd9779fce52c).
+// The chip set and what each one matches live in lib/activity.ts
+// (ACTIVITY_CHIPS / matchesActivityChip). Selection is component state only.
 
-type ActivityChipKey = 'all' | 'follows' | 'likes' | 'comments' | 'thread_cash' | 'orders';
-
-const ACTIVITY_CHIPS: { key: ActivityChipKey; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'follows', label: 'Follows' },
-  { key: 'likes', label: 'Likes' },
-  { key: 'comments', label: 'Comments' },
-  { key: 'thread_cash', label: 'Thread Cash' },
-  { key: 'orders', label: 'Orders' },
-];
-
-const FOLLOW_ROW_TYPES = new Set(['new_follower']);
-const LIKE_ROW_TYPES = new Set(['post_like', 'story_like']);
-const COMMENT_ROW_TYPES = new Set(['post_comment', 'comment_reply', 'mention']);
-const THREAD_CASH_ROW_TYPES = new Set(['thread_cash_received']);
-
-/** Which social item types belong to a given chip; `null` = no type filter (All). */
-function chipTypeFilter(chip: ActivityChipKey): ReadonlySet<string> | null {
-  switch (chip) {
-    case 'follows': return FOLLOW_ROW_TYPES;
-    case 'likes': return LIKE_ROW_TYPES;
-    case 'comments': return COMMENT_ROW_TYPES;
-    case 'thread_cash': return THREAD_CASH_ROW_TYPES;
-    default: return null;
-  }
-}
+/** One shared design-system Chip with a stable per-chip handler. */
+const ActivityFilterChip = React.memo(function ActivityFilterChip({ chip, label, selected, onSelect }: {
+  chip: ActivityChip;
+  label: string;
+  selected: boolean;
+  onSelect: (key: ActivityChip) => void;
+}) {
+  const handlePress = useCallback(() => onSelect(chip), [chip, onSelect]);
+  return <Chip label={label} selected={selected} onPress={handlePress} testID={`activity-chip-${chip}`} />;
+});
 
 function ActivityFilterChips({ selected, onSelect, styles }: {
-  selected: ActivityChipKey;
-  onSelect: (key: ActivityChipKey) => void;
+  selected: ActivityChip;
+  onSelect: (key: ActivityChip) => void;
   styles: Styles;
 }) {
-  const { theme } = useAppTheme();
   return (
     // A plain View wrapper with an explicit height, not just the ScrollView's
     // own style — a horizontal ScrollView with no non-zero cross-axis height
     // of its own can collapse to nothing in this screen's flex column,
-    // letting the SectionList below render through/over it. Plain `Pressable`
-    // (not `PressableScale`) here too, so there's no ambiguity about which
-    // element in the tree actually carries the chip's visible style.
+    // letting the SectionList below render through/over it.
     <View style={styles.chipRow}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
         contentContainerStyle={styles.chipScrollContent}
       >
-        {ACTIVITY_CHIPS.map((chip) => {
-          const isSelected = chip.key === selected;
-          return (
-            <Pressable
-              key={chip.key}
-              style={({ pressed }) => [
-                styles.chip,
-                isSelected
-                  ? { backgroundColor: theme.cardElevated, borderColor: theme.border }
-                  : { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.15)' },
-                pressed && styles.chipPressed,
-              ]}
-              onPress={() => onSelect(chip.key)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={chip.label}
-            >
-              <Text style={[styles.chipText, { color: isSelected ? theme.text : theme.muted }]} numberOfLines={1}>
-                {chip.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {ACTIVITY_CHIPS.map((chip) => (
+          <ActivityFilterChip
+            key={chip.key}
+            chip={chip.key}
+            label={chip.label}
+            selected={chip.key === selected}
+            onSelect={onSelect}
+          />
+        ))}
       </ScrollView>
       {/* Hints that the row scrolls further — same right-edge fade pattern
           used on the seller Orders filter pills — instead of the last chip
@@ -204,18 +182,21 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
 
 function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }) {
   const { theme } = useAppTheme();
+  // Monochrome like every other type badge — the green bill artwork was one
+  // of the Activity screen's only non-LIVE colour accents.
   if (row.type === 'thread_cash_received') {
     return (
-      <View style={styles.typeBadgeBill}>
-        <ThreadCashBillIcon size={20} />
+      <View style={styles.typeBadge}>
+        <Feather name="dollar-sign" size={10} color={theme.accentLight} />
       </View>
     );
   }
   let icon: string | null = null;
   let color = theme.accentLight;
-  if (FOLLOW_ROW_TYPES.has(row.type)) icon = 'user-plus';
-  else if (LIKE_ROW_TYPES.has(row.type)) { icon = 'heart'; color = theme.error; }
-  else if (COMMENT_ROW_TYPES.has(row.type)) icon = 'message-circle';
+  const category = activityCategory(row);
+  if (category === 'follows') icon = 'user-plus';
+  else if (category === 'likes') icon = 'heart';
+  else if (category === 'comments') icon = 'message-circle';
   if (!icon) return null;
   return (
     <View style={styles.typeBadge}>
@@ -339,7 +320,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
   );
   const sentence = parts.map((p) => p.text).join('');
   // "$5.00 · tap to view" → "+$5.00": the amount is the whole point of a
-  // Thread Cash row, so it gets its own bold green line instead of reading
+  // Thread Cash row, so it gets its own bold line (monochrome, theme text) instead of reading
   // like an ordinary detail caption.
   const cashAmount = row.type === 'thread_cash_received' ? row.body?.match(/\$[\d,.]+/)?.[0] : null;
 
@@ -422,11 +403,9 @@ const ActivityRowView = React.memo(function ActivityRowView({
         ) : (
           <View style={styles.leading}>
             <View style={styles.iconCircle}>
-              {row.type === 'thread_cash_received' ? (
-                <ThreadCashBillIcon size={ICON.md} />
-              ) : (
-                <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
-              )}
+              {/* Thread Cash included — activityIcon gives it a monochrome
+                  dollar-sign, not the green bill artwork. */}
+              <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
             </View>
           </View>
         )}
@@ -439,7 +418,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
             <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
           </Text>
           {cashAmount ? (
-            <Text style={[styles.detail, { color: THREAD_CASH_GREEN_MID, fontFamily: FONT.bold }]}>{`+${cashAmount}`}</Text>
+            <Text style={[styles.detail, styles.cashAmount]}>{`+${cashAmount}`}</Text>
           ) : detail ? (
             <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
           ) : null}
@@ -602,7 +581,7 @@ export default function ActivityCenterScreen() {
   const [suggested, setSuggested] = useState<SuggestedPerson[]>([]);
   const [suggestedFollowState, setSuggestedFollowState] = useState<Record<string, 'pending' | 'done'>>({});
   // Chip filter — component state only, not persisted across app restarts.
-  const [chip, setChip] = useState<ActivityChipKey>('all');
+  const [chip, setChip] = useState<ActivityChip>('all');
 
   const requestId = useRef(0);
   const itemsRef = useRef<ActivityItem[]>([]);
@@ -713,21 +692,16 @@ export default function ActivityCenterScreen() {
 
   const readIds = useMemo(() => new Set(items.filter((item) => item.isRead).map((item) => item.id)), [items]);
 
-  // Order/payout updates stay out of the default "All" feed (shopping noise
-  // doesn't belong next to likes/follows), but the "Orders" chip shows them
-  // as ordinary rows in the same list — no separate summary card.
-  const orderItems = useMemo(() => items.filter((item) => activityKind(item) === 'orders'), [items]);
-  const socialItems = useMemo(() => items.filter((item) => activityKind(item) !== 'orders'), [items]);
-
   // Client-side filtering of the already-loaded page — pagination
   // (loadMore/hasMore) keeps working against the unfiltered `items`, this
-  // only narrows what's displayed.
-  const filteredItems = useMemo(() => {
-    if (chip === 'orders') return orderItems;
-    const typeFilter = chipTypeFilter(chip);
-    if (!typeFilter) return socialItems;
-    return socialItems.filter((item) => typeFilter.has(item.type));
-  }, [socialItems, orderItems, chip]);
+  // only narrows what's displayed. Order/payout updates stay out of "All"
+  // (shopping noise doesn't belong next to likes/follows); the "Orders" chip
+  // shows them as ordinary rows in the same list — see matchesActivityChip.
+  const filteredItems = useMemo(
+    () => items.filter((item) => matchesActivityChip(item, chip)),
+    [items, chip],
+  );
+  const chipEmpty = activityChipEmpty(chip);
 
   const sections: ListSection[] = useMemo(() => {
     const raw = buildActivitySections(
@@ -1081,7 +1055,13 @@ export default function ActivityCenterScreen() {
           )}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
-              <EmptyState icon={EMPTY_ICON} illustration="bell" message={EMPTY_MESSAGE} />
+              {/* A filter with nothing in it says so specifically (minimal
+                  per-chip copy — full empty-state polish is item 85). */}
+              {chip === 'all' ? (
+                <EmptyState icon={EMPTY_ICON} illustration="bell" message={EMPTY_MESSAGE} />
+              ) : (
+                <EmptyState icon={chipEmpty.icon as any} message={chipEmpty.message} testID={`activity-empty-${chip}`} />
+              )}
             </View>
           )}
           ListFooterComponent={listFooter}
@@ -1158,23 +1138,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingBottom: SP.sm,
     gap: SP.sm,
     alignItems: 'center',
-  },
-  chip: {
-    height: 36,
-    paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // A plain `Pressable` here (not `PressableScale`) has no built-in press
-  // feedback of its own — this restores a subtle dim on tap.
-  chipPressed: {
-    opacity: 0.6,
-  },
-  chipText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
   },
   // 16pt trailing inset (matches `chipScrollContent`'s own paddingHorizontal)
   // so the fade sits fully inside the last chip's own padding, not overlapping it.
@@ -1270,19 +1233,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  typeBadgeBill: {
-    position: 'absolute',
-    right: -8,
-    bottom: -5,
-    paddingHorizontal: 2,
-    paddingVertical: 2,
-    borderRadius: RADIUS.xs,
-    backgroundColor: theme.cardElevated,
-    borderWidth: 2,
-    borderColor: theme.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   avatar: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1332,6 +1282,12 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontFamily: FONT.regular,
     fontSize: FS.sm,
     lineHeight: 18,
+  },
+  // Thread Cash "+$5.00": bold, theme text colour — never green (the only
+  // colour accents allowed are LIVE red and end-call red).
+  cashAmount: {
+    color: theme.text,
+    fontFamily: FONT.bold,
   },
 
   // Same right edge for every row whether the trailing item is this

@@ -12,7 +12,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRAD_DARK_FADE } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRAD_DARK_FADE, WEB_SAFE_AREA_TOP } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, SearchBar } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
@@ -29,6 +29,7 @@ import { formatCents } from '@/lib/money';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useScrollReset } from '@/hooks/useScrollReset';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -706,6 +707,15 @@ export default function OrdersScreen() {
 
   const api = useApi();
   const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
+  // ?bt_preview=seller (web design-preview bypass, app/_layout.tsx): renders
+  // this screen without ever waiting for Clerk to load or sign in, so
+  // authLoaded/isSignedIn/userId can legitimately stay false/null forever —
+  // that is not "still loading", it is the deliberate no-account preview
+  // state. Gating the fetch/loading state on real auth in that state is
+  // exactly what produced an infinite skeleton (never resolves because
+  // isSignedIn never becomes true). Evaluated once: bt_preview doesn't
+  // change during a session.
+  const [isPreviewMode] = useState(() => isSellerDevPreview());
 
   // Deep-link support: /(tabs)/orders?filter=unfulfilled opens pre-filtered
   // (e.g. from the dashboard's "N orders to ship" row) instead of always
@@ -738,6 +748,23 @@ export default function OrdersScreen() {
   const hasLoadedRef = useRef(false);
 
   const loadData = useCallback(async (generation: number) => {
+    // Design-preview bypass with no real signed-in account: there is no
+    // token to fetch real orders with, and there never will be (Clerk was
+    // never awaited — see app/_layout.tsx's PREVIEW_ROLE bypass). This is
+    // not a connectivity failure, so it resolves straight to the honest
+    // empty state rather than the "couldn't load" retry banner a real
+    // fetch failure shows.
+    if (isPreviewMode && !userId) {
+      if (generationRef.current === generation) {
+        setOrders([]);
+        setStats(computeStats([]));
+        setLoadError(false);
+        setLoading(false);
+        setRefreshing(false);
+        hasLoadedRef.current = true;
+      }
+      return;
+    }
     if (!authLoaded || !isSignedIn || !userId) return;
     if (requestGenerationRef.current === generation) return;
     const requestOwnerId = userId;
@@ -777,7 +804,7 @@ export default function OrdersScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [api, authLoaded, isSignedIn, userId]);
+  }, [api, authLoaded, isPreviewMode, isSignedIn, userId]);
 
   // Re-apply the ?filter= deep link every time this screen is focused (not
   // just on first mount) — the seller tab bar keeps this screen mounted, so
@@ -795,24 +822,32 @@ export default function OrdersScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!authLoaded || !isSignedIn || !userId) {
+      // In the design-preview bypass, real auth may never resolve (see
+      // isPreviewMode above) — that's the deliberate no-account state, not
+      // "still loading", so it must not block loadData the way waiting on
+      // a real account does.
+      if (!isPreviewMode && (!authLoaded || !isSignedIn || !userId)) {
         setLoading(true);
         return undefined;
       }
-      clearBadge(userId);
+      if (userId) clearBadge(userId);
       const generation = ++generationRef.current;
       consecutiveFailuresRef.current = 0;
       setUpdatesPaused(false);
       if (!hasLoadedRef.current) setLoading(true);
       loadData(generation);
-      timerRef.current = setInterval(() => loadData(generation), 30_000);
+      // Preview mode with no account resolves once, synchronously, in
+      // loadData above — no real backend to poll every 30s.
+      if (userId || !isPreviewMode) {
+        timerRef.current = setInterval(() => loadData(generation), 30_000);
+      }
       return () => {
         if (timerRef.current !== null) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
       };
-    }, [authLoaded, isSignedIn, loadData, userId])
+    }, [authLoaded, isPreviewMode, isSignedIn, loadData, userId])
   );
 
   // Safety net for a real race: useFocusEffect above only re-runs its
@@ -837,6 +872,23 @@ export default function OrdersScreen() {
     loadData(generation);
     timerRef.current = setInterval(() => loadData(generation), 30_000);
   }, [authLoaded, isSignedIn, loadData, userId]);
+
+  // Hard backstop: whatever the cause — a real load that's taking unusually
+  // long, an auth or network edge case neither guard above anticipated —
+  // the skeleton must never spin indefinitely. If nothing has resolved
+  // `loading` within 1.5s of it turning true, fall through to whatever
+  // state that leaves (the real empty state when `orders` is still empty,
+  // or the existing list/error state otherwise) instead of an infinite
+  // skeleton. A real, fast load always resolves well before this fires, so
+  // in the normal case this timer is cleared long before it would run.
+  useEffect(() => {
+    if (!loading) return undefined;
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      hasLoadedRef.current = true;
+    }, 1500);
+    return () => clearTimeout(timeout);
+  }, [loading]);
 
   const retryUpdates = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1107,8 +1159,10 @@ export default function OrdersScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
+  // Overnight batch item 40: shared WEB_SAFE_AREA_TOP (lib/theme.ts), not a
+  // hardcoded 67 — see its own comment.
   return (
-    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? 67 : insets.top) + 12, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top) + 12, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
       {/* ── Fixed header ── */}
       <View style={s.header}>
         {/* Title row */}
@@ -1142,13 +1196,18 @@ export default function OrdersScreen() {
 
         {/* Persistent search row */}
         <View style={s.searchRow}>
-          <View style={s.searchBox}>
-            <Feather name="map-pin" size={14} color={MUTED} style={{ marginRight: SP.xs }} />
+          {/* Overnight batch item 37: SearchBar is the box now (no border, at
+              rest or focus) — the outer `searchBox` wrapper used to draw a
+              second bordered card around it, which is exactly the doubled-up
+              "rectangle bar" the owner flagged. The pin icon sits beside it
+              instead of inside a shared bordered box. */}
+          <View style={s.searchBoxRow}>
+            <Feather name="map-pin" size={14} color={MUTED} />
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="All locations · Search orders"
-              style={s.searchInput}
+              style={s.searchBarFlex}
             />
           </View>
           <TouchableOpacity
@@ -1336,24 +1395,13 @@ const createStyles = (theme: any) => {
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
   },
-  searchBox: {
+  searchBoxRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CARD,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: SP.sm,
-    height: 36,
+    gap: SP.xs,
   },
-  searchInput: {
-    flex: 1,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    height: 36,
-  },
+  searchBarFlex: { flex: 1, height: 36 },
   controlBtn: {
     width: 36,
     height: 36,
