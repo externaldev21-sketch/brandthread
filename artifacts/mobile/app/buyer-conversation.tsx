@@ -1982,96 +1982,104 @@ export default function BuyerConversationScreen() {
           Sits directly on the theme background with a hairline border
           underneath instead of a floating "glass" card. */}
       <View style={[s.headerWrap, { paddingTop: headerTopPad + SP.xs, paddingRight: SP.md + insets.right }]}>
-        <PressableScale rippleEnabled={false}
-          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
-          style={s.roundBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          testID="conversation-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-        </PressableScale>
+        <View style={s.headerLeftGroup}>
+          <PressableScale rippleEnabled={false}
+            onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
+            style={s.roundBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            testID="conversation-back"
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
+            <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+          </PressableScale>
 
-        <PressableScale rippleEnabled={false}
-          style={s.headerCenter}
-          activeOpacity={participant ? 0.7 : 1}
-          disabled={!participant}
-          onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
-          testID="conversation-header-name"
-          accessibilityRole="button"
-          accessibilityLabel={`${displayName} — chat details`}
-        >
-          {participant && (
-            <View style={s.headerAvatarWrap} testID="conversation-avatar">
-              {isAgentConv ? (
-                <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <BrandthreadLogo size={18} />
-                </View>
-              ) : (
-                <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                  <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
-                </View>
-              )}
-              {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
-            </View>
-          )}
-          <View style={s.headerTextCol}>
-            <View style={s.headerNameRow}>
-              <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
-              {isAgentConv && (
-                <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
-                  <Feather name="check-circle" size={14} color={theme.accent} style={{ marginLeft: 4 }} />
-                  <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
-                    <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
+          <PressableScale rippleEnabled={false}
+            style={s.headerCenter}
+            activeOpacity={participant ? 0.7 : 1}
+            disabled={!participant}
+            onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+            testID="conversation-header-name"
+            accessibilityRole="button"
+            accessibilityLabel={`${displayName} — chat details`}
+          >
+            {participant && (
+              <View style={s.headerAvatarWrap} testID="conversation-avatar">
+                {isAgentConv ? (
+                  <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                    <BrandthreadLogo size={18} />
                   </View>
-                </View>
-              )}
+                ) : (
+                  <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
+                    <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                  </View>
+                )}
+                {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
+              </View>
+            )}
+            <View style={s.headerTextCol}>
+              <View style={s.headerNameRow}>
+                <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+                {isAgentConv && (
+                  <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
+                    <Feather name="check-circle" size={14} color={theme.accent} style={{ marginLeft: 4 }} />
+                    <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
+                      <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+              {statusLine ? (
+                <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
+                  {statusLine}
+                </Text>
+              ) : null}
             </View>
-            {statusLine ? (
-              <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
-                {statusLine}
-              </Text>
-            ) : null}
-          </View>
-        </PressableScale>
+          </PressableScale>
+        </View>
 
-        {/* An AI account can't take a call — no voice/video icons for it,
-            just the info icon below. */}
-        {conv && !isAgentConv && (
+        {/* Icon group hard-right-aligned to the header edge, per Mobbin
+            (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — not
+            centered/adjacent to the name. headerWrap's justifyContent:
+            'space-between' pushes this group to the far right. */}
+        <View style={s.headerIconGroup}>
+          {/* An AI account can't take a call — no voice/video icons for it,
+              just the info icon below. */}
+          {conv && !isAgentConv && (
+            <PressableScale rippleEnabled={false}
+              style={s.roundBtn}
+              onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="conversation-call-voice"
+              accessibilityRole="button"
+              accessibilityLabel="Voice call"
+            >
+              <Feather name="phone" size={ICON.lg} color={theme.muted} />
+            </PressableScale>
+          )}
+          {conv && !isAgentConv && (
+            <PressableScale rippleEnabled={false}
+              style={s.roundBtn}
+              onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="conversation-call-video"
+              accessibilityRole="button"
+              accessibilityLabel="Video call"
+            >
+              <Feather name="video" size={ICON.lg} color={theme.muted} />
+            </PressableScale>
+          )}
           <PressableScale rippleEnabled={false}
             style={s.roundBtn}
-            onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+            onPress={() => { hapticPrimaryAction(); openOptions(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            testID="conversation-call-voice"
+            testID="conversation-options"
             accessibilityRole="button"
-            accessibilityLabel="Voice call"
+            accessibilityLabel={isAgentConv ? 'About Brandthread Agent' : 'More options'}
           >
-            <Feather name="phone" size={ICON.sm} color={theme.muted} />
+            <Feather name={isAgentConv ? 'info' : 'more-horizontal'} size={ICON.lg} color={theme.muted} />
           </PressableScale>
-        )}
-        {conv && !isAgentConv && (
-          <PressableScale rippleEnabled={false}
-            style={s.roundBtn}
-            onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            testID="conversation-call-video"
-            accessibilityRole="button"
-            accessibilityLabel="Video call"
-          >
-            <Feather name="video" size={ICON.sm} color={theme.muted} />
-          </PressableScale>
-        )}
-        <PressableScale rippleEnabled={false}
-          style={s.roundBtn}
-          onPress={() => { hapticPrimaryAction(); openOptions(); }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          testID="conversation-options"
-          accessibilityRole="button"
-          accessibilityLabel={isAgentConv ? 'About Brandthread Agent' : 'More options'}
-        >
-          <Feather name={isAgentConv ? 'info' : 'more-horizontal'} size={ICON.sm} color={theme.muted} />
-        </PressableScale>
+        </View>
       </View>
 
       {/* Request-mode profile header — Instagram's message-request chat
@@ -2309,15 +2317,19 @@ export default function BuyerConversationScreen() {
               />
             ) : (<>
             {/* Attach — photos, video, Thread Cash (Apple-Cash-style), and
-                (for seller chats) products/posts. Clean, unbordered "+" glyph
-                (Mobbin: Instagram's composer keeps this control borderless —
-                mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) —
-                previously a hairline-bordered circle, which read as an "ugly
-                bordered plus" against the pill. */}
+                (for seller chats) products/posts, via the same "Add to
+                message" sheet as before. IG-style camera-circle trigger
+                (Mobbin: mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7)
+                — a solid white circle with a black camera glyph, replacing
+                the bare "+" glyph. Same action as before (opens the
+                multi-option sheet: Photos / Video clip / Product or post),
+                just a new visual — the sheet has more than one real option,
+                so this stays an entry point to that sheet rather than a
+                direct camera action. */}
             <PressableScale rippleEnabled={false}
               bounce={false}
               onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
-              style={s.roundInputBtn}
+              style={s.cameraCircleBtn}
               disabled={isUploading || isSending}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="conversation-attach"
@@ -2325,8 +2337,8 @@ export default function BuyerConversationScreen() {
               accessibilityLabel="Attach"
             >
               {isUploading
-                ? <UploadRing size={ICON.md} color={theme.accent} />
-                : <Feather name="plus" size={ICON.md} color={theme.text} />
+                ? <UploadRing size={ICON.md} color="#000000" />
+                : <Feather name="camera" size={20} color="#000000" />
               }
             </PressableScale>
 
@@ -2902,19 +2914,30 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    // Left group (back + avatar + name) stays left; the icon group is
+    // pushed to the far right edge — not centered/adjacent to the name.
+    // Mobbin: Instagram DM header
+    // (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — the icon
+    // group is hard-right-aligned to the edge, evenly spaced, 16pt inset
+    // from the screen edge (paddingRight is set inline: SP.md + insets.right).
+    justifyContent: 'space-between',
     backgroundColor: theme.background,
-    // Left stays tight to the back arrow; the right-side icon cluster's own
-    // padding is set inline below (it needs insets.right, which isn't known
-    // to this static stylesheet). Mobbin: Instagram DM header
-    // (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — the call/
-    // video/overflow icons sit inset from the screen edge, evenly spaced,
-    // never flush against it.
     paddingLeft: SP.xs,
     paddingBottom: SP.sm,
-    gap: SP.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.border,
     zIndex: 5,
+  },
+  headerLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    gap: SP.sm,
+  },
+  headerIconGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
   },
   roundBtn: {
     width: 36,
@@ -2924,11 +2947,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     justifyContent: 'center',
   },
   headerCenter: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SP.xs,
+    flexShrink: 1,
     gap: SP.sm,
   },
   headerTextCol: {
@@ -3343,6 +3364,22 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+  },
+  // IG-style camera-circle attach trigger — a solid white circle with a
+  // black camera glyph, 36pt diameter (Mobbin: Instagram DM composer,
+  // mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7). Fixed
+  // white/black regardless of theme, same as Instagram's own control, with
+  // a hairline border for definition against a light-theme background.
+  cameraCircleBtn: {
+    width: COMPOSER_CONTROL,
+    height: COMPOSER_CONTROL,
+    borderRadius: COMPOSER_CONTROL / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.12)',
   },
   // The single composer pill — holds the TextInput, the Thread Cash coin,
   // and the mic⇄send morph, all inside one rounded surface. ~44pt tall at

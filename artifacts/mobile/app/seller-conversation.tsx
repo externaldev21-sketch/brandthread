@@ -1217,74 +1217,83 @@ export default function SellerConversationScreen() {
 
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm, paddingRight: SP.md + insets.right }]}>
-        <PressableScale
-          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
-          style={s.headerBack}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Feather name="arrow-left" size={ICON.lg} color={FG} />
-        </PressableScale>
-        <PressableScale
-          style={s.headerCenterRow}
-          disabled={!other || !id}
-          onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
-          testID="seller-conversation-header-name"
-          accessibilityRole="button"
-          accessibilityLabel={`${displayName} — chat details`}
-        >
-          {other && (
-            <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
-              <Text style={s.headerAvatarInitials}>
-                {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
-              </Text>
-            </View>
-          )}
-          <View style={s.headerCenter}>
-            <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
-            {other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null}
-          </View>
-        </PressableScale>
-        {id && (
-          <>
-            <PressableScale
-              style={s.headerCallBtn}
-              onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel="Voice call"
-            >
-              <Feather name="phone" size={ICON.md} color={MUTED} />
-            </PressableScale>
-            <PressableScale
-              style={s.headerCallBtn}
-              onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel="Video call"
-            >
-              <Feather name="video" size={ICON.md} color={MUTED} />
-            </PressableScale>
-          </>
-        )}
-        {other ? (
+        <View style={s.headerLeftGroup}>
           <PressableScale
-            style={s.headerCallBtn}
-            onPress={() => { hapticPrimaryAction(); openConversationOptions({
-              router,
-              social: api.social,
-              counterpart: { userId: other.userId, name: other.name },
-              messaging,
-              onChange: setMessaging,
-            }); }}
+            onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
+            style={s.headerBack}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel="Conversation options"
+            accessibilityLabel="Back"
           >
-            <Feather name="more-horizontal" size={ICON.md} color={FG} />
+            <Feather name="arrow-left" size={ICON.lg} color={FG} />
           </PressableScale>
-        ) : null}
+          <PressableScale
+            style={s.headerCenterRow}
+            disabled={!other || !id}
+            onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+            testID="seller-conversation-header-name"
+            accessibilityRole="button"
+            accessibilityLabel={`${displayName} — chat details`}
+          >
+            {other && (
+              <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
+                <Text style={s.headerAvatarInitials}>
+                  {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={s.headerCenter}>
+              <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+              {other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null}
+            </View>
+          </PressableScale>
+        </View>
+
+        {/* Icon group hard-right-aligned to the header edge, per Mobbin
+            (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — not
+            centered/adjacent to the name. s.header's justifyContent:
+            'space-between' pushes this group to the far right. */}
+        <View style={s.headerIconGroup}>
+          {id && (
+            <>
+              <PressableScale
+                style={s.headerCallBtn}
+                onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Voice call"
+              >
+                <Feather name="phone" size={ICON.lg} color={MUTED} />
+              </PressableScale>
+              <PressableScale
+                style={s.headerCallBtn}
+                onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Video call"
+              >
+                <Feather name="video" size={ICON.lg} color={MUTED} />
+              </PressableScale>
+            </>
+          )}
+          {other ? (
+            <PressableScale
+              style={s.headerCallBtn}
+              onPress={() => { hapticPrimaryAction(); openConversationOptions({
+                router,
+                social: api.social,
+                counterpart: { userId: other.userId, name: other.name },
+                messaging,
+                onChange: setMessaging,
+              }); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Conversation options"
+            >
+              <Feather name="more-horizontal" size={ICON.lg} color={FG} />
+            </PressableScale>
+          ) : null}
+        </View>
       </View>
 
       {/* Order context card */}
@@ -1434,9 +1443,14 @@ export default function SellerConversationScreen() {
           <Feather name="paperclip" size={ICON.md} color={pendingAttachment ? PURPLE : MUTED} />
         </PressableScale>
 
-        {/* Media */}
+        {/* Media — IG-style camera-circle trigger (Mobbin: Instagram DM
+            composer, mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7),
+            same treatment as app/buyer-conversation.tsx's camera-circle
+            attach button: a solid white circle with a black camera glyph.
+            Same action as before (opens the Photo/Video sheet), just a new
+            visual. */}
         <PressableScale
-          style={s.attachBtn}
+          style={s.cameraCircleBtn}
           onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
           disabled={isUploading || isSending}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1444,8 +1458,8 @@ export default function SellerConversationScreen() {
           accessibilityLabel="Photo or video"
         >
           {isUploading
-            ? <ActivityIndicator size="small" color={PURPLE} />
-            : <Feather name="camera" size={ICON.md} color={MUTED} />
+            ? <ActivityIndicator size="small" color="#000000" />
+            : <Feather name="camera" size={20} color="#000000" />
           }
         </PressableScale>
 
@@ -1797,23 +1811,28 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   header: {
     flexDirection: 'row', alignItems: 'center',
+    // Left group (back + avatar + name) stays left; the icon group is
+    // pushed to the far right edge — not centered/adjacent to the name.
+    justifyContent: 'space-between',
     backgroundColor: BG,
     // Right edge padding is set inline (needs insets.right) — see the
     // header's own JSX. Mobbin: Instagram DM header
-    // (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — the call/
-    // video/overflow icons sit inset from the screen edge, evenly spaced,
-    // never flush against it.
+    // (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — the icon
+    // group is hard-right-aligned to the edge, evenly spaced, 16pt inset
+    // from the screen edge.
     paddingLeft: SP.md, paddingBottom: SP.sm,
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
+  headerLeftGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  headerIconGroup: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   headerBack: { marginRight: SP.sm },
   headerAvatar: {
     width: 34, height: 34, borderRadius: 17,
     alignItems: 'center', justifyContent: 'center', marginRight: SP.sm,
   },
   headerAvatarInitials: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
-  headerCenterRow: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  headerCenter: { flex: 1 },
+  headerCenterRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  headerCenter: { flexShrink: 1 },
   headerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   headerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
 
@@ -1929,6 +1948,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 2,
   },
+  // IG-style camera-circle attach trigger — same visual as
+  // app/buyer-conversation.tsx's cameraCircleBtn: a solid white circle
+  // with a black camera glyph, 36pt diameter, fixed white/black regardless
+  // of theme (Mobbin: mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7).
+  cameraCircleBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.12)',
+  },
   textInput: {
     flex: 1, backgroundColor: CARD, borderRadius: RADIUS.xl,
     borderWidth: 1, borderColor: BORDER,
@@ -2004,7 +2035,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   emptyText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
 
   // ── Call + media styles ──────────────────────────────────────────────────────
-  headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: SP.sm },
+  headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   recordingBtn:  { backgroundColor: 'rgba(255,59,48,0.12)', borderRadius: RADIUS.pill },
 
   // Photo grid
