@@ -68,7 +68,7 @@ async function run(browser, images, origin, role) {
   const chipEl = (chip) => page.getByTestId(`activity-chip-${chip}`).first();
 
   // The owner's way in: buyer tab bar / seller dashboard bell (direct route as a fallback).
-  let enteredVia = null;
+  const enteredVia = [];
   const openActivity = async () => {
     for (let attempt = 1; ; attempt += 1) {
       // (In the production export the buyer's home feed renders without the
@@ -79,8 +79,24 @@ async function run(browser, images, origin, role) {
       const entry = role === 'buyer' ? page.getByTestId('buyer-tab-activity').first() : page.getByTestId('seller-dashboard-activity').first();
       const later = page.getByText('Continue setup later');
       if (await later.count()) { await later.first().click().catch(() => {}); await settle(500); }
-      if (await entry.count()) { await entry.click(); enteredVia = role === 'buyer' ? 'buyer tab bar' : 'seller dashboard bell'; }
-      else { await openScreen(page, activity, origin, role, '/activity-center'); enteredVia = 'direct route (entry not found)'; }
+      // The seller's "Continue setup later" sheet can arrive late and cover the bell.
+      let found = false;
+      for (let i = 0; i < 30 && !found; i += 1) {
+        if (await later.count()) await later.first().click().catch(() => {});
+        found = await entry.isVisible().catch(() => false);
+        if (!found) await page.waitForTimeout(500);
+      }
+      if (found) { await entry.click(); enteredVia.push(role === 'buyer' ? 'buyer tab bar' : 'seller dashboard bell'); }
+      // A cold start can still be on the branded loader — reload before giving up.
+      else if (attempt < 3) continue;
+      else {
+        if (process.env.VERIFY_DEBUG) {
+          await shot(`debug-no-entry-${enteredVia.length}`);
+          console.log('DEBUG no entry at', page.url());
+        }
+        await openScreen(page, activity, origin, role, '/activity-center');
+        enteredVia.push('direct route (entry not found)');
+      }
       try { await chipEl('all').waitFor({ timeout: 15_000 }); break; } catch (error) { if (attempt >= 3) throw error; }
     }
     await settle(1200);
@@ -160,7 +176,7 @@ async function run(browser, images, origin, role) {
   await settle(400);
   await shot('partial-likes-empty');
 
-  result.enteredVia = enteredVia;
+  result.enteredVia = [...new Set(enteredVia)];
   await context.close();
   return result;
 }
