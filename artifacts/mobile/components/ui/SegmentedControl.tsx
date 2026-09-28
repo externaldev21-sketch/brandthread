@@ -285,6 +285,16 @@ function UnderlineTabs({
                 },
               ]}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+              // Caps how far iOS/Android "larger text" accessibility
+              // settings can inflate this label. Uncapped Dynamic Type
+              // could grow "Following"/"Threads" enough to visually
+              // overlap the fixed-size icon clusters flanking this
+              // control in the buyer feed's top bar (see feed.tsx) —
+              // 1.2x still respects the setting without letting it blow
+              // the tab strip out past the space it's given.
+              maxFontSizeMultiplier={1.2}
             >
               {option.label}
             </Text>
@@ -308,8 +318,14 @@ const styles = StyleSheet.create({
   segmentCompact: { paddingHorizontal: 6 },
   compactLabel: { fontSize: 12, lineHeight: 15 },
 
-  underlineRoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  underlineSegment: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  // flexShrink/minWidth: 0 so that when a parent gives this a bounded
+  // width (the buyer feed top bar's absolutely-positioned wrap — see
+  // feed.tsx), an oversized Dynamic-Type label shrinks (via
+  // adjustsFontSizeToFit above) and the row itself can shrink to fit,
+  // instead of overflowing past its own bounds and visually colliding
+  // with whatever sits beside it.
+  underlineRoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexShrink: 1, minWidth: 0 },
+  underlineSegment: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, flexShrink: 1, minWidth: 0 },
   underlineLabel: {
     fontSize: 15, lineHeight: 18,
     textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
