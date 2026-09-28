@@ -350,9 +350,13 @@ let cachedSuggestions: PreviewSuggestedPerson[] | null = null;
 /** The seeded "Suggested for you" list. Gate on `isPreviewActivityEnabled()`. */
 export function getPreviewSuggestedPeople(): PreviewSuggestedPerson[] {
   if (cachedSuggestions) return cachedSuggestions;
+  // Never name the suggested person as their own mutual (e.g. Astrae's own
+  // reason must never read "Followed by Astrae") — each entry here lines up
+  // 1:1 with PEOPLE.slice(5) below, so double-check against that list when
+  // editing either.
   const reasons = [
     'Followed by Atelier Noire + 4 others',
-    'Followed by Astrae + 1 other',
+    'Followed by Maison Vela + 1 other',
     'New on Brandthread',
     'Followed by Orison',
     'New on Brandthread',

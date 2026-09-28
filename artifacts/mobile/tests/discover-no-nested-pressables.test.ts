@@ -28,6 +28,8 @@ const FILES_TO_CHECK = [
   'app/(buyer)/discover.tsx',
   'components/discover/DiscoverPeopleRow.tsx',
   'components/discover/DiscoverBrandCard.tsx',
+  'components/discover/DiscoverPersonCard.tsx',
+  'components/discover/DiscoverEntityCard.tsx',
   'components/discover/DiscoverPostViewer.tsx',
   'components/discover/DiscoverTileView.tsx',
   'components/discover/EditorialTile.tsx',
