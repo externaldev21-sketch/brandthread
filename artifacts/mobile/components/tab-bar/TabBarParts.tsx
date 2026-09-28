@@ -404,29 +404,29 @@ export function useTabBarActiveIndex(activeIndex: number, reduceMotion: boolean)
  * dragging a drop of liquid. Position and size are driven by
  * `useTabBarActiveIndex`, owned by the tab bar so a press can kick the glide
  * ahead of the real navigation — see that hook's doc.
+ *
+ * Always sized from `metrics` alone — the buyer bar's compact/regular
+ * capsule transition (see BuyerTabBar) shrinks this along with everything
+ * else in the capsule via one outer `transform: scale`, rather than this
+ * component interpolating its own width/height/position toward a second
+ * `compactMetrics` (which used to mean this pill's `width`/`height` — a
+ * layout property — animated on every capsule-mode transition frame too).
  */
 export function TabBarIndicator({
-  x, target, opacity, metrics, theme, progress, compactMetrics,
+  x, target, opacity, metrics, theme,
 }: {
   x: SharedValue<number>;
   target: SharedValue<number>;
   opacity: SharedValue<number>;
   metrics: TabBarMetrics;
   theme: AppThemePreset;
-  /** 0 (regular) → 1 (compact) — only the buyer bar passes this, to shrink
-   *  the pill together with the capsule/circle during the compact-mode
-   *  transition. Omitted everywhere else, which renders exactly as before. */
-  progress?: SharedValue<number>;
-  /** The compact-mode counterpart of `metrics`, required alongside `progress`. */
-  compactMetrics?: TabBarMetrics;
 }) {
   const style = useAnimatedStyle(() => {
-    const p = progress && compactMetrics ? progress.value : 0;
-    const itemWidth = compactMetrics ? interpolate(p, [0, 1], [metrics.itemWidth, compactMetrics.itemWidth]) : metrics.itemWidth;
-    const pad = compactMetrics ? interpolate(p, [0, 1], [metrics.capsulePadding, compactMetrics.capsulePadding]) : metrics.capsulePadding;
-    const baseWidth = compactMetrics ? interpolate(p, [0, 1], [metrics.indicatorWidth, compactMetrics.indicatorWidth]) : metrics.indicatorWidth;
-    const capsuleHeight = compactMetrics ? interpolate(p, [0, 1], [metrics.capsuleHeight, compactMetrics.capsuleHeight]) : metrics.capsuleHeight;
-    const indicatorHeight = compactMetrics ? interpolate(p, [0, 1], [metrics.indicatorHeight, compactMetrics.indicatorHeight]) : metrics.indicatorHeight;
+    const itemWidth = metrics.itemWidth;
+    const pad = metrics.capsulePadding;
+    const baseWidth = metrics.indicatorWidth;
+    const capsuleHeight = metrics.capsuleHeight;
+    const indicatorHeight = metrics.indicatorHeight;
     const maxStretch = itemWidth * 0.55;
 
     const distanceUnits = Math.abs(target.value - x.value);
