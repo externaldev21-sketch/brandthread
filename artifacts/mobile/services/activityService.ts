@@ -12,6 +12,14 @@
 import { serviceRequest } from '@/lib/serviceConfig';
 import { subscribeSocial } from '@/services/socialService';
 import { ACTIVITY_PAGE_SIZE, type ActivityFilter, type ActivityItem } from '@/lib/activity';
+import {
+  isPreviewActivityEnabled,
+  isPreviewActivityId,
+  isPreviewActivitySeedServed,
+  markAllPreviewActivityRead,
+  markPreviewActivityRead,
+  previewUnreadActivityCount,
+} from '@/lib/previewActivity';
 
 export type { ActivityItem, ActivityFilter } from '@/lib/activity';
 
@@ -53,6 +61,24 @@ function emitChange(): void {
   });
 }
 
+// Optimistic unread count: "Mark all read" zeroes every badge (tab bar,
+// seller bell) the instant it's tapped, in the same frame as the dots clear,
+// instead of waiting for the PATCH and a badge refetch to land. A failed
+// request triggers a normal change broadcast, which refetches the true count.
+type UnreadOverrideListener = (count: number) => void;
+const unreadOverrideListeners = new Set<UnreadOverrideListener>();
+
+export function subscribeUnreadOverride(fn: UnreadOverrideListener): () => void {
+  unreadOverrideListeners.add(fn);
+  return () => { unreadOverrideListeners.delete(fn); };
+}
+
+function emitUnreadOverride(count: number): void {
+  unreadOverrideListeners.forEach((fn) => {
+    try { fn(count); } catch { /* a listener must not break the others */ }
+  });
+}
+
 // ─── Reads ────────────────────────────────────────────────────────────────────
 
 export async function getActivity(params: {
@@ -73,15 +99,26 @@ export async function getActivity(params: {
 export async function getUnreadActivityCount(): Promise<number> {
   try {
     const result = await serviceRequest<{ count?: number }>(`${BASE}/unread-count`, {}, false);
-    return typeof result?.count === 'number' ? result.count : 0;
+    const count = typeof result?.count === 'number' ? result.count : 0;
+    // Dev-web preview showing the seeded feed: badge counts the seeded rows
+    // too, so it agrees with the unread dots on the Activity screen.
+    if (count === 0 && isPreviewActivityEnabled() && isPreviewActivitySeedServed()) return previewUnreadActivityCount();
+    return count;
   } catch {
-    return 0;
+    return isPreviewActivityEnabled() ? previewUnreadActivityCount() : 0;
   }
 }
 
 // ─── Writes ───────────────────────────────────────────────────────────────────
 
 export async function markActivityRead(id: string): Promise<void> {
+  // Seeded preview rows live only in the dev-web preview; there is nothing
+  // server-side to PATCH, so their read state is kept in memory instead.
+  if (isPreviewActivityEnabled() && isPreviewActivityId(id)) {
+    markPreviewActivityRead([id]);
+    emitChange();
+    return;
+  }
   await serviceRequest(`${BASE}/${encodeURIComponent(id)}/read`, {
     method: 'PATCH',
     body: JSON.stringify({}),
@@ -90,7 +127,18 @@ export async function markActivityRead(id: string): Promise<void> {
 }
 
 export async function markAllActivityRead(): Promise<void> {
-  await serviceRequest(`${BASE}/read-all`, { method: 'PATCH', body: JSON.stringify({}) });
+  if (isPreviewActivityEnabled()) markAllPreviewActivityRead();
+  emitUnreadOverride(0);
+  try {
+    await serviceRequest(`${BASE}/read-all`, { method: 'PATCH', body: JSON.stringify({}) });
+  } catch (err) {
+    // The dev-web preview has no backend: its (in-memory) mark-all already
+    // happened above, so don't surface a false failure there.
+    if (!isPreviewActivityEnabled() || !isPreviewActivitySeedServed()) {
+      emitChange(); // badges refetch the true count
+      throw err;
+    }
+  }
   emitChange();
 }
 
