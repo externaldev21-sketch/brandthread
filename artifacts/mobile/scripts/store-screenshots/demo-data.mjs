@@ -155,34 +155,36 @@ const TRENDING = [
   // example to open in a screenshot — a forward-compatible field our own
   // client mapping (lib/discoverFeed.ts) reads defensively, not something
   // the real endpoint sends yet.
+  //
+  // Extended past the original 6 to 24 entries (same shape, no new fields)
+  // so the For You grid has enough tiles to reach the rails gated deep into
+  // it (Just Dropped / High Demand / Shop the Look each require a growing
+  // `rows.length` threshold) — a real feed has far more posts than this
+  // fixture; this is a test-fixture-scale fix, not a product change.
   { brand: 'northline', caption: 'Drop 04 is live. Ember hoodies restocked in every size.', mediaType: 'photo', likesCount: 4210, commentsCount: 96, verified: true, productTags: [{ productId: 'prod_nl_hoodie_ember', productName: 'Heavyweight Hoodie — Ember', priceCents: 9800 }] },
   { brand: 'field', caption: 'Trail Runner 02 — built for city miles and weekend trails.', mediaType: 'photo', likesCount: 3180, commentsCount: 54, verified: true },
   { brand: 'quiet', caption: 'Moss, midnight and bone. The loopback capsule lands Friday.', mediaType: 'video', likesCount: 2870, commentsCount: 41 },
-  { brand: 'ember', caption: 'Behind the seams: how we cut the Onyx anorak.', mediaType: 'video', likesCount: 2340, commentsCount: 38, verified: true },
+  { brand: 'ember', caption: 'Behind the seams: how we cut the Onyx anorak.', mediaType: 'video', likesCount: 2340, commentsCount: 38, verified: true, productTags: [{ productId: 'prod_em_anorak_onyx', productName: 'Onyx Anorak', priceCents: 24500 }] },
   { brand: 'northline', caption: 'Studio day. Sampling the FW26 cargo in rust.', mediaType: 'photo', likesCount: 1920, commentsCount: 22 },
   { brand: 'field', caption: 'Clay or stone? Vote for the next colourway.', mediaType: 'photo', likesCount: 1440, commentsCount: 65 },
-  // Extra rows past what the original 6 covered — needed so the For You
-  // grid has enough tiles to reach the rails inserted deep into it (High
-  // Demand, Trending Brands) in the Playwright screenshot harness. Same
-  // shape/fields as the rows above, no new field types added.
-  { brand: 'ember', caption: 'Restock alert: Onyx anorak back in stock this week.', mediaType: 'photo', likesCount: 1980, commentsCount: 29 },
-  { brand: 'quiet', caption: 'Sourcing trip: the mill behind our loopback cotton.', mediaType: 'video', likesCount: 1650, commentsCount: 18 },
-  { brand: 'northline', caption: 'Care guide: keeping heavyweight hoodies heavyweight.', mediaType: 'photo', likesCount: 1310, commentsCount: 24 },
-  { brand: 'field', caption: 'Trail Runner 02 in the wild — weekend miles logged.', mediaType: 'photo', likesCount: 1720, commentsCount: 33 },
-  { brand: 'ember', caption: 'Pattern cutting: the Onyx anorak\'s raglan sleeve.', mediaType: 'video', likesCount: 1105, commentsCount: 14 },
-  { brand: 'quiet', caption: 'FW26 preview: three new colourways landing soon.', mediaType: 'photo', likesCount: 2050, commentsCount: 47 },
-  { brand: 'northline', caption: 'Drop 04 restock — sizes S through XL back now.', mediaType: 'photo', likesCount: 2680, commentsCount: 58, verified: true },
-  { brand: 'field', caption: 'Behind the build: sole unit testing for Trail Runner 02.', mediaType: 'video', likesCount: 980, commentsCount: 12 },
-  { brand: 'ember', caption: 'Studio visit: hand-finishing every Onyx anorak seam.', mediaType: 'photo', likesCount: 1540, commentsCount: 21 },
-  { brand: 'quiet', caption: 'Loopback capsule now shipping worldwide.', mediaType: 'photo', likesCount: 2210, commentsCount: 36 },
-  { brand: 'northline', caption: 'FAQ: how the Ember hoodie is dyed in small batches.', mediaType: 'video', likesCount: 890, commentsCount: 9 },
-  { brand: 'field', caption: 'Clay colourway restocking Thursday — set a reminder.', mediaType: 'photo', likesCount: 1330, commentsCount: 27 },
-  { brand: 'ember', caption: 'Q&A: your most-asked Onyx anorak fit questions.', mediaType: 'photo', likesCount: 1470, commentsCount: 31 },
-  { brand: 'quiet', caption: 'Bone colourway sold through in under an hour.', mediaType: 'video', likesCount: 3020, commentsCount: 62, verified: true },
-  { brand: 'northline', caption: 'Fit check: heavyweight hoodie true-to-size guide.', mediaType: 'photo', likesCount: 1160, commentsCount: 19 },
-  { brand: 'field', caption: 'Trail Runner 02 — now in three widths.', mediaType: 'photo', likesCount: 1850, commentsCount: 40 },
-  { brand: 'ember', caption: 'Last call: Onyx anorak pre-order closes Sunday.', mediaType: 'video', likesCount: 2440, commentsCount: 53 },
-  { brand: 'quiet', caption: 'Moss colourway restock — small batch, going fast.', mediaType: 'photo', likesCount: 1690, commentsCount: 25 },
+  { brand: 'quiet', caption: 'Loopback capsule, restocked in bone.', mediaType: 'photo', likesCount: 1310, commentsCount: 19 },
+  { brand: 'ember', caption: 'Onyx anorak, now in three colourways.', mediaType: 'photo', likesCount: 1275, commentsCount: 27, productTags: [{ productId: 'prod_em_anorak_onyx', productName: 'Onyx Anorak', priceCents: 24500 }] },
+  { brand: 'northline', caption: 'Ember hoodie restock — almost sold out again.', mediaType: 'photo', likesCount: 1180, commentsCount: 31, verified: true },
+  { brand: 'field', caption: 'Trail Runner 02, city-tested for six weeks.', mediaType: 'video', likesCount: 1102, commentsCount: 18 },
+  { brand: 'quiet', caption: 'Midnight capsule, first look.', mediaType: 'photo', likesCount: 1044, commentsCount: 14 },
+  { brand: 'ember', caption: 'Cutting room: the Onyx anorak pattern.', mediaType: 'photo', likesCount: 998, commentsCount: 22, verified: true },
+  { brand: 'northline', caption: 'FW26 cargo, rust colourway restocked.', mediaType: 'photo', likesCount: 940, commentsCount: 16 },
+  { brand: 'field', caption: 'Weekend trails, city miles. One shoe.', mediaType: 'photo', likesCount: 905, commentsCount: 12, verified: true },
+  { brand: 'quiet', caption: 'Bone, moss, midnight — pick your capsule.', mediaType: 'video', likesCount: 870, commentsCount: 20 },
+  { brand: 'ember', caption: 'Studio fit check: Onyx anorak layered.', mediaType: 'photo', likesCount: 820, commentsCount: 9 },
+  { brand: 'northline', caption: 'Heavyweight hoodie, ember colourway restock.', mediaType: 'photo', likesCount: 795, commentsCount: 11, productTags: [{ productId: 'prod_nl_hoodie_ember', productName: 'Heavyweight Hoodie — Ember', priceCents: 9800 }] },
+  { brand: 'field', caption: 'Trail Runner 02 colourway poll results.', mediaType: 'photo', likesCount: 760, commentsCount: 8 },
+  { brand: 'quiet', caption: 'Loopback capsule, styled three ways.', mediaType: 'photo', likesCount: 712, commentsCount: 13, verified: true },
+  { brand: 'ember', caption: 'Onyx anorak, behind the seams part two.', mediaType: 'video', likesCount: 688, commentsCount: 10 },
+  { brand: 'northline', caption: 'Studio day, FW26 preview continues.', mediaType: 'photo', likesCount: 654, commentsCount: 7 },
+  { brand: 'field', caption: 'City miles, weekend trails — same shoe.', mediaType: 'photo', likesCount: 610, commentsCount: 9, verified: true },
+  { brand: 'quiet', caption: 'Midnight capsule, restocked Friday.', mediaType: 'photo', likesCount: 588, commentsCount: 6 },
+  { brand: 'ember', caption: 'Onyx anorak, now shipping worldwide.', mediaType: 'photo', likesCount: 542, commentsCount: 5 },
 ].map((row, i) => ({
   id: `post_trending_${i + 1}`, rank: i + 1, brand: BRANDS[row.brand].name, brandId: BRANDS[row.brand].id,
   caption: row.caption, mediaType: row.mediaType,

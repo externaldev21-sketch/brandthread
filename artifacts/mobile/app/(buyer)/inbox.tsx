@@ -42,7 +42,7 @@ import {
 import {
   scheduleDeleteConversationRequest, undoDeleteConversationRequest, blockConversationRequestUser,
 } from '@/lib/requestActions';
-import { subscribePendingConversationDeletes } from '@/lib/pendingRequestDeletes';
+import { subscribePendingConversationDeletes, DELETE_GRACE_MS } from '@/lib/pendingRequestDeletes';
 import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import { BLOCK_EXPLAINER } from '@/lib/safety';
 import {
@@ -685,10 +685,21 @@ export default function InboxScreen() {
   function deleteRequestConversation(conv: Conversation) {
     const participant = getParticipant(conv);
     hapticDestructiveConfirm();
-    scheduleDeleteConversationRequest(conv.id, api);
+    // The undo window (`pendingDeleteIds`, subscribed above) only hides the
+    // row for ~4s — once it commits for real, `conversations` state itself
+    // has to drop the row too, or it silently reappears (see the doc comment
+    // on scheduleDeleteConversationRequest for the bug this fixes).
+    scheduleDeleteConversationRequest(conv.id, api, () => {
+      setConversations(prev => prev.filter(c => c.id !== conv.id));
+    });
     showUndo({
       message: `Deleted request from ${participant?.name ?? 'this person'}`,
       undo: () => undoDeleteConversationRequest(conv.id),
+      // Match the toast's own visible window to the real undo grace period
+      // — the default 6s toast outliving the 4s delete commit let someone
+      // tap "Undo" after the delete already went through, silently doing
+      // nothing (see the doc comment on scheduleDeleteConversationRequest).
+      durationMs: DELETE_GRACE_MS,
     });
   }
 
@@ -696,10 +707,13 @@ export default function InboxScreen() {
     if (requestConvs.length === 0) return;
     hapticDestructiveConfirm();
     const ids = requestConvs.map(c => c.id);
-    ids.forEach(id => scheduleDeleteConversationRequest(id, api));
+    ids.forEach(id => scheduleDeleteConversationRequest(id, api, () => {
+      setConversations(prev => prev.filter(c => c.id !== id));
+    }));
     showUndo({
       message: ids.length === 1 ? 'Deleted 1 request' : `Deleted ${ids.length} requests`,
       undo: () => ids.forEach(id => undoDeleteConversationRequest(id)),
+      durationMs: DELETE_GRACE_MS,
     });
   }
 

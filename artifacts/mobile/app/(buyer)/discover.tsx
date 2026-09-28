@@ -299,6 +299,11 @@ export default function DiscoverScreen() {
     });
   }
 
+  const shopTheLookPosts = useMemo(
+    () => forYouPosts.filter((p) => (p.productTags?.length ?? 0) > 0).slice(0, 12),
+    [forYouPosts],
+  );
+
   function removePostFromLists(authorId: string, onlyPostId?: string) {
     const filterFn = (p: DiscoverPost) => (onlyPostId ? p.id !== onlyPostId : p.authorId !== authorId);
     setForYouPosts((prev) => prev.filter(filterFn));
@@ -327,6 +332,8 @@ export default function DiscoverScreen() {
           justDroppedItems={justDroppedItems}
           trendingBrands={trendingBrands}
           highDemandItems={highDemandItems}
+          shopTheLookPosts={shopTheLookPosts}
+          onOpenShopTheLook={openShopTheLook}
           people={people}
           onEndReached={() => {
             if (forYouLoadingMore || forYouLoading || forYouLimit.current >= 120) return;

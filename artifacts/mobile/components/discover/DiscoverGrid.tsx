@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { EditorialTile, TileRailSkeleton, type EditorialTileItem } from './EditorialTile';
 import { DiscoverTileView, DiscoverTileSkeleton } from './DiscoverTileView';
 import { DiscoverPeopleRow } from './DiscoverPeopleRow';
+import { DiscoverShopTheLookRail } from './DiscoverShopTheLookRail';
 import { DiscoverTrendingBrandsRail } from './DiscoverTrendingBrandsRail';
 import type { DiscoverPost, DiscoverPersonSuggestion, DiscoverBrandCard as BrandCardData } from '@/lib/discoverFeed';
 import { buildGridRows, type GridRow } from '@/lib/discoverGridPacking';
@@ -39,6 +40,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   loadingMore?: boolean;
   justDroppedItems?: EditorialTileItem[];
   highDemandItems?: EditorialTileItem[];
+  shopTheLookPosts?: DiscoverPost[];
+  onOpenShopTheLook?: (post: DiscoverPost) => void;
   trendingBrands?: BrandCardData[];
   people?: DiscoverPersonSuggestion[];
   showRails?: boolean;
@@ -53,6 +56,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   loadingMore,
   justDroppedItems = [],
   highDemandItems = [],
+  shopTheLookPosts = [],
+  onOpenShopTheLook,
   trendingBrands = [],
   people = [],
   showRails = true,
@@ -82,9 +87,19 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
       hasJustDropped: justDroppedItems.length > 0,
       hasHighDemand: highDemandItems.length > 0,
       hasTrendingBrands: trendingBrands.length > 0,
+      hasShopTheLook: shopTheLookPosts.length > 0,
       hasPeople: people.length > 0,
     });
-  }, [posts, loading, showRails, justDroppedItems.length, highDemandItems.length, trendingBrands.length, people.length]);
+  }, [
+    posts,
+    loading,
+    showRails,
+    justDroppedItems.length,
+    highDemandItems.length,
+    trendingBrands.length,
+    shopTheLookPosts.length,
+    people.length,
+  ]);
 
   return (
     <FlatList
@@ -158,6 +173,9 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
         }
         if (row.kind === 'trendingBrands') {
           return <DiscoverTrendingBrandsRail brands={trendingBrands} />;
+        }
+        if (row.kind === 'shopTheLook') {
+          return <DiscoverShopTheLookRail posts={shopTheLookPosts} onPress={onOpenShopTheLook ?? (() => {})} />;
         }
         // Rail row (Just Dropped / High Demand)
         const items = row.kind === 'justDropped' ? justDroppedItems : highDemandItems;
