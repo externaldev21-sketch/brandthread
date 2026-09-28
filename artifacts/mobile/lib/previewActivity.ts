@@ -263,11 +263,6 @@ function seedPreviewActivity(): ActivityItem[] {
 // screen" behaviour the real DELETE gives a signed-in account.
 const dismissedPreviewIds = new Set<string>();
 
-/** True for a seeded preview row id (never a real notification's id). */
-export function isPreviewActivityId(id: string): boolean {
-  return isPreviewActivityEnabled() && id.startsWith('preview-');
-}
-
 export function markPreviewActivityDismissed(id: string): void {
   dismissedPreviewIds.add(id);
 }
