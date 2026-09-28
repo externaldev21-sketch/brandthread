@@ -43,8 +43,9 @@ vi.mock('react-native', () => {
     TextInput: nativeComponent('TextInput'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    AccessibilityInfo: { isReduceMotionEnabled: () => Promise.resolve(false) },
     Animated: {
-      Value: class { constructor(_v?: number) {} },
+      Value: class { constructor(_v?: number) {} setValue(_v: number) {} },
       View: nativeComponent('Animated.View'),
       event: () => () => {},
       timing: () => ({ start: (cb?: () => void) => cb?.() }),

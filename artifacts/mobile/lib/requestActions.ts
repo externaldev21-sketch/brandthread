@@ -17,7 +17,7 @@ import {
   isPreviewConversationId, acceptPreviewConversationRequest, deletePreviewConversationRequest,
 } from './previewInbox';
 import { schedulePendingConversationDelete, cancelPendingConversationDelete } from './pendingRequestDeletes';
-import { blockUser as blockUserLocal } from '@/services/socialService';
+import { blockUser as blockUserLocal, notifySocialListeners } from '@/services/socialService';
 
 export interface RequestBlockSubject {
   userId: string;
@@ -39,19 +39,42 @@ export async function acceptConversationRequest(id: string, api: BrandthreadApi)
 
 /** Starts the ~4s undo window for deleting a message request, then performs
  *  the real (irreversible) delete — or the preview-mode equivalent — only if
- *  it's never cancelled. See lib/pendingRequestDeletes.ts. */
-export function scheduleDeleteConversationRequest(id: string, api: BrandthreadApi): void {
+ *  it's never cancelled. See lib/pendingRequestDeletes.ts.
+ *
+ *  `onCommitted` fires once the delete actually goes through (after the undo
+ *  window elapses uncancelled) — the caller's own local `conversations`
+ *  state (e.g. inbox.tsx's) needs this to drop the row for good. Every
+ *  commit also calls `notifySocialListeners()` unconditionally, so a
+ *  *different* screen than the one that scheduled the delete (e.g. it was
+ *  scheduled from the request-mode conversation screen's Delete action,
+ *  which navigates back to Inbox immediately — well before the ~4s window
+ *  elapses) still refetches and drops the row too. Without either of these,
+ *  the row was only ever hidden by `isPendingConversationDelete()` during
+ *  the ~4s window itself: once that window closes the id leaves the pending
+ *  set, and with nothing else telling local state the row is really gone,
+ *  it silently reappeared in the Requests list a few seconds after "Delete"
+ *  — a real bug found verifying this flow (item 75). */
+export function scheduleDeleteConversationRequest(
+  id: string,
+  api: BrandthreadApi,
+  onCommitted?: () => void,
+): void {
   schedulePendingConversationDelete(id, async () => {
-    if (isPreviewConversationId(id)) {
-      deletePreviewConversationRequest(id);
-      return;
-    }
     try {
-      await api.conversations.decline(id);
-    } catch {
-      // Best-effort — if the real delete fails (e.g. already gone) there's
-      // nothing left for the UI to roll back to; the row already left the
-      // list when the undo window opened.
+      if (isPreviewConversationId(id)) {
+        deletePreviewConversationRequest(id);
+        return;
+      }
+      try {
+        await api.conversations.decline(id);
+      } catch {
+        // Best-effort — if the real delete fails (e.g. already gone) there's
+        // nothing left for the UI to roll back to; the row already left the
+        // list when the undo window opened.
+      }
+    } finally {
+      onCommitted?.();
+      notifySocialListeners();
     }
   });
 }
