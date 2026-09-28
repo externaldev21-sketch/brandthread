@@ -9,9 +9,23 @@
  *   - Inert (returns false) in a real production build (neither flag set)
  *   - Inert on native (Platform.OS !== 'web')
  *   - Inert when window is unavailable (SSR / test environments without window)
- *   - true  only when ?bt_preview=seller is explicitly set
- *   - false otherwise, including when no bt_preview param is present at all
- *     (no query param must mean the real signed-in experience, never fake data)
+ *   - true  only when ?bt_preview=seller was explicitly set at some point
+ *     this session
+ *   - false otherwise, including a fresh session with no bt_preview param at
+ *     all (no query param must mean the real signed-in experience, never
+ *     fake data)
+ *
+ * The query param only has to be present on the FIRST page load. Expo
+ * Router's tab bar and any `router.push()` to a plain path (no query string)
+ * drop it from the URL — normal in-app navigation, not a reload — so a
+ * helper that re-read `window.location.search` on every call went inert the
+ * moment someone tapped a tab, and every screen past that point tried the
+ * real (here, unreachable) API and hung on its loading skeleton forever.
+ * `app/_layout.tsx`'s own `PREVIEW_ROLE` already avoids this by reading the
+ * query string exactly once at module load and mirroring it into
+ * `localStorage['user_role']` for AuthGate; this helper now falls back to
+ * that same persisted value once the query param itself is gone, instead of
+ * inventing a second storage key.
  *
  * Pure / testable: accepts an optional override for the search string so unit
  * tests can exercise every branch without touching the global window object.
@@ -25,9 +39,19 @@ import { Platform } from 'react-native';
 
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
+function persistedPreviewRole(): 'buyer' | 'seller' | null {
+  try {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('user_role') : null;
+    return stored === 'buyer' || stored === 'seller' ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Returns true only in the dev-web seller preview context, and only when
- * explicitly requested via ?bt_preview=seller.
+ * explicitly requested via ?bt_preview=seller (this navigation or earlier
+ * this session).
  *
  * @param searchOverride  Optional query string (e.g. '?bt_preview=buyer')
  *   supplied by tests instead of reading window.location.search.
@@ -46,9 +70,11 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
     search = window.location.search;
   }
 
-  // Only an explicit ?bt_preview=seller opts into fake preview data.
   const v = new URLSearchParams(search).get('bt_preview');
-  return v === 'seller';
+  if (v === 'seller') return true;
+  if (v === 'buyer') return false; // an explicit, different role always wins
+  // No param on this navigation — fall back to the role the first load set.
+  return persistedPreviewRole() === 'seller';
 }
 
 /**
@@ -66,5 +92,7 @@ export function isBuyerDevPreview(searchOverride?: string): boolean {
   }
 
   const v = new URLSearchParams(search).get('bt_preview');
-  return v === 'buyer';
+  if (v === 'buyer') return true;
+  if (v === 'seller') return false;
+  return persistedPreviewRole() === 'buyer';
 }
