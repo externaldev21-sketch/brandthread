@@ -445,19 +445,28 @@ function ShareTile({
   textColor: string;
 }) {
   return (
-    <PressableScale
-      style={styles.tile}
-      onPress={onPress}
-      disabled={busy}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      testID={`share-profile-tile-${label.toLowerCase().replace(/\s+/g, '-')}`}
-    >
-      <View style={styles.tileIconCircle}>
-        <Feather name={icon} size={20} color={textColor} />
-      </View>
-      <Text style={[styles.tileLabel, { color: textColor }]} numberOfLines={1}>{label}</Text>
-    </PressableScale>
+    // The flex:1 that makes the three tiles divide the row evenly has to
+    // live on this wrapping View, not on PressableScale's own `style` prop:
+    // when that prop is a plain object (not a function) PressableScale
+    // applies it to its *inner* Animated.View, not the outer Pressable that
+    // actually participates in tilesRow's flex layout — so a bare `flex: 1`
+    // there silently did nothing and the three labels ran together with no
+    // spacing between them.
+    <View style={styles.tileFlex}>
+      <PressableScale
+        style={styles.tile}
+        onPress={onPress}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        testID={`share-profile-tile-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      >
+        <View style={styles.tileIconCircle}>
+          <Feather name={icon} size={20} color={textColor} />
+        </View>
+        <Text style={[styles.tileLabel, { color: textColor }]} numberOfLines={1}>{label}</Text>
+      </PressableScale>
+    </View>
   );
 }
 
@@ -537,8 +546,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.lg,
     marginTop: SP.lg,
   },
+  tileFlex: { flex: 1 },
   tile: {
-    flex: 1,
     alignItems: 'center',
     gap: SP.xs,
   },
