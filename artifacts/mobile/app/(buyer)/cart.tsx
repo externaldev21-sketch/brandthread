@@ -11,11 +11,12 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
-  View, Text, ScrollView, StyleSheet, Image,
+  View, Text, ScrollView, StyleSheet,
   ActivityIndicator, Alert, TextInput, TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, StickyFooter } from '@/components/layout';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -186,7 +187,7 @@ function CartItemRow({
 
       <View style={ir.img}>
         {item.imageUri
-          ? <Image source={{ uri: item.imageUri }} style={ir.productImage} resizeMode="cover" />
+          ? <CachedImage source={{ uri: item.imageUri }} style={ir.productImage} contentFit="cover" />
            : <Feather name="image" size={ICON.md} color={theme.muted} />}
       </View>
 
@@ -424,7 +425,7 @@ function SellerGroup({
       >
         <View style={[sg.avatar, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
           {group.sellerAvatarUri ? (
-            <Image source={{ uri: group.sellerAvatarUri }} style={sg.avatarImage} resizeMode="cover" />
+            <CachedImage source={{ uri: group.sellerAvatarUri }} style={sg.avatarImage} contentFit="cover" />
           ) : (
             <Text style={[sg.avatarText, { color: theme.accentLight }]}>{group.sellerInitial}</Text>
           )}
