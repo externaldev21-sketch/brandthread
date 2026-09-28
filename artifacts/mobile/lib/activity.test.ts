@@ -5,6 +5,7 @@ import {
   activityKind,
   activityMessage,
   aggregateActivity,
+  followControlState,
   applyRead,
   buildActivitySections,
   createReadTracker,
@@ -314,6 +315,41 @@ describe('aggregateActivity — reposts and story likes', () => {
     });
     const rows = aggregateActivity([storyLike('s1'), storyLike('s2')]);
     expect(rows).toHaveLength(2);
+  });
+});
+
+describe('follow row inline pill', () => {
+  const follow = (name: string, overrides: Partial<ActivityItem> = {}) => item({
+    type: 'new_follower', title: `${name} started following you`,
+    actorId: `u_${name}`, actorName: name, targetId: `u_${name}`, targetType: 'user', cta: 'Follow back',
+    ...overrides,
+  });
+
+  it('offers Follow back while the viewer does not follow them', () => {
+    const [row] = aggregateActivity([follow('Jay', { isFollowingActor: false })]);
+    expect(followControlState(row)).toEqual({ userId: 'u_Jay', following: false });
+    expect(isFollowBackRow(row)).toBe(true);
+  });
+
+  it('reads Following once the server says the viewer follows them, even with a stale cta', () => {
+    const [row] = aggregateActivity([follow('Jay', { isFollowingActor: true })]);
+    expect(followControlState(row)).toEqual({ userId: 'u_Jay', following: true });
+    // No longer a pinned Highlights follow-back.
+    expect(isFollowBackRow(row)).toBe(false);
+  });
+
+  it('falls back to the stored cta when the server sends no live state', () => {
+    const [pending] = aggregateActivity([follow('Jay')]);
+    expect(followControlState(pending)?.following).toBe(false);
+    const [mutual] = aggregateActivity([follow('Mina', { cta: undefined, title: 'Mina followed you back' })]);
+    expect(followControlState(mutual)?.following).toBe(true);
+  });
+
+  it('has no pill on merged or non-follow rows', () => {
+    const [merged] = aggregateActivity([follow('Jay'), follow('Mina')]);
+    expect(followControlState(merged)).toBeNull();
+    const [liked] = aggregateActivity([like('Jay', 'post1')]);
+    expect(followControlState(liked)).toBeNull();
   });
 });
 

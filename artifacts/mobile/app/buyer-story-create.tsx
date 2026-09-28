@@ -42,6 +42,7 @@ import { hapticLight, hapticToggle, hapticPrimaryAction, hapticSuccessAction } f
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { TEXT_FONTS, storyFontFamily, loadStoryFontsAsync, type StoryFontKey } from '@/lib/storyFonts';
 import { startUploadActivity, updateUploadActivity, endUploadActivity } from '@/lib/uploadLiveActivity';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -1204,7 +1205,7 @@ export default function StoryComposer() {
           <View style={styles.alsoShareSearchWrap}>
             <Feather name="search" size={16} color={MUTED} />
             <TextInput
-              style={styles.alsoShareSearchInput}
+              style={[styles.alsoShareSearchInput, WEB_INPUT_RESET]}
               placeholder="Search"
               placeholderTextColor={MUTED}
               value={alsoShareQuery}

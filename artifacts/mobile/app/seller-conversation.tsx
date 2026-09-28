@@ -4,7 +4,7 @@
  * Sellers can attach a product card or the linked order to a reply.
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
@@ -42,6 +42,10 @@ import type { CallLogEntry } from '@/lib/calls/types';
 import { SystemLine } from '@/components/chat/SystemLine';
 import { getConversationTheme } from '@/lib/conversationThemes';
 import { LinearGradient } from 'expo-linear-gradient';
+import {
+  formatDate as sharedFormatDate, formatTime, groupFlags,
+  groupCornerRadii, lastOwnMessageId,
+} from '@/lib/chatGrouping';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,6 +73,11 @@ interface Msg {
   id: string; conversationId: string;
   fromId: string; fromName: string; fromInitials: string; fromColor: string;
   text: string; attachment?: MsgAttachment; status: string; ts: number;
+  /** ISO timestamp the buyer read this message, when known — drives the
+   *  double-check "read" receipt and the "Seen" line below my own last
+   *  message. Same field the API returns on app/buyer-conversation.tsx's
+   *  Message type; see lib/chatGrouping.ts. */
+  readAt?: string;
 }
 interface SellerProduct {
   id: string; name: string; priceCents?: number; status?: string;
@@ -80,16 +89,10 @@ interface SellerProduct {
 const SCREEN_W = Dimensions.get('window').width;
 const BUBBLE_MAX = SCREEN_W * 0.75;
 
-function formatDate(ts: number): string {
-  const d = new Date(ts);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 86400000);
-  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  if (msgDay.getTime() === today.getTime()) return 'Today';
-  if (msgDay.getTime() === yesterday.getTime()) return 'Yesterday';
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
+// Shared with app/buyer-conversation.tsx via lib/chatGrouping.ts — see that
+// module's doc comment for why the two screens' grouping math is
+// consolidated even though their JSX/render code isn't.
+const formatDate = sharedFormatDate;
 
 function formatPrice(p: SellerProduct): string {
   if (p.priceCents != null) return formatCents(p.priceCents);
@@ -116,25 +119,41 @@ function attachmentIcon(type: MsgAttachment['type']): keyof typeof Feather.glyph
 
 type ListRow =
   | { type: 'date'; date: string }
-  | { type: 'message'; msg: Msg }
+  | { type: 'message'; msg: Msg; isFirstInGroup: boolean; isLastInGroup: boolean }
   | { type: 'call_log'; entry: CallLogEntry };
 
 /** Merges the (client-only, PR1) call log into the message timeline by
  *  timestamp, alongside the real messages — see CallSessionContext's own doc
- *  comment on why this log isn't backend-persisted yet. */
+ *  comment on why this log isn't backend-persisted yet. Also computes each
+ *  message's grouping flags (lib/chatGrouping.ts — shared with
+ *  app/buyer-conversation.tsx so the same thread groups identically from
+ *  both sides): a call-log entry breaks a group the same way a date
+ *  separator does, since it renders as its own standalone row. */
 function groupByDate(msgs: Msg[], callLog: CallLogEntry[] = []): ListRow[] {
-  type Item = { ts: number; row: ListRow };
+  type Item =
+    | { ts: number; kind: 'message'; msg: Msg }
+    | { ts: number; kind: 'call_log'; entry: CallLogEntry };
   const items: Item[] = [
-    ...msgs.map((msg) => ({ ts: msg.ts, row: { type: 'message' as const, msg } })),
-    ...callLog.map((entry) => ({ ts: entry.startedAt, row: { type: 'call_log' as const, entry } })),
+    ...msgs.map((msg) => ({ ts: msg.ts, kind: 'message' as const, msg })),
+    ...callLog.map((entry) => ({ ts: entry.startedAt, kind: 'call_log' as const, entry })),
   ].sort((a, b) => a.ts - b.ts);
 
   const rows: ListRow[] = [];
   let last = '';
-  for (const item of items) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
     const d = formatDate(item.ts);
     if (d !== last) { rows.push({ type: 'date', date: d }); last = d; }
-    rows.push(item.row);
+    if (item.kind === 'call_log') {
+      rows.push({ type: 'call_log', entry: item.entry });
+      continue;
+    }
+    const prevItem = items[i - 1];
+    const nextItem = items[i + 1];
+    const prevMsg = prevItem?.kind === 'message' ? prevItem.msg : undefined;
+    const nextMsg = nextItem?.kind === 'message' ? nextItem.msg : undefined;
+    const { isFirstInGroup, isLastInGroup } = groupFlags(item.msg, prevMsg, nextMsg);
+    rows.push({ type: 'message', msg: item.msg, isFirstInGroup, isLastInGroup });
   }
   return rows;
 }
@@ -280,6 +299,11 @@ export default function SellerConversationScreen() {
   const receivedTextColor = convTheme?.receivedText ?? FG;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
+  // Seen receipt: id of MY (the seller's) most recent message in this
+  // thread — "Seen" only ever renders under that one message. See
+  // lib/chatGrouping.ts's doc comment on the real, honest granularity this
+  // reflects (conversation-level readAt, not per-bubble).
+  const lastOwnMsgId = useMemo(() => lastOwnMessageId(messages, myId), [messages, myId]);
 
   const { startCall, simulateIncomingCall } = useCallSession();
   const callLog = useCallLog(id ?? '');
@@ -682,7 +706,7 @@ export default function SellerConversationScreen() {
         </View>
       );
     }
-    const { msg } = item;
+    const { msg, isFirstInGroup, isLastInGroup } = item;
     const isOwn = msg.fromId === myId;
     if (msg.attachment?.type === 'system') {
       return (
@@ -696,57 +720,90 @@ export default function SellerConversationScreen() {
       );
     }
     const removed = (msg as { removedByModeration?: boolean }).removedByModeration === true;
+    const isRead = msg.status === 'read' || !!msg.readAt;
     return (
-      <PressableScale
-        activeOpacity={0.9}
-        disabled={isOwn || removed || !other}
-        onLongPress={() => {
-          if (!other) return;
-          hapticSelection();
-          openMessageOptions({
-            router,
-            messageId: msg.id,
-            text: msg.text,
-            counterpart: { userId: other.userId, name: other.name },
-          });
-        }}
-        delayLongPress={350}
-        style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start' }]}
-        accessibilityHint={isOwn ? undefined : 'Long press to report this message'}
-        // Voice messages render their own play/scrub/speed/transcription
-        // buttons inside this bubble — PressableScale defaults to rendering
-        // an actual <button> on web, which cannot legally contain other
-        // interactive controls. Drop the role only here so it's a plain,
-        // still fully long-pressable <div> instead. See buyer-conversation.tsx.
-        accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : undefined}
-      >
+      <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? SP.sm : 2 }]}>
+        {/* Buyer avatar — only on the last bubble of a consecutive run, same
+            IG-style grouping as app/buyer-conversation.tsx (lib/chatGrouping.ts). */}
         {!isOwn && (
-          <View style={[s.msgAvatar, { backgroundColor: msg.fromColor || PURPLE }]}>
-            <Text style={s.msgAvatarInitials}>{msg.fromInitials || (msg.fromName?.[0] ?? '?')}</Text>
-          </View>
+          isLastInGroup ? (
+            <View style={[s.msgAvatar, { backgroundColor: msg.fromColor || PURPLE }]}>
+              <Text style={s.msgAvatarInitials}>{msg.fromInitials || (msg.fromName?.[0] ?? '?')}</Text>
+            </View>
+          ) : <View style={s.msgAvatarSpacer} />
         )}
-        <View
-          style={[
-            s.bubble,
-            {
-              backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor,
-              borderColor: isOwn ? sentBubbleColor : BORDER,
-              borderBottomRightRadius: isOwn ? 4 : RADIUS.lg,
-              borderBottomLeftRadius: isOwn ? RADIUS.lg : 4,
-              maxWidth: BUBBLE_MAX,
-            },
-          ]}
-        >
-          {/* Attachment */}
-          {msg.attachment && renderMsgAttachment(msg.attachment, isOwn)}
-          {/* Text — hide the single-space placeholder */}
-          {removed ? (
-            <Text style={[s.msgText, { color: isOwn ? sentTextColor : MUTED, fontStyle: 'italic' }]}>{REMOVED_MESSAGE_TEXT}</Text>
-          ) : msg.text && msg.text.trim().length > 0 && (
-            <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
+        <View style={{ maxWidth: BUBBLE_MAX }}>
+          <PressableScale
+            activeOpacity={0.9}
+            disabled={isOwn || removed || !other}
+            onLongPress={() => {
+              if (!other) return;
+              hapticSelection();
+              openMessageOptions({
+                router,
+                messageId: msg.id,
+                text: msg.text,
+                counterpart: { userId: other.userId, name: other.name },
+              });
+            }}
+            delayLongPress={350}
+            style={[
+              s.bubble,
+              {
+                backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor,
+                borderColor: isOwn ? sentBubbleColor : BORDER,
+                // Shared corner-grouping math (lib/chatGrouping.ts) — the
+                // shared edge between grouped bubbles is tightened, every
+                // outer corner stays fully rounded, matching the buyer's
+                // own thread view of this same conversation.
+                ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, RADIUS.lg, 4),
+              },
+            ]}
+            accessibilityHint={isOwn ? undefined : 'Long press to report this message'}
+            // Voice messages render their own play/scrub/speed/transcription
+            // buttons inside this bubble — PressableScale defaults to rendering
+            // an actual <button> on web, which cannot legally contain other
+            // interactive controls. Drop the role only here so it's a plain,
+            // still fully long-pressable <div> instead. See buyer-conversation.tsx.
+            accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : undefined}
+          >
+            {/* Attachment */}
+            {msg.attachment && renderMsgAttachment(msg.attachment, isOwn)}
+            {/* Text — hide the single-space placeholder */}
+            {removed ? (
+              <Text style={[s.msgText, { color: isOwn ? sentTextColor : MUTED, fontStyle: 'italic' }]}>{REMOVED_MESSAGE_TEXT}</Text>
+            ) : msg.text && msg.text.trim().length > 0 && (
+              <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
+            )}
+
+            {/* Inline bottom-right timestamp + read receipt (last bubble of
+                a run) — same automatic, group-boundary timestamp behavior as
+                app/buyer-conversation.tsx (see that file's own note on why
+                this was chosen over tap-to-reveal). */}
+            {isLastInGroup && (
+              <View style={s.bubbleMeta}>
+                <Text style={[s.bubbleTime, { color: isOwn ? `${ON_DARK}B0` : MUTED }]}>
+                  {formatTime(msg.ts)}
+                </Text>
+                {isOwn && msg.status !== 'failed' && (
+                  <View style={s.receiptChecks}>
+                    <Feather name="check" size={11} color={isRead ? ON_DARK : `${ON_DARK}B0`} />
+                    {isRead && <Feather name="check" size={11} color={ON_DARK} style={{ marginLeft: -7 }} />}
+                  </View>
+                )}
+              </View>
+            )}
+          </PressableScale>
+
+          {/* Seen receipt — real backend readAt, same as
+              app/buyer-conversation.tsx; see lib/chatGrouping.ts. */}
+          {isOwn && msg.id === lastOwnMsgId && !!msg.readAt && (
+            <Text style={s.seenReceipt}>
+              Seen {formatTime(new Date(msg.readAt).getTime())}
+            </Text>
           )}
         </View>
-      </PressableScale>
+      </View>
     );
   }
 
@@ -1215,8 +1272,31 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginRight: SP.sm, marginBottom: 2,
   },
   msgAvatarInitials: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
+  // Reserves the avatar's own width+gap for a bubble that isn't the last in
+  // its group, so every bubble in a run still lines up on the same left
+  // edge — matches app/buyer-conversation.tsx's msgAvatarSpacer.
+  msgAvatarSpacer: { width: 32, marginRight: SP.sm },
   bubble: { borderWidth: 1, borderRadius: RADIUS.lg, padding: SP.md },
   msgText: { fontSize: FS.base, fontFamily: FONT.regular, color: FG, marginTop: 4 },
+  bubbleMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    marginTop: 4,
+    gap: 3,
+  },
+  bubbleTime: { fontSize: 10, fontFamily: FONT.regular },
+  receiptChecks: { flexDirection: 'row', marginLeft: 2 },
+  // Seen receipt (Instagram DM "Seen just now" reference) — small muted
+  // text under the sender's own last message.
+  seenReceipt: {
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    color: MUTED,
+    alignSelf: 'flex-end',
+    marginTop: 3,
+    marginRight: 2,
+  },
 
   attachCard: {
     flexDirection: 'row', alignItems: 'center',

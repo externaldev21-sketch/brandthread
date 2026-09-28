@@ -114,9 +114,10 @@ export function PersonRow({
  * component: the owner's spec is a fixed 32pt-tall white-fill/black-text
  * pill (a dark outlined version for "Following"), not the theme-accent
  * `Button` sizes. A plain sibling `Pressable`, never nested inside the
- * row's own Pressable above.
+ * row's own Pressable above. Also used by the Activity tab's single-person
+ * follow rows, so every Follow pill in the social surfaces is this one.
  */
-function FollowPill({
+export function FollowPill({
   following,
   followBack,
   loading,
