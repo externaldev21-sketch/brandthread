@@ -405,8 +405,13 @@ export default function InboxScreen() {
     }
   }, [userId, api]);
 
-  // Preview-only: simulate a transient "typing…" row for one seeded thread
-  // (see lib/previewInbox.ts) — a no-op outside the dev/preview environment.
+  // Preview-only overlay for the "typing…" row treatment: real accounts get
+  // it purely from `conv.agentTyping` below (polled via GET /api/conversations
+  // — the only real "someone is typing" signal that exists today, and only
+  // ever true for the Brandthread Agent thread; there is no presence/typing
+  // mechanism for ordinary human buyer<->seller or buyer<->buyer threads).
+  // This just simulates that same field, on that same seeded Agent thread,
+  // for the seeded dev/preview inbox — a no-op outside that environment.
   useEffect(() => {
     const unsub = subscribePreviewTyping(setTypingConvId);
     return unsub;
@@ -898,7 +903,13 @@ export default function InboxScreen() {
     const participant = getParticipant(conv);
     if (!participant) return null;
     const isUnread = conv.unreadCount > 0;
-    const isTyping = typingConvId === conv.id;
+    // Real signal: `conv.agentTyping` (only ever true for the Brandthread
+    // Agent thread — see the field's comment on Conversation in
+    // services/socialTypes.ts). `typingConvId` is the preview-only overlay
+    // above, which flips the exact same seeded Agent thread's state so the
+    // row treatment demos the same real field rather than a fake parallel
+    // mechanism — it is never set for an ordinary buyer<->seller/buyer row.
+    const isTyping = conv.agentTyping === true || typingConvId === conv.id;
 
     const swipeActions: InboxSwipeAction[] = [
       {

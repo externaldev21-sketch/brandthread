@@ -445,6 +445,27 @@ describe('buyer inbox', () => {
     expect(renderer.root.findAllByProps({ testID: 'inbox-unread-badge-unread-thread' }, { deep: false })).toHaveLength(0);
   });
 
+  it('shows "typing…" in place of the preview when conv.agentTyping is true, and hides it otherwise', async () => {
+    // conv.agentTyping is the one real "someone is typing" signal the
+    // backend exposes today (only ever true for the Brandthread Agent
+    // thread, polled via GET /api/conversations — see its comment on
+    // Conversation in services/socialTypes.ts). The row must render from
+    // that real field, not just the preview-only simulation.
+    getConversationsMock.mockResolvedValue([
+      conversation('agent-thread', 1, { agentTyping: true, lastMessage: 'want me to show you Thread Cash?' }),
+      conversation('quiet-thread', 0, { agentTyping: false }),
+    ]);
+    renderer = await renderScreen();
+
+    const typingRow = renderer.root.findByProps({ testID: 'inbox-conversation-agent-thread' });
+    expect(typingRow.findAllByProps({ testID: 'inbox-typing-agent-thread' }, { deep: false })).toHaveLength(1);
+    // The real last-message preview must NOT also render while typing.
+    expect(typingRow.findAllByType('Text' as never).some((n) => n.props.children === 'want me to show you Thread Cash?')).toBe(false);
+
+    const quietRow = renderer.root.findByProps({ testID: 'inbox-conversation-quiet-thread' });
+    expect(quietRow.findAllByProps({ testID: 'inbox-typing-quiet-thread' }, { deep: false })).toHaveLength(0);
+  });
+
   it('filters conversations by name, handle and last-message text', async () => {
     getConversationsMock.mockResolvedValue([
       conversation('c1', 1, { participants: [{ userId: 's1', name: 'Alice Unread', handle: '@alice', initials: 'A', color: '#fff', accountType: 'seller' }], lastMessage: 'See you soon' }),
