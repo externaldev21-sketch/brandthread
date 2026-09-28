@@ -113,14 +113,8 @@ describe('Feed page/video container sizing (web all-black bug)', () => {
   });
 
   it('gives the sharp-clip wrapper inside VideoVisual an explicit size, independent of its ancestor', () => {
-    // The sharp frame now stops at the tab bar's top edge (Reels/TikTok
-    // framing), so its explicit size is keyed off `frameHeight`
-    // (pageHeight minus the tab-bar strip), not the full page — see
-    // immersiveFrameHeight()/frameStyle in VideoVisual/LiveVideoVisual.
-    expect(feed).toContain('const frameStyle = pageWidth != null && frameHeight != null');
-    expect(feed).toContain("? { position: 'absolute' as const, top: 0, left: 0, width: pageWidth, height: frameHeight }");
-    expect(feed).toContain(': StyleSheet.absoluteFill;');
-    expect(feed).toContain('<View style={frameStyle}>');
+    expect(feed).toContain('const clipSize = pageWidth != null && pageHeight != null ? { width: pageWidth, height: pageHeight } : null;');
+    expect(feed).toContain('<View style={[StyleSheet.absoluteFill, clipSize, sharpClipStyle]}>');
   });
 
   it('re-fires the play effect once the page has a real measured size, not just on isActive/paused/focus', () => {

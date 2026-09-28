@@ -93,23 +93,12 @@ describe('buyer Home feed behind the bar', () => {
     expect(feed).toContain('progressBottom={immersive ? bottomClearance : undefined}');
     // The blurred strip only shows where there's an actual floating tab bar
     // to blend into (hasTabBar) — the creator-profile-videos player reuses
-    // this same component without one. It's sized off `videoFrameInset`
-    // (the bar's own top pixel — buyerBarTopInset) rather than the padded
-    // `bottomClearance`, so the sharp video's bottom edge lands exactly on
-    // the bar's top edge, not on the extra breathing room above it.
-    expect(feed).toContain('bottomStripHeight={immersive && hasTabBar ? (videoFrameInset ?? bottomClearance) : 0}');
-    expect(feed).toContain('videoFrameInset={isBuyerSurface ? buyerBarTopInset : undefined}');
+    // this same component without one.
+    expect(feed).toContain('bottomStripHeight={immersive && hasTabBar ? bottomClearance : 0}');
   });
 
   it('fills the screen only when that crops little, and letterboxes otherwise', () => {
-    // Callers with a bottom strip (Buyer Home's immersive frame) use the
-    // tighter Reels/TikTok 15% tolerance, keyed to the FRAME's own aspect
-    // (pageHeight minus the tab-bar strip); callers with no strip (e.g. the
-    // LIVE viewer, which has no tab bar) keep the original 30% tolerance
-    // against the full page, unaffected by this change.
-    expect(feed).toContain('const IMMERSIVE_FRAME_COVER_CROP_THRESHOLD = 0.15;');
-    expect(feed).toContain('const FULL_PAGE_COVER_CROP_THRESHOLD = 0.3;');
-    expect(feed).toContain("const fit = immersive && cropFraction <= coverThreshold ? 'cover' : 'contain';");
+    expect(feed).toContain("const fit = immersive && cropFraction <= 0.3 ? 'cover' : 'contain';");
     expect(feed).toContain("player.addListener('videoTrackChange'");
     expect(feed).toContain('contentFit={fit}');
     expect(feed).toContain('styles.videoFill');
