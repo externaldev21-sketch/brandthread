@@ -96,6 +96,10 @@ let cached: ActivityItem[] | null = null;
 const previewReadIds = new Set<string>();
 let previewSeedServed = false;
 
+export function isPreviewActivityId(id: string): boolean {
+  return id.startsWith('preview-act-');
+}
+
 /** Mark seeded preview rows read (ids that aren't preview rows are ignored). */
 export function markPreviewActivityRead(ids: Iterable<string>): void {
   for (const id of ids) if (isPreviewActivityId(id)) previewReadIds.add(id);
