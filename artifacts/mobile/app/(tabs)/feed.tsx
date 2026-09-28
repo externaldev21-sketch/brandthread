@@ -801,7 +801,9 @@ function initialEngagement(item: SpotlightItem): EngagementState {
     saved: item.savedByMe === true, saves: item.saves,
     reposted: item.repostedByMe === true, reposts: item.reposts,
     following: false,
-    comments: item.comments,
+    // Some feed items arrive without a comments array (e.g. posts restored
+    // from the feed cache); never let that reach the memo comparator below.
+    comments: item.comments ?? [],
   };
 }
 
@@ -1775,7 +1777,7 @@ function engagementEqual(a: EngagementState | undefined, b: EngagementState | un
   return a.liked === b.liked && a.likes === b.likes
     && a.saved === b.saved && a.saves === b.saves
     && a.reposted === b.reposted && a.reposts === b.reposts
-    && a.following === b.following && a.comments.length === b.comments.length;
+    && a.following === b.following && (a.comments?.length ?? 0) === (b.comments?.length ?? 0);
 }
 
 const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (

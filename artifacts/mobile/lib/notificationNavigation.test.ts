@@ -90,6 +90,22 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenCalledWith('/product-detail?id=prod-abc');
   });
 
+  it('routes a buyer order update on targetType "order" to the buyer order screen', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('ship-1', { targetType: 'order', targetId: 'ord-1', type: 'order_shipped' }));
+    expect(router.push).toHaveBeenCalledWith('/buyer-order-detail?id=ord-1');
+  });
+
+  it('still routes a seller order push (new order, buyer cancelled) to the seller order screen', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('new-1', { targetType: 'order', targetId: 'ord-2', type: 'new_order_received' }));
+    handler(targetResponse('cxl-1', { targetType: 'order', targetId: 'ord-3', type: 'order_cancelled_by_buyer' }));
+    expect(router.push).toHaveBeenNthCalledWith(1, '/order-detail?id=ord-2');
+    expect(router.push).toHaveBeenNthCalledWith(2, '/order-detail?id=ord-3');
+  });
+
   it('routes a return status notification to the return detail screen', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);

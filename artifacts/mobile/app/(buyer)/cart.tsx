@@ -33,6 +33,7 @@ import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { useApi } from '@/hooks/useApi';
+import SwipeableActions, { type SwipeAction } from '@/components/SwipeableActions';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
   FONT, FS, SP, RADIUS, COMP, ICON, TYPE, SHADOW_SM,
@@ -124,8 +125,36 @@ function CartItemRow({
   // Very low: highlight differently at 1
   const isCriticalStock = item.isAvailable && item.maxQuantity === 1;
 
+  // Swipe left to reveal Save for later + Remove — Mobbin: ZARA iOS shopping
+  // bag (row swiped left → SAVE / DELETE side by side). Same shared
+  // SwipeableActions as Activity rows; both actions run the exact handlers
+  // the row's own Save / Remove buttons use (same API, same undo toast).
+  // Monochrome: Save on a light-gray tint of the card (ZARA's dark SAVE), Remove
+  // white with a black trash (the screen's one solid "act" color, like the
+  // Checkout pill) — no red.
+  const swipeActions = useMemo<SwipeAction[]>(() => [
+    {
+      key: 'save',
+      icon: 'bookmark',
+      color: 'rgba(255,255,255,0.14)',
+      iconColor: theme.text,
+      accessibilityLabel: `Save ${item.productName} for later`,
+      onPress: onSaveForLater,
+    },
+    {
+      key: 'remove',
+      icon: 'trash-2',
+      color: '#FFFFFF',
+      iconColor: '#000000',
+      accessibilityLabel: `Remove ${item.productName} from cart`,
+      onPress: onRemove,
+    },
+  ], [item.productName, onRemove, onSaveForLater, theme.text]);
+
   return (
-    <View style={[ir.root, isRowBusy && ir.rowBusy]}>
+    <View style={ir.swipeBleed} testID={`cart-row-${item.id}`}>
+    <SwipeableActions actions={swipeActions} disabled={isRowBusy}>
+    <View style={[ir.root, ir.swipeFront, isRowBusy && ir.rowBusy]}>
       {/* Pending overlay for remove/save */}
       {isRowBusy && (
         <View style={ir.busyOverlay} pointerEvents="none">
@@ -264,12 +293,20 @@ function CartItemRow({
         </View>
       </View>
     </View>
+    </SwipeableActions>
+    </View>
   );
 }
 
 const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm, alignItems: 'flex-start' },
   rowBusy: { opacity: 0.7 },
+  // The swipe row spans the card's full inner width (edge to edge, cancelling
+  // the Card's 16pt padding) so the revealed actions sit flush with the card
+  // edge; the row pads itself back in, so at rest nothing moves. Opaque card
+  // fill so the actions never show through behind the row at rest (web).
+  swipeBleed: { marginHorizontal: -SP.md },
+  swipeFront: { paddingHorizontal: SP.md, backgroundColor: theme.card },
   checkbox: { width: COMP.minTouchTarget, height: 72, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
   checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {

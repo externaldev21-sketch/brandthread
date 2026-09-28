@@ -333,6 +333,7 @@ export default function ProfileScreen() {
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Posts');
+  const [postFilter, setPostFilter] = useState<'Published' | 'Drafts'>('Published');
   const [refreshing, setRefreshing] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [myOrders, setMyOrders] = useState<BuyerOrderView[]>([]);
@@ -390,7 +391,7 @@ export default function ProfileScreen() {
       ]);
       if (accountRef.current !== user?.id) return;
       setProfile(p);
-      setPosts(po.filter(x => !x.isArchived && !x.isDraft));
+      setPosts(po.filter(x => !x.isArchived));
       setSavedItems(sv);
       setPrivacySettings(pr);
       setAvatarUri(bp.avatarUri || null);
@@ -596,8 +597,14 @@ export default function ProfileScreen() {
   const handlePostTap = useCallback((item: ProfileGridItem) => {
     if (!user?.id) return;
     hapticSelection();
+    // A draft has no published media to view — resume it in the composer,
+    // same as the seller profile's Drafts filter does.
+    if (postFilter === 'Drafts' && activeTab === 'Posts') {
+      router.push((`/create-post?accountType=buyer&editId=` + encodeURIComponent(item.id)) as never);
+      return;
+    }
     router.push(profileVideosHref({ source: 'creator', id: user.id, startPostId: item.id, title: displayName }) as never);
-  }, [displayName, router, user?.id]);
+  }, [activeTab, displayName, postFilter, router, user?.id]);
 
   const handleSavedTap = useCallback(() => {
     router.push('/buyer-saved' as any);
@@ -609,13 +616,16 @@ export default function ProfileScreen() {
 
   // ── Per-tab rows ──
   const rows: ListRow[] = useMemo(() => {
-    if (activeTab === 'Posts') return posts.map((post) => ({ kind: 'post' as const, post, item: gridItemFromBuyerPost(post) }));
+    if (activeTab === 'Posts') {
+      const filtered = posts.filter(p => postFilter === 'Drafts' ? p.isDraft : !p.isDraft);
+      return filtered.map((post) => ({ kind: 'post' as const, post, item: gridItemFromBuyerPost(post) }));
+    }
     if (activeTab === 'Saved') return savedItems.map((saved) => ({ kind: 'saved' as const, saved }));
     if (activeTab === 'Orders') return myOrders.map((order) => ({ kind: 'order' as const, order }));
     // Liked has no backing data yet — a clean empty slot rather than
     // inventing engagement history.
     return [];
-  }, [activeTab, posts, savedItems, myOrders]);
+  }, [activeTab, postFilter, posts, savedItems, myOrders]);
 
   const numColumns = activeTab === 'Posts' ? layout.gridColumns : activeTab === 'Saved' ? savedColumns : 1;
 
@@ -641,7 +651,8 @@ export default function ProfileScreen() {
   ), []);
 
   // One table decides every tab's empty copy + CTA (own profile → CTA).
-  const empty = profileEmptyState(`buyer:${activeTab.toLowerCase()}` as ProfileEmptyTab, true);
+  const emptyTabKey = activeTab === 'Posts' && postFilter === 'Drafts' ? 'buyer:draft' : `buyer:${activeTab.toLowerCase()}`;
+  const empty = profileEmptyState(emptyTabKey as ProfileEmptyTab, true);
   const emptyIcon = empty.icon as keyof typeof Feather.glyphMap;
   const emptyIllustration = empty.illustration;
   const emptyTitle = empty.title;
@@ -667,9 +678,11 @@ export default function ProfileScreen() {
   const hasActiveStory = myStoryIds.length > 0;
   const heroActive = focused && heroOnScreen && !heroPosterOnly;
 
-  // Instagram order: Posts · Followers · Following.
+  // Instagram order: Posts · Followers · Following. Drafts never count toward
+  // the public "Posts" stat (they aren't published).
+  const publishedPosts = posts.filter(p => !p.isDraft);
   const stats: ProfileStat[] = [
-    { key: 'posts', label: 'Posts', value: formatProfileCount(posts.length) },
+    { key: 'posts', label: 'Posts', value: formatProfileCount(publishedPosts.length) },
     {
       key: 'followers', label: 'Followers',
       value: formatProfileCount(socialCounts?.followers ?? profile?.friendsCount ?? 0),
@@ -835,6 +848,33 @@ export default function ProfileScreen() {
       <View style={styles.tabsBlock}>
         <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} variant="iconOnly" />
       </View>
+
+      {/* Posts sub-filter (Published / Drafts) — same pattern as the seller
+          profile's own filter row, minus Scheduled (buyers can't schedule). */}
+      {activeTab === 'Posts' && (
+        <View style={styles.filterRow} accessibilityRole="tablist" testID="buyer-post-filters">
+          {(['Published', 'Drafts'] as const).map((filter) => {
+            const selected = filter === postFilter;
+            return (
+              <Pressable
+                key={filter}
+                onPress={() => { hapticSelection(); setPostFilter(filter); }}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${filter} posts`}
+                testID={`buyer-post-filter-${filter.toLowerCase()}`}
+                style={({ pressed }) => [
+                  styles.filterChip,
+                  { borderColor: selected ? theme.text : theme.border, backgroundColor: selected ? theme.text : 'transparent' },
+                  pressed && styles.filterChipPressed,
+                ]}
+              >
+                <Text style={[styles.filterText, { color: selected ? theme.background : theme.muted }]}>{filter}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 
@@ -914,7 +954,7 @@ export default function ProfileScreen() {
         buyerExtra={{
           statLabel: 'followers',
           statValue: socialCounts?.followers ?? profile?.friendsCount ?? 0,
-          topPosts: posts.slice(0, 3).map(p => ({ id: p.id, uri: p.mediaUrl })),
+          topPosts: publishedPosts.slice(0, 3).map(p => ({ id: p.id, uri: p.mediaUrl })),
         }}
       />
 
@@ -959,6 +999,13 @@ function makeStyles(theme: AppThemePreset) {
     // Streak card (or highlights) → tabs: 16pt above; tabs → grid: 1pt
     // (Instagram's grid starts right under the underline).
     tabsBlock: { paddingTop: 16, paddingBottom: 1 },
+
+    // Posts sub-filter (Published / Drafts) — same pattern as the seller
+    // profile's own filterRow, buyer has no Scheduled (buyers can't schedule).
+    filterRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xs },
+    filterChip: { height: 30, borderRadius: 15, borderWidth: 1, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+    filterChipPressed: { opacity: 0.7 },
+    filterText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   });
 }
 
