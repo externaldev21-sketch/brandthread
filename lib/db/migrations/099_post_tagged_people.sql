@@ -1,4 +1,4 @@
--- 098: "Tag people" on a Thread (post/reel creation, item 115).
+-- 099: "Tag people" on a Thread (post/reel creation, item 115).
 --
 -- Mirrors post_tagged_products' shape exactly (one row per tag, cascade-
 -- deleted with the post) so the two features share one mental model. x/y
