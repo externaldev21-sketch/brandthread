@@ -444,6 +444,56 @@ function sellerOrders(count = 9) {
   });
 }
 
+// GET /api/orders/:id — the order-detail screen's full raw shape (order-
+// detail.tsx's adaptApiOrder), built from the same sellerOrders() rows so
+// the order number, customer and amount always match the list screen.
+// The first row (the demo seller's real buyer, BUYER_USER) carries a real
+// buyerId so the "Message Buyer" action (item 129) has someone to message;
+// the rest are guest checkouts (buyerId: null), same as production data
+// where not every order has a linked Brandthread account.
+function sellerOrderDetail(id, count = 9) {
+  const rows = sellerOrders(count);
+  const row = rows.find((r) => r.id === id);
+  if (!row) return undefined;
+  const index = rows.indexOf(row);
+  return {
+    id: row.id,
+    ownerId: 'user_northline',
+    buyerId: index === 0 ? BUYER_USER.id : null,
+    customerId: null,
+    customer: null,
+    customerName: row.customerName,
+    customerEmail: row.customerEmail,
+    guestEmail: index === 0 ? null : row.customerEmail,
+    shippingAddress: {
+      name: row.customerName,
+      street: '129 Ember Court',
+      city: 'Portland',
+      state: 'OR',
+      zip: '97205',
+      country: 'US',
+    },
+    orderNumber: row.orderNumber,
+    status: row.status,
+    totalCents: row.totalCents,
+    subtotalCents: Math.round(row.totalCents * 0.92),
+    shippingCents: row.totalCents - Math.round(row.totalCents * 0.92),
+    trackingNumber: row.trackingNumber,
+    carrier: row.carrier,
+    cancellationReason: row.cancellationReason,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    items: [{
+      id: `${row.id}-item-1`,
+      productId: CATALOGUE.find((c) => c.brand === 'northline')?.id ?? '',
+      productName: row.dropName,
+      variantLabel: 'M',
+      quantity: row.itemCount,
+      priceCents: Math.round(row.totalCents / row.itemCount),
+    }],
+  };
+}
+
 function homeAnalytics(range) {
   const midnight = new Date(DEMO_LOCAL_MIDNIGHT);
   const config = {
@@ -728,6 +778,7 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
   if (p === '/finance/balance') return { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
   if (p === '/orders') return sellerOrders(options.orderCount ?? 9);
+  if ((match = p.match(/^\/orders\/([^/]+)$/))) return sellerOrderDetail(match[1], options.orderCount ?? 9);
   if (p === '/conversations') return role === 'seller' ? sellerConversations(options.conversationCount ?? 5) : [];
   if (p === '/manufacturers/public') return MANUFACTURERS;
   if ((match = p.match(/^\/manufacturers\/public\/([^/]+)$/))) return byId(MANUFACTURERS)(match[1]);
