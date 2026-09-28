@@ -428,7 +428,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     location: 'Paris, France',
     productId: 'preview-product-01',
     sellerId: 'preview-seller-01',
-    productTags: [{ productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000 }],
+    // Two tags on this preview post (not one) so the ShopSideTab's
+    // product-count badge and ShopProductSheet's multi-tag switcher have
+    // real multi-product data to render against in dev/e2e preview, the
+    // same way a seller who tagged more than one product on a real post
+    // would show up here — see ShopSideTab's module comment for why the
+    // badge only appears once count > 1.
+    productTags: [
+      { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000 },
+      { productId: 'preview-product-01b', productName: 'Leather Ankle Boots', priceCents: 21000 },
+    ],
     commentsCount: 0,
   },
   {
