@@ -276,10 +276,18 @@ function CartItemRow({
               accessibilityLabel={`Remove ${item.productName} from cart`}
               accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'remove' }}
             >
+               {/* Overnight follow-up: was theme.error (red) — this app's
+                   monochrome rule reserves red for LIVE indicators and the
+                   end-call button only. Grey, matching Save's own icon/text
+                   above and how the swipe-to-remove action and the Saved-
+                   for-later "Remove" button (SavedItemRow below) both
+                   already render this exact same destructive-but-not-live
+                   action. Color-only change — see this PR's body for the
+                   collision check on this file. */}
                {pendingAction === 'remove'
-                 ? <ActivityIndicator size="small" color={theme.error} style={{ width: 12, height: 12 }} />
-                 : <Feather name="trash-2" size={12} color={theme.error} />}
-               <Text style={[ir.actionText, { color: theme.error }]}>Remove</Text>
+                 ? <ActivityIndicator size="small" color={theme.muted} style={{ width: 12, height: 12 }} />
+                 : <Feather name="trash-2" size={12} color={theme.muted} />}
+               <Text style={ir.actionText}>Remove</Text>
             </PressableScale>
           </View>
           {/* Buys just this line — its own variant + qty — through the shared
