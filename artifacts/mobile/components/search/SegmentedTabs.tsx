@@ -8,21 +8,25 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 
-export type SearchTabKey = 'top' | 'videos' | 'users' | 'shop' | 'live';
+// Mirrors Instagram's post-submit results tabs (Mobbin "Instagram iOS
+// Searching Instagram") 1:1 in layout/interaction — only the tab set itself
+// is Brandthread's own, per the owner's explicit mapping: Audio -> Products
+// (we sell products, not audio), Places -> Brands/Shops (brand storefronts
+// stand in for locations).
+export type SearchTabKey = 'forYou' | 'accounts' | 'products' | 'tags' | 'brands';
 
 export const SEARCH_TABS: Array<{ key: SearchTabKey; label: string }> = [
-  { key: 'top', label: 'Top' },
-  { key: 'videos', label: 'Videos' },
-  { key: 'users', label: 'Users' },
-  { key: 'shop', label: 'Shop' },
-  { key: 'live', label: 'LIVE' },
+  { key: 'forYou', label: 'For you' },
+  { key: 'accounts', label: 'Accounts' },
+  { key: 'products', label: 'Products' },
+  { key: 'tags', label: 'Tags' },
+  { key: 'brands', label: 'Brands' },
 ];
 
 /**
  * Horizontally-scrolling pill segmented control switching between result
- * tabs (Alta-style "For you / Top this week / Recent" reference) — a
- * scrolling pill row rather than fixed equal-width segments so a 5th tab
- * (Videos) never crushes label text at 375pt width.
+ * tabs — a scrolling pill row rather than fixed equal-width segments so a
+ * 5th tab never crushes label text at 375pt width.
  */
 export function SegmentedTabs({
   active,
