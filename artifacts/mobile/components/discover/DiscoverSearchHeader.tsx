@@ -12,7 +12,7 @@ import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { FONT, GUTTER } from '@/lib/theme';
+import { FONT, GUTTER, WEB_SAFE_AREA_TOP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { IconButton } from '@/components/ui/IconButton';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -32,9 +32,9 @@ export function DiscoverSearchHeader({
 }) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
-  // Same fixed fallback TabPageHeader itself uses on web preview — see that
-  // component's own comment on why insets.top reads 0 there.
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  // Overnight batch item 40: shared stand-in (lib/theme.ts) for a real
+  // device's status-bar inset on web preview — see its own comment.
+  const topPad = Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top;
 
   return (
     <View style={[styles.row, { paddingTop: topPad + 12 }]}>

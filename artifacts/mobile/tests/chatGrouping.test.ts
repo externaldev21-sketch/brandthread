@@ -9,6 +9,7 @@ import {
   groupFlags,
   isSeenReceipt,
   lastOwnMessageId,
+  messagePreviewText,
   sameSenderClose,
   type GroupableMessage,
   type SeenableMessage,
@@ -193,5 +194,34 @@ describe('chatGrouping: seen receipts (real readAt-derived, conversation-level g
   it('never shows "Seen" under a message that is not mine', () => {
     const theirs = { ...conv[1], readAt: '2026-09-28T12:05:00.000Z' };
     expect(isSeenReceipt(theirs, 'me', 'm2')).toBe(false);
+  });
+});
+
+// ─── messagePreviewText (swipe-to-reply quote / banner text) ─────────────────
+
+describe('chatGrouping: messagePreviewText', () => {
+  it('uses the message text when present', () => {
+    expect(messagePreviewText({ text: 'Hey, is this still available?' })).toBe('Hey, is this still available?');
+  });
+
+  it('trims whitespace-only text and falls through to the attachment', () => {
+    expect(messagePreviewText({ text: '   ', attachment: { title: 'Sculpted Wool Coat' } }))
+      .toBe('Sculpted Wool Coat');
+  });
+
+  it('falls back to the attachment title when there is no text', () => {
+    expect(messagePreviewText({ text: '', attachment: { title: 'Sculpted Wool Coat' } }))
+      .toBe('Sculpted Wool Coat');
+  });
+
+  it('falls back to a type-specific label when the attachment has no title', () => {
+    expect(messagePreviewText({ text: '', attachment: { type: 'voice' } })).toBe('Voice message');
+    expect(messagePreviewText({ text: '', attachment: { type: 'image' } })).toBe('Photo');
+    expect(messagePreviewText({ text: '', attachment: { type: 'video' } })).toBe('Video');
+    expect(messagePreviewText({ text: '', attachment: { type: 'product' } })).toBe('Product');
+  });
+
+  it('falls back to a neutral "Message" with neither text nor attachment', () => {
+    expect(messagePreviewText({})).toBe('Message');
   });
 });

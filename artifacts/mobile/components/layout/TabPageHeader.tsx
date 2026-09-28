@@ -9,7 +9,7 @@ import React from 'react';
 import { Platform, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { FONT, GUTTER } from '@/lib/theme';
+import { FONT, GUTTER, WEB_SAFE_AREA_TOP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { IconButton } from '@/components/ui/IconButton';
 
@@ -31,15 +31,11 @@ interface TabPageHeaderProps {
 export function TabPageHeader({ title, actions, gutter = GUTTER, style }: TabPageHeaderProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
-  // Same fixed value across every tab page, matching the other buyer/seller
-  // tab headers (see e.g. orders.tsx, products.tsx): outside of a real
-  // device (or a preview frame that actually emulates one), the browser
-  // never fills in a non-zero `env(safe-area-inset-top)`, so
-  // react-native-safe-area-context's web implementation reads 0 for
-  // `insets.top` and the title sits flush at the very top of the viewport —
-  // this is what pushed Discover/Messages/Activity's titles up into the
-  // corner, nearly under the notch, in the plain 390x844 web preview.
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  // Overnight batch item 40: WEB_SAFE_AREA_TOP (lib/theme.ts) is the one
+  // shared stand-in for a real device's status-bar inset, since
+  // react-native-safe-area-context reads `insets.top` as 0 outside a real
+  // device or an emulating preview frame.
+  const topPad = Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top;
 
   return (
     <View style={[styles.row, { paddingTop: topPad + 12, paddingHorizontal: gutter }, style]}>

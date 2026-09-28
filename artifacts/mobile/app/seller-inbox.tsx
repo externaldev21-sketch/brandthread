@@ -20,6 +20,7 @@ import { useApi } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
+import { isPreviewInboxEnabled, getSellerPreviewConversations } from '@/lib/previewInbox';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -148,7 +149,7 @@ export default function SellerInboxScreen() {
 
   useFocusEffect(useCallback(() => {
     if (isDemoPreview) {
-      setConvs([]);
+      setConvs(isPreviewInboxEnabled() ? getSellerPreviewConversations() as ConvView[] : []);
       setLoadError(false);
       setIsLoading(false);
       return;

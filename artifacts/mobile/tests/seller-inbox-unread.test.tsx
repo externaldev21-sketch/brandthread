@@ -96,6 +96,16 @@ vi.mock('@clerk/expo', () => ({
   useUser: () => ({ user: { id: 'seller-user' } }),
 }));
 
+// previewInbox.ts imports expo-asset and requires bundled image assets at
+// module scope, neither of which Vitest can transform — mocked out here the
+// same way tests/buyer-inbox.test.tsx does for the buyer inbox. This test
+// always has a real Clerk user (see the @clerk/expo mock above), so
+// getSellerPreviewConversations() is never actually reached — item 71.
+vi.mock('@/lib/previewInbox', () => ({
+  isPreviewInboxEnabled: () => false,
+  getSellerPreviewConversations: () => [],
+}));
+
 vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
 }));

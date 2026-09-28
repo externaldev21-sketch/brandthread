@@ -505,8 +505,8 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
     ? ` Reason: ${reason.replace(/_/g, " ")}.`
     : "";
   const notifMap: Record<string, { type: string; title: string; body: string } | undefined> = {
-    shipped:   { type: "order_shipped",   title: "Your order has shipped! 🚚", body: `Order #${transitioned.orderNumber} is on its way.` },
-    delivered: { type: "order_delivered", title: "Your order was delivered! 📦", body: `Order #${transitioned.orderNumber} has been delivered.` },
+    shipped:   { type: "order_shipped",   title: "Your order has shipped!", body: `Order #${transitioned.orderNumber} is on its way.` },
+    delivered: { type: "order_delivered", title: "Your order was delivered!", body: `Order #${transitioned.orderNumber} has been delivered.` },
     cancelled: { type: "order_cancelled", title: "Order cancelled", body: `Order #${transitioned.orderNumber} has been cancelled.${cancellationReasonLabel}` },
   };
   const notif = notifMap[status];
@@ -693,7 +693,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
       userId:     statusTransition.buyerId,
       category:   "orders",
       type:       "order_shipped",
-      title:      "Your order has shipped! 🚚",
+      title:      "Your order has shipped!",
       body:       `Order #${statusTransition.orderNumber} is on its way via ${carrierLabel} — tracking: ${updated.trackingNumber ?? "not available yet"}`,
       targetId:   statusTransition.id,
       targetType: "order",
@@ -706,7 +706,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   }>> = {
     out_for_delivery: {
       type: "order_out_for_delivery",
-      title: "Your package is arriving today 🚚",
+      title: "Your package is arriving today",
       body: `Order #${updated.orderNumber} is out for delivery today.`,
     },
     exception: {

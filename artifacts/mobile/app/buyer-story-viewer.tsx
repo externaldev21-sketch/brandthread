@@ -20,6 +20,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
+import { Glass } from '@/components/ui/Glass';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
@@ -35,6 +36,12 @@ import { shouldShowStoryGestureGuide } from '@/lib/storyGestureGuideStorage';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
 
 const { width: W, height: H } = Dimensions.get('window');
+
+// Mirrors Instagram's default quick-reaction row shown above the reply
+// pill before the viewer starts typing (Mobbin: Instagram iOS story
+// viewer reply screen). Emoji glyphs carry their own inherent color —
+// not a themed accent — so they're exempt from the monochrome rule.
+const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '👏', '🔥'];
 
 function timeAgo(ms: number): string {
   const diff = Date.now() - ms;
@@ -81,6 +88,7 @@ export default function BuyerStoryViewer() {
   const [isPaused, setIsPaused] = useState(false);
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [replyFocused, setReplyFocused] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
   const [viewerModalVisible, setViewerModalVisible] = useState(false);
   // Like state keyed by storyId
@@ -171,8 +179,8 @@ export default function BuyerStoryViewer() {
     return unsub;
   }, []);
 
-  const handleSendReply = async () => {
-    const text = inputText.trim();
+  const handleSendReply = async (override?: string) => {
+    const text = (override ?? inputText).trim();
     if (!text || sendingReply || !currentStory) return;
     setSendingReply(true);
     try {
@@ -188,13 +196,18 @@ export default function BuyerStoryViewer() {
         },
       });
       await sendMessage(conv.id, text);
-      setInputText('');
+      if (!override) setInputText('');
       hapticSuccessAction();
     } catch {
       Alert.alert('Couldn’t send reply', 'Try again.');
     } finally {
       setSendingReply(false);
     }
+  };
+
+  const sendQuickReaction = (emoji: string) => {
+    hapticLight();
+    void handleSendReply(emoji);
   };
 
   const slideCounts = stories.map(s => s.media.length);
@@ -557,24 +570,41 @@ export default function BuyerStoryViewer() {
         style={styles.bottomBarWrap}
         keyboardVerticalOffset={0}
       >
+        {!currentStory.repliesDisabled && !replyFocused && (
+          <View style={styles.quickReactionRow}>
+            {QUICK_REACTIONS.map(emoji => (
+              <PressableScale
+                key={emoji}
+                onPress={() => sendQuickReaction(emoji)}
+                disabled={sendingReply}
+                accessibilityRole="button"
+                accessibilityLabel={`React with ${emoji}`}
+              >
+                <Text style={styles.quickReactionEmoji}>{emoji}</Text>
+              </PressableScale>
+            ))}
+          </View>
+        )}
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
           {!currentStory.repliesDisabled ? (
             <>
-              <TextInput
-                style={styles.replyInput}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder={`Reply to ${currentStory.authorName}…`}
-                placeholderTextColor="rgba(255,255,255,0.4)"
-                onFocus={() => setIsPaused(true)}
-                onBlur={() => setIsPaused(false)}
-                onSubmitEditing={handleSendReply}
-                returnKeyType="send"
-                editable={!sendingReply}
-              />
+              <Glass variant="clear" radius={RADII.pill} style={styles.replyInputGlass}>
+                <TextInput
+                  style={styles.replyInput}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder={`Reply to ${currentStory.authorName}…`}
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  onFocus={() => { setIsPaused(true); setReplyFocused(true); }}
+                  onBlur={() => { setIsPaused(false); setReplyFocused(false); }}
+                  onSubmitEditing={() => handleSendReply()}
+                  returnKeyType="send"
+                  editable={!sendingReply}
+                />
+              </Glass>
               {inputText.trim().length > 0 && (
                 <PressableScale
-                  onPress={handleSendReply}
+                  onPress={() => handleSendReply()}
                   style={styles.likeBtn}
                   disabled={sendingReply}
                   accessibilityRole="button"
@@ -822,14 +852,23 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: SP.sm,
   },
-  replyInput: {
+  quickReactionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SP.md,
+    paddingBottom: SP.sm,
+  },
+  quickReactionEmoji: {
+    fontSize: 26,
+  },
+  replyInputGlass: {
     flex: 1,
     height: 44,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.pill,
+    justifyContent: 'center',
+  },
+  replyInput: {
+    height: 44,
     paddingHorizontal: SP.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     color: ON_DARK,

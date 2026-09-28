@@ -280,7 +280,23 @@ export function activityMessage(row: ActivityRow): MessagePart[] {
   if (first && row.actorCount > 1) {
     return [...actorNames(row), { text: ` · ${row.title}` }];
   }
-  return [{ text: row.title, bold: true }];
+  return [{ text: stripEmoji(row.title), bold: true }];
+}
+
+// Explicit ranges rather than \p{Extended_Pictographic}, which Hermes
+// doesn't reliably support. Pictographs, symbols & dingbats (minus the plain
+// ✓/✔ check glyphs, which are monochrome text), flags, VS16 and ZWJ.
+const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{2712}\u{2715}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu;
+
+/**
+ * System titles without emoji. Older order rows were stored as "Your order
+ * has shipped! 🚚" / "…delivered! 📦" / "New order! 🛍️" (the server copy no
+ * longer has them); colour emoji break the monochrome brand, and each row
+ * already carries its own monochrome icon (activityIcon). Only system rows
+ * are cleaned — never a person's name.
+ */
+export function stripEmoji(text: string): string {
+  return text.replace(EMOJI, '').replace(/\s{2,}/g, ' ').trim();
 }
 
 /** Secondary line under the sentence (comment excerpt, amount, etc.). */

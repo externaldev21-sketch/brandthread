@@ -1034,7 +1034,7 @@ export async function handleCheckoutPaid(
             userId: createdOrder.ownerId,
             category: "orders",
             type: "new_order_received",
-            title: "New order! 🛍️",
+            title: "New order!",
             body: `Order #${createdOrder.orderNumber} for $${(createdOrder.totalCents / 100).toFixed(2)} is ready to review.`,
             targetId: createdOrderId,
             targetType: "order",

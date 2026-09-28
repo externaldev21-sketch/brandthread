@@ -138,6 +138,7 @@ vi.mock('@/lib/theme', () => ({
   RADIUS: { sm: 8, md: 12, lg: 16, pill: 999 },
   ICON: { sm: 16, md: 20, lg: 24, xl: 32, xxl: 40 },
   GUTTER: 16,
+  WEB_SAFE_AREA_TOP: 47,
   SECTION_GAP: 24,
   CONTENT_MAX_WIDTH: 720,
   GRID_MAX_WIDTH: 1080,

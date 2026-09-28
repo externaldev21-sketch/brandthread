@@ -22,6 +22,7 @@ import {
   isBuyerOrderNotification,
   newFollowersSummary,
   relativeTime,
+  stripEmoji,
   type ActivityItem,
 } from './activity';
 
@@ -243,6 +244,28 @@ describe('read state', () => {
       expect(tracker.hasMarked('a')).toBe(true);
       tracker.dispose();
     });
+  });
+});
+
+describe('monochrome system titles', () => {
+  it('drops colour emoji from stored order titles', () => {
+    expect(stripEmoji('Your order has shipped! 🚚')).toBe('Your order has shipped!');
+    expect(stripEmoji('Your order was delivered! 📦')).toBe('Your order was delivered!');
+    expect(stripEmoji('New order! 🛍️')).toBe('New order!');
+    expect(stripEmoji('Your package is arriving today 🚚')).toBe('Your package is arriving today');
+    expect(stripEmoji('Big 🎉 news')).toBe('Big news');
+  });
+
+  it('keeps plain text and monochrome check glyphs', () => {
+    expect(stripEmoji('✓ Trial started')).toBe('✓ Trial started');
+    expect(stripEmoji('Order #BT-00042 — 2 items')).toBe('Order #BT-00042 — 2 items');
+  });
+
+  it('is applied to system rows only, never to a person-led sentence', () => {
+    const [system] = aggregateActivity([item({ type: 'order_shipped', category: 'orders', title: 'Your order has shipped! 🚚' })]);
+    expect(activityMessage(system)).toEqual([{ text: 'Your order has shipped!', bold: true }]);
+    const [person] = aggregateActivity([like('Mia 🌸', 'post1')]);
+    expect(activityMessage(person).map((p) => p.text).join('')).toBe('Mia 🌸 liked your post');
   });
 });
 

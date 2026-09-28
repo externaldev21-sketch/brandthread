@@ -1,12 +1,22 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { ReactionType } from '@/services/socialTypes';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { AppleEmoji } from '@/lib/appleEmoji';
+import { reactionAuthorId, reactionAuthorName, reactionKind } from '@/lib/reactionShapes';
+
+// Re-exported so existing call sites (app/buyer-conversation.tsx,
+// app/seller-conversation.tsx) keep importing these from this file; the
+// actual (react-native-free) implementation lives in lib/reactionShapes.ts —
+// see that file's doc comment for why.
+export { reactionAuthorId, reactionAuthorName, reactionKind };
 
 /**
- * The small fixed reaction bar shown on long-press — six minimalist vector
- * glyphs (never a free-form emoji picker), matching the monochrome aesthetic.
+ * The small fixed reaction bar shown on long-press — six real emoji glyphs
+ * (never a free-form emoji picker) — matches Instagram DM's "Tap and hold to
+ * super react" row (mobbin.com/screens/5d13fdd9-75ad-43d6-9089-7b236e362b73).
+ * The emoji themselves are naturally colorful; the glass/menu chrome around
+ * them stays monochrome (see components/chat/ReactionOverlay.tsx).
  */
 export const REACTION_CONFIG: ReadonlyArray<{ type: ReactionType; label: string }> = [
   { type: 'like', label: 'Like' },
@@ -17,33 +27,21 @@ export const REACTION_CONFIG: ReadonlyArray<{ type: ReactionType; label: string 
   { type: 'fire', label: 'Fire' },
 ];
 
-export function ReactionGlyph({ type, size, color }: { type: ReactionType; size: number; color: string }) {
-  switch (type) {
-    case 'like': return <Feather name="thumbs-up" size={size} color={color} />;
-    case 'love': return <Feather name="heart" size={size} color={color} />;
-    case 'haha': return <Feather name="smile" size={size} color={color} />;
-    case 'wow':  return <Feather name="zap" size={size} color={color} />;
-    case 'sad':  return <Feather name="frown" size={size} color={color} />;
-    case 'fire': return <MaterialCommunityIcons name="fire" size={size} color={color} />;
-    default:     return null;
-  }
-}
+/** Real emoji glyph per reaction kind — the data model (`ReactionType`) is
+ *  unchanged; only the rendered glyph moved from a vector icon to emoji. */
+export const REACTION_EMOJI: Record<ReactionType, string> = {
+  like: '👍',
+  love: '❤️',
+  haha: '😂',
+  wow:  '😮',
+  sad:  '😢',
+  fire: '🔥',
+};
 
-/** Reads a reaction's kind across both the local optimistic shape
- *  (`emoji`) and the server response shape (`reactionType`). */
-export function reactionKind(r: { emoji?: string; reactionType?: string }): ReactionType {
-  return (r.reactionType ?? r.emoji) as ReactionType;
-}
-
-/** Reads a reaction's author id across the local (`fromId`) and server
- *  (`userId`) response shapes. */
-export function reactionAuthorId(r: { fromId?: string; userId?: string }): string {
-  return r.fromId ?? r.userId ?? '';
-}
-
-/** Reads a reaction's author display name across both shapes. */
-export function reactionAuthorName(r: { fromName?: string; userName?: string }): string {
-  return r.fromName ?? r.userName ?? '?';
+export function ReactionGlyph({ type, size }: { type: ReactionType; size: number; color?: string }) {
+  const emoji = REACTION_EMOJI[type];
+  if (!emoji) return null;
+  return <AppleEmoji emoji={emoji} size={size} />;
 }
 
 export function ReactionChipsRow({
