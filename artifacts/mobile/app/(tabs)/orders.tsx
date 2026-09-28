@@ -1119,13 +1119,18 @@ export default function OrdersScreen() {
 
         {/* Persistent search row */}
         <View style={s.searchRow}>
-          <View style={s.searchBox}>
-            <Feather name="map-pin" size={14} color={MUTED} style={{ marginRight: SP.xs }} />
+          {/* Overnight batch item 37: SearchBar is the box now (no border, at
+              rest or focus) — the outer `searchBox` wrapper used to draw a
+              second bordered card around it, which is exactly the doubled-up
+              "rectangle bar" the owner flagged. The pin icon sits beside it
+              instead of inside a shared bordered box. */}
+          <View style={s.searchBoxRow}>
+            <Feather name="map-pin" size={14} color={MUTED} />
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="All locations · Search orders"
-              style={s.searchInput}
+              style={s.searchBarFlex}
             />
           </View>
           <TouchableOpacity
@@ -1313,24 +1318,13 @@ const createStyles = (theme: any) => {
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
   },
-  searchBox: {
+  searchBoxRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CARD,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: SP.sm,
-    height: 36,
+    gap: SP.xs,
   },
-  searchInput: {
-    flex: 1,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    height: 36,
-  },
+  searchBarFlex: { flex: 1, height: 36 },
   controlBtn: {
     width: 36,
     height: 36,

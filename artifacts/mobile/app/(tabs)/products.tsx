@@ -560,14 +560,18 @@ export default function ProductsScreen() {
 
         {/* Persistent search row */}
         <View style={s.searchRow}>
-          <View style={s.searchBox}>
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search products…"
-              style={s.searchInput}
-            />
-          </View>
+          {/* Overnight batch item 37: SearchBar is the box now (no border, at
+              rest or focus) — the outer `searchBox` wrapper used to draw a
+              second bordered card around it, and this file's own
+              `searchInput` style forced SearchBar's own fill to transparent
+              to compensate, which is exactly the doubled-up "rectangle bar"
+              the owner flagged. */}
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search products…"
+            style={s.searchBarFlex}
+          />
           <PressableScale
             style={[s.controlBtn, hasActiveFilter && s.controlBtnActive]}
             onPress={() => { hapticPrimaryAction(); setFilterModalVisible(true); }}
@@ -719,24 +723,7 @@ const createStyles = (theme: any) => {
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
   },
-  searchBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CARD,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: SP.sm,
-    height: 36,
-  },
-  searchInput: {
-    flex: 1,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    height: 36,
-  },
+  searchBarFlex: { flex: 1, height: 36 },
   controlBtn: {
     width: 36,
     height: 36,

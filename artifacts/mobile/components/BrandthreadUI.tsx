@@ -572,11 +572,16 @@ interface SearchBarProps {
 
 export function SearchBar({ value, onChange, placeholder = 'Search…', style, onFocus, onBlur }: SearchBarProps) {
   const [focused, setFocused] = useState(false);
-  const { theme } = useAppTheme();
   const palette = useColors();
   return (
-    <View style={[srS.root, { backgroundColor: palette.card, borderColor: palette.border }, focused && [srS.focused, { borderColor: theme.accent }], style]}>
-      <Feather name="search" size={ICON.sm} color={focused ? theme.accentLight : palette.mutedForeground} />
+    // Overnight batch item 37: filled rounded, no border at rest OR focus —
+    // a themed card+border swapping to an accent border on focus is exactly
+    // the "rectangle bar" the owner flagged across every search field.
+    // Fixed monochrome white-alpha fill regardless of theme (matches the
+    // fill spec exactly), not a themed card color, so this reads the same
+    // on every one of the app's selectable color themes.
+    <View style={[srS.root, style]}>
+      <Feather name="search" size={ICON.sm} color={focused ? '#FFFFFF' : palette.mutedForeground} />
       <TextInput
         style={[srS.input, { color: palette.foreground }]}
         value={value}
@@ -604,10 +609,9 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
 }
 
 const srS = StyleSheet.create({
-  root:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD,
-             borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+  root:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(255,255,255,0.10)',
+             borderRadius: 12, borderWidth: 0,
              paddingHorizontal: SP.md, height: COMP.inputH - 4 },
-  focused: { borderColor: BORDER_FOCUS },
   input:   { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: FG },
 });
 
