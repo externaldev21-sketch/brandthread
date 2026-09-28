@@ -568,7 +568,24 @@ export function respond({ method, path, query, role, options = {} }) {
       isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false,
     };
   }
-  if (p.match(/^\/social\/profile\/[^/]+\/posts$/)) return [];
+  // One published + one draft buyer post, so the buyer profile's Drafts
+  // sub-filter (item 117) has something real to show and hide between.
+  if (p.match(/^\/social\/profile\/[^/]+\/posts$/)) {
+    if (role !== 'buyer') return [];
+    const buyerName = `${BUYER_USER.firstName} ${BUYER_USER.lastName}`;
+    const base = {
+      authorId: BUYER_USER.id, authorName: buyerName, authorHandle: '@' + BUYER_USER.username,
+      authorInitials: buyerName.slice(0, 2).toUpperCase(), authorColor: '#7A7A7A',
+      authorAccountType: 'buyer', feedEligibility: 'profile_only', profileVisibility: 'friends_only',
+      type: 'photo', hashtags: [], mediaColors: ['#7A7A7A', '#07070f'],
+      likesCount: 0, commentsCount: 0, repostsCount: 0,
+      likedByMe: false, repostedByMe: false, savedByMe: false, isArchived: false,
+    };
+    return [
+      { ...base, id: 'buyer-post-published', caption: 'Fit check', isDraft: false, createdAt: iso(0), updatedAt: iso(0) },
+      { ...base, id: 'buyer-post-draft', caption: 'Untitled draft', isDraft: true, createdAt: iso(0), updatedAt: iso(0) },
+    ];
+  }
   if (p === '/buyer/notifications/unread-count') return { count: 0 };
   if (p === '/buyer/saved') return [];
   if (p === '/buyer/orders') return [];
