@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 
 import { useAuth } from '@clerk/expo';
@@ -27,6 +27,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticLight, hapticTabChange } from '@/lib/haptics';
 import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { TabBarGlassZone } from '@/components/buyer-nav/TabBarGlassZone';
 import {
   TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, tabIconColor,
 } from '@/components/tab-bar/TabBarParts';
@@ -184,6 +185,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
   const api = useApi();
   const { userId } = useAuth();
   const { theme } = useAppTheme();
+  const { width } = useWindowDimensions();
 
   const activeTab = getActiveTab(segments as string[]);
 
@@ -283,6 +285,22 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
       style={[styles.bar, { bottom: metrics.bottomOffset, gap: metrics.gap }]}
       testID="seller-global-tab-bar"
     >
+      {/* Frosted glass over whatever's actually rendered behind the bar —
+          same shared treatment as the buyer side's BuyerTabBar, and for the
+          same reason: this component is the one shared tab-bar container
+          mounted once for the whole seller shell (SellerNavigationShell,
+          below), so rendering the glass here gets Dashboard/Products/
+          Orders/Profile the same live-sampled frosted strip with no
+          per-screen wiring. See BuyerTabBar for why `bottom`/`height` are
+          computed this way (glass reaches the true screen bottom edge and
+          its own top lands exactly on the bar's top pixel). */}
+      <TabBarGlassZone
+        height={metrics.barTopInset}
+        width={width}
+        tint="dark"
+        style={{ bottom: -metrics.bottomOffset }}
+      />
+
       <TabBarCircle
         theme={theme}
         size={metrics.circleSize}
