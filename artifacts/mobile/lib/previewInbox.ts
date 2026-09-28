@@ -49,7 +49,10 @@ const POSTER_SOURCES = [
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const LOGO_SOURCE = require('../assets/images/brandthread-logo.png');
 
-function posterUri(index: number): string {
+// Exported so other preview seed modules (e.g. lib/previewStories.ts, the
+// Messages stories tray) can reuse the same 10 bundled runway photos as
+// avatar/story-slide images instead of re-requiring the assets themselves.
+export function posterUri(index: number): string {
   return Asset.fromModule(POSTER_SOURCES[index]).uri;
 }
 

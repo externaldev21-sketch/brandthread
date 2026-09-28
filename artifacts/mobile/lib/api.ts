@@ -2071,6 +2071,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<Array<{
           authorId: string; authorName: string; authorHandle: string;
           authorInitials: string; authorColor: string; authorAccountType: string;
+          avatarUrl: string | null;
           isMe: boolean; storyIds: string[]; seen: boolean; latestCreatedAt: number;
         }>>('/api/social/stories/following'),
       /** Who has viewed my story (author only) */

@@ -5,10 +5,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
-import { type SearchResult, type TrendingTerm } from '@/lib/searchData';
+import { type SearchResult } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
@@ -32,21 +33,26 @@ type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
 type VideoResult = Extract<SearchResult, { kind: 'video' }>;
 
-const TRENDING_FALLBACK = ['black wool coat', 'silver dress', 'Atelier Noire', 'streetwear drops'];
+// "You may like" is always curated, never sourced from live search-analytics
+// "trending" data — that endpoint turned out to reflect raw per-keystroke
+// query fragments (e.g. "at"/"ate" logged while someone typed "Atelier"),
+// which is exactly the junk this list must never show. A fixed editorial
+// list is the only way to guarantee that.
+const YOU_MAY_LIKE_CURATED = ['black wool coat', 'hoodie', 'runway', 'satin slip', 'streetwear'];
 const DEBOUNCE_MS = 150;
 const VIDEO_GRID_GAP = 8;
 
 /**
  * Rejects punctuation-only fragments ("...", ",,") and anything shorter than
- * 2 letters — guards both "You may like" (trending API terms) and recent
- * searches against junk that slipped in from a stray keystroke or an
- * analytics artifact upstream.
+ * 3 characters (a "whole word" floor — nothing genuinely meaningful in
+ * fashion search is 1-2 characters) — guards recent searches against junk
+ * that slipped in from a stray keystroke.
  */
 function isMeaningfulTerm(term: string): boolean {
   const trimmed = term.trim();
-  if (trimmed.length < 2) return false;
+  if (trimmed.length < 3) return false;
   const letters = trimmed.replace(/[^\p{L}\p{N}]/gu, '');
-  return letters.length >= 2;
+  return letters.length >= 3;
 }
 
 function dedupeCaseInsensitive(terms: string[]): string[] {
@@ -149,7 +155,6 @@ export default function BuyerSearchScreen() {
   const [followPending, setFollowPending] = useState<Record<string, boolean>>({});
   const [searching, setSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [trending, setTrending] = useState<TrendingTerm[]>([]);
   const recentKey = `bt:buyer-search-recent:${userId ?? 'anon'}`;
   const trimmedQuery = query.trim();
 
@@ -208,31 +213,10 @@ export default function BuyerSearchScreen() {
     });
   }
 
-  // "You may like" — real trending terms once loaded; the owner's fixed
-  // fallback list covers preview mode, a cold load and an empty response.
-  useEffect(() => {
-    let cancelled = false;
-    api.public.trending(8)
-      .then((res) => { if (!cancelled) setTrending(res?.trending ?? []); })
-      .catch(() => { if (!cancelled) setTrending([]); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // Real trending terms, filtered of punctuation-only/too-short junk (an
-  // artifact of upstream analytics logging partial/incomplete queries), then
-  // padded out to 4 with the fixed fallback terms whenever fewer than 4
-  // survive that filter — case-insensitively de-duplicated throughout.
-  const youMayLike = useMemo(() => {
-    const clean = dedupeCaseInsensitive(trending.map((t) => t.term).filter(isMeaningfulTerm));
-    if (clean.length >= 4) return clean;
-    const padded = [...clean];
-    for (const term of TRENDING_FALLBACK) {
-      if (padded.length >= 4) break;
-      if (padded.some((t) => t.toLowerCase() === term.toLowerCase())) continue;
-      padded.push(term);
-    }
-    return padded;
-  }, [trending]);
+  // "You may like" — always the curated list (see YOU_MAY_LIKE_CURATED's
+  // comment for why this deliberately never touches live search-analytics
+  // "trending" data), deduped defensively.
+  const youMayLike = useMemo(() => dedupeCaseInsensitive(YOU_MAY_LIKE_CURATED), []);
 
   const performSearch = useCallback(async (term: string) => {
     const [productRes, peopleRes] = await Promise.allSettled([
@@ -629,7 +613,15 @@ export default function BuyerSearchScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView
+        // nativeID bridges to a real DOM id on web so the scoped CSS rule in
+        // app/+html.tsx can hide the scrollbar — it was showing as a stray
+        // white strip down the right edge.
+        nativeID="buyer-search-scroll"
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
         {trimmedQuery.length === 0 ? (
           <View testID="buyer-search-empty-state" accessibilityLabel="Search is empty">
             {recentSearches.length > 0 && (
@@ -650,10 +642,25 @@ export default function BuyerSearchScreen() {
 
             <AnimatedEntrance delay={30}>
               <Text style={styles.sectionLabel}>YOU MAY LIKE</Text>
-              <View style={styles.chipRow}>
-                {youMayLike.map((term, index) => (
-                  <Chip key={`${term}-${index}`} label={term} selected={false} icon="trending-up" iconColor={primary} onPress={() => submitTerm(term)} />
-                ))}
+              <View style={styles.youMayLikeWrap}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.youMayLikeRow}
+                >
+                  {youMayLike.map((term, index) => (
+                    <Chip key={`${term}-${index}`} label={term} selected={false} icon="trending-up" iconColor={primary} onPress={() => submitTerm(term)} />
+                  ))}
+                </ScrollView>
+                {/* Signals more chips scroll off the right edge, same pattern
+                    as SegmentedTabs' right fade on the results tab row. */}
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={['transparent', bg]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.youMayLikeFade}
+                />
               </View>
             </AnimatedEntrance>
 
@@ -694,7 +701,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingHorizontal: SCREEN_GUTTER, paddingBottom: SPACING.sm,
   },
   field: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
+    // minWidth: 0 overrides a flex child's default web min-width:auto —
+    // without it, the TextInput's own intrinsic width can refuse to shrink
+    // on web and overflow the header row, pushing the "Search" button past
+    // its 16pt right inset (and past the clear button, colliding with it).
+    flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
     height: 36, borderRadius: RADIUS.sm,
     // 10pt right padding keeps the clear (x) icon inside the field itself,
     // clear of the "Search" button's own 8pt gap below.
@@ -723,6 +734,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   sectionAction: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, paddingTop: SPACING.md, paddingBottom: SPACING.xs - 2 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.xxs, paddingBottom: SPACING.xs },
+  youMayLikeWrap: { position: 'relative' },
+  youMayLikeRow: {
+    flexDirection: 'row', gap: SPACING.xs,
+    paddingLeft: SCREEN_GUTTER, paddingRight: SCREEN_GUTTER + 20,
+    paddingTop: SPACING.xxs, paddingBottom: SPACING.xs,
+  },
+  youMayLikeFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 28 },
   // theme-exempt: fixed 70%-white on this page's fixed-dark chrome, same
   // intentional pattern as the field's #1f1f1f fill and the Follow pill.
   sectionLabel: {

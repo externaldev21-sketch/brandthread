@@ -12,22 +12,24 @@ import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
+import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
   subscribeSocial,
   searchProfiles, createOrGetConversation, muteUser, MY_USER_ID,
-  getFriendSuggestions,
+  getFriendSuggestions, cacheStoriesForViewer,
 } from '@/services/socialService';
-import type { Conversation, ProfileSearchResult, AccountType } from '@/services/socialTypes';
+import type { Conversation, ProfileSearchResult, AccountType, Story } from '@/services/socialTypes';
 import { getSuggestedPeople, dismissSuggestedPerson, type SuggestedPerson } from '@/services/activityService';
 import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
+import { getLiveDirectory } from '@/lib/live/useLiveDirectory';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import {
@@ -40,6 +42,10 @@ import {
 import { subscribePendingConversationDeletes } from '@/lib/pendingRequestDeletes';
 import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import { BLOCK_EXPLAINER } from '@/lib/safety';
+import {
+  isPreviewStoriesEnabled, getPreviewStoryTrayRows, getPreviewStoryFor,
+  markPreviewStorySeen, PREVIEW_MY_STORY,
+} from '@/lib/previewStories';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
 
@@ -209,6 +215,36 @@ function railDisplayName(name: string): string {
   return trimmed.split(/\s+/)[0] ?? trimmed;
 }
 
+// ─── Stories tray ───────────────────────────────────────────────────────────
+// One row per followed person who is either LIVE right now or has an active
+// (< 24h old) story, ordered LIVE → unseen → seen (newest first within each
+// group) — replaces the old "people I've messaged" rail entirely. "Your
+// story" is always a separate, first slot (see MyStorySlot below), not part
+// of this list.
+type StoryTrayRow = {
+  authorId: string;
+  name: string;
+  handle: string;
+  initials: string;
+  color: string;
+  avatarUri?: string;
+  /** Latest active story id for this author, or null if they only qualify
+   *  for the tray by being LIVE (tapping them opens the live pager, never
+   *  the story viewer, so no story needs to be resolved). */
+  storyId: string | null;
+  seen: boolean;
+  latestCreatedAt: number;
+};
+
+function sortStoryTray(rows: StoryTrayRow[], isLive: (authorId: string) => boolean): StoryTrayRow[] {
+  return [...rows].sort((a, b) => {
+    const aLive = isLive(a.authorId), bLive = isLive(b.authorId);
+    if (aLive !== bLive) return aLive ? -1 : 1;
+    if (a.seen !== b.seen) return a.seen ? 1 : -1;
+    return b.latestCreatedAt - a.latestCreatedAt;
+  });
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function InboxScreen() {
@@ -276,6 +312,78 @@ export default function InboxScreen() {
   const [suggestedPeople, setSuggestedPeople] = useState<SuggestedPerson[]>([]);
   const [suggestedLoading, setSuggestedLoading] = useState(true);
   const [messagingSuggestedId, setMessagingSuggestedId] = useState<string | null>(null);
+
+  // Stories tray — see loadStoryTray() below. `myStoryId` is null when the
+  // buyer has no active story ("Your story" then shows the add/"+" badge).
+  const { user: clerkUser } = useUser();
+  const [storyTrayRows, setStoryTrayRows] = useState<StoryTrayRow[]>([]);
+  const [myStoryId, setMyStoryId] = useState<string | null>(null);
+  const myAvatarUri = clerkUser?.hasImage ? clerkUser.imageUrl : undefined;
+  const myDisplayName = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || 'You';
+  const myInitials = myDisplayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
+
+  // Re-renders whenever the shared LIVE directory changes (same singleton
+  // LiveHostRing reads from), so sorting the tray by "is this author live
+  // right now" always reflects the latest state without a per-row hook.
+  const liveDirectory = getLiveDirectory();
+  React.useSyncExternalStore(liveDirectory.subscribe, liveDirectory.version, liveDirectory.version);
+  const isAuthorLive = useCallback((authorId: string) => !!liveDirectory.streamFor(authorId), [liveDirectory]);
+
+  const loadStoryTray = useCallback(async () => {
+    if (!userId) {
+      if (isPreviewStoriesEnabled()) {
+        setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
+          authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
+          color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
+          seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+        })));
+        setMyStoryId(PREVIEW_MY_STORY.id);
+        cacheStoriesForViewer([
+          PREVIEW_MY_STORY,
+          ...getPreviewStoryTrayRows().map(r => getPreviewStoryFor(r.authorId)).filter((s): s is Story => !!s),
+        ]).catch(() => {});
+      } else {
+        setStoryTrayRows([]);
+        setMyStoryId(null);
+      }
+      return;
+    }
+    try {
+      const rows = await api.social.storiesFollowing();
+      if (accountRef.current !== userId) return;
+      const others = rows.filter(r => !r.isMe);
+      const mine = rows.find(r => r.isMe);
+      setMyStoryId(mine?.storyIds?.[mine.storyIds.length - 1] ?? null);
+      setStoryTrayRows(others.map(r => ({
+        authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
+        color: r.authorColor, avatarUri: r.avatarUrl ?? undefined,
+        storyId: r.storyIds[r.storyIds.length - 1] ?? null, seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+      })));
+      // Resolve the real (media-bearing) Story objects so the viewer — which
+      // reads its queue purely from local storage — can actually show them.
+      const fetches: Promise<Story[]>[] = [];
+      if (mine) fetches.push(api.social.myStories().catch(() => []) as Promise<Story[]>);
+      for (const o of others) fetches.push(api.social.storiesForUser(o.authorId).catch(() => []) as Promise<Story[]>);
+      const fetched = (await Promise.all(fetches)).flat();
+      if (fetched.length) cacheStoriesForViewer(fetched).catch(() => {});
+    } catch {
+      if (isPreviewStoriesEnabled()) {
+        setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
+          authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
+          color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
+          seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+        })));
+        setMyStoryId(PREVIEW_MY_STORY.id);
+        cacheStoriesForViewer([
+          PREVIEW_MY_STORY,
+          ...getPreviewStoryTrayRows().map(r => getPreviewStoryFor(r.authorId)).filter((s): s is Story => !!s),
+        ]).catch(() => {});
+      } else {
+        setStoryTrayRows([]);
+        setMyStoryId(null);
+      }
+    }
+  }, [userId, api]);
 
   // Preview-only: simulate a transient "typing…" row for one seeded thread
   // (see lib/previewInbox.ts) — a no-op outside the dev/preview environment.
@@ -369,12 +477,13 @@ export default function InboxScreen() {
   useFocusEffect(useCallback(() => {
     loadData();
     loadSuggested();
-  }, [loadData, loadSuggested]));
+    loadStoryTray();
+  }, [loadData, loadSuggested, loadStoryTray]));
 
   useEffect(() => {
-    const unsub = subscribeSocial(() => { loadData(); loadSuggested(); });
+    const unsub = subscribeSocial(() => { loadData(); loadSuggested(); loadStoryTray(); });
     return unsub;
-  }, [loadData, loadSuggested]);
+  }, [loadData, loadSuggested, loadStoryTray]);
 
   // ── Filter logic ────────────────────────────────────────────────────────────
 
@@ -410,6 +519,44 @@ export default function InboxScreen() {
     hapticPrimaryAction();
     markReadSafely(conv.id);
     router.push(`/buyer-conversation?id=${conv.id}` as never);
+  }
+
+  // Stories tray — ordered LIVE → unseen → seen (newest first within each
+  // group); "Your story" isn't part of this array, it's prepended separately
+  // wherever the queue for the full-screen viewer is built.
+  const orderedStoryTray = sortStoryTray(storyTrayRows, isAuthorLive);
+
+  // The story-viewer's queue: every tray entry that actually has a story to
+  // show (LIVE-only entries are skipped — tapping those opens the live pager
+  // instead), in the same LIVE→unseen→seen order as the tray, with "Your
+  // story" first when the buyer has one active.
+  const storyQueue: Array<{ authorId: string; storyId: string }> = [
+    ...(myStoryId ? [{ authorId: 'me', storyId: myStoryId }] : []),
+    ...orderedStoryTray.filter((r): r is StoryTrayRow & { storyId: string } => !!r.storyId)
+      .map(r => ({ authorId: r.authorId, storyId: r.storyId })),
+  ];
+
+  function openStoryViewerFor(authorId: string) {
+    const idx = storyQueue.findIndex(q => q.authorId === authorId);
+    if (idx < 0) return;
+    hapticPrimaryAction();
+    // Optimistic "seen" — the real seen flag is authoritative on next
+    // load (trackStoryView / api.social.viewStory), but this keeps the
+    // tray from flashing a person back into the unseen group before that
+    // round-trip lands, and is the only signal preview mode gets at all.
+    setStoryTrayRows(prev => prev.map(r => r.authorId === authorId ? { ...r, seen: true } : r));
+    markPreviewStorySeen(authorId);
+    const allStoryIds = storyQueue.map(q => q.storyId).join(',');
+    router.push(`/buyer-story-viewer?storyId=${encodeURIComponent(storyQueue[idx].storyId)}&allStoryIds=${encodeURIComponent(allStoryIds)}` as never);
+  }
+
+  function openMyStorySlot() {
+    hapticPrimaryAction();
+    if (myStoryId) {
+      openStoryViewerFor('me');
+    } else {
+      router.push('/buyer-story-create' as never);
+    }
   }
 
   // Requests-tab row tap: opens the conversation in request mode (see
@@ -1040,10 +1187,6 @@ export default function InboxScreen() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  // Instagram-Notes-style slim avatar rail: the small set of people the buyer
-  // is actively talking to.
-  const activeRail = filteredConvs.slice(0, 10);
-
   const requestsTabContent = (
     <ScrollView
       contentContainerStyle={[{ paddingBottom: barInset + SP.md, paddingHorizontal: gutter }]}
@@ -1129,50 +1272,110 @@ export default function InboxScreen() {
         </View>
       )}
 
-      {/* Notes-style active-people rail */}
-      {!loading && !messagesSearchLower && activeRail.length > 0 && (
+      {/* Stories tray — Instagram-DM-style: "Your story" first, then people
+          the buyer follows who are LIVE or have an active (<24h) story.
+          Always renders (even with nobody but "Your story") — see the
+          storyTrayRows.length check below, which only ever hides the *rest*
+          of the row, never the whole thing. */}
+      {!loading && !messagesSearchLower && (
         <AnimatedEntrance distance={12}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={s.activeRail}
-            contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md }}
-          >
-            {activeRail.map(conv => {
-              const participant = getParticipant(conv);
-              if (!participant) return null;
-              return (
-                <PressableScale
-                  key={conv.id}
-                  style={s.activeRailItem}
-                  onPress={() => openConversation(conv)}
-                  rippleEnabled={NO_RIPPLE}
-                  accessibilityRole="button"
-                  accessibilityLabel={participant.name}
-                  testID={`inbox-active-rail-${conv.id}`}
-                >
-                  {conv.isOfficial ? (
-                    <View style={[s.activeRailAvatar, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                      <BrandthreadLogo size={26} />
-                    </View>
+          <View style={s.storyTrayWrap}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={s.activeRail}
+              contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md }}
+            >
+              {/* "Your story" — always first. */}
+              <PressableScale
+                style={s.activeRailItem}
+                onPress={openMyStorySlot}
+                rippleEnabled={NO_RIPPLE}
+                accessibilityRole="button"
+                accessibilityLabel={myStoryId ? 'Your story' : 'Add to your story'}
+                testID="inbox-my-story"
+              >
+                <View style={s.activeRailAvatar1}>
+                  {myStoryId ? (
+                    <View style={[s.storyRing, s.storyRingUnseen, { borderColor: theme.text }]} />
+                  ) : null}
+                  {myAvatarUri ? (
+                    <Image source={{ uri: myAvatarUri }} style={s.activeRailAvatar} />
                   ) : (
-                    // Ring drawn on the avatar edge: this horizontal
-                    // ScrollView clips anything outside the 64pt avatar.
-                    <LiveHostRing hostId={participant.userId} hostName={participant.name} size={64} ringGap={-2} pressToWatch>
-                      {participant.avatarUri ? (
-                        <Image source={{ uri: participant.avatarUri }} style={s.activeRailAvatar} />
+                    <View style={[s.activeRailAvatar, { backgroundColor: theme.cardElevated }]}>
+                      <Text style={[s.activeRailInitials, { color: theme.text }]}>{myInitials}</Text>
+                    </View>
+                  )}
+                  {!myStoryId && (
+                    <View style={[s.addStoryBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} pointerEvents="none">
+                      <Feather name="plus" size={12} color={theme.onAccent} />
+                    </View>
+                  )}
+                </View>
+                <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>Your story</Text>
+              </PressableScale>
+
+              {orderedStoryTray.map(row => {
+                const live = isAuthorLive(row.authorId);
+                if (live) {
+                  // A single Pressable (LiveHostRing's own pressToWatch), not
+                  // nested inside another one — tapping opens the live pager.
+                  return (
+                    <View key={row.authorId} style={s.activeRailItem}>
+                      <LiveHostRing hostId={row.authorId} hostName={row.name} size={64} ringGap={-2} pressToWatch>
+                        {row.avatarUri ? (
+                          <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
+                        ) : (
+                          <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
+                            <Text style={s.activeRailInitials}>{row.initials}</Text>
+                          </View>
+                        )}
+                      </LiveHostRing>
+                      <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>{railDisplayName(row.name)}</Text>
+                    </View>
+                  );
+                }
+                return (
+                  <PressableScale
+                    key={row.authorId}
+                    style={s.activeRailItem}
+                    onPress={() => openStoryViewerFor(row.authorId)}
+                    rippleEnabled={NO_RIPPLE}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${row.name}${row.seen ? '' : ', new story'}`}
+                    testID={`inbox-story-tray-${row.authorId}`}
+                  >
+                    <View style={s.activeRailAvatar1}>
+                      <View
+                        style={[
+                          s.storyRing,
+                          row.seen ? s.storyRingSeen : s.storyRingUnseen,
+                          { borderColor: row.seen ? theme.border : theme.text },
+                        ]}
+                      />
+                      {row.avatarUri ? (
+                        <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
                       ) : (
-                        <View style={[s.activeRailAvatar, { backgroundColor: participant.color }]}>
-                          <Text style={s.activeRailInitials}>{participant.initials}</Text>
+                        <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
+                          <Text style={s.activeRailInitials}>{row.initials}</Text>
                         </View>
                       )}
-                    </LiveHostRing>
-                  )}
-                  <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>{railDisplayName(participant.name)}</Text>
-                </PressableScale>
-              );
-            })}
-          </ScrollView>
+                    </View>
+                    <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>{railDisplayName(row.name)}</Text>
+                  </PressableScale>
+                );
+              })}
+            </ScrollView>
+            {/* Right-edge fade softening the ScrollView's cut edge, so the
+                row reads as "more to scroll" rather than a hard clip. */}
+            <LinearGradient
+              pointerEvents="none"
+              colors={['transparent', SCREEN_BG]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={s.storyTrayFade}
+            />
+          </View>
         </AnimatedEntrance>
       )}
 
@@ -1356,14 +1559,35 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
   },
 
-  // Instagram-Notes-style active-people rail (below search, above the tabs)
-  activeRail: { marginBottom: SP.md },
+  // Instagram-DM-style stories tray (below search, above the tabs) — chrome
+  // (sizes/spacing) unchanged from the old "active people" rail this
+  // replaced; only what the circles represent and do is new.
+  storyTrayWrap: { position: 'relative', marginBottom: SP.md },
+  activeRail: {},
   activeRailItem: { width: 72, alignItems: 'center', gap: 6 },
   activeRailAvatar: {
     width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center',
   },
+  // Wraps the 64x64 avatar so a story ring can be drawn on its own edge
+  // (absolute, -2/+2 inset like LiveHostRing's ringGap={-2}) without ever
+  // growing the 64x64 box the ScrollView lays rows out against.
+  activeRailAvatar1: { width: 64, height: 64, position: 'relative' },
+  storyRing: {
+    position: 'absolute', left: -2, top: -2, right: -2, bottom: -2, borderRadius: 34,
+  },
+  storyRingUnseen: { borderWidth: 2 },
+  storyRingSeen: { borderWidth: 1.5 },
+  // "Add to your story" badge — pure visual decoration on top of the single
+  // "Your story" Pressable, never its own tappable element.
+  addStoryBadge: {
+    position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10,
+    borderWidth: 2, alignItems: 'center', justifyContent: 'center',
+  },
   activeRailInitials: { fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
   activeRailName: { fontSize: 11, fontFamily: FONT.medium, width: 72, textAlign: 'center' },
+  storyTrayFade: {
+    position: 'absolute', top: 0, bottom: 0, right: 0, width: 28,
+  },
 
   // Threads-style empty inbox (centered badge + headline + full-width button)
   inboxEmptyWrap: {
