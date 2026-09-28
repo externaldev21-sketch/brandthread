@@ -437,9 +437,21 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     // same way a seller who tagged more than one product on a real post
     // would show up here — see ShopSideTab's module comment for why the
     // badge only appears once count > 1.
+    //
+    // imageUri on each tag (overnight follow-up): the sheet's multi-tag
+    // switcher (ShopProductSheet's tagListWrap) only has a real photo for
+    // whichever tag is currently hydrated (`product`/`previewProduct`) —
+    // any OTHER tag in the row falls back to a bag-icon placeholder until
+    // it's tapped. Sculpted Wool Coat (the tag opened first) always reads
+    // as hydrated, so it never showed the gap; Leather Ankle Boots, never
+    // the initially-active tag, did. Both now carry this post's own poster
+    // as their `imageUri` — the same bundled asset this preview post
+    // already uses for its own poster/gallery/seller-avatar fallbacks (see
+    // buildPreviewGalleryUris/buildPreviewShopProduct below) — so the tag
+    // card always has a real photo instead of a placeholder, active or not.
     productTags: [
-      { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000 },
-      { productId: 'preview-product-01b', productName: 'Leather Ankle Boots', priceCents: 21000 },
+      { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000, imageUri: FASHION_PREVIEW_POSTER_URIS[0] },
+      { productId: 'preview-product-01b', productName: 'Leather Ankle Boots', priceCents: 21000, imageUri: FASHION_PREVIEW_POSTER_URIS[0] },
     ],
     commentsCount: 980,
   },
@@ -2776,7 +2788,7 @@ export default function FeedScreen({
   const handleShopTag = useCallback((item: SpotlightItem, tag: SpotlightProductTag) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const allTags = (item.productTags ?? []).length > 0
-      ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number }>)
+      ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number; imageUri?: string }>)
       : [tag];
     const tagIdx = allTags.findIndex(t => t.productId === tag.productId);
     setShopSelection({

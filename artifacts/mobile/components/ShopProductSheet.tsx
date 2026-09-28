@@ -73,6 +73,11 @@ export interface ShopTag {
   productName: string;
   priceCents: number;
   tagId?: string;
+  // A plain fallback photo for this tag's own LIST-step row (see
+  // ProductListRow), shown only until that tag's real product finishes
+  // hydrating (listProducts) — never overrides a real hydrated product's
+  // own imageUris once it's loaded.
+  imageUri?: string;
 }
 
 export interface ShopSheetSelection {
@@ -1141,9 +1146,16 @@ export function ShopProductSheet({
               />
             </View>
 
-            {/* Variant error */}
+            {/* Variant error — shown once, right here next to the size/
+                option chips it's actually about (rejectMissingVariant
+                scrolls this into view so it's always on screen when it
+                fires). Used to also be mirrored into the sticky action bar
+                below, which rendered the exact same message a second time
+                whenever the sheet's scroll position already had this one
+                in view — see the sticky bar's own comment for why that
+                mirror was removed instead of this one. */}
             {!!variantError && (
-              <View style={ss.variantError}>
+              <View style={ss.variantError} accessibilityRole="alert" accessibilityLiveRegion="polite">
                 <Feather name="alert-circle" size={13} color={theme.error} />
                 <Text style={ss.variantErrorText}>{variantError}</Text>
               </View>
@@ -1175,15 +1187,15 @@ export function ShopProductSheet({
         {/* Sticky Add to Cart + Buy Now — always reachable, never scrolls away */}
         {sheetStep === 'detail' && (phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
           <View style={[ss.stickyActionsWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-            {/* Mirrors the inline variantError message (rendered next to the
-                size/color chips) into the one part of the sheet that's
-                always on screen — see rejectMissingVariant's comment. */}
-            {!!variantError && (
-              <View style={ss.stickyVariantError} accessibilityRole="alert" accessibilityLiveRegion="polite">
-                <Feather name="alert-circle" size={13} color={theme.error} />
-                <Text style={ss.variantErrorText}>{variantError}</Text>
-              </View>
-            )}
+            {/* Overnight follow-up: this used to mirror the same
+                variantError message a second time here, so it rendered
+                twice at once — once next to the size/option chips, once
+                again in this always-on-screen sticky bar. rejectMissingVariant
+                already scrolls the chips (and the one message next to them)
+                into view when it fires, so the mirror was never load-
+                bearing once that scroll landed — it only doubled the
+                message. Removed; see the single render next to the option
+                chips above. */}
             <View style={ss.actions}>
               <TouchableOpacity
                 onPress={phase === 'added' ? handleViewCart : handleAddToCart}
@@ -1487,8 +1499,12 @@ function ProductListRow({
 }) {
   const { theme } = useAppTheme();
   const ss = useMemo(() => makeSheetStyles(theme), [theme]);
-  const imageUri = product?.imageUris?.[0];
-  const loading = product === undefined;
+  // The real hydrated photo once it's in, else the caller's own fallback
+  // (tag.imageUri — e.g. feed.tsx's productTags) so the row shows a real
+  // photo immediately instead of a loading skeleton whenever the caller
+  // already has one on hand.
+  const imageUri = product?.imageUris?.[0] ?? tag.imageUri;
+  const loading = product === undefined && !imageUri;
 
   return (
     <View style={ss.listRow}>
@@ -2093,16 +2109,6 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     color: theme.error,
     flex: 1,
   },
-  // Same message, rendered inside the sticky action bar (always on screen)
-  // instead of the scrollable content — see rejectMissingVariant.
-  stickyVariantError: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-
   // Status banner
   statusBanner: {
     flexDirection: 'row',
