@@ -21,12 +21,13 @@
  * won't until that migration lands).
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { StarRating } from '@/components/StarRating';
+import { CachedImage } from '@/components/CachedImage';
 import { FONT, FS, BORDER_SUBTLE, FG, MUTED, SUBTLE, CARD_ELEVATED } from '@/lib/theme';
 import * as Haptics from 'expo-haptics';
 
@@ -88,7 +89,7 @@ function ReviewPhotoViewer({ photos, startIndex, onClose }: { photos: string[]; 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
       <TouchableOpacity style={photoS.backdrop} activeOpacity={1} onPress={onClose} accessibilityLabel="Close photo">
-        <Image source={{ uri: photos[startIndex] }} style={photoS.image} resizeMode="contain" />
+        <CachedImage source={{ uri: photos[startIndex] }} style={photoS.image} contentFit="contain" />
       </TouchableOpacity>
     </Modal>
   );
@@ -173,7 +174,7 @@ export function ProductReviewsSection({
           <View key={review.id} style={s.reviewCard}>
             <View style={s.reviewHeader}>
               {review.buyerAvatar ? (
-                <Image source={{ uri: review.buyerAvatar }} style={s.avatar} />
+                <CachedImage source={{ uri: review.buyerAvatar }} style={s.avatar} recyclingKey={review.id} />
               ) : (
                 <View style={s.avatar}>
                   <Text style={s.avatarText}>{(review.buyerName?.[0] ?? '?').toUpperCase()}</Text>
@@ -217,7 +218,7 @@ export function ProductReviewsSection({
                     accessibilityRole="button"
                     accessibilityLabel={`View review photo ${i + 1}`}
                   >
-                    <Image source={{ uri }} style={s.photoThumb} />
+                    <CachedImage source={{ uri }} style={s.photoThumb} recyclingKey={uri} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -258,40 +259,42 @@ const s = StyleSheet.create({
   summaryRow: { flexDirection: 'row', gap: 20, marginBottom: 16, alignItems: 'center' },
   avgBlock: { alignItems: 'flex-start', gap: 3 },
   avgNumber: { fontSize: FS.xxl, fontFamily: FONT.bold, color: FG },
-  countText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  countText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
   breakdownBlock: { flex: 1, gap: 4 },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  breakdownLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE, width: 8 },
+  breakdownLabel: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, width: 10 },
   breakdownTrack: { flex: 1, height: 4, borderRadius: 2, backgroundColor: CARD_ELEVATED, overflow: 'hidden' },
   breakdownFill: { height: '100%', borderRadius: 2 },
-  breakdownPct: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, width: 32, textAlign: 'right' },
+  breakdownPct: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, width: 34, textAlign: 'right' },
   reviewCard: { marginBottom: 16 },
   reviewHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 },
   avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: FS.xs, fontFamily: FONT.bold, color: FG },
+  avatarText: { fontSize: FS.meta, fontFamily: FONT.bold, color: FG },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 },
   reviewerName: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
   verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  verifiedText: { fontSize: 10, fontFamily: FONT.semibold },
-  reviewDate: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  // Was fontSize: 10 (below the 11pt floor) — "Verified buyer" specifically
+  // measured as blurry-small on live.
+  verifiedText: { fontSize: FS.meta, fontFamily: FONT.semibold },
+  reviewDate: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
   fitChip: { alignSelf: 'flex-start', backgroundColor: CARD_ELEVATED, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 6 },
-  fitChipText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  reviewBody: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 19, marginBottom: 8 },
+  fitChipText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
+  reviewBody: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 19, marginBottom: 8 },
   photoRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
   photoThumb: { width: 56, height: 56, borderRadius: 6, backgroundColor: CARD_ELEVATED },
   helpfulRow: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start' },
-  helpfulText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  helpfulText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED },
 });
 
 const fitS = StyleSheet.create({
   wrap: { marginBottom: 18 },
-  label: { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
+  label: { fontSize: FS.meta, fontFamily: FONT.bold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
   value: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 8 },
   track: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   dot: { flex: 1, height: 4, borderRadius: 2 },
   dotActive: { height: 8, borderRadius: 4 },
   endLabels: { flexDirection: 'row', justifyContent: 'space-between' },
-  endLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  endLabel: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE },
 });
 
 const photoS = StyleSheet.create({

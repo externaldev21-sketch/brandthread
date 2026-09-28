@@ -1923,7 +1923,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerCenterRow: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   headerCenter: { flex: 1 },
   headerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  headerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  headerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
   orderCard: {
     flexDirection: 'row', alignItems: 'center',
@@ -1932,7 +1932,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER,
   },
   orderNumber: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  orderProduct: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  orderProduct: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
   orderBadge: {
     backgroundColor: PURPLE_DIM, borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm, paddingVertical: SP.xs,
@@ -2008,7 +2008,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER,
   },
   attachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  attachSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  attachSubtitle: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
   // Product/order chat cards (item 70/71) moved to the standalone
   // ChatAttachmentCard component (components/chat/ChatAttachmentCard.tsx) —
@@ -2023,7 +2023,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },
   pendingAttachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  pendingAttachSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  pendingAttachSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end',
@@ -2083,7 +2083,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
   },
   sheetOptionLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  sheetOptionDesc: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  sheetOptionDesc: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
 
   // Product picker sheet
   productSheet: {
@@ -2107,7 +2107,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginRight: SP.sm,
   },
   productName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  productPrice: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  productPrice: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
   emptyState: { alignItems: 'center', paddingVertical: SP.xxl },
   emptyText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
 
