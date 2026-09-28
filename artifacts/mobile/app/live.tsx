@@ -189,8 +189,12 @@ function LivePage({
           onOpenHost={onOpenHost}
         />
         <View style={styles.topRight}>
-          <LiveViewerStack viewers={stream.topViewers} />
-          <LiveViewerCount count={viewerCount} />
+          {pageWidth >= 380 && (
+            <>
+              <LiveViewerStack viewers={stream.topViewers} />
+              <LiveViewerCount count={viewerCount} />
+            </>
+          )}
           <Pressable onPress={onClose} style={styles.topIcon} accessibilityRole="button" accessibilityLabel="Close live and go back to Threads" hitSlop={8} testID="live-close">
             <Feather name="x" size={22} color="#fff" />
           </Pressable>
@@ -432,8 +436,8 @@ const styles = StyleSheet.create({
   rtcBtnText: { color: '#000', fontFamily: FONT.bold, fontSize: FS.sm },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  topRow: { position: 'absolute', left: 10, right: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  topRow: { position: 'absolute', left: 10, right: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   topIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   title: {
     position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,
