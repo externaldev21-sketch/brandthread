@@ -1202,6 +1202,7 @@ export default function InboxScreen() {
               Open a chat to get info about who's messaging you. They won't know you've seen it until you accept.
             </Text>
             <PressableScale
+              style={s.requestsDeleteAllPressable}
               onPress={deleteAllRequests}
               rippleEnabled={NO_RIPPLE}
               accessibilityRole="button"
@@ -1680,10 +1681,12 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     fontFamily: FONT.regular,
     lineHeight: 17,
   },
+  requestsDeleteAllPressable: {
+    alignSelf: 'flex-end',
+  },
   requestsDeleteAll: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    alignSelf: 'flex-end',
   },
 
   // Conversation row — Threads style: no per-row hairline (rhythm from
