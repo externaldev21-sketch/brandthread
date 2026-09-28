@@ -2042,19 +2042,13 @@ export default function FeedScreen({
   // truth so BuyerHighDemandPage's content never renders underneath it
   // (see styles.topBar / styles.buyerTopRow below).
   const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;
-  // Bug fix (urgent rail-fixes pass): the previous 14pt/12pt gaps left only
-  // ~9pt of clearance between the left cluster's third icon (TV/Live) and
-  // the centered "Following" label at 390pt width — well under the 16pt
-  // minimum clear-space this row needs, and it read as the TV icon almost
-  // touching the tab text. Tightened to 8pt/6pt between icons *within* each
-  // cluster (each cluster stays evenly spaced internally, just narrower
-  // overall) — that alone reclaims enough width to clear 16pt+ to the
-  // centered tabs on both sides, at both 375pt and 390pt, without dropping
-  // any icon into an overflow menu.
-  const topRowIconGap = windowWidth < 380 ? 6 : 8;
+  // Cart sits beside LIVE, away from the right edge. Narrow phones use a
+  // tighter gap and gutter so the centered tabs still clear both 24pt icons.
+  const topRowIconGap = windowWidth < 350 ? 8 : 14;
+  const topRowSideGutter = windowWidth < 350 ? 12 : 16;
   // Guard width for the centered tabs (buyerTabSwitcherWrap below): the
-  // left cluster is 1 icon (LIVE), the right is 2 (search, cart) — always
-  // wider. Bounding the tabs' wrap symmetrically by the wider cluster's
+  // left cluster is 2 icons (LIVE, cart), the right is search alone.
+  // Bounding the tabs' wrap symmetrically by the wider cluster's
   // width (not a flat 0) keeps the tabs screen-centered (both bounds equal
   // — that's what centering means here) while guaranteeing the underline
   // labels' own box never physically reaches into either icon cluster's
@@ -3246,24 +3240,19 @@ export default function FeedScreen({
             styles.topBar,
             {
               paddingTop: previewTopInset + 4,
-              // 16px gutter PLUS the real safe-area inset (notch/Dynamic-
-              // Island/landscape cutouts) on each side — a flat
-              // paddingHorizontal here is what let the cart icon sit
-              // flush against, and on some real devices past, the true
-              // safe edge. insets.left/right are 0 on a plain rectangular
-              // screen, so this is a no-op there and just widens the
-              // gutter exactly where a device actually has a cutout.
-              paddingLeft: 16 + insets.left,
-              paddingRight: 16 + insets.right,
+              // Add the real safe-area inset on top of the device-width
+              // gutter so no top-row icon ever reaches a notch or edge.
+              paddingLeft: topRowSideGutter + insets.left,
+              paddingRight: topRowSideGutter + insets.right,
             },
           ]}
           pointerEvents="box-none"
         >
           {/* Buyer Threads Home: For You feed chrome — one line, TikTok-
-              style: LIVE only on the left, a centered "Following | Threads"
+              style: LIVE and cart on the left, a centered "Following | Threads"
               underline switcher (real SegmentedControl from the shared
               design system — see components/ui/SegmentedControl.tsx),
-              search/cart on the right. Friends and Drops used to also live
+              search alone on the right. Friends and Drops used to also live
               on the left (3 icons vs. the right's 2), crowding the row;
               Friends moved to a "Find friends" row in the Following empty
               state and the profile Menu, Drops moved to Discover — see
@@ -3288,17 +3277,40 @@ export default function FeedScreen({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Live"
-                hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
+                hitSlop={{ top: 4, bottom: 4, left: 10, right: topRowIconGap / 2 }}
                 testID="buyer-home-live"
               >
                 <Feather name="tv" size={24} color={ON_DARK} />
               </TouchableOpacity>
+              <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
+                <TouchableOpacity
+                  style={styles.buyerTopIconBtn}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push('/(buyer)/cart' as never);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+                  hitSlop={{ top: 4, bottom: 4, left: topRowIconGap / 2, right: 7 }}
+                  testID="buyer-home-cart-icon"
+                >
+                  <Feather name="shopping-cart" size={24} color={ON_DARK} />
+                  {cartCount > 0 && (
+                    <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
+                      <Text style={styles.cartCountText}>
+                        {cartCount > 99 ? '99+' : cartCount}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
             </View>
 
             {/* Absolutely centered on the screen (left:0/right:0), not a
                 flex sibling of the two icon clusters — a flex-centered tab
                 switcher shifts off-center whenever the two clusters aren't
-                the same width (they aren't: 3 icons left, 2 right), which
+                the same width (they aren't: 2 icons left, 1 right), which
                 is exactly what put the tabs' center at ~180 instead of ~195
                 on a 390pt screen. pointerEvents box-none so it never steals
                 taps meant for the icon clusters underneath its empty
@@ -3341,29 +3353,6 @@ export default function FeedScreen({
               >
                 <Feather name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
               </TouchableOpacity>
-              <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
-              <TouchableOpacity
-                style={styles.buyerTopIconBtn}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/(buyer)/cart' as never);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-                hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
-                testID="buyer-home-cart-icon"
-              >
-                <Feather name="shopping-cart" size={24} color={ON_DARK} />
-                {cartCount > 0 && (
-                  <View style={[styles.cartCountBadge, styles.buyerCartBadge]}>
-                    <Text style={styles.cartCountText}>
-                      {cartCount > 99 ? '99+' : cartCount}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              </Animated.View>
             </View>
           </View>
         </View>
@@ -3669,14 +3658,14 @@ const styles = StyleSheet.create({
   // simpler back/cart top bar (isCreatorFeed), distinct from the compact
   // buyer Threads Home top row above which needs to fit more controls.
   buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  // flexShrink: 0 — the LIVE cluster (left) and search+cart cluster
+  // flexShrink: 0 — the LIVE+cart cluster (left) and search cluster
   // (right) must never shrink or get squeezed out of the row by the
   // center tabs; only the tabs (buyerTabSwitcherWrap/SegmentedControl)
   // are allowed to shrink under Dynamic Type or a narrow screen.
   buyerTopCluster: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
   // Absolutely centered on the row (left:0/right:0), not a flex sibling of
-  // the icon clusters: those two clusters are different widths (3 icons
-  // left, 2 right), so centering the tabs in the flex space *between* them
+  // the icon clusters: those two clusters are different widths (2 icons
+  // left, 1 right), so centering the tabs in the flex space *between* them
   // would put the tabs' true center off the screen's actual center by half
   // that width difference — which is what caused the ~180-vs-195 mismatch
   // this fixes. box-none so its empty left/right margin never intercepts
@@ -3691,14 +3680,8 @@ const styles = StyleSheet.create({
     // which sit outside this wrap entirely and are unaffected by it.
     overflow: 'hidden',
   },
-  // `right: -6` (an earlier pass's "true top-right corner" polish) pushed
-  // the badge outward past the cart glyph's own box — fine with the old
-  // flat 10px row padding, but on a real device with a right-edge safe-area
-  // inset on top of that, it pushed the badge (on the last, rightmost icon
-  // in the row) outside the safe screen bounds entirely. `right: 0` keeps
-  // the same top-right-corner read without ever stepping outside the
-  // icon's own box, which the row's padding already keeps clear of the
-  // real edge (see the buyer topBar padding fix).
+  // The badge stays inside the cart's own box, now beside LIVE instead of
+  // against the right safe-area edge.
   buyerCartBadge: { top: -4, right: 0 },
   // Same shadow as the rail's icons (RightActionRail's iconShadow) — the
   // top-row search icon sits directly on video with nothing behind it, so

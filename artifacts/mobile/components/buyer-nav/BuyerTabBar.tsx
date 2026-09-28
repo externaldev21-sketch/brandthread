@@ -3,8 +3,6 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { Tabs } from 'expo-router';
 import Animated, {
   interpolate,
-  runOnJS,
-  useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -126,21 +124,12 @@ export function BuyerTabBar({
     progress.set(reducedMotion ? target : withTiming(target, BAR_MODE_TIMING));
   }, [isCompact, reducedMotion, progress]);
 
-  // TabBarGlassZone isn't a Reanimated-aware component (its native path
-  // renders several plain BlurView bands, its web path a CSS mask) — its
-  // `height` prop is kept in sync with `progress` every frame via this
-  // reaction instead, so the glass strip's top edge never lags behind or
-  // outruns the capsule's own animated top edge in either mode.
-  const [barTopInset, setBarTopInset] = React.useState(
-    isCompact ? compactMetrics.barTopInset : regularMetrics.barTopInset,
-  );
-  useAnimatedReaction(
-    () => interpolate(progress.value, [0, 1], [regularMetrics.barTopInset, compactMetrics.barTopInset]),
-    (current, previous) => {
-      if (current !== previous) runOnJS(setBarTopInset)(current);
-    },
-    [regularMetrics.barTopInset, compactMetrics.barTopInset],
-  );
+  // Clip a stable glass surface to the animated bar height on the UI thread.
+  // Passing a changing height prop into TabBarGlassZone used to rebuild its
+  // blur bands / web mask through React every frame while screens switched.
+  const glassClipStyle = useAnimatedStyle(() => ({
+    height: interpolate(progress.value, [0, 1], [regularMetrics.barTopInset, compactMetrics.barTopInset]),
+  }));
 
   const barGapStyle = useAnimatedStyle(() => ({
     gap: interpolate(progress.value, [0, 1], [regularMetrics.gap, compactMetrics.gap]),
@@ -244,32 +233,20 @@ export function BuyerTabBar({
         barGapStyle,
       ]}
     >
-      {/* Frosted glass over whatever's actually rendered behind the bar —
-          the feed's full-bleed video, or an ordinary scrolling list on
-          Discover/Inbox/Activity/Profile. `BuyerTabBar` is the one shared
-          tab-bar container mounted for the whole buyer navigator (see
-          app/(buyer)/_layout.tsx's `tabBar` prop), so rendering it here
-          once — instead of each screen wiring its own copy — is what gets
-          every one of those screens the same live-sampled treatment
-          automatically, feed included.
-          `bar`'s own coordinate origin is already offset by
-          `metrics.bottomOffset` from the true screen bottom (see the
-          `bottom` set on `styles.bar` above), so this needs the negative
-          of that same offset to actually reach the screen's bottom edge —
-          a plain `bottom: 0` would stop short by exactly that offset and
-          leave a hard, unblurred edge below the glass. The height is
-          `barTopInset` (not the more generous `occupiedHeight`) so the
-          glass's own top edge lands exactly on the bar's top pixel, with
-          no gap of sharp content between them. `barTopInset` itself is kept
-          in sync with the capsule's animated height every frame (see the
-          `useAnimatedReaction` above) so this never falls behind or overlaps
-          the real edge while switching in/out of compact mode. */}
-      <TabBarGlassZone
-        height={barTopInset}
-        width={width}
-        tint="dark"
-        style={{ bottom: -metrics.bottomOffset }}
-      />
+      {/* The clipping edge and capsule read the same progress value. Keep
+          the glass's feather at the clip's top and extend the blur to the
+          screen bottom without re-rendering its native bands each frame. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.glassClip, { bottom: -metrics.bottomOffset }, glassClipStyle]}
+      >
+        <TabBarGlassZone
+          height={regularMetrics.barTopInset}
+          width={width}
+          tint="dark"
+          style={{ top: 0, bottom: undefined }}
+        />
+      </Animated.View>
 
       {/* ── Capsule ─────────────────────────────────────────────────────── */}
       <Animated.View style={[styles.shadow, capsuleAnimatedStyle]}>
@@ -366,6 +343,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     pointerEvents: 'box-none',
+  },
+  glassClip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
   },
   // Shadow lives on an unclipped wrapper; the glass inside clips to the radius.
   shadow: TAB_BAR_SHADOW,
