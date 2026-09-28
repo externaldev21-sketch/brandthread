@@ -50,7 +50,7 @@ export function LiveHostPill({
 }) {
   return (
     <View style={styles.hostPill} testID="live-host-pill">
-      <View style={styles.hostIdentity}>
+      <View style={styles.hostIdentity} testID="live-host-identity">
         <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
         <Pressable
           onPress={onOpenHost}
@@ -58,7 +58,7 @@ export function LiveHostPill({
           accessibilityRole="button"
           accessibilityLabel={`${host.name}${host.verified ? ', verified' : ''}. ${formatViewerCount(viewerCount)} watching. Open profile`}
         >
-          <LiveHostAvatar host={host} size={32} />
+          <LiveHostAvatar host={host} size={36} />
           <View style={styles.hostText}>
             <View style={styles.hostNameRow}>
               <Text style={styles.hostName} numberOfLines={1}>{host.name}</Text>
@@ -406,25 +406,26 @@ const styles = StyleSheet.create({
   hostAvatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', flexShrink: 0 },
   hostInitials: { color: '#fff', fontFamily: FONT.bold },
   hostPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0, maxWidth: 250,
+    flexDirection: 'row', alignItems: 'center', gap: 18, flexShrink: 1, minWidth: 0, maxWidth: 300,
   },
   hostIdentity: {
-    flexShrink: 1, minWidth: 0, paddingLeft: 3, paddingRight: 9, paddingVertical: 4,
+    height: 48, justifyContent: 'center', flexShrink: 1, minWidth: 0,
+    paddingLeft: 5, paddingRight: 14,
     borderRadius: RADIUS.pill, overflow: 'hidden',
   },
-  hostTap: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1, minWidth: 0 },
+  hostTap: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0 },
   hostText: { flexShrink: 1, minWidth: 0, justifyContent: 'center' },
   hostNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
-  hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 13, lineHeight: 16, flexShrink: 1 },
-  hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 14, marginTop: 1 },
+  hostName: { color: '#fff', fontFamily: FONT.bold, fontSize: 14, lineHeight: 18, flexShrink: 1 },
+  hostMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 16, marginTop: 2 },
   hostMeta: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14 },
-  liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
-  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: 8.5, lineHeight: 11, letterSpacing: 0.8 },
+  liveBadge: { backgroundColor: LIVE_RED, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1 },
+  liveBadgeText: { color: '#fff', fontFamily: FONT.bold, fontSize: 9, lineHeight: 12, letterSpacing: 0.8 },
   followBtn: {
-    minWidth: 58, height: 28, paddingHorizontal: 12, borderRadius: RADIUS.pill,
+    minWidth: 66, height: 32, paddingHorizontal: 14, borderRadius: RADIUS.pill,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  followBtnOn: { backgroundColor: 'transparent', overflow: 'hidden', minWidth: 32, paddingHorizontal: 0, width: 32, height: 32 },
+  followBtnOn: { backgroundColor: 'transparent', overflow: 'hidden', minWidth: 34, paddingHorizontal: 0, width: 34, height: 34 },
   followText: { color: '#000', fontFamily: FONT.bold, fontSize: 12 },
 
   // Fixed width (24 + 2×16 = 56 for up to 3 overlapping 24pt avatars, each
