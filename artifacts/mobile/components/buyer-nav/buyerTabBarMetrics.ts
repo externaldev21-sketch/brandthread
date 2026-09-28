@@ -56,6 +56,16 @@ export type BuyerTabBarMetrics = {
    * indicator area and breathing room. Screens behind the bar pad by this.
    */
   occupiedHeight: number;
+  /**
+   * Distance from the bottom of the screen to the bar's own TOP edge
+   * (`bottomOffset + capsuleHeight`) — no extra breathing room added, unlike
+   * `occupiedHeight`. This is "the line" a Reels/TikTok-style immersive
+   * video frame stops at: the sharp video's bottom edge and this value's
+   * screen-space y both land on the bar's real top pixel, not the padded
+   * clearance above it that `occupiedHeight` gives ordinary scrolling
+   * content.
+   */
+  barTopInset: number;
 };
 
 export type TabBarMetrics = BuyerTabBarMetrics;
@@ -133,6 +143,7 @@ export function getBuyerTabBarMetrics({ width, height, bottomInset, sideCircleCo
     indicatorWidth: Math.min(itemWidth - 8, 64),
     indicatorHeight: capsuleHeight - capsulePadding * 2,
     occupiedHeight: bottomOffset + capsuleHeight + CONTENT_CLEARANCE,
+    barTopInset: bottomOffset + capsuleHeight,
   };
 }
 
@@ -153,4 +164,15 @@ export const useTabBarMetrics = useBuyerTabBarMetrics;
  */
 export function useBuyerTabBarInset(): number {
   return useBuyerTabBarMetrics().occupiedHeight;
+}
+
+/**
+ * Height, from the bottom of the screen, of the bar's own visible top edge —
+ * "the line" a Reels/TikTok-style immersive video frame stops at. See
+ * `barTopInset` above for why this is smaller than `useBuyerTabBarInset()`
+ * (which adds breathing room for ordinary scrolling content, not for a
+ * video frame that must end exactly where the bar begins).
+ */
+export function useBuyerTabBarTopInset(): number {
+  return useBuyerTabBarMetrics().barTopInset;
 }
