@@ -43,6 +43,15 @@ const ALLOWLIST: Record<string, string> = {
   // whole row" exception as a list row), not a standalone "View" button
   // that skipped components/ui/Button.
   'components/ShopProductSheet.tsx': 'Added-to-cart toast is one compound-label row, not a standalone "View" button',
+  // RemoveFollowerSheet's outer sheet-container Pressable (backgroundColor:
+  // theme.card, the bottom-sheet surface itself — same shape as
+  // components/ui/ActionSheet.tsx's own sheet Pressable) happens to contain
+  // both "Cancel" and "Remove" text further down inside its own separate
+  // PressableScale rows. The heuristic flags the *container's* chrome, not
+  // either button's own: each button (removeBtn/cancelBtn) is a plain
+  // full-width text row with no background/border of its own — the actual
+  // "delegate to Button/Chip" case this test guards against doesn't apply.
+  'app/activity-center.tsx': 'RemoveFollowerSheet\'s bottom-sheet container Pressable (its own backgroundColor is the sheet surface, not either action button\'s chrome)',
 };
 
 const TAG_NAMES = ['Pressable', 'TouchableOpacity', 'TouchableHighlight'];

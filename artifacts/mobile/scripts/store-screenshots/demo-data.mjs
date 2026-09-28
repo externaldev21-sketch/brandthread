@@ -576,7 +576,38 @@ export function respond({ method, path, query, role, options = {} }) {
     };
   }
   if (p === '/buyer/cart') return options.emptyCart ? { items: [], savedItems: [] } : CART;
-  if (p === '/buyer/notifications') return [];
+  // Seeded so the Activity redesign (swipe/menu/remove-follower/block, see
+  // docs/activity-flows.md) has real rows to screenshot: two single-actor
+  // new-follower rows (one unread → Highlights, one read → Today) and one
+  // like row with a thumbnail.
+  if (p === '/buyer/notifications') {
+    return [
+      {
+        id: 'n-follow-1', category: 'social', type: 'new_follower',
+        title: 'Priya Shah started following you', body: '', isRead: false, isMuted: false,
+        actorId: 'demo-follower-1', actorName: 'Priya Shah', actorHandle: '@priyashah',
+        actorInitials: 'PS', actorColor: '#8B5CF6',
+        targetId: 'demo-follower-1', targetType: 'user', cta: 'Follow back',
+        createdAt: iso(6 * HOUR),
+      },
+      {
+        id: 'n-follow-2', category: 'social', type: 'new_follower',
+        title: 'Marcus Webb started following you', body: '', isRead: true, isMuted: false,
+        actorId: 'demo-follower-2', actorName: 'Marcus Webb', actorHandle: '@marcusw',
+        actorInitials: 'MW', actorColor: '#EC4899',
+        targetId: 'demo-follower-2', targetType: 'user', cta: 'Follow back',
+        createdAt: iso(1 * DAY + 2 * HOUR),
+      },
+      {
+        id: 'n-like-1', category: 'social', type: 'post_like',
+        title: 'Jordan Lee liked your post', body: '', isRead: true, isMuted: false,
+        actorId: 'demo-liker-1', actorName: 'Jordan Lee', actorHandle: '@jordanlee',
+        actorInitials: 'JL', actorColor: '#3B82F6',
+        targetId: 'post-1', targetType: 'post', targetImageUrl: PUBLIC_PRODUCTS[0]?.images?.[0] ?? null,
+        createdAt: iso(3 * DAY),
+      },
+    ];
+  }
   if (p === '/shipping-rates/calculate') return { shippingCents: 1200, rateName: 'Express courier (2–3 days)', isFree: false };
 
   // Seller

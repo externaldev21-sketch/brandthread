@@ -1143,6 +1143,21 @@ export const suggestionDismissals = pgTable('suggestion_dismissals', {
   pk: primaryKey({ columns: [t.userId, t.suggestedUserId] }),
 }));
 
+// "See less" on an Activity row (Instagram's "..." menu) — a persisted,
+// per-user mute of either a whole notification type ("type:new_follower") or
+// a specific actor ("actor:<clerkId>"), stored as one opaque key so a single
+// unique index covers both shapes without nullable partial-unique columns.
+// The Activity feed query (notifications-feed.ts) and publishNotification()
+// both consult this so the preference sticks across devices and future
+// events, not just the rows already on screen.
+export const activityMutes = pgTable('activity_mutes', {
+  userId:    text('user_id').notNull(),
+  muteKey:   text('mute_key').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.muteKey] }),
+}));
+
 // ─── Discount codes ───────────────────────────────────────────────────────────
 
 export const discountCodes = pgTable('discount_codes', {
