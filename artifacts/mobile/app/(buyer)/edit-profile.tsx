@@ -16,7 +16,7 @@ import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeSta
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { useApi } from '@/lib/api';
-import { pickProfileImage } from '@/lib/pickProfileImage';
+import { useImageSourceSheet } from '@/components/profile/ImageSourceSheet';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -125,6 +125,7 @@ export default function BuyerEditProfileScreen() {
   const [avatarProgress, setAvatarProgress] = useState(0);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [genderPickerOpen, setGenderPickerOpen] = useState(false);
+  const { open: openAvatarSheet, sheet: avatarSheet } = useImageSourceSheet();
   // Profile video (the looping video behind the profile header) — the same
   // pick → trim → upload flow the profile screen uses.
   const [serverCover, setServerCover] = useState<CoverMedia>({ videoUrl: null, posterUrl: null });
@@ -195,7 +196,7 @@ export default function BuyerEditProfileScreen() {
   }
 
   async function pickAvatar() {
-    const asset = await pickProfileImage({ aspect: [1, 1], title: 'Update profile photo' });
+    const asset = await openAvatarSheet({ aspect: [1, 1] });
     if (!asset) return;
     setAvatarError(null);
     setAvatarUploading(true);
@@ -687,6 +688,7 @@ export default function BuyerEditProfileScreen() {
         />
         <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
         <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
+        {avatarSheet}
       </View>
     </KeyboardAvoidingView>
   );
