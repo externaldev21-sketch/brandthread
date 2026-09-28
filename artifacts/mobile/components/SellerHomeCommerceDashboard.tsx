@@ -66,6 +66,7 @@ import { SellerDashboardStatGrid, type SellerDashboardStatTileData } from '@/com
 import { SellerDashboardActionNeeded } from '@/components/SellerDashboardActionNeeded';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProducts';
+import { SellerDashboardTrafficSources } from '@/components/SellerDashboardTrafficSources';
 import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
 import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
 import {
@@ -657,6 +658,7 @@ export default function SellerHomeCommerceDashboard({
                 onRangeChange={(next) => { setRange(next); setScrubIndex(null); }}
                 onScrub={setScrubIndex}
                 isEmpty={isEmptyChart}
+                formatValue={(v) => formatMetricValue(metric, v)}
               />
 
               {/* ── Stat tile grid ───────────────────────────────────────── */}
@@ -727,6 +729,12 @@ export default function SellerHomeCommerceDashboard({
                     onOpenProduct={() => nav('/(tabs)/products')}
                     onSeeAll={() => nav('/(tabs)/products')}
                   />
+                </View>
+              )}
+
+              {!newSeller && data && (
+                <View style={styles.section}>
+                  <SellerDashboardTrafficSources totalVisits={data.visitorCount} theme={theme} />
                 </View>
               )}
 

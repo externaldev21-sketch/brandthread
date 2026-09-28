@@ -135,6 +135,7 @@ async function buildBuyerPosts(
     mediaType: posts.mediaType,
     caption: posts.caption,
     styleTags: posts.styleTags,
+    postStatus: posts.postStatus,
     createdAt: posts.createdAt,
     name: users.name,
     displayName: users.displayName,
@@ -146,7 +147,11 @@ async function buildBuyerPosts(
       inArray(posts.userId, authorIds),
     ))
     .where(and(
-      sql`${posts.postStatus} NOT IN ('deleted', 'archived', 'draft')`,
+      sql`${posts.postStatus} NOT IN ('deleted', 'archived')`,
+      // A draft is never visible to anyone except its own author viewing
+      // their own profile (item 117: buyer drafts resume) — this never
+      // leaks another author's draft even when authorIds has several people.
+      sql`(${posts.postStatus} != 'draft' OR ${posts.userId} = ${viewerId})`,
       eq(posts.moderationStatus, "visible"),
       authorInGoodStanding(posts.userId),
       notBlockedWith(viewerId, posts.userId),
@@ -213,7 +218,7 @@ async function buildBuyerPosts(
       repostedByMe: mine.get(row.id)?.has("repost") ?? false,
       savedByMe: false,
       isArchived: false,
-      isDraft: false,
+      isDraft: row.postStatus === "draft",
       createdAt: row.createdAt,
       updatedAt: row.createdAt,
     };

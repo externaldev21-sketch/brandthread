@@ -121,13 +121,18 @@ export function ShippingAddressCard({
             );
           })}
           {usingNewAddress ? (
-            <View style={[styles.option, { borderColor: theme.text, borderWidth: 1.5 }]} accessibilityRole="radio" accessibilityState={{ selected: true }}>
-              <RadioDot selected />
-              <View style={styles.optionCopy}>
-                <Text style={[styles.optionTitle, { color: theme.text }]}>New address</Text>
-                {addressLines(address).map(line => (
-                  <Text key={line} style={[styles.optionLine, { color: theme.muted }]} numberOfLines={1}>{line}</Text>
-                ))}
+            // The Edit link is a sibling of the radio (not inside it): a
+            // button nested in a role="radio" element is a nested
+            // interactive control on web. Same visual row as before.
+            <View style={[styles.option, { borderColor: theme.text, borderWidth: 1.5 }]}>
+              <View style={styles.newAddressRadio} accessibilityRole="radio" accessibilityState={{ selected: true }}>
+                <RadioDot selected />
+                <View style={styles.optionCopy}>
+                  <Text style={[styles.optionTitle, { color: theme.text }]}>New address</Text>
+                  {addressLines(address).map(line => (
+                    <Text key={line} style={[styles.optionLine, { color: theme.muted }]} numberOfLines={1}>{line}</Text>
+                  ))}
+                </View>
               </View>
               {editLink}
             </View>
@@ -307,6 +312,7 @@ const styles = StyleSheet.create({
     borderRadius: RADII.card, padding: SP.sm + 6,
   },
   optionCopy: { flex: 1, minWidth: 0 },
+  newAddressRadio: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm + 4 },
   optionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: 2 },
   optionTitle: { fontFamily: FONT.semibold, fontSize: FS.base },
   optionLine: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
