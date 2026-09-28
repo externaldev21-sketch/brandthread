@@ -34,6 +34,8 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useSheetTransition } from '@/components/ui/BottomSheet';
 import { CachedImage } from '@/components/CachedImage';
+import { Avatar } from '@/components/ui/Avatar';
+import { profileHref } from '@/lib/profileNavigation';
 import { ProductReviewsSection, type ReviewsSeed } from '@/components/ProductReviewsSection';
 import { formatCents } from '@/lib/money';
 import {
@@ -71,6 +73,11 @@ export interface ShopTag {
   productName: string;
   priceCents: number;
   tagId?: string;
+  // A plain fallback photo for this tag's own LIST-step row (see
+  // ProductListRow), shown only until that tag's real product finishes
+  // hydrating (listProducts) — never overrides a real hydrated product's
+  // own imageUris once it's loaded.
+  imageUri?: string;
 }
 
 export interface ShopSheetSelection {
@@ -132,6 +139,19 @@ function buildPreviewReviewsSeed(productPhotos: string[]): ReviewsSeed {
   ],
   };
 }
+
+// ─── Shipping / returns copy (item 7) ──────────────────────────────────────────
+// The returns half reuses `product.refundPolicy` — real, per-product copy
+// already computed for the buyer product-detail page (adaptApiProduct in
+// services/cartService.ts, and the seeded preview catalog in
+// lib/previewProducts.ts). The shipping-estimate half has no equivalent
+// source anywhere in the app yet (grepped services/cartTypes.ts,
+// cartService.ts and buyer-product-detail.tsx — no generic per-product
+// shipping-time field exists), so it's a placeholder pending real
+// seller-level shipping data — flagged in this PR, not silently presented
+// as real.
+const SHIPPING_ESTIMATE_COPY = 'Ships in 2-3 days'; // PLACEHOLDER — see comment above
+const DEFAULT_RETURNS_COPY = 'Free returns within 14 days';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -325,8 +345,56 @@ export function ShopProductSheet({
   const router = useRouter();
   const { push } = useThreadPull();
 
+  // Photo cap (item 1): the sheet itself is capped at maxHeight: '85%' (see
+  // ss.sheet) — the hero photo is capped at ~45% of THAT height, not of the
+  // raw window, so price/size/details still sit above the fold across
+  // viewport sizes instead of a fixed aspect ratio eating most of the
+  // screen on shorter devices.
+  const sheetHeightBudget = windowHeight * 0.85;
+  const imageMaxHeight = Math.round(sheetHeightBudget * 0.45);
+
   const [activeTagIdx, setActiveTagIdx] = useState(selection.activeTagIndex);
   const activeTag = selection.tags[activeTagIdx];
+  const hasMultipleTags = selection.tags.length > 1;
+
+  // Two-step TikTok-Shop-style flow (rebuild): a post with 2+ tagged
+  // products opens on a LIST step (a vertical row per product — no giant
+  // photo); tapping a row pushes to that product's DETAIL step, with a
+  // working back chevron. A single-product post skips the list entirely
+  // and opens straight on DETAIL, with no back target at all.
+  const [sheetStep, setSheetStep] = useState<'list' | 'detail'>(hasMultipleTags ? 'list' : 'detail');
+
+  // Summary data for every tagged product's LIST row (thumbnail, price,
+  // seller + verified check, real sold count) — hydrated once, in
+  // parallel, through the exact same getBuyerProduct()/previewProduct path
+  // the DETAIL step already uses, so every row shows a real image instead
+  // of a bag-icon placeholder. `undefined` = still loading, `null` = failed.
+  const [listProducts, setListProducts] = useState<Record<string, BuyerProduct | null | undefined>>({});
+  useEffect(() => {
+    if (!hasMultipleTags) return;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(selection.tags.map(async (tag) => {
+        if (selection.previewProduct && tag.productId === selection.previewProduct.id) {
+          return [tag.productId, selection.previewProduct] as const;
+        }
+        try {
+          return [tag.productId, await getBuyerProduct(tag.productId)] as const;
+        } catch {
+          return [tag.productId, null] as const;
+        }
+      }));
+      if (cancelled) return;
+      setListProducts(prev => {
+        const next = { ...prev };
+        for (const [id, p] of entries) next[id] = p;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+    // Tag list is fixed for the lifetime of one sheet instance — hydrate once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMultipleTags]);
 
   const [product, setProduct] = useState<BuyerProduct | null>(null);
   const [phase, setPhase] = useState<SheetPhase>('loading');
@@ -558,6 +626,15 @@ export function ShopProductSheet({
     !product ||
     product.options.length === 0 ||
     Object.keys(selections).length === product.options.length;
+  // Size-specific gate for the CTAs (item 2): only a product that actually
+  // HAS a size option is blocked on it — a product with no sizes (e.g.
+  // color-only, or no options at all) is never gated here. Reuses the same
+  // `BuyerProductOption`/`selections` shape the rest of this file already
+  // reads (adaptApiProduct / previewProducts.ts both name the size option
+  // exactly "Size"), not a new/invented stock model.
+  const sizeOption = product?.options.find(o => o.name.toLowerCase() === 'size') ?? null;
+  const sizeSelected = !sizeOption || !!selections[sizeOption.id];
+  const nonSizeOptions = product?.options.filter(o => o !== sizeOption) ?? [];
   const inStock = variant
     ? variant.isAvailable && variant.inventoryQuantity > 0
     : product != null && product.variants.every(v => v.inventoryQuantity === 0)
@@ -570,6 +647,64 @@ export function ShopProductSheet({
     sourceTagId: activeTag?.tagId ?? activeTag?.productId,
     channel: 'thread',
   };
+
+  /**
+   * Quick add-to-cart from the tag list ("Item lineup" row — see the Mobbin
+   * reference in ShopSideTab.tsx). Lets a buyer add a SECOND (or third…)
+   * tagged product without first navigating away or manually switching +
+   * scrolling to find its own Add to cart button.
+   *
+   * Tapping the row's own Add-to-cart button when that row is already the
+   * active tag and its product is hydrated (`phase === 'ready'`) adds it
+   * immediately through the exact same `handleAddToCart()` used by the
+   * sticky bar — no parallel add-to-cart implementation. Tapping it for a
+   * different row switches `activeTagIdx` to hydrate that product first;
+   * `pendingQuickAddRef` remembers which product this was for, and the
+   * effect below finishes the add once that product's own `phase` settles.
+   */
+  const pendingQuickAddRef = useRef<string | null>(null);
+
+  function handleQuickAdd(idx: number) {
+    Haptics.selectionAsync();
+    const tag = selection.tags[idx];
+    if (!tag) return;
+    if (idx === activeTagIdx) {
+      if (phase === 'ready') {
+        void handleAddToCart();
+      } else if (phase === 'loading') {
+        pendingQuickAddRef.current = tag.productId;
+      }
+      return;
+    }
+    pendingQuickAddRef.current = tag.productId;
+    setActiveTagIdx(idx);
+  }
+
+  // Finishes a quick add once the just-switched-to product hydrates: adds
+  // it straight away when it needs no variant pick (loadProduct auto-fills
+  // `selections` for a 0/1-variant product), otherwise scrolls its option
+  // chips into view — the same non-dead-end behavior `rejectMissingVariant`
+  // already guarantees for the sticky bar, just reached from this row
+  // instead.
+  useEffect(() => {
+    if (!pendingQuickAddRef.current || activeTag?.productId !== pendingQuickAddRef.current) return;
+    if (phase === 'ready') {
+      pendingQuickAddRef.current = null;
+      if (allOptionsSelected) {
+        void handleAddToCart();
+      } else {
+        // Needs a size pick — push into the DETAIL step (the list step has
+        // no chips to scroll to) and scroll its option chips into view.
+        setSheetStep('detail');
+        requestAnimationFrame(() => {
+          contentScrollRef.current?.scrollTo({ y: Math.max(0, optionsSectionY.current - 12), animated: true });
+        });
+      }
+    } else if (phase === 'sold_out' || phase === 'unavailable' || phase === 'error') {
+      pendingQuickAddRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, activeTag, allOptionsSelected]);
 
   // Add to cart
   /**
@@ -588,6 +723,11 @@ export function ShopProductSheet({
    */
   function rejectMissingVariant(message: string) {
     setVariantError(message);
+    // Also ensures the DETAIL step is showing — a quick-add tapped from the
+    // LIST step's own compact cart button can reach this same validation
+    // (idx === activeTagIdx, already hydrated, but missing a size), and the
+    // chips it needs to scroll to only exist in the DETAIL step.
+    setSheetStep('detail');
     requestAnimationFrame(() => {
       contentScrollRef.current?.scrollTo({ y: Math.max(0, optionsSectionY.current - 12), animated: true });
     });
@@ -675,6 +815,27 @@ export function ShopProductSheet({
     });
   }
 
+  // Tapping a LIST-step row (its image/name/price/seller — not its own
+  // compact cart button, a sibling, never nested inside this) pushes to
+  // that product's DETAIL step WITHIN the same sheet — TikTok Shop's own
+  // list → detail pattern — rather than navigating away to the full page
+  // (handleViewDetail, above, is what "View details" inside the DETAIL
+  // step itself still uses for that).
+  function openDetailStep(idx: number) {
+    Haptics.selectionAsync();
+    if (idx !== activeTagIdx) setActiveTagIdx(idx);
+    setVariantError('');
+    setSheetStep('detail');
+  }
+
+  // Back from the DETAIL step to the LIST step (multi-product posts only —
+  // a single-product post opens straight on DETAIL and never shows a back
+  // chevron at all, since there's no list to go back to).
+  function handleBackToList() {
+    setVariantError('');
+    setSheetStep('list');
+  }
+
   function handleViewCart() {
     navigateAndDismiss(() => router.push('/(buyer)/cart' as never));
   }
@@ -693,6 +854,50 @@ export function ShopProductSheet({
   // Capture phase as string to allow comparison across JSX blocks without narrowing conflicts
   const currentPhase: string = phase;
 
+  // One option's chip row — shared by the size-under-price block and the
+  // remaining (non-size) options further down, so there's exactly one chip-
+  // rendering implementation instead of two diverging ones.
+  function renderOptionChips(option: BuyerProductOption) {
+    if (!product) return null;
+    return (
+      <View style={ss.optionSection}>
+        <View style={ss.optionHeader}>
+          <Text style={ss.optionLabel}>{option.name}</Text>
+          {selections[option.id] && (
+            <Text style={[ss.optionSelected, { color: accent }]}>
+              {option.values.find(v => v.id === selections[option.id])?.label}
+            </Text>
+          )}
+        </View>
+        <View style={ss.chipsRow}>
+          {option.values.map(val => {
+            const { [option.id]: _ign, ...rest } = selections;
+            const available = isVariantComboAvailable(product, option.id, val.id, rest);
+            return (
+              <OptionChip
+                key={val.id}
+                label={val.label}
+                selected={selections[option.id] === val.id}
+                available={available}
+                accentColor={accent}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setSelections(prev => {
+                    const updated = { ...prev, [option.id]: val.id };
+                    const newVariant = findVariant(product, updated);
+                    if (newVariant && qty > newVariant.inventoryQuantity) setQty(1);
+                    return updated;
+                  });
+                  setVariantError('');
+                }}
+              />
+            );
+          })}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <Modal transparent animationType="none" visible={modalVisible} onRequestClose={handleClose}>
       {/* Dim backdrop — tap to dismiss. Fades on the exact same Reanimated
@@ -708,18 +913,40 @@ export function ShopProductSheet({
         <ReanimatedAnimated.View
           testID="shop-product-sheet"
           onLayout={onSheetLayout}
-          style={[ss.sheet, {
-            backgroundColor: theme.surface,
-            borderColor: theme.border,
-            paddingBottom: insets.bottom + 8,
-          }, sheetStyle]}
+          style={[
+            ss.sheet,
+            sheetStep === 'list' && ss.sheetHalf,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.border,
+              paddingBottom: insets.bottom + 8,
+            },
+            sheetStyle,
+          ]}
         >
         {/* ─ Handle ─ */}
         <View style={ss.handle} />
 
         {/* ─ Header ─ */}
         <View style={ss.header}>
-          <Text style={ss.eyebrow}>SHOP THE POST</Text>
+          <View style={ss.headerLeft}>
+            {/* Back to the product LIST — only when there IS a list to go
+                back to (2+ tagged products) and we're on the DETAIL step
+                reached from it. A single-product post never shows this: it
+                opens straight on DETAIL with no back target at all. */}
+            {hasMultipleTags && sheetStep === 'detail' && (
+              <TouchableOpacity
+                onPress={handleBackToList}
+                style={ss.backBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Back to products list"
+              >
+                <Feather name="chevron-left" size={18} color={theme.text} />
+              </TouchableOpacity>
+            )}
+            <Text style={ss.eyebrow}>SHOP THE POST</Text>
+          </View>
           <TouchableOpacity
             onPress={handleClose}
             style={ss.closeBtn}
@@ -730,67 +957,58 @@ export function ShopProductSheet({
           </TouchableOpacity>
         </View>
 
-        {/* ─ Multi-tag switcher — roomy product rows, not overlapping thumbnails ─ */}
-        {selection.tags.length > 1 && (
-          <View style={ss.tagListWrap}>
-            <Text style={ss.tagListLabel}>
-              {selection.tags.length} products tagged in this post
-            </Text>
+        {/* ─ LIST step — every tagged product as a row (2+ products only);
+            step 1 of the TikTok-Shop-style list → detail flow. No giant
+            photo here, just a 72pt thumbnail per row. ─ */}
+        {hasMultipleTags && sheetStep === 'list' && (
+          <>
+            <Text style={ss.listTitle}>Products in this post ({selection.tags.length})</Text>
             <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={ss.tagRow}
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              contentContainerStyle={ss.listContent}
             >
               {selection.tags.map((tag, idx) => {
                 const isActiveTag = activeTagIdx === idx;
-                const tagPreview = tag.productId === product?.id ? product : (
-                  selection.previewProduct?.id === tag.productId ? selection.previewProduct : null
+                const rowProduct = listProducts[tag.productId];
+                // Busy/added/sold-out for THIS row's own compact cart
+                // button — only meaningful while this row is also the
+                // active (hydrating/adding) tag.
+                const rowAdding = isActiveTag && (
+                  phase === 'adding' || (phase === 'loading' && pendingQuickAddRef.current === tag.productId)
                 );
-                const thumbUri = tagPreview?.imageUris?.[0];
+                const rowAdded = isActiveTag && phase === 'added';
+                const rowSoldOut = isActiveTag && (phase === 'sold_out' || phase === 'unavailable');
                 return (
-                  <TouchableOpacity
+                  <ProductListRow
                     key={tag.productId + idx}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setActiveTagIdx(idx);
-                    }}
-                    style={[
-                      ss.tagCard,
-                      isActiveTag && { borderColor: accent, borderWidth: 2 },
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isActiveTag }}
-                    accessibilityLabel={`Switch to ${tag.productName}, ${formatCents(tag.priceCents)}`}
-                  >
-                    <View style={ss.tagCardImageWrap} ref={isActiveTag ? activeTagImageRef : undefined} collapsable={false}>
-                      {thumbUri ? (
-                        <CachedImage source={{ uri: thumbUri }} style={ss.tagCardImage} contentFit="cover" />
-                      ) : (
-                        <View style={[ss.tagCardImage, ss.productImagePlaceholder]}>
-                          <Feather name="shopping-bag" size={16} color={theme.subtle} />
-                        </View>
-                      )}
-                    </View>
-                    <Text style={[ss.tagCardName, isActiveTag && { color: accent }]} numberOfLines={2}>
-                      {tag.productName}
-                    </Text>
-                    <Text style={ss.tagCardPrice}>{formatCents(tag.priceCents)}</Text>
-                  </TouchableOpacity>
+                    tag={tag}
+                    product={rowProduct}
+                    adding={rowAdding}
+                    added={rowAdded}
+                    soldOut={rowSoldOut}
+                    onPressRow={() => openDetailStep(idx)}
+                    onPressCart={() => handleQuickAdd(idx)}
+                    imageRef={isActiveTag ? activeTagImageRef : undefined}
+                  />
                 );
               })}
             </ScrollView>
-          </View>
+          </>
         )}
 
-        {/* ─ Content ─ */}
-        {phase === 'loading' && (
+        {/* ─ DETAIL step — content below unchanged from here down, except
+            every phase block now also requires sheetStep === 'detail' so
+            nothing from step 2 renders underneath the LIST step above. ─ */}
+        {sheetStep === 'detail' && phase === 'loading' && (
           <View style={ss.centerBox} accessibilityLiveRegion="polite">
             <ActivityIndicator color={accent} size="large" />
             <Text style={ss.loadingText}>Loading product…</Text>
           </View>
         )}
 
-        {phase === 'error' && (
+        {sheetStep === 'detail' && phase === 'error' && (
           <View style={ss.centerBox}>
             <Feather name="alert-circle" size={ICON.lg} color={theme.error} />
             <Text style={ss.errorText}>{errorMsg || 'Could not load product.'}</Text>
@@ -804,7 +1022,7 @@ export function ShopProductSheet({
           </View>
         )}
 
-        {phase === 'sold_out' && product && (
+        {sheetStep === 'detail' && phase === 'sold_out' && product && (
           <ProductHeader
             product={product}
             variantPrice={variantPrice}
@@ -814,7 +1032,7 @@ export function ShopProductSheet({
           />
         )}
 
-        {phase === 'unavailable' && product && (
+        {sheetStep === 'detail' && phase === 'unavailable' && product && (
           <View>
             <ProductHeader
               product={product}
@@ -830,7 +1048,7 @@ export function ShopProductSheet({
           </View>
         )}
 
-        {(phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
+        {sheetStep === 'detail' && (phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
           <ScrollView
             // Without an explicit flex the sheet (maxHeight: '85%',
             // overflow: 'hidden') sizes this ScrollView to its full content
@@ -846,14 +1064,19 @@ export function ShopProductSheet({
             keyboardShouldPersistTaps="handled"
             bounces={false}
           >
-            {/* Swipeable image gallery */}
+            {/* Swipeable image gallery — capped near-square (item 1), never
+                more than ~45% of the sheet's own height, so price/size/
+                details sit above the fold without scrolling. */}
             {/* Measured at Add-to-cart time: the flight lifts off this photo. */}
             <View ref={productPhotoRef} collapsable={false}>
-              <ProductImageCarousel imageUris={product.imageUris} />
+              <ProductImageCarousel imageUris={product.imageUris} maxHeight={imageMaxHeight} />
             </View>
 
-            {/* Product header row — no thumbnail: the carousel above already
-                shows this exact photo full-size directly above it. */}
+            {/* Product title/price row — the WHOLE row is the tap target to
+                the full product page, with its own explicit "View details"
+                affordance (item 4) instead of a bare chevron. No thumbnail:
+                the carousel above already shows this exact photo full-size
+                directly above it. */}
             <ProductHeader
               product={product}
               variantPrice={variantPrice}
@@ -862,7 +1085,33 @@ export function ShopProductSheet({
               accent={accent}
               onViewDetail={handleViewDetail}
               showImage={false}
+              showSellerLine={false}
             />
+
+            {/* Size chips directly under the price (item 2) — real stock via
+                the same BuyerProductVariant/isVariantComboAvailable this
+                file already used for every option; sold-out sizes render
+                strike-through + dashed border (OptionChip). */}
+            {sizeOption && (
+              <View onLayout={e => { optionsSectionY.current = e.nativeEvent.layout.y; }}>
+                {renderOptionChips(sizeOption)}
+              </View>
+            )}
+
+            {/* One grey info line: shipping estimate + this product's real
+                return policy (item 7), positioned under the size chips. */}
+            <View style={ss.infoLine}>
+              <Feather name="truck" size={12} color={theme.subtle} />
+              <Text style={ss.infoLineText} numberOfLines={2}>
+                {SHIPPING_ESTIMATE_COPY} · {product.refundPolicy || DEFAULT_RETURNS_COPY}
+              </Text>
+            </View>
+
+            {/* Seller row — avatar, white/monochrome verified check, name;
+                the WHOLE row taps through to the seller's store (item 5). A
+                sibling of the title/price row above and the CTA buttons
+                below, never nested inside either. */}
+            <SellerRow product={product} />
 
             <View style={ss.descriptionSection}>
               <Text style={ss.descriptionLabel}>Description</Text>
@@ -871,46 +1120,14 @@ export function ShopProductSheet({
               </Text>
             </View>
 
-            {/* Variant options */}
-            <View onLayout={e => { optionsSectionY.current = e.nativeEvent.layout.y; }}>
-            {product.options.map((option: BuyerProductOption) => (
-              <View key={option.id} style={ss.optionSection}>
-                <View style={ss.optionHeader}>
-                  <Text style={ss.optionLabel}>{option.name}</Text>
-                  {selections[option.id] && (
-                    <Text style={[ss.optionSelected, { color: accent }]}>
-                      {option.values.find(v => v.id === selections[option.id])?.label}
-                    </Text>
-                  )}
-                </View>
-                <View style={ss.chipsRow}>
-                  {option.values.map(val => {
-                    const { [option.id]: _ign, ...rest } = selections;
-                    const available = isVariantComboAvailable(product, option.id, val.id, rest);
-                    return (
-                      <OptionChip
-                        key={val.id}
-                        label={val.label}
-                        selected={selections[option.id] === val.id}
-                        available={available}
-                        accentColor={accent}
-                        onPress={() => {
-                          Haptics.selectionAsync();
-                          setSelections(prev => {
-                            const updated = { ...prev, [option.id]: val.id };
-                            const newVariant = findVariant(product, updated);
-                            if (newVariant && qty > newVariant.inventoryQuantity) setQty(1);
-                            return updated;
-                          });
-                          setVariantError('');
-                        }}
-                      />
-                    );
-                  })}
-                </View>
+            {/* Any remaining (non-size) variant options — e.g. Color. */}
+            {nonSizeOptions.length > 0 && (
+              <View onLayout={sizeOption ? undefined : e => { optionsSectionY.current = e.nativeEvent.layout.y; }}>
+                {nonSizeOptions.map(option => (
+                  <React.Fragment key={option.id}>{renderOptionChips(option)}</React.Fragment>
+                ))}
               </View>
-            ))}
-            </View>
+            )}
 
             {/* Qty + stock */}
             <View style={ss.qtyRow}>
@@ -929,9 +1146,16 @@ export function ShopProductSheet({
               />
             </View>
 
-            {/* Variant error */}
+            {/* Variant error — shown once, right here next to the size/
+                option chips it's actually about (rejectMissingVariant
+                scrolls this into view so it's always on screen when it
+                fires). Used to also be mirrored into the sticky action bar
+                below, which rendered the exact same message a second time
+                whenever the sheet's scroll position already had this one
+                in view — see the sticky bar's own comment for why that
+                mirror was removed instead of this one. */}
             {!!variantError && (
-              <View style={ss.variantError}>
+              <View style={ss.variantError} accessibilityRole="alert" accessibilityLiveRegion="polite">
                 <Feather name="alert-circle" size={13} color={theme.error} />
                 <Text style={ss.variantErrorText}>{variantError}</Text>
               </View>
@@ -961,23 +1185,27 @@ export function ShopProductSheet({
         )}
 
         {/* Sticky Add to Cart + Buy Now — always reachable, never scrolls away */}
-        {(phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
+        {sheetStep === 'detail' && (phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
           <View style={[ss.stickyActionsWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-            {/* Mirrors the inline variantError message (rendered next to the
-                size/color chips) into the one part of the sheet that's
-                always on screen — see rejectMissingVariant's comment. */}
-            {!!variantError && (
-              <View style={ss.stickyVariantError} accessibilityRole="alert" accessibilityLiveRegion="polite">
-                <Feather name="alert-circle" size={13} color={theme.error} />
-                <Text style={ss.variantErrorText}>{variantError}</Text>
-              </View>
-            )}
+            {/* Overnight follow-up: this used to mirror the same
+                variantError message a second time here, so it rendered
+                twice at once — once next to the size/option chips, once
+                again in this always-on-screen sticky bar. rejectMissingVariant
+                already scrolls the chips (and the one message next to them)
+                into view when it fires, so the mirror was never load-
+                bearing once that scroll landed — it only doubled the
+                message. Removed; see the single render next to the option
+                chips above. */}
             <View style={ss.actions}>
               <TouchableOpacity
                 onPress={phase === 'added' ? handleViewCart : handleAddToCart}
-                disabled={isBusy || currentPhase === 'sold_out'}
+                // Disabled outright (not just rejected-on-tap) once the
+                // product actually has sizes and none is chosen yet (item
+                // 2) — a product with no size option at all is never gated
+                // here.
+                disabled={isBusy || currentPhase === 'sold_out' || (phase !== 'added' && !sizeSelected)}
                 activeOpacity={0.85}
-                style={[ss.addBtn, isBusy && { opacity: 0.6 }]}
+                style={[ss.addBtn, (isBusy || (phase !== 'added' && !sizeSelected)) && { opacity: 0.6 }]}
                 accessibilityRole="button"
                 accessibilityLabel={phase === 'added' ? 'View cart' : 'Add to cart'}
               >
@@ -993,26 +1221,25 @@ export function ShopProductSheet({
 
               <TouchableOpacity
                 onPress={handleBuyNow}
-                disabled={isBusy || currentPhase === 'sold_out'}
+                disabled={isBusy || currentPhase === 'sold_out' || !sizeSelected}
                 activeOpacity={0.85}
-                style={[ss.buyBtn, { backgroundColor: accent }, isBusy && { opacity: 0.6 }]}
+                style={[ss.buyBtn, { backgroundColor: accent }, (isBusy || !sizeSelected) && { opacity: 0.6 }]}
                 accessibilityRole="button"
                 accessibilityLabel="Buy now"
               >
                 {phase === 'buying' ? (
                   <ActivityIndicator color={theme.onAccent} size="small" />
                 ) : (
-                  <>
-                    <Feather name="arrow-right-circle" size={18} color={theme.onAccent} />
-                    <Text style={[ss.buyBtnText, { color: theme.onAccent }]}>Buy now</Text>
-                  </>
+                  // Text only (item 6) — the circle-arrow icon is dropped;
+                  // Add to cart above keeps its cart icon.
+                  <Text style={[ss.buyBtnText, { color: theme.onAccent }]}>Buy now</Text>
                 )}
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {phase === 'sold_out' && product && (
+        {sheetStep === 'detail' && phase === 'sold_out' && product && (
           <View>
             <View style={[ss.statusBanner, { backgroundColor: `${theme.warning}22` }]}>
               <Feather name="clock" size={14} color={theme.warning} />
@@ -1121,6 +1348,7 @@ function ProductHeader({
   accent,
   onViewDetail,
   showImage = true,
+  showSellerLine = true,
 }: {
   product: BuyerProduct;
   variantPrice: number;
@@ -1137,6 +1365,15 @@ function ProductHeader({
    * right above it with no visual separation, reading as an overlap.
    */
   showImage?: boolean;
+  /**
+   * Whether this row also prints the inline "by Seller · @handle" line.
+   * Default true (sold-out/unavailable phases, which don't render the
+   * dedicated `SellerRow` below). The ready-phase call site passes false
+   * since it renders `SellerRow` as its own separate, fully seller-focused
+   * tappable row (item 5) instead — avoiding two different seller
+   * affordances stacked on top of each other.
+   */
+  showSellerLine?: boolean;
 }) {
   const { theme } = useAppTheme();
   const ss = useMemo(() => makeSheetStyles(theme), [theme]);
@@ -1180,15 +1417,153 @@ function ProductHeader({
             <Text style={ss.comparePrice}>{formatCents(variantCompare)}</Text>
           )}
         </View>
-        <Text style={ss.sellerName} numberOfLines={1}>
-          by {product.sellerName}
-          {product.sellerHandle ? ` · ${product.sellerHandle}` : ''}
-        </Text>
+        {showSellerLine && (
+          <Text style={ss.sellerName} numberOfLines={1}>
+            by {product.sellerName}
+            {product.sellerHandle ? ` · ${product.sellerHandle}` : ''}
+          </Text>
+        )}
+        {/* Explicit "View details" affordance (item 4) — the whole row
+            above is already the tap target, but a bare trailing chevron
+            (the old treatment) reads as ambiguous on its own, the same
+            "icon alone isn't a clear tap target" issue the SHOP pill's own
+            chevron has elsewhere in this feed. */}
+        {onViewDetail && (
+          <View style={ss.viewDetailInline}>
+            <Text style={ss.viewDetailInlineText}>View details</Text>
+            <Feather name="chevron-right" size={12} color={theme.muted} />
+          </View>
+        )}
       </View>
-      {onViewDetail && (
-        <Feather name="chevron-right" size={16} color={theme.subtle} style={{ alignSelf: 'center' }} />
-      )}
     </TouchableOpacity>
+  );
+}
+
+// ─── Seller row — avatar, verified check, name; whole row → seller store ────
+
+function SellerRow({ product }: { product: BuyerProduct }) {
+  const { theme } = useAppTheme();
+  const ss = useMemo(() => makeSheetStyles(theme), [theme]);
+  const router = useRouter();
+
+  return (
+    <TouchableOpacity
+      style={ss.sellerRow}
+      onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${product.sellerName}'s shop`}
+      testID="shop-sheet-seller-row"
+    >
+      <Avatar uri={product.sellerAvatarUri} name={product.sellerName} size={32} />
+      <View style={ss.sellerRowNameWrap}>
+        <Text style={ss.sellerRowName} numberOfLines={1}>{product.sellerName}</Text>
+        {/* Monochrome verified check — theme.text (not a colored/blue
+            badge), matching the same check-circle treatment PersonRow.tsx
+            and BrandRow.tsx already use for a verified name sitting on a
+            plain card surface (as opposed to CaptionBlock.tsx's ON_DARK
+            white, which is for a badge over a playing video). */}
+        {product.sellerVerified && (
+          <Feather name="check-circle" size={13} color={theme.text} style={ss.sellerRowVerified} />
+        )}
+      </View>
+      <View style={ss.sellerViewStore}>
+        <Text style={ss.sellerViewStoreText}>View store</Text>
+        <Feather name="chevron-right" size={14} color={theme.muted} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Product list row — LIST step (2+ tagged products) ──────────────────────
+// TikTok Shop's own "Shopping from a video" product-anchor list (Mobbin:
+// mobbin.com/screens/8f86927b-bff7-44d1-8f66-7264d31e76d5) and eBay's "Item
+// lineup" sheet (mobbin.com/screens/0342aaee-4b93-4156-adf4-267ba35131e1) —
+// a vertical list of real product rows, never a big preview image. A plain
+// View, not a pressable — its two children (row nav, compact cart button)
+// are SIBLING TouchableOpacitys, never nested inside one another (tests/
+// buyer-shopping-no-nested-pressables.test.ts guards this file specifically).
+
+function ProductListRow({
+  tag, product, adding, added, soldOut, onPressRow, onPressCart, imageRef,
+}: {
+  tag: ShopTag;
+  /** undefined = still hydrating, null = failed to load, else the real product. */
+  product: BuyerProduct | null | undefined;
+  adding: boolean;
+  added: boolean;
+  soldOut: boolean;
+  onPressRow: () => void;
+  onPressCart: () => void;
+  imageRef?: RefObject<View | null>;
+}) {
+  const { theme } = useAppTheme();
+  const ss = useMemo(() => makeSheetStyles(theme), [theme]);
+  // The real hydrated photo once it's in, else the caller's own fallback
+  // (tag.imageUri — e.g. feed.tsx's productTags) so the row shows a real
+  // photo immediately instead of a loading skeleton whenever the caller
+  // already has one on hand.
+  const imageUri = product?.imageUris?.[0] ?? tag.imageUri;
+  const loading = product === undefined && !imageUri;
+
+  return (
+    <View style={ss.listRow}>
+      <TouchableOpacity
+        style={ss.listRowBody}
+        onPress={onPressRow}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${tag.productName}, ${formatCents(tag.priceCents)}`}
+      >
+        <View style={ss.listRowThumbWrap} ref={imageRef} collapsable={false}>
+          {loading ? (
+            <View style={[ss.listRowThumb, ss.listRowThumbSkeleton]}>
+              <ActivityIndicator size="small" color={theme.subtle} />
+            </View>
+          ) : imageUri ? (
+            <CachedImage source={{ uri: imageUri }} style={ss.listRowThumb} contentFit="cover" />
+          ) : (
+            <View style={[ss.listRowThumb, ss.listRowThumbSkeleton]}>
+              <Feather name="image" size={18} color={theme.subtle} />
+            </View>
+          )}
+        </View>
+        <View style={ss.listRowInfo}>
+          <Text style={ss.listRowName} numberOfLines={2}>{tag.productName}</Text>
+          <Text style={ss.listRowPrice}>{formatCents(tag.priceCents)}</Text>
+          {product && (
+            <View style={ss.listRowSellerRow}>
+              <Text style={ss.listRowSellerText} numberOfLines={1}>{product.sellerName}</Text>
+              {product.sellerVerified && (
+                <Feather name="check-circle" size={11} color={theme.text} />
+              )}
+            </View>
+          )}
+          {/* Real sold count (BuyerProduct.claimedUnits — a sum of paid-
+              order quantities, computed server-side; see cartService's
+              adaptApiProduct) — hidden rather than shown as "0 sold" when
+              there's genuinely no sales yet. */}
+          {!!product?.claimedUnits && (
+            <Text style={ss.listRowSoldText}>{product.claimedUnits} sold</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={onPressCart}
+        disabled={soldOut}
+        activeOpacity={0.8}
+        style={[ss.listRowCartBtn, added && ss.listRowCartBtnAdded, soldOut && ss.listRowCartBtnDisabled]}
+        accessibilityRole="button"
+        accessibilityLabel={added ? `${tag.productName} added to cart` : `Add ${tag.productName} to cart`}
+      >
+        {adding ? (
+          <ActivityIndicator size="small" color={theme.text} />
+        ) : added ? (
+          <Feather name="check" size={16} color={theme.background} />
+        ) : (
+          <Feather name="shopping-cart" size={16} color={theme.text} />
+        )}
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -1250,25 +1625,29 @@ function FullScreenImageViewer({
   );
 }
 
-// ─── Product image carousel — full-bleed 4:5, swipeable, dot indicator ──────
-// Never letterboxed: every frame is `cover`-fit inside a fixed 4:5 window on
-// a dark backdrop, so a differently-shaped seller photo fills the frame
-// (cropped) instead of showing as a boxed-in image on a solid color.
-// Tap opens the full-screen viewer for a closer look.
+// ─── Product image carousel — near-square, capped, swipeable, dot indicator ──
+// Capped at `maxHeight` (item 1 — ~45% of the sheet's own height, computed
+// by the caller) instead of a fixed 4:5 aspect ratio, so the photo can never
+// eat most of the sheet regardless of viewport size. Never letterboxed:
+// every frame is `cover`-fit inside that capped window on a dark backdrop,
+// so a differently-shaped seller photo fills the frame (cropped) instead of
+// showing as a boxed-in image on a solid color. Tap opens the full-screen
+// viewer for a closer look. Page dots only — no numeric "1/N" badge (item
+// 3); the full-screen viewer (a separate, immersive view) keeps its own.
 
-function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
+function ProductImageCarousel({ imageUris, maxHeight }: { imageUris: string[]; maxHeight: number }) {
   const { theme } = useAppTheme();
   const ss = useMemo(() => makeSheetStyles(theme), [theme]);
   const { width: windowWidth } = useWindowDimensions();
   const pageWidth = Math.min(windowWidth, 520);
-  const pageHeight = Math.round(pageWidth * 1.25); // 4:5
+  const pageHeight = Math.max(160, Math.min(pageWidth, maxHeight)); // near-square, capped
   const [index, setIndex] = useState(0);
   const [fullScreen, setFullScreen] = useState(false);
   const images = imageUris.length > 0 ? imageUris : [''];
 
   if (images.length === 1) {
     return (
-      <View style={[ss.carouselWrap, { height: pageWidth }]}>
+      <View style={[ss.carouselWrap, { height: pageHeight }]}>
         {images[0] ? (
           <CachedImage source={{ uri: images[0] }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
@@ -1317,11 +1696,6 @@ function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
               colors={['transparent', 'rgba(0,0,0,0.45)']}
               style={ss.carouselBottomGradient}
             />
-          )}
-          {images.length > 1 && (
-            <View style={ss.carouselCounter} pointerEvents="none">
-              <Text style={ss.carouselCounterText}>{index + 1}/{images.length}</Text>
-            </View>
           )}
           {images.length > 1 && (
             <View style={ss.dotsRow} pointerEvents="none">
@@ -1440,6 +1814,10 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     maxHeight: '85%',
     overflow: 'hidden',
   },
+  // LIST step (item: two-step list → detail rebuild) — a half-height sheet,
+  // per the TikTok Shop / eBay Item-lineup reference: a compact product
+  // picker, not a nearly-full-screen surface.
+  sheetHalf: { maxHeight: '55%' },
   handle: {
     width: 36,
     height: 5,
@@ -1456,6 +1834,15 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.cardElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   eyebrow: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
@@ -1471,41 +1858,56 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     justifyContent: 'center',
   },
 
-  // Tagged-products list — roomy cards, one per tagged product, never overlapping.
-  tagListWrap: { paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: theme.borderSubtle, marginBottom: 4 },
-  tagListLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: theme.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    paddingHorizontal: 16,
-    marginBottom: 10,
-  },
-  tagRow: {
-    paddingHorizontal: 16,
-    gap: 10,
-    flexDirection: 'row',
-  },
-  tagCard: {
-    width: 112,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.card,
-    padding: 8,
-    gap: 4,
-  },
-  tagCardImageWrap: { width: '100%', aspectRatio: 1, borderRadius: 10, overflow: 'hidden', backgroundColor: theme.cardElevated },
-  tagCardImage: { width: '100%', height: '100%' },
-  tagCardName: {
-    fontSize: FS.xs,
+  // LIST step — vertical rows, one per tagged product (TikTok Shop /
+  // eBay "Item lineup" reference — see the ProductListRow module comment).
+  listTitle: {
+    fontSize: FS.base,
     fontFamily: FONT.semibold,
     color: theme.text,
-    lineHeight: 15,
-    minHeight: 30,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
-  tagCardPrice: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.muted },
+  listContent: { paddingBottom: 12 },
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.borderSubtle,
+  },
+  // The row's own nav (thumbnail, name, price, seller, sold count) — a
+  // TouchableOpacity, but a SIBLING of listRowCartBtn below, not their
+  // shared parent (that's the plain View `listRow` is applied to at the
+  // call site) — see the no-nested-pressables comment in ProductListRow.
+  listRowBody: { flex: 1, flexDirection: 'row', gap: 12 },
+  listRowThumbWrap: { width: 72, height: 96, borderRadius: 10, overflow: 'hidden', backgroundColor: theme.cardElevated, flexShrink: 0 },
+  listRowThumb: { width: '100%', height: '100%' },
+  listRowThumbSkeleton: { alignItems: 'center', justifyContent: 'center' },
+  listRowInfo: { flex: 1, gap: 3, justifyContent: 'center' },
+  listRowName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, lineHeight: 18 },
+  listRowPrice: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text },
+  listRowSellerRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  listRowSellerText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  listRowSoldText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle },
+  // Compact, row-scoped cart button — icon-only circle, monochrome outline
+  // by default, inverted (solid text-color fill) only for the momentary
+  // "Added" confirmation, matching the same allowance the old tag-card
+  // button used.
+  listRowCartBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.cardElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  listRowCartBtnAdded: { backgroundColor: theme.text, borderColor: theme.text },
+  listRowCartBtnDisabled: { opacity: 0.5 },
 
   // Loading / error
   centerBox: {
@@ -1563,15 +1965,13 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     backgroundColor: theme.cardElevated,
   },
   carouselWrap: { width: '100%', backgroundColor: theme.cardElevated, overflow: 'hidden' },
-  // Subtle bottom fade so the "1/3" pill and page dots stay readable over a
-  // bright photo — a plain scrim, never a full-image dim.
+  // Subtle bottom fade so the page dots stay readable over a bright photo —
+  // a plain scrim, never a full-image dim. No numeric "1/N" pill in the
+  // sheet's own carousel any more (item 3, dots only); the full-screen
+  // viewer below still shows one (`fullScreenCounter`), reusing this same
+  // text style.
   carouselBottomGradient: {
     position: 'absolute', left: 0, right: 0, bottom: 0, height: 72,
-  },
-  carouselCounter: {
-    position: 'absolute', right: 10, bottom: 10,
-    paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.pill,
-    backgroundColor: 'rgba(0,0,0,0.62)',
   },
   carouselCounterText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11 },
   dotsRow: {
@@ -1615,6 +2015,38 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     textDecorationLine: 'line-through',
   },
   sellerName: { fontSize: 13, fontFamily: FONT.regular, color: theme.muted },
+  // "View details" affordance under the title/price row (item 4) — small,
+  // explicit text + chevron instead of a bare trailing icon.
+  viewDetailInline: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  viewDetailInlineText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
+
+  // Seller row (item 5) — avatar, name + verified check, whole row taps to
+  // the seller's store. Same card-row shape as buyer-product-detail.tsx's
+  // own seller card, kept consistent rather than inventing a new layout.
+  sellerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingVertical: 8,
+  },
+  sellerRowNameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  sellerRowName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
+  sellerRowVerified: { marginTop: 1 },
+  sellerViewStore: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  sellerViewStoreText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
+
+  // Grey shipping + returns info line (item 7), directly under the size chips.
+  infoLine: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginHorizontal: 16,
+    marginBottom: 14,
+  },
+  infoLineText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, lineHeight: 16 },
+
   descriptionSection: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -1677,16 +2109,6 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     color: theme.error,
     flex: 1,
   },
-  // Same message, rendered inside the sticky action bar (always on screen)
-  // instead of the scrollable content — see rejectMissingVariant.
-  stickyVariantError: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-
   // Status banner
   statusBanner: {
     flexDirection: 'row',

@@ -16,7 +16,7 @@
  * EngagementButton-driven icon here (like/repost/save/follow).
  */
 import React from 'react';
-import { Animated, Image, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { Animated, Image, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EngagementButton } from '@/components/EngagementButton';
@@ -26,6 +26,7 @@ import { FONT, FS, GOLD, ON_DARK } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
+import { useLiveStreamForHost } from '@/lib/live/useLiveDirectory';
 
 export interface RailEngagement {
   liked?: boolean;
@@ -79,6 +80,16 @@ export function RightActionRail({
    *  gate the rest of the feed's motion pass respects. */
   reduceMotion?: boolean;
 }) {
+  // Bug fix (urgent rail-fixes pass): when this creator is currently live,
+  // the small "LIVE" pill from LiveHostRing/LiveAvatarRing (PR #288) sits
+  // anchored at the ring's bottom edge — the same spot the follow "+"
+  // badge below used to occupy, so the two collided/stacked when a live
+  // creator wasn't yet followed. IG's own avatar treatment doesn't show a
+  // competing follow badge over a live ring, so the "+" badge is simply
+  // suppressed for the duration this creator is live — the LIVE pill's own
+  // position/styling (from #288) is untouched, and the badge reappears in
+  // its normal spot the moment the stream ends.
+  const isLive = !!useLiveStreamForHost(hostId);
   const [badgeVisible, setBadgeVisible] = React.useState(!engagement?.following);
   const [showCheck, setShowCheck] = React.useState(!!engagement?.following);
   const wasFollowing = React.useRef(!!engagement?.following);
@@ -132,8 +143,22 @@ export function RightActionRail({
           {/* ringGap 1.5 (was the component's own default, 3) — that
               default was the "dark gap between the photo and the ring"
               the owner flagged; the ring now hugs the avatar with only a
-              1.5pt gap, plus ringWidth 2. */}
-          <LiveHostRing hostId={hostId} size={38} showTag={!!engagement?.following} ringGap={1.5} ringWidth={2}>
+              1.5pt gap, plus ringWidth 2.
+
+              showTag intentionally left at its default (true): the red
+              ring only ever renders when this host is genuinely live
+              (LiveHostRing checks the live directory itself), so the
+              "LIVE" tag must always accompany it. This previously read
+              `showTag={!!engagement?.following}`, which tied the tag to
+              whether the viewer follows the creator — wiring left over
+              from the follow badge above and unrelated to live status.
+              That produced a real, undiagnosed bug: a genuinely-live
+              creator the viewer doesn't follow got the red ring with no
+              LIVE tag, which reads as an unexplained red ring on a
+              non-live post. Every other LiveHostRing/LiveAvatarRing call
+              site in the app (profile, inbox row, story tray) already
+              uses the default. */}
+          <LiveHostRing hostId={hostId} size={38} ringGap={1.5} ringWidth={2}>
             {avatarUri ? (
               <Image source={{ uri: avatarUri }} style={styles.avatar} />
             ) : (
@@ -143,7 +168,7 @@ export function RightActionRail({
             )}
           </LiveHostRing>
         </TouchableOpacity>
-        {badgeVisible && (
+        {badgeVisible && !isLive && (
           // Plain TouchableOpacity, not EngagementButton — EngagementButton
           // applies the `style` prop passed to it to its *inner* content
           // view, not the outer touchable wrapper, so a positioning style
@@ -263,7 +288,6 @@ export function RightActionRail({
         style={styles.actionContent}
         translateYAnim={saveDrop}
         scaleAnim={saveScale}
-        iconFillTransition
         onPress={async () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); await onSave(); }}
         hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
         testID={`save-btn-${testIdBase}`}
@@ -339,17 +363,39 @@ const styles = StyleSheet.create({
   // below) read as one consistent row instead of some counts looking
   // brighter than others depending on how much of the legibility scrim
   // happens to fall behind that particular icon.
-  count: {
-    fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
-  // Stronger drop shadow (was 0.5/radius 2) applied to the rail's two plain
-  // icons (comment, share — the EngagementButton-driven icons get the
-  // matching `iconShadow` style inside EngagementButton.tsx itself), tuned
-  // against a bright/high-key clip (e.g. Maison Vela's silver dress) where
-  // the previous, lighter shadow washed out to nearly nothing. (PR #122,
-  // strengthened for feed legibility round.)
-  iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
-  },
+  //
+  // TikTok two-layer shadow pass (still-washed-out round — see this same
+  // block's comment in EngagementButton.tsx's `count`/`iconShadow` for the
+  // full reasoning): web gets a tight-plus-wide stacked `textShadow`, native
+  // keeps the single strongest shadow RN's Text props can express. Kept in
+  // sync with EngagementButton.tsx's matching styles, per that file's own
+  // convention.
+  count: Platform.select({
+    web: {
+      fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
+      textShadow: '0px 1px 1px rgba(0,0,0,0.9), 0px 1px 6px rgba(0,0,0,0.55)',
+    } as object,
+    default: {
+      fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, color: ON_DARK, ...TABULAR_NUMS,
+      textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
+    },
+  }),
+  // Stronger drop shadow (was 0.5/radius 2, then 0.45/radius 4, then
+  // 0.7/radius 6) applied to the rail's two plain icons (comment, share —
+  // the EngagementButton-driven icons get the matching `iconShadow` style
+  // inside EngagementButton.tsx itself, kept identical to this one), tuned
+  // against a bright/high-key clip (Atelier Noire's runway floor, live
+  // Replit preview at 390x844) where the previous shadow still washed out
+  // for thinner-stroke glyphs (repost/save/share) even though it read fine
+  // on bold ones (heart, comment). (PR #122, strengthened for feed
+  // legibility round, strengthened again in the urgent rail-fixes pass
+  // (#324), strengthened again here with a real two-layer shadow on web.)
+  iconShadow: Platform.select({
+    web: {
+      textShadow: '0px 1px 2px rgba(0,0,0,0.9), 0px 2px 10px rgba(0,0,0,0.6)',
+    } as object,
+    default: {
+      textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8,
+    },
+  }),
 });

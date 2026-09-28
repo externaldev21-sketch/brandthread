@@ -17,7 +17,12 @@
  * resurrects a row that's about to be deleted for good.
  */
 
-const DELETE_GRACE_MS = 4000;
+// Exported so callers that show their own "Undo" toast (inbox.tsx,
+// buyer-conversation.tsx) can size that toast's own visible window to match
+// exactly — the toast's `durationMs` outliving this grace period would let
+// someone tap "Undo" after the real delete already committed, silently
+// doing nothing (see the message-requests verification pass, item 75).
+export const DELETE_GRACE_MS = 4000;
 
 type Timer = ReturnType<typeof setTimeout>;
 

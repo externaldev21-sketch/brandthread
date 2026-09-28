@@ -388,6 +388,29 @@ describe('buyer conversation chat redesign', () => {
     expect(socialServiceMock.addReaction).not.toHaveBeenCalled();
   });
 
+  // Regression for item 75 (message-requests verification): request mode
+  // hides the composer and disables swipe-to-reply (SwipeToReplyBubble's own
+  // `disabled={isRequestMode}`), but double-tap-to-like and the long-press
+  // reaction overlay both routed into handleReact() unguarded, so either one
+  // still fired a real POST /reactions call against a not-yet-accepted
+  // request — engagement the request-mode UI is otherwise built to fully
+  // hide until Accept.
+  it('does not react to a message while the request is still pending', async () => {
+    socialServiceMock.getConversation.mockResolvedValue(conversationFixture({ isRequest: true }));
+    renderer = await renderScreen();
+    const bubble = renderer.root.findByProps({ testID: 'conversation-bubble-msg-1' });
+
+    expect(bubble.props.onLongPress).toBeUndefined();
+
+    await act(async () => {
+      bubble.props.onPress({ nativeEvent: { pageX: 100, pageY: 200 } });
+      bubble.props.onPress({ nativeEvent: { pageX: 100, pageY: 200 } });
+      await flushPromises();
+    });
+
+    expect(socialServiceMock.addReaction).not.toHaveBeenCalled();
+  });
+
   it('long-press opens the reaction bar and selecting a reaction calls the API', async () => {
     renderer = await renderScreen();
     const bubble = renderer.root.findByProps({ testID: 'conversation-bubble-msg-1' });

@@ -15,8 +15,10 @@
  *            lululemon (order complete / confirmation screens).
  *
  * Grouped Glass cards, monochrome, Inter, the shared Button. The sticky
- * footer holds only "Place order · $total" (+ what's missing, + the terms
- * line) — the price breakdown itself appears exactly once, in the scroll.
+ * footer holds "Place order · $total" (+ what's missing, + the terms line)
+ * and, since item 110, the price breakdown itself: folded into a "Total $X ⌃"
+ * row that expands the full breakdown above the button (Shop / Vestiaire
+ * pattern). It still appears exactly once.
  *
  * Logic is unchanged from the previous screen: session load/restore, saved
  * addresses, server cart validation, the per-seller Stripe-hosted Checkout
@@ -34,12 +36,16 @@ import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
+import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@clerk/expo';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
+import { ThreadCashCard } from '@/components/checkout/ThreadCashCard';
+import { useCheckoutThreadCash } from '@/hooks/useCheckoutThreadCash';
+import { threadCashCeilingCents, withThreadCashRedemption } from '@/lib/threadCashCheckout';
+import { isPreviewCheckoutGroup, placePreviewOrder, withPreviewCheckoutDetails } from '@/lib/previewCheckout';
 import {
   applyDiscount, createCheckoutSession,
   getCart, getCheckoutSession, removeCartItems, removeDiscount, saveCheckoutProgress, validateCart,
@@ -130,6 +136,11 @@ export default function BuyerCheckoutScreen() {
   const [error, setError] = useState<CheckoutError | null>(null);
   const [canRetryPayment, setCanRetryPayment] = useState(false);
   const [footerHeight, setFooterHeight] = useState(180);
+  // Item 110: the footer's price breakdown, folded by default. Scrolling the
+  // page away (more than a nudge) folds it again.
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const breakdownOpenedAtY = useRef(0);
+  const scrollY = useRef(0);
   const scrollRef = useRef<ScrollView>(null);
   /**
    * Fully verified orders — each entry has a real server `id` (used for navigation/API)
@@ -168,8 +179,15 @@ export default function BuyerCheckoutScreen() {
       // The generic terms checkbox is now the plain line under Place order —
       // drop it from sessions saved before that change (pre-order acks stay).
       next.acknowledgments = withoutImplicitTermsAck(next.acknowledgments ?? []);
-      const restoredContact: Partial<CheckoutContact> = next.contact ?? { orderUpdates: 'email', marketingConsent: false };
-      const restoredAddress: CheckoutAddressDraft = next.shippingAddress ?? { country: 'US', saveAddress: true };
+      let restoredContact: Partial<CheckoutContact> = next.contact ?? { orderUpdates: 'email', marketingConsent: false };
+      let restoredAddress: CheckoutAddressDraft = next.shippingAddress ?? { country: 'US', saveAddress: true };
+      // Dev-web preview only: an all-preview order gets the preview buyer's
+      // demo contact and address, so Place order is one tap on the live
+      // preview. isPreviewCheckoutGroup is false for any real product or
+      // seller and in production builds, so real checkouts are unchanged.
+      if (next.deliveryGroups.length > 0 && next.deliveryGroups.every(isPreviewCheckoutGroup)) {
+        ({ contact: restoredContact, address: restoredAddress } = withPreviewCheckoutDetails(restoredContact, restoredAddress));
+      }
       const firstIncomplete = getFirstIncompleteCheckoutSection(restoredContact, restoredAddress, next);
       if (next.step !== 'confirmation') next.step = firstIncomplete;
 
@@ -272,14 +290,46 @@ export default function BuyerCheckoutScreen() {
 
   const persist = async (next: CheckoutSession) => {
     const snapshot = mergeCheckoutFormState(next, contact, address);
+    sessionRef.current = snapshot;
     setSession(snapshot);
     await saveCheckoutProgress(snapshot);
   };
 
   const current = session as CheckoutSession;
 
+  // Dev-web preview only (lib/previewCheckout.ts): every group is seeded
+  // preview products, so there is no server cart or Stripe to talk to.
+  const previewOnly = !!current?.deliveryGroups?.length && current.deliveryGroups.every(isPreviewCheckoutGroup);
+
+  // ── Thread Cash (item 109) ──────────────────────────────────────────────
+  // Single-seller, signed-in orders only (a token discounts one Stripe
+  // session), behind the OFF-by-default 'threadCashCheckoutDiscount' flag.
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const threadCashEligible = !!session && !!isSignedIn && threadCashCheckoutEnabled
+    && session.deliveryGroups.length === 1 && session.step !== 'confirmation'
+    // Preview orders never reach the server, so there's no wallet to use.
+    && !previewOnly;
+  const liveTotals = session ? getCheckoutDisplayTotals(session) : null;
+  const threadCash = useCheckoutThreadCash({
+    enabled: threadCashEligible,
+    redemption: session?.threadCashRedemption ?? null,
+    ceilingCents: session && liveTotals
+      ? threadCashCeilingCents({
+          subtotalCents: liveTotals.subtotalCents,
+          shippingCents: liveTotals.shippingCents,
+          promoCents: liveTotals.promoCents,
+          loyaltyCents: session.loyaltyRedemption?.discountCents ?? 0,
+        })
+      : 0,
+    onChange: async (redemption) => {
+      if (!sessionRef.current) return;
+      await persist(withThreadCashRedemption(sessionRef.current, redemption, `ck_${randomUUID()}`));
+    },
+  });
+
   const validateServerCart = async () => {
-    if (!isSignedIn) return true;
+    if (!isSignedIn || previewOnly) return true;
     try {
       const result = await validateCart(
         current.deliveryGroups.flatMap(g => g.items),
@@ -334,6 +384,30 @@ export default function BuyerCheckoutScreen() {
         // Skip groups already verified in a previous payment attempt this session.
         if (paidRef.current.has(group.sellerId)) continue;
 
+        // Dev-web preview only: seeded preview products "pay" locally with no
+        // charge and no Stripe (lib/previewCheckout.ts). Never true for a real
+        // product/seller or in a production build.
+        if (isPreviewCheckoutGroup(group)) {
+          const method = group.availableMethods.find(m => m.id === group.selectedMethodId);
+          const previewPaid = placePreviewOrder({
+            group,
+            shippingCents: method?.priceCents ?? 0,
+            contact,
+            address,
+          });
+          const vo: VerifiedOrder = { id: previewPaid.orderId, number: previewPaid.orderNumber, sellerId: group.sellerId };
+          confirmed.push(vo);
+          paidRef.current.set(group.sellerId, vo.id);
+          paidGroups[group.sellerId] = {
+            stripeSessionId: `preview_${previewPaid.orderId}`,
+            orderId: vo.id,
+            orderNumber: vo.number,
+            amountTotalCents: previewPaid.amountTotal,
+          };
+          await persist({ ...current, paidGroups });
+          continue;
+        }
+
         let result: any;
         if (isSignedIn) {
           result = await api.buyer.checkout.createSession(
@@ -355,11 +429,9 @@ export default function BuyerCheckoutScreen() {
               ...(current.loyaltyRedemption && current.deliveryGroups.length === 1
                 ? { loyaltyToken: current.loyaltyRedemption.token }
                 : {}),
-              // THREAD CASH HOOK POINT: server currently rejects this token
-              // outright (see routes/buyer.ts) until checkout can fund the
-              // discount without changing seller payout — see
-              // docs/payments/thread-cash-checkout-todo.md. Wired here so the
-              // rest of the flow needs no changes once that lands.
+              // Thread Cash (item 109): the server reserves this token after
+              // the promo code, charges the card the rest, and tops the seller
+              // up by the Thread Cash amount (lib/threadCash/checkoutTopup.ts).
               ...(current.threadCashRedemption && current.deliveryGroups.length === 1
                 ? { threadCashToken: current.threadCashRedemption.token }
                 : {}),
@@ -589,7 +661,7 @@ export default function BuyerCheckoutScreen() {
   const isConfirmation = current.step === 'confirmation';
   const totals = getCheckoutDisplayTotals(current);
   const itemCount = current.deliveryGroups.reduce((sum, group) => sum + group.items.reduce((n, item) => n + item.quantity, 0), 0);
-  const ready = getCheckoutBlockingSection(contact, address, current) === null;
+  const ready = getCheckoutBlockingSection(contact, address, current) === null && !(threadCashEligible && threadCash.busy);
   const nextStep = getCheckoutNextStepHint(contact, address, current);
   const multiSeller = current.deliveryGroups.length > 1;
   const preorderAcks = current.acknowledgments;
@@ -634,6 +706,11 @@ export default function BuyerCheckoutScreen() {
         bounces={false}
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={32}
+        onScroll={event => {
+          scrollY.current = event.nativeEvent.contentOffset.y;
+          if (breakdownOpen && Math.abs(scrollY.current - breakdownOpenedAtY.current) > 24) setBreakdownOpen(false);
+        }}
         testID="checkout-scroll"
       >
         {error ? (
@@ -683,6 +760,15 @@ export default function BuyerCheckoutScreen() {
           savedCards={isSignedIn ? savedCards : []}
           sellerCount={current.deliveryGroups.length}
         />
+        {previewOnly ? (
+          // Dev-web preview only: said plainly, since no Stripe page opens.
+          <View style={styles.previewNote} testID="checkout-preview-note">
+            <Feather name="info" size={13} color={theme.muted} />
+            <Text style={[styles.previewNoteText, { color: theme.muted }]}>
+              Preview order: placing it won’t charge a card or reach Stripe.
+            </Text>
+          </View>
+        ) : null}
 
         <PromoCodeCard
           discounts={current.discounts}
@@ -690,33 +776,24 @@ export default function BuyerCheckoutScreen() {
           onApply={async (code): Promise<CheckoutDiscount> => {
             const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts);
             // Only a server-validated code is kept (the server takes one code per order).
-            if (discount.isValid) await persist({ ...current, discounts: [discount] });
+            // A new code is a new order total: start a new payment attempt so a
+            // payment opened earlier (with the old total) isn't reused.
+            if (discount.isValid) await persist({ ...current, discounts: [discount], idempotencyKey: `ck_${randomUUID()}` });
             return discount;
           }}
           onRemove={code =>
             void removeDiscount(code, current.discounts).then(discounts =>
-              persist({ ...current, discounts }),
+              persist({ ...current, discounts, idempotencyKey: `ck_${randomUUID()}` }),
             )
           }
         />
 
-        {/* THREAD CASH HOOK POINT: same self-contained card cart.tsx uses,
-            gated behind the same OFF-by-default 'threadCashCheckoutDiscount'
-            flag. See components/thread-cash/UseThreadCashCard.tsx and
-            docs/payments/thread-cash-checkout-todo.md — no checkout money
-            logic is touched here. Hidden while the flag is off (like the
-            cart does) — a disabled "Coming soon" toggle was a dead control
-            on the one screen where every row must do something. */}
-        {isSignedIn && !multiSeller && threadCashCheckoutEnabled && (
-          <View style={{ marginBottom: SP.sm + 4 }}>
-            <UseThreadCashCard
-              maxDiscountCents={Math.max(0, current.summary.subtotalCents + current.summary.shippingTotalCents - 1)}
-              redemption={current.threadCashRedemption ?? null}
-              onApply={(redemption) => void persist({ ...current, threadCashRedemption: redemption })}
-              onRemove={() => void persist({ ...current, threadCashRedemption: undefined })}
-            />
-          </View>
-        )}
+        {/* Thread Cash (item 109): one on/off row after the promo code. It
+            stacks after the code and follows the total live (see
+            hooks/useCheckoutThreadCash.ts). Hidden while the
+            'threadCashCheckoutDiscount' flag is off, for guests, and for
+            multi-seller orders. */}
+        {threadCashEligible && <ThreadCashCard state={threadCash} />}
 
         {/* Pre-order disclosures stay explicit, required checkboxes. */}
         {preorderAcks.length > 0 && (
@@ -748,8 +825,6 @@ export default function BuyerCheckoutScreen() {
           </CheckoutCard>
         )}
 
-        <PriceBreakdownCard totals={totals} itemCount={itemCount} />
-
         {/* Purchase protection trust row — the app's existing copy (Terms-sourced). */}
         <BuyerProtectionNote
           flat
@@ -768,6 +843,19 @@ export default function BuyerCheckoutScreen() {
               <Text style={[styles.hint, { color: theme.muted }]}>{nextStep}</Text>
             </View>
           ) : null}
+          {/* Item 110: Total ⌃ expands the breakdown above it. A separate
+              control from Place order (siblings, never nested). */}
+          <PriceBreakdownCard
+            totals={totals}
+            itemCount={itemCount}
+            collapsible={{
+              expanded: breakdownOpen,
+              onToggle: () => {
+                breakdownOpenedAtY.current = scrollY.current;
+                setBreakdownOpen(open => !open);
+              },
+            }}
+          />
           <Button
             label={ctaLabel}
             icon="lock"
@@ -790,6 +878,8 @@ export default function BuyerCheckoutScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  previewNote: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -SP.xs, marginBottom: SP.sm + 4, paddingHorizontal: 2 },
+  previewNoteText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.meta + 1, lineHeight: 17 },
   root: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center',

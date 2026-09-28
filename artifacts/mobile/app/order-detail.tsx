@@ -23,6 +23,9 @@ import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } 
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { getInitials } from '@/lib/format';
+import { sellerThreadCashPayout } from '@/lib/threadCashCheckout';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryClient';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -251,7 +254,9 @@ export function adaptApiOrder(raw: any): Order {
     fulfillment,
     payment: {
        subtotalCents,
-       discountTotalCents:      0,
+       // Promo + Thread Cash on the Stripe charge, so the breakdown adds up
+       // to the charged total (older rows without the field stay at 0).
+       discountTotalCents:      Math.max(0, raw.discountAmountCents ?? 0),
        shippingTotalCents:      shippingCents,
        taxTotalCents:           0,
        totalCents,
@@ -266,6 +271,7 @@ export function adaptApiOrder(raw: any): Order {
        platformFeeCents:        0,
       payoutStatus:            isRefundPending ? 'held' : uiStatus === 'refunded' ? 'paid' : 'pending',
     },
+    threadCashPayout: sellerThreadCashPayout(raw),
     shipments,
     trackingStatus: raw.trackingStatus ?? undefined,
     estimatedDelivery: raw.estimatedDelivery ?? undefined,
@@ -429,9 +435,15 @@ export default function OrderDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const queryClient = useQueryClient();
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Stale-while-revalidate: the seller Orders list (app/(tabs)/orders.tsx)
+  // seeds this same cache entry from data it already fetched, and warms it
+  // further on press-in. When it's there, paint it immediately instead of
+  // the spinner below — `load` still runs on focus and refreshes silently.
+  const cachedOrder = id ? queryClient.getQueryData<any>(queryKeys.order(id)) : undefined;
+  const [order, setOrder] = useState<Order | null>(() => (cachedOrder ? adaptApiOrder(cachedOrder) : null));
+  const [loading, setLoading] = useState(!cachedOrder);
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>((tab as Tab) || 'overview');
   // Item 108: this order's real return requests (GET /api/returns, seller).
@@ -466,7 +478,7 @@ export default function OrderDetailScreen() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const generationRef = useRef(0);
   const requestGenerationRef = useRef<number | null>(null);
-  const hasLoadedRef = useRef(false);
+  const hasLoadedRef = useRef(!!cachedOrder);
 
   const load = useCallback(async (generation: number) => {
     // Keep one request in flight per focus cycle. Without this guard, a slow
@@ -490,6 +502,7 @@ export default function OrderDetailScreen() {
       const raw = await api.orders.get(id);
       if (generationRef.current !== generation) return; // stale focus cycle
       setOrder(adaptApiOrder(raw));
+      queryClient.setQueryData(queryKeys.order(id), raw);
       setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
     } catch {
@@ -512,7 +525,7 @@ export default function OrderDetailScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [id, api]);
+  }, [id, api, queryClient]);
 
   // Poll every 15 s while focused so status updates surface quickly.
   // After 3 consecutive failures the interval clears to avoid hammering a
@@ -1227,10 +1240,12 @@ function PaymentTab({ order }: { order: Order }) {
   const p = order.payment;
   return (
     <View style={s.tabContent}>
+      {order.threadCashPayout ? <ThreadCashPayoutCard payout={order.threadCashPayout} /> : null}
+
       <SectionHeader title="Payment Breakdown" />
       <BrandthreadCard>
         <InfoRow label="Subtotal" value={usd(p.subtotalCents)} />
-        {p.discountTotalCents > 0 && <InfoRow label="Discounts" value={`-${usd(p.discountTotalCents)}`} valueColor={SUCCESS} />}
+        {p.discountTotalCents > 0 && <InfoRow label="Discounts" value={`-${usd(p.discountTotalCents)}`} />}
         <InfoRow label="Shipping" value={usd(p.shippingTotalCents)} />
         <InfoRow label="Tax" value={usd(p.taxTotalCents)} />
         <View style={s.divider} />
@@ -1295,6 +1310,35 @@ function PaymentTab({ order }: { order: Order }) {
           ))}
         </View>
       )}
+    </View>
+  );
+}
+
+/**
+ * Item 109: a Thread Cash order, from the seller's side. The buyer paid part
+ * with Thread Cash, which Brandthread pays to the seller separately, so
+ * the payout is what a card-only sale would have been. Monochrome, and
+ * every line adds up to "Your payout".
+ */
+function ThreadCashPayoutCard({ payout }: { payout: NonNullable<Order['threadCashPayout']> }) {
+  const { theme } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
+  return (
+    <View style={s.section} testID="order-thread-cash-payout">
+      <SectionHeader title="Your Payout" />
+      <BrandthreadCard>
+        {payout.lines.map(line => (
+          <View key={line.key}>
+            <InfoRow label={line.label} value={`${line.cents < 0 ? '-' : ''}${usd(Math.abs(line.cents))}`} />
+            {line.note ? <Text style={[s.payoutNote, { color: theme.muted }]}>{line.note}</Text> : null}
+          </View>
+        ))}
+        <View style={s.divider} />
+        <InfoRow label="Your payout" value={usd(payout.payoutCents)} bold />
+        <Text style={[s.payoutNote, { color: theme.muted }]}>
+          Same as if the buyer had paid everything by card. Thread Cash never comes out of your pay.
+        </Text>
+      </BrandthreadCard>
     </View>
   );
 }
@@ -1892,6 +1936,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Payment
   divider:          { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
+  payoutNote:       { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: -2, marginBottom: SP.xs, lineHeight: 16 },
   heldFundsNotice:  { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', marginBottom: SP.md },
   heldFundsNoticeText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   heldFundsGrid:    { flexDirection: 'row', gap: SP.md, marginBottom: SP.md },

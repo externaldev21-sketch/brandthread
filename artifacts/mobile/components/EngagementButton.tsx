@@ -23,6 +23,7 @@ import {
   TouchableOpacity,
   Animated,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import Reanimated, {
@@ -424,14 +425,47 @@ const ebStyles = StyleSheet.create({
   // — see RightActionRail's own `count` style — so every unit in the rail
   // reads as one consistent row: 12pt semibold, pure white, identical
   // shadow, whether the count is under a bright or a dark patch of video.
-  count: {
-    fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
+  //
+  // TikTok-style legibility pass (still-washed-out round, live Replit
+  // preview at 390x844 over the Atelier Noire runway clip's bright floor):
+  // a single shadow, however strong, is a tradeoff between a soft wash that
+  // disappears on bright footage and a hard ring that reads as an outline
+  // on dark footage. TikTok's own treatment stacks two: a tight, dark
+  // shadow that hugs the glyph edge (definition on ANY background) plus a
+  // wider, softer one that reads as an ambient hold-down (the actual
+  // "legible on bright video" lift). RN's `Text` shadow props
+  // (textShadowColor/Offset/Radius) can only express one layer, so native
+  // keeps a single strengthened shadow (0.85/radius 6, up from
+  // 0.75/radius 4) — still comfortably more than #324's pass — while web
+  // gets the real two-layer stack via a raw CSS `textShadow` string.
+  // react-native-web forwards unrecognized style keys straight to the DOM
+  // node's CSS (see components/ui/Glass.tsx's `backdropFilter` for the
+  // same technique), so this reaches the browser untouched; RN's own
+  // `StyleSheet.create` types don't know the property, hence the cast.
+  count: Platform.select({
+    web: {
+      fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, textAlign: 'center',
+      textShadow: '0px 1px 1px rgba(0,0,0,0.9), 0px 1px 6px rgba(0,0,0,0.55)',
+    } as object,
+    default: {
+      fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, textAlign: 'center',
+      textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
+    },
+  }),
   // Matches RightActionRail's own `iconShadow` — see that file's comment
-  // for why this was strengthened (bright/high-key clip legibility).
-  iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
-  },
+  // for why this was strengthened again (bug-fix round: repost/save/share
+  // — the thinner-stroke FontAwesome glyphs, with far less filled ink area
+  // than heart/comment's bold shapes — were reading grey/washed-out
+  // against a bright, high-key clip even with the previous 0.7/radius-6
+  // shadow). See `count` above for the two-layer web / single-layer native
+  // split this now uses.
+  iconShadow: Platform.select({
+    web: {
+      textShadow: '0px 1px 2px rgba(0,0,0,0.9), 0px 2px 10px rgba(0,0,0,0.6)',
+    } as object,
+    default: {
+      textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8,
+    },
+  }),
 });
 

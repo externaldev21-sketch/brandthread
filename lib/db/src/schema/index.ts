@@ -191,6 +191,9 @@ export const products = pgTable('products', {
   // ── Size chart ────────────────────────────────────────────────────────────
   // { columns: string[], rows: [{size:string, values:string[]}], unit?:string, notes?:string }
   sizeChart:             json('size_chart').$type<Record<string, unknown> | null>(),
+  // A photo of the seller's own size chart — distinct from the structured
+  // table data above. Optional; shown to buyers as a "Size guide" link.
+  sizeChartImageUrl:     text('size_chart_image_url'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -831,6 +834,13 @@ export const conversationParticipants = pgTable('conversation_participants', {
   // (pinned vs not); it's a timestamp rather than a boolean so a future
   // "most-recently-pinned first" ordering has something to sort by for free.
   pinnedAt:       timestamp('pinned_at'),
+  // Real-time "X is typing…" (migration 102): set a few seconds into the
+  // future while THIS participant is actively composing in the conversation,
+  // cleared (null) on send/blur/timeout. Per-membership, like unreadCount/
+  // mutedUntil/pinnedAt above — every participant's own typing state is
+  // independent. Polled, same as agentTypingUntil on `conversations` (no
+  // websocket layer exists for DMs yet).
+  typingUntil:    timestamp('typing_until', { withTimezone: true }),
   joinedAt:       timestamp('joined_at').defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.conversationId, table.userId] }),
@@ -1012,6 +1022,10 @@ export const notificationsFeed = pgTable('notifications_feed', {
   // Thumbnail of the related post/product/order. Either an absolute URL or a
   // private `/objects/…` path that the feed route signs at read time.
   targetImageUrl: text('target_image_url'),
+  // The specific comment a post_comment / comment_reply / mention row is
+  // about (target_id is the post), so a tap lands on that comment
+  // (migration 101). Null for every other type and for older rows.
+  commentId:     text('comment_id'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   userCreatedIdx: index('notifications_feed_user_created_idx')

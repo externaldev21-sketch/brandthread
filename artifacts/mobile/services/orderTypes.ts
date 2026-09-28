@@ -419,6 +419,12 @@ export interface Order {
   lineItems: OrderLineItem[];
   fulfillment: Fulfillment;
   payment: PaymentSummary;
+  /**
+   * Item 109: how a Thread Cash order pays out to the seller (card +
+   * Brandthread's Thread Cash top-up − fees). Absent for orders without
+   * Thread Cash. See sellerThreadCashPayout in lib/threadCashCheckout.ts.
+   */
+  threadCashPayout?: { lines: Array<{ key: string; label: string; cents: number; note?: string }>; payoutCents: number } | null;
   heldFunds?: HeldFundsRecord;
   shipments: Shipment[];
   trackingStatus?: TrackingStatus;
@@ -467,13 +473,20 @@ export interface BuyerOrderView {
     imageUri?: string;
   }[];
   shippingAddress: OrderAddress;
-  payment: Pick<PaymentSummary, 'subtotalCents' | 'shippingTotalCents' | 'taxTotalCents' | 'totalCents'>;
+  payment: Pick<PaymentSummary, 'subtotalCents' | 'shippingTotalCents' | 'taxTotalCents' | 'totalCents'> & {
+    /** Item 109 (additive): promo/reward discount on the charge, not counting Thread Cash. */
+    discountCents?: number;
+    /** Item 109 (additive): Thread Cash that paid part of the order; totalCents is the card charge. */
+    threadCashCents?: number;
+  };
   trackingNumber?: string;
   trackingCarrier?: string;
   trackingStatus?: TrackingStatus;
   estimatedDelivery?: string;
   /** When the order was actually marked shipped (server timestamp), if known. */
   shippedAt?: string;
+  /** When payment was captured (orders.paid_at), if known — the "Confirmed" step. */
+  paidAt?: string;
   isPreOrder: boolean;
   preOrderEstShipDate?: string;
   hasReturnRequest: boolean;

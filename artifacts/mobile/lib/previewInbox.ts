@@ -135,16 +135,67 @@ function toConversation(seed: PreviewConversationSeed): Conversation {
 
 let cachedConversations: Conversation[] | null = null;
 
+// Conversations created at runtime (not part of the fixed seed list) — e.g.
+// replying to a story tray author (lib/previewStories.ts) who has no
+// pre-seeded thread of their own. Same lifetime/sharing model as
+// previewExtraMessages below: module-level, cleared on reload.
+const runtimeConversations = new Map<string, Conversation>();
+
 /** The full seeded preview inbox (Brandthread Agent pinned first, then 10
- *  ordinary threads) — sorted pinned-first, otherwise unchanged. Callers
- *  must still gate on `isPreviewInboxEnabled()` and prefer real API data. */
+ *  ordinary threads), plus any runtime ones from `upsertPreviewConversation`
+ *  — runtime threads first (most-recently-replied), matching how a real
+ *  inbox sorts by `updatedAt`. Callers must still gate on
+ *  `isPreviewInboxEnabled()` and prefer real API data. */
 export function getPreviewConversations(): Conversation[] {
   if (!cachedConversations) cachedConversations = allSeeds().map(toConversation);
-  return cachedConversations;
+  const runtime = [...runtimeConversations.values()].sort((a, b) => (b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0));
+  return [...runtime, ...cachedConversations];
 }
 
 export function getPreviewConversation(id: string): Conversation | null {
-  return getPreviewConversations().find(c => c.id === id) ?? null;
+  return runtimeConversations.get(id) ?? getPreviewConversations().find(c => c.id === id) ?? null;
+}
+
+/** Finds an existing preview conversation for `authorId` (seeded or
+ *  runtime), or creates a fresh runtime one for it — used by the story
+ *  viewer so replying to any tray author (not just the pre-seeded ones)
+ *  actually lands somewhere real in the preview inbox. */
+export function getOrCreatePreviewConversationForAuthor(author: {
+  authorId: string; authorName: string; authorHandle: string; authorInitials: string; authorColor: string; avatarUri?: string;
+}): Conversation {
+  const existing = getPreviewConversations().find(c => c.participants[0]?.userId === author.authorId);
+  if (existing) return existing;
+  const id = `${ID_PREFIX}story-${author.authorId}`;
+  const conv: Conversation = {
+    id,
+    type: 'buyer_to_seller',
+    participants: [{
+      userId: author.authorId,
+      name: author.authorName,
+      handle: author.authorHandle,
+      initials: author.authorInitials,
+      color: author.authorColor,
+      accountType: 'seller',
+      avatarUri: author.avatarUri,
+    }],
+    unreadCount: 0,
+    isFriendshipActive: true,
+    isArchived: false,
+    isRequest: false,
+    updatedAt: new Date().toISOString(),
+  };
+  runtimeConversations.set(id, conv);
+  return conv;
+}
+
+/** Bumps a runtime conversation's preview/timestamp after a new message —
+ *  mirrors what appendPreviewMessage's seeded-conversation counterpart gets
+ *  from the real backend for free. No-op for seeded conversations (their
+ *  preview is derived from `toConversation`, not mutated here). */
+export function touchPreviewConversation(conversationId: string, lastMessage: string, ts: number): void {
+  const conv = runtimeConversations.get(conversationId);
+  if (!conv) return;
+  runtimeConversations.set(conversationId, { ...conv, lastMessage, lastMessageTs: ts, lastMessageSenderId: 'me', updatedAt: new Date(ts).toISOString() });
 }
 
 /**
@@ -263,6 +314,23 @@ function toAttachment(seed: PreviewMessageSeed['attachment'], conv: PreviewConve
   // through). meta.duration is stamped from the real bundled clip's actual
   // length (VOICE_NOTE_DURATION_SEC) so the label and the live
   // audio-time-driven progress bar never disagree.
+  // Photo/video messages (item 74, upload progress ring): reuse the same
+  // bundled poster photos as the real thumbnail — for an image message this
+  // is genuinely what the attachment shows (photoUris drives the sent
+  // bubble's photo grid, see renderAttachment in app/buyer-conversation.tsx
+  // and renderMsgAttachment in app/seller-conversation.tsx). For a video
+  // message, the sent bubble already renders `uri` as the thumbnail image
+  // (not a real extracted video frame — see MediaUploadThumb.tsx's doc
+  // comment on that pre-existing gap), so a real bundled jpg poster here is
+  // honest and consistent with that existing contract.
+  if (seed.type === 'image' && typeof conv.posterIndex === 'number') {
+    const uri = posterUri(conv.posterIndex);
+    attachment.uri = uri;
+    attachment.meta = { ...attachment.meta, photoUris: JSON.stringify([uri]) };
+  }
+  if (seed.type === 'video' && typeof conv.posterIndex === 'number') {
+    attachment.uri = posterUri(conv.posterIndex);
+  }
   if (seed.type === 'voice') {
     attachment.uri = voiceNoteUri();
     attachment.meta = {
@@ -480,4 +548,37 @@ export function subscribePreviewTyping(cb: (typingConversationId: string | null)
     cb(on ? TYPING_CONVERSATION_ID : null);
   }, TYPING_INTERVAL_MS);
   return () => clearInterval(interval);
+}
+
+// ─── Auto-reply (preview-only, keeps a demo thread feeling live) ──────────
+//
+// A seeded preview conversation has no real counterpart to write back — the
+// person previewing the app is the only participant actually there. Without
+// this, sending a message in `?bt_preview=buyer`/`?bt_preview=seller` is a
+// one-way shout into an empty thread. This makes the OTHER (simulated) side
+// send back exactly one short, generic reply a beat after each message the
+// preview user sends — never fake commerce claims, never a loop of replies
+// replying to replies (only a user-originated send schedules one). Purely
+// cosmetic for the demo: it never touches real data, and both call sites
+// (app/buyer-conversation.tsx, app/seller-conversation.tsx) gate it behind
+// their existing isPreviewConversationId/isSellerPreviewConversationId check.
+const PREVIEW_AUTO_REPLY_TEXTS = [
+  'Got it, thanks!',
+  'Sounds good — thanks for letting me know.',
+  'Okay, noted. Thank you!',
+  'Thanks for the message — got it.',
+  'Appreciate you reaching out, thanks!',
+];
+
+/** One short, generic acknowledgement — randomized so a demo with several
+ *  sends doesn't repeat the exact same line back to back. */
+export function previewAutoReplyText(): string {
+  return PREVIEW_AUTO_REPLY_TEXTS[Math.floor(Math.random() * PREVIEW_AUTO_REPLY_TEXTS.length)];
+}
+
+/** How long to wait before the simulated reply lands — long enough to read
+ *  as a real person typing back, short enough that a demo doesn't stall. */
+export const PREVIEW_AUTO_REPLY_DELAY_MS = 1100;
+export function previewAutoReplyDelayMs(): number {
+  return PREVIEW_AUTO_REPLY_DELAY_MS + Math.random() * 900;
 }

@@ -1475,6 +1475,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>(`/api/conversations/${encodeURIComponent(id)}/messages`, body),
       markRead:   (id: string) =>
         patch<{ ok: boolean }>(`/api/conversations/${encodeURIComponent(id)}/read`, {}),
+      /** Real-time "X is typing…" (no websocket layer — the other side picks
+       *  this up on its own light poll of the conversation). Fire-and-forget
+       *  from the caller's side; see Conversation.otherTyping. */
+      setTyping:  (id: string, typing: boolean) =>
+        patch<{ ok: boolean }>(`/api/conversations/${encodeURIComponent(id)}/typing`, { typing }),
       /** Accept a message request — moves it from Requests to main inbox */
       accept:  (id: string) =>
         patch<any>(`/api/conversations/${encodeURIComponent(id)}/accept`, {}),
@@ -2104,7 +2109,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           authorId: string; authorName: string; authorHandle: string;
           authorInitials: string; authorColor: string; authorAccountType: string;
           avatarUrl: string | null;
-          isMe: boolean; storyIds: string[]; seen: boolean; latestCreatedAt: number;
+          isMe: boolean; storyIds: string[]; seen: boolean; closeFriendsOnly: boolean; latestCreatedAt: number;
         }>>('/api/social/stories/following'),
       // ── Notes (bubble above story-tray avatars) ────────────────────────────
       /** Post (or replace) my own active note — 60 chars max, 24h TTL. */
@@ -2737,6 +2742,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
       redeem: (body: { amountCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body),
+      /** Return an unused, unattached redemption's amount to the balance (idempotent). */
+      cancelRedemption: (token: string) =>
+        post<{ ok: boolean; returnedCents: number; balanceCents: number }>(`/api/thread-cash/redeem/${encodeURIComponent(token)}/cancel`, {}),
       send: (body: { recipientId: string; conversationId?: string; note?: string; amountCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; transferId: string }>('/api/thread-cash/send', body),
       claim: (body: { transferId: string }) =>

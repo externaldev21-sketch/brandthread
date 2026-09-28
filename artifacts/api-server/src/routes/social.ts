@@ -893,7 +893,7 @@ function buildStoryView(row: typeof stories.$inferSelect, likedByMe: boolean) {
       visibility:        row.privacyVisibility,
       replyPermission:   row.privacyReplyPerm,
       hiddenFromUserIds: [],
-      closeFriendsOnly:  false,
+      closeFriendsOnly:  row.privacyVisibility === "friends",
     },
     viewers:    [],          // viewer list omitted for listing; fetch separately if needed
     likesCount: row.likesCount,
@@ -1104,6 +1104,7 @@ router.get("/stories/following", async (req, res) => {
       isMe:              authorId === myId,
       storyIds:          authorStories.map((s) => s.id),
       seen:              authorStories.every((s) => viewedSet.has(s.id)),
+      closeFriendsOnly:  authorStories.some((s) => s.privacyVisibility === "friends"),
       latestCreatedAt:   new Date(latest.createdAt).getTime(),
     };
   });

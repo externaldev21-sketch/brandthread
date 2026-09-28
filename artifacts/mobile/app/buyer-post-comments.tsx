@@ -33,7 +33,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import {
   SURFACE, CARD, BORDER,
-  FG, MUTED, SUBTLE,
+  FG, MUTED, SUBTLE, SUBTLE_WASH,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { SHEET_EASING_BEZIER, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion';
@@ -48,7 +48,8 @@ import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXP
 import type { ThreadComment } from '@/lib/safetyTypes';
 import { hapticSelection, hapticLight, hapticSuccess, hapticError, hapticDestructiveConfirm } from '@/lib/haptics';
 import { bumpCommentCount } from '@/lib/commentCountBus';
-import { buildPreviewComments } from '@/lib/previewComments';
+import { buildPreviewComments, previewNotificationComments } from '@/lib/previewComments';
+import { getPreviewActivityForComment } from '@/lib/previewActivity';
 import { AppleEmoji, QUICK_REACTION_EMOJI } from '@/lib/appleEmoji';
 
 const MAX_COMMENT_LENGTH = 1000;
@@ -247,12 +248,15 @@ function LikeHeart({
 
 function CommentRow({
   comment,
+  highlighted = false,
   postAuthorId,
   onLike,
   onReply,
   onMore,
 }: {
   comment: Row;
+  /** The comment a notification deep-linked to — briefly tinted. */
+  highlighted?: boolean;
   postAuthorId: string;
   onLike: (comment: Row) => void;
   onReply: (comment: Row) => void;
@@ -265,7 +269,7 @@ function CommentRow({
   const isPending = comment.id.startsWith('tmp_');
 
   return (
-    <View style={[s.commentRow, comment.isReply && s.commentRowIndented, isPending && s.commentRowPending]}>
+    <View style={[s.commentRow, comment.isReply && s.commentRowIndented, isPending && s.commentRowPending, highlighted && s.commentRowHighlighted]} testID={highlighted ? 'comment-deep-link-highlight' : undefined}>
       <Avatar uri={comment.author.avatarUrl} initials={comment.author.initials} size={comment.isReply ? 26 : 32} />
 
       <View style={s.commentBody}>
@@ -626,7 +630,10 @@ export default function BuyerPostCommentsScreen() {
     postMediaColor1?: string;
     postMediaColor2?: string;
     postType?: string;
+    /** Deep link from an Activity row / push: open on this exact comment. */
+    commentId?: string;
   }>();
+  const targetCommentId = typeof params.commentId === 'string' ? params.commentId : '';
 
   const postId = params.postId ?? '';
   const isPreviewPost = postId.length > 0 && !UUID_RE.test(postId);
@@ -718,7 +725,22 @@ export default function BuyerPostCommentsScreen() {
       // session in previewCommentsCache) and a fully working composer that
       // appends locally, instead of the old locked, empty dead-end state.
       const cached = previewCommentsCache.get(postId);
-      const seeded = cached ?? flatten(buildPreviewComments(postId, params.postAuthorName || 'the creator'));
+      let seeded = cached ?? flatten(buildPreviewComments(postId, params.postAuthorName || 'the creator'));
+      // A seeded Activity row deep-linking to "its" comment: that comment
+      // has to exist here to be scrolled to — add it on top of the seed.
+      const note = targetCommentId && !seeded.some((c) => c.id === targetCommentId)
+        ? getPreviewActivityForComment(targetCommentId)
+        : undefined;
+      if (note && note.targetId === postId) {
+        seeded = [...flatten(previewNotificationComments({
+          commentId: targetCommentId,
+          postId,
+          type: note.type,
+          body: note.body,
+          actorName: note.actorName || 'Someone',
+          createdAt: note.createdAt,
+        }, myName)), ...seeded];
+      }
       if (!cached) previewCommentsCache.set(postId, seeded);
       setComments(seeded);
       setMeta({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, nextCursor: null });
@@ -747,7 +769,7 @@ export default function BuyerPostCommentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api, postId, params.postAuthorName]);
+  }, [api, postId, params.postAuthorName, targetCommentId, myName]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -968,6 +990,58 @@ export default function BuyerPostCommentsScreen() {
     });
   }, []);
 
+  // ── Deep link to one comment (?commentId=, from an Activity row / push) ──
+  // Instagram-style: open on that comment — its reply thread expanded if
+  // it's a reply, scrolled into view, briefly highlighted. Older pages load
+  // until it's found (bounded); a deleted/hidden comment just opens the
+  // sheet normally.
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const deepLinkDone = useRef(false);
+  const deepLinkPages = useRef(0);
+  useEffect(() => {
+    if (!targetCommentId || deepLinkDone.current || loading) return;
+    const target = comments.find((c) => c.id === targetCommentId);
+    if (!target) {
+      if (meta.nextCursor && !loadingMore && deepLinkPages.current < 5) {
+        deepLinkPages.current += 1;
+        void loadMore();
+      } else if (!meta.nextCursor || deepLinkPages.current >= 5) {
+        deepLinkDone.current = true;
+      }
+      return;
+    }
+    deepLinkDone.current = true;
+    if (target.isReply && target.parentId) {
+      const rootId = target.parentId;
+      setExpandedRoots((prev) => (prev.has(rootId) ? prev : new Set(prev).add(rootId)));
+    }
+    setHighlightId(target.id);
+  }, [comments, loadMore, loading, loadingMore, meta.nextCursor, targetCommentId]);
+
+  const deepLinkScrolled = useRef(false);
+  useEffect(() => {
+    if (!highlightId || deepLinkScrolled.current) return;
+    const index = visibleRows.findIndex((row) => !isViewRepliesRow(row) && row.id === highlightId);
+    if (index < 0) return;
+    deepLinkScrolled.current = true;
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index, viewPosition: 0.3, animated: true });
+    });
+  }, [highlightId, visibleRows]);
+  useEffect(() => {
+    if (!highlightId) return;
+    const fade = setTimeout(() => setHighlightId(null), 2600);
+    return () => clearTimeout(fade);
+  }, [highlightId]);
+
+  const handleScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
+    // Rows below the fold aren't measured yet: jump near it, then settle.
+    listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+    setTimeout(() => {
+      listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.3, animated: true });
+    }, 80);
+  }, []);
+
   const composerLocked = meta.commentsDisabled || !meta.canComment;
 
   return (
@@ -1048,6 +1122,8 @@ export default function BuyerPostCommentsScreen() {
             ref={listRef}
             data={loading ? [] : visibleRows}
             keyExtractor={row => (isViewRepliesRow(row) ? `view-replies-${row.rootId}` : row.id)}
+            extraData={highlightId}
+            onScrollToIndexFailed={handleScrollToIndexFailed}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
@@ -1064,6 +1140,7 @@ export default function BuyerPostCommentsScreen() {
             ) : (
               <CommentRow
                 comment={item}
+                highlighted={item.id === highlightId}
                 postAuthorId={postAuthorId}
                 onLike={handleLike}
                 onReply={handleReply}
@@ -1307,13 +1384,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   commentRowIndented: { paddingLeft: SP.md + 48 },
   commentRowPending: { opacity: 0.6 },
+  // Deep-linked comment: a neutral light tint (monochrome), fades after ~2.6s.
+  commentRowHighlighted: { backgroundColor: 'rgba(255,255,255,0.08)' },
   commentBody: { flex: 1, minWidth: 0 },
   commentHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: 3 },
   authorName: { fontFamily: FONT.semibold, fontSize: 13, color: MUTED, flexShrink: 1 },
   creatorBadge: { fontFamily: FONT.semibold, fontSize: 13 },
   replyContext: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginBottom: 2 },
   commentTime: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 16, color: SUBTLE },
-  pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE, marginLeft: 2 },
+  pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE_WASH, marginLeft: 2 },
   commentText: { fontFamily: FONT.regular, fontSize: 15, color: FG, lineHeight: 19 },
   commentTextHeld: { color: MUTED },
   reviewPill: {
