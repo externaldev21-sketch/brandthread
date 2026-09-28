@@ -657,6 +657,7 @@ export default function SellerHomeCommerceDashboard({
                 onRangeChange={(next) => { setRange(next); setScrubIndex(null); }}
                 onScrub={setScrubIndex}
                 isEmpty={isEmptyChart}
+                formatValue={(v) => formatMetricValue(metric, v)}
               />
 
               {/* ── Stat tile grid ───────────────────────────────────────── */}
