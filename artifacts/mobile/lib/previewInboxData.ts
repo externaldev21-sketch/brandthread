@@ -146,6 +146,10 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantInitials: 'MV',
     participantColor: '#8B5CF6',
     posterIndex: 1,
+    // Seeded already-pinned (in addition to the always-pinned agent thread)
+    // so the preview inbox has more than one pinned row to screenshot the
+    // pinned-row treatment against — see item 66's PR.
+    isPinned: true,
     lastMessage: 'Thank you so much — enjoy the dress!',
     lastMessageFromMe: false,
     minutesAgo: 130,
@@ -205,6 +209,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantInitials: 'KL',
     participantColor: '#1F2933',
     posterIndex: 4,
+    isPinned: true,
     lastMessage: 'Order #BT-10234',
     lastMessageFromMe: true,
     lastMessageType: 'order',
