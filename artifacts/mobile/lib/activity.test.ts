@@ -296,27 +296,6 @@ describe('classification and routing', () => {
   });
 });
 
-describe('aggregateActivity — reposts and story likes', () => {
-  it('merges repeat reposts on the same post', () => {
-    const repost = (name: string) => item({
-      type: 'repost', title: `${name} reposted your post`, actorId: `u_${name}`,
-      actorName: name, targetId: 'post1', targetType: 'post',
-    });
-    const rows = aggregateActivity([repost('Jay'), repost('Mina')]);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].actorCount).toBe(2);
-  });
-
-  it('does not merge story likes on different stories', () => {
-    const storyLike = (storyId: string) => item({
-      type: 'story_like', title: 'Jay liked your story', actorId: 'u_jay',
-      actorName: 'Jay', targetId: storyId, targetType: 'story',
-    });
-    const rows = aggregateActivity([storyLike('s1'), storyLike('s2')]);
-    expect(rows).toHaveLength(2);
-  });
-});
-
 describe('filter chips', () => {
   const of = (type: string, category = 'social') => item({ type, category });
 
@@ -351,6 +330,27 @@ describe('filter chips', () => {
     const messages = ACTIVITY_CHIPS.map((c) => activityChipEmpty(c.key).message);
     expect(new Set(messages).size).toBe(ACTIVITY_CHIPS.length);
     expect(activityChipEmpty('thread_cash').message).toContain('Thread Cash');
+  });
+});
+
+describe('aggregateActivity — reposts and story likes', () => {
+  it('merges repeat reposts on the same post', () => {
+    const repost = (name: string) => item({
+      type: 'repost', title: `${name} reposted your post`, actorId: `u_${name}`,
+      actorName: name, targetId: 'post1', targetType: 'post',
+    });
+    const rows = aggregateActivity([repost('Jay'), repost('Mina')]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].actorCount).toBe(2);
+  });
+
+  it('does not merge story likes on different stories', () => {
+    const storyLike = (storyId: string) => item({
+      type: 'story_like', title: 'Jay liked your story', actorId: 'u_jay',
+      actorName: 'Jay', targetId: storyId, targetType: 'story',
+    });
+    const rows = aggregateActivity([storyLike('s1'), storyLike('s2')]);
+    expect(rows).toHaveLength(2);
   });
 });
 
