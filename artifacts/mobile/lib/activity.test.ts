@@ -14,6 +14,7 @@ import {
   applyRead,
   buildActivitySections,
   createReadTracker,
+  findActivityArrivals,
   groupByRecency,
   groupedPeopleHref,
   groupedPeopleTitle,
@@ -514,5 +515,26 @@ describe('grouped rows → people list', () => {
     expect(groupedPeopleTitle('post_comment')).toBe('Comments');
     expect(groupedPeopleTitle('repost')).toBe('Reposts');
     expect(groupedPeopleTitle('new_follower')).toBe('New followers');
+  });
+});
+
+describe('live arrivals', () => {
+  const t = (mins: number) => new Date(Date.UTC(2026, 8, 24, 15, mins)).toISOString();
+  const shown = [item({ id: 'a', createdAt: t(10) }), item({ id: 'b', createdAt: t(5) })];
+
+  it('finds rows newer than anything on screen', () => {
+    const next = [item({ id: 'c', createdAt: t(12) }), item({ id: 'd', createdAt: t(11) }), ...shown];
+    expect(findActivityArrivals(shown, next)).toEqual(['c', 'd']);
+  });
+
+  it('never animates the first load, a later page, or a row that comes back', () => {
+    expect(findActivityArrivals([], shown)).toEqual([]);
+    const older = item({ id: 'old', createdAt: t(1) });
+    expect(findActivityArrivals(shown, [...shown, older])).toEqual([]);
+  });
+
+  it('ignores rows that only changed (read state) or went away', () => {
+    expect(findActivityArrivals(shown, shown.map((row) => ({ ...row, isRead: !row.isRead })))).toEqual([]);
+    expect(findActivityArrivals(shown, [shown[0]])).toEqual([]);
   });
 });

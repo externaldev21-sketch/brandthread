@@ -55,6 +55,12 @@ import { showActionSheet } from '@/components/ui/ActionSheet';
 import SwipeableActions from '@/components/SwipeableActions';
 import { RemoveFollowerSheet } from '@/components/social/RemoveFollowerSheet';
 import { CenteredToast } from '@/components/social/CenteredToast';
+import { Glass } from '@/components/ui/Glass';
+import { LiveRowEnter } from '@/components/motion/LiveRowEnter';
+import { findActivityArrivals } from '@/lib/activity';
+import {
+  deliverPreviewLiveArrival, hasPendingPreviewLiveArrival, PREVIEW_LIVE_ARRIVAL_DELAY_MS,
+} from '@/lib/previewActivity';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
@@ -98,6 +104,8 @@ import {
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
 
+/** Within this many points of the top, live arrivals come straight in (item 84). */
+const LIVE_TOP_SLOP = 48;
 const EMPTY_ICON = 'activity' as const;
 const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
 const AVATAR_SIZE = 40;
@@ -595,6 +603,54 @@ export default function ActivityCenterScreen() {
   }), []);
   useEffect(() => () => tracker.dispose(), [tracker]);
 
+  // ── Live arrivals (item 84) ────────────────────────────────────────────────
+  // Rows that arrive while Activity is open (the ~1.5s realtime poll below,
+  // or a pull-to-refresh) slide in at the top instead of just appearing.
+  // Scrolled down the list, they're held back behind a "New activity" pill
+  // (LinkedIn's "See notifications you missed") so nothing shifts under the
+  // viewer's finger; the pill (or scrolling back up) brings them in.
+  const [entering, setEntering] = useState<ReadonlySet<string>>(() => new Set());
+  const [heldCount, setHeldCount] = useState(0);
+  const heldRef = useRef<ActivityItem[] | null>(null);
+  const scrollYRef = useRef(0);
+  const showPage = useCallback((next: ActivityItem[], arrivals: readonly string[]) => {
+    heldRef.current = null;
+    setHeldCount(0);
+    if (arrivals.length > 0) setEntering((prev) => new Set([...prev, ...arrivals]));
+    setItems(next);
+    setSessionNew(new Set(next.filter((item) => !item.isRead).map((item) => item.id)));
+  }, []);
+  /** Puts a freshly loaded first page on screen, animating whatever is new in it. */
+  const applyPage = useCallback((next: ActivityItem[], mode: 'initial' | 'refresh' | 'focus') => {
+    const arrivals = mode === 'initial' ? [] : findActivityArrivals(itemsRef.current, next);
+    if (arrivals.length > 0 && scrollYRef.current > LIVE_TOP_SLOP) {
+      heldRef.current = next;
+      setHeldCount(arrivals.length);
+      return;
+    }
+    showPage(next, arrivals);
+  }, [showPage]);
+  const revealHeld = useCallback(() => {
+    const next = heldRef.current;
+    if (!next) return;
+    showPage(next, findActivityArrivals(itemsRef.current, next));
+  }, [showPage]);
+  const handleEntered = useCallback((row: ActivityRow) => {
+    setEntering((prev) => {
+      if (!row.ids.some((id) => prev.has(id))) return prev;
+      const next = new Set(prev);
+      for (const id of row.ids) next.delete(id);
+      return next;
+    });
+  }, []);
+  // An arrival filtered out by the current chip never renders to clear
+  // itself; don't let it animate later when the chip changes.
+  useEffect(() => {
+    if (entering.size === 0) return;
+    const timer = setTimeout(() => setEntering(new Set()), 2000);
+    return () => clearTimeout(timer);
+  }, [entering]);
+
   // Seeded suggestions, with anyone already followed this preview session
   // (lib/previewFollowStore) shown as "Following" instead of "Follow" again.
   const showPreviewSuggestions = useCallback(() => {
@@ -632,8 +688,7 @@ export default function ActivityCenterScreen() {
       // show the same rich seeded world every other preview screen uses
       // instead of an empty "Activity will show up here".
       const resolved = page.length === 0 && isPreviewActivityEnabled() ? applyPreviewFollowState(getPreviewActivity()) : page;
-      setItems(resolved);
-      setSessionNew(new Set(resolved.filter((item) => !item.isRead).map((item) => item.id)));
+      applyPage(resolved, mode);
       setHasMore(page.length === ACTIVITY_PAGE_SIZE);
       setNow(Date.now());
       setStatus('ready');
@@ -644,8 +699,7 @@ export default function ActivityCenterScreen() {
         // backend to reach at all, so a fetch failure here is expected.
         retriedRef.current = false;
         const seeded = applyPreviewFollowState(getPreviewActivity());
-        setItems(seeded);
-        setSessionNew(new Set(seeded.filter((item) => !item.isRead).map((item) => item.id)));
+        applyPage(seeded, mode);
         setHasMore(false);
         setNow(Date.now());
         setStatus('ready');
@@ -666,7 +720,19 @@ export default function ActivityCenterScreen() {
     } finally {
       if (id === requestId.current) setRefreshing(false);
     }
-  }, []);
+  }, [applyPage]);
+
+  // Preview only: the one simulated live event (lib/previewActivity), a few
+  // seconds after Activity is first on screen — so the slide-in can be seen
+  // in a preview that has no backend to send anything. It arrives through the
+  // same first-page refresh a real event takes.
+  useFocusEffect(useCallback(() => {
+    if (status !== 'ready' || !hasPendingPreviewLiveArrival()) return;
+    const timer = setTimeout(() => {
+      if (deliverPreviewLiveArrival()) void loadFirstPage('focus');
+    }, PREVIEW_LIVE_ARRIVAL_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [loadFirstPage, status]));
 
   // Runs on focus, and periodically while focused (no websocket/SSE layer —
   // see watchActivityRealtime's own comment).
@@ -982,19 +1048,50 @@ export default function ActivityCenterScreen() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const renderItem = useCallback(({ item: row }: { item: ActivityRow }) => (
-    <ActivityRowView
-      row={row}
-      unread={row.ids.some((id) => !readIds.has(id))}
-      now={now}
-      styles={styles}
-      followOverride={row.targetId ? followOverrides[row.targetId] : undefined}
-      followPending={!!row.targetId && followPending.has(row.targetId)}
-      onPress={handlePress}
-      onDismiss={handleDismiss}
-      onToggleFollow={handleToggleFollow}
-      onOpenMenu={handleOpenMenu}
-    />
-  ), [followOverrides, followPending, handleDismiss, handleToggleFollow, handleOpenMenu, handlePress, now, readIds, styles]);
+    <LiveRowEnter
+      animate={row.ids.some((id) => entering.has(id))}
+      onEntered={() => handleEntered(row)}
+      testID={`activity-live-enter-${row.key}`}
+    >
+      <ActivityRowView
+        row={row}
+        unread={row.ids.some((id) => !readIds.has(id))}
+        now={now}
+        styles={styles}
+        followOverride={row.targetId ? followOverrides[row.targetId] : undefined}
+        followPending={!!row.targetId && followPending.has(row.targetId)}
+        onPress={handlePress}
+        onDismiss={handleDismiss}
+        onToggleFollow={handleToggleFollow}
+        onOpenMenu={handleOpenMenu}
+      />
+    </LiveRowEnter>
+  ), [entering, followOverrides, followPending, handleDismiss, handleEntered, handleToggleFollow, handleOpenMenu, handlePress, now, readIds, styles]);
+
+  // Scroll position, for holding live arrivals while the viewer is down the
+  // list — and bringing them in once they're back at the top.
+  const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
+    const y = event.nativeEvent.contentOffset.y;
+    scrollYRef.current = y;
+    if (y <= LIVE_TOP_SLOP && heldRef.current) revealHeld();
+  }, [revealHeld]);
+
+  // Where the list starts (below the header + chips) — the pill sits just there.
+  const [listTop, setListTop] = useState(0);
+  const handleHeaderLayout = useCallback((event: { nativeEvent: { layout: { y: number; height: number } } }) => {
+    const { y, height } = event.nativeEvent.layout;
+    setListTop(y + height);
+  }, []);
+  const livePillTop = listTop + SP.sm;
+
+  const handleShowNewActivity = useCallback(() => {
+    const node = listRef.current as any;
+    const responder = node?.getScrollResponder?.();
+    if (responder?.scrollTo) responder.scrollTo({ x: 0, y: 0, animated: true });
+    else node?.scrollToLocation?.({ sectionIndex: 0, itemIndex: 0, viewOffset: 0, animated: true });
+    scrollYRef.current = 0;
+    revealHeld();
+  }, [listRef, revealHeld]);
 
   const renderSectionHeader = useCallback(({ section }: { section: ListSection }) => (
     <View style={styles.sectionHeader}>
@@ -1027,17 +1124,21 @@ export default function ActivityCenterScreen() {
 
   return (
     <View style={styles.container}>
-      <PageHeader
-        title="Activity"
-        showBack={false}
-        largeTitle
-        actions={hasUnread ? [{
-          icon: 'check-circle',
-          onPress: () => { void handleMarkAll(); },
-          accessibilityLabel: 'Mark all activity as read',
-        }] : []}
-        belowTitle={<ActivityFilterChips selected={chip} onSelect={setChip} styles={styles} />}
-      />
+      {/* Unstyled wrapper, only to measure where the list starts (the
+          "New activity" pill sits just below the header — item 84). */}
+      <View onLayout={handleHeaderLayout}>
+        <PageHeader
+          title="Activity"
+          showBack={false}
+          largeTitle
+          actions={hasUnread ? [{
+            icon: 'check-circle',
+            onPress: () => { void handleMarkAll(); },
+            accessibilityLabel: 'Mark all activity as read',
+          }] : []}
+          belowTitle={<ActivityFilterChips selected={chip} onSelect={setChip} styles={styles} />}
+        />
+      </View>
 
       {status === 'loading' ? (
         <SkeletonRows styles={styles} />
@@ -1063,6 +1164,8 @@ export default function ActivityCenterScreen() {
           viewabilityConfig={viewabilityConfig}
           onEndReached={() => { void loadMore(); }}
           onEndReachedThreshold={0.4}
+          onScroll={handleScroll}
+          scrollEventThrottle={32}
           refreshControl={(
             <ThemedRefreshControl
               refreshing={refreshing}
@@ -1091,6 +1194,26 @@ export default function ActivityCenterScreen() {
           windowSize={9}
         />
       )}
+
+      {/* Live arrivals held while scrolled down the list (item 84). Sits just
+          under the header, over the list; Glass is only the pill's backdrop,
+          so the pill itself is the one pressable. */}
+      {heldCount > 0 && status === 'ready' ? (
+        <View pointerEvents="box-none" style={[styles.livePillWrap, { top: livePillTop }]}>
+          <PressableScale
+            style={styles.livePill}
+            onPress={handleShowNewActivity}
+            accessibilityRole="button"
+            accessibilityLabel={heldCount === 1 ? 'Show 1 new activity' : `Show ${heldCount} new activities`}
+            testID="activity-new-pill"
+            noMinHeight
+          >
+            <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
+            <Feather name="arrow-up" size={ICON.sm} color={theme.text} />
+            <Text style={styles.livePillText}>New activity</Text>
+          </PressableScale>
+        </View>
+      ) : null}
 
       {/* The frosted glass over the live list behind the floating tab bar —
           replacing the old opaque-black `GRAD_DARK_FADE` scrim, which read as
@@ -1174,6 +1297,29 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontFamily: FONT.semibold,
     fontSize: FS.md,
     letterSpacing: -0.2,
+  },
+
+  // "New activity" pill (item 84): centred, floating just under the header.
+  livePillWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  livePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    paddingHorizontal: SP.md,
+    height: 36,
+    borderRadius: RADIUS.pill,
+    overflow: 'hidden',
+  },
+  livePillText: {
+    color: theme.text,
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
   },
 
   // Avatar starts flush at the row's own 16pt padding — the same gutter as
