@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { Chip } from '@/components/ui/Chip';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP, COMP } from '@/lib/theme';
@@ -197,12 +198,22 @@ export function VariantPickerSheet({
                             </TouchableOpacity>
                           );
                         }
+                        // The shared Chip — same size chip + sold-out treatment
+                        // (disabled, slash, struck label) as the product page.
                         return (
-                          <TouchableOpacity
+                          <Chip
                             key={val.id}
+                            label={val.label}
+                            selected={selected}
+                            disabled={!available}
+                            icon={available ? undefined : 'slash'}
+                            iconColor={theme.subtle}
+                            strikethrough={!available}
+                            accessibilityRole="radio"
+                            accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', sold out'}`}
+                            testID={`variant-chip-${val.id}`}
                             onPress={() => {
                               if (!available) return;
-                              Haptics.selectionAsync().catch(() => {});
                               setSelections(prev => {
                                 const updated = { ...prev, [option.id]: val.id };
                                 const nextVariant = findVariant(product, updated);
@@ -210,15 +221,7 @@ export function VariantPickerSheet({
                                 return updated;
                               });
                             }}
-                            disabled={!available}
-                            style={[s.chip, selected && s.chipSelected, !available && s.chipUnavail]}
-                            accessibilityRole="radio"
-                            accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
-                            accessibilityState={{ selected, disabled: !available }}
-                          >
-                            {!available && <Feather name="slash" size={11} color={theme.subtle} style={{ marginRight: 4 }} />}
-                            <Text style={[s.chipText, selected && s.chipTextSelected, !available && s.chipTextUnavail]}>{val.label}</Text>
-                          </TouchableOpacity>
+                          />
                         );
                       })}
                     </View>
@@ -281,16 +284,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   optionSelected: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.accentLight },
   optionRequired: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.error },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  chip: {
-    minWidth: COMP.minTouchTarget, height: COMP.minTouchTarget, paddingHorizontal: 16,
-    borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: theme.border, backgroundColor: theme.card,
-    alignItems: 'center', justifyContent: 'center', flexDirection: 'row',
-  },
-  chipSelected: { borderColor: theme.accent, backgroundColor: theme.accentDim },
   chipUnavail: { borderStyle: 'dashed', borderColor: theme.border, backgroundColor: 'transparent' },
-  chipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
-  chipTextSelected: { color: theme.accentLight, fontFamily: FONT.bold },
-  chipTextUnavail: { color: theme.subtle, textDecorationLine: 'line-through' },
   colorSwatch: {
     width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm,
     borderWidth: 2, borderColor: theme.border, alignItems: 'center', justifyContent: 'center',
