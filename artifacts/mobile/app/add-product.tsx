@@ -1291,6 +1291,7 @@ export default function AddProductScreen() {
           }}
           style={s.sectionHdr}
         />
+        <Text style={s.sectionHelper}>Add sizes, colors, materials or other choices buyers pick from.</Text>
 
         {localOptions.map((opt, idx) => (
           <BrandthreadCard key={opt.id} style={s.optionCard}>
@@ -2016,28 +2017,36 @@ export default function AddProductScreen() {
           </View>
         </ScrollView>
 
-        <View style={[s.stickyFooter, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
+        {/* The action area is outside the scroll view so it's always
+            available without losing the form's draft state or scroll position.
+             The outer wrappers carry flex:1 because button styles only reach
+             PressableScale's inner Animated.View, not the row's flex items. */}
+        <View style={[s.stickyFooter, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
           <View style={s.publishButtons}>
-            <SecondaryButton
-              label={stepIndex === 0 ? 'Cancel' : 'Back'}
-              onPress={goBack}
-              style={{ flex: 1 }}
-            />
-            {isLastStep ? (
-              <PrimaryButton
-                label={photosUploading ? 'Uploading photos…' : publishing ? 'Publishing…' : 'Publish'}
-                disabled={publishing || photosUploading}
-                onPress={handlePublish}
-                style={{ flex: 1 }}
+            <View style={s.footerBtnWrap}>
+              <SecondaryButton
+                label={stepIndex === 0 ? 'Cancel' : 'Back'}
+                onPress={goBack}
+                style={s.footerBtnFill}
               />
-            ) : (
-              <PrimaryButton
-                label="Next"
-                icon="arrow-right"
-                onPress={goNext}
-                style={{ flex: 1 }}
-              />
-            )}
+            </View>
+            <View style={s.footerBtnWrap}>
+              {isLastStep ? (
+                <PrimaryButton
+                  label={photosUploading ? 'Uploading photos…' : publishing ? 'Publishing…' : 'Publish'}
+                  disabled={publishing || photosUploading}
+                  onPress={handlePublish}
+                  style={s.footerBtnFill}
+                />
+              ) : (
+                <PrimaryButton
+                  label="Next"
+                  icon="arrow-right"
+                  onPress={goNext}
+                  style={s.footerBtnFill}
+                />
+              )}
+            </View>
           </View>
           <TouchableOpacity onPress={handleSaveDraftAndExit} style={{ alignSelf: 'center', paddingTop: 4 }}>
             <Text style={[s.headerSaveText, { color: MUTED }]}>Save as draft & exit</Text>
@@ -2185,7 +2194,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderTopColor: BORDER,
     backgroundColor: BG,
   },
-  publishButtons: { flexDirection: 'row', gap: SP.sm },
+  publishButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  footerBtnWrap: { flex: 1 },
+  footerBtnFill: { height: 52, width: '100%' },
   publishError: {
     flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
     padding: SP.md, borderRadius: RADIUS.sm,
@@ -2195,6 +2209,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Shared field helpers
   sectionHdr: { paddingHorizontal: 0 },
+  sectionHelper: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: -SP.xs, marginBottom: SP.md },
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
 
