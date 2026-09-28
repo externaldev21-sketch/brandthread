@@ -27,6 +27,8 @@ import type { Friendship } from '@/services/socialTypes';
 import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { useApi } from '@/lib/api';
+import { isUUID } from '@/lib/engagementUtils';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -60,11 +62,23 @@ export function ThreadShareSheet({
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const api = useApi();
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [savingProgress, setSavingProgress] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const actionInFlightRef = useRef(false);
+
+  // Records a persisted share interaction (see POST /api/posts/:id/interact,
+  // type "share") whenever the person actually completes a share out of the
+  // app — sending to a friend, copying the link, or handing off to the
+  // native share sheet. Fire-and-forget: this is analytics, not something
+  // the share flow should ever block or fail on, and preview/demo posts
+  // (non-UUID ids) have nothing to record against.
+  const recordShare = React.useCallback(() => {
+    if (!isUUID(postId)) return;
+    api.posts.interact(postId, { type: 'share' }).catch(() => {});
+  }, [api, postId]);
 
   const postUrl = ExpoLinking.createURL('/buyer-post-viewer', {
     queryParams: { postId },
@@ -122,6 +136,7 @@ export function ThreadShareSheet({
       });
       onClose();
       onFeedback(`Sent to ${friend.name}`, 'info');
+      recordShare();
     });
   }
 
@@ -130,6 +145,7 @@ export function ThreadShareSheet({
       await Clipboard.setStringAsync(postUrl);
       onClose();
       onFeedback('Link copied. Anyone who opens it can view this post.', 'info');
+      recordShare();
     });
   }
 
@@ -145,6 +161,7 @@ export function ThreadShareSheet({
         await Linking.openURL(url);
       }
       onClose();
+      recordShare();
     });
   }
 
@@ -152,6 +169,7 @@ export function ThreadShareSheet({
     await runAction('more', async () => {
       await Share.share({ message: shareText, url: postUrl });
       onClose();
+      recordShare();
     });
   }
 

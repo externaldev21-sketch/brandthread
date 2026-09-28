@@ -8,12 +8,12 @@ import type { DiscoverPost } from '@/lib/discoverFeed';
 export type GridRow =
   | { key: string; type: 'normal'; tiles: DiscoverPost[] }
   | { key: string; type: 'feature'; big: DiscoverPost; small: DiscoverPost[] }
-  | { key: string; type: 'rail'; kind: 'justDropped' | 'highDemand' }
+  | { key: string; type: 'rail'; kind: 'justDropped' | 'highDemand' | 'trendingBrands' }
   | { key: string; type: 'people' };
 
 export function buildGridRows(
   posts: DiscoverPost[],
-  opts: { showRails: boolean; hasJustDropped: boolean; hasHighDemand: boolean; hasPeople: boolean },
+  opts: { showRails: boolean; hasJustDropped: boolean; hasHighDemand: boolean; hasTrendingBrands?: boolean; hasPeople: boolean },
 ): GridRow[] {
   const rows: GridRow[] = [];
   let i = 0;
@@ -31,6 +31,7 @@ export function buildGridRows(
   let nextFeatureAt = 5;
   let insertedJustDropped = false;
   let insertedHighDemand = false;
+  let insertedTrendingBrands = false;
   let tilesSincePeople = 0;
 
   while (i < posts.length) {
@@ -55,6 +56,10 @@ export function buildGridRows(
     if (opts.showRails && !insertedHighDemand && insertedJustDropped && rows.length >= 5 && opts.hasHighDemand) {
       rows.push({ key: 'rail-high-demand', type: 'rail', kind: 'highDemand' });
       insertedHighDemand = true;
+    }
+    if (opts.showRails && !insertedTrendingBrands && insertedHighDemand && rows.length >= 8 && opts.hasTrendingBrands) {
+      rows.push({ key: 'rail-trending-brands', type: 'rail', kind: 'trendingBrands' });
+      insertedTrendingBrands = true;
     }
     if (opts.hasPeople && tilesSincePeople >= 20) {
       rows.push({ key: `people-${i}`, type: 'people' });

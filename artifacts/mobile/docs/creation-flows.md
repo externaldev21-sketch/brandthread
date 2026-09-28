@@ -50,6 +50,7 @@ Legend: **PR** = which PR ships it. **Role** = buyer / seller / both.
 | 1 | Picker — grid + camera tile + Recents dropdown + mode pill | [01-picker-new-reel](polish/screenshots/creation-flow/mobbin-reference/01-picker-new-reel.webp), [01b-picker-new-post](polish/screenshots/creation-flow/mobbin-reference/01b-picker-new-post.webp) — dd1cb4f7… pos 1-2 | `app/create-post.tsx` `media-pick` step | both | 1 |
 | 2 | Camera — flash/speed/timer, left tool rail, shutter, flip, mode row | [02-camera](polish/screenshots/creation-flow/mobbin-reference/02-camera.webp) | `app/camera-capture.tsx` (already the shared camera layer `create-post.tsx` routes to) | both | 1 |
 | 3 | Editor — rounded clip card, tap-to-pause, tool row, Edit video/Next | [03-editor-pause](polish/screenshots/creation-flow/mobbin-reference/03-editor-pause.webp), [03b-editor-tools](polish/screenshots/creation-flow/mobbin-reference/03b-editor-tools.webp), [03c-editor-tool-row](polish/screenshots/creation-flow/mobbin-reference/03c-editor-tool-row.webp) | `app/create-post.tsx` `video-edit`/`slide-edit` step | both | 1 |
+| 3v | **Item 116 verification** — Trim, Speed, Text, Audio in the tool row above | Instagram tool row (Text/Sticker/Audio/Add clips/Overlay/Edit/Caption) — same `1798a59a…` screen already referenced at 03c; Trim/Speed cross-checked against TikTok/CapCut/Edits/Snapchat/Shopee editor screens (`docs/polish/screenshots/reel-editor/mobbin-reference/`) | Trim and Speed are real — both send `trimStart`/`trimEnd`/`clip.speed` to the real `api.posts.composeVideo` call, applied by `post-video.ts`'s ffmpeg pipeline (verified by reading the code; live video playback couldn't be captured in this sandbox — see below). Text is real (`TextOverlayEditor`, shared by video/photo). Audio is an honest, real "Sound library coming soon." empty state, not fake data — there is no sound-catalog backend yet; building one is its own, much larger item, not part of 116. Fixed in this PR: `TextOverlayEditor`'s caption input picked up the browser's default colored focus ring on web (monochrome violation), same fix as item 115's caption screen. | both | 2nd PR (verification-only, no video-edit code changes beyond the outline fix) |
 | 4 | Details — cover card + Preview chip + Edit cover, caption entry row, Tag people / Tag products / Add location / Audience rows, Save draft + Share | [04-details-cover](polish/screenshots/creation-flow/mobbin-reference/04-details-cover.webp), [04b-edit-cover](polish/screenshots/creation-flow/mobbin-reference/04b-edit-cover.webp), [07c-audience](polish/screenshots/creation-flow/mobbin-reference/07c-audience.webp) | `app/create-post.tsx` `post-details` step | both (Tag products row: seller only) | 2 |
 | 5 | Caption — full screen, OK top-right, chips (Hashtags/Tag products/Poll) above keyboard | [05-caption](polish/screenshots/creation-flow/mobbin-reference/05-caption.webp) | new `app/create-post-caption.tsx` (or sheet within `post-details`) | both (Tag products chip: seller only) | 2 |
 | 6 | Tag people — tap photo, draggable name chip, list of tags, Done | [06-tag-people](polish/screenshots/creation-flow/mobbin-reference/06-tag-people.webp) | new sheet reusing `OverlayChip`-style tag pattern | both | 2 |
@@ -91,6 +92,14 @@ remote updates, not for the local-only in-app progress this v1 implements).
   chosen to visually match the reference, not measured pixel-for-pixel.
 - Anything else discovered while building is appended below by the agent/PR
   that hits it, not assumed away in advance.
+- **Item 116 verification:** real video playback and the video-only Trim/
+  Speed sheets could not be captured live — this sandbox's headless Chromium
+  build has no H.264 decoder (`<video>` throws "Failed to load because no
+  supported source was found" for every real `.mp4` already bundled with the
+  app). Verified by reading `app/create-post.tsx` instead: both fields are
+  sent to the real compose API. Text and the honest audio empty-state were
+  captured live via the photo-editor path, which shares the same
+  `TextOverlayEditor` component.
 
 ## What's already there vs. what this changes
 

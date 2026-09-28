@@ -144,10 +144,18 @@ export default function ThreadCashScreen() {
     // user, so skip the network round-trip entirely and show clearly-labeled
     // placeholder data for UI review. No fake business numbers ever reach a
     // real signed-in buyer — this path is unreachable outside __DEV__ web
-    // preview. Mirrors the existing pattern in app/boost.tsx.
+    // preview.
+    //
+    // No artificial delay here (a `setTimeout` used to sit before resolving,
+    // to "look" like a network round trip): a `setTimeout` started while a
+    // navigation transition is still busy with synchronous/microtask render
+    // work never got a turn on the event loop's macrotask queue and simply
+    // never fired — this screen reached via a real in-app push (not a fresh
+    // page load) hung on its loading skeleton forever, every time. Resolving
+    // on a microtask instead means it always actually completes.
     if (isBuyerDevPreview()) {
       setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await Promise.resolve();
       setStatus(PREVIEW_STATUS);
       setHistory(PREVIEW_HISTORY);
       setLoading(false);

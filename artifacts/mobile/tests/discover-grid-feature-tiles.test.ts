@@ -59,3 +59,24 @@ describe('DiscoverGrid buildGridRows — 2x2 feature tile cadence', () => {
     expect(seen).toEqual(posts.map((p) => p.id));
   });
 });
+
+describe('DiscoverGrid buildGridRows — Trending Brands rail (item 47)', () => {
+  it('inserts a trendingBrands rail after the high-demand rail when there is enough content', () => {
+    const posts = Array.from({ length: 30 }, (_, i) => post(String(i)));
+    const rows = buildGridRows(posts, { showRails: true, hasJustDropped: true, hasHighDemand: true, hasTrendingBrands: true, hasPeople: false });
+    const kinds = rows.filter((r) => r.type === 'rail').map((r) => r.kind);
+    expect(kinds).toEqual(['justDropped', 'highDemand', 'trendingBrands']);
+  });
+
+  it('never inserts the rail when there are no trending brands', () => {
+    const posts = Array.from({ length: 30 }, (_, i) => post(String(i)));
+    const rows = buildGridRows(posts, { showRails: true, hasJustDropped: true, hasHighDemand: true, hasTrendingBrands: false, hasPeople: false });
+    expect(rows.some((r) => r.type === 'rail' && r.kind === 'trendingBrands')).toBe(false);
+  });
+
+  it('never inserts any rail when showRails is false (the Fits filter)', () => {
+    const posts = Array.from({ length: 30 }, (_, i) => post(String(i)));
+    const rows = buildGridRows(posts, { showRails: false, hasJustDropped: true, hasHighDemand: true, hasTrendingBrands: true, hasPeople: false });
+    expect(rows.some((r) => r.type === 'rail')).toBe(false);
+  });
+});

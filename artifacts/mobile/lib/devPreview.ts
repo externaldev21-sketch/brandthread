@@ -10,8 +10,12 @@
  *   - Inert on native (Platform.OS !== 'web')
  *   - Inert when window is unavailable (SSR / test environments without window)
  *   - ?bt_preview=buyer|seller explicitly selects and persists a preview role
- *   - the saved role is used when the URL has no selection; a fresh dev-web
- *     session temporarily defaults to buyer preview
+ *   - in dev, the saved tab role is used when the URL has no selection; a fresh
+ *     dev-web session temporarily defaults to buyer preview
+ *
+ * Expo Router drops the query on in-app navigation. Dev builds retain the
+ * tab-scoped choice; exported screenshot builds use the role that _layout
+ * saved for AuthGate so preview screens do not hang after navigation.
  *
  * Pure / testable: accepts an optional override for the search string so unit
  * tests can exercise every branch without touching the global window object.
@@ -58,6 +62,15 @@ export function setDevWebPreviewRole(role: PreviewRole): void {
 
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
+function persistedPreviewRole(): 'buyer' | 'seller' | null {
+  try {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('user_role') : null;
+    return stored === 'buyer' || stored === 'seller' ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Returns true in the dev-web seller preview context. The URL selection takes
  * precedence, then the saved browser-session role, with buyer as the temporary default.
@@ -71,7 +84,12 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
 
   // Native (iOS / Android): never activate
   if (Platform.OS !== 'web') return false;
-  return getDevWebPreviewRole(searchOverride) === 'seller';
+  if (typeof window === 'undefined') return false;
+  if (__DEV__) return getDevWebPreviewRole(searchOverride) === 'seller';
+  const v = new URLSearchParams(searchOverride ?? window.location.search).get('bt_preview');
+  if (v === 'seller') return true;
+  if (v === 'buyer') return false;
+  return persistedPreviewRole() === 'seller';
 }
 
 /**
@@ -81,5 +99,10 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
 export function isBuyerDevPreview(searchOverride?: string): boolean {
   if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return false;
   if (Platform.OS !== 'web') return false;
-  return getDevWebPreviewRole(searchOverride) === 'buyer';
+  if (typeof window === 'undefined') return false;
+  if (__DEV__) return getDevWebPreviewRole(searchOverride) === 'buyer';
+  const v = new URLSearchParams(searchOverride ?? window.location.search).get('bt_preview');
+  if (v === 'buyer') return true;
+  if (v === 'seller') return false;
+  return persistedPreviewRole() === 'buyer';
 }

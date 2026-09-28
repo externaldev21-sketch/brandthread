@@ -18,12 +18,32 @@ const analyticsKitSource = fs.readFileSync(
 );
 
 describe('seller profile action layout', () => {
-  it('keeps only My Profile and Messages in the quick-action row', () => {
-    expect(profileSource).toContain("label: 'My Profile',    route: '/edit-profile'");
-    expect(profileSource).toContain("label: 'Messages'");
-    expect(profileSource).not.toContain("label: 'Brand Assets'");
-    expect(profileSource).not.toContain("label: 'Add Product'");
-    expect(profileSource).not.toContain("label: 'New Campaign'");
+  // Instagram own-business-profile shape (mobbin.com/screens/
+  // 7b7b7c39-39a7-4ba6-bf3a-45c009a4769d): a "Professional dashboard" row
+  // above one row of three buttons — Edit profile / Share profile / Contact
+  // — replacing the old six-button wall (Edit Profile, Settings, Go Live,
+  // Create Post, My Profile, Messages). Settings stays in the top-right
+  // gear; Go Live and Create Post move into the Studio control center.
+  it('shows the Professional dashboard row and only Edit profile / Share profile / Contact below it', () => {
+    expect(profileSource).toContain('Professional dashboard');
+    expect(profileSource).toContain('accessibilityLabel="Edit profile"');
+    expect(profileSource).toContain('accessibilityLabel="Share profile"');
+    expect(profileSource).toContain('accessibilityLabel="Contact"');
+    expect(profileSource).not.toContain("label='Go Live'");
+    expect(profileSource).not.toContain('accessibilityLabel="Go Live"');
+    expect(profileSource).not.toContain("label='Create Post'");
+    expect(profileSource).not.toContain('accessibilityLabel="Create Post"');
+    expect(profileSource).not.toContain("label: 'My Profile'");
+    expect(profileSource).not.toContain("QUICK_ACTIONS");
+  });
+
+  it('never lets the stats row get stuck on "–" — loading resolves once the initial fetch settles, not on profile alone', () => {
+    expect(profileSource).toContain('statsLoading={statsInitialLoading}');
+    expect(profileSource).not.toContain('statsLoading={!profile}');
+    expect(profileSource).toContain('Promise.allSettled([loadPosts(), loadProfile(), loadSocialCounts()])');
+    // Second, independent guarantee — even if auth itself never resolves,
+    // the row still falls back to real (zero) values instead of "–" forever.
+    expect(profileSource).toContain("setTimeout(() => setStatsInitialLoading(false), 6000)");
   });
 
   it('uses Instagram Posts / Shop / Tagged tabs, keeping drafts and scheduled posts as a Posts sub-filter', () => {
@@ -33,15 +53,19 @@ describe('seller profile action layout', () => {
     expect(profileSource).not.toContain('Store performance');
   });
 
-  it('keeps post creation in the top action and out of the content grid', () => {
-    expect(profileSource).toContain('accessibilityLabel="Create Post"');
-    expect(profileSource).not.toContain('accessibilityLabel="Create post"');
+  it('reaches post creation from the Studio control center instead of a top action button', () => {
     expect(profileSource).not.toContain('Share something with');
     // The empty Post tab offers "Create your first post" through the shared
     // profile empty-state table (components/profile/profileEmptyStates.ts).
     expect(profileSource).toContain("{ Published: 'seller:post', Drafts: 'seller:draft', Scheduled: 'seller:schedule' }");
     expect(fs.readFileSync(path.join(__dirname, '../components/profile/profileEmptyStates.ts'), 'utf8'))
       .toContain("label: 'Create your first post', route: '/create-post'");
+    const controlCenterSource = fs.readFileSync(
+      path.resolve(__dirname, '../lib/sellerControlCenter.ts'),
+      'utf8',
+    );
+    expect(controlCenterSource).toContain("route: '/create-post'");
+    expect(controlCenterSource).toContain("route: '/seller-go-live'");
   });
 });
 

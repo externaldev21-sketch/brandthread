@@ -491,6 +491,7 @@ export interface SellerThreadPost {
   commentsCount:     number;
   repostsCount:      number;
   savedCount:        number;
+  sharesCount:       number;
   likedByMe:         boolean;
   savedByMe:         boolean;
   repostedByMe:      boolean;
@@ -575,6 +576,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     commentsCount:   p.commentsCount ?? 0,
     repostsCount:    p.repostsCount ?? 0,
     savedCount:      p.savedCount ?? 0,
+    sharesCount:     p.sharesCount ?? 0,
     likedByMe:       false,
     savedByMe:       false,
     repostedByMe:    false,
@@ -800,7 +802,8 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     likesCount:    p.likesCount    ?? 0,
     commentsCount: p.commentsCount ?? 0,
     repostsCount:  p.repostsCount  ?? 0,
-    savedCount:    0,
+    savedCount:    typeof p.savesCount === 'number' ? p.savesCount : 0,
+    sharesCount:   typeof p.sharesCount === 'number' ? p.sharesCount : 0,
     viewsCount:    typeof p.viewsCount === 'number' ? p.viewsCount : undefined,
     likedByMe:     false,
     savedByMe:     false,
