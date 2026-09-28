@@ -124,8 +124,18 @@ export interface CheckoutDisplayTotals {
   taxCents: number;
   /** Promo code savings — only applied server-side to single-seller checkouts. */
   promoCents: number;
-  /** Rewards / Thread Cash savings already folded into summary.totalCents. */
+  /** Loyalty rewards already folded into summary.totalCents (Thread Cash has its own line). */
   rewardsCents: number;
+  /**
+   * Item 109: Thread Cash applied to this order. It's folded into
+   * summary.totalCents like rewards, but shown on its own line, after the
+   * order total, because it pays part of that total rather than lowering the
+   * price (talabat "Pay with credit" / "Pay by card").
+   */
+  threadCashCents: number;
+  /** What the order costs before Thread Cash: totalCents + threadCashCents. */
+  orderTotalCents: number;
+  /** What the card is charged (and what "Place order · $X" shows). */
   totalCents: number;
 }
 
@@ -137,21 +147,31 @@ export interface CheckoutDisplayTotals {
  * Stripe remains the final authority on tax and the charged amount.
  */
 export function getCheckoutDisplayTotals(
-  session: Pick<CheckoutSession, 'summary' | 'discounts' | 'deliveryGroups'>,
+  session: Pick<CheckoutSession, 'summary' | 'discounts' | 'deliveryGroups'> & Partial<Pick<CheckoutSession, 'threadCashRedemption'>>,
 ): CheckoutDisplayTotals {
   const { summary } = session;
   const promoApplies = session.deliveryGroups.length === 1;
   const promoCents = promoApplies
     ? session.discounts.filter(d => d.isValid).reduce((sum, d) => sum + Math.max(0, d.appliedAmountCents || 0), 0)
     : 0;
-  const cappedPromo = Math.min(promoCents, Math.max(0, summary.totalCents));
+  // Only what the summary actually folded in (withThreadCashRedemption keeps
+  // them in step), so the lines always add up to the total.
+  const threadCashCents = Math.min(Math.max(0, session.threadCashRedemption?.discountCents ?? 0), Math.max(0, summary.discountTotalCents));
+  // The promo comes off the order before Thread Cash pays for part of it (the
+  // server's order too, routes/buyer.ts), so it's capped by the total before
+  // Thread Cash, never by what's left after it.
+  const beforeThreadCashCents = summary.totalCents + threadCashCents;
+  const cappedPromo = Math.min(promoCents, Math.max(0, beforeThreadCashCents));
+  const orderTotalCents = Math.max(0, beforeThreadCashCents - cappedPromo);
   return {
     subtotalCents: summary.subtotalCents,
     shippingCents: summary.shippingTotalCents,
     taxCents: summary.taxTotalCents,
     promoCents: cappedPromo,
-    rewardsCents: summary.discountTotalCents,
-    totalCents: Math.max(0, summary.totalCents - cappedPromo),
+    rewardsCents: summary.discountTotalCents - threadCashCents,
+    threadCashCents,
+    orderTotalCents,
+    totalCents: Math.max(0, orderTotalCents - threadCashCents),
   };
 }
 
