@@ -22,6 +22,7 @@ const { nativeComponent, captured } = vi.hoisted(() => ({
 vi.mock('react-native', () => ({
   View: nativeComponent('View'),
   Pressable: nativeComponent('Pressable'),
+  Platform: { OS: 'ios' },
   StyleSheet: { create: (styles: unknown) => styles },
   PanResponder: {
     create: (config: Record<string, (...args: any[]) => any>) => {
@@ -110,5 +111,23 @@ describe('SwipeableActions', () => {
     config.onPanResponderGrant();
     config.onPanResponderRelease({}, g(1, 1));
     expect(captured.springs).toEqual([-REVEAL, 0]);
+  });
+
+  it('takes the touch ahead of the row content only while open, so a tap closes it instead of opening the row', () => {
+    const config = mount();
+    expect(config.onStartShouldSetPanResponderCapture()).toBe(false);
+    config.onPanResponderGrant();
+    config.onPanResponderMove({}, g(-200, 0));
+    config.onPanResponderRelease({}, g(-200, 0));
+    expect(config.onStartShouldSetPanResponderCapture()).toBe(true);
+    config.onPanResponderGrant();
+    config.onPanResponderRelease({}, g(0, 0));
+    expect(captured.springs).toEqual([-REVEAL, 0]);
+    expect(config.onStartShouldSetPanResponderCapture()).toBe(false);
+  });
+
+  it('never takes the touch ahead of the content when disabled', () => {
+    const config = mount(true);
+    expect(config.onStartShouldSetPanResponderCapture()).toBe(false);
   });
 });
