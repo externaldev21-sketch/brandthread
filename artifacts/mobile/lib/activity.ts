@@ -770,6 +770,22 @@ export function createReadTracker(options: ReadTrackerOptions): ReadTracker {
   };
 }
 
+// ─── Live arrivals (item 84) ──────────────────────────────────────────────────
+
+/**
+ * Ids in `next` that genuinely arrived since `prev` was on screen: not shown
+ * before, and at least as new as the newest row that was. Anything older
+ * that shows up (a later page, a restored row) isn't an arrival, and the
+ * first load has nothing to compare against, so it never animates.
+ */
+export function findActivityArrivals(prev: readonly ActivityItem[], next: readonly ActivityItem[]): string[] {
+  if (prev.length === 0) return [];
+  const known = new Set(prev.map((item) => item.id));
+  let newest = '';
+  for (const item of prev) if (item.createdAt > newest) newest = item.createdAt;
+  return next.filter((item) => !known.has(item.id) && item.createdAt >= newest).map((item) => item.id);
+}
+
 // ─── Delete with Undo (item 83) ───────────────────────────────────────────────
 
 /** How long a swiped-away notification can be brought back (the Undo toast). */
