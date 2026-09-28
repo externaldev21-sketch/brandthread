@@ -140,6 +140,7 @@ export function getPreviewActivity(): ActivityItem[] {
       title: `${p[5].name} commented on your post`, body: 'obsessed with this fit 😍', isRead: true,
       actorId: p[5].userId, actorName: p[5].name, actorInitials: p[5].initials, actorColor: p[5].color, actorAvatarUrl: p[5].avatarUrl,
       targetId: 'preview-post-02', targetType: 'post', targetImageUrl: posterUri(5), createdAt: minutesAgo(90),
+      commentId: 'preview-comment-act-01',
     },
     {
       id: 'preview-act-highlight-like-01', category: 'social', type: 'story_like',
@@ -170,12 +171,14 @@ export function getPreviewActivity(): ActivityItem[] {
       title: `${p[4].name} mentioned you in a comment`, body: `check out @you's fit from last week`, isRead: true,
       actorId: p[4].userId, actorName: p[4].name, actorInitials: p[4].initials, actorColor: p[4].color, actorAvatarUrl: p[4].avatarUrl,
       targetId: 'preview-post-05', targetType: 'post', targetImageUrl: posterUri(4), createdAt: minutesAgo(60 * 24 * 3),
+      commentId: 'preview-comment-act-02',
     },
     {
       id: 'preview-act-reply-01', category: 'social', type: 'comment_reply',
       title: `${p[6].name} replied to your comment`, body: 'right?! grabbing one before it sells out', isRead: true,
       actorId: p[6].userId, actorName: p[6].name, actorInitials: p[6].initials, actorColor: p[6].color, actorAvatarUrl: p[6].avatarUrl,
       targetId: 'preview-post-06', targetType: 'post', targetImageUrl: posterUri(6), createdAt: minutesAgo(60 * 24 * 4),
+      commentId: 'preview-comment-act-03',
     },
     {
       id: 'preview-act-order-02', category: 'orders', type: 'payout_sent',
@@ -197,6 +200,68 @@ export function getPreviewActivity(): ActivityItem[] {
     },
   ];
   return cached;
+}
+
+/** The seeded Activity row about a given preview comment (deep-link target). */
+/**
+ * The viewer's own seeded post a preview Activity row points at (item 82),
+ * so tapping "Saint Rue liked your video" opens that post's real image and
+ * counts instead of an empty placeholder. Built only from the rows that
+ * already reference it; `undefined` outside the preview or for any other id.
+ */
+export interface PreviewActivityPost {
+  id: string;
+  mediaUrl?: string;
+  likesCount: number;
+  commentsCount: number;
+  repostsCount: number;
+  createdAt: string;
+}
+
+export function getPreviewActivityPost(postId: string): PreviewActivityPost | undefined {
+  if (!isPreviewActivityEnabled() || !postId || !postId.startsWith('preview-post-')) return undefined;
+  const rows = getPreviewActivity().filter((item) => item.targetType === 'post' && item.targetId === postId);
+  if (rows.length === 0) return undefined;
+  const count = (types: string[]) => rows.filter((item) => types.includes(item.type)).length;
+  const oldest = rows.reduce((min, item) => (item.createdAt < min ? item.createdAt : min), rows[0].createdAt);
+  return {
+    id: postId,
+    mediaUrl: rows.find((item) => item.targetImageUrl)?.targetImageUrl,
+    likesCount: count(['post_like']),
+    commentsCount: count(['post_comment', 'mention', 'comment_reply']),
+    repostsCount: count(['repost']),
+    createdAt: new Date(new Date(oldest).getTime() - 60 * 60_000).toISOString(),
+  };
+}
+
+/**
+ * Same idea for a liked story or highlight (item 82): the viewer's own seeded
+ * story's photo and like count, so the row opens a real story rather than
+ * "This story's no longer available." `undefined` outside the preview.
+ */
+export interface PreviewActivityStory {
+  id: string;
+  imageUri?: string;
+  likesCount: number;
+  createdAt: number;
+}
+
+export function getPreviewActivityStory(storyId: string): PreviewActivityStory | undefined {
+  if (!isPreviewActivityEnabled() || !storyId || !storyId.startsWith('preview-story-')) return undefined;
+  const rows = getPreviewActivity().filter((item) => item.targetType === 'story' && item.targetId === storyId);
+  if (rows.length === 0) return undefined;
+  const oldest = rows.reduce((min, item) => (item.createdAt < min ? item.createdAt : min), rows[0].createdAt);
+  return {
+    id: storyId,
+    imageUri: rows.find((item) => item.targetImageUrl)?.targetImageUrl,
+    likesCount: rows.filter((item) => item.type === 'story_like').length,
+    createdAt: new Date(oldest).getTime() - 30 * 60_000,
+  };
+}
+
+export function getPreviewActivityForComment(commentId: string): ActivityItem | undefined {
+  if (!isPreviewActivityEnabled() || !commentId) return undefined;
+  return getPreviewActivity().find((item) => item.commentId === commentId);
 }
 
 export interface PreviewSuggestedPerson {
