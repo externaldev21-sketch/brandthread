@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, queryPersister } from '@/lib/queryClient';
-import { warmBuyerTabs } from '@/lib/appStartPrefetch';
+import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -758,7 +758,15 @@ function ServiceConfigurer() {
         // The request may finish after sign-out or an account switch. Never
         // hydrate identity into whichever account happens to be active then.
         if (prevUserIdRef.current !== newUserId) return;
-        if (profile.accountType !== 'buyer') return;
+        if (profile.accountType !== 'buyer') {
+          // Seller equivalent of the buyer warmup below: no per-account
+          // profile hydration to do here (that's buyer-only), just prime
+          // each seller tab's first page of data.
+          InteractionManager.runAfterInteractions(() => {
+            warmSellerTabs(queryClient, api, newUserId);
+          });
+          return;
+        }
         InteractionManager.runAfterInteractions(() => {
           warmBuyerTabs(queryClient, api, newUserId);
         });
