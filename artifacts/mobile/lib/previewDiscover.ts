@@ -30,6 +30,13 @@ function posterUri(index: number): string {
   return Asset.fromModule(POSTER_SOURCES[index % POSTER_SOURCES.length]).uri;
 }
 
+// fashion_runway_07.jpg (index 6) is a bright sunset/city-skyline shot — the
+// one photo in this bundle that breaks the muted, monochrome-leaning
+// editorial look the rest of Discover keeps (item 45). BUYERS below picks
+// its poster from this list instead of a raw `i + 3` offset so that photo
+// is never selected.
+const BUYER_POSTER_INDICES = [3, 4, 5, 7, 8, 9, 0, 1];
+
 // Monochrome only (Discover stays on-brand) — dark-gray shades, not a
 // colored identity per person.
 const BUYERS = [
@@ -64,7 +71,7 @@ export function getPreviewDiscoverPosts(filter: 'forYou' | 'fits'): DiscoverPost
       authorColor: buyer.color,
       authorAccountType: 'buyer' as const,
       media: (i % 4 === 0 ? 'video' : i % 5 === 0 ? 'slideshow' : 'photo') as DiscoverPost['media'],
-      imageUri: posterUri(i + 3),
+      imageUri: posterUri(BUYER_POSTER_INDICES[i % BUYER_POSTER_INDICES.length]),
       caption: FIT_CAPTIONS[i % FIT_CAPTIONS.length],
       likesCount: 40 + i * 37,
       commentsCount: 2 + i * 3,

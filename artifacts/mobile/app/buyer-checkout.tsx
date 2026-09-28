@@ -40,6 +40,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
+import { isPreviewCheckoutGroup, placePreviewOrder } from '@/lib/previewCheckout';
 import {
   applyDiscount, createCheckoutSession,
   getCart, getCheckoutSession, removeCartItems, removeDiscount, saveCheckoutProgress, validateCart,
@@ -278,8 +279,12 @@ export default function BuyerCheckoutScreen() {
 
   const current = session as CheckoutSession;
 
+  // Dev-web preview only (lib/previewCheckout.ts): every group is seeded
+  // preview products, so there is no server cart or Stripe to talk to.
+  const previewOnly = !!current?.deliveryGroups?.length && current.deliveryGroups.every(isPreviewCheckoutGroup);
+
   const validateServerCart = async () => {
-    if (!isSignedIn) return true;
+    if (!isSignedIn || previewOnly) return true;
     try {
       const result = await validateCart(
         current.deliveryGroups.flatMap(g => g.items),
@@ -333,6 +338,30 @@ export default function BuyerCheckoutScreen() {
       for (const group of current.deliveryGroups) {
         // Skip groups already verified in a previous payment attempt this session.
         if (paidRef.current.has(group.sellerId)) continue;
+
+        // Dev-web preview only: seeded preview products "pay" locally with no
+        // charge and no Stripe (lib/previewCheckout.ts). Never true for a real
+        // product/seller or in a production build.
+        if (isPreviewCheckoutGroup(group)) {
+          const method = group.availableMethods.find(m => m.id === group.selectedMethodId);
+          const previewPaid = placePreviewOrder({
+            group,
+            shippingCents: method?.priceCents ?? 0,
+            contact,
+            address,
+          });
+          const vo: VerifiedOrder = { id: previewPaid.orderId, number: previewPaid.orderNumber, sellerId: group.sellerId };
+          confirmed.push(vo);
+          paidRef.current.set(group.sellerId, vo.id);
+          paidGroups[group.sellerId] = {
+            stripeSessionId: `preview_${previewPaid.orderId}`,
+            orderId: vo.id,
+            orderNumber: vo.number,
+            amountTotalCents: previewPaid.amountTotal,
+          };
+          await persist({ ...current, paidGroups });
+          continue;
+        }
 
         let result: any;
         if (isSignedIn) {
@@ -683,6 +712,15 @@ export default function BuyerCheckoutScreen() {
           savedCards={isSignedIn ? savedCards : []}
           sellerCount={current.deliveryGroups.length}
         />
+        {previewOnly ? (
+          // Dev-web preview only: said plainly, since no Stripe page opens.
+          <View style={styles.previewNote} testID="checkout-preview-note">
+            <Feather name="info" size={13} color={theme.muted} />
+            <Text style={[styles.previewNoteText, { color: theme.muted }]}>
+              Preview order: placing it won’t charge a card or reach Stripe.
+            </Text>
+          </View>
+        ) : null}
 
         <PromoCodeCard
           discounts={current.discounts}
@@ -790,6 +828,8 @@ export default function BuyerCheckoutScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  previewNote: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -SP.xs, marginBottom: SP.sm + 4, paddingHorizontal: 2 },
+  previewNoteText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs + 1, lineHeight: 17 },
   root: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center',

@@ -33,11 +33,40 @@ export function isPreviewOrderId(id: string | null | undefined): boolean {
   return typeof id === 'string' && id.startsWith('preview-order-');
 }
 
-/** A seeded order in GET /api/buyer/orders/:id's shape, or null. */
+// Orders placed in this preview session through the real checkout
+// (lib/previewCheckout.ts placePreviewOrder). Kept in memory and mirrored to
+// sessionStorage so "View order" still works after a reload of the tab.
+// Never persisted beyond the tab, and dev builds only.
+const PLACED_KEY = 'bt:preview-orders:v1';
+const placed = new Map<string, Record<string, unknown>>();
+
+function readPlaced(): void {
+  if (placed.size > 0) return;
+  try {
+    const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(PLACED_KEY) : null;
+    const rows = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(rows)) for (const row of rows) if (row && typeof row.id === 'string') placed.set(row.id, row);
+  } catch { /* storage unavailable: memory only */ }
+}
+
+/** Records a preview-checkout order in GET /api/buyer/orders/:id's shape. */
+export function recordPreviewOrder(order: Record<string, unknown> & { id: string }): void {
+  if (!__DEV__ || !isPreviewOrderId(order.id)) return;
+  readPlaced();
+  placed.set(order.id, order);
+  try {
+    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(PLACED_KEY, JSON.stringify([...placed.values()]));
+  } catch { /* memory only */ }
+}
+
+/** A seeded or preview-checkout order in GET /api/buyer/orders/:id's shape, or null. */
 export function getPreviewBuyerOrder(id: string | null | undefined): Record<string, unknown> | null {
   // Same gate as isPreviewCatalogEnabled (dev builds only), checked before
   // anything is loaded.
   if (!__DEV__ || !isPreviewOrderId(id)) return null;
+  readPlaced();
+  const placedOrder = placed.get(id!);
+  if (placedOrder) return placedOrder;
   if (id !== 'preview-order-01') return null;
   const product = previewCatalogProduct('preview-product-01');
   if (!product) return null;

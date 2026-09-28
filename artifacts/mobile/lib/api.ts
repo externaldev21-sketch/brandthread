@@ -2104,7 +2104,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           authorId: string; authorName: string; authorHandle: string;
           authorInitials: string; authorColor: string; authorAccountType: string;
           avatarUrl: string | null;
-          isMe: boolean; storyIds: string[]; seen: boolean; latestCreatedAt: number;
+          isMe: boolean; storyIds: string[]; seen: boolean; closeFriendsOnly: boolean; latestCreatedAt: number;
         }>>('/api/social/stories/following'),
       // ── Notes (bubble above story-tray avatars) ────────────────────────────
       /** Post (or replace) my own active note — 60 chars max, 24h TTL. */
