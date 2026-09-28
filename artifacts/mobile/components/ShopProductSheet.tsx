@@ -71,6 +71,11 @@ export interface ShopTag {
   productName: string;
   priceCents: number;
   tagId?: string;
+  // Overnight follow-up: a plain fallback photo for this tag's own card in
+  // the multi-tag switcher below, used only while this tag isn't the
+  // hydrated one (see thumbUri's comment) — never overrides a real
+  // hydrated product's own imageUris once it's loaded.
+  imageUri?: string;
 }
 
 export interface ShopSheetSelection {
@@ -814,7 +819,14 @@ export function ShopProductSheet({
                 const tagPreview = tag.productId === product?.id ? product : (
                   selection.previewProduct?.id === tag.productId ? selection.previewProduct : null
                 );
-                const thumbUri = tagPreview?.imageUris?.[0];
+                // Falls back to the tag's own `imageUri` (set by the caller,
+                // e.g. feed.tsx's productTags) whenever this tag isn't the
+                // one currently hydrated — a non-active tag has no `product`/
+                // `previewProduct` to read imageUris from until it's tapped,
+                // which used to leave it showing the bag-icon placeholder
+                // (see e.g. the "Leather Ankle Boots" preview tag) even
+                // though the seller/fixture has a real photo for it.
+                const thumbUri = tagPreview?.imageUris?.[0] ?? tag.imageUri;
                 // Busy/added state for THIS row's own Add-to-cart button —
                 // only meaningful while this row is also the active tag
                 // (its product is the one actually being hydrated/added).
