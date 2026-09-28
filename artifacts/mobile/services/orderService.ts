@@ -703,7 +703,7 @@ function mapApiBuyerOrder(o: any): BuyerOrderView {
       variant:     item.variantLabel ?? '',
       quantity:    item.quantity     ?? 1,
       unitPriceCents: item.priceCents ?? 0,
-      imageUri:    item.imageUri     ?? undefined,
+      imageUri:    item.imageUri ?? item.imageUrl ?? undefined, // order_items rows carry imageUrl (same fallback as buyer-order-detail)
     })),
     shippingAddress: address
       ? {

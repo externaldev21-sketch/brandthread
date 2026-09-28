@@ -1,5 +1,5 @@
-import { Router } from "express";
-import { db, returns, orders, users } from "@workspace/db";
+import express, { Router } from "express";
+import { db, returns, orders, orderItems, users } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds";
@@ -8,9 +8,76 @@ import { reversePurchasePointsOnce } from "./loyalty";
 import { sendReturnStatusEmail } from "../lib/brandthreadEmail";
 import { logger } from "../lib/logger";
 import { publishNotification } from "./notifications-feed";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { notifySellerReturnRequested } from "../lib/orderNotifications";
 
 const router = Router();
+const objectStorage = new ObjectStorageService();
 router.use(requireAuth);
+
+// ─── Evidence photos (item 108) ───────────────────────────────────────────────
+// Buyers upload return photos first (POST /evidence), then send the returned
+// private object paths as evidenceUrls. Paths live under the buyer's own
+// prefix, so a request can only attach photos that buyer uploaded; readers
+// (the buyer and the order's seller, already authorised by each route) get
+// short-lived signed URLs, never the raw private path.
+const EVIDENCE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const MAX_EVIDENCE_BYTES = 8 * 1024 * 1024;
+const MAX_EVIDENCE_PHOTOS = 5;
+
+export function evidencePrefix(buyerId: string): string {
+  return `/objects/returns/${buyerId.replace(/[^A-Za-z0-9_-]/g, "_")}/`;
+}
+
+function hasImageSignature(bytes: Buffer, contentType: string): boolean {
+  if (contentType === "image/jpeg" || contentType === "image/jpg") {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (contentType === "image/png") {
+    return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  }
+  return bytes.length >= 12 && bytes.subarray(0, 4).toString() === "RIFF" && bytes.subarray(8, 12).toString() === "WEBP";
+}
+
+async function signEvidence<T extends { evidenceUrls: unknown }>(row: T): Promise<T> {
+  const paths = Array.isArray(row.evidenceUrls) ? (row.evidenceUrls as unknown[]).filter((v): v is string => typeof v === "string") : [];
+  const urls = await Promise.all(paths.map((path) =>
+    path.startsWith("/objects/") ? objectStorage.getObjectEntityDownloadURL(path).catch(() => null) : Promise.resolve(path),
+  ));
+  return { ...row, evidenceUrls: urls.filter((url): url is string => !!url) };
+}
+
+router.post(
+  "/evidence",
+  express.raw({ type: "image/*", limit: MAX_EVIDENCE_BYTES }),
+  async (req, res): Promise<void> => {
+    const buyerId = (req as any).clerkUserId as string;
+    const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
+    const bytes = req.body as Buffer;
+    if (!EVIDENCE_MIMES.has(contentType)) {
+      res.status(400).json({ error: "Use a JPEG, PNG, or WebP photo." });
+      return;
+    }
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_EVIDENCE_BYTES) {
+      res.status(400).json({ error: "Photos must be no larger than 8 MB." });
+      return;
+    }
+    if (!hasImageSignature(bytes, contentType)) {
+      res.status(400).json({ error: "The uploaded file does not match its declared image type." });
+      return;
+    }
+    let objectPath: string | null = null;
+    try {
+      objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType, `${evidencePrefix(buyerId)}${crypto.randomUUID()}`);
+      await objectStorage.trySetObjectEntityAclPolicy(objectPath, { owner: buyerId, visibility: "private" });
+      res.status(201).json({ objectPath });
+    } catch (err) {
+      if (objectPath) await objectStorage.deleteObjectEntity(objectPath).catch(() => {});
+      req.log.error({ err }, "Could not upload return evidence photo");
+      res.status(500).json({ error: "The photo could not be uploaded" });
+    }
+  },
+);
 
 const RETURN_STATUS_COPY: Record<"pending" | "approved" | "denied" | "refunded", { type: string; title: string; body: (orderNumber: string, refundAmountCents?: number | null) => string }> = {
   pending: {
@@ -105,6 +172,11 @@ router.post("/", async (req, res) => {
     if (evidenceUrls !== undefined && (!Array.isArray(evidenceUrls) || evidenceUrls.some((url) => typeof url !== "string"))) {
       return res.status(400).json({ error: "evidenceUrls must be an array of strings" });
     }
+    // Only photos this buyer uploaded through POST /evidence can be attached.
+    const evidence = (evidenceUrls as string[] | undefined) ?? [];
+    if (evidence.length > MAX_EVIDENCE_PHOTOS || evidence.some((url) => !url.startsWith(evidencePrefix(clerkUserId)))) {
+      return res.status(400).json({ error: "Attach up to 5 photos uploaded with this return request" });
+    }
     if (requestedItems !== undefined && !Array.isArray(requestedItems)) {
       return res.status(400).json({ error: "requestedItems must be an array" });
     }
@@ -116,6 +188,7 @@ router.post("/", async (req, res) => {
         buyerId: orders.buyerId,
         ownerId: orders.ownerId,
         status: orders.status,
+        orderNumber: orders.orderNumber,
         totalCents: orders.totalCents,
         stripePaymentIntentId: orders.stripePaymentIntentId,
       })
@@ -155,7 +228,27 @@ router.post("/", async (req, res) => {
       return res.status(409).json({ error: "A return request already exists for this order" });
     }
 
-    // 6. Insert the return
+    // 6. The returned items come from the order itself (names, variants and
+    //    prices the buyer actually paid) — never from client-sent prices.
+    const lines = await db
+      .select({ id: orderItems.id, productName: orderItems.productName, variantLabel: orderItems.variantLabel, quantity: orderItems.quantity, priceCents: orderItems.priceCents })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId));
+    const wanted = new Set(
+      (Array.isArray(requestedItems) ? requestedItems : [])
+        .map((item: any) => (typeof item?.lineItemId === "string" ? item.lineItemId : null))
+        .filter((value): value is string => !!value),
+    );
+    const chosen = lines.filter((line) => wanted.size === 0 || wanted.has(line.id));
+    const items = (chosen.length > 0 ? chosen : lines).map((line) => ({
+      lineItemId: line.id,
+      productName: line.productName,
+      variantTitle: line.variantLabel ?? undefined,
+      quantity: line.quantity,
+      unitPriceCents: line.priceCents,
+    }));
+
+    // 7. Insert the return
     const id = crypto.randomUUID();
     const [created] = await db
       .insert(returns)
@@ -168,16 +261,23 @@ router.post("/", async (req, res) => {
         notes: notes ?? null,
         resolutionRequested: resolutionRequested ?? "refund",
         status: "pending",
-        evidenceUrls: (evidenceUrls as string[] | undefined)?.slice(0, 5) ?? [],
-        requestedItems: (requestedItems as any[] | undefined)?.slice(0, 100) ?? [],
+        evidenceUrls: evidence,
+        requestedItems: items,
       })
       .returning();
 
-    // 7. Return created row
+    // 8. Tell both sides: the buyer's confirmation, and the seller's
+    //    "return requested" row (so a request never sits unseen).
     void notifyReturnStatus(created.id, "pending").catch((err) => {
       req.log.error({ err, returnId: created.id }, "Return request email delivery failed");
     });
-    return res.status(201).json(created);
+    void notifySellerReturnRequested({
+      sellerId: order.ownerId,
+      buyerId: clerkUserId,
+      returnId: created.id,
+      orderNumber: order.orderNumber,
+    });
+    return res.status(201).json(await signEvidence(created));
   } catch (err: any) {
     const status = err.status ?? 500;
     return res.status(status).json({ error: err.message ?? "Internal server error" });
@@ -216,7 +316,7 @@ router.get("/buyer", async (req, res) => {
       .where(eq(returns.buyerId, clerkUserId))
       .orderBy(sql`${returns.createdAt} DESC`);
 
-    return res.json(rows);
+    return res.json(await Promise.all(rows.map(signEvidence)));
   } catch (err: any) {
     const status = err.status ?? 500;
     return res.status(status).json({ error: err.message ?? "Internal server error" });
@@ -249,13 +349,15 @@ router.get("/", async (req, res) => {
         updatedAt: returns.updatedAt,
         orderNumber: orders.orderNumber,
         totalCents: orders.totalCents,
+        buyerName: sql<string>`COALESCE(${users.displayName}, ${users.name}, 'Buyer')`,
       })
       .from(returns)
       .innerJoin(orders, eq(orders.id, returns.orderId))
+      .leftJoin(users, eq(users.clerkId, returns.buyerId))
       .where(eq(returns.sellerId, clerkUserId))
       .orderBy(sql`${returns.createdAt} DESC`);
 
-    return res.json(rows);
+    return res.json(await Promise.all(rows.map(signEvidence)));
   } catch (err: any) {
     const status = err.status ?? 500;
     return res.status(status).json({ error: err.message ?? "Internal server error" });
@@ -287,6 +389,8 @@ router.get("/:id", async (req, res) => {
         updatedAt: returns.updatedAt,
         orderNumber: orders.orderNumber,
         totalCents: orders.totalCents,
+        sellerName: sql<string>`(SELECT COALESCE(u.brand_name, u.display_name, u.name, 'Seller') FROM users u WHERE u.clerk_id = ${returns.sellerId} LIMIT 1)`,
+        buyerName: sql<string>`(SELECT COALESCE(u.display_name, u.name, 'Buyer') FROM users u WHERE u.clerk_id = ${returns.buyerId} LIMIT 1)`,
       })
       .from(returns)
       .innerJoin(orders, eq(orders.id, returns.orderId))
@@ -301,7 +405,7 @@ router.get("/:id", async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    return res.json(row);
+    return res.json(await signEvidence(row));
   } catch (err: any) {
     const status = err.status ?? 500;
     return res.status(status).json({ error: err.message ?? "Internal server error" });
@@ -405,7 +509,7 @@ router.patch("/:id/status", async (req, res) => {
         ).catch((err) => {
           req.log.error({ err, returnId: id }, "Return status email delivery failed");
         });
-        return res.json(updated);
+        return res.json(await signEvidence(updated));
       } catch (refundErr: any) {
         if (refundErr instanceof RefundError && refundErr.status < 500) {
           return res.status(refundErr.status).json({ error: refundErr.message, code: refundErr.code });
