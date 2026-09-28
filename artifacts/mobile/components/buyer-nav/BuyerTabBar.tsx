@@ -2,8 +2,7 @@ import React from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { Tabs } from 'expo-router';
 import Animated, {
-  interpolate,
-  runOnJS,
+  Easing,
   useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
@@ -14,7 +13,6 @@ import Animated, {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticTabChange } from '@/lib/haptics';
 import { useActivityUnreadCount } from '@/components/ActivityBellButton';
-import { SHEET_EASING, SHEET_OPEN_MS } from '@/constants/motion';
 import {
   TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, CrossfadeNavIcon, tabIconColor,
   useTabBarActiveIndex,
@@ -23,11 +21,11 @@ import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { COMPACT_ICON_SCALE, COMPACT_ICON_STROKE_SCALE, useBuyerTabBarMetrics } from './buyerTabBarMetrics';
 import { TabBarGlassZone } from './TabBarGlassZone';
 
-// Reuse the app's established no-bounce/no-overshoot sheet timing (constants/
-// motion.ts, PRs #170/#176) for the compact <-> regular capsule transition,
-// rather than inventing a new curve/duration — 260ms sits in the requested
-// 250-300ms window.
-const BAR_MODE_TIMING = { duration: SHEET_OPEN_MS, easing: SHEET_EASING } as const;
+// Smooth ease-out, no bounce/overshoot — this round's explicit spec for the
+// compact <-> regular capsule transition (superseding the earlier SHEET_EASING/
+// 260ms pairing for this one motion, same way #225/#344 superseded a shared
+// constant for the pill).
+const BAR_MODE_TIMING = { duration: 220, easing: Easing.bezier(0.2, 0, 0, 1) } as const;
 
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -117,69 +115,95 @@ export function BuyerTabBar({
   } = useTabBarActiveIndex(activeIndex, reducedMotion);
 
   // 0 = regular, 1 = compact. Every animated style below reads this one
-  // value so width, height, icon scale and the selection pill all move as
-  // one coordinated transition instead of several out-of-sync ones.
+  // value so the capsule/circle/pill/icons all move as one coordinated
+  // transition instead of several out-of-sync ones.
+  //
+  // Driven entirely on the UI thread off `indicatorTarget` (the same shared
+  // value the pill's own eager glide uses — see useTabBarActiveIndex) rather
+  // than a React useEffect keyed on the real, committed `isCompact`: a press
+  // on Home (index 0) sets `indicatorTarget` to 0 on press-in, so this
+  // reaction — and the capsule resize it drives — starts the same frame,
+  // before the tabPress event and the destination screen's mount, instead of
+  // waiting for React to commit the real navigation state and competing with
+  // that mount for the JS thread.
   const progress = useSharedValue(isCompact ? 1 : 0);
-  React.useEffect(() => {
-    const target = isCompact ? 1 : 0;
-    // Reduced Motion: snap instantly, no animated transition at all.
-    progress.set(reducedMotion ? target : withTiming(target, BAR_MODE_TIMING));
-  }, [isCompact, reducedMotion, progress]);
+  useAnimatedReaction(
+    () => indicatorTarget.value === 0,
+    (nowCompact, wasCompact) => {
+      if (nowCompact === wasCompact) return;
+      progress.set(reducedMotion ? (nowCompact ? 1 : 0) : withTiming(nowCompact ? 1 : 0, BAR_MODE_TIMING));
+    },
+    [reducedMotion],
+  );
 
   // TabBarGlassZone isn't a Reanimated-aware component (its native path
   // renders several plain BlurView bands, its web path a CSS mask) — its
-  // `height` prop is kept in sync with `progress` every frame via this
-  // reaction instead, so the glass strip's top edge never lags behind or
-  // outruns the capsule's own animated top edge in either mode.
+  // `height` prop can only be updated from JS, which used to happen via a
+  // per-frame useAnimatedReaction + runOnJS (~16 React re-renders across the
+  // transition, on the same JS thread mounting the destination screen). Set
+  // once, straight to the target, instead — a same-tick snap rather than a
+  // gradual sync, trading a barely-visible seam on the glass strip's own top
+  // edge for zero per-frame JS work.
   const [barTopInset, setBarTopInset] = React.useState(
     isCompact ? compactMetrics.barTopInset : regularMetrics.barTopInset,
   );
-  useAnimatedReaction(
-    () => interpolate(progress.value, [0, 1], [regularMetrics.barTopInset, compactMetrics.barTopInset]),
-    (current, previous) => {
-      if (current !== previous) runOnJS(setBarTopInset)(current);
-    },
-    [regularMetrics.barTopInset, compactMetrics.barTopInset],
-  );
+  React.useEffect(() => {
+    setBarTopInset(isCompact ? compactMetrics.barTopInset : regularMetrics.barTopInset);
+  }, [isCompact, compactMetrics.barTopInset, regularMetrics.barTopInset]);
 
-  const barGapStyle = useAnimatedStyle(() => ({
-    gap: interpolate(progress.value, [0, 1], [regularMetrics.gap, compactMetrics.gap]),
+  // Capsule/circle scale factors, in "regular -> compact" ratio form so the
+  // capsule and circle can each be rendered at a FIXED (regular) layout size
+  // and resized purely with `transform: scale` — no width/height/borderRadius
+  // animated per frame, so no relayout and no BlurView resize (TabBarGlass's
+  // own box never changes size; only the whole already-blurred result gets
+  // scaled down as one compositor operation). The capsule's own width and
+  // height shrink by very slightly different ratios (~1% apart, see
+  // buyerTabBarMetrics.ts's COMPACT_*_SCALE constants), so it gets its own
+  // non-uniform scaleX/scaleY; the circle is a true circle in both modes
+  // (circleSize === capsuleHeight always), so one scalar covers it exactly.
+  const capsuleScaleX = compactMetrics.capsuleWidth / regularMetrics.capsuleWidth;
+  const capsuleScaleY = compactMetrics.capsuleHeight / regularMetrics.capsuleHeight;
+  // How far the circle needs to slide toward the capsule to close both the
+  // capsule's own shrink (half its width delta, since it scales from its
+  // center) and the gap's own shrink — derived once from the metrics
+  // (plain numbers, not per-frame), not from an animated `gap` layout prop.
+  const circleShiftXTarget = (compactMetrics.capsuleWidth - regularMetrics.capsuleWidth) / 2
+    + (compactMetrics.circleSize - regularMetrics.circleSize) / 2
+    + (compactMetrics.gap - regularMetrics.gap);
+
+  const capsuleAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scaleX: 1 + (capsuleScaleX - 1) * progress.value },
+      { scaleY: 1 + (capsuleScaleY - 1) * progress.value },
+    ],
   }));
-  const capsuleAnimatedStyle = useAnimatedStyle(() => {
-    const h = interpolate(progress.value, [0, 1], [regularMetrics.capsuleHeight, compactMetrics.capsuleHeight]);
-    return {
-      height: h,
-      borderRadius: h / 2,
-      width: interpolate(progress.value, [0, 1], [regularMetrics.capsuleWidth, compactMetrics.capsuleWidth]),
-    };
-  });
-  const capsuleGlassStyle = useAnimatedStyle(() => {
-    const h = interpolate(progress.value, [0, 1], [regularMetrics.capsuleHeight, compactMetrics.capsuleHeight]);
-    return { borderRadius: h / 2 };
-  });
-  const circleAnimatedStyle = useAnimatedStyle(() => {
-    const size = interpolate(progress.value, [0, 1], [regularMetrics.circleSize, compactMetrics.circleSize]);
-    return { width: size, height: size, borderRadius: size / 2 };
-  });
-  const circleGlassStyle = useAnimatedStyle(() => {
-    const size = interpolate(progress.value, [0, 1], [regularMetrics.circleSize, compactMetrics.circleSize]);
-    return { borderRadius: size / 2 };
-  });
-  const slotAnimatedStyle = useAnimatedStyle(() => ({
-    width: interpolate(progress.value, [0, 1], [regularMetrics.itemWidth, compactMetrics.itemWidth]),
-    height: interpolate(progress.value, [0, 1], [regularMetrics.capsuleHeight, compactMetrics.capsuleHeight]),
+  const circleAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: circleShiftXTarget * progress.value },
+      { scale: 1 + (capsuleScaleY - 1) * progress.value },
+    ],
   }));
   // Icons shrink less than the capsule itself ("slightly smaller", not
-  // tiny) — a uniform scale transform on the icon's own wrapper, driven by
-  // the same `progress` value, so it moves in lockstep with the capsule/
-  // circle/pill resize rather than as a separate, staggered animation.
-  const iconScaleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(progress.value, [0, 1], [1, COMPACT_ICON_SCALE]) }],
-  }));
+  // tiny). They're nested inside the capsule/circle's own transform above,
+  // so this counter-scales against that parent scale first (dividing it
+  // out) and then applies the icon's own, gentler target ratio — net result
+  // is the icon's true COMPACT_ICON_SCALE regardless of how much its parent
+  // shrunk, composited in the same frame as one transform, no extra layer.
+  const slotIconScaleStyle = useAnimatedStyle(() => {
+    const iconScale = 1 + (COMPACT_ICON_SCALE - 1) * progress.value;
+    const parentScaleX = 1 + (capsuleScaleX - 1) * progress.value;
+    const parentScaleY = 1 + (capsuleScaleY - 1) * progress.value;
+    return { transform: [{ scaleX: iconScale / parentScaleX }, { scaleY: iconScale / parentScaleY }] };
+  });
+  const circleIconScaleStyle = useAnimatedStyle(() => {
+    const iconScale = 1 + (COMPACT_ICON_SCALE - 1) * progress.value;
+    const parentScale = 1 + (capsuleScaleY - 1) * progress.value;
+    return { transform: [{ scale: iconScale / parentScale }] };
+  });
   // Static (not interpolated) compensation: a smaller icon rendered with a
   // proportionally heavier stroke reads as the same visual weight instead of
   // going thin. Snapping this once per mode (rather than animating it frame
-  // by frame) is imperceptible over a 260ms transition and keeps the vector
+  // by frame) is imperceptible over a 220ms transition and keeps the vector
   // icons themselves out of the per-frame animation path.
   const iconStrokeWidth = isCompact ? 1.8 * COMPACT_ICON_STROKE_SCALE : undefined;
 
@@ -240,8 +264,7 @@ export function BuyerTabBar({
       testID="buyer-bottom-tab-bar"
       style={[
         styles.bar,
-        { bottom: metrics.bottomOffset },
-        barGapStyle,
+        { bottom: metrics.bottomOffset, gap: metrics.gap },
       ]}
     >
       {/* Frosted glass over whatever's actually rendered behind the bar —
@@ -260,10 +283,7 @@ export function BuyerTabBar({
           leave a hard, unblurred edge below the glass. The height is
           `barTopInset` (not the more generous `occupiedHeight`) so the
           glass's own top edge lands exactly on the bar's top pixel, with
-          no gap of sharp content between them. `barTopInset` itself is kept
-          in sync with the capsule's animated height every frame (see the
-          `useAnimatedReaction` above) so this never falls behind or overlaps
-          the real edge while switching in/out of compact mode. */}
+          no gap of sharp content between them. */}
       <TabBarGlassZone
         height={barTopInset}
         width={width}
@@ -272,16 +292,23 @@ export function BuyerTabBar({
       />
 
       {/* ── Capsule ─────────────────────────────────────────────────────── */}
-      <Animated.View style={[styles.shadow, capsuleAnimatedStyle]}>
-        <TabBarGlass theme={theme} radius={metrics.capsuleHeight / 2} animatedStyle={capsuleGlassStyle} />
+      {/* Fixed at its regular layout size always — `capsuleAnimatedStyle`
+          resizes it purely via `transform: scale`, so this box (and the
+          TabBarGlass/BlurView inside it) never triggers a relayout. */}
+      <Animated.View
+        style={[
+          styles.shadow,
+          { width: regularMetrics.capsuleWidth, height: regularMetrics.capsuleHeight, borderRadius: regularMetrics.capsuleHeight / 2 },
+          capsuleAnimatedStyle,
+        ]}
+      >
+        <TabBarGlass theme={theme} radius={regularMetrics.capsuleHeight / 2} />
 
         <TabBarIndicator
           x={indicatorX}
           target={indicatorTarget}
           opacity={indicatorOpacity}
           metrics={regularMetrics}
-          compactMetrics={compactMetrics}
-          progress={progress}
           theme={theme}
         />
 
@@ -302,7 +329,6 @@ export function BuyerTabBar({
                 focused={focused}
                 width={metrics.itemWidth}
                 height={metrics.capsuleHeight}
-                animatedStyle={slotAnimatedStyle}
                 hitSlop={isCompact ? compactHitSlop : undefined}
                 onPress={() => openRoute(item.route)}
                 onPressIn={() => pressIndicator(index)}
@@ -313,7 +339,7 @@ export function BuyerTabBar({
                 pillTarget={indicatorTarget}
                 pillIndex={index}
               >
-                <Animated.View style={iconScaleStyle}>
+                <Animated.View style={slotIconScaleStyle}>
                   <CrossfadeNavIcon
                     name={item.icon}
                     focused={focused}
@@ -329,11 +355,14 @@ export function BuyerTabBar({
       </Animated.View>
 
       {/* ── Profile circle ──────────────────────────────────────────────── */}
+      {/* Also fixed at its regular size — `circleAnimatedStyle` both shrinks
+          it (transform: scale) and slides it toward the capsule by exactly
+          the space that shrink + the gap's own shrink reclaim, in place of
+          animating `gap` (a real layout property on `styles.bar`'s row). */}
       <TabBarCircle
         theme={theme}
         size={metrics.circleSize}
         animatedStyle={circleAnimatedStyle}
-        glassAnimatedStyle={circleGlassStyle}
         hitSlop={isCompact ? compactCircleHitSlop : undefined}
         active={profileFocused}
         accessibilityLabel="Profile tab"
@@ -343,7 +372,7 @@ export function BuyerTabBar({
         onLongPress={() => onLongPress('profile')}
         testID="buyer-tab-profile"
       >
-        <Animated.View style={iconScaleStyle}>
+        <Animated.View style={circleIconScaleStyle}>
           <BuyerNavIcon
             name="profile"
             color={tabIconColor(theme, profileFocused)}
