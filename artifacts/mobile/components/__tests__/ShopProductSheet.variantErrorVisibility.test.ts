@@ -69,7 +69,7 @@ describe('ShopProductSheet — a missing-variant error is always visible, not ju
 
   it('the main content ScrollView is wired to contentScrollRef', () => {
     const scrollViewOpen = sheetSource.slice(
-      sheetSource.indexOf('{(phase === \'ready\' || phase === \'adding\' || phase === \'buying\' || phase === \'added\') && product && (\n          <ScrollView'),
+      sheetSource.indexOf('sheetStep === \'detail\' && (phase === \'ready\' || phase === \'adding\' || phase === \'buying\' || phase === \'added\') && product && (\n          <ScrollView'),
     ).slice(0, 780);
     expect(scrollViewOpen).toContain('ref={contentScrollRef}');
   });
