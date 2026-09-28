@@ -99,6 +99,12 @@ const DETAILS: Record<string, { description: string; materials: string; care: st
     care: 'Dry clean only.',
     fit: 'True to size. Structured bodice.',
   },
+  'Leather Ankle Boots': {
+    description: 'A pointed-toe ankle boot in supple calfskin leather with a stacked block heel and a side zip closure.',
+    materials: '100% calfskin leather upper. Sole: leather with a rubber grip pad.',
+    care: 'Wipe clean with a soft, dry cloth. Condition leather regularly.',
+    fit: 'True to size.',
+  },
 };
 
 const RETURNS_POLICY = 'Returns accepted within 14 days of delivery for unworn items with tags attached.';
