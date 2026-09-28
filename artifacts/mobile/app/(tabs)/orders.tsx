@@ -3,7 +3,7 @@
  * Shopify-pattern layout: persistent search row, status pills, date-grouped divider rows.
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Platform, Share } from 'react-native';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
@@ -29,6 +29,7 @@ import { formatCents } from '@/lib/money';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useScrollReset } from '@/hooks/useScrollReset';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -200,7 +201,7 @@ const FULFILLMENT_MAP: Partial<Record<OrderStatus, FulfillmentStatus>> = {
 
 export function apiRowToOrder(row: any): OrderListOrder {
   const ordStatus: OrderStatus = dbStatusToOrderStatus(row.status as string);
-  const rowPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(row.status as string) as PaymentStatus;
+  const rowPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(row.status as string, row.paidAt) as PaymentStatus;
   const fStatus: FulfillmentStatus = FULFILLMENT_MAP[ordStatus] ?? 'unfulfilled';
   const initials = ((row.customerName as string | undefined) ?? 'C')
     .split(/\s+/).map((w: string) => w[0] ?? '').slice(0, 2).join('').toUpperCase();
@@ -706,6 +707,15 @@ export default function OrdersScreen() {
 
   const api = useApi();
   const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
+  // ?bt_preview=seller (web design-preview bypass, app/_layout.tsx): renders
+  // this screen without ever waiting for Clerk to load or sign in, so
+  // authLoaded/isSignedIn/userId can legitimately stay false/null forever —
+  // that is not "still loading", it is the deliberate no-account preview
+  // state. Gating the fetch/loading state on real auth in that state is
+  // exactly what produced an infinite skeleton (never resolves because
+  // isSignedIn never becomes true). Evaluated once: bt_preview doesn't
+  // change during a session.
+  const [isPreviewMode] = useState(() => isSellerDevPreview());
 
   // Deep-link support: /(tabs)/orders?filter=unfulfilled opens pre-filtered
   // (e.g. from the dashboard's "N orders to ship" row) instead of always
@@ -738,6 +748,23 @@ export default function OrdersScreen() {
   const hasLoadedRef = useRef(false);
 
   const loadData = useCallback(async (generation: number) => {
+    // Design-preview bypass with no real signed-in account: there is no
+    // token to fetch real orders with, and there never will be (Clerk was
+    // never awaited — see app/_layout.tsx's PREVIEW_ROLE bypass). This is
+    // not a connectivity failure, so it resolves straight to the honest
+    // empty state rather than the "couldn't load" retry banner a real
+    // fetch failure shows.
+    if (isPreviewMode && !userId) {
+      if (generationRef.current === generation) {
+        setOrders([]);
+        setStats(computeStats([]));
+        setLoadError(false);
+        setLoading(false);
+        setRefreshing(false);
+        hasLoadedRef.current = true;
+      }
+      return;
+    }
     if (!authLoaded || !isSignedIn || !userId) return;
     if (requestGenerationRef.current === generation) return;
     const requestOwnerId = userId;
@@ -777,7 +804,7 @@ export default function OrdersScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [api, authLoaded, isSignedIn, userId]);
+  }, [api, authLoaded, isPreviewMode, isSignedIn, userId]);
 
   // Re-apply the ?filter= deep link every time this screen is focused (not
   // just on first mount) — the seller tab bar keeps this screen mounted, so
@@ -795,25 +822,73 @@ export default function OrdersScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!authLoaded || !isSignedIn || !userId) {
+      // In the design-preview bypass, real auth may never resolve (see
+      // isPreviewMode above) — that's the deliberate no-account state, not
+      // "still loading", so it must not block loadData the way waiting on
+      // a real account does.
+      if (!isPreviewMode && (!authLoaded || !isSignedIn || !userId)) {
         setLoading(true);
         return undefined;
       }
-      clearBadge(userId);
+      if (userId) clearBadge(userId);
       const generation = ++generationRef.current;
       consecutiveFailuresRef.current = 0;
       setUpdatesPaused(false);
       if (!hasLoadedRef.current) setLoading(true);
       loadData(generation);
-      timerRef.current = setInterval(() => loadData(generation), 30_000);
+      // Preview mode with no account resolves once, synchronously, in
+      // loadData above — no real backend to poll every 30s.
+      if (userId || !isPreviewMode) {
+        timerRef.current = setInterval(() => loadData(generation), 30_000);
+      }
       return () => {
         if (timerRef.current !== null) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
       };
-    }, [authLoaded, isSignedIn, loadData, userId])
+    }, [authLoaded, isPreviewMode, isSignedIn, loadData, userId])
   );
+
+  // Safety net for a real race: useFocusEffect above only re-runs its
+  // callback on an actual navigation focus event — it does NOT re-run
+  // merely because authLoaded/isSignedIn/userId changed while this tab was
+  // already focused (e.g. this tab is focused at cold start, before
+  // Clerk's async `isLoaded` flips true). If that happens, the effect
+  // above sets loading=true and returns, and — since a tab screen never
+  // unmounts and no further focus event follows — nothing else ever calls
+  // loadData: the skeleton spins forever (item 127). This plain effect
+  // closes that one gap: it only fires once auth has just become ready and
+  // nothing has loaded yet, so it never duplicates the normal focus-driven
+  // poll once that has started.
+  useEffect(() => {
+    if (!authLoaded || !isSignedIn || !userId) return;
+    if (hasLoadedRef.current || timerRef.current !== null) return;
+    clearBadge(userId);
+    const generation = ++generationRef.current;
+    consecutiveFailuresRef.current = 0;
+    setUpdatesPaused(false);
+    setLoading(true);
+    loadData(generation);
+    timerRef.current = setInterval(() => loadData(generation), 30_000);
+  }, [authLoaded, isSignedIn, loadData, userId]);
+
+  // Hard backstop: whatever the cause — a real load that's taking unusually
+  // long, an auth or network edge case neither guard above anticipated —
+  // the skeleton must never spin indefinitely. If nothing has resolved
+  // `loading` within 1.5s of it turning true, fall through to whatever
+  // state that leaves (the real empty state when `orders` is still empty,
+  // or the existing list/error state otherwise) instead of an infinite
+  // skeleton. A real, fast load always resolves well before this fires, so
+  // in the normal case this timer is cleared long before it would run.
+  useEffect(() => {
+    if (!loading) return undefined;
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      hasLoadedRef.current = true;
+    }, 1500);
+    return () => clearTimeout(timeout);
+  }, [loading]);
 
   const retryUpdates = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

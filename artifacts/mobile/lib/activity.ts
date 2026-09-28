@@ -30,6 +30,12 @@ export interface ActivityItem {
   targetType?: string;
   targetImageUrl?: string;
   cta?: string;
+  /**
+   * New-follower rows only: whether the viewer follows this person right
+   * now (live, from the feed endpoint). Absent from older servers/rows, in
+   * which case the stored `cta` is the only signal.
+   */
+  isFollowingActor?: boolean;
   createdAt: string;
 }
 
@@ -311,6 +317,62 @@ export function matchesFilter(item: Pick<ActivityItem, 'category' | 'type'>, fil
   return filter === 'all' || activityKind(item) === filter;
 }
 
+// ─── Filter chips ─────────────────────────────────────────────────────────────
+
+/**
+ * The Activity tab's filter chips — Threads' own Activity pattern (a pill
+ * row over one feed: https://mobbin.com/screens/cb296e3d-df9e-4c48-a030-0f08248197d5).
+ * Same set for buyers and sellers: the feed is per account, not per role,
+ * so every category below can show up in either mode.
+ */
+export type ActivityChip = 'all' | 'follows' | 'likes' | 'comments' | 'orders' | 'thread_cash';
+
+export const ACTIVITY_CHIPS: readonly { key: ActivityChip; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'follows', label: 'Follows' },
+  { key: 'likes', label: 'Likes' },
+  { key: 'comments', label: 'Comments' },
+  { key: 'orders', label: 'Orders' },
+  { key: 'thread_cash', label: 'Thread Cash' },
+];
+
+const FOLLOW_TYPES = new Set(['new_follower']);
+const LIKE_TYPES = new Set(['post_like', 'story_like']);
+const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'mention']);
+const THREAD_CASH_TYPES = new Set(['thread_cash_received']);
+
+/** Which chip an item belongs to; 'other' rows (reposts, drops…) show under All only. */
+export function activityCategory(item: Pick<ActivityItem, 'category' | 'type'>): Exclude<ActivityChip, 'all'> | 'other' {
+  if (activityKind(item) === 'orders') return 'orders';
+  if (FOLLOW_TYPES.has(item.type)) return 'follows';
+  if (LIKE_TYPES.has(item.type)) return 'likes';
+  if (COMMENT_TYPES.has(item.type)) return 'comments';
+  if (THREAD_CASH_TYPES.has(item.type)) return 'thread_cash';
+  return 'other';
+}
+
+/**
+ * Whether an item shows under a chip. "All" is the social feed: order,
+ * payout and inventory updates stay under "Orders" so shopping noise doesn't
+ * sit between likes and follows.
+ */
+export function matchesActivityChip(item: Pick<ActivityItem, 'category' | 'type'>, chip: ActivityChip): boolean {
+  const category = activityCategory(item);
+  return chip === 'all' ? category !== 'orders' : category === chip;
+}
+
+/** What an empty chip says instead of a blank list. */
+export function activityChipEmpty(chip: ActivityChip): { icon: string; message: string } {
+  switch (chip) {
+    case 'follows': return { icon: 'user-plus', message: "No new followers yet. When someone follows you, you'll see it here." };
+    case 'likes': return { icon: 'heart', message: "No likes yet. When someone likes your posts or stories, you'll see it here." };
+    case 'comments': return { icon: 'message-circle', message: 'No comments yet. Comments, replies and mentions of you will show up here.' };
+    case 'orders': return { icon: 'package', message: 'No order updates yet. Order, shipping and payout updates will show up here.' };
+    case 'thread_cash': return { icon: 'dollar-sign', message: "No Thread Cash yet. When someone sends you Thread Cash, you'll see it here." };
+    default: return { icon: 'activity', message: 'Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.' };
+  }
+}
+
 /** Feather icon used when a row has no actor avatar or thumbnail. */
 export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): string {
   switch (item.type) {
@@ -358,10 +420,62 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
 
 /** True for rows that render an inline "Follow back" button instead of navigating. */
 export function isFollowBackRow(row: ActivityRow): boolean {
-  return row.type === 'new_follower' && row.cta === 'Follow back' && row.actorCount === 1 && !!row.targetId;
+  return row.type === 'new_follower' && row.cta === 'Follow back' && row.actorCount === 1 && !!row.targetId
+    && row.isFollowingActor !== true;
+}
+
+/**
+ * The inline Follow back / Following pill on a single-person follow row
+ * ("bear.2123374 started following you · Follow back" — Instagram iOS
+ * Activity, https://mobbin.com/screens/1f627db9-fb0f-4870-b58d-35bec67239c7),
+ * or null when the row has no pill (merged rows, non-follow rows).
+ *
+ * `following` prefers the server's live `isFollowingActor`; without it, a
+ * row whose stored `cta` isn't "Follow back" was a follow-back ("…followed
+ * you back"), so the viewer already follows them.
+ */
+export function followControlState(row: ActivityRow): { userId: string; following: boolean } | null {
+  if (row.type !== 'new_follower' || row.actorCount !== 1 || !row.targetId) return null;
+  const following = typeof row.isFollowingActor === 'boolean'
+    ? row.isFollowingActor
+    : row.cta !== 'Follow back';
+  return { userId: row.targetId, following };
 }
 
 const q = encodeURIComponent;
+
+// ─── Grouped rows → people list ───────────────────────────────────────────────
+
+/** Most feed ids a people-list link carries (matches the server's cap). */
+export const GROUPED_PEOPLE_MAX_IDS = 100;
+
+/**
+ * True for a merged row of two or more people ("Jay and 12 others liked your
+ * post"). Tapping one opens the list of those people — Instagram's "View
+ * likes" pattern (https://mobbin.com/flows/c575ad7c-8644-4b26-a3d0-ae737f855c13)
+ * — instead of jumping straight to the post.
+ */
+export function isGroupedRow(row: Pick<ActivityRow, 'type' | 'actorCount'>): boolean {
+  return row.actorCount > 1 && AGGREGATED_TYPES.has(row.type);
+}
+
+/** Header for the people list a grouped row opens. */
+export function groupedPeopleTitle(type: string): string {
+  switch (type) {
+    case 'post_like':
+    case 'story_like': return 'Likes';
+    case 'post_comment': return 'Comments';
+    case 'repost': return 'Reposts';
+    case 'new_follower': return 'New followers';
+    default: return 'People';
+  }
+}
+
+/** Route for the people list behind a grouped row. */
+export function groupedPeopleHref(row: Pick<ActivityRow, 'type' | 'ids'>): string {
+  const ids = row.ids.slice(0, GROUPED_PEOPLE_MAX_IDS).join(',');
+  return `/activity-people?type=${q(row.type)}&ids=${q(ids)}`;
+}
 
 /**
  * Where tapping a row goes, or null when there is nowhere useful to go.

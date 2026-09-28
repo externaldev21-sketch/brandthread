@@ -35,6 +35,7 @@ import { undoExpiresAt } from '@/lib/undoRecovery';
 import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
 import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
 // Mutations remain responsible for their own server/local rollback. This provider
@@ -572,18 +573,13 @@ interface SearchBarProps {
 
 export function SearchBar({ value, onChange, placeholder = 'Search…', style, onFocus, onBlur }: SearchBarProps) {
   const [focused, setFocused] = useState(false);
+  const { theme } = useAppTheme();
   const palette = useColors();
   return (
-    // Overnight batch item 37: filled rounded, no border at rest OR focus —
-    // a themed card+border swapping to an accent border on focus is exactly
-    // the "rectangle bar" the owner flagged across every search field.
-    // Fixed monochrome white-alpha fill regardless of theme (matches the
-    // fill spec exactly), not a themed card color, so this reads the same
-    // on every one of the app's selectable color themes.
-    <View style={[srS.root, style]}>
-      <Feather name="search" size={ICON.sm} color={focused ? '#FFFFFF' : palette.mutedForeground} />
+    <View style={[srS.root, { backgroundColor: palette.card }, focused && srS.focused, style]}>
+      <Feather name="search" size={ICON.sm} color={focused ? theme.accentLight : palette.mutedForeground} />
       <TextInput
-        style={[srS.input, { color: palette.foreground }]}
+        style={[srS.input, { color: palette.foreground }, WEB_INPUT_RESET]}
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
@@ -609,9 +605,13 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
 }
 
 const srS = StyleSheet.create({
-  root:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(255,255,255,0.10)',
-             borderRadius: 12, borderWidth: 0,
+  root:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD,
+             borderRadius: RADIUS.md, borderWidth: 0,
              paddingHorizontal: SP.md, height: COMP.inputH - 4 },
+  // Focused state stays the same pill as unfocused — no border/box appears,
+  // at rest or on focus (borderWidth is 0 above, not just transparent).
+  // Only a very subtle fill change signals focus.
+  focused: { backgroundColor: 'rgba(255,255,255,0.10)' },
   input:   { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: FG },
 });
 
@@ -986,7 +986,7 @@ export function FormInput({
       {label && <Text style={fiS.label}>{label}</Text>}
       <View style={[fiS.inputRow, focused && [fiS.focusedRow, { borderColor: theme.accent }], multiline && fiS.multilineRow]}>
         <TextInput
-          style={[fiS.input, multiline && fiS.multilineInput]}
+          style={[fiS.input, multiline && fiS.multilineInput, WEB_INPUT_RESET]}
           value={value}
           onChangeText={onChange}
           placeholder={placeholder}
