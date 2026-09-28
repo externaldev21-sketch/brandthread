@@ -1803,6 +1803,15 @@ export const liveStreams = pgTable('live_streams', {
   endedAt:          timestamp('ended_at', { withTimezone: true }),
   replayPostId:     uuid('replay_post_id').references(() => posts.id, { onDelete: 'set null' }),
   replayUrl:        text('replay_url'),
+  // Agora Cloud Recording bookkeeping (migration 106) — see that file for
+  // the recording_status state machine and idempotency notes.
+  recordingStatus:      text('recording_status').notNull().default('none'),
+  recordingResourceId:  text('recording_resource_id'),
+  recordingSid:         text('recording_sid'),
+  recordingUid:         integer('recording_uid'),
+  recordingStartedAt:   timestamp('recording_started_at', { withTimezone: true }),
+  recordingStoppedAt:   timestamp('recording_stopped_at', { withTimezone: true }),
+  recordingError:       text('recording_error'),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   statusViewerIdx: index('live_streams_status_viewer_idx')
