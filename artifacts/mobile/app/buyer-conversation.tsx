@@ -1146,6 +1146,25 @@ export default function BuyerConversationScreen() {
       );
     }
 
+    // Story reply (Mobbin: Instagram "Replying to a story") — a small
+    // square thumbnail of the replied-to slide + "Replied to your story",
+    // then the actual reply text renders below as the bubble's own text
+    // (unchanged rendering, same as every other message).
+    if (att.type === 'story_reply') {
+      return (
+        <View style={s.storyReplyCard}>
+          {att.uri ? (
+            <CachedImage source={{ uri: att.uri }} style={s.storyReplyThumb} recyclingKey={att.uri} />
+          ) : (
+            <View style={[s.storyReplyThumb, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Feather name="camera" size={ICON.sm} color={theme.muted} />
+            </View>
+          )}
+          <Text style={s.storyReplyLabel} numberOfLines={1}>{att.title || 'Replied to your story'}</Text>
+        </View>
+      );
+    }
+
     // 'thread_cash', 'quick_replies' and 'agent_card' are handled in
     // renderItem() before this function is ever called for them — they're
     // standalone rows, not content that belongs inside a chat bubble.
@@ -3103,6 +3122,23 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   productUnavailableText: {
     fontFamily: FONT.medium,
+  },
+  storyReplyCard: {
+    alignItems: 'center',
+    marginBottom: SP.xs,
+  },
+  storyReplyThumb: {
+    width: 72,
+    height: 108,
+    borderRadius: RADIUS.md,
+    backgroundColor: theme.cardElevated,
+    overflow: 'hidden',
+  },
+  storyReplyLabel: {
+    marginTop: 4,
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: theme.muted,
   },
   productViewChip: {
     flexDirection: 'row',

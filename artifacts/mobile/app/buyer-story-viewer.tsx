@@ -21,15 +21,19 @@ import {
 } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { Glass } from '@/components/ui/Glass';
+import { AppleEmoji } from '@/components/ui/AppleEmoji';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
 import {
   getStories, trackStoryView, subscribeSocial, muteUser, createOrGetConversation, sendMessage,
 } from '@/services/socialService';
+import {
+  isPreviewInboxEnabled, getOrCreatePreviewConversationForAuthor, appendPreviewMessage, touchPreviewConversation,
+} from '@/lib/previewInbox';
 import { useAuth } from '@clerk/expo';
 import { confirmBlock, reportHref } from '@/lib/safety';
-import type { Story, StoryMedia } from '@/services/socialTypes';
+import type { Story, StoryMedia, MessageAttachment } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import StoryGestureGuide from '@/components/social/StoryGestureGuide';
 import { shouldShowStoryGestureGuide } from '@/lib/storyGestureGuideStorage';
@@ -37,11 +41,24 @@ import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, 
 
 const { width: W, height: H } = Dimensions.get('window');
 
-// Mirrors Instagram's default quick-reaction row shown above the reply
-// pill before the viewer starts typing (Mobbin: Instagram iOS story
-// viewer reply screen). Emoji glyphs carry their own inherent color —
-// not a themed accent — so they're exempt from the monochrome rule.
-const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '👏', '🔥'];
+// Mirrors Instagram's own quick-reaction row (Mobbin: Instagram iOS story
+// viewer reply screen) — same 8 emoji, in the same order: laughing-crying,
+// heart-eyes, open-mouth, clap, fire, party, crying, 100. Rendered via
+// <AppleEmoji> for consistent art across platforms (see that component for
+// why). Emoji carry their own inherent color — not a themed accent — so
+// they're exempt from the monochrome rule.
+const QUICK_REACTIONS = ['😂', '😍', '😮', '👏', '🔥', '🎉', '😢', '💯'];
+
+// Preview/demo mode (?bt_preview=buyer) has no reachable backend to answer
+// api.social.storyViewers() for "my" story — reuses the same 3 seeded
+// people lib/previewInboxData.ts's follow notifications already use, so
+// the "Seen by" row has real-looking, consistent stacked avatars instead
+// of rendering empty.
+const PREVIEW_STORY_VIEWERS = [
+  { userId: 'preview-seller-01', name: 'Atelier Noire', handle: '@atelier_noire', avatarUrl: null, viewedAt: new Date(Date.now() - 8 * 60_000).toISOString() },
+  { userId: 'preview-seller-04', name: 'Orison', handle: '@orison', avatarUrl: null, viewedAt: new Date(Date.now() - 40 * 60_000).toISOString() },
+  { userId: 'preview-seller-07', name: 'Astrae', handle: '@astrae', avatarUrl: null, viewedAt: new Date(Date.now() - 90 * 60_000).toISOString() },
+];
 
 function timeAgo(ms: number): string {
   const diff = Date.now() - ms;
@@ -96,10 +113,16 @@ export default function BuyerStoryViewer() {
   const [likesCounts, setLikesCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [showGestureGuide, setShowGestureGuide] = useState(false);
-  const [serverViewers, setServerViewers] = useState<Array<{ userId: string; name: string; handle: string; viewedAt: string }>>([]);
+  const [serverViewers, setServerViewers] = useState<Array<{ userId: string; name: string; handle: string; avatarUrl: string | null; viewedAt: string }>>([]);
   const [viewersLoading, setViewersLoading] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
   const loadGeneration = useRef(0);
+  // Blurring the reply input (e.g. web's mousedown-fires-blur-before-click)
+  // would otherwise unmount the quick-reaction row before a tap on one of
+  // its emoji finishes registering — a real dropped-tap bug, not just a
+  // sandbox artifact. Delaying the hide lets an in-flight press land first;
+  // refocusing (tapping back into the input) cancels the pending hide.
+  const replyBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const progress = useRef(new Animated.Value(0)).current;
   const ids = allStoryIds ? allStoryIds.split(',').filter(Boolean) : storyId ? [storyId] : [];
@@ -156,6 +179,21 @@ export default function BuyerStoryViewer() {
     });
   }, [stories]);
 
+  // Prefetches viewers for a story I posted, so the bottom-left "Seen by"
+  // row has real stacked avatars immediately instead of only after tapping
+  // into the full viewers sheet.
+  useEffect(() => {
+    const isMine = (!!myUserId && currentStory?.authorId === myUserId) || currentStory?.authorId === 'me';
+    if (!currentStory || !isMine) return;
+    let cancelled = false;
+    setViewersLoading(true);
+    api.social.storyViewers(currentStory.id)
+      .then(rows => { if (!cancelled) setServerViewers(rows.length ? rows : (!myUserId ? PREVIEW_STORY_VIEWERS : [])); })
+      .catch(() => { if (!cancelled) setServerViewers(!myUserId ? PREVIEW_STORY_VIEWERS : []); })
+      .finally(() => { if (!cancelled) setViewersLoading(false); });
+    return () => { cancelled = true; };
+  }, [currentStory?.id, myUserId]);
+
   const handleLike = async () => {
     if (!currentStory) return;
     const sid = currentStory.id;
@@ -183,19 +221,58 @@ export default function BuyerStoryViewer() {
     const text = (override ?? inputText).trim();
     if (!text || sendingReply || !currentStory) return;
     setSendingReply(true);
+    // Every reply (typed or a tapped quick-reaction) carries the replied-to
+    // slide as a thumbnail, IG style — see buyer-conversation.tsx's
+    // 'story_reply' attachment card.
+    const attachment: MessageAttachment = {
+      type: 'story_reply',
+      uri: currentSlide?.imageUri,
+      title: 'Replied to your story',
+      meta: { storyId: currentStory.id },
+    };
     try {
-      const conv = await createOrGetConversation({
-        type: 'buyer_to_buyer',
-        participant: {
-          userId: currentStory.authorId,
-          name: currentStory.authorName,
-          handle: currentStory.authorHandle,
-          initials: currentStory.authorInitials,
-          color: currentStory.authorColor,
-          accountType: 'buyer',
-        },
-      });
-      await sendMessage(conv.id, text);
+      if (!myUserId && isPreviewInboxEnabled()) {
+        // Preview/demo mode has no reachable backend — land the reply in
+        // the same seeded local inbox app/(buyer)/inbox.tsx and
+        // buyer-conversation.tsx already read (lib/previewInbox.ts), so the
+        // flow is actually verifiable end to end without a live network.
+        const conv = getOrCreatePreviewConversationForAuthor({
+          authorId: currentStory.authorId,
+          authorName: currentStory.authorName,
+          authorHandle: currentStory.authorHandle,
+          authorInitials: currentStory.authorInitials,
+          authorColor: currentStory.authorColor,
+        });
+        const ts = Date.now();
+        appendPreviewMessage(conv.id, {
+          id: `preview-story-reply-${ts}`,
+          conversationId: conv.id,
+          fromId: 'me',
+          fromName: 'You',
+          fromInitials: 'Y',
+          fromColor: '#F7F7FA',
+          text,
+          attachment,
+          reactions: [],
+          status: 'sent',
+          ts,
+          deletedForMe: false,
+        });
+        touchPreviewConversation(conv.id, attachment.title as string, ts);
+      } else {
+        const conv = await createOrGetConversation({
+          type: 'buyer_to_buyer',
+          participant: {
+            userId: currentStory.authorId,
+            name: currentStory.authorName,
+            handle: currentStory.authorHandle,
+            initials: currentStory.authorInitials,
+            color: currentStory.authorColor,
+            accountType: 'buyer',
+          },
+        });
+        await sendMessage(conv.id, text, attachment);
+      }
       if (!override) setInputText('');
       hapticSuccessAction();
     } catch {
@@ -321,7 +398,12 @@ export default function BuyerStoryViewer() {
     );
   }
 
-  const isMyStory = !!myUserId && currentStory.authorId === myUserId;
+  // 'me' is the preview/demo-mode author id (lib/previewStories.ts) — there's
+  // no real Clerk sign-in under ?bt_preview, so myUserId alone can't tell
+  // "my own story" apart from anyone else's there. Same check the story
+  // options menu below already uses for the same reason.
+  const isMyStory = (!!myUserId && currentStory.authorId === myUserId) || currentStory.authorId === 'me';
+  const seenByCount = serverViewers.length || (currentStory as any).viewsCount || currentStory.viewers.length;
 
   const openViewersModal = async () => {
     setViewerModalVisible(true);
@@ -446,6 +528,22 @@ export default function BuyerStoryViewer() {
         </View>
       </View>
 
+      {/* LEGIBILITY SCRIMS — dark gradients so progress bars, avatar, name,
+          time, and the top/bottom icon row read on any photo (a plain white
+          product shot included), matching Instagram's own top/bottom fade
+          over the media rather than a flat tint. Non-interactive so they
+          never intercept the tap zones. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']}
+        style={styles.topScrim}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)']}
+        style={styles.bottomScrim}
+      />
+
       {/* PROGRESS BAR */}
       <View style={[styles.progressContainer, { top: insets.top + SP.sm }]}>
         {currentStory.media.map((_, i) => (
@@ -564,104 +662,193 @@ export default function BuyerStoryViewer() {
         />
       </View>
 
-      {/* BOTTOM BAR */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.bottomBarWrap}
-        keyboardVerticalOffset={0}
-      >
-        {!currentStory.repliesDisabled && !replyFocused && (
-          <View style={styles.quickReactionRow}>
-            {QUICK_REACTIONS.map(emoji => (
-              <PressableScale
-                key={emoji}
-                onPress={() => sendQuickReaction(emoji)}
-                disabled={sendingReply}
-                accessibilityRole="button"
-                accessibilityLabel={`React with ${emoji}`}
-              >
-                <Text style={styles.quickReactionEmoji}>{emoji}</Text>
-              </PressableScale>
-            ))}
+      {/* BOTTOM BAR — Mobbin: Instagram "Viewing your own story" (own) vs
+          "Replying to a story" (others). The two are different enough
+          (no reply/heart/send on your own story at all — viewers only)
+          that they're two separate render branches, not one bar with bits
+          conditionally hidden. */}
+      {isMyStory ? (
+        <View style={[styles.bottomBarWrap, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={styles.ownStoryBar}>
+            <PressableScale
+              style={styles.seenByRow}
+              onPress={() => { hapticLight(); openViewersModal(); }}
+              accessibilityRole="button"
+              accessibilityLabel={`Seen by ${seenByCount}`}
+            >
+              <View style={styles.seenByStack}>
+                {serverViewers.slice(0, 3).map((v, i) => (
+                  <View
+                    key={v.userId}
+                    style={[styles.seenByAvatar, { marginLeft: i === 0 ? 0 : -10, zIndex: 3 - i }]}
+                  >
+                    {v.avatarUrl ? (
+                      <Image source={{ uri: v.avatarUrl }} style={styles.seenByAvatarImg} />
+                    ) : (
+                      <Text style={styles.seenByInitials}>{v.name.charAt(0).toUpperCase()}</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.seenByText}>
+                Seen by {seenByCount}
+              </Text>
+            </PressableScale>
+            <View style={{ flex: 1 }} />
+            <PressableScale
+              onPress={() => {
+                hapticLight();
+                setIsPaused(true);
+                Share.share({ message: `Check out my story on Brandthread` })
+                  .catch(() => {})
+                  .finally(() => setIsPaused(false));
+              }}
+              style={styles.likeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Share this story"
+            >
+              <Feather name="send" size={ICON.lg} color={ON_DARK} />
+            </PressableScale>
+            <PressableScale
+              onPress={() => {
+                hapticLight();
+                setIsPaused(true);
+                Alert.alert('Your story', undefined, [
+                  {
+                    text: 'Save to device',
+                    onPress: async () => {
+                      try {
+                        const MediaLibrary = await import('expo-media-library');
+                        const perm = await MediaLibrary.requestPermissionsAsync();
+                        if (!perm.granted || !currentSlide?.imageUri) throw new Error('permission');
+                        await MediaLibrary.Asset.create(currentSlide.imageUri);
+                        hapticSuccessAction();
+                      } catch {
+                        Alert.alert('Couldn’t save', 'Check your photo library permission and try again.');
+                      } finally {
+                        setIsPaused(false);
+                      }
+                    },
+                  },
+                  {
+                    text: 'Delete story',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        await api.social.deleteStory(currentStory.id);
+                        goBackOr(router);
+                      } catch {
+                        Alert.alert('Couldn’t delete', 'Try again.');
+                        setIsPaused(false);
+                      }
+                    },
+                  },
+                  { text: 'Cancel', style: 'cancel', onPress: () => setIsPaused(false) },
+                ]);
+              }}
+              style={styles.likeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="More options"
+            >
+              <Feather name="more-horizontal" size={ICON.lg} color={ON_DARK} />
+            </PressableScale>
           </View>
-        )}
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
-          {!currentStory.repliesDisabled ? (
-            <>
-              <Glass variant="clear" radius={RADII.pill} style={styles.replyInputGlass}>
-                <TextInput
-                  style={styles.replyInput}
-                  value={inputText}
-                  onChangeText={setInputText}
-                  placeholder={`Reply to ${currentStory.authorName}…`}
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  onFocus={() => { setIsPaused(true); setReplyFocused(true); }}
-                  onBlur={() => { setIsPaused(false); setReplyFocused(false); }}
-                  onSubmitEditing={() => handleSendReply()}
-                  returnKeyType="send"
-                  editable={!sendingReply}
-                />
-              </Glass>
-              {inputText.trim().length > 0 && (
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.bottomBarWrap}
+          keyboardVerticalOffset={0}
+        >
+          {!currentStory.repliesDisabled && replyFocused && (
+            <View style={styles.quickReactionRow}>
+              {QUICK_REACTIONS.map(emoji => (
                 <PressableScale
-                  onPress={() => handleSendReply()}
-                  style={styles.likeBtn}
+                  key={emoji}
+                  onPress={() => sendQuickReaction(emoji)}
                   disabled={sendingReply}
                   accessibilityRole="button"
-                  accessibilityLabel="Send reply"
+                  accessibilityLabel={`React with ${emoji}`}
                 >
-                  <Feather name="send" size={ICON.md} color={sendingReply ? 'rgba(255,255,255,0.4)' : ON_DARK} />
+                  <AppleEmoji emoji={emoji} size={26} />
                 </PressableScale>
-              )}
-              <PressableScale
-                onPress={() => { hapticLight(); handleLike(); }}
-                style={styles.likeBtn}
-                accessibilityRole="button"
-                accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
-              >
-                <Feather
-                  name="heart"
-                  size={ICON.lg}
-                  color={likedSet.has(currentStory.id) ? '#EF4444' : ON_DARK}
-                  style={likedSet.has(currentStory.id) ? styles.heartFilled : undefined}
-                />
-                {(likesCounts[currentStory.id] ?? 0) > 0 && (
-                  <Text style={styles.likesCountText}>
-                    {likesCounts[currentStory.id]}
-                  </Text>
-                )}
-              </PressableScale>
-              <PressableScale
-                onPress={() => {
-                  hapticLight();
-                  setIsPaused(true);
-                  Share.share({ message: `Check out ${currentStory.authorName}'s story on Brandthread` })
-                    .catch(() => {})
-                    .finally(() => setIsPaused(false));
-                }}
-                style={styles.likeBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Share this story"
-              >
-                <Feather name="send" size={ICON.lg} color={ON_DARK} />
-              </PressableScale>
-              {isMyStory && (
-                <PressableScale
-                  style={styles.viewerBtn}
-                  onPress={() => { hapticLight(); openViewersModal(); }}
-                  accessibilityRole="button"
-                  accessibilityLabel="See who viewed this story"
-                >
-                  <Feather name="eye" size={ICON.lg} color={ON_DARK} />
-                  <Text style={styles.viewerCount}>{(currentStory as any).viewsCount ?? currentStory.viewers.length}</Text>
-                </PressableScale>
-              )}
-            </>
-          ) : (
-            <Text style={styles.repliesDisabled}>Replies disabled</Text>
+              ))}
+            </View>
           )}
-        </View>
-      </KeyboardAvoidingView>
+          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
+            {!currentStory.repliesDisabled ? (
+              <>
+                <Glass variant="regular" radius={RADII.pill} style={styles.replyInputGlass}>
+                  <TextInput
+                    style={styles.replyInput}
+                    value={inputText}
+                    onChangeText={setInputText}
+                    placeholder={`Reply to ${currentStory.authorName}…`}
+                    placeholderTextColor="rgba(255,255,255,0.65)"
+                    onFocus={() => {
+                      if (replyBlurTimer.current) { clearTimeout(replyBlurTimer.current); replyBlurTimer.current = null; }
+                      setIsPaused(true);
+                      setReplyFocused(true);
+                    }}
+                    onBlur={() => {
+                      setIsPaused(false);
+                      replyBlurTimer.current = setTimeout(() => setReplyFocused(false), 200);
+                    }}
+                    onSubmitEditing={() => handleSendReply()}
+                    returnKeyType="send"
+                    editable={!sendingReply}
+                  />
+                </Glass>
+                {inputText.trim().length > 0 && (
+                  <PressableScale
+                    onPress={() => handleSendReply()}
+                    style={styles.likeBtn}
+                    disabled={sendingReply}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send reply"
+                  >
+                    <Feather name="send" size={ICON.md} color={sendingReply ? 'rgba(255,255,255,0.4)' : ON_DARK} />
+                  </PressableScale>
+                )}
+                <PressableScale
+                  onPress={() => { hapticLight(); handleLike(); }}
+                  style={styles.likeBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
+                >
+                  <Feather
+                    name="heart"
+                    size={ICON.lg}
+                    color={likedSet.has(currentStory.id) ? '#EF4444' : ON_DARK}
+                    style={likedSet.has(currentStory.id) ? styles.heartFilled : undefined}
+                  />
+                  {(likesCounts[currentStory.id] ?? 0) > 0 && (
+                    <Text style={styles.likesCountText}>
+                      {likesCounts[currentStory.id]}
+                    </Text>
+                  )}
+                </PressableScale>
+                <PressableScale
+                  onPress={() => {
+                    hapticLight();
+                    setIsPaused(true);
+                    Share.share({ message: `Check out ${currentStory.authorName}'s story on Brandthread` })
+                      .catch(() => {})
+                      .finally(() => setIsPaused(false));
+                  }}
+                  style={styles.likeBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share this story"
+                >
+                  <Feather name="send" size={ICON.lg} color={ON_DARK} />
+                </PressableScale>
+              </>
+            ) : (
+              <Text style={styles.repliesDisabled}>Replies disabled</Text>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      )}
       </Animated.View>
 
       {/* VIEWER MODAL */}
@@ -799,12 +986,33 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   authorName: {
     color: ON_DARK,
     fontFamily: FONT.semibold,
-    fontSize: FS.base,
+    fontSize: 14,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   authorTime: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: FS.xs,
+    // Solid grey, not an alpha-white — an alpha color washes out (and can
+    // invert toward white) over a bright photo; this reads the same on any
+    // background, backed by the top scrim + its own text shadow.
+    color: '#D4D4D8',
+    fontSize: FS.sm,
     fontFamily: FONT.regular,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  topScrim: {
+    position: 'absolute',
+    left: 0, right: 0, top: 0,
+    height: 120,
+    zIndex: 1,
+  },
+  bottomScrim: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: 160,
+    zIndex: 1,
   },
   productTag: {
     flexDirection: 'row',
@@ -858,9 +1066,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: SP.md,
     paddingBottom: SP.sm,
   },
-  quickReactionEmoji: {
-    fontSize: 26,
-  },
   replyInputGlass: {
     flex: 1,
     height: 44,
@@ -873,15 +1078,49 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.regular,
     color: ON_DARK,
   },
-  viewerBtn: {
+  ownStoryBar: {
+    paddingHorizontal: SP.md,
+    paddingTop: SP.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.xs,
+    gap: SP.sm,
   },
-  viewerCount: {
+  seenByRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  seenByStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: SP.xs,
+  },
+  seenByAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: '#000',
+    backgroundColor: CARD_ELEVATED,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  seenByAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  seenByInitials: {
+    color: ON_DARK,
+    fontSize: 10,
+    fontFamily: FONT.bold,
+  },
+  seenByText: {
     color: ON_DARK,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   repliesDisabled: {
     color: 'rgba(255,255,255,0.4)',
