@@ -85,7 +85,7 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
-import { CaptionBlock } from '@/components/buyer-feed/CaptionBlock';
+import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
@@ -825,13 +825,29 @@ function formatPlaybackTime(totalSeconds: number): string {
  * `paused`/`holdPaused` state). While dragging: the line thickens, a round
  * thumb appears on it, a "current / total" time bubble tracks the thumb, and
  * a light haptic "tick" fires every ~3% of the scrub so long drags feel
- * textured rather than silent. */
+ * textured rather than silent.
+ *
+ * The time bubble's vertical position is NOT a fixed offset above the thumb
+ * — it's derived from `chromeTop` (the screen-space top edge of the
+ * bottom-left caption/sound stack, passed in by the caller, which already
+ * knows CaptionBlock's real height). A fixed offset is how this bug
+ * happened in the first place: the bubble used to hug the thumb at a
+ * hand-picked `bottom: 22`, which put it squarely behind CaptionBlock's
+ * sound/mute pill (CaptionBlock renders after this bar, so it painted on
+ * top) whenever a drag showed the bubble. Deriving the clearance from
+ * CaptionBlock's actual exported height (`CAPTION_BLOCK_HEIGHT`/
+ * `_WITH_REPOST`, see components/buyer-feed/CaptionBlock.tsx) instead of a
+ * second hand-tuned number means the two can't drift apart again. */
 function ScrubProgressBar({
-  player, progress, bottom, externallyPaused = false,
+  player, progress, bottom, chromeTop, externallyPaused = false,
 }: {
   player: ReturnType<typeof useVideoPlayer>;
   progress: number;
   bottom: number;
+  /** Screen-space y (measured from the bottom of the video frame, same
+   *  frame `bottom` is measured from) that the drag-time bubble must clear
+   *  — i.e. the top edge of the caption/sound stack, plus a margin. */
+  chromeTop: number;
   /** True while the post is deliberately paused (tap or hold) — on release,
    * the scrubber leaves it paused instead of resuming playback. */
   externallyPaused?: boolean;
@@ -902,10 +918,15 @@ function ScrubProgressBar({
   const thumbLeft = trackWidth > 0 ? shown * trackWidth : 0;
   const duration = player.duration || 0;
   const bubbleLeft = trackWidth > 0 ? Math.min(Math.max(thumbLeft - 34, 0), Math.max(trackWidth - 68, 0)) : 0;
+  const hitAreaScreenBottom = bottom - 13;
+  // Never *less* than the thumb-hugging 22 this used to always be (so on a
+  // short/no-caption post the bubble still sits close to the thumb) — only
+  // ever pushed higher, and only as far as `chromeTop` actually requires.
+  const bubbleBottom = Math.max(22, chromeTop - hitAreaScreenBottom);
 
   return (
     <View
-      style={[styles.progressHitArea, { bottom: bottom - 13 }]}
+      style={[styles.progressHitArea, { bottom: hitAreaScreenBottom }]}
       onLayout={e => setTrackWidth(e.nativeEvent.layout.width)}
       {...panResponder.panHandlers}
       accessibilityRole="adjustable"
@@ -913,7 +934,7 @@ function ScrubProgressBar({
       accessibilityValue={{ min: 0, max: 100, now: Math.round(shown * 100) }}
     >
       {dragging && (
-        <View style={[styles.scrubBubble, { left: bubbleLeft }]} pointerEvents="none">
+        <View style={[styles.scrubBubble, { left: bubbleLeft, bottom: bubbleBottom }]} pointerEvents="none">
           <Text style={styles.scrubBubbleText}>
             {formatPlaybackTime(shown * duration)} / {formatPlaybackTime(duration)}
           </Text>
@@ -957,6 +978,11 @@ type VideoVisualProps = {
   immersive?: boolean;
   /** When set, a thin playback progress line sits this far above the bottom. */
   progressBottom?: number;
+  /** Screen-space top edge (measured the same way as `progressBottom`) of
+   *  the bottom-left caption/sound stack the scrub bar's drag-time bubble
+   *  must clear — see ScrubProgressBar's own comment. Required whenever
+   *  `progressBottom` is set. */
+  chromeTop?: number;
   /** Width / height of the page the clip is shown in. */
   pageAspect?: number;
   /** Playback rate — 2 while the right side of the video is pressed and held. */
@@ -1093,6 +1119,7 @@ function LiveVideoVisual({
   fallbackColor,
   immersive = false,
   progressBottom,
+  chromeTop,
   pageAspect = 9 / 16,
   rate = 1,
   pageWidth,
@@ -1264,7 +1291,13 @@ function LiveVideoVisual({
         </Animated.View>
       </View>
       {progressBottom != null && isActive && (
-        <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} externallyPaused={paused} />
+        <ScrubProgressBar
+          player={player}
+          progress={progress}
+          bottom={progressBottom}
+          chromeTop={chromeTop ?? progressBottom + 34}
+          externallyPaused={paused}
+        />
       )}
     </>
   );
@@ -1386,6 +1419,11 @@ function SpotlightPageImpl({
   const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+  // Real rendered height of the caption/sound stack below — see
+  // CaptionBlock's `onHeightChange` and ScrubProgressBar's own comment.
+  // Starts at the taller of the two nominal minimums so the very first
+  // frame (before layout fires) still clears a repost row if there is one.
+  const [captionBlockHeight, setCaptionBlockHeight] = useState(CAPTION_BLOCK_HEIGHT_WITH_REPOST);
   /** Long-press context menu: "2x speed" / "Not interested" / "Report". */
   const [menuOpen, setMenuOpen] = useState(false);
   const { showToast } = useFeedToast();
@@ -1562,6 +1600,16 @@ function SpotlightPageImpl({
                 fallbackColor={item.accentColor}
                 immersive={immersive}
                 progressBottom={immersive ? bottomClearance : undefined}
+                // Drag-time scrub bubble must clear the WHOLE caption/sound
+                // stack (see ScrubProgressBar's comment) — its top edge is
+                // this same bottomClearance anchor plus CAPTION_BOTTOM_GAP
+                // plus the stack's *measured* height (captionBlockHeight,
+                // from CaptionBlock's onHeightChange below — the nominal
+                // CAPTION_BLOCK_HEIGHT constants are minimums only, real
+                // content routinely renders taller), plus a small margin.
+                chromeTop={immersive
+                  ? bottomClearance + CAPTION_BOTTOM_GAP + captionBlockHeight + 8
+                  : undefined}
                 pageAspect={pageHeight > 0 ? pageWidth / pageHeight : undefined}
                 pageWidth={pageWidth}
                 pageHeight={pageHeight}
@@ -1697,6 +1745,7 @@ function SpotlightPageImpl({
         captionExpanded={captionExpanded}
         onToggleCaptionExpanded={() => setCaptionExpanded(v => !v)}
         onOpenCreator={() => onOpenCreator(item)}
+        onHeightChange={setCaptionBlockHeight}
       />
     </View>
   );
@@ -3377,7 +3426,7 @@ const styles = StyleSheet.create({
     shadowColor: '#fff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4,
   },
   scrubBubble: {
-    position: 'absolute', bottom: 22, minWidth: 40, alignItems: 'center',
+    position: 'absolute', minWidth: 40, alignItems: 'center',
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm,
     backgroundColor: 'rgba(0,0,0,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
   },
