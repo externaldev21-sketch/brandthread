@@ -14,6 +14,9 @@
  * GET  /api/thread-cash/history     — paginated ledger
  * POST /api/thread-cash/redeem      — reserve balance as a checkout discount token
  *                                      (feature-flagged: 'threadCashCheckoutDiscount')
+ * POST /api/thread-cash/redeem/:token/cancel — return an unused, unattached token's
+ *                                      amount to the balance (never flag-gated: it
+ *                                      only ever gives the buyer their own balance back)
  * POST /api/thread-cash/send        — send Thread Cash to a friend in chat (mutual-follow required)
  * POST /api/thread-cash/claim       — claim a Thread Cash send
  * POST /api/thread-cash/cancel      — sender cancels a still-pending send
@@ -38,6 +41,8 @@ import {
   isFeatureEnabled,
   redeemThreadCash,
   sendThreadCash,
+  cancelThreadCashRedemption,
+  listOpenThreadCashRedemptions,
 } from "../lib/threadCash/wallet";
 
 const router = Router();
@@ -67,14 +72,18 @@ async function loadStreakState(buyerId: string): Promise<{ state: StreakState; t
 // ─── GET /api/thread-cash ───────────────────────────────────────────────────
 router.get("/", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
-  const [balanceCents, config, { state, timezone }] = await Promise.all([
+  const [balanceCents, config, { state, timezone }, openRedemptions] = await Promise.all([
     getBalanceCents(db, buyerId),
     getThreadCashConfig(),
     loadStreakState(buyerId),
+    listOpenThreadCashRedemptions(db, buyerId),
   ]);
   const preview = computeCheckIn(state, config, new Date(), timezone);
   res.json({
     balanceCents,
+    // Redeemed at checkout but neither spent nor attached to a payment (see
+    // POST /redeem/:token/cancel). Additive field (item 109).
+    openRedemptions,
     config,
     streak: {
       currentStreak: state.currentStreak,
@@ -312,6 +321,23 @@ router.post("/redeem", async (req, res) => {
   try {
     const redemption = await redeemThreadCash(buyerId, amountCents, idempotencyKey);
     res.json({ ok: true, discountCents: redemption.discountCents, token: redemption.token });
+  } catch (error) {
+    if (error instanceof ThreadCashError) {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    throw error;
+  }
+});
+
+// ─── POST /api/thread-cash/redeem/:token/cancel ─────────────────────────────
+// Returns a redemption the buyer no longer wants to their balance. Not behind
+// the checkout flag: turning the flag off must never strand a balance.
+router.post("/redeem/:token/cancel", async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
+  try {
+    const result = await cancelThreadCashRedemption(buyerId, String(req.params.token ?? ""));
+    res.json({ ok: true, ...result });
   } catch (error) {
     if (error instanceof ThreadCashError) {
       res.status(error.status).json({ error: error.message, code: error.code });
