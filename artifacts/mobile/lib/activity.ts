@@ -738,3 +738,90 @@ export function createReadTracker(options: ReadTrackerOptions): ReadTracker {
     },
   };
 }
+
+// ─── Delete with Undo (item 83) ───────────────────────────────────────────────
+
+/** How long a swiped-away notification can be brought back (the Undo toast). */
+export const ACTIVITY_UNDO_MS = 5000;
+
+export interface DeferredDeleteOptions {
+  delayMs: number;
+  /** Deletes the ids for real; resolves with the ids that failed. */
+  commit: (ids: string[]) => Promise<string[]>;
+  /** Called with the ids whose delete failed, so the screen can put them back. */
+  onFailed?: (ids: string[]) => void;
+  setTimer?: (fn: () => void, ms: number) => unknown;
+  clearTimer?: (handle: unknown) => void;
+}
+
+export interface DeferredDelete {
+  /** Deletes `ids` after `delayMs` unless undone. Returns a token for `undo`. */
+  schedule(ids: string[]): number;
+  /** Cancels a delete that hasn't been sent yet. False once it's too late. */
+  undo(token: number): boolean;
+  /** Sends any waiting delete now (a newer delete, or leaving the screen). */
+  flush(): void;
+  /** True while an id is waiting or its delete is in flight — keep it off screen. */
+  isPending(id: string): boolean;
+}
+
+/**
+ * The server delete is a real, permanent delete, so Undo works by holding the
+ * request back for the Undo window instead of trying to recreate the row —
+ * the "Notification deleted · Undo" pattern (LinkedIn, OpenPhone on Mobbin).
+ * One delete waits at a time (the toast shows one); a newer delete sends the
+ * previous one straight away.
+ */
+export function createDeferredDelete(options: DeferredDeleteOptions): DeferredDelete {
+  const setTimer = options.setTimer ?? ((fn: () => void, ms: number) => setTimeout(fn, ms));
+  const clearTimer = options.clearTimer ?? ((handle: unknown) => clearTimeout(handle as ReturnType<typeof setTimeout>));
+  let nextToken = 1;
+  let waiting: { token: number; ids: string[]; handle: unknown } | null = null;
+  const inFlight = new Map<string, number>();
+
+  const send = (ids: string[]) => {
+    for (const id of ids) inFlight.set(id, (inFlight.get(id) ?? 0) + 1);
+    const release = () => {
+      for (const id of ids) {
+        const left = (inFlight.get(id) ?? 1) - 1;
+        if (left <= 0) inFlight.delete(id); else inFlight.set(id, left);
+      }
+    };
+    void options.commit(ids).then(
+      (failed) => { release(); if (failed.length > 0) options.onFailed?.(failed); },
+      () => { release(); options.onFailed?.(ids); },
+    );
+  };
+
+  const flush = () => {
+    if (!waiting) return;
+    const { ids, handle } = waiting;
+    waiting = null;
+    clearTimer(handle);
+    send(ids);
+  };
+
+  return {
+    schedule(ids) {
+      flush();
+      const token = nextToken++;
+      const handle = setTimer(() => {
+        if (waiting?.token !== token) return;
+        waiting = null;
+        send(ids);
+      }, options.delayMs);
+      waiting = { token, ids: [...ids], handle };
+      return token;
+    },
+    undo(token) {
+      if (!waiting || waiting.token !== token) return false;
+      clearTimer(waiting.handle);
+      waiting = null;
+      return true;
+    },
+    flush,
+    isPending(id) {
+      return inFlight.has(id) || !!waiting?.ids.includes(id);
+    },
+  };
+}
