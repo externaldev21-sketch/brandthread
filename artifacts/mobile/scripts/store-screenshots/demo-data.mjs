@@ -119,6 +119,12 @@ function publicProduct(item, index = 0) {
 
 export const PUBLIC_PRODUCTS = CATALOGUE.map(publicProduct);
 
+// The demo seller (SELLER_USER, brand "northline") only owns its own
+// products, not the whole cross-brand CATALOGUE — same shape as
+// PUBLIC_PRODUCTS so this is the one real product list, reused by /products,
+// /analytics/products and /inventory below, never forked.
+export const SELLER_CATALOGUE = CATALOGUE.filter((item) => item.brand === 'northline').map(publicProduct);
+
 const DROPS = [
   { id: 'drop_nl_04', brand: 'northline', name: 'Drop 04 — Ember Season', live: true, releaseIn: -2 * HOUR, endsIn: 30 * HOUR, products: ['prod_nl_hoodie_ember', 'prod_nl_jacket_rust'] },
   { id: 'drop_fo_runner', brand: 'field', name: 'Trail Runner 02 Restock', live: false, releaseIn: 20 * HOUR, endsIn: 72 * HOUR, products: ['prod_fo_runner_rust'] },
@@ -687,8 +693,39 @@ export function respond({ method, path, query, role, options = {} }) {
 
   // Seller
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
-  if (p === '/finance/balance') return { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
+  if (p === '/finance/balance') return {
+    available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' },
+    pending: { amount: 62740, currency: 'usd', formatted: '$627.40' },
+    connected: true,
+    payoutsEnabled: true,
+    bankConnected: true,
+    processingCashout: null,
+    // A real payout in flight — exercises the seller dashboard's "Needs
+    // attention" pending-payouts row (item 125) with real, non-fabricated data.
+    nextPayout: { id: 'po_demo_1', amount: 62740, currency: 'usd', formatted: '$627.40', arrivalDate: isoAhead(2 * DAY), status: 'pending' },
+  };
   if (p === '/orders') return sellerOrders(options.orderCount ?? 9);
+  // Seller's own catalog + per-product analytics + inventory — the same
+  // northline products used everywhere else in this fixture (CATALOGUE),
+  // never a second, disconnected product list.
+  if (p === '/products') return SELLER_CATALOGUE;
+  if (p === '/analytics/products') return SELLER_CATALOGUE.map((item, i) => ({
+    productId: item.id,
+    name: item.name,
+    unitsSold: item.claimed,
+    revenueCents: item.claimed * item.priceCents,
+  })).sort((a, b) => b.revenueCents - a.revenueCents);
+  if (p === '/inventory') return SELLER_CATALOGUE.map((item) => ({
+    id: item.id,
+    productId: item.id,
+    name: item.name,
+    stock: item.remaining,
+    onHand: item.remaining,
+    available: item.remaining,
+    lowStockThreshold: 15,
+    incoming: item.remaining < 15 ? 50 : 0,
+    incomingStatus: item.remaining < 15 ? 'in_transit' : null,
+  }));
   if (p === '/conversations') return role === 'seller' ? sellerConversations(options.conversationCount ?? 5) : [];
   if (p === '/manufacturers/public') return MANUFACTURERS;
   if ((match = p.match(/^\/manufacturers\/public\/([^/]+)$/))) return byId(MANUFACTURERS)(match[1]);

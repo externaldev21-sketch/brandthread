@@ -22,7 +22,12 @@ const ROWS: ActionRowConfig[] = [
   { key: 'toAnswer', icon: 'message-circle', title: (n) => `${n} ${n === 1 ? 'message' : 'messages'} to answer`, subtitle: 'Buyers and manufacturers waiting on you', route: '/seller-inbox' },
   { key: 'lowStock', icon: 'trending-down', title: (n) => `${n} ${n === 1 ? 'item' : 'items'} low on stock`, subtitle: 'Restock before you sell out', route: '/inventory' },
   { key: 'returns', icon: 'corner-up-left', title: (n) => `${n} ${n === 1 ? 'return' : 'returns'} to review`, subtitle: 'Buyer-initiated returns awaiting a decision', route: '/(tabs)/orders?filter=all' },
+  { key: 'pendingPayouts', icon: 'send', title: (n) => `${n} ${n === 1 ? 'payout' : 'payouts'} on the way`, subtitle: 'Processing to your bank account', route: '/payouts' },
 ];
+
+// Only these four keys gate the "You're all caught up" collapse — see the
+// doc comment on hasNoActionNeeded for why pendingPayouts is excluded.
+const ACTIONABLE_ROW_KEYS: ReadonlyArray<keyof DashboardActionCounts> = ['toShip', 'toAnswer', 'lowStock', 'returns'];
 
 export function SellerDashboardActionNeeded({
   counts,
@@ -33,19 +38,30 @@ export function SellerDashboardActionNeeded({
   theme: AppThemePreset;
   onNavigate: (route: string) => void;
 }) {
-  const rows = ROWS.filter((row) => counts[row.key] > 0);
+  // pendingPayouts is informational (money already on its way), so it never
+  // blocks the "all caught up" collapse — but it still renders as its own
+  // row underneath, in either state, whenever there's a real payout to show.
+  const actionableRows = ROWS.filter((row) => ACTIONABLE_ROW_KEYS.includes(row.key) && counts[row.key] > 0);
+  const payoutRow = ROWS.find((row) => row.key === 'pendingPayouts' && counts.pendingPayouts > 0) ?? null;
+  const rows = payoutRow ? [...actionableRows, payoutRow] : actionableRows;
   const allCaughtUp = hasNoActionNeeded(counts);
 
   return (
     <View testID="seller-dashboard-action-needed">
       <Text style={[styles.sectionHeader, { color: theme.muted }]}>Needs attention</Text>
-      {allCaughtUp ? (
+      {allCaughtUp && !payoutRow ? (
         <View style={styles.caughtUpRow} testID="seller-dashboard-all-caught-up">
-          <Feather name="check-circle" size={16} color={theme.success} />
+          <Feather name="check-circle" size={16} color={theme.text} />
           <Text style={[styles.caughtUpText, { color: theme.muted }]}>You’re all caught up</Text>
         </View>
       ) : (
         <View>
+          {allCaughtUp && payoutRow ? (
+            <View style={[styles.caughtUpRow, { marginBottom: SP.sm }]} testID="seller-dashboard-all-caught-up">
+              <Feather name="check-circle" size={16} color={theme.text} />
+              <Text style={[styles.caughtUpText, { color: theme.muted }]}>You’re all caught up</Text>
+            </View>
+          ) : null}
           {rows.map((row, index) => {
             const count = counts[row.key];
             return (

@@ -87,9 +87,13 @@ describe('describeDashboardDelta', () => {
 
 describe('hasNoActionNeeded / countOrderReturns', () => {
   it('is true only when every action count is zero', () => {
-    expect(hasNoActionNeeded({ toShip: 0, toAnswer: 0, lowStock: 0, returns: 0 })).toBe(true);
-    expect(hasNoActionNeeded({ toShip: 1, toAnswer: 0, lowStock: 0, returns: 0 })).toBe(false);
-    expect(hasNoActionNeeded({ toShip: 0, toAnswer: 0, lowStock: 0, returns: 2 })).toBe(false);
+    expect(hasNoActionNeeded({ toShip: 0, toAnswer: 0, lowStock: 0, returns: 0, pendingPayouts: 0 })).toBe(true);
+    expect(hasNoActionNeeded({ toShip: 1, toAnswer: 0, lowStock: 0, returns: 0, pendingPayouts: 0 })).toBe(false);
+    expect(hasNoActionNeeded({ toShip: 0, toAnswer: 0, lowStock: 0, returns: 2, pendingPayouts: 0 })).toBe(false);
+  });
+
+  it('ignores pendingPayouts: money already on its way to the bank never blocks "all caught up"', () => {
+    expect(hasNoActionNeeded({ toShip: 0, toAnswer: 0, lowStock: 0, returns: 0, pendingPayouts: 3 })).toBe(true);
   });
 
   it('counts only orders with a real, non-empty returns array', () => {

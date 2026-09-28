@@ -94,6 +94,15 @@ interface FinanceBalance {
     currency: string;
     formatted: string;
   } | null;
+  /** The seller's next Stripe payout already in flight (status "pending"/"in_transit"), or null. */
+  nextPayout?: {
+    id: string;
+    amount: number;
+    currency: string;
+    formatted: string;
+    arrivalDate: string;
+    status: string;
+  } | null;
 }
 
 interface PersistedCashoutAttempt {
@@ -502,11 +511,17 @@ export default function SellerHomeCommerceDashboard({
 
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
   const newSeller = everSoldCount !== null && isNewSeller(everSoldCount);
+  // A payout "on the way" is the real Stripe next-payout (status pending/in
+  // transit) plus, separately, a cash-out this seller just confirmed that's
+  // still processing — both already fetched by loadFinanceBalance, never a
+  // second request just for this count.
+  const pendingPayoutsCount = (financeBalance?.nextPayout ? 1 : 0) + (financeBalance?.processingCashout ? 1 : 0);
   const actionCounts: DashboardActionCounts | null = actionInputs ? {
     toShip: actionInputs.toShip,
     toAnswer: actionInputs.unreadMessages,
     lowStock: actionInputs.lowStockCount,
     returns: actionInputs.returns,
+    pendingPayouts: pendingPayoutsCount,
   } : null;
 
   // ── Metric aggregate + chart series for the currently focused metric ─────
