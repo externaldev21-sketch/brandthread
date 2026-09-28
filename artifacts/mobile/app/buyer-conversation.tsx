@@ -1049,20 +1049,57 @@ export default function BuyerConversationScreen() {
         />
       );
     }
+    // Product share card (item 70): image, name, price/"No longer available"
+    // (kept live server-side — see lib/productAttachmentInfo.ts on the API),
+    // and an explicit "View" button. It's a single tap target, same as the
+    // other structured cards below — a second, nested Pressable for "View"
+    // would both violate the no-nested-pressables rule and get swallowed by
+    // the bubble's own long-press/swipe handlers, so "View" is a plain
+    // View+Text chip inside the one PressableScale that owns the whole card.
+    if (att.type === 'product') {
+      const unavailable = att.meta?.unavailable === 'true';
+      return (
+        <PressableScale rippleEnabled={false}
+          style={s.productCard}
+          activeOpacity={0.7}
+          accessibilityLabel={`${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`}
+          testID="product-card-attachment"
+          onPress={() => {
+            const pid = att.meta?.productId;
+            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
+          }}
+        >
+          <View style={[s.productCardImage, unavailable && s.productCardImageDim]}>
+            {att.uri ? (
+              <CachedImage source={{ uri: att.uri }} style={s.productCardImageFill} recyclingKey={att.uri} />
+            ) : (
+              <Feather name="shopping-bag" size={ICON.md} color={theme.muted} />
+            )}
+          </View>
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Product'}</Text>
+            <Text style={[s.attachSubtitle, unavailable && s.productUnavailableText]} numberOfLines={1}>
+              {unavailable ? 'No longer available' : (att.subtitle ?? 'Product')}
+            </Text>
+          </View>
+          <View style={s.productViewChip}>
+            <Text style={s.productViewChipText}>View</Text>
+            <Feather name="chevron-right" size={ICON.xs} color={theme.text} />
+          </View>
+        </PressableScale>
+      );
+    }
+
     // 'thread_cash', 'quick_replies' and 'agent_card' are handled in
     // renderItem() before this function is ever called for them — they're
     // standalone rows, not content that belongs inside a chat bubble.
-    // Default: product / order / post / profile card
+    // Default: order / post / profile card
     return (
       <PressableScale rippleEnabled={false}
         style={s.attachCard}
-        activeOpacity={att.type === 'product' || att.type === 'order' || att.type === 'post' ? 0.7 : 1}
+        activeOpacity={att.type === 'order' || att.type === 'post' ? 0.7 : 1}
         onPress={() => {
-          if (att.type === 'product') {
-            const pid = att.meta?.productId;
-            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
-            else if (participant) router.push(('/seller-profile?id=' + participant.userId) as never);
-          } else if (att.type === 'order') {
+          if (att.type === 'order') {
             router.push('/(buyer)/orders' as never);
           } else if (att.type === 'post') {
             const postId = att.meta?.postId;
@@ -1088,7 +1125,7 @@ export default function BuyerConversationScreen() {
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
-        {(att.type === 'product' || att.type === 'order' || att.type === 'post') && (
+        {(att.type === 'order' || att.type === 'post') && (
           <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
         )}
       </PressableScale>
@@ -2979,6 +3016,55 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderColor: theme.border,
     padding: SP.sm,
     marginBottom: SP.xs,
+  },
+  // Product share card (item 70) — same row shape as attachCard but with a
+  // real image thumbnail instead of a leading glyph, and an explicit "View"
+  // chip in place of the bare chevron.
+  productCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 240,
+    backgroundColor: theme.card,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: SP.sm,
+    marginBottom: SP.xs,
+  },
+  productCardImage: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.sm,
+    backgroundColor: theme.cardElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  productCardImageDim: {
+    opacity: 0.5,
+  },
+  productCardImageFill: {
+    width: '100%',
+    height: '100%',
+  },
+  productUnavailableText: {
+    fontFamily: FONT.medium,
+  },
+  productViewChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: RADIUS.pill,
+    paddingVertical: 4,
+    paddingHorizontal: SP.xs,
+    marginLeft: SP.xs,
+  },
+  productViewChipText: {
+    fontFamily: FONT.semibold,
+    fontSize: FS.xs,
+    color: theme.text,
   },
   // A standalone agent info/deep-link card — full width, coin/icon-in-a-
   // circle, bold title, subtitle, chevron. Same row shape as the Thread Cash

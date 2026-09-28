@@ -30,6 +30,7 @@ import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { isAgentUserId } from "../lib/brandthreadAgent";
+import { enrichProductAttachments } from "../lib/productAttachmentInfo";
 
 const router = Router();
 router.use(requireAuth);
@@ -539,11 +540,16 @@ router.get("/:id/messages", async (req, res) => {
     msgs.map((m) => m.replyToId).filter((v): v is string => !!v),
   );
 
-  return res.json(msgs.reverse().map((m) => adaptMessage(
+  const adapted = msgs.reverse().map((m) => adaptMessage(
     m,
     reactionsByMessage.get(m.id) ?? [],
     m.replyToId ? replyPreviewById.get(m.replyToId) : undefined,
-  )));
+  ));
+  // Product cards (item 70): always show the CURRENT price/name/image, or an
+  // honest "No longer available" state — never the stale value cached on the
+  // message at send time. See lib/productAttachmentInfo.ts.
+  await enrichProductAttachments(adapted);
+  return res.json(adapted);
 });
 
 // ─── POST /api/conversations/:id/messages ────────────────────────────────────
@@ -822,7 +828,9 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
   const replyPreview = msg.replyToId
     ? (await loadReplyPreviews([msg.replyToId])).get(msg.replyToId)
     : undefined;
-  return res.status(201).json(adaptMessage(msg, [], replyPreview));
+  const adapted = adaptMessage(msg, [], replyPreview);
+  await enrichProductAttachments([adapted]);
+  return res.status(201).json(adapted);
 });
 
 // ─── PUT /api/conversations/:id/messages/:messageId/reactions ────────────────

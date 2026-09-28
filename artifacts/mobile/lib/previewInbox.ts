@@ -222,11 +222,19 @@ export function getPreviewNotifications(): Notification[] {
   return cachedNotifications;
 }
 
-function toAttachment(seed: PreviewMessageSeed['attachment']): MessageAttachment | undefined {
+function toAttachment(seed: PreviewMessageSeed['attachment'], conv: PreviewConversationSeed): MessageAttachment | undefined {
   if (!seed) return undefined;
   const attachment: MessageAttachment = { type: seed.type, meta: seed.meta };
   if (seed.title) attachment.title = seed.title;
   if (seed.subtitle) attachment.subtitle = seed.subtitle;
+  // Product share cards (item 70): a real bundled poster image, same as the
+  // conversation's own avatar — preview mode has no backend to re-fetch live
+  // product data from, so a seed's `meta.unavailable: 'true'` (see
+  // previewInboxData.ts) drives the "No longer available" state directly,
+  // in place of the real API's lib/productAttachmentInfo.ts.
+  if (seed.type === 'product' && typeof conv.posterIndex === 'number') {
+    attachment.uri = posterUri(conv.posterIndex);
+  }
   return attachment;
 }
 
@@ -305,7 +313,7 @@ export function getPreviewMessages(conversationId: string): Message[] {
       fromInitials: isMe ? 'Y' : seed.participantInitials,
       fromColor: isMe ? '#8B5CF6' : seed.participantColor,
       text: m.text,
-      attachment: toAttachment(m.attachment),
+      attachment: toAttachment(m.attachment, seed),
       reactions: previewReactionOverrides.get(m.id) ?? seedReactions(seed, m),
       status: 'read',
       // Real conversations get `readAt` from the backend once the other

@@ -606,15 +606,51 @@ export default function SellerConversationScreen() {
         />
       );
     }
+    // Product share card (item 70) — same treatment as buyer-conversation.tsx
+    // so a shared product card looks identical from both sides of the DM: a
+    // real image thumbnail, live name/price (or "No longer available" — kept
+    // fresh server-side, see api-server's lib/productAttachmentInfo.ts), and
+    // an explicit "View" chip. It's a single tap target — no nested
+    // pressable inside the bubble's own long-press/swipe handlers.
+    if (att.type === 'product') {
+      const unavailable = att.meta?.unavailable === 'true';
+      return (
+        <PressableScale
+          style={s.productCard}
+          activeOpacity={0.7}
+          accessibilityLabel={`${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`}
+          testID="product-card-attachment"
+          onPress={() => {
+            const pid = att.meta?.productId;
+            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
+          }}
+        >
+          <View style={[s.productCardImage, unavailable && s.productCardImageDim]}>
+            {att.uri ? (
+              <CachedImage source={{ uri: att.uri }} style={s.productCardImageFill} recyclingKey={att.uri} />
+            ) : (
+              <Feather name="shopping-bag" size={ICON.md} color={MUTED} />
+            )}
+          </View>
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Product'}</Text>
+            <Text style={[s.attachSubtitle, unavailable && s.productUnavailableText]} numberOfLines={1}>
+              {unavailable ? 'No longer available' : (att.subtitle ?? 'Product')}
+            </Text>
+          </View>
+          <View style={s.productViewChip}>
+            <Text style={s.productViewChipText}>View</Text>
+            <Feather name="chevron-right" size={ICON.xs} color={FG} />
+          </View>
+        </PressableScale>
+      );
+    }
     return (
       <PressableScale
         style={s.attachCard}
-        activeOpacity={att.type === 'product' || att.type === 'order' || att.type === 'post' ? 0.7 : 1}
+        activeOpacity={att.type === 'order' || att.type === 'post' ? 0.7 : 1}
         onPress={() => {
-          if (att.type === 'product') {
-            const pid = att.meta?.productId;
-            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
-          } else if (att.type === 'order') {
+          if (att.type === 'order') {
             const orderId = att.meta?.orderId;
             router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
           } else if (att.type === 'post') {
@@ -638,7 +674,7 @@ export default function SellerConversationScreen() {
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
-        {(att.type === 'product' || att.type === 'order' || att.type === 'post') && (
+        {(att.type === 'order' || att.type === 'post') && (
           <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
         )}
       </PressableScale>
@@ -1509,6 +1545,27 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   attachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   attachSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+
+  // Product share card (item 70) — see buyer-conversation.tsx's matching styles.
+  productCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: BG, borderRadius: RADIUS.md,
+    padding: SP.sm, marginBottom: 2,
+    borderWidth: 1, borderColor: BORDER,
+  },
+  productCardImage: {
+    width: 44, height: 44, borderRadius: RADIUS.sm,
+    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  productCardImageDim: { opacity: 0.5 },
+  productCardImageFill: { width: '100%', height: '100%' },
+  productUnavailableText: { fontFamily: FONT.medium },
+  productViewChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill,
+    paddingVertical: 4, paddingHorizontal: SP.xs, marginLeft: SP.xs,
+  },
+  productViewChipText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG },
 
   pendingAttachRow: {
     flexDirection: 'row', alignItems: 'center',

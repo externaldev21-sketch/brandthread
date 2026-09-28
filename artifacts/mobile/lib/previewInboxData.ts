@@ -219,6 +219,18 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
         attachment: { type: 'product', title: 'Ivory Column Set', subtitle: '$410.00 · Sets', meta: { productId: 'preview-product-04' } },
         minutesAgo: 55,
       },
+      { id: 'preview-msg-04-3', fromOfficialOrParticipant: 'me', text: 'Also, is this one still around?', minutesAgo: 40 },
+      {
+        // Demos the deleted/unavailable-product state (item 70) — a product
+        // card whose listing is gone by the time this thread is opened, kept
+        // fresh honestly instead of showing its last-known price forever.
+        id: 'preview-msg-04-4', fromOfficialOrParticipant: 'me', text: '',
+        attachment: {
+          type: 'product', title: 'Draped Satin Slip', subtitle: '$260.00 · Dresses',
+          meta: { productId: 'preview-product-discontinued', unavailable: 'true' },
+        },
+        minutesAgo: 39,
+      },
     ],
   },
   {
