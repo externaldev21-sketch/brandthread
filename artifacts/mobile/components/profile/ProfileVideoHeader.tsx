@@ -1,22 +1,25 @@
 /**
  * Own-profile header with the profile video playing behind it (buyer + seller).
+ * Instagram's own-profile order: avatar + stats share a row, then name /
+ * @handle+chip / bio sit below it.
  *
  *   ┌──────────────────────────────┐ ← video starts at the very top (under the
  *   │ @handle ⌄        $ 🔔 ≡      │   status bar); controls respect the inset
  *   │                              │
- *   │  ◉  Display Name             │   avatar + name/@handle/role chip
- *   │     @handle  [Buyer]         │
- *   │  bio · link                  │ ← last ~40% fades to theme.background
+ *   │  ◉    12      340      87    │   avatar + Posts · Followers · Following,
+ *   │       Posts  Followers Following  same row, vertically centered on it
  *   ├──────────────────────────────┤ ← fade is fully solid exactly here
- *   │ 12      340        87        │   Posts · Followers · Following
- *   │ Posts   Followers  Following │   (on the plain solid background)
+ *   │  Display Name                │   (on the plain solid background)
+ *   │  @handle  [Buyer]             │
+ *   │  bio · link                  │
  *   └──────────────────────────────┘
  *
- * The video layer is absolutely positioned *behind* the identity stack and
- * sized to that stack's measured height (onLayout), so a long bio, a missing
- * chip, etc. never leave a seam: the fade's last stop is the literal
- * `theme.background` the rest of the page uses, and it ends at the stats row.
- * With no video set the same layout renders on the plain background.
+ * The video layer is absolutely positioned *behind* the avatar+stats row and
+ * sized to that row's measured height (onLayout) — a long bio, a missing
+ * chip, etc. never affect it, and the fade's last stop is the literal
+ * `theme.background` the rest of the page uses, ending exactly at the
+ * bottom of the stats row. With no video set the same layout renders on the
+ * plain background.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
@@ -107,7 +110,6 @@ export function ProfileVideoHeader({
     onHeroHeight?.(next);
   }, [onHeroHeight]);
 
-  const shadow = hasMedia ? OVER_MEDIA_TEXT_SHADOW : null;
   const bg = theme.background;
 
   return (
@@ -142,25 +144,28 @@ export function ProfileVideoHeader({
 
         <View style={styles.avatarRow}>
           {avatar}
-          <View style={styles.nameCol}>
-            <Text style={[styles.name, { color: theme.text }, shadow]} numberOfLines={2} accessibilityRole="header">
-              {name}
-              {nameAccessory ? <Text>{' '}{nameAccessory}</Text> : null}
-            </Text>
-            {(handle || chip) ? (
-              <View style={styles.handleRow}>
-                {handle ? <Text style={[styles.handle, { color: theme.muted }, shadow]} numberOfLines={1}>{handle}</Text> : null}
-                {chip}
-              </View>
-            ) : null}
+          <View style={styles.statsInline}>
+            <ProfileStatColumns stats={stats} loading={statsLoading} />
           </View>
         </View>
+      </View>
 
+      {/* Below the fade, on the plain solid background — Instagram's own
+          order: name, then @handle + role chip, then bio/link. */}
+      <View style={styles.belowAvatarRow} testID="profile-identity-meta">
+        <Text style={[styles.name, { color: theme.text }]} numberOfLines={2} accessibilityRole="header">
+          {name}
+          {nameAccessory ? <Text>{' '}{nameAccessory}</Text> : null}
+        </Text>
+        {(handle || chip) ? (
+          <View style={styles.handleRow}>
+            {handle ? <Text style={[styles.handle, { color: theme.muted }]} numberOfLines={1}>{handle}</Text> : null}
+            {chip}
+          </View>
+        ) : null}
         {meta ? <View style={styles.meta}>{meta}</View> : null}
         {coverAffordance ? <View style={styles.coverRow}>{coverAffordance}</View> : null}
       </View>
-
-      <ProfileStatColumns stats={stats} loading={statsLoading} />
     </View>
   );
 }
@@ -213,9 +218,9 @@ export function ProfileStatColumns({ stats, loading }: { stats: ProfileStat[]; l
   const { theme } = useAppTheme();
   return (
     <View style={styles.statsRow} testID="profile-stats-row">
-      {stats.map((stat, index) => {
+      {stats.map((stat) => {
         const label = stat.accessibilityLabel ?? `${stat.value} ${stat.label}`;
-        const cellStyle = [styles.statCell, index > 0 && styles.statSpacing];
+        const cellStyle = styles.statCell;
         const content = (
           <>
             <Text style={[styles.statValue, { color: loading ? theme.subtle : theme.text }]} numberOfLines={1}>
@@ -255,16 +260,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SP.md, paddingBottom: SP.sm,
   },
-  // Top bar → avatar row: 16pt of video between them.
-  avatarRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md },
-  nameCol: { flex: 1, minWidth: 0, marginLeft: 14, gap: 4 },
+  // Top bar → avatar row: 16pt of video between them. Avatar + stats share
+  // this row, vertically centered on the avatar, per Instagram's own order.
+  avatarRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: 16 },
+  statsInline: { flex: 1, minWidth: 0, marginLeft: 14 },
+  // Below the fade, on solid background: name → @handle+chip → bio/link.
+  belowAvatarRow: { paddingHorizontal: SP.md, paddingTop: 12 },
   name: { fontFamily: FONT.bold, fontSize: 18, lineHeight: 23, letterSpacing: -0.3 },
-  handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.sm },
+  handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.sm, marginTop: 4 },
   handle: { fontFamily: FONT.medium, fontSize: 14, lineHeight: 18, flexShrink: 1 },
-  // Avatar row → bio: 12pt. The stack's own bottom padding (16pt) is where
-  // the fade lands on the solid background, right above the stats row.
-  meta: { paddingHorizontal: SP.md, paddingTop: 12, gap: 2 },
-  coverRow: { paddingHorizontal: SP.md, paddingTop: 10, alignItems: 'flex-start' },
+  meta: { paddingTop: 8, gap: 2 },
+  coverRow: { paddingTop: 10, alignItems: 'flex-start' },
 
   affordance: {
     flexDirection: 'row', alignItems: 'center', gap: 4, height: 26,
@@ -273,9 +279,10 @@ const styles = StyleSheet.create({
   affordancePressed: { opacity: 0.6 },
   affordanceText: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },
 
-  statsRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: SP.md, paddingTop: 16 },
-  statCell: { alignItems: 'flex-start', minWidth: 44 },
-  statSpacing: { marginLeft: 28 },
+  // Space-around, centered columns filling the row beside the avatar —
+  // Instagram's own stat treatment (not the old left-aligned fixed-gap row).
+  statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+  statCell: { alignItems: 'center', minWidth: 44 },
   statPressed: { opacity: 0.6 },
   statValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 21, fontVariant: ['tabular-nums'] },
   statLabel: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 17 },

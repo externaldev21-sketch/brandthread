@@ -16,54 +16,11 @@ import { EditorialTile, TileRailSkeleton, type EditorialTileItem } from './Edito
 import { DiscoverTileView, DiscoverTileSkeleton } from './DiscoverTileView';
 import { DiscoverPeopleRow } from './DiscoverPeopleRow';
 import type { DiscoverPost, DiscoverPersonSuggestion } from '@/lib/discoverFeed';
+import { buildGridRows, type GridRow } from '@/lib/discoverGridPacking';
+
+export type { GridRow } from '@/lib/discoverGridPacking';
 
 const GAP = 2;
-
-type GridRow =
-  | { key: string; type: 'normal'; tiles: DiscoverPost[] }
-  | { key: string; type: 'feature'; big: DiscoverPost; small: DiscoverPost[] }
-  | { key: string; type: 'rail'; kind: 'justDropped' | 'highDemand' }
-  | { key: string; type: 'people' };
-
-function buildGridRows(
-  posts: DiscoverPost[],
-  opts: { showRails: boolean; hasJustDropped: boolean; hasHighDemand: boolean; hasPeople: boolean },
-): GridRow[] {
-  const rows: GridRow[] = [];
-  let i = 0;
-  let tileCounter = 0;
-  let insertedJustDropped = false;
-  let insertedHighDemand = false;
-  let tilesSincePeople = 0;
-
-  while (i < posts.length) {
-    tileCounter += 1;
-    if (tileCounter % 5 === 0 && i + 2 < posts.length) {
-      rows.push({ key: `feature-${i}`, type: 'feature', big: posts[i], small: [posts[i + 1], posts[i + 2]] });
-      i += 3;
-      tilesSincePeople += 3;
-    } else {
-      const chunk = posts.slice(i, i + 3);
-      rows.push({ key: `normal-${i}`, type: 'normal', tiles: chunk });
-      i += chunk.length;
-      tilesSincePeople += chunk.length;
-    }
-
-    if (opts.showRails && !insertedJustDropped && rows.length >= 2 && opts.hasJustDropped) {
-      rows.push({ key: 'rail-just-dropped', type: 'rail', kind: 'justDropped' });
-      insertedJustDropped = true;
-    }
-    if (opts.showRails && !insertedHighDemand && insertedJustDropped && rows.length >= 5 && opts.hasHighDemand) {
-      rows.push({ key: 'rail-high-demand', type: 'rail', kind: 'highDemand' });
-      insertedHighDemand = true;
-    }
-    if (opts.hasPeople && tilesSincePeople >= 20) {
-      rows.push({ key: `people-${i}`, type: 'people' });
-      tilesSincePeople = 0;
-    }
-  }
-  return rows;
-}
 
 function RailHeader({ title, sub }: { title: string; sub?: string }) {
   const { theme } = useAppTheme();

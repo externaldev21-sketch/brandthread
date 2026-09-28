@@ -13,10 +13,11 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { IconButton } from '@/components/ui/IconButton';
 import FollowButton from '@/components/social/FollowButton';
 import { formatCents } from '@/lib/money';
 import { formatProfileCount } from '@/services/profileService';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
@@ -78,7 +79,7 @@ function ViewerPage({
             </View>
           )}
           <Text style={styles.authorName} numberOfLines={1}>{post.authorName}</Text>
-          {post.authorVerified && <Feather name="check-circle" size={14} color="#4DA6FF" style={{ marginLeft: 4 }} />}
+          {post.authorVerified && <Feather name="check-circle" size={14} color={ON_DARK} style={{ marginLeft: 4 }} />}
         </PressableScale>
         <View style={{ marginTop: SP.sm }}>
           <FollowButton
@@ -159,15 +160,15 @@ export function DiscoverPostViewer({
             <ViewerPage post={item} onOpenProfile={openProfile} onOpenShopTheLook={onOpenShopTheLook} onSafetyMenu={onSafetyMenu} />
           )}
         />
-        <Pressable
+        <IconButton
+          name="chevron-left"
+          variant="glass"
+          size={26}
           onPress={onClose}
-          style={[styles.backBtn, { top: insets.top + 8 }]}
-          accessibilityRole="button"
           accessibilityLabel="Close"
           testID="discover-viewer-close"
-        >
-          <Feather name="chevron-left" size={26} color="#FFFFFF" />
-        </Pressable>
+          style={[styles.backBtn, { top: insets.top + 8 }]}
+        />
       </View>
     </Modal>
   );
@@ -177,8 +178,7 @@ const styles = StyleSheet.create({
   fallback: { backgroundColor: '#111' },
   playGlyph: { position: 'absolute', top: '45%', left: '45%' },
   backBtn: {
-    position: 'absolute', left: SP.md, width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', left: SP.md, width: 40, height: 40,
   },
   bottomWrap: { position: 'absolute', left: 0, right: 80, bottom: 0, paddingHorizontal: SP.md },
   authorRow: { flexDirection: 'row', alignItems: 'center' },

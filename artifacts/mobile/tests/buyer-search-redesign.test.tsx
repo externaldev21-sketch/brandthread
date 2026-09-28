@@ -4,32 +4,34 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { apiMock, routerMock, storageMock } = vi.hoisted(() => {
+const { apiMock, routerMock } = vi.hoisted(() => {
   const apiMock = {
     public: {
       search: vi.fn(),
-      trending: vi.fn(),
+      recent: vi.fn(),
+      removeRecent: vi.fn(),
+      clearRecent: vi.fn(),
+      log: vi.fn(),
     },
     social: {
       search: vi.fn(),
       follow: vi.fn(),
       unfollow: vi.fn(),
     },
+    reports: {
+      submit: vi.fn(),
+    },
   };
 
   const routerMock = {
     push: vi.fn(),
+    replace: vi.fn(),
     navigate: vi.fn(),
     back: vi.fn(),
+    canGoBack: vi.fn(() => true),
   };
 
-  const storageMock = {
-    getItem: vi.fn(),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-  };
-
-  return { apiMock, routerMock, storageMock };
+  return { apiMock, routerMock };
 });
 
 vi.mock('react-native', () => {
@@ -62,6 +64,7 @@ vi.mock('react-native', () => {
     Platform: { OS: 'ios', select: (obj: any) => obj.ios },
     Pressable: nativeComponent('Pressable'),
     ScrollView: nativeComponent('ScrollView'),
+    FlatList: nativeComponent('FlatList'),
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1, absoluteFill: {} },
     Text: nativeComponent('Text'),
     TextInput: nativeComponent('TextInput'),
@@ -85,6 +88,7 @@ vi.mock('expo-linear-gradient', () => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => routerMock,
+  useLocalSearchParams: () => ({}),
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -95,12 +99,8 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 
-vi.mock('@react-native-async-storage/async-storage', () => ({
-  default: storageMock,
-}));
-
 vi.mock('@clerk/expo', () => ({
-  useAuth: () => ({ userId: 'buyer-1' }),
+  useAuth: () => ({ userId: 'buyer-1', isSignedIn: true }),
 }));
 
 vi.mock('@/lib/api', () => ({
@@ -109,6 +109,23 @@ vi.mock('@/lib/api', () => ({
 
 vi.mock('@/lib/devPreview', () => ({
   isBuyerDevPreview: () => false,
+}));
+
+vi.mock('@/lib/discoverFeed', () => ({
+  composeDiscoverPosts: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('@/components/discover/DiscoverGrid', () => ({
+  DiscoverGrid: () => React.createElement('DiscoverGrid'),
+}));
+vi.mock('@/components/discover/DiscoverPostViewer', () => ({
+  DiscoverPostViewer: () => React.createElement('DiscoverPostViewer'),
+}));
+vi.mock('@/components/discover/DiscoverSafetyMenu', () => ({
+  DiscoverSafetyMenu: () => React.createElement('DiscoverSafetyMenu'),
+}));
+vi.mock('@/components/ShopProductSheet', () => ({
+  ShopProductSheet: () => React.createElement('ShopProductSheet'),
 }));
 
 vi.mock('@/contexts/AppThemeContext', () => ({
@@ -128,8 +145,8 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 }));
 
 vi.mock('@/components/BrandthreadUI', () => ({
-  EmptyState: ({ title, description }: { title: string; description: string }) =>
-    React.createElement('EmptyState', {}, React.createElement('Text', {}, `${title} ${description}`)),
+  EmptyState: ({ title, description }: { title: string; description?: string }) =>
+    React.createElement('EmptyState', {}, React.createElement('Text', {}, `${title} ${description ?? ''}`)),
   AnimatedEntrance: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -152,8 +169,6 @@ vi.mock('react-native-reanimated', () => ({
   withTiming: (v: unknown) => v,
   withSpring: (v: unknown) => v,
   runOnJS: (fn: (...args: unknown[]) => void) => fn,
-  // `constants/motion.ts` (pulled in transitively via components/ui/Button)
-  // calls `Easing.bezier(...)` at module scope.
   Easing: {
     out: (fn: unknown) => fn,
     in: (fn: unknown) => fn,
@@ -162,19 +177,6 @@ vi.mock('react-native-reanimated', () => ({
     linear: (t: number) => t,
     bezier: (..._points: number[]) => (t: number) => t,
   },
-}));
-
-vi.mock('@/components/ui', () => ({
-  // The real barrel eagerly imports SegmentedControl -> expo-blur, which
-  // isn't available in this plain react-native mock — stub just the pieces
-  // this screen uses.
-  Chip: ({ label, onPress, onRemove, removeAccessibilityLabel }: any) =>
-    React.createElement('View', {}, [
-      React.createElement('Pressable', { key: 'main', onPress, accessibilityLabel: label }, React.createElement('Text', {}, label)),
-      onRemove ? React.createElement('Pressable', { key: 'remove', onPress: onRemove, accessibilityLabel: removeAccessibilityLabel }) : null,
-    ]),
-  Button: ({ label, onPress, accessibilityLabel, testID, loading }: any) =>
-    React.createElement('Pressable', { onPress, accessibilityLabel, testID }, React.createElement('Text', {}, loading ? '…' : label)),
 }));
 
 vi.mock('@/components/layout', () => ({
@@ -241,20 +243,23 @@ function setField(renderer: ReactTestRenderer, value: string) {
   });
 }
 
-describe('buyer full-screen search', () => {
+function submitField(renderer: ReactTestRenderer) {
+  renderer.root.findByProps({ testID: 'buyer-search-field' }).props.onSubmitEditing();
+}
+
+describe('buyer full-screen search — Instagram-mimicking rebuild', () => {
   let renderer: ReactTestRenderer | undefined;
 
   beforeEach(() => {
     apiMock.public.search.mockReset().mockResolvedValue({ results: [] });
-    // "You may like" no longer calls this endpoint at all (see the tests
-    // below) — mocked only so nothing throws if some other code path does.
-    apiMock.public.trending.mockReset().mockResolvedValue({ trending: [] });
+    apiMock.public.recent.mockReset().mockResolvedValue({ recent: [{ query: 'sneakers', normalized: 'sneakers' }, { query: 'denim', normalized: 'denim' }] });
+    apiMock.public.removeRecent.mockReset().mockResolvedValue({ ok: true });
+    apiMock.public.clearRecent.mockReset().mockResolvedValue({ ok: true });
+    apiMock.public.log.mockReset().mockResolvedValue({ ok: true });
     apiMock.social.search.mockReset().mockResolvedValue([]);
     apiMock.social.follow.mockReset().mockResolvedValue({ ok: true });
     apiMock.social.unfollow.mockReset().mockResolvedValue({ ok: true });
-    storageMock.getItem.mockReset().mockResolvedValue(JSON.stringify(['sneakers', 'denim']));
-    storageMock.setItem.mockReset().mockResolvedValue(undefined);
-    storageMock.removeItem.mockReset().mockResolvedValue(undefined);
+    apiMock.reports.submit.mockReset().mockResolvedValue({ ok: true });
     routerMock.push.mockReset();
     routerMock.back.mockReset();
   });
@@ -262,18 +267,6 @@ describe('buyer full-screen search', () => {
   afterEach(() => {
     renderer?.unmount();
     renderer = undefined;
-  });
-
-  it('hides the page scrollbar (nativeID for the scoped web CSS rule, indicator off)', async () => {
-    renderer = await renderScreen();
-    const scroll = renderer.root.findByProps({ nativeID: 'buyer-search-scroll' });
-    expect(scroll.props.showsVerticalScrollIndicator).toBe(false);
-  });
-
-  it('"You may like" scrolls horizontally in a single row instead of wrapping', async () => {
-    renderer = await renderScreen();
-    const rows = renderer.root.findAllByProps({ horizontal: true });
-    expect(rows.length).toBeGreaterThan(0);
   });
 
   it('pops the screen when Back is pressed', async () => {
@@ -284,107 +277,78 @@ describe('buyer full-screen search', () => {
     expect(routerMock.back).toHaveBeenCalled();
   });
 
-  it('renders recent searches and the curated "You may like" list in the empty state, with no results/product/trending fetch yet', async () => {
+  it('unfocused + empty query shows the browse grid and an add-person icon, no Cancel', async () => {
     renderer = await renderScreen();
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-add-person' }, { deep: false })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-cancel' }, { deep: false })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-recent' }, { deep: false })).toHaveLength(0);
+  });
+
+  it('tapping the add-person icon navigates to Friends', async () => {
+    renderer = await renderScreen();
+    act(() => {
+      renderer!.root.findByProps({ testID: 'buyer-search-add-person' }).props.onPress();
+    });
+    expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/friends');
+  });
+
+  it('focusing an empty field shows Cancel + the Recent section (server-backed) instead of the grid', async () => {
+    renderer = await renderScreen();
+    act(() => {
+      renderer!.root.findByProps({ testID: 'buyer-search-field' }).props.onFocus();
+    });
+    await act(async () => { await flushPromises(); });
+
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-cancel' }, { deep: false })).toHaveLength(1);
     const content = textContent(renderer);
+    expect(content).toContain('Recent');
     expect(content).toContain('sneakers');
     expect(content).toContain('denim');
-    expect(renderer.root.findAllByProps({ testID: 'buyer-search-empty-state' }, { deep: false })).toHaveLength(1);
-    expect(apiMock.public.search).not.toHaveBeenCalled();
-    // "You may like" never calls the live trending/analytics endpoint —
-    // that's exactly what was leaking raw query fragments like "at"/"ate".
-    expect(apiMock.public.trending).not.toHaveBeenCalled();
+    expect(apiMock.public.recent).toHaveBeenCalled();
   });
 
-  it('"You may like" always shows the fixed curated list, never live trending/analytics terms', async () => {
+  it('removes a single recent search via the row\'s x button', async () => {
     renderer = await renderScreen();
-    const content = textContent(renderer);
-    expect(content).toContain('black wool coat');
-    expect(content).toContain('hoodie');
-    expect(content).toContain('runway');
-    expect(content).toContain('satin slip');
-    expect(content).toContain('streetwear');
-    // Regression guard for the exact junk fragments reported live: raw
-    // partial-typed queries must never appear in "You may like".
-    const section = content.slice(content.indexOf('YOU MAY LIKE'), content.indexOf('WATCH SOMETHING NEW'));
-    expect(section).not.toMatch(/\bat\b/);
-    expect(section).not.toMatch(/\bate\b/);
-  });
+    act(() => { renderer!.root.findByProps({ testID: 'buyer-search-field' }).props.onFocus(); });
+    await act(async () => { await flushPromises(); });
 
-  it('shows "No results for X" with fallback suggestion chips', async () => {
-    apiMock.public.search.mockResolvedValue({ results: [] });
-    apiMock.social.search.mockResolvedValue([]);
-
-    renderer = await renderScreen();
-    vi.useFakeTimers();
-    setField(renderer, 'zzznomatch');
-    await act(async () => {
-      vi.advanceTimersByTime(150);
-      vi.useRealTimers();
-      await flushPromises();
-    });
-    await act(async () => {
-      renderer!.root.findByProps({ testID: 'buyer-search-submit' }).props.onPress();
-      await flushPromises();
-    });
-
-    const content = textContent(renderer);
-    expect(content).toContain('No results for "zzznomatch"');
-    expect(content).toContain('black wool coat');
-  });
-
-  it('renders a person\'s real avatar image instead of the initials fallback when avatarUrl is present', async () => {
-    apiMock.public.search.mockResolvedValue({ results: [] });
-    apiMock.social.search.mockResolvedValue([person({ userId: 'p3', name: 'Robin Ito', avatarUrl: 'https://example.com/robin.jpg' })]);
-
-    renderer = await renderScreen();
-    vi.useFakeTimers();
-    setField(renderer, 'robin');
-    await act(async () => {
-      vi.advanceTimersByTime(150);
-      vi.useRealTimers();
-      await flushPromises();
-    });
-    await act(async () => {
-      renderer!.root.findByProps({ testID: 'buyer-search-submit' }).props.onPress();
-      await flushPromises();
-    });
-    await act(async () => {
-      renderer!.root.findByProps({ testID: 'search-tab-users' }).props.onPress();
-      await flushPromises();
-    });
-
-    const images = renderer.root.findAll(
-      (node) => (node.type as unknown) === 'CachedImage' && (node.props as { source?: { uri?: string } }).source?.uri === 'https://example.com/robin.jpg',
-    );
-    expect(images.length).toBeGreaterThan(0);
-  });
-
-  it('shows suggestions (not results tabs) immediately while typing, before Search is pressed', async () => {
-    apiMock.public.search.mockResolvedValue({ results: [] });
-    apiMock.social.search.mockResolvedValue([]);
-    renderer = await renderScreen();
-    setField(renderer, 'v');
-    expect(renderer.root.findAllByProps({ testID: 'buyer-search-suggestions' }, { deep: false })).toHaveLength(1);
-    expect(renderer.root.findAllByProps({ testID: 'buyer-search-results-state' }, { deep: false })).toHaveLength(0);
-  });
-
-  it('clears an individual recent search and all recent searches', async () => {
-    renderer = await renderScreen();
     await act(async () => {
       renderer!.root.findByProps({ accessibilityLabel: 'Remove sneakers from recent searches' }).props.onPress();
       await flushPromises();
     });
-    expect(storageMock.setItem).toHaveBeenCalledWith('bt:buyer-search-recent:buyer-1', JSON.stringify(['denim']));
-
-    await act(async () => {
-      renderer!.root.findByProps({ accessibilityLabel: 'Clear recent searches' }).props.onPress();
-      await flushPromises();
-    });
-    expect(storageMock.removeItem).toHaveBeenCalledWith('bt:buyer-search-recent:buyer-1');
+    expect(apiMock.public.removeRecent).toHaveBeenCalledWith('sneakers');
   });
 
-  it('debounces typing (150ms) before calling the search and social APIs, shows suggestions first, then renders tabs on submit', async () => {
+  it('Cancel clears the query and returns to the unfocused browse grid', async () => {
+    renderer = await renderScreen();
+    setField(renderer, 'hoodie');
+    act(() => {
+      renderer!.root.findByProps({ testID: 'buyer-search-cancel' }).props.onPress();
+    });
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-add-person' }, { deep: false })).toHaveLength(1);
+  });
+
+  it('shows live suggestions (query row first, then matching accounts) while typing, before submit', async () => {
+    apiMock.public.search.mockResolvedValue({ results: [] });
+    apiMock.social.search.mockResolvedValue([person()]);
+    renderer = await renderScreen();
+
+    vi.useFakeTimers();
+    setField(renderer, 'jor');
+    await act(async () => {
+      vi.advanceTimersByTime(150);
+      vi.useRealTimers();
+      await flushPromises();
+    });
+
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-suggestions' }, { deep: false })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-results-state' }, { deep: false })).toHaveLength(0);
+    // The name is bold-highlighted (split across nested Text nodes), so
+    // assert on the plain, unsplit handle string instead.
+    expect(textContent(renderer)).toContain('@jordanlee');
+  });
+
+  it('debounces typing (150ms), submits to the tabbed results view, and logs the submitted term', async () => {
     apiMock.public.search.mockResolvedValue({ results: [product()] });
     apiMock.social.search.mockResolvedValue([person()]);
 
@@ -403,29 +367,32 @@ describe('buyer full-screen search', () => {
     expect(apiMock.public.search).toHaveBeenCalledWith({ q: 'vault', limit: 30 });
     expect(apiMock.social.search).toHaveBeenCalledWith('vault', 20);
 
-    // Typing alone — before Search is pressed — shows suggestions, not the
-    // tabbed results view. The suggestion data (fetched above) is what
-    // powers the suggestion rows, but the tabs themselves stay hidden.
-    expect(renderer.root.findAllByProps({ testID: 'buyer-search-suggestions' }, { deep: false })).toHaveLength(1);
-    expect(renderer.root.findAllByProps({ testID: 'buyer-search-results-state' }, { deep: false })).toHaveLength(0);
-
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'buyer-search-submit' }).props.onPress();
+      submitField(renderer!);
       await flushPromises();
     });
 
+    expect(apiMock.public.log).toHaveBeenCalledWith('vault');
+    expect(renderer.root.findAllByProps({ testID: 'buyer-search-results-state' }, { deep: false })).toHaveLength(1);
+    // Default tab on submit is "For you" — an Accounts section, not the
+    // product grid (that's the dedicated Products tab).
     expect(textContent(renderer)).toContain('Jordan Lee');
+
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'search-tab-products' }).props.onPress();
+      await flushPromises();
+    });
     expect(textContent(renderer)).toContain('Canvas Cargo Jacket');
 
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'search-tab-users' }).props.onPress();
+      renderer!.root.findByProps({ testID: 'search-tab-accounts' }).props.onPress();
       await flushPromises();
     });
     expect(textContent(renderer)).toContain('Jordan Lee');
     expect(renderer.root.findAllByProps({ testID: 'search-follow-p1' }, { deep: false })).toHaveLength(1);
   });
 
-  it('shows a friendly no-results state', async () => {
+  it('shows a friendly no-results state on the Products tab', async () => {
     apiMock.public.search.mockResolvedValue({ results: [] });
     apiMock.social.search.mockResolvedValue([]);
 
@@ -439,14 +406,19 @@ describe('buyer full-screen search', () => {
     });
 
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'buyer-search-submit' }).props.onPress();
+      submitField(renderer!);
+      await flushPromises();
+    });
+
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'search-tab-products' }).props.onPress();
       await flushPromises();
     });
 
     expect(renderer.root.findAllByProps({ testID: 'buyer-search-no-results' }, { deep: false })).toHaveLength(1);
   });
 
-  it('follows and unfollows a person from the Users tab', async () => {
+  it('follows and unfollows a person from the Accounts tab', async () => {
     apiMock.public.search.mockResolvedValue({ results: [] });
     apiMock.social.search.mockResolvedValue([person({ userId: 'p2', name: 'Sam Rivera', isFollowing: false })]);
 
@@ -460,12 +432,12 @@ describe('buyer full-screen search', () => {
     });
 
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'buyer-search-submit' }).props.onPress();
+      submitField(renderer!);
       await flushPromises();
     });
 
     await act(async () => {
-      renderer!.root.findByProps({ testID: 'search-tab-users' }).props.onPress();
+      renderer!.root.findByProps({ testID: 'search-tab-accounts' }).props.onPress();
       await flushPromises();
     });
 

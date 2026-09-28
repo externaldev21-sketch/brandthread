@@ -17,6 +17,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, Modal, Animated, Share, Linking, Alert, ScrollView, Platform, Pressable,
+  useWindowDimensions, type LayoutChangeEvent,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,10 +59,11 @@ import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import { Button } from '@/components/ui/Button';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
+import { ProfileEmptyAreaContext } from '@/components/profile/ProfileEmptyAreaContext';
 import {
   CoverCoachmarkSheet, CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia,
 } from '@/components/profile/ProfileCover';
-import { profileEmptyState, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
+import { profileEmptyState, computeEmptyArea, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
 import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
 import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRow';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
@@ -287,11 +289,33 @@ export default function ProfileScreen() {
   const heroPosterOnly = useHeroPosterOnly();
   const threadCashEnabled = useFeatureFlag('threadCash');
   const celebrateThreadCash = useCelebrateThreadCash();
+  const { height: winHeight } = useWindowDimensions();
   // Clears the floating buyer tab bar.
   const listPadding = { paddingBottom: barInset + SP.lg };
   const savedColumns = layout.gridColumns >= 4 ? 3 : 2;
   const savedCellSize = Math.floor((layout.columnWidth - SP.md * 2) / savedColumns);
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+
+  // The whole header (video hero, identity, buttons, highlights, streak,
+  // tabs) scrolls away with the list — nothing stays pinned above the empty
+  // state — so `computeEmptyArea` (the same helper ProfileShell already uses
+  // for this exact bug class) is given the header's own measured height as
+  // its "tabsHeight" input. This sizes the empty state to fill the rest of
+  // the viewport, guaranteeing its CTA clears the floating tab bar by
+  // `EMPTY_AREA_BREATHING_ROOM` at the end of the scroll, on any header
+  // height (the video hero makes this header much taller than a fixed
+  // constant could safely assume).
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const handleHeaderLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.height);
+    setHeaderHeight((prev) => (prev === next ? prev : next));
+  }, []);
+  const emptyArea = computeEmptyArea({
+    viewportHeight: winHeight,
+    topChrome: 0,
+    tabsHeight: headerHeight,
+    bottomInset: barInset,
+  });
 
   const accountRef = useRef(user?.id);
   accountRef.current = user?.id;
@@ -691,7 +715,7 @@ export default function ProfileScreen() {
   );
 
   const header = (
-    <View>
+    <View onLayout={handleHeaderLayout}>
       {/* ── Video hero + identity: the profile video (when set) runs from the
           very top of the screen, behind the top bar, avatar, name/@handle/
           chip and bio, and fades into the solid background exactly where the
@@ -729,7 +753,6 @@ export default function ProfileScreen() {
             website={profile?.website}
             location={profile?.location}
             onOpenWebsite={(url) => { void Linking.openURL(url); }}
-            overMedia={hasCover}
           />
         ) : null}
         coverAffordance={(
@@ -809,6 +832,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.root} testID="buyer-profile">
+      <ProfileEmptyAreaContext.Provider value={emptyArea.minHeight}>
       <Animated.FlatList
         key={`buyer-${numColumns}`}
         data={loading ? [] : rows}
@@ -818,17 +842,12 @@ export default function ProfileScreen() {
         columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
         ListHeaderComponent={header}
         ListEmptyComponent={(
-          // A floating overlay independent of scroll (tried here first) can
-          // only ever guarantee tab-bar clearance if the header + this state
-          // both fit above the tab bar with room to spare — on a short
-          // viewport (this screen's header alone can approach 650pt) that's
-          // not always possible, and an absolutely-positioned overlay that
-          // doesn't fit just renders off-screen with no way to scroll to it,
-          // which is worse than the bug it was meant to fix. In-flow content
-          // plus a `paddingBottom` sized to the tab bar's own footprint (see
-          // `listPadding` below) instead guarantees the CTA scrolls fully
-          // clear of the bar by at least 16pt on every screen size, and sits
-          // clear of it with no scrolling at all whenever there's room.
+          // `emptyArea` (computeEmptyArea, shared with ProfileShell) sizes
+          // this to fill the rest of the viewport below the (measured, video
+          // hero included) header, and `emptyArea.paddingBottom` below
+          // reserves the floating tab bar's own footprint — so at the end of
+          // the scroll the CTA sits fully clear of the bar, on any header
+          // height, not just a fixed constant.
           <ProfileGridPlaceholder
             loading={loading}
             error={false}
@@ -845,10 +864,11 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={32}
-        contentContainerStyle={{ paddingBottom: listPadding.paddingBottom }}
+        contentContainerStyle={{ paddingBottom: emptyArea.paddingBottom }}
         refreshing={refreshing}
         onRefresh={onRefresh}
       />
+      </ProfileEmptyAreaContext.Provider>
 
       {/* ── Profile Menu Sheet ── */}
       <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>

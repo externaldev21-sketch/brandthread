@@ -546,6 +546,10 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/public/trending') return { trending: TRENDING.slice(0, Number(query.get('limit') ?? 20)) };
   if (p === '/public/search') return publicSearch(query.get('q') ?? '');
   if (p === '/public/search/trending') return { trending: [{ term: 'Hoodies', type: 'category' }, { term: 'Northline Studio', type: 'brand' }, { term: 'trail runner', type: 'query' }, { term: 'Outerwear', type: 'category' }] };
+  // Fixed demo recent-search rows (real /api/public/search/recent is
+  // per-user server history — see search.ts route) so the Search rebuild's
+  // "Recent" section and "See all" page are screenshotable here.
+  if (p === '/public/search/recent') return { recent: [{ query: 'hoodie', normalized: 'hoodie' }, { query: 'trail runner', normalized: 'trail runner' }, { query: 'Northline Studio', normalized: 'northline studio' }] };
   if (p === '/public/search/suggested') return searchSuggested();
   if (p === '/public/search/categories') return searchCategories();
   if (p === '/social/search') return searchPeople();
