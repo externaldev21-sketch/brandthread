@@ -12,7 +12,7 @@ import type {
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
   Conversation, ConversationType, ConversationParticipant,
   Message, MessageAttachment, MessageReaction, ReactionType,
-  Story, StoryMedia, StoryPrivacySettings, StoryViewer,
+  Story, StoryMedia, StoryPrivacySettings, StoryViewer, Note,
   Notification, NotificationCategory, NotificationPreference,
   BlockRecord, MuteRecord, RestrictRecord,
   SavedItem, SavedItemType, SavedCollection, PrivacySettings, ProfileSearchResult,
@@ -1316,6 +1316,29 @@ export async function deleteStory(storyId: string): Promise<void> {
   const k = K();
   const stories = await loadStories(k);
   await save(k.stories, stories.filter(s => s.id !== storyId)); notify();
+}
+
+// ─── Notes (bubble above story-tray avatars) ─────────────────────────────────
+// No local cache to prune here (unlike stories) — a note tray is small and
+// short-lived enough that app/(buyer)/inbox.tsx just re-fetches it alongside
+// the story tray on every load/focus, same as it does for stories via
+// api.social.storiesFollowing().
+
+/** Post (or replace) my own active note — 60 chars max, 24h TTL, matching the
+ *  server's own validation in POST /api/social/notes. */
+export async function postNote(text: string): Promise<Note> {
+  const note = await serviceRequest<Note>('/api/social/notes', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  });
+  notify();
+  return note;
+}
+
+/** Active notes from people I follow (+ my own), for the stories tray. */
+export async function getNotesForTray(): Promise<Note[]> {
+  const remote = await serviceRequest<Note[]>('/api/social/notes/following');
+  return Array.isArray(remote) ? remote : [];
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

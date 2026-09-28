@@ -22,8 +22,10 @@ import {
   subscribeSocial,
   searchProfiles, createOrGetConversation, muteUser, MY_USER_ID,
   getFriendSuggestions, cacheStoriesForViewer, setConversationPinned,
+  getNotesForTray, postNote,
 } from '@/services/socialService';
-import type { Conversation, ProfileSearchResult, AccountType, Story } from '@/services/socialTypes';
+import type { Conversation, ProfileSearchResult, AccountType, Story, Note } from '@/services/socialTypes';
+import { NOTE_MAX_CHARS } from '@/services/socialTypes';
 import { getSuggestedPeople, dismissSuggestedPerson, type SuggestedPerson } from '@/services/activityService';
 import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { useApi } from '@/lib/api';
@@ -47,8 +49,12 @@ import {
   isPreviewStoriesEnabled, getPreviewStoryTrayRows, getPreviewStoryFor,
   markPreviewStorySeen, PREVIEW_MY_STORY,
 } from '@/lib/previewStories';
+import {
+  isPreviewNotesEnabled, getPreviewNotesForTray, getPreviewMyNote, postPreviewNote,
+} from '@/lib/previewNotes';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
+import { Glass } from '@/components/ui/Glass';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
 // (see rippleEnabled on PressableScale/IconButton) — the translucent ripple
@@ -343,6 +349,16 @@ export default function InboxScreen() {
   const myDisplayName = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || 'You';
   const myInitials = myDisplayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
 
+  // Notes bubble above the tray (see loadNotesTray() below) — "my note" is
+  // null when the buyer has no active (<24h) note ("Your note" then shows
+  // the empty tap-to-post prompt bubble); notesByAuthor covers everyone
+  // else's bubble, keyed by authorId, same key space as storyTrayRows.
+  const [myNote, setMyNote] = useState<Note | null>(null);
+  const [notesByAuthor, setNotesByAuthor] = useState<Record<string, Note>>({});
+  const [noteComposeVisible, setNoteComposeVisible] = useState(false);
+  const [noteComposeText, setNoteComposeText] = useState('');
+  const [noteComposeSaving, setNoteComposeSaving] = useState(false);
+
   // Re-renders whenever the shared LIVE directory changes (same singleton
   // LiveHostRing reads from), so sorting the tray by "is this author live
   // right now" always reflects the latest state without a per-row hook.
@@ -405,6 +421,37 @@ export default function InboxScreen() {
       }
     }
   }, [userId, api]);
+
+  // Notes bubble tray fetch — piggybacks on the same "followed authors" set
+  // the story tray already resolves server-side (api.social.notesFollowing()
+  // reuses the follow-graph lookup /stories/following runs), so this is a
+  // second small request rather than a second full directory lookup.
+  const loadNotesTray = useCallback(async () => {
+    if (!userId) {
+      if (isPreviewNotesEnabled()) {
+        setMyNote(getPreviewMyNote());
+        const byAuthor: Record<string, Note> = {};
+        for (const n of getPreviewNotesForTray()) byAuthor[n.authorId] = n;
+        setNotesByAuthor(byAuthor);
+      } else {
+        setMyNote(null);
+        setNotesByAuthor({});
+      }
+      return;
+    }
+    try {
+      const rows = await getNotesForTray();
+      if (accountRef.current !== userId) return;
+      const mine = rows.find(r => r.authorId === userId) ?? null;
+      const byAuthor: Record<string, Note> = {};
+      for (const r of rows) if (r.authorId !== userId) byAuthor[r.authorId] = r;
+      setMyNote(mine);
+      setNotesByAuthor(byAuthor);
+    } catch {
+      // Non-critical: the note bubbles just stay off the tray on failure —
+      // the tray itself (avatars/stories) still renders normally.
+    }
+  }, [userId]);
 
   // Preview-only overlay for the "typing…" row treatment: real accounts get
   // it purely from `conv.agentTyping` below (polled via GET /api/conversations
@@ -504,12 +551,13 @@ export default function InboxScreen() {
     loadData();
     loadSuggested();
     loadStoryTray();
-  }, [loadData, loadSuggested, loadStoryTray]));
+    loadNotesTray();
+  }, [loadData, loadSuggested, loadStoryTray, loadNotesTray]));
 
   useEffect(() => {
-    const unsub = subscribeSocial(() => { loadData(); loadSuggested(); loadStoryTray(); });
+    const unsub = subscribeSocial(() => { loadData(); loadSuggested(); loadStoryTray(); loadNotesTray(); });
     return unsub;
-  }, [loadData, loadSuggested, loadStoryTray]);
+  }, [loadData, loadSuggested, loadStoryTray, loadNotesTray]);
 
   // ── Filter logic ────────────────────────────────────────────────────────────
 
@@ -582,6 +630,41 @@ export default function InboxScreen() {
       openStoryViewerFor('me');
     } else {
       router.push('/buyer-story-create' as never);
+    }
+  }
+
+  // Tapping "Your note" (empty prompt or an already-posted bubble) opens the
+  // lightweight compose sheet below — pre-filled with the current text when
+  // replacing an existing note, matching Instagram's own "tap your note to
+  // edit it" behavior.
+  function openNoteCompose() {
+    hapticPrimaryAction();
+    setNoteComposeText(myNote?.text ?? '');
+    setNoteComposeVisible(true);
+  }
+
+  function closeNoteCompose() {
+    setNoteComposeVisible(false);
+    setNoteComposeText('');
+  }
+
+  async function submitNote() {
+    const text = noteComposeText.trim();
+    if (!text || noteComposeSaving) return;
+    hapticPrimaryAction();
+    setNoteComposeSaving(true);
+    try {
+      if (!userId && isPreviewNotesEnabled()) {
+        setMyNote(postPreviewNote(text));
+      } else {
+        const posted = await postNote(text);
+        setMyNote(posted);
+      }
+      closeNoteCompose();
+    } catch {
+      Alert.alert('Couldn’t post your note', 'Please try again.');
+    } finally {
+      setNoteComposeSaving(false);
     }
   }
 
@@ -1394,42 +1477,91 @@ export default function InboxScreen() {
               style={[s.activeRail, { marginVertical: -2 }]}
               contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md, paddingVertical: 2 }}
             >
-              {/* "Your story" — always first. */}
-              <PressableScale
-                style={s.activeRailItem}
-                onPress={openMyStorySlot}
-                rippleEnabled={NO_RIPPLE}
-                accessibilityRole="button"
-                accessibilityLabel={myStoryId ? 'Your story' : 'Add to your story'}
-                testID="inbox-my-story"
-              >
-                <View style={s.activeRailAvatar1}>
-                  {myStoryId ? (
-                    <View style={[s.storyRing, s.storyRingUnseen, { borderColor: theme.text }]} />
-                  ) : null}
-                  {myAvatarUri ? (
-                    <Image source={{ uri: myAvatarUri }} style={s.activeRailAvatar} />
-                  ) : (
-                    <View style={[s.activeRailAvatar, { backgroundColor: theme.cardElevated }]}>
-                      <Text style={[s.activeRailInitials, { color: theme.text }]}>{myInitials}</Text>
-                    </View>
-                  )}
-                  {!myStoryId && (
-                    <View style={[s.addStoryBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} pointerEvents="none">
-                      <Feather name="plus" size={12} color={theme.onAccent} />
-                    </View>
-                  )}
-                </View>
-                <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>Your story</Text>
-              </PressableScale>
+              {/* "Your story" — always first. The note bubble sits above the
+                  avatar as its own sibling Pressable (never nested inside
+                  the story-slot Pressable below it) since it opens a
+                  different flow — compose, not the story viewer/creator. */}
+              <View style={s.activeRailItemWrap}>
+                <PressableScale
+                  style={s.noteBubbleTouchable}
+                  onPress={openNoteCompose}
+                  rippleEnabled={NO_RIPPLE}
+                  accessibilityRole="button"
+                  accessibilityLabel={myNote ? `Your note: ${myNote.text}` : 'Add a note'}
+                  testID="inbox-my-note"
+                >
+                  <View style={[
+                    s.noteBubble,
+                    { backgroundColor: theme.cardElevated, borderColor: theme.border },
+                  ]}>
+                    <Text
+                      style={[s.noteBubbleText, { color: myNote ? theme.text : theme.subtle, fontFamily: myNote ? FONT.medium : FONT.regular }]}
+                      numberOfLines={1}
+                    >
+                      {myNote ? myNote.text : 'Your thoughts go here...'}
+                    </Text>
+                  </View>
+                  <View style={[s.noteBubbleTail, { backgroundColor: theme.cardElevated, borderColor: theme.border }]} />
+                </PressableScale>
+                <PressableScale
+                  style={s.activeRailItem}
+                  onPress={openMyStorySlot}
+                  rippleEnabled={NO_RIPPLE}
+                  accessibilityRole="button"
+                  accessibilityLabel={myStoryId ? 'Your story' : 'Add to your story'}
+                  testID="inbox-my-story"
+                >
+                  <View style={s.activeRailAvatar1}>
+                    {myStoryId ? (
+                      <View style={[s.storyRing, s.storyRingUnseen, { borderColor: theme.text }]} />
+                    ) : null}
+                    {myAvatarUri ? (
+                      <Image source={{ uri: myAvatarUri }} style={s.activeRailAvatar} />
+                    ) : (
+                      <View style={[s.activeRailAvatar, { backgroundColor: theme.cardElevated }]}>
+                        <Text style={[s.activeRailInitials, { color: theme.text }]}>{myInitials}</Text>
+                      </View>
+                    )}
+                    {!myStoryId && (
+                      <View style={[s.addStoryBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} pointerEvents="none">
+                        <Feather name="plus" size={12} color={theme.onAccent} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>Your story</Text>
+                </PressableScale>
+              </View>
 
               {orderedStoryTray.map(row => {
                 const live = isAuthorLive(row.authorId);
+                const note = notesByAuthor[row.authorId];
+                // Purely decorative (never its own Pressable) — per the PR
+                // notes, tapping a friend's note bubble doesn't need a
+                // separate interaction; it inherits whatever tapping their
+                // avatar already does (open their story, or their live).
+                // Always reserves the same fixed-height slot (empty when
+                // this author has no active note) so every avatar in the
+                // row still lines up on the same baseline.
+                const noteBubble = (
+                  <View style={s.activeRailNoteWrap} pointerEvents="none">
+                    {note ? (
+                      <>
+                        <View style={[s.noteBubble, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
+                          <Text style={[s.noteBubbleText, { color: theme.text, fontFamily: FONT.medium }]} numberOfLines={1}>
+                            {note.text}
+                          </Text>
+                        </View>
+                        <View style={[s.noteBubbleTail, { backgroundColor: theme.cardElevated, borderColor: theme.border }]} />
+                      </>
+                    ) : null}
+                  </View>
+                );
                 if (live) {
                   // A single Pressable (LiveHostRing's own pressToWatch), not
                   // nested inside another one — tapping opens the live pager.
                   return (
                     <View key={row.authorId} style={s.activeRailItem}>
+                      {noteBubble}
                       <LiveHostRing hostId={row.authorId} hostName={row.name} size={64} ringGap={-2} pressToWatch>
                         {row.avatarUri ? (
                           <Image source={{ uri: row.avatarUri }} style={s.activeRailAvatar} />
@@ -1450,9 +1582,10 @@ export default function InboxScreen() {
                     onPress={() => openStoryViewerFor(row.authorId)}
                     rippleEnabled={NO_RIPPLE}
                     accessibilityRole="button"
-                    accessibilityLabel={`${row.name}${row.seen ? '' : ', new story'}`}
+                    accessibilityLabel={`${row.name}${row.seen ? '' : ', new story'}${note ? `, note: ${note.text}` : ''}`}
                     testID={`inbox-story-tray-${row.authorId}`}
                   >
+                    {noteBubble}
                     <View style={s.activeRailAvatar1}>
                       <View
                         style={[
@@ -1617,6 +1750,67 @@ export default function InboxScreen() {
         </View>
       </Modal>
 
+      {/* Note-compose sheet — a lightweight bottom sheet (not a whole new
+          screen), reusing the shared Glass chrome per the app's sheet/
+          overlay convention. Opened from the "Your note" bubble above. */}
+      <Modal
+        visible={noteComposeVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeNoteCompose}
+      >
+        <View style={s.composeBackdrop}>
+          <Glass
+            variant="regular"
+            tint="dark"
+            radius={RADIUS.xl}
+            style={[s.noteComposeSheet, { paddingBottom: insets.bottom + SP.md }]}
+          >
+            <SheetHandle />
+            <View style={s.composeHeader}>
+              <Text style={[s.composeTitle, { color: theme.text }]}>
+                {myNote ? 'Edit your note' : 'Share a note'}
+              </Text>
+              <PressableScale
+                onPress={closeNoteCompose}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Feather name="x" size={22} color={theme.text} />
+              </PressableScale>
+            </View>
+            <Text style={[s.noteComposeHint, { color: theme.muted }]}>
+              Visible to your followers for 24 hours.
+            </Text>
+            <TextInput
+              value={noteComposeText}
+              onChangeText={text => setNoteComposeText(text.slice(0, NOTE_MAX_CHARS))}
+              placeholder="Your thoughts go here..."
+              placeholderTextColor={theme.subtle}
+              style={[s.noteComposeInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.cardElevated }, Platform.OS === 'web' && s.searchInputWebNoOutline]}
+              maxLength={NOTE_MAX_CHARS}
+              multiline
+              autoFocus
+              returnKeyType="done"
+              blurOnSubmit
+              onSubmitEditing={submitNote}
+              testID="inbox-note-compose-input"
+              accessibilityLabel="Note text"
+            />
+            <Text style={[s.noteComposeCount, { color: theme.subtle }]}>
+              {noteComposeText.length}/{NOTE_MAX_CHARS}
+            </Text>
+            <PrimaryButton
+              label={myNote ? 'Update note' : 'Share note'}
+              onPress={submitNote}
+              disabled={!noteComposeText.trim() || noteComposeSaving}
+              loading={noteComposeSaving}
+            />
+          </Glass>
+        </View>
+      </Modal>
+
       <Snackbar
         visible={!!snackbarMessage}
         message={snackbarMessage ?? ''}
@@ -1695,6 +1889,47 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   activeRailName: { fontSize: 11, fontFamily: FONT.medium, width: 72, textAlign: 'center' },
   storyTrayFade: {
     position: 'absolute', top: 0, bottom: 0, right: 0, width: 28,
+  },
+
+  // Notes bubble above the tray avatar (IG-style) — a small neutral
+  // chat-bubble shape (card-elevated fill, hairline border, no accent
+  // color), never wider than the 72pt item column. The 4x4 "tail" square,
+  // rotated 45deg and half-overlapped by the bubble above it, reads as a
+  // speech-bubble point aimed down at the avatar without needing a custom
+  // SVG/triangle shape.
+  activeRailItemWrap: { width: 72, alignItems: 'center' },
+  // Fixed-height slot every tray item reserves above its avatar — present
+  // (and empty) even for authors with no active note, so every avatar in
+  // the row still lines up on the same baseline regardless of who has a
+  // note bubble floating above them.
+  activeRailNoteWrap: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
+  noteBubbleTouchable: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
+  noteBubble: {
+    maxWidth: 84, paddingHorizontal: 9, paddingVertical: 5,
+    borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
+  },
+  noteBubbleText: { fontSize: 10.5, lineHeight: 13 },
+  noteBubbleTail: {
+    width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
+    borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],
+  },
+
+  // Note-compose bottom sheet
+  noteComposeSheet: {
+    paddingTop: SP.sm,
+    paddingHorizontal: SP.md,
+    maxWidth: Platform.OS === 'web' ? CONTENT_MAX_WIDTH + SP.xl * 2 : undefined,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  noteComposeHint: { fontSize: FS.xs, fontFamily: FONT.regular, marginBottom: SP.sm },
+  noteComposeInput: {
+    minHeight: 72, maxHeight: 120, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth,
+    padding: SP.md, fontSize: FS.md, fontFamily: FONT.regular, textAlignVertical: 'top',
+  },
+  noteComposeCount: {
+    fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'right',
+    marginTop: SP.xs, marginBottom: SP.md,
   },
 
   // Threads-style empty inbox (centered badge + headline + full-width button)
