@@ -105,8 +105,6 @@ import {
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
 
-const EMPTY_ICON = 'activity' as const;
-const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
 const AVATAR_SIZE = 40;
 
 type Styles = ReturnType<typeof makeStyles>;
@@ -777,7 +775,19 @@ export default function ActivityCenterScreen() {
     () => items.filter((item) => matchesActivityChip(item, chip)),
     [items, chip],
   );
-  const chipEmpty = activityChipEmpty(chip);
+  const chipEmpty = activityChipEmpty(chip, role);
+  const emptyActionHref = chipEmpty.action?.href;
+  const handleEmptyAction = useCallback(() => {
+    if (emptyActionHref) router.push(emptyActionHref as never);
+  }, [emptyActionHref, router]);
+  const emptyStateProps = {
+    icon: chipEmpty.icon as any,
+    title: chipEmpty.title,
+    message: chipEmpty.message,
+    actionLabel: chipEmpty.action?.label,
+    onAction: chipEmpty.action ? handleEmptyAction : undefined,
+    testID: `activity-empty-${chip}`,
+  };
 
   const sections: ListSection[] = useMemo(() => {
     const raw = buildActivitySections(
@@ -1138,12 +1148,12 @@ export default function ActivityCenterScreen() {
           )}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
-              {/* A filter with nothing in it says so specifically (minimal
-                  per-chip copy — full empty-state polish is item 85). */}
+              {/* A filter with nothing in it says so specifically, per role,
+                  with one next step where there's a real one (item 85). */}
               {chip === 'all' ? (
-                <EmptyState icon={EMPTY_ICON} illustration="bell" message={EMPTY_MESSAGE} />
+                <EmptyState {...emptyStateProps} illustration="bell" />
               ) : (
-                <EmptyState icon={chipEmpty.icon as any} message={chipEmpty.message} testID={`activity-empty-${chip}`} />
+                <EmptyState {...emptyStateProps} />
               )}
             </View>
           )}

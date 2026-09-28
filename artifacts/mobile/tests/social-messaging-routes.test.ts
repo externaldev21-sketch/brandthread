@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { activityHref } from '../lib/activity';
+import { activityChipEmpty, activityHref } from '../lib/activity';
 
 const APP_DIR = resolve(__dirname, '..', 'app');
 const ROOT_DIR = resolve(__dirname, '..');
@@ -126,5 +126,20 @@ describe('activityHref() targets', () => {
         existsSync(resolve(APP_DIR, trimmed, 'index.tsx'));
       expect(exists, `activityHref -> ${href} has no matching screen file`).toBe(true);
     }
+  });
+});
+
+describe('activityChipEmpty() call-to-action targets', () => {
+  const chips = ['all', 'follows', 'likes', 'comments', 'orders', 'thread_cash'] as const;
+  const cases = (['buyer', 'seller'] as const).flatMap((role) => chips.map((chip) => [chip, role] as const));
+
+  it.each(cases)('the %s empty state (%s) never links to a missing screen', (chip, role) => {
+    const href = activityChipEmpty(chip, role).action?.href;
+    if (!href) return;
+    const trimmed = href.split('?')[0].replace(/^\//, '');
+    const exists =
+      existsSync(resolve(APP_DIR, `${trimmed}.tsx`)) ||
+      existsSync(resolve(APP_DIR, trimmed, 'index.tsx'));
+    expect(exists, `${chip} (${role}) empty-state action -> ${href} has no matching screen file`).toBe(true);
   });
 });
