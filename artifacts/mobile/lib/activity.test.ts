@@ -5,10 +5,10 @@ import {
   activityKind,
   activityMessage,
   aggregateActivity,
+  followControlState,
   applyRead,
   buildActivitySections,
   createReadTracker,
-  followControlState,
   groupByRecency,
   isFollowBackRow,
   newFollowersSummary,
@@ -314,24 +314,6 @@ describe('aggregateActivity — reposts and story likes', () => {
   });
 });
 
-describe('newFollowersSummary', () => {
-  it('returns null when there are no follow events', () => {
-    expect(newFollowersSummary([like('Jay', 'post1')])).toBeNull();
-  });
-
-  it('collects distinct followers, newest first, and unread state', () => {
-    const follow = (name: string, isRead: boolean) => item({
-      type: 'new_follower', title: `${name} started following you`,
-      actorId: `u_${name}`, actorName: name, isRead,
-    });
-    const summary = newFollowersSummary([follow('Jay', false), follow('Mina', true)]);
-    expect(summary).not.toBeNull();
-    expect(summary!.count).toBe(2);
-    expect(summary!.actors.map((a) => a.name)).toEqual(['Jay', 'Mina']);
-    expect(summary!.hasUnread).toBe(true);
-  });
-});
-
 describe('follow row inline pill', () => {
   const follow = (name: string, overrides: Partial<ActivityItem> = {}) => item({
     type: 'new_follower', title: `${name} started following you`,
@@ -364,5 +346,23 @@ describe('follow row inline pill', () => {
     expect(followControlState(merged)).toBeNull();
     const [liked] = aggregateActivity([like('Jay', 'post1')]);
     expect(followControlState(liked)).toBeNull();
+  });
+});
+
+describe('newFollowersSummary', () => {
+  it('returns null when there are no follow events', () => {
+    expect(newFollowersSummary([like('Jay', 'post1')])).toBeNull();
+  });
+
+  it('collects distinct followers, newest first, and unread state', () => {
+    const follow = (name: string, isRead: boolean) => item({
+      type: 'new_follower', title: `${name} started following you`,
+      actorId: `u_${name}`, actorName: name, isRead,
+    });
+    const summary = newFollowersSummary([follow('Jay', false), follow('Mina', true)]);
+    expect(summary).not.toBeNull();
+    expect(summary!.count).toBe(2);
+    expect(summary!.actors.map((a) => a.name)).toEqual(['Jay', 'Mina']);
+    expect(summary!.hasUnread).toBe(true);
   });
 });

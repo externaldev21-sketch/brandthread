@@ -156,6 +156,17 @@ async function blockedCounterpartIds(userId: string): Promise<string[]> {
   return rows.map((row) => (row.blockerId === userId ? row.blockedId : row.blockerId));
 }
 
+/** Which new-follower actors on this page the viewer already follows. */
+async function viewerFollowingFollowers(userId: string, rows: FeedRow[]): Promise<Set<string>> {
+  const actorIds = [...new Set(rows
+    .filter((row) => row.type === "new_follower" && row.actorId)
+    .map((row) => row.actorId!))];
+  if (actorIds.length === 0) return new Set();
+  const following = await db.select({ followingId: follows.followingId }).from(follows)
+    .where(and(eq(follows.followerId, userId), inArray(follows.followingId, actorIds)));
+  return new Set(following.map((row) => row.followingId));
+}
+
 buyerRouter.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { limit, offset } = parsePage(req.query as Record<string, unknown>);
@@ -188,17 +199,6 @@ buyerRouter.get("/", async (req, res) => {
     return item;
   }));
 });
-
-/** Which new-follower actors on this page the viewer already follows. */
-async function viewerFollowingFollowers(userId: string, rows: FeedRow[]): Promise<Set<string>> {
-  const actorIds = [...new Set(rows
-    .filter((row) => row.type === "new_follower" && row.actorId)
-    .map((row) => row.actorId!))];
-  if (actorIds.length === 0) return new Set();
-  const following = await db.select({ followingId: follows.followingId }).from(follows)
-    .where(and(eq(follows.followerId, userId), inArray(follows.followingId, actorIds)));
-  return new Set(following.map((row) => row.followingId));
-}
 
 /**
  * Cheap enough to short-poll every ~1.5s while a screen is focused (bell
