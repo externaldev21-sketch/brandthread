@@ -33,6 +33,7 @@ import { confirmBlock, reportHref } from '@/lib/safety';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
 import { Snackbar } from '@/components/ui/Snackbar';
+import { ListRow } from '@/components/ui/ListRow';
 import { hapticLight, hapticMedium, hapticSuccessAction } from '@/lib/haptics';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
@@ -168,12 +169,17 @@ export default function SellerProfileScreen() {
     return () => { active = false; };
   }, [api, authLoaded, explicitOwner, routeSellerId, userId, reloadTick]);
 
-  // ── Social counts + follow state (auth only; guests see public counts) ────
+  // ── Social counts + follow state (public counts for everyone; follow
+  // state only once signed in) ──────────────────────────────────────────────
   useEffect(() => {
-    if (!canonicalSellerId || !userId) return;
+    // Counts must load for a signed-out guest too — the comment above always
+    // said so, but gating the whole effect on `userId` left it never firing
+    // for a guest (or before Clerk finishes loading), so Followers/Following
+    // stayed the "–" placeholder forever instead of the real number.
+    if (!canonicalSellerId) return;
     let active = true;
     Promise.allSettled([
-      isOwner ? Promise.resolve(null) : getSellerFollowState(canonicalSellerId),
+      (!isOwner && userId) ? getSellerFollowState(canonicalSellerId) : Promise.resolve(null),
       api.social.profile(canonicalSellerId),
     ]).then(([followState, social]) => {
       if (!active) return;
@@ -418,6 +424,25 @@ export default function SellerProfileScreen() {
 
   const actions = isOwner ? (
     <>
+      {/* Instagram's own-profile shape, matched 1:1 (mobbin.com/screens/
+          7b7b7c39-39a7-4ba6-bf3a-45c009a4769d): a full-width "Professional
+          dashboard" row ABOVE the action buttons, then Edit profile / Share
+          profile as the only two buttons in one row — nothing else. The
+          previous two even rows of two (Edit/Share, then Messages/Create
+          post) duplicated the header's own Inbox and Share glass icons
+          (topRight above) and read as a wall of near-identical buttons.
+          Messages is one tap away via the header's Inbox icon; Create post
+          is reachable from the Products and Studio tabs, so dropping both
+          from here loses no functionality. */}
+      <ListRow
+        icon="bar-chart-2"
+        title="Professional dashboard"
+        subtitle="Views, followers and content stats"
+        chevron
+        onPress={() => router.push('/(tabs)' as never)}
+        style={styles.dashboardRow}
+        testID="seller-profile-dashboard"
+      />
       <View style={styles.actionRow}>
         <ProfileButton label="Edit profile" icon="edit-3" variant="primary" onPress={() => router.push('/edit-profile' as never)} testID="seller-profile-edit" />
         <ProfileButton
@@ -427,10 +452,6 @@ export default function SellerProfileScreen() {
           accessibilityHint="Opens your shareable profile link and QR code"
           testID="seller-profile-share-btn"
         />
-      </View>
-      <View style={styles.actionRow}>
-        <ProfileButton label="Messages" icon="message-circle" onPress={handleOpenInbox} />
-        <ProfileButton label="Create post" icon="video" onPress={() => router.push('/create-post' as never)} />
       </View>
     </>
   ) : (
@@ -616,6 +637,10 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     flex: { flex: 1 },
     actionRow: { flexDirection: 'row', gap: SP.sm },
+    dashboardRow: {
+      backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1,
+      borderRadius: RADIUS.md, marginBottom: SP.sm,
+    },
     followBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },
     vacation: {
       flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.xs,

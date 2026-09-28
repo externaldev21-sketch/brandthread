@@ -247,12 +247,38 @@ export default function BuyerStoryViewer() {
     }
   }, [storyIdx, stories]);
 
+  // Swipe-down-to-close drag: the content follows the finger (translateY +
+  // a slight shrink), then either snaps back (timing, never a spring — no
+  // bounce) or finishes the dismiss with the same shrink continuing off
+  // screen before actually closing.
+  const dragY = useRef(new Animated.Value(0)).current;
+  const isDraggingDown = useRef(false);
+  const dragScale = dragY.interpolate({ inputRange: [0, H], outputRange: [1, 0.82], extrapolate: 'clamp' });
+  const dragOpacity = dragY.interpolate({ inputRange: [0, H * 0.6], outputRange: [1, 0.4], extrapolate: 'clamp' });
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
         Math.abs(g.dx) > 12 || Math.abs(g.dy) > 12,
+      onPanResponderMove: (_, g) => {
+        const verticalDown = Math.abs(g.dy) > Math.abs(g.dx) && g.dy > 0;
+        isDraggingDown.current = verticalDown;
+        if (verticalDown) dragY.setValue(g.dy);
+      },
       onPanResponderRelease: (_, g) => {
-        switch (classifyGesture(g.dx, g.dy)) {
+        const gesture = classifyGesture(g.dx, g.dy);
+        const wasDraggingDown = isDraggingDown.current;
+        isDraggingDown.current = false;
+        if (wasDraggingDown) {
+          if (gesture === 'close') {
+            Animated.timing(dragY, { toValue: H, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true })
+              .start(() => goBackOr(router));
+          } else {
+            Animated.timing(dragY, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+          }
+          return;
+        }
+        switch (gesture) {
           case 'next-user': goToNextUser(); break;
           case 'prev-user': goToPrevUser(); break;
           case 'close': goBackOr(router); break;
@@ -301,6 +327,8 @@ export default function BuyerStoryViewer() {
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
       <StatusBar hidden />
+
+      <Animated.View style={[styles.dragShrinkLayer, { transform: [{ translateY: dragY }, { scale: dragScale }], opacity: dragOpacity }]}>
 
       {/* CONTENT */}
       <View style={StyleSheet.absoluteFill}>
@@ -604,6 +632,7 @@ export default function BuyerStoryViewer() {
           )}
         </View>
       </KeyboardAvoidingView>
+      </Animated.View>
 
       {/* VIEWER MODAL */}
       <Modal
@@ -660,6 +689,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   container: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  dragShrinkLayer: {
+    flex: 1,
+    borderRadius: RADII.sheet,
+    overflow: 'hidden',
   },
   slideContent: {
     flex: 1,

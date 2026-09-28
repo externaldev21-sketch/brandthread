@@ -1189,6 +1189,25 @@ export async function muteConversation(conversationId: string, durationMinutes: 
   return result.mutedUntil ?? null;
 }
 
+/** Inbox swipe-row > Pin (item 62). Toggles the CURRENT viewer's pin on a
+ *  conversation via PATCH /api/conversations/:id/pin and updates the cached
+ *  conversation's isPinned so the row/sort order reflects it without a
+ *  refetch. Preview-mode ids are handled by the caller (see
+ *  lib/previewInbox.ts's setPreviewConversationPinned) — this always hits
+ *  the real API, matching muteConversation above. */
+export async function setConversationPinned(conversationId: string, pinned: boolean): Promise<boolean> {
+  const k = K();
+  const result = await serviceRequest<{ ok: boolean; pinnedAt: string | null }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/pin`,
+    { method: 'PATCH', body: JSON.stringify({ pinned }) },
+  );
+  const isPinned = !!result.pinnedAt;
+  const convs = await load<Conversation[]>(k.conversations, []);
+  await save(k.conversations, convs.map(c => c.id === conversationId ? { ...c, isPinned } : c));
+  notify();
+  return isPinned;
+}
+
 /** Chat details > Nicknames. An empty nickname clears it back to the real
  *  name. Updates the cached conversation's participant so it renders
  *  immediately in the thread without a refetch. */
