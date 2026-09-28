@@ -483,6 +483,119 @@ export async function consumeThreadCashRedemption(
   }
 }
 
+/**
+ * Item 108/109: undo a redemption the buyer no longer wants (they turned the
+ * checkout toggle off, or the app is re-sizing it to a new order total).
+ *
+ * `redeemThreadCash` moves the amount out of the balance the moment a token
+ * is created, so without this a buyer who toggled Thread Cash on and back
+ * off lost that balance for good. It posts a compensating
+ * `redemption_cancelled` entry and marks the token used, so the token can
+ * never discount a checkout afterwards.
+ *
+ * Only a token that is NOT attached to a checkout can be cancelled. A token
+ * a Stripe session is holding stays with that session: the session either
+ * pays (and consumes it) or expires (and the webhook releases it, after
+ * which it can be cancelled here). Idempotent: cancelling twice returns the
+ * same result and credits once.
+ */
+export async function cancelThreadCashRedemption(
+  buyerId: string,
+  token: string,
+): Promise<{ returnedCents: number; balanceCents: number }> {
+  const normalizedToken = String(token ?? "").trim().toUpperCase();
+  if (!normalizedToken || normalizedToken.length > 160) {
+    throw new ThreadCashError("Enter a valid Thread Cash token.");
+  }
+  const cancelKey = `redemption-cancel:${normalizedToken}`;
+  return db.transaction(async (tx) => {
+    // Same two locks the redeem and reserve paths take, in the same order
+    // (balance first), so a cancel can't race a checkout reservation.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-balance:${buyerId}`}))`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`thread-cash-redemption:${normalizedToken}`}))`);
+
+    const [already] = await tx.select({ amountCents: threadCashEntries.amountCents })
+      .from(threadCashEntries)
+      .where(and(eq(threadCashEntries.buyerId, buyerId), eq(threadCashEntries.idempotencyKey, cancelKey)))
+      .limit(1);
+    if (already) {
+      return { returnedCents: already.amountCents, balanceCents: await getBalanceCents(tx, buyerId) };
+    }
+
+    const [redemption] = await tx.select({
+      amountCents: threadCashEntries.amountCents,
+      checkoutSessionId: threadCashEntries.checkoutSessionId,
+      usedAt: threadCashEntries.usedAt,
+    })
+      .from(threadCashEntries)
+      .where(and(
+        eq(threadCashEntries.buyerId, buyerId),
+        eq(threadCashEntries.source, "redemption"),
+        eq(threadCashEntries.referenceId, normalizedToken),
+      ))
+      .limit(1);
+    if (!redemption || redemption.amountCents >= 0) {
+      throw new ThreadCashError("This Thread Cash token is not valid for your account.", 404, "THREAD_CASH_TOKEN_NOT_FOUND");
+    }
+    if (redemption.usedAt) {
+      throw new ThreadCashError("This Thread Cash was already spent on an order.", 409, "THREAD_CASH_TOKEN_USED");
+    }
+    if (redemption.checkoutSessionId) {
+      throw new ThreadCashError(
+        "This Thread Cash is attached to a checkout that's still open. Finish or close that payment first.",
+        409,
+        "THREAD_CASH_TOKEN_RESERVED",
+      );
+    }
+
+    const returnedCents = -redemption.amountCents;
+    await tx.update(threadCashEntries)
+      .set({ usedAt: new Date() })
+      .where(and(
+        eq(threadCashEntries.buyerId, buyerId),
+        eq(threadCashEntries.source, "redemption"),
+        eq(threadCashEntries.referenceId, normalizedToken),
+        isNull(threadCashEntries.usedAt),
+        isNull(threadCashEntries.checkoutSessionId),
+      ));
+    await tx.insert(threadCashEntries).values({
+      buyerId,
+      amountCents: returnedCents,
+      source: "redemption_cancelled",
+      referenceId: normalizedToken,
+      idempotencyKey: cancelKey,
+      note: `Returned $${(returnedCents / 100).toFixed(2)} Thread Cash from checkout`,
+    });
+    return { returnedCents, balanceCents: await getBalanceCents(tx, buyerId) };
+  });
+}
+
+/**
+ * Redemptions that hold balance but aren't spent or attached to a checkout —
+ * e.g. from a checkout the buyer abandoned. The client returns them to the
+ * balance (cancelThreadCashRedemption) unless it's still holding one.
+ */
+export async function listOpenThreadCashRedemptions(
+  executor: DbExecutor,
+  buyerId: string,
+): Promise<Array<{ token: string; amountCents: number; createdAt: string }>> {
+  const rows = await executor.select({
+    token: threadCashEntries.referenceId,
+    amountCents: threadCashEntries.amountCents,
+    createdAt: threadCashEntries.createdAt,
+  })
+    .from(threadCashEntries)
+    .where(and(
+      eq(threadCashEntries.buyerId, buyerId),
+      eq(threadCashEntries.source, "redemption"),
+      isNull(threadCashEntries.usedAt),
+      isNull(threadCashEntries.checkoutSessionId),
+    ));
+  return rows
+    .filter((row) => typeof row.token === "string" && row.amountCents < 0)
+    .map((row) => ({ token: row.token!, amountCents: -row.amountCents, createdAt: new Date(row.createdAt).toISOString() }));
+}
+
 /** A refunded/cancelled order leaves the buyer's existing token usable. */
 export async function releaseThreadCashRedemption(
   transaction: any,

@@ -44,6 +44,14 @@ export interface UndoAction {
   message: string;
   undo: () => void | Promise<void>;
   durationMs?: number;
+  /** 'monochrome' draws "Undo" in the text colour instead of the success
+   *  green (Activity, item 83). Existing callers are unchanged. */
+  tone?: 'monochrome';
+  /** Optional testID on the toast (for verification scripts). */
+  testID?: string;
+  /** Distance from the bottom edge; lets a screen with the floating tab bar
+   *  sit the toast above it instead of over it. Defaults to the usual spot. */
+  bottom?: number;
 }
 type UndoToastContextValue = { showUndo: (action: UndoAction) => void; dismissUndo: () => void };
 const UndoToastContext = createContext<UndoToastContextValue | null>(null);
@@ -69,10 +77,10 @@ export function UndoToastProvider({ children }: { children: React.ReactNode }) {
     <UndoToastContext.Provider value={{ showUndo, dismissUndo }}>
       {children}
       {action && (
-        <View accessibilityLiveRegion="polite" style={[undoS.root, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
+        <View accessibilityLiveRegion="polite" testID={action.testID} style={[undoS.root, { backgroundColor: colors.elevated, borderColor: colors.border }, action.bottom != null && { bottom: action.bottom }]}>
           <Text style={[undoS.message, { color: colors.foreground }]}>{action.message}</Text>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Undo: ${action.message}`} onPress={undo} disabled={undoing} style={undoS.button}>
-            <Text style={[undoS.buttonText, { color: colors.success }]}>{undoing ? 'Restoring…' : 'Undo'}</Text>
+            <Text style={[undoS.buttonText, { color: action.tone === 'monochrome' ? colors.foreground : colors.success }]}>{undoing ? 'Restoring…' : 'Undo'}</Text>
           </TouchableOpacity>
         </View>
       )}

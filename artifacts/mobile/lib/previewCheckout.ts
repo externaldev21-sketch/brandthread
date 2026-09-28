@@ -128,3 +128,45 @@ export function buildPreviewOrder(
   };
   return { record, result: { orderId, orderNumber, amountTotal: total, paymentStatus: 'paid' } };
 }
+
+/**
+ * The preview buyer's demo checkout details: the same Jordan Reyes /
+ * 148 Mercer Street the seeded preview order ships to. Checkout fills them
+ * in for an all-preview order, so "Place order" works in one tap on the
+ * live preview. Only fields the buyer left empty are filled, and nothing is
+ * saved to an account.
+ */
+export const PREVIEW_CHECKOUT_CONTACT = {
+  email: 'jordan.reyes@example.com',
+  phone: '(212) 555-0142',
+} as const;
+
+export const PREVIEW_CHECKOUT_ADDRESS = {
+  firstName: 'Jordan',
+  lastName: 'Reyes',
+  line1: '148 Mercer Street',
+  city: 'New York',
+  state: 'NY',
+  postalCode: '10012',
+  country: 'US',
+} as const;
+
+/**
+ * Pure: `contact`/`address` with the preview buyer's details filled into
+ * any empty field. Anything the buyer typed is kept. The address is filled
+ * as a whole, and only when it has no street yet, so a half-typed real
+ * address is never mixed with the demo one.
+ */
+export function withPreviewCheckoutDetails<
+  C extends { email?: string; phone?: string },
+  A extends { line1?: string; saveAddress?: boolean },
+>(contact: C, address: A): { contact: C; address: A } {
+  return {
+    contact: {
+      ...contact,
+      email: contact.email?.trim() ? contact.email : PREVIEW_CHECKOUT_CONTACT.email,
+      phone: contact.phone?.trim() ? contact.phone : PREVIEW_CHECKOUT_CONTACT.phone,
+    },
+    address: address.line1?.trim() ? address : { ...address, ...PREVIEW_CHECKOUT_ADDRESS, saveAddress: false },
+  };
+}

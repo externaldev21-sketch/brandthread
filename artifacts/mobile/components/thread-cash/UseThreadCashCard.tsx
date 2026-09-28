@@ -79,6 +79,20 @@ export function UseThreadCashCard({
   async function handleToggle(next: boolean) {
     if (isDisabled) return;
     if (!next) {
+      // Item 109: give the amount back to the balance. Just dropping the
+      // token used to leave it spent.
+      if (redemption) {
+        setApplying(true);
+        try {
+          const result = await api.threadCash.cancelRedemption(redemption.token);
+          setBalanceCents(Math.max(0, result.balanceCents));
+        } catch {
+          // Still dropped from this cart; the checkout screen returns
+          // leftover redemptions to the balance when it loads.
+        } finally {
+          setApplying(false);
+        }
+      }
       onRemove();
       return;
     }

@@ -20,8 +20,13 @@ export type ThreadCashStreakState = {
   streakBonusDays?: number;
 };
 
+/** A checkout redemption holding balance but neither spent nor attached to a payment. */
+export type ThreadCashOpenRedemption = { token: string; amountCents: number; createdAt: string };
+
 export type ThreadCashStatus = {
   balanceCents: number;
+  /** Additive (item 109): older servers omit it. */
+  openRedemptions?: ThreadCashOpenRedemption[];
   config: ThreadCashConfig;
   streak: ThreadCashStreakState;
 };
@@ -42,7 +47,7 @@ export type ThreadCashEntry = {
   source:
     | 'daily_checkin' | 'streak_bonus' | 'redemption' | 'checkout_spend'
     | 'refund_credit' | 'expiry' | 'admin_adjustment' | 'send_sent' | 'send_received'
-    | 'send_cancelled' | 'send_expired';
+    | 'send_cancelled' | 'send_expired' | 'redemption_cancelled';
   referenceId: string | null;
   note: string | null;
   createdAt: string;

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { apiMock, focusState, routerMock } = vi.hoisted(() => ({
+const { apiMock, focusState, routerMock, previewMock } = vi.hoisted(() => ({
   apiMock: {
     conversations: {
       list: vi.fn(),
@@ -17,6 +17,9 @@ const { apiMock, focusState, routerMock } = vi.hoisted(() => ({
   routerMock: {
     back: vi.fn(),
     push: vi.fn(),
+  },
+  previewMock: {
+    isPreviewInboxEnabled: vi.fn(() => false),
   },
 }));
 
@@ -93,7 +96,11 @@ vi.mock('react-native-svg', () => {
 });
 
 vi.mock('@clerk/expo', () => ({
-  useUser: () => ({ user: { id: 'seller-user' } }),
+  // seller-inbox.tsx reads useAuth().userId (not useUser()'s isLoaded) —
+  // see its own comment for why: useUser()'s isLoaded can lag well behind
+  // userId itself, which left the seller inbox stuck on its web-preview
+  // loading skeleton forever whenever that happened.
+  useAuth: () => ({ userId: 'seller-user' }),
 }));
 
 // previewInbox.ts imports expo-asset and requires bundled image assets at
@@ -102,8 +109,10 @@ vi.mock('@clerk/expo', () => ({
 // always has a real Clerk user (see the @clerk/expo mock above), so
 // getSellerPreviewConversations() is never actually reached — item 71.
 vi.mock('@/lib/previewInbox', () => ({
-  isPreviewInboxEnabled: () => false,
-  getSellerPreviewConversations: () => [],
+  isPreviewInboxEnabled: previewMock.isPreviewInboxEnabled,
+  getSellerPreviewConversations: () => [
+    conversation('preview-seller-conversation-01', 1),
+  ],
 }));
 
 vi.mock('@expo/vector-icons', () => ({
@@ -244,6 +253,8 @@ describe('seller inbox unread state', () => {
     apiMock.conversations.list.mockReset();
     routerMock.back.mockReset();
     routerMock.push.mockReset();
+    previewMock.isPreviewInboxEnabled.mockReset();
+    previewMock.isPreviewInboxEnabled.mockReturnValue(false);
     focusState.callback = undefined;
     focusState.cleanup = undefined;
   });
@@ -363,5 +374,30 @@ describe('seller inbox unread state', () => {
     expect(textContent(renderer)).toContain('3 unread');
     expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }).length)
       .toBeGreaterThan(0);
+  });
+
+  // Regression test for the QA-pass fix: the web preview (?bt_preview=seller)
+  // doesn't require Clerk to be signed out — a real Clerk userId can still be
+  // present while the preview's backend is unreachable/401s. Before this fix,
+  // that combination (myId truthy + API failure) left the seller inbox stuck
+  // showing nothing but its own error state forever, unlike the buyer inbox's
+  // identical scenario, which has always fallen back to the seeded preview
+  // conversations. See app/seller-inbox.tsx's `load()` catch block.
+  it('falls back to seeded preview conversations when the API fails and the web preview is active', async () => {
+    previewMock.isPreviewInboxEnabled.mockReturnValue(true);
+    apiMock.conversations.list.mockRejectedValue(new Error('401 Unauthorized'));
+    renderer = await renderScreen();
+
+    expect(textContent(renderer)).toContain('Can you help with sizing?');
+    expect(renderer.root.findAllByProps({ testID: 'seller-conversation-preview-seller-conversation-01' }).length)
+      .toBeGreaterThan(0);
+  });
+
+  it('shows the real error state (not seeded data) when the API fails outside preview', async () => {
+    previewMock.isPreviewInboxEnabled.mockReturnValue(false);
+    apiMock.conversations.list.mockRejectedValue(new Error('offline'));
+    renderer = await renderScreen();
+
+    expect(textContent(renderer)).not.toContain('Can you help with sizing?');
   });
 });

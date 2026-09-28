@@ -18,7 +18,9 @@ import {
 } from '@/lib/previewProducts';
 import {
   buildPreviewOrder, isPreviewCheckoutGroup, isPreviewGroupShape, previewRateFor, previewShippingRate,
+  withPreviewCheckoutDetails,
 } from '@/lib/previewCheckout';
+import { getCheckoutBlockingSection } from '@/lib/checkoutReadiness';
 import { getPreviewBuyerOrder } from '@/lib/previewOrders';
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -102,5 +104,21 @@ describe('preview checkout', () => {
       shippingAddress: { name: 'Jordan Reyes', street: '148 Mercer Street', city: 'New York', state: 'NY', zip: '10012', country: 'US' },
     });
     expect((record.items as any[])[0]).toMatchObject({ productName: 'Sculpted Wool Coat', variantLabel: 'M', quantity: 2, priceCents: 48000 });
+  });
+});
+
+describe('preview checkout is one tap', () => {
+  it('fills the preview buyer\'s contact and address, so Place order is enabled with no typing', () => {
+    const empty = withPreviewCheckoutDetails({ orderUpdates: 'email' } as any, { country: 'US', saveAddress: true } as any);
+    expect(empty.contact).toMatchObject({ email: 'jordan.reyes@example.com', phone: '(212) 555-0142' });
+    expect(empty.address).toMatchObject({ firstName: 'Jordan', lastName: 'Reyes', line1: '148 Mercer Street', city: 'New York', state: 'NY', postalCode: '10012', saveAddress: false });
+    const session = { deliveryGroups: [{ selectedMethodId: 'seller_rate_preview-seller-01' }], acknowledgments: [] } as any;
+    expect(getCheckoutBlockingSection(empty.contact, empty.address, session)).toBeNull();
+  });
+
+  it('never overwrites what the buyer typed', () => {
+    const typed = withPreviewCheckoutDetails({ email: 'me@x.com', phone: '' } as any, { line1: '1 Main St', city: 'Austin' } as any);
+    expect(typed.contact).toMatchObject({ email: 'me@x.com', phone: '(212) 555-0142' });
+    expect(typed.address).toEqual({ line1: '1 Main St', city: 'Austin' });
   });
 });

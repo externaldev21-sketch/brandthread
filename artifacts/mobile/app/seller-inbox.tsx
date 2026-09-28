@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useUser } from '@clerk/expo';
+import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
@@ -17,7 +17,6 @@ import { ListSkeleton } from '@/components/layout';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
-import { isSellerDevPreview } from '@/lib/devPreview';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
 import { isPreviewInboxEnabled, getSellerPreviewConversations } from '@/lib/previewInbox';
@@ -56,12 +55,18 @@ export default function SellerInboxScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
-  const { user, isLoaded: clerkLoaded = true } = useUser();
-  const myId = user?.id ?? '';
-  const isDemoPreview = isSellerDevPreview();
+  // useAuth().userId (not useUser()'s isLoaded) — matches
+  // app/(buyer)/inbox.tsx's identical guard. useUser()'s `isLoaded` can stay
+  // false well after `userId` itself has already resolved (e.g. whenever
+  // Clerk's own script/environment fetch is slow or unreachable, which is
+  // exactly the situation on the dev-web preview this bypass exists for);
+  // gating on it left the seller inbox stuck on its loading skeleton
+  // forever instead of ever reaching the `!myId` preview branch below.
+  const { userId } = useAuth();
+  const myId = userId ?? '';
 
   const [convs, setConvs] = useState<ConvView[]>([]);
-  const [isLoading, setIsLoading] = useState(!clerkLoaded && !isDemoPreview);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -80,11 +85,24 @@ export default function SellerInboxScreen() {
     optimisticReadsRef.current.clear();
     setConvs([]);
     setLoadError(false);
-    setIsLoading(!clerkLoaded && !isDemoPreview);
-  }, [clerkLoaded, isDemoPreview, myId]);
+    setIsLoading(true);
+  }, [myId]);
 
   const load = useCallback(async (generation: number, silent = false) => {
-    if (isDemoPreview || !clerkLoaded || !myId) return;
+    if (!myId) {
+      // The dev-web ?bt_preview=seller bypass never signs in through Clerk
+      // (see lib/devPreview.ts), so `myId` is empty here in that mode —
+      // without this branch the seller inbox had nothing to show at all in
+      // preview (see app/(buyer)/inbox.tsx's identical buyer-side guard,
+      // which this mirrors). Real accounts always have a myId and never hit
+      // this branch.
+      if (isPreviewInboxEnabled()) {
+        setConvs(getSellerPreviewConversations() as unknown as ConvView[]);
+        setLoadError(false);
+      }
+      setIsLoading(false);
+      return;
+    }
     // Keep one request in flight per focus cycle so a slow request cannot
     // overlap a later poll and corrupt the consecutive-failure count.
     if (requestGenerationRef.current === generation) return;
@@ -125,7 +143,20 @@ export default function SellerInboxScreen() {
       consecutiveFailuresRef.current = 0;
     } catch (e) {
       if (generationRef.current !== generation) return;
-      setLoadError(true);
+      // Dev/preview only, and only when the real API genuinely can't be
+      // reached (e.g. a real Clerk session is active — bt_preview=seller
+      // doesn't require signing out — but the backend the web preview talks
+      // to 401s or is unreachable) — never for a real signed-in account,
+      // and dead code in production. Mirrors app/(buyer)/inbox.tsx's
+      // identical catch-block fallback, which this previously lacked: on
+      // web preview this branch left the seller inbox stuck on its loading
+      // skeleton forever instead of showing the seeded preview data.
+      if (isPreviewInboxEnabled()) {
+        setConvs(getSellerPreviewConversations() as unknown as ConvView[]);
+        setLoadError(false);
+      } else {
+        setLoadError(true);
+      }
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3 && pollRef.current !== null) {
         clearInterval(pollRef.current);
@@ -137,7 +168,7 @@ export default function SellerInboxScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [api, clerkLoaded, isDemoPreview, myId]);
+  }, [api, myId]);
 
   useEffect(() => subscribeConversationReadFailure((conversationId) => {
     // A failed mark-as-read must not leave the inbox suppressing the server's
@@ -145,15 +176,9 @@ export default function SellerInboxScreen() {
     // the authoritative participant count.
     if (!optimisticReadsRef.current.delete(conversationId)) return;
     void load(generationRef.current, true);
-  }), [load, clerkLoaded, myId]);
+  }), [load, myId]);
 
   useFocusEffect(useCallback(() => {
-    if (isDemoPreview) {
-      setConvs(isPreviewInboxEnabled() ? getSellerPreviewConversations() as ConvView[] : []);
-      setLoadError(false);
-      setIsLoading(false);
-      return;
-    }
     const generation = ++generationRef.current;
     consecutiveFailuresRef.current = 0;
     load(generation);
@@ -164,10 +189,9 @@ export default function SellerInboxScreen() {
         pollRef.current = null;
       }
     };
-  }, [isDemoPreview, load, clerkLoaded, myId]));
+  }, [load, myId]));
 
   async function onRefresh() {
-    if (isDemoPreview) return;
     setIsRefreshing(true);
     consecutiveFailuresRef.current = 0;
     await load(generationRef.current, true);

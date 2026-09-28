@@ -2,6 +2,8 @@
  * The ONE price breakdown on the checkout screen (SSENSE Subtotal / Shipping
  * Total / Order Total; GOAT "Total" block): Subtotal, Shipping, Tax,
  * Discount (only when a promo applies), Rewards (only when used), Total.
+ * With Thread Cash applied, Total becomes Order total → Thread Cash →
+ * Charged to card.
  * The sticky footer's "Place order · $X" repeats only the final number, as
  * the button's own label — there is no second breakdown anywhere.
  */
@@ -37,7 +39,17 @@ export function PriceBreakdownCard({ totals, itemCount }: { totals: CheckoutDisp
         <Line label="Rewards" value={`−${formatCents(totals.rewardsCents)}`} />
       ) : null}
       <Hairline style={{ marginVertical: SP.sm }} />
-      <Line label="Total" value={formatCents(totals.totalCents)} strong testID="checkout-total-line" />
+      {totals.threadCashCents > 0 ? (
+        <>
+          {/* Item 109: Thread Cash pays part of the total, so it comes after
+              it; the card line is what Stripe charges (talabat "Pay by card"). */}
+          <Line label="Order total" value={formatCents(totals.orderTotalCents)} testID="checkout-order-total-line" />
+          <Line label="Thread Cash" value={`−${formatCents(totals.threadCashCents)}`} testID="checkout-thread-cash-line" />
+          <Line label="Charged to card" value={formatCents(totals.totalCents)} strong testID="checkout-total-line" />
+        </>
+      ) : (
+        <Line label="Total" value={formatCents(totals.totalCents)} strong testID="checkout-total-line" />
+      )}
     </CheckoutCard>
   );
 }

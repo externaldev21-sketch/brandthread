@@ -52,9 +52,62 @@ export function createFakeStripe() {
     balanceAvailable: 0,
     balancePending: 0,
     payouts: [] as any[],
+    /** Checkout Sessions created through the checkout route (item 109 tests). */
+    checkoutSessions: new Map<string, any>(),
+    checkoutSessionCreates: [] as Array<{ params: any; options: any }>,
+    coupons: [] as any[],
+    customers: [] as any[],
   };
 
   const stripe = {
+    checkout: {
+      sessions: {
+        create: async (params: any, options: any = {}) => {
+          state.checkoutSessionCreates.push({ params, options });
+          const session = {
+            id: nextId("cs_test"),
+            object: "checkout.session",
+            url: `https://checkout.stripe.test/pay/${state.checkoutSessionCreates.length}`,
+            status: "open",
+            payment_status: "unpaid",
+            payment_intent: null,
+            metadata: params.metadata ?? {},
+          };
+          state.checkoutSessions.set(session.id, session);
+          return session;
+        },
+        retrieve: async (id: string) => {
+          const session = state.checkoutSessions.get(id);
+          if (!session) throw stripeError("definitive", "No such checkout session");
+          return session;
+        },
+        /** Like Stripe: only an open session can be expired. */
+        expire: async (id: string) => {
+          const session = state.checkoutSessions.get(id);
+          if (!session) throw stripeError("definitive", "No such checkout session");
+          if (session.status !== "open") throw stripeError("definitive", `Session is ${session.status}`);
+          session.status = "expired";
+          return session;
+        },
+        list: async () => ({ data: [...state.checkoutSessions.values()], has_more: false }),
+      },
+    },
+    coupons: {
+      create: async (params: any) => {
+        const coupon = { id: nextId("coupon"), ...params };
+        state.coupons.push(coupon);
+        return coupon;
+      },
+    },
+    customers: {
+      create: async (params: any) => {
+        const customer = { id: nextId("cus"), ...params };
+        state.customers.push(customer);
+        return customer;
+      },
+      update: async (id: string, params: any) => ({ id, ...params }),
+      retrieve: async (id: string) => ({ id, deleted: false }),
+    },
     paymentIntents: {
       retrieve: async (id: string) => {
         if (state.retrieveFails) throw stripeError("ambiguous", "Stripe unavailable");
@@ -158,6 +211,10 @@ export function createFakeStripe() {
     state.balanceAvailable = 0;
     state.balancePending = 0;
     state.payouts.length = 0;
+    state.checkoutSessions.clear();
+    state.checkoutSessionCreates.length = 0;
+    state.coupons.length = 0;
+    state.customers.length = 0;
   }
 
   /** A signed webhook body + header, exactly as Stripe would deliver it. */

@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { CachedImage } from '@/components/CachedImage';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { ThemePickerSheet } from '@/components/chat/ThemePickerSheet';
@@ -225,7 +226,10 @@ export default function ConversationDetailsScreen() {
   }
 
   function openOptions() {
-    Alert.alert(displayName, undefined, [
+    // Alert.alert() with a button array is a silent no-op on web — this left
+    // the "Options" action button completely dead in the web preview. See
+    // components/ui/ActionSheet.tsx's header comment.
+    showActionSheet(displayName, undefined, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: isBlocked ? `Unblock ${displayName}` : `Block ${displayName}`,

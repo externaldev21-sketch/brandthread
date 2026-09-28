@@ -43,6 +43,21 @@
  * carry a count badge, and neither Depop nor GOAT have a comparable
  * video-overlay shop entry point — Whatnot/eBay Live were the closer match
  * for this specific pill-with-badge-into-sheet shape).
+ *
+ * Overnight follow-up (expanded-pill tap target): both Whatnot's shop pill
+ * and eBay Live's "Item lineup" entry (same two screens linked above) treat
+ * their whole opened row as one open-the-list tap target — nothing inside
+ * it, including a trailing chevron/disclosure glyph, is its own separate
+ * "collapse" control; dismissal happens by tapping elsewhere or an explicit
+ * close affordance in the destination sheet itself. Mirrored here: the
+ * entire expanded strip (name/price text and the trailing chevron alike)
+ * is one TouchableOpacity whose onPress opens `ShopProductSheet` — the
+ * chevron carries no onPress of its own (see the `pointerEvents="none"`
+ * note on it below). Collapsing back to the compact pill stays reachable
+ * via the three affordances already built for it — tapping outside, a
+ * swipe-left, and the 4s auto-collapse — matching the "tap out to dismiss"
+ * pattern those same two references use, rather than adding a second,
+ * redundant close control inside the pill.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
@@ -279,8 +294,20 @@ export function ShopSideTab({
             {/* Self-audit find #3: full white, not 75% — every other icon
                 in the feed (rail, top row, caption block) settled on pure
                 white as this polish pass's baseline; this was the one
-                holdout still reading as slightly washed out. */}
-            <Feather name="chevron-right" size={12} color={ON_DARK} />
+                holdout still reading as slightly washed out.
+                pointerEvents="none": purely decorative, no onPress of its
+                own — the WHOLE expanded strip (name/price text and this
+                chevron alike) shares the one TouchableOpacity above, whose
+                onPress opens the sheet while expanded (see the module JSX
+                below). This icon must never become its own separate tap
+                target that could re-collapse the pill instead — see the
+                overnight follow-up that added this note (found live: the
+                chevron reading as its own "collapse" affordance instead of
+                part of the same open-sheet row). Collapsing back to compact
+                stays reachable via tapping outside (the full-screen
+                backdrop Pressable above), swiping left, or the 4s
+                auto-collapse — no separate close control was needed. */}
+            <Feather name="chevron-right" size={12} color={ON_DARK} pointerEvents="none" />
           </ReanimatedAnimated.View>
         </TouchableOpacity>
       </ReanimatedAnimated.View>

@@ -491,6 +491,7 @@ async function releaseCheckoutLoyaltyRedemption(session: any) {
       id: checkoutSessions.id,
       buyerId: checkoutSessions.buyerId,
       loyaltyToken: checkoutSessions.loyaltyToken,
+      threadCashToken: checkoutSessions.threadCashToken,
     })
     .from(checkoutSessions)
     .where(csRef
@@ -498,13 +499,22 @@ async function releaseCheckoutLoyaltyRedemption(session: any) {
       : eq(checkoutSessions.stripeSessionId, session.id))
     .limit(1);
 
-  if (!checkout?.loyaltyToken || !checkout.buyerId) return;
-  await db.transaction((tx) => releaseLoyaltyRedemption(
-    tx,
-    checkout.buyerId!,
-    checkout.loyaltyToken!,
-    checkout.id,
-  ));
+  if (!checkout?.buyerId) return;
+  if (checkout.loyaltyToken) {
+    await db.transaction((tx) => releaseLoyaltyRedemption(
+      tx,
+      checkout.buyerId!,
+      checkout.loyaltyToken!,
+      checkout.id,
+    ));
+  }
+  // Item 109: an expired / failed session also lets go of its Thread Cash
+  // token (it only released loyalty before, so an abandoned payment kept the
+  // buyer's Thread Cash locked to it forever). Released tokens can be reused
+  // or cancelled back to the balance (POST /api/thread-cash/redeem/:token/cancel).
+  if (checkout.threadCashToken) {
+    await releaseThreadCashRedemption(db, checkout.buyerId, checkout.threadCashToken, checkout.id);
+  }
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────

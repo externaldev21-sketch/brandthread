@@ -401,8 +401,12 @@ export function adaptOrderDetail(row: any): BuyerOrderView {
     payment: {
       subtotalCents:     row.subtotalCents ?? 0,
       shippingTotalCents: row.shippingCents ?? 0,
-      taxTotalCents:     0,
+      // Item 109: the buyer orders API now returns these (additive); older
+      // responses leave them undefined, which keeps the old receipt.
+      taxTotalCents:     row.taxCents ?? 0,
       totalCents:        row.totalCents ?? 0,
+      discountCents:     Math.max(0, (row.discountAmountCents ?? 0) - (row.threadCashAppliedCents ?? 0)),
+      threadCashCents:   Math.max(0, row.threadCashAppliedCents ?? 0),
     },
     trackingNumber:    row.trackingNumber    ?? undefined,
     trackingCarrier:   row.carrier           ?? undefined,
@@ -991,9 +995,15 @@ export default function BuyerOrderDetailScreen() {
           {!!order.payment.taxTotalCents && (
             <Row label="Tax" value={formatCents(order.payment.taxTotalCents)} />
           )}
+          {!!order.payment.discountCents && (
+            <Row label="Discount" value={`−${formatCents(order.payment.discountCents)}`} />
+          )}
+          {!!order.payment.threadCashCents && (
+            <Row label="Thread Cash" value={`−${formatCents(order.payment.threadCashCents)}`} />
+          )}
           <View style={styles.divider} />
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalLabel}>{order.payment.threadCashCents ? 'Charged to card' : 'Total'}</Text>
             <Text style={styles.totalAmount}>{formatCents(order.payment.totalCents)}</Text>
           </View>
           <Text style={styles.paymentNote}>Payment processed securely via Brandthread</Text>

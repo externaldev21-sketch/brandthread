@@ -1,5 +1,20 @@
 # Thread Cash at checkout — what's needed before enabling `threadCashCheckoutDiscount`
 
+> **Status (item 109): implemented.** The plan below is built:
+> - fee basis on the full price;
+> - the combined coupon;
+> - the platform-funded seller top-up;
+> - the ledger postings;
+> - refunds returning Thread Cash once.
+>
+> Checkout now also:
+> - stacks Thread Cash after the promo code;
+> - follows the order total live;
+> - returns the balance when the toggle is turned off (`POST /redeem/:token/cancel`);
+> - frees tokens held by abandoned, unpaid Stripe sessions (`lib/threadCash/checkoutRelease.ts`).
+>
+> These are covered end to end by `lib/money/__tests__/threadCashCheckoutRoutes.integration.test.ts`. The flag still ships **off**. Only the sign-off list at the bottom remains before flipping it.
+
 Thread Cash is a **platform-funded** buyer reward credit: when a buyer spends
 it, the seller must still be paid the full item price. This document is the
 plan for wiring that into the existing Stripe/ledger money flow (see

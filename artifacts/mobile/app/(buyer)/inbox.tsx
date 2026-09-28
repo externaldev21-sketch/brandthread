@@ -10,6 +10,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
@@ -739,7 +740,10 @@ export default function InboxScreen() {
 
   function longPressConversation(conv: Conversation) {
     hapticDestructiveConfirm();
-    Alert.alert('Options', undefined, [
+    // Alert.alert() with a button array is a silent no-op on web — this left
+    // the row long-press menu completely dead in the web preview. See
+    // components/ui/ActionSheet.tsx's header comment.
+    showActionSheet('Options', undefined, [
       { text: 'Archive', onPress: () => swipeArchiveConversation(conv), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -1021,7 +1025,12 @@ export default function InboxScreen() {
   }
 
   function openFilterMenu() {
-    Alert.alert('Filter messages', 'Coming soon.');
+    // Alert.alert() is a silent no-op on web (react-native-web has no
+    // native dialog to defer to), so it left this button dead in the web
+    // preview — no dialog, no honest "not available" state, nothing. Use
+    // the screen's existing snackbar (already the pattern for every other
+    // inbox affordance above) so the tap always gives real feedback.
+    showSnackbar('Message filters — coming soon');
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────

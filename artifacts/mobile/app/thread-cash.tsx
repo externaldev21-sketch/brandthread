@@ -38,6 +38,7 @@ function historyLabel(entry: ThreadCashEntry): string {
     case 'send_received': return 'Received from a friend';
     case 'send_cancelled': return 'Cancelled send, returned';
     case 'send_expired': return 'Unclaimed send, returned';
+    case 'redemption_cancelled': return 'Returned from checkout';
     default: return 'Adjustment';
   }
 }
@@ -53,7 +54,8 @@ function historyGlyph(
     case 'streak_bonus': return { icon: 'zap', color: theme.accent };
     case 'redemption':
     case 'checkout_spend': return { icon: 'shopping-bag', color: theme.muted };
-    case 'refund_credit': return { icon: 'rotate-ccw', color: theme.success };
+    case 'refund_credit':
+    case 'redemption_cancelled': return { icon: 'rotate-ccw', color: theme.success };
     case 'expiry': return { icon: 'clock', color: theme.subtle };
     case 'send_sent': return { icon: 'arrow-up-right', color: theme.muted };
     case 'send_received': return { icon: 'arrow-down-left', color: theme.success };

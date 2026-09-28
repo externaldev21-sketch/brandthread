@@ -148,7 +148,18 @@ export function OrderConfirmation({
           </>
         ) : null}
         <Hairline />
-        <DetailRow label="Total">
+        {(session.threadCashRedemption?.discountCents ?? 0) > 0 ? (
+          <>
+            {/* Item 109: the card total below is after Thread Cash. */}
+            <DetailRow label="Thread Cash">
+              <Text style={[styles.detailText, { color: theme.text }, TABULAR_NUMS]} testID="checkout-confirmation-thread-cash">
+                −{formatCents(session.threadCashRedemption!.discountCents)}
+              </Text>
+            </DetailRow>
+            <Hairline />
+          </>
+        ) : null}
+        <DetailRow label={(session.threadCashRedemption?.discountCents ?? 0) > 0 ? 'Charged to card' : 'Total'}>
           <Text style={[styles.detailStrong, { color: theme.text }, TABULAR_NUMS]}>{formatCents(totalPaidCents)}</Text>
         </DetailRow>
       </CheckoutCard>
