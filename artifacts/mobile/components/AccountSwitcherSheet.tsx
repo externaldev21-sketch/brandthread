@@ -152,86 +152,107 @@ export function AccountSwitcherSheet({ visible, onClose }: AccountSwitcherSheetP
 
   const s = styles(colors);
 
+  function handleClose() {
+    // Always closes back to the account list — never leaves a reopen sitting
+    // on the "Add account" sub-view.
+    setShowAddAccount(false);
+    onClose();
+  }
+
+  // One BottomSheet (one Modal); the sub-view swaps its content instead of
+  // stacking a second sheet — two sibling BottomSheets (each its own Modal)
+  // fought each other on web: opening the second while the first's `visible`
+  // flipped false raced its close animation and dropped both.
   return (
-    <>
-      <BottomSheet visible={visible && !showAddAccount} onClose={onClose} testID="account-switcher-sheet">
-        <View style={s.header}>
-          <Text style={s.headerTitle}>Switch account</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            onPress={onClose}
-          >
-            <Feather name="x" size={22} color={colors.mutedForeground} />
-          </Pressable>
-        </View>
-
-        <View style={s.list}>
-          {accounts.map((account) => (
+    <BottomSheet visible={visible} onClose={handleClose} testID="account-switcher-sheet">
+      {showAddAccount ? (
+        <>
+          <View style={s.header}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => setShowAddAccount(false)}
+            >
+              <Feather name="chevron-left" size={22} color={colors.mutedForeground} />
+            </Pressable>
+            <Text style={s.headerTitle}>Add account</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={handleClose}
+            >
+              <Feather name="x" size={22} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
+          <View style={s.list}>
             <ListRow
-              key={account.id}
-              avatar={{ uri: account.imageUri, name: account.displayName }}
-              title={account.handle}
-              subtitle={account.accountType}
-              disabled={!!switchingId}
-              onPress={account.current ? undefined : () => handleSwitch(account)}
-              testID={`account-switcher-row-${account.id}`}
-              right={
-                switchingId === account.id ? (
-                  <Feather name="loader" size={18} color={colors.mutedForeground} />
-                ) : account.current ? (
-                  <View style={[s.checkBadge, { backgroundColor: colors.primary }]}>
-                    <Feather name="check" size={13} color={colors.primaryForeground} />
-                  </View>
-                ) : account.unreadCount ? (
-                  <View style={s.unreadBadge}>
-                    <Text style={s.unreadBadgeText}>{account.unreadCount > 9 ? '9+' : account.unreadCount}</Text>
-                  </View>
-                ) : null
-              }
+              icon="log-in"
+              title="Log into existing account"
+              onPress={handleLogIntoExisting}
+              testID="account-switcher-log-into-existing"
             />
-          ))}
-        </View>
+            <ListRow
+              icon="user-plus"
+              title="Create new account"
+              onPress={handleCreateNew}
+              testID="account-switcher-create-new"
+            />
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={s.header}>
+            <Text style={s.headerTitle}>Switch account</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={handleClose}
+            >
+              <Feather name="x" size={22} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
 
-        <View style={s.divider} />
+          <View style={s.list}>
+            {accounts.map((account) => (
+              <ListRow
+                key={account.id}
+                avatar={{ uri: account.imageUri, name: account.displayName }}
+                title={account.handle}
+                subtitle={account.accountType}
+                disabled={!!switchingId}
+                onPress={account.current ? undefined : () => handleSwitch(account)}
+                testID={`account-switcher-row-${account.id}`}
+                right={
+                  switchingId === account.id ? (
+                    <Feather name="loader" size={18} color={colors.mutedForeground} />
+                  ) : account.current ? (
+                    <View style={[s.checkBadge, { backgroundColor: colors.primary }]}>
+                      <Feather name="check" size={13} color={colors.primaryForeground} />
+                    </View>
+                  ) : account.unreadCount ? (
+                    <View style={s.unreadBadge}>
+                      <Text style={s.unreadBadgeText}>{account.unreadCount > 9 ? '9+' : account.unreadCount}</Text>
+                    </View>
+                  ) : null
+                }
+              />
+            ))}
+          </View>
 
-        <ListRow
-          icon="plus-circle"
-          title="Add account"
-          onPress={() => setShowAddAccount(true)}
-          testID="account-switcher-add-account"
-        />
-      </BottomSheet>
+          <View style={s.divider} />
 
-      <BottomSheet visible={visible && showAddAccount} onClose={() => setShowAddAccount(false)} testID="account-switcher-add-account-sheet">
-        <View style={s.header}>
-          <Text style={s.headerTitle}>Add account</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            onPress={() => setShowAddAccount(false)}
-          >
-            <Feather name="x" size={22} color={colors.mutedForeground} />
-          </Pressable>
-        </View>
-        <View style={s.list}>
           <ListRow
-            icon="log-in"
-            title="Log into existing account"
-            onPress={handleLogIntoExisting}
-            testID="account-switcher-log-into-existing"
+            icon="plus-circle"
+            title="Add account"
+            onPress={() => setShowAddAccount(true)}
+            testID="account-switcher-add-account"
           />
-          <ListRow
-            icon="user-plus"
-            title="Create new account"
-            onPress={handleCreateNew}
-            testID="account-switcher-create-new"
-          />
-        </View>
-      </BottomSheet>
-    </>
+        </>
+      )}
+    </BottomSheet>
   );
 }
 
