@@ -395,14 +395,45 @@ export function matchesActivityChip(item: Pick<ActivityItem, 'category' | 'type'
 }
 
 /** What an empty chip says instead of a blank list. */
-export function activityChipEmpty(chip: ActivityChip): { icon: string; message: string } {
+export interface ActivityChipEmpty {
+  icon: string;
+  /** Short heading (item 85) — the plain-language state, e.g. "No likes yet". */
+  title: string;
+  message: string;
+  /** One next step, only where there is a real one to take (Mobbin: SoundCloud
+   *  "Find artists to follow", AllTrails "Connect with friends"). Likes and
+   *  comments have none — there's no honest one-tap way to get them. */
+  action?: { label: string; href: string };
+}
+
+/**
+ * What an empty chip says instead of a blank list, per role (item 85). A
+ * seller's followers follow their store and their orders are sales, so
+ * those read differently; everything else is the same for both.
+ */
+export function activityChipEmpty(chip: ActivityChip, role: 'buyer' | 'seller' | null = 'buyer'): ActivityChipEmpty {
+  const seller = role === 'seller';
+  const findPeople = { label: 'Find people to follow', href: '/buyer-search' };
+  const shareStore = { label: 'Share your store', href: '/share-store' };
   switch (chip) {
-    case 'follows': return { icon: 'user-plus', message: "No new followers yet. When someone follows you, you'll see it here." };
-    case 'likes': return { icon: 'heart', message: "No likes yet. When someone likes your posts or stories, you'll see it here." };
-    case 'comments': return { icon: 'message-circle', message: 'No comments yet. Comments, replies and mentions of you will show up here.' };
-    case 'orders': return { icon: 'package', message: 'No order updates yet. Order, shipping and payout updates will show up here.' };
-    case 'thread_cash': return { icon: 'dollar-sign', message: "No Thread Cash yet. When someone sends you Thread Cash, you'll see it here." };
-    default: return { icon: 'activity', message: 'Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.' };
+    case 'follows': return seller
+      ? { icon: 'user-plus', title: 'No followers yet', message: "When someone follows your store, you'll see it here.", action: shareStore }
+      : { icon: 'user-plus', title: 'No followers yet', message: "When someone follows you, you'll see it here.", action: findPeople };
+    case 'likes': return { icon: 'heart', title: 'No likes yet', message: "When someone likes your posts or stories, you'll see it here." };
+    case 'comments': return { icon: 'message-circle', title: 'No comments yet', message: 'Comments, replies and mentions of you will show up here.' };
+    case 'orders': return seller
+      ? { icon: 'package', title: 'No orders yet', message: 'When someone buys from your store, new orders and payout updates will show up here.', action: shareStore }
+      : { icon: 'package', title: 'No order updates yet', message: 'Shipping and delivery updates for your orders will show up here.', action: { label: 'Start shopping', href: '/(buyer)/discover' } };
+    case 'thread_cash': return {
+      icon: 'dollar-sign', title: 'No Thread Cash yet', message: "When someone sends you Thread Cash, you'll see it here.",
+      // The Thread Cash screen itself (where a Thread Cash row also opens) —
+      // not /thread-explainer, which is onboarding-only and bounces anyone
+      // who has already seen it (and every seller) elsewhere.
+      action: { label: 'Open Thread Cash', href: '/thread-cash' },
+    };
+    default: return seller
+      ? { icon: 'activity', title: 'No activity yet', message: 'New followers, likes and comments on your posts, and order updates will show up here.', action: shareStore }
+      : { icon: 'activity', title: 'No activity yet', message: 'When people follow you, like or comment on your posts, or send you Thread Cash, it will show up here.', action: findPeople };
   }
 }
 

@@ -291,6 +291,15 @@ vi.mock('@/components/ShareProfileSheet', () => ({
   ),
 }));
 
+// Same reasoning as ShareProfileSheet above: AccountSwitcherSheet pulls in
+// Clerk hooks and the reanimated-based BottomSheet primitive, neither
+// exercised by this file's tests, which only need to know it opened.
+vi.mock('@/components/AccountSwitcherSheet', () => ({
+  AccountSwitcherSheet: ({ visible }: { visible: boolean }) => (
+    visible ? require('react').createElement('View', { testID: 'account-switcher-sheet' }) : null
+  ),
+}));
+
 const { threadCashFlag } = vi.hoisted(() => ({ threadCashFlag: { on: false } }));
 vi.mock('@/contexts/FeatureFlagContext', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/contexts/FeatureFlagContext')>()),
@@ -498,8 +507,10 @@ describe('buyer profile tabs', () => {
 
     const switcher = renderer.root.findByProps({ testID: 'buyer-profile-account-switcher' });
     expect(switcher.props.accessibilityLabel).toBe('Switch account');
+    expect(renderer.root.findAllByProps({ testID: 'account-switcher-sheet' }).length).toBe(0);
     await act(async () => { switcher.props.onPress(); });
-    expect(routerMock.push).toHaveBeenCalledWith('/account-switcher');
+    // The switcher is a sheet on the profile screen now, not a pushed route.
+    expect(renderer.root.findAllByProps({ testID: 'account-switcher-sheet' }).length).toBe(1);
 
     routerMock.push.mockReset();
     const editProfileBtns = renderer.root.findAll(

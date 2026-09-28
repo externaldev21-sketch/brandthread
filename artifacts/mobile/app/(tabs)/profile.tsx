@@ -31,6 +31,7 @@ import {
 import { SheetRise } from '@/components/motion/SheetRise';
 import { Button } from '@/components/ui/Button';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
+import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { ListRow } from '@/components/ui/ListRow';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, productDetailHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
@@ -123,6 +124,7 @@ export default function ProfileScreen() {
   const [productsCount, setProductsCount] = useState<number | null>(null);
   const [profileEditorVisible, setProfileEditorVisible] = useState(false);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
+  const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [brandNameInput, setBrandNameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
@@ -419,7 +421,7 @@ export default function ProfileScreen() {
       style={[s.switcher, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push('/account-switcher' as never);
+        setAccountSwitcherOpen(true);
       }}
       activeOpacity={0.75}
       accessibilityRole="button"
@@ -749,6 +751,8 @@ export default function ProfileScreen() {
           products: sellerPosts.slice(0, 3).map(p => ({ id: p.id, uri: p.thumbnailUri ?? p.mediaUris?.[0] })),
         }}
       />
+
+      <AccountSwitcherSheet visible={accountSwitcherOpen} onClose={() => setAccountSwitcherOpen(false)} />
     </>
   );
 }

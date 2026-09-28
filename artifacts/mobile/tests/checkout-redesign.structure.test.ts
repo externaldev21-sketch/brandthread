@@ -77,6 +77,19 @@ describe('checkout screen structure', () => {
     expect(screen).not.toContain('stickyTotalRow');
   });
 
+  it('item 110: the breakdown folds into the footer total, a sibling of Place order', () => {
+    const footer = screen.slice(screen.indexOf('<StickyFooter'), screen.indexOf('</StickyFooter>'));
+    expect(footer).toContain('<PriceBreakdownCard');
+    expect(footer).toContain('collapsible={{');
+    // The toggle and Place order are separate controls, not nested.
+    expect(footer.indexOf('<PriceBreakdownCard')).toBeLessThan(footer.indexOf('testID="checkout-place-order"'));
+    const card = read('components/checkout/PriceBreakdownCard.tsx');
+    expect(card).toContain('Easing.out(Easing.cubic)');
+    expect(card).not.toMatch(/Animated\.spring|bounciness/);
+    expect(card).toContain('isReduceMotionEnabled');
+    expect(card).toContain('accessibilityState={{ expanded }}');
+  });
+
   it('gates Place order on checkoutReadiness and shows what is missing', () => {
     expect(screen).toContain('getCheckoutBlockingSection(contact, address, current) === null');
     expect(screen).toContain('disabled={!ready}');

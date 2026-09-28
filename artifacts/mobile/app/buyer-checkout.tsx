@@ -15,8 +15,10 @@
  *            lululemon (order complete / confirmation screens).
  *
  * Grouped Glass cards, monochrome, Inter, the shared Button. The sticky
- * footer holds only "Place order · $total" (+ what's missing, + the terms
- * line) — the price breakdown itself appears exactly once, in the scroll.
+ * footer holds "Place order · $total" (+ what's missing, + the terms line)
+ * and, since item 110, the price breakdown itself: folded into a "Total $X ⌃"
+ * row that expands the full breakdown above the button (Shop / Vestiaire
+ * pattern). It still appears exactly once.
  *
  * Logic is unchanged from the previous screen: session load/restore, saved
  * addresses, server cart validation, the per-seller Stripe-hosted Checkout
@@ -134,6 +136,11 @@ export default function BuyerCheckoutScreen() {
   const [error, setError] = useState<CheckoutError | null>(null);
   const [canRetryPayment, setCanRetryPayment] = useState(false);
   const [footerHeight, setFooterHeight] = useState(180);
+  // Item 110: the footer's price breakdown, folded by default. Scrolling the
+  // page away (more than a nudge) folds it again.
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const breakdownOpenedAtY = useRef(0);
+  const scrollY = useRef(0);
   const scrollRef = useRef<ScrollView>(null);
   /**
    * Fully verified orders — each entry has a real server `id` (used for navigation/API)
@@ -699,6 +706,11 @@ export default function BuyerCheckoutScreen() {
         bounces={false}
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={32}
+        onScroll={event => {
+          scrollY.current = event.nativeEvent.contentOffset.y;
+          if (breakdownOpen && Math.abs(scrollY.current - breakdownOpenedAtY.current) > 24) setBreakdownOpen(false);
+        }}
         testID="checkout-scroll"
       >
         {error ? (
@@ -813,8 +825,6 @@ export default function BuyerCheckoutScreen() {
           </CheckoutCard>
         )}
 
-        <PriceBreakdownCard totals={totals} itemCount={itemCount} />
-
         {/* Purchase protection trust row — the app's existing copy (Terms-sourced). */}
         <BuyerProtectionNote
           flat
@@ -833,6 +843,19 @@ export default function BuyerCheckoutScreen() {
               <Text style={[styles.hint, { color: theme.muted }]}>{nextStep}</Text>
             </View>
           ) : null}
+          {/* Item 110: Total ⌃ expands the breakdown above it. A separate
+              control from Place order (siblings, never nested). */}
+          <PriceBreakdownCard
+            totals={totals}
+            itemCount={itemCount}
+            collapsible={{
+              expanded: breakdownOpen,
+              onToggle: () => {
+                breakdownOpenedAtY.current = scrollY.current;
+                setBreakdownOpen(open => !open);
+              },
+            }}
+          />
           <Button
             label={ctaLabel}
             icon="lock"
