@@ -1750,7 +1750,10 @@ export default function BuyerConversationScreen() {
           <PressableScale
             rippleEnabled={false}
             style={s.requestProfilePill}
-            onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
+            onPress={() => {
+              hapticPrimaryAction();
+              if (participant) router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
+            }}
             accessibilityRole="button"
             accessibilityLabel={`View ${participant.name}'s profile`}
             testID="conversation-request-view-profile"

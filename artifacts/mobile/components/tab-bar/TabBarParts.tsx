@@ -12,6 +12,7 @@ import Animated, {
   withSpring,
   withTiming,
   Extrapolation,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -44,15 +45,21 @@ const POP_SETTLE = { mass: 0.6, stiffness: 300, damping: 12 } as const;
 const INDICATOR_TIMING = { duration: 220, easing: Easing.out(Easing.cubic) } as const;
 const REDUCED_MOTION = { duration: 160 } as const;
 
+// Wraps Pressable so it can take a Reanimated-driven `style` (the buyer bar's
+// compact/regular capsule transition) alongside its normal static style —
+// every prior call site that never passes an animated style renders exactly
+// as before, since a plain style array works on an animated component too.
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 // ─── Glass surface ────────────────────────────────────────────────────────────
 
-export function TabBarGlass({ theme, radius }: { theme: AppThemePreset; radius: number }) {
+export function TabBarGlass({ theme, radius, animatedStyle }: { theme: AppThemePreset; radius: number; animatedStyle?: object }) {
   // iOS and web get a live backdrop blur. expo-blur's Android blur needs the
   // whole navigator wrapped in a BlurTargetView, which cannot sample video
   // surfaces and redraws the feed every frame, so Android uses a denser tint.
   const hasBlur = Platform.OS !== 'android';
   return (
-    <View style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden', pointerEvents: 'none' }]}>
+    <Animated.View style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden', pointerEvents: 'none' }, animatedStyle]}>
       {hasBlur && (
         <BlurView
           intensity={Platform.OS === 'ios' ? 60 : 70}
@@ -71,13 +78,14 @@ export function TabBarGlass({ theme, radius }: { theme: AppThemePreset; radius: 
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
-      <View
+      <Animated.View
         style={[
           StyleSheet.absoluteFill,
           { borderRadius: radius, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)' },
+          animatedStyle,
         ]}
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -170,6 +178,7 @@ function useTabMotion(focused: boolean) {
 
 export function TabBarSlot({
   focused, width, height, onPress, onLongPress, testID, accessibilityLabel, hidden = false, badge, children,
+  animatedStyle, hitSlop,
 }: {
   focused: boolean;
   width: number;
@@ -182,10 +191,19 @@ export function TabBarSlot({
   hidden?: boolean;
   badge?: React.ReactNode;
   children: React.ReactNode;
+  /** Reanimated style layered on top of the static width/height above — the
+   *  buyer bar's only use of this is the compact/regular capsule transition;
+   *  every other call site (seller bar, buyer search) omits it and renders
+   *  identically to before. */
+  animatedStyle?: object;
+  /** Extends the touch target beyond the visual slot — the buyer bar uses
+   *  this in compact mode so the tappable area never shrinks below 44pt even
+   *  though the visual glyph does. */
+  hitSlop?: { top?: number; bottom?: number; left?: number; right?: number };
 }) {
   const { onPressIn, onPressOut, iconStyle } = useTabMotion(focused);
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="tab"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected: focused }}
@@ -196,13 +214,14 @@ export function TabBarSlot({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       testID={testID}
-      style={[styles.slot, { width, height, pointerEvents: hidden ? 'none' : 'auto' }]}
+      hitSlop={hitSlop}
+      style={[styles.slot, { width, height, pointerEvents: hidden ? 'none' : 'auto' }, animatedStyle]}
     >
       <Animated.View style={iconStyle}>
         {children}
         {badge}
       </Animated.View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -210,7 +229,7 @@ export function TabBarSlot({
 
 export function TabBarCircle({
   theme, size, active = false, onPress, onLongPress, testID, accessibilityLabel, accessibilityRole = 'button',
-  selected, children,
+  selected, children, animatedStyle, hitSlop, glassAnimatedStyle,
 }: {
   theme: AppThemePreset;
   size: number;
@@ -222,11 +241,20 @@ export function TabBarCircle({
   accessibilityRole?: 'button' | 'tab';
   selected?: boolean;
   children: React.ReactNode;
+  /** Reanimated style layered on top of the static size above — see
+   *  TabBarSlot's `animatedStyle` doc; only the buyer bar's compact/regular
+   *  transition uses this, every other call site is unaffected. */
+  animatedStyle?: object;
+  /** Extends the touch target beyond the visual circle in compact mode. */
+  hitSlop?: { top?: number; bottom?: number; left?: number; right?: number };
+  /** Reanimated style layered onto the inner glass surface's own radius so
+   *  its corner rounding tracks an animated `size` (see `animatedStyle`). */
+  glassAnimatedStyle?: object;
 }) {
   const { onPressIn, onPressOut, iconStyle } = useTabMotion(active);
   const inset = 5;
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel}
       accessibilityState={selected === undefined ? {} : { selected }}
@@ -236,9 +264,10 @@ export function TabBarCircle({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       testID={testID}
-      style={[TAB_BAR_SHADOW, { width: size, height: size, borderRadius: size / 2 }]}
+      hitSlop={hitSlop}
+      style={[TAB_BAR_SHADOW, { width: size, height: size, borderRadius: size / 2 }, animatedStyle]}
     >
-      <TabBarGlass theme={theme} radius={size / 2} />
+      <TabBarGlass theme={theme} radius={size / 2} animatedStyle={glassAnimatedStyle} />
       {active && (
         <View
           style={[
@@ -253,7 +282,7 @@ export function TabBarCircle({
         />
       )}
       <Animated.View style={[styles.circleContent, iconStyle]}>{children}</Animated.View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -265,15 +294,26 @@ export function TabBarCircle({
  * its resting size, so switching tabs feels like dragging a drop of liquid.
  */
 export function TabBarIndicator({
-  activeIndex, visible, metrics, theme,
+  activeIndex, visible, metrics, theme, progress, compactMetrics,
 }: {
   activeIndex: number;
   visible: boolean;
   metrics: TabBarMetrics;
   theme: AppThemePreset;
+  /** 0 (regular) → 1 (compact) — only the buyer bar passes this, to shrink
+   *  the pill together with the capsule/circle during the compact-mode
+   *  transition. Omitted everywhere else, which renders exactly as before. */
+  progress?: SharedValue<number>;
+  /** The compact-mode counterpart of `metrics`, required alongside `progress`. */
+  compactMetrics?: TabBarMetrics;
 }) {
   const reduceMotion = useReducedMotion();
-  const restingX = Math.max(activeIndex, 0) * metrics.itemWidth;
+  // Tracked in slot-index "units" rather than raw pixels so the resting/glide
+  // position stays correct while `itemWidth` itself is also animating
+  // between its regular and compact values (see the style worklet below) —
+  // a pixel-space position computed against one fixed itemWidth would no
+  // longer line up once the capsule has resized.
+  const restingX = Math.max(activeIndex, 0);
   const x = useSharedValue(restingX);
   const target = useSharedValue(restingX);
   const opacity = useSharedValue(visible && activeIndex >= 0 ? 1 : 0);
@@ -290,20 +330,28 @@ export function TabBarIndicator({
     opacity.set(withTiming(shown ? 1 : 0, { duration: 180 }));
   }, [shown, restingX, reduceMotion, x, target, opacity]);
 
-  const pad = metrics.capsulePadding;
-  const baseWidth = metrics.indicatorWidth;
-  const maxStretch = metrics.itemWidth * 0.55;
-
   const style = useAnimatedStyle(() => {
-    const distance = Math.abs(target.value - x.value);
+    const p = progress && compactMetrics ? progress.value : 0;
+    const itemWidth = compactMetrics ? interpolate(p, [0, 1], [metrics.itemWidth, compactMetrics.itemWidth]) : metrics.itemWidth;
+    const pad = compactMetrics ? interpolate(p, [0, 1], [metrics.capsulePadding, compactMetrics.capsulePadding]) : metrics.capsulePadding;
+    const baseWidth = compactMetrics ? interpolate(p, [0, 1], [metrics.indicatorWidth, compactMetrics.indicatorWidth]) : metrics.indicatorWidth;
+    const capsuleHeight = compactMetrics ? interpolate(p, [0, 1], [metrics.capsuleHeight, compactMetrics.capsuleHeight]) : metrics.capsuleHeight;
+    const indicatorHeight = compactMetrics ? interpolate(p, [0, 1], [metrics.indicatorHeight, compactMetrics.indicatorHeight]) : metrics.indicatorHeight;
+    const maxStretch = itemWidth * 0.55;
+
+    const distanceUnits = Math.abs(target.value - x.value);
+    const distance = distanceUnits * itemWidth;
     const stretch = Math.min(distance * 0.45, maxStretch);
     const width = baseWidth + stretch;
     // The leading edge reaches ahead toward the destination tab.
     const direction = target.value >= x.value ? 1 : -1;
-    const center = x.value + metrics.itemWidth / 2 + (direction * stretch) / 2;
+    const center = (x.value + 0.5) * itemWidth + (direction * stretch) / 2;
     return {
       opacity: opacity.value,
       width,
+      height: indicatorHeight,
+      top: (capsuleHeight - indicatorHeight) / 2,
+      borderRadius: indicatorHeight / 2,
       left: pad + center - width / 2,
       transform: [{ scaleY: 1 - Math.min(stretch / maxStretch, 1) * 0.12 }],
     };
@@ -314,9 +362,6 @@ export function TabBarIndicator({
       style={[
         styles.indicator,
         {
-          top: (metrics.capsuleHeight - metrics.indicatorHeight) / 2,
-          height: metrics.indicatorHeight,
-          borderRadius: metrics.indicatorHeight / 2,
           backgroundColor: `${theme.accent}26`,
           borderColor: `${theme.accent}59`,
         },
@@ -344,12 +389,16 @@ const ICON_CROSSFADE_MS = 220;
  * since it's the same crossfade.
  */
 export function CrossfadeNavIcon({
-  name, focused, theme, size,
+  name, focused, theme, size, strokeWidth,
 }: {
   name: BuyerNavIconName;
   focused: boolean;
   theme: AppThemePreset;
   size: number;
+  /** Overrides BuyerNavIcon's default 1.8 stroke — the buyer bar's compact
+   *  mode passes a slightly heavier stroke here so a smaller icon keeps the
+   *  same visual weight instead of reading thin. */
+  strokeWidth?: number;
 }) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(focused ? 1 : 0);
@@ -365,10 +414,10 @@ export function CrossfadeNavIcon({
   return (
     <View style={{ width: size, height: size }}>
       <Animated.View style={[StyleSheet.absoluteFill, outlineStyle]}>
-        <BuyerNavIcon name={name} color={tabIconColor(theme, false)} focused={false} size={size} />
+        <BuyerNavIcon name={name} color={tabIconColor(theme, false)} focused={false} size={size} strokeWidth={strokeWidth} />
       </Animated.View>
       <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
-        <BuyerNavIcon name={name} color={tabIconColor(theme, true)} focused size={size} />
+        <BuyerNavIcon name={name} color={tabIconColor(theme, true)} focused size={size} strokeWidth={strokeWidth} />
       </Animated.View>
     </View>
   );
