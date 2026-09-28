@@ -1,3 +1,22 @@
+/**
+ * Search — rebuilt to mirror Instagram's own search flow 1:1 (Mobbin
+ * "Instagram iOS Searching Instagram" + "Instagram iOS Clearing search
+ * history"; layout/spacing/hierarchy/copy/interactions match those flows,
+ * only color/font/icon are Brandthread's). Same data sources as before
+ * (api.public.search, api.social.search, lib/discoverFeed's composeDiscoverPosts) —
+ * this PR replaces the UI only.
+ *
+ * States, in the order Instagram's own flow moves through them:
+ *   1. Unfocused, empty query   — a browse grid (Explore-style) + search
+ *      field + add-person icon.
+ *   2. Focused, empty query     — Cancel appears; "Recent" header + "See
+ *      all" + recent-search rows (server-side history — see lib/api.ts'
+ *      api.public.recent/removeRecent/clearRecent/log).
+ *   3. Typing                   — live suggestion list: the query itself
+ *      (search icon) first, then matching accounts.
+ *   4. Submitted                — tabs (For you / Accounts / Products /
+ *      Tags / Brands) + tab content.
+ */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
@@ -5,9 +24,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { type SearchResult } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
@@ -17,7 +34,6 @@ import { AnimatedEntrance, EmptyState } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { FONT, GUTTER, GRID_MAX_WIDTH, RADIUS } from '@/lib/theme';
 import { ResponsiveContainer, useGridColumns } from '@/components/layout';
-import { Chip } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -25,48 +41,25 @@ import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { ProductTile } from '@/components/search/ProductTile';
 import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
+import { BrandRow, type SearchBrandRow } from '@/components/search/BrandRow';
+import { TagRow, type SearchTag } from '@/components/search/TagRow';
+import { RecentSearchRow } from '@/components/search/RecentSearchRow';
 import { SegmentedTabs, type SearchTabKey } from '@/components/search/SegmentedTabs';
 import { VideoTile } from '@/components/search/VideoTile';
 import { FASHION_PREVIEW_POSTS } from '@/app/(tabs)/feed';
+import { DiscoverGrid } from '@/components/discover/DiscoverGrid';
+import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
+import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
+import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
+import { composeDiscoverPosts, type DiscoverPost } from '@/lib/discoverFeed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
 type VideoResult = Extract<SearchResult, { kind: 'video' }>;
 
-// "You may like" is always curated, never sourced from live search-analytics
-// "trending" data — that endpoint turned out to reflect raw per-keystroke
-// query fragments (e.g. "at"/"ate" logged while someone typed "Atelier"),
-// which is exactly the junk this list must never show. A fixed editorial
-// list is the only way to guarantee that.
-const YOU_MAY_LIKE_CURATED = ['black wool coat', 'hoodie', 'runway', 'satin slip', 'streetwear'];
 const DEBOUNCE_MS = 150;
 const VIDEO_GRID_GAP = 8;
-
-/**
- * Rejects punctuation-only fragments ("...", ",,") and anything shorter than
- * 3 characters (a "whole word" floor — nothing genuinely meaningful in
- * fashion search is 1-2 characters) — guards recent searches against junk
- * that slipped in from a stray keystroke.
- */
-function isMeaningfulTerm(term: string): boolean {
-  const trimmed = term.trim();
-  if (trimmed.length < 3) return false;
-  const letters = trimmed.replace(/[^\p{L}\p{N}]/gu, '');
-  return letters.length >= 3;
-}
-
-function dedupeCaseInsensitive(terms: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const term of terms) {
-    const key = term.trim().toLowerCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(term);
-  }
-  return out;
-}
 
 /** Small, clearly-fictional preview accounts so the Users tab is demoable
  * under ?bt_preview=buyer with no live backend. Only shown when the real
@@ -126,8 +119,28 @@ function matchesAny(fields: Array<string | null | undefined>, query: string): bo
   return fields.some((f) => (f ?? '').toLowerCase().includes(q));
 }
 
+/** #tag extraction from a video result's own caption, filtered to the
+ *  active query — see TagRow's own comment on why this is derived
+ *  client-side rather than backed by a dedicated hashtag-search endpoint. */
+function deriveTags(videos: VideoResult[], query: string): SearchTag[] {
+  const counts = new Map<string, number>();
+  const q = query.toLowerCase().replace(/^#/, '');
+  for (const v of videos) {
+    const matches = (v.caption ?? '').match(/#(\w+)/g) ?? [];
+    for (const raw of matches) {
+      const tag = raw.slice(1);
+      if (q && !tag.toLowerCase().includes(q)) continue;
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([tag, postCount]) => ({ tag, postCount }))
+    .sort((a, b) => b.postCount - a.postCount);
+}
+
 export default function BuyerSearchScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ q?: string }>();
   const insets = useSafeAreaInsets();
   const { push } = useThreadPull();
   const { theme } = useAppTheme();
@@ -138,86 +151,68 @@ export default function BuyerSearchScreen() {
   const primary = theme.accent;
 
   const api = useApi();
-  const { userId } = useAuth();
+  const { isSignedIn } = useAuth();
   const inputRef = useRef<TextInput>(null);
   const previewMode = isBuyerDevPreview();
 
   const [query, setQuery] = useState('');
-  // TikTok-style two-step flow: typing only ever shows live suggestions.
-  // The tabbed results view appears only once the user explicitly submits
-  // (Search button, Enter, or tapping a suggestion) — set here, and cleared
-  // again the moment the field is edited so a new keystroke drops back to
-  // suggestions instead of staying stuck on stale results.
   const [submitted, setSubmitted] = useState(false);
   const [fieldFocused, setFieldFocused] = useState(false);
-  const [activeTab, setActiveTab] = useState<SearchTabKey>('top');
+  const [activeTab, setActiveTab] = useState<SearchTabKey>('forYou');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [people, setPeople] = useState<SearchPerson[]>([]);
   const [followPending, setFollowPending] = useState<Record<string, boolean>>({});
   const [searching, setSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const recentKey = `bt:buyer-search-recent:${userId ?? 'anon'}`;
   const trimmedQuery = query.trim();
 
-  // Below the safe area — a plain browser preview has no real
-  // env(safe-area-inset-top), so web guarantees at least 54pt clear of
-  // where a notch/status bar would sit (matching TabPageHeader's own gate).
+  // Browse grid backing the unfocused entry state — the same "For You"
+  // Explore composition Discover uses (Instagram's own search tab defaults
+  // to its Explore grid too).
+  const [browsePosts, setBrowsePosts] = useState<DiscoverPost[]>([]);
+  const [browseLoading, setBrowseLoading] = useState(true);
+  const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
+  const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
+  const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
+
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
 
-  // Below the safe area on web preview matches every other buyer tab
-  // header's fallback; autofocus a beat after mount so the keyboard doesn't
-  // fight the push transition on native.
+  // Deliberately no auto-focus on mount — Instagram's own search tab opens
+  // unfocused, showing its Explore grid, until the field is explicitly
+  // tapped (Mobbin "Instagram iOS Searching Instagram"). The pre-rebuild
+  // screen auto-focused; that's part of what this PR replaces.
+
+  // A term handed in via ?q= (e.g. "See all" -> Recent Searches -> tap a
+  // term navigates back here) submits immediately instead of just filling
+  // the field.
   useEffect(() => {
-    const timer = setTimeout(() => inputRef.current?.focus(), Platform.OS === 'web' ? 0 : 260);
-    return () => clearTimeout(timer);
-  }, []);
+    if (params.q) submitTerm(String(params.q));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.q]);
 
   useEffect(() => {
     let cancelled = false;
-    AsyncStorage.getItem(recentKey)
-      .then((raw) => {
-        if (cancelled || !raw) return;
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const cleaned = dedupeCaseInsensitive(
-            parsed.filter((item): item is string => typeof item === 'string' && isMeaningfulTerm(item)),
-          ).slice(0, 5);
-          setRecentSearches(cleaned);
-        }
-      })
-      .catch(() => { if (!cancelled) setRecentSearches([]); });
+    composeDiscoverPosts({ api, isSignedIn: !!isSignedIn, filter: 'forYou', limit: 30 })
+      .then((rows) => { if (!cancelled) setBrowsePosts(rows); })
+      .catch(() => { if (!cancelled) setBrowsePosts([]); })
+      .finally(() => { if (!cancelled) setBrowseLoading(false); });
     return () => { cancelled = true; };
-  }, [recentKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  function rememberSearch(value: string) {
-    const term = value.trim();
-    if (!isMeaningfulTerm(term)) return;
-    setRecentSearches((current) => {
-      const next = [term, ...current.filter((item) => item.toLowerCase() !== term.toLowerCase())].slice(0, 5);
-      AsyncStorage.setItem(recentKey, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-  }
+  const loadRecent = useCallback(() => {
+    api.public.recent(10)
+      .then(({ recent }) => setRecentSearches(recent.map((r) => r.query)))
+      .catch(() => setRecentSearches([]));
+  }, [api]);
 
-  function clearRecentSearches() {
+  useEffect(() => { loadRecent(); }, [loadRecent]);
+
+  function removeRecent(term: string) {
     hapticSelection();
-    setRecentSearches([]);
-    AsyncStorage.removeItem(recentKey).catch(() => {});
+    setRecentSearches((current) => current.filter((t) => t !== term));
+    api.public.removeRecent(term).catch(() => {});
   }
-
-  function removeRecentSearch(term: string) {
-    hapticSelection();
-    setRecentSearches((current) => {
-      const next = current.filter((item) => item.toLowerCase() !== term.toLowerCase());
-      AsyncStorage.setItem(recentKey, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-  }
-
-  // "You may like" — always the curated list (see YOU_MAY_LIKE_CURATED's
-  // comment for why this deliberately never touches live search-analytics
-  // "trending" data), deduped defensively.
-  const youMayLike = useMemo(() => dedupeCaseInsensitive(YOU_MAY_LIKE_CURATED), []);
 
   const performSearch = useCallback(async (term: string) => {
     const [productRes, peopleRes] = await Promise.allSettled([
@@ -252,16 +247,16 @@ export default function BuyerSearchScreen() {
   }, [query, performSearch]);
 
   const productResultsRaw = useMemo(() => results.filter((r): r is ProductResult => r.kind === 'product'), [results]);
-  const brandResults = useMemo(() => results.filter((r): r is BrandResult => r.kind === 'brand'), [results]);
+  const brandResultsRaw = useMemo(() => results.filter((r): r is BrandResult => r.kind === 'brand'), [results]);
   const videoResultsRaw = useMemo(() => results.filter((r): r is VideoResult => r.kind === 'video'), [results]);
   // Blend in bundled preview posts/products when the live API has nothing
-  // for this query — matched against name/author/brand, not just caption,
-  // so e.g. "ate" surfaces Atelier Noire's video and product alongside her
-  // account instead of leaving Top with just the one user row.
+  // for this query — matched against name/author/brand, not just caption.
   const videoResults = videoResultsRaw.length > 0 ? videoResultsRaw
     : (trimmedQuery.length > 0 ? PREVIEW_VIDEOS.filter((v) => matchesAny([v.caption, v.authorName, v.authorHandle], trimmedQuery)) : []);
   const productResults = productResultsRaw.length > 0 ? productResultsRaw
     : (trimmedQuery.length > 0 ? PREVIEW_PRODUCTS.filter((p) => matchesAny([p.name, p.brand], trimmedQuery)) : []);
+  const brandRows: SearchBrandRow[] = brandResultsRaw.map((b) => ({ id: b.id, name: b.name, handle: (b as any).handle ?? '', color: b.color, initials: b.initials }));
+  const tagRows = useMemo(() => deriveTags(videoResults, trimmedQuery), [videoResults, trimmedQuery]);
 
   const gridColumns = useGridColumns({ phone: 2, tablet: 3, tabletLandscape: 4 });
   const { width: winWidth } = useWindowDimensions();
@@ -269,9 +264,6 @@ export default function BuyerSearchScreen() {
   const fallbackGridWidth = Math.min(winWidth, GRID_MAX_WIDTH) - GUTTER * 2;
   const effectiveGridWidth = gridWidth > 0 ? gridWidth : fallbackGridWidth;
   const gridCardWidth = Math.max(1, (effectiveGridWidth - GUTTER * (gridColumns - 1)) / gridColumns);
-  // Video tiles sit closer together (8pt) than product cards (16pt) — a
-  // dedicated card width keeps that gap accurate instead of leaving slack
-  // computed for the wider product-grid gap.
   const videoGridCardWidth = Math.max(1, (effectiveGridWidth - VIDEO_GRID_GAP * (gridColumns - 1)) / gridColumns);
   const onGridLayout = useCallback(({ nativeEvent }: { nativeEvent: { layout: { width: number } } }) => {
     const nextWidth = Math.round(nativeEvent.layout.width);
@@ -289,13 +281,11 @@ export default function BuyerSearchScreen() {
 
   function goToVideo(video: VideoResult) {
     hapticPrimaryAction();
-    rememberSearch(query || video.caption || video.authorName);
     router.push({ pathname: '/buyer-other-profile' as any, params: { userId: video.authorId, postId: video.postId } });
   }
 
   function handleResultPress(r: ProductResult | BrandResult) {
     hapticPrimaryAction();
-    rememberSearch(query || r.name);
     if (r.kind === 'brand' && (r as any).sellerId) {
       goToBrand((r as any).sellerId);
     } else if (r.kind === 'product' && (r as any).productId) {
@@ -304,7 +294,6 @@ export default function BuyerSearchScreen() {
   }
 
   function handlePersonPress(p: SearchPerson) {
-    rememberSearch(query || p.name);
     hapticPrimaryAction();
     if (p.accountType === 'seller') {
       router.push({ pathname: '/seller-profile' as any, params: { sellerId: p.userId } });
@@ -337,22 +326,53 @@ export default function BuyerSearchScreen() {
   }
 
   function submitTerm(term: string) {
-    rememberSearch(term);
-    setQuery(term);
-    setActiveTab('top');
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    setQuery(trimmed);
+    setActiveTab('forYou');
     setSubmitted(true);
+    setFieldFocused(false);
+    inputRef.current?.blur();
+    api.public.log(trimmed).catch(() => {});
+    loadRecent();
   }
 
   function submit() {
     if (!trimmedQuery) return;
-    rememberSearch(trimmedQuery);
-    setActiveTab('top');
-    setSubmitted(true);
+    submitTerm(trimmedQuery);
   }
 
   function handleChangeText(value: string) {
     setQuery(value);
     setSubmitted(false);
+  }
+
+  function handleCancel() {
+    hapticSelection();
+    setQuery('');
+    setSubmitted(false);
+    setFieldFocused(false);
+    inputRef.current?.blur();
+  }
+
+  function openViewer(post: DiscoverPost, flatIndex: number, allPosts: DiscoverPost[]) {
+    setViewer({ posts: allPosts, startIndex: flatIndex });
+  }
+
+  function openShopTheLook(post: DiscoverPost) {
+    const tags = post.productTags ?? [];
+    if (tags.length === 0) return;
+    setShopSelection({
+      postId: post.id,
+      postSellerId: post.authorAccountType === 'seller' ? post.authorId : undefined,
+      tags,
+      activeTagIndex: 0,
+    });
+  }
+
+  function removePostFromLists(authorId: string, onlyPostId?: string) {
+    const filterFn = (p: DiscoverPost) => (onlyPostId ? p.id !== onlyPostId : p.authorId !== authorId);
+    setBrowsePosts((prev) => prev.filter(filterFn));
   }
 
   const productGrid = (items: ProductResult[]) => (
@@ -383,17 +403,29 @@ export default function BuyerSearchScreen() {
     <PersonRow key={p.userId} person={p} loading={!!followPending[p.userId]} onPress={() => handlePersonPress(p)} onToggleFollow={() => handleToggleFollow(p)} />
   ));
 
-  // ── Live suggestions while typing ──────────────────────────────────────
-  type SuggestionRow = {
-    key: string;
-    icon: keyof typeof Feather.glyphMap;
-    /** Person suggestions show a real 28pt avatar circle instead of the icon. */
-    avatar?: { uri: string | null; color: string; initials: string };
-    title: React.ReactNode;
-    subtitle?: string;
-    onFill: () => void;
-    onSubmit: () => void;
-  };
+  const brandRowList = (items: SearchBrandRow[]) => items.map((b) => (
+    <BrandRow key={b.id} brand={b} onPress={() => goToBrand((brandResultsRaw.find((r) => r.id === b.id) as any)?.sellerId)} />
+  ));
+
+  function renderNoResults() {
+    return (
+      <View testID="buyer-search-no-results">
+        <EmptyState
+          icon="search"
+          illustration="search"
+          title={`No results for "${trimmedQuery}"`}
+          description="Try a different spelling or a broader term."
+          action={{ label: 'Clear search', icon: 'x-circle', onPress: handleCancel }}
+        />
+      </View>
+    );
+  }
+
+  // ── Live suggestions while typing — query row (search icon) first, then
+  //    matching accounts, per the Mobbin reference exactly. Tapping any row
+  //    submits directly (no separate "fill" affordance — Instagram doesn't
+  //    have one either). ──────────────────────────────────────────────────
+  type SuggestionRow = { key: string; icon: keyof typeof Feather.glyphMap; avatar?: { uri: string | null; color: string; initials: string }; title: React.ReactNode; subtitle?: string; onSubmit: () => void };
   const suggestionRows = useMemo<SuggestionRow[]>(() => {
     if (!trimmedQuery) return [];
     const bold = (text: string) => {
@@ -408,156 +440,133 @@ export default function BuyerSearchScreen() {
       );
     };
     const rows: SuggestionRow[] = [
-      { key: 'q', icon: 'search', title: bold(trimmedQuery), onFill: () => setQuery(trimmedQuery), onSubmit: () => submitTerm(trimmedQuery) },
+      { key: 'q', icon: 'search', title: bold(trimmedQuery), onSubmit: () => submitTerm(trimmedQuery) },
     ];
-    for (const p of people.slice(0, 3)) {
+    for (const p of people.slice(0, 5)) {
       rows.push({
         key: `u-${p.userId}`, icon: 'user',
         avatar: { uri: p.avatarUrl ?? null, color: p.color, initials: p.initials },
         title: bold(p.name), subtitle: p.handle,
-        onFill: () => setQuery(p.name), onSubmit: () => handlePersonPress(p),
+        onSubmit: () => handlePersonPress(p),
       });
-    }
-    for (const b of brandResults.slice(0, 2)) {
-      rows.push({ key: `b-${b.id}`, icon: 'tag', title: bold(b.name), subtitle: 'Brand', onFill: () => setQuery(b.name), onSubmit: () => handleResultPress(b) });
-    }
-    for (const p of productResults.slice(0, 3)) {
-      rows.push({ key: `p-${p.id}`, icon: 'shopping-bag', title: bold(p.name), subtitle: p.brand, onFill: () => setQuery(p.name), onSubmit: () => handleResultPress(p) });
     }
     return rows.slice(0, 8);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trimmedQuery, people, brandResults, productResults]);
+  }, [trimmedQuery, people]);
 
   function renderSuggestions() {
     return (
       <View testID="buyer-search-suggestions">
         {suggestionRows.map((row) => (
-          // Two sibling touch targets, never nested: the row's own button
-          // submits the suggestion; a separate absolutely-positioned button
-          // on top of its trailing edge fills the field without submitting.
-          // A Touchable inside another Touchable is invalid on web (nested
-          // <button> elements) — see tests/buyer-shopping-no-nested-pressables.
-          <View key={row.key} style={styles.suggestionRowWrap}>
-            <TouchableOpacity
-              style={styles.suggestionRow}
-              onPress={() => { hapticSelection(); row.onSubmit(); }}
-              accessibilityRole="button"
-            >
-              {row.avatar ? (
-                row.avatar.uri ? (
-                  <CachedImage source={{ uri: row.avatar.uri }} style={styles.suggestionAvatar} />
-                ) : (
-                  <View style={[styles.suggestionAvatar, { backgroundColor: row.avatar.color, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={styles.suggestionAvatarText}>{row.avatar.initials}</Text>
-                  </View>
-                )
+          <TouchableOpacity
+            key={row.key}
+            style={styles.suggestionRow}
+            onPress={() => { hapticSelection(); row.onSubmit(); }}
+            accessibilityRole="button"
+          >
+            {row.avatar ? (
+              row.avatar.uri ? (
+                <CachedImage source={{ uri: row.avatar.uri }} style={styles.suggestionAvatar} />
               ) : (
+                <View style={[styles.suggestionAvatar, { backgroundColor: row.avatar.color, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={styles.suggestionAvatarText}>{row.avatar.initials}</Text>
+                </View>
+              )
+            ) : (
+              <View style={[styles.suggestionAvatar, styles.suggestionIconWrap, { borderColor: theme.border }]}>
                 <Feather name={row.icon} size={16} color={muted} />
-              )}
-              <View style={{ flex: 1, paddingRight: 32 }}>
-                <Text style={[TYPE_SCALE.body, { color: fg }]} numberOfLines={1}>{row.title}</Text>
-                {row.subtitle ? <Text style={[TYPE_SCALE.caption, { color: muted }]} numberOfLines={1}>{row.subtitle}</Text> : null}
               </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.suggestionFillButton}
-              hitSlop={8}
-              onPress={() => { hapticSelection(); row.onFill(); }}
-              accessibilityRole="button"
-              accessibilityLabel={`Fill search with ${typeof row.title === 'string' ? row.title : 'suggestion'}`}
-            >
-              <Feather name="arrow-up-left" size={16} color={muted} />
-            </TouchableOpacity>
-          </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[TYPE_SCALE.body, { color: fg }]} numberOfLines={1}>{row.title}</Text>
+              {row.subtitle ? <Text style={[TYPE_SCALE.caption, { color: muted }]} numberOfLines={1}>{row.subtitle}</Text> : null}
+            </View>
+          </TouchableOpacity>
         ))}
         {searching && suggestionRows.length <= 1 && <ActivityIndicator style={{ marginTop: SPACING.md }} color={muted} />}
       </View>
     );
   }
 
-  function renderNoResults() {
-    // "Try one of these instead" — the same curated/trending terms as the
-    // empty state's "You may like", so a dead-end query always has a next
-    // step rather than just a clear-and-retry.
-    const suggestedTerms = youMayLike.filter((t) => t.toLowerCase() !== trimmedQuery.toLowerCase()).slice(0, 4);
+  function renderRecent() {
     return (
-      <View testID="buyer-search-no-results">
-        <EmptyState
-          icon="search"
-          illustration="search"
-          title={`No results for "${trimmedQuery}"`}
-          description="Try a different spelling or a broader term."
-          action={{ label: 'Clear search', icon: 'x-circle', onPress: () => { setQuery(''); setSubmitted(false); } }}
-        />
-        {suggestedTerms.length > 0 && (
-          <View style={styles.chipRow}>
-            {suggestedTerms.map((term) => (
-              <Chip key={term} label={term} selected={false} icon="trending-up" iconColor={primary} onPress={() => submitTerm(term)} />
-            ))}
+      <View testID="buyer-search-recent">
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionLabel, { paddingHorizontal: 0 }]}>Recent</Text>
+          {recentSearches.length > 0 && (
+            <TouchableOpacity onPress={() => router.push('/buyer-search-history' as never)} accessibilityRole="button" accessibilityLabel="See all recent searches" hitSlop={12}>
+              <Text style={[styles.sectionAction, { color: fg }]}>See all</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {recentSearches.length === 0 ? (
+          <View style={{ paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.sm }}>
+            <Text style={[TYPE_SCALE.footnote, { color: muted }]}>No recent searches</Text>
           </View>
+        ) : (
+          recentSearches.slice(0, 5).map((term) => (
+            <RecentSearchRow key={term} term={term} onPress={() => submitTerm(term)} onRemove={() => removeRecent(term)} />
+          ))
         )}
       </View>
     );
   }
 
   function renderTabContent() {
-    if (activeTab === 'users') {
-      if (people.length === 0) return renderNoResults();
-      return <View>{personRows(people)}</View>;
+    if (activeTab === 'accounts') {
+      if (people.length === 0 && brandRows.length === 0) return renderNoResults();
+      return <View>{personRows(people)}{brandRowList(brandRows)}</View>;
     }
-    if (activeTab === 'shop') {
+    if (activeTab === 'products') {
       if (productResults.length === 0) return renderNoResults();
       return productGrid(productResults);
     }
-    if (activeTab === 'videos') {
-      if (videoResults.length === 0) return renderNoResults();
-      return videoGrid(videoResults);
+    if (activeTab === 'tags') {
+      if (tagRows.length === 0) {
+        return (
+          <View testID="buyer-search-tags-empty">
+            <EmptyState icon="hash" title="No tags found" description="Try a different search term." />
+          </View>
+        );
+      }
+      return <View>{tagRows.map((t) => <TagRow key={t.tag} tag={t} onPress={() => submitTerm(t.tag)} />)}</View>;
     }
-    if (activeTab === 'live') {
-      return (
-        <View testID="buyer-search-live-empty">
-          <EmptyState
-            icon="tv"
-            title="Live search is coming soon"
-            description="Search for live sessions from Brandthread sellers right here."
-            action={{ label: 'Browse live now', onPress: () => router.push('/live-feed' as never) }}
-          />
-        </View>
-      );
+    if (activeTab === 'brands') {
+      if (brandRows.length === 0) return renderNoResults();
+      return <View>{brandRowList(brandRows)}</View>;
     }
 
-    // Top — a smart-mixed short list of a few of each kind. Counts the
-    // blended (live + preview-fallback) product/video lists, not just the
-    // raw API results, so a query matched only by a fallback post/product
-    // still renders instead of hitting the no-results state.
+    // For you — an Accounts section (up to 5 rows) then a posts grid, per
+    // the Mobbin reference. "View counts" don't exist in our data model
+    // (the real video-search endpoint returns likesCount, not a view
+    // count) — the grid honestly shows likes instead of a fabricated
+    // view-count overlay.
     const totalCount = productResults.length + people.length + videoResults.length;
     if (totalCount === 0) return renderNoResults();
-    const topPeople = people.slice(0, 3);
-    const topProducts = productResults.slice(0, 6);
-    const topVideos = videoResults.slice(0, 4);
+    const topPeople = people.slice(0, 5);
     return (
       <View>
         {topPeople.length > 0 && (
           <AnimatedEntrance>
-            <Text style={styles.sectionLabel}>USERS</Text>
+            <Text style={styles.sectionLabel}>ACCOUNTS</Text>
             {personRows(topPeople)}
           </AnimatedEntrance>
         )}
-        {topProducts.length > 0 && (
+        {videoResults.length > 0 && (
           <AnimatedEntrance delay={40}>
-            <Text style={styles.sectionLabel}>SHOP</Text>
-            {productGrid(topProducts)}
-          </AnimatedEntrance>
-        )}
-        {topVideos.length > 0 && (
-          <AnimatedEntrance delay={80}>
-            <Text style={styles.sectionLabel}>VIDEOS</Text>
-            {videoGrid(topVideos)}
+            <Text style={styles.sectionLabel}>POSTS</Text>
+            {videoGrid(videoResults)}
           </AnimatedEntrance>
         )}
       </View>
     );
   }
+
+  // ── Header: back chevron always visible; the trailing element is either
+  //    an add-person icon (idle, unfocused, empty) or a Cancel button
+  //    (focused / typing / submitted) — matching the Mobbin reference's own
+  //    Cancel-on-focus behavior. ────────────────────────────────────────
+  const showCancel = fieldFocused || trimmedQuery.length > 0 || submitted;
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
@@ -587,7 +596,6 @@ export default function BuyerSearchScreen() {
             returnKeyType="search"
             onSubmitEditing={submit}
             onFocus={() => setFieldFocused(true)}
-            onBlur={() => setFieldFocused(false)}
             testID="buyer-search-field"
             maxFontSizeMultiplier={1.3}
           />
@@ -596,12 +604,6 @@ export default function BuyerSearchScreen() {
               onPress={() => { hapticSelection(); setQuery(''); setSubmitted(false); inputRef.current?.focus(); }}
               accessibilityRole="button"
               accessibilityLabel="Clear search"
-              // Asymmetric — the field itself already sits inside a padded
-              // row with the "Search" button right after it, so a generous
-              // hitSlop on every side (RN Web turns this into an enlarged
-              // hit target, not just a bigger tap radius) was overlapping
-              // that neighboring button even though nothing visually
-              // touched. Keep the hit area entirely inside the field.
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 2 }}
               testID="buyer-search-clear"
             >
@@ -609,89 +611,86 @@ export default function BuyerSearchScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity onPress={submit} accessibilityRole="button" testID="buyer-search-submit" style={styles.searchButton}>
-          <Text style={[styles.searchButtonText, { color: fg }]}>Search</Text>
-        </TouchableOpacity>
+        {showCancel ? (
+          <TouchableOpacity onPress={handleCancel} accessibilityRole="button" testID="buyer-search-cancel" style={styles.headerSideButton}>
+            <Text style={[styles.headerSideButtonText, { color: fg }]}>Cancel</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() => router.push('/(buyer)/friends' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Add friends"
+            testID="buyer-search-add-person"
+            style={styles.headerSideButton}
+          >
+            <Feather name="user-plus" size={22} color={fg} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      <ScrollView
-        // nativeID bridges to a real DOM id on web so the scoped CSS rule in
-        // app/+html.tsx can hide the scrollbar — it was showing as a stray
-        // white strip down the right edge.
-        nativeID="buyer-search-scroll"
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-      >
-        {trimmedQuery.length === 0 ? (
-          <View testID="buyer-search-empty-state" accessibilityLabel="Search is empty">
-            {recentSearches.length > 0 && (
-              <AnimatedEntrance>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={[styles.sectionLabel, { paddingHorizontal: 0 }]}>RECENT SEARCHES</Text>
-                  <TouchableOpacity onPress={clearRecentSearches} accessibilityRole="button" accessibilityLabel="Clear recent searches" hitSlop={12}>
-                    <Text style={[styles.sectionAction, { color: fg }]}>Clear all</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.chipRow}>
-                  {recentSearches.map((term) => (
-                    <Chip key={term} label={term} selected={false} icon="clock" onPress={() => submitTerm(term)} onRemove={() => removeRecentSearch(term)} removeAccessibilityLabel={`Remove ${term} from recent searches`} />
-                  ))}
-                </View>
-              </AnimatedEntrance>
-            )}
-
-            <AnimatedEntrance delay={30}>
-              <Text style={styles.sectionLabel}>YOU MAY LIKE</Text>
-              <View style={styles.youMayLikeWrap}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.youMayLikeRow}
-                >
-                  {youMayLike.map((term, index) => (
-                    <Chip key={`${term}-${index}`} label={term} selected={false} icon="trending-up" iconColor={primary} onPress={() => submitTerm(term)} />
-                  ))}
-                </ScrollView>
-                {/* Signals more chips scroll off the right edge, same pattern
-                    as SegmentedTabs' right fade on the results tab row. */}
-                <LinearGradient
-                  pointerEvents="none"
-                  colors={['transparent', bg]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.youMayLikeFade}
-                />
+      {trimmedQuery.length === 0 && !fieldFocused ? (
+        <DiscoverGrid
+          posts={browsePosts}
+          loading={browseLoading}
+          showRails={false}
+          onTilePress={(post, idx) => openViewer(post, idx, browsePosts)}
+          onTileLongPress={setSafetyMenuPost}
+          contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.xl }}
+        />
+      ) : (
+        <ScrollView
+          nativeID="buyer-search-scroll"
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          {trimmedQuery.length === 0 ? (
+            renderRecent()
+          ) : !submitted ? (
+            renderSuggestions()
+          ) : (
+            <>
+              <View style={styles.tabsRow}>
+                <SegmentedTabs active={activeTab} onChange={setActiveTab} />
               </View>
-            </AnimatedEntrance>
+              <View testID="buyer-search-results-state" accessibilityLabel={`Search results for ${query}`}>
+                {renderTabContent()}
+              </View>
+            </>
+          )}
+          <View style={{ height: insets.bottom + SPACING.xl }} />
+        </ScrollView>
+      )}
 
-            <AnimatedEntrance delay={60}>
-              <Text style={styles.sectionLabel}>WATCH SOMETHING NEW</Text>
-              <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
-                <View style={styles.videoGrid} onLayout={onGridLayout}>
-                  {PREVIEW_VIDEOS.map((item, index) => (
-                    <AnimatedEntrance key={item.id} delay={Math.min(index, 8) * 20}>
-                      <VideoTile item={item} width={videoGridCardWidth} onPress={() => goToVideo(item)} />
-                    </AnimatedEntrance>
-                  ))}
-                </View>
-              </ResponsiveContainer>
-            </AnimatedEntrance>
-          </View>
-        ) : !submitted ? (
-          renderSuggestions()
-        ) : (
-          <>
-            <View style={styles.tabsRow}>
-              <SegmentedTabs active={activeTab} onChange={setActiveTab} />
-            </View>
-            <View testID="buyer-search-results-state" accessibilityLabel={`Search results for ${query}`}>
-              {renderTabContent()}
-            </View>
-          </>
-        )}
-        <View style={{ height: insets.bottom + SPACING.xl }} />
-      </ScrollView>
+      {viewer && (
+        <DiscoverPostViewer
+          posts={viewer.posts}
+          startIndex={viewer.startIndex}
+          onClose={() => setViewer(null)}
+          onOpenShopTheLook={openShopTheLook}
+          onSafetyMenu={setSafetyMenuPost}
+        />
+      )}
+      {shopSelection && (
+        <ShopProductSheet
+          selection={shopSelection}
+          onClose={() => setShopSelection(null)}
+          reduceMotion={null}
+        />
+      )}
+      {safetyMenuPost && (
+        <DiscoverSafetyMenu
+          visible
+          authorName={safetyMenuPost.authorName}
+          onClose={() => setSafetyMenuPost(null)}
+          onNotInterested={() => { removePostFromLists(safetyMenuPost.authorId, safetyMenuPost.id); setSafetyMenuPost(null); }}
+          onMute={() => { removePostFromLists(safetyMenuPost.authorId); setSafetyMenuPost(null); }}
+          onReport={() => {
+            api.reports.submit({ targetType: 'post', targetId: safetyMenuPost.id, reason: 'other', note: 'Reported from Search' }).catch(() => {});
+            setSafetyMenuPost(null);
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -699,49 +698,27 @@ export default function BuyerSearchScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SCREEN_GUTTER, paddingBottom: SPACING.sm,
+    paddingHorizontal: SCREEN_GUTTER, paddingBottom: SPACING.sm, gap: SPACING.sm,
   },
   field: {
-    // minWidth: 0 overrides a flex child's default web min-width:auto —
-    // without it, the TextInput's own intrinsic width can refuse to shrink
-    // on web and overflow the header row, pushing the "Search" button past
-    // its 16pt right inset (and past the clear button, colliding with it).
     flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
     height: 36, borderRadius: RADIUS.sm,
-    // 10pt right padding keeps the clear (x) icon inside the field itself,
-    // clear of the "Search" button's own 8pt gap below.
     paddingLeft: SPACING.sm, paddingRight: 10,
-    marginLeft: SPACING.sm,
     // theme-exempt: fixed dark fill per spec, same pattern as profile.tsx's
     // store-details section — regardless of light/dark theme.
     backgroundColor: '#1f1f1f',
     borderWidth: 1, borderColor: 'transparent',
   },
-  // A subtle 1px light border on focus instead of the browser's default
-  // thick yellow/orange outline (removed via fieldInputWebNoOutline below).
   fieldFocused: { borderColor: 'rgba(255,255,255,0.2)' },
   fieldInput: { flex: 1, ...TYPE_SCALE.body, padding: 0 },
-  // react-native-web renders a default focus ring on <input>; the field's
-  // own border above is the only focus affordance we want.
   fieldInputWebNoOutline: { outlineStyle: 'none', outlineWidth: 0 } as any,
-  // Explicit 8pt gap to the field, on top of the header row's own `gap` —
-  // guarantees a fixed gap even if a web flexbox `gap` renders inconsistently,
-  // so the "Search" button never crowds the field's trailing clear button.
-  searchButton: { marginLeft: 8 },
-  searchButtonText: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
+  headerSideButton: { minWidth: 24, alignItems: 'flex-end' },
+  headerSideButtonText: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   sectionHeaderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SCREEN_GUTTER,
   },
   sectionAction: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, paddingTop: SPACING.md, paddingBottom: SPACING.xs - 2 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.xxs, paddingBottom: SPACING.xs },
-  youMayLikeWrap: { position: 'relative' },
-  youMayLikeRow: {
-    flexDirection: 'row', gap: SPACING.xs,
-    paddingLeft: SCREEN_GUTTER, paddingRight: SCREEN_GUTTER + 20,
-    paddingTop: SPACING.xxs, paddingBottom: SPACING.xs,
-  },
-  youMayLikeFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 28 },
   // theme-exempt: fixed 70%-white on this page's fixed-dark chrome, same
   // intentional pattern as the field's #1f1f1f fill and the Follow pill.
   sectionLabel: {
@@ -752,15 +729,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
   videoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: VIDEO_GRID_GAP },
   tabsRow: { paddingTop: SPACING.xs },
-  suggestionRowWrap: { position: 'relative', justifyContent: 'center' },
   suggestionRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
     paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xs + 3,
   },
-  suggestionFillButton: {
-    position: 'absolute', right: SCREEN_GUTTER, top: 0, bottom: 0,
-    width: 32, alignItems: 'center', justifyContent: 'center',
-  },
   suggestionAvatar: { width: 28, height: 28, borderRadius: RADII.avatar },
+  suggestionIconWrap: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   suggestionAvatarText: { fontSize: 11, fontFamily: FONT.bold, color: '#FFFFFF' },
 });

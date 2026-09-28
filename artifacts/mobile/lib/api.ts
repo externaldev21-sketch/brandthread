@@ -1609,6 +1609,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/public/search/recent?limit=${encodeURIComponent(String(limit))}`
         ),
       clearRecent: () => del<{ ok: boolean }>('/api/public/search/recent'),
+      /** Remove a single term from this buyer's recent searches. */
+      removeRecent: (term: string) => del<{ ok: boolean }>(`/api/public/search/recent/${encodeURIComponent(term)}`),
+      /** Record an explicitly-submitted search — NOT called for the
+       *  live-as-you-type suggestion fetches (see the route's own comment on
+       *  why: this is what keeps /search/recent free of keystroke junk). */
+      log: (query: string) => post<{ ok: boolean }>('/api/public/search/log', { query }),
       /** Suggested brands + products for the search empty state. */
       suggested: (limit = 6) =>
         get<{
