@@ -24,6 +24,8 @@ import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { evaluateContent } from "../lib/contentModerator";
 import { optionalViewerId, publishingRestriction } from "../lib/safety";
 import { rankLiveFeed } from "../lib/liveFeed";
+import { logger } from "../lib/logger";
+import { beginCloudRecording, stopCloudRecordingAndMaybeFinalize } from "../lib/liveReplay";
 
 const router = Router();
 
@@ -114,6 +116,14 @@ router.post("/start", requireAuth, hostPlan, async (req, res) => {
 
   const stream = result.rows[0] as any;
 
+  // Kick off Agora Cloud Recording (if configured) so an ended stream can
+  // get a real replay. This never blocks or fails stream start — a
+  // recording failure is logged and leaves the stream with no replay
+  // (see lib/liveReplay.ts + the part-1 guard on GET /:id and /end below).
+  beginCloudRecording(stream).catch((err) =>
+    logger.error({ err, streamId: stream.id }, "beginCloudRecording threw unexpectedly"),
+  );
+
   return res.status(201).json({
     stream: {
       id: stream.id,
@@ -180,6 +190,7 @@ router.get("/feed", async (req, res) => {
 
 // ─── GET /api/live/:id ────────────────────────────────────────────────────────
 router.get("/:id", async (req, res) => {
+  const viewerId = optionalViewerId(req);
   try {
     const rows = await db.execute(sql`
       SELECT ls.*, u.display_name AS seller_name, u.brand_name, u.avatar_url
@@ -188,7 +199,30 @@ router.get("/:id", async (req, res) => {
       WHERE ls.id = ${req.params.id}::uuid
     `);
     if (!rows.rows.length) return res.status(404).json({ error: "Not found" });
-    return res.json({ stream: rows.rows[0] });
+
+    const row = rows.rows[0] as any;
+    const isOwner = !!viewerId && viewerId === row.seller_id;
+
+    // Recording internals (Agora resourceId/sid) are never returned to any
+    // client — they're only ever needed server-side. `recording_status` /
+    // `recording_error` (the "Replay unavailable" state) are shown only to
+    // the seller who went live, the same pattern as other owner-only fields
+    // in this codebase (see hydrateVideoRows' `isOwnerView` in
+    // routes/profile-media.ts): buyers/viewers never see them, and never
+    // see a replay reference unless `replay_url` is actually set (it's only
+    // ever set once a recording is confirmed uploaded — see lib/liveReplay.ts).
+    const {
+      recording_resource_id, recording_sid, recording_status, recording_error,
+      recording_uid, recording_started_at, recording_stopped_at,
+      ...publicRow
+    } = row;
+
+    return res.json({
+      stream: {
+        ...publicRow,
+        ...(isOwner ? { recordingStatus: recording_status, recordingError: recording_error } : {}),
+      },
+    });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
@@ -268,43 +302,30 @@ router.post("/:id/end", requireAuth, hostPlan, async (req, res) => {
       WHERE id = ${req.params.id}::uuid
     `);
 
-    // Save a replay post so the recording appears in the Thread feed
-    const productTagIds = (stream.product_tags as any[])
-      .map((t: any) => t.productId)
-      .filter(Boolean);
-
-    // Create a posts row as the replay
-    const postResult = await db.execute(sql`
-      INSERT INTO posts (user_id, media_url, media_type, caption, style_tags)
-      VALUES (
-        ${sellerId},
-        ${stream.replay_url ?? ""},
-        'video',
-        ${"🔴 Live replay: " + stream.title + (stream.description ? " — " + stream.description : "")},
-        '["live","replay"]'::json
-      )
-      RETURNING id
-    `);
-    const postId = (postResult.rows[0] as any).id;
-
-    // Attach product tags to the post
-    for (let i = 0; i < productTagIds.length; i++) {
-      try {
-        await db.execute(sql`
-          INSERT INTO post_tagged_products (post_id, product_id, position)
-          VALUES (${postId}::uuid, ${productTagIds[i]}::uuid, ${i})
-          ON CONFLICT DO NOTHING
-        `);
-      } catch {}
+    // Stop the Agora Cloud Recording session (if one is running) and, if the
+    // upload is already confirmed, create the replay post right away.
+    //
+    // IMPORTANT: a replay post is only ever created once a real recording
+    // file is confirmed uploaded — never here unconditionally. If recording
+    // was never configured/started, or the upload isn't confirmed yet, no
+    // post is created now; `recording_status` stays 'stopping' and
+    // jobs/liveRecordingFinalize.ts finishes the job once Agora reports the
+    // file as ready (or marks it 'failed' after a bounded timeout).
+    let replayPostId: string | null = null;
+    let replayStatus: "ready" | "pending" | "unavailable" = "unavailable";
+    try {
+      const { postId } = await stopCloudRecordingAndMaybeFinalize(stream);
+      if (postId) {
+        replayPostId = postId;
+        replayStatus = "ready";
+      } else if (stream.recording_status === "started") {
+        replayStatus = "pending";
+      }
+    } catch (err) {
+      logger.error({ err, streamId: stream.id }, "stopCloudRecordingAndMaybeFinalize threw unexpectedly");
     }
 
-    // Update live_stream with replay_post_id
-    await db.execute(sql`
-      UPDATE live_streams SET replay_post_id = ${postId}::uuid
-      WHERE id = ${req.params.id}::uuid
-    `);
-
-    return res.json({ ok: true, replayPostId: postId });
+    return res.json({ ok: true, replayPostId, replayStatus });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
