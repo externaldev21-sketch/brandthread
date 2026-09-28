@@ -34,6 +34,13 @@ import { isAgentUserId } from "../lib/brandthreadAgent";
 const router = Router();
 router.use(requireAuth);
 
+// Attachment types a message may carry. "product"/"order" get extra
+// cross-reference checks below; the rest (plain media + structured cards) are
+// stored as-is once their shape passes the lighter checks further down.
+const MESSAGE_ATTACHMENT_TYPES = [
+  "product", "order", "post", "profile", "image", "video", "voice",
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function isFollowedBy(followerId: string, targetId: string): Promise<boolean> {
@@ -574,9 +581,15 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
   }
 
   // ── Attachment validation ────────────────────────────────────────────────
+  // "image"/"video"/"voice" are plain media attachments (uri + meta only —
+  // no cross-referenced record to check, unlike product/order below). They
+  // were missing from this allowlist entirely, which meant every photo,
+  // video and voice message sent through this route 400'd against a real
+  // (non-preview) backend; fixed here as part of adding audio messages,
+  // since the same gap blocked those too. See docs/dm-flows.md.
   for (const item of attachmentItems) {
     const type = (item as { type?: unknown } | null)?.type;
-    if (typeof type !== "string" || !["product", "order", "post", "profile"].includes(type)) {
+    if (typeof type !== "string" || !MESSAGE_ATTACHMENT_TYPES.includes(type)) {
       return res.status(400).json({ error: "Invalid attachment type." });
     }
   }
@@ -588,7 +601,7 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
       subtitle?: string;
       meta?: { productId?: string; orderId?: string; postId?: string };
     };
-    const allowedTypes = ["product", "order", "post", "profile"];
+    const allowedTypes = MESSAGE_ATTACHMENT_TYPES;
     if (!att.type || !allowedTypes.includes(att.type)) {
       return res.status(400).json({ error: "Invalid attachment type." });
     }
@@ -969,6 +982,10 @@ const UPLOAD_MEDIA_MIME_EXTENSIONS: Record<string, string> = {
   "audio/mpeg": "mp3",
   "audio/mp4": "m4a",
   "audio/x-m4a": "m4a",
+  // Some recorders (including this app's voice-message recorder) report the
+  // informal "audio/m4a" mime type rather than the registered "audio/mp4" —
+  // accept it as the same alias so voice message uploads aren't rejected.
+  "audio/m4a": "m4a",
   "audio/wav": "wav",
 };
 const UPLOAD_MEDIA_BASE64_RE = /^[A-Za-z0-9+/]+=*$/;

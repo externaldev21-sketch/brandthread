@@ -18,7 +18,8 @@ describe('seller Profile tab navigation', () => {
     expect(buyerProfile).toContain('testID="buyer-profile-account-switcher"');
     expect(buyerProfile).toContain('accessibilityLabel="Switch account"');
     expect(buyerProfile).toContain("router.push('/account-switcher' as never)");
-    expect(buyerProfile).toContain('{displayName}</Text>');
+    expect(buyerProfile).toContain('{displayHandle || displayName}</Text>');
+    expect(buyerProfile).toContain('name={displayName}');
     expect(buyerProfile).toContain('name="chevron-down"');
     expect(buyerProfile).not.toContain("name={isPrivate ? 'lock' : 'globe'}");
   });

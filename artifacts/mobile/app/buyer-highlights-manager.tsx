@@ -1,15 +1,17 @@
 /**
  * Highlights Manager — create, rename, and delete story highlights.
- * Accessible from the profile highlights row via long-press or "New" button.
+ * Opened from the buyer profile's highlights row ("New" → `?create=1` opens
+ * the create form; tapping a highlight → `?edit=<id>` opens that highlight)
+ * and from the profile menu.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, Modal, Platform, Alert, Pressable,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
@@ -153,9 +155,21 @@ export default function BuyerHighlightsManager() {
   const [emoji, setEmoji] = useState('✨');
   const [coverColor, setCoverColor] = useState(COVER_COLORS[0]);
 
+  const params = useLocalSearchParams<{ create?: string; edit?: string }>();
+  // Deep-link intents from the profile's highlights row run once per mount.
+  const intentHandled = useRef(false);
+
   useFocusEffect(useCallback(() => {
-    loadHighlights().then(setHighlights);
-  }, []));
+    loadHighlights().then((items) => {
+      setHighlights(items);
+      if (intentHandled.current) return;
+      intentHandled.current = true;
+      const target = params.edit ? items.find((h) => h.id === params.edit) : undefined;
+      if (target) openEdit(target);
+      else if (params.create === '1') openCreate();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.create, params.edit]));
 
   function openCreate() {
     hapticSelection();

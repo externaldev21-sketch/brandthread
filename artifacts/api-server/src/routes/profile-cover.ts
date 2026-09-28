@@ -15,7 +15,7 @@
  * frame; both go to object storage via ObjectStorageService.
  *
  * Limits (server-enforced — see lib/profileCover.ts):
- *  - ≤30s after the optional trim (probed on the rendered file);
+ *  - ≤25s after the optional trim (probed on the rendered file);
  *  - one change per 24h — setting AND removing both count, so removing
  *    can't be used to cycle covers faster than once a day.
  *
@@ -175,7 +175,7 @@ export function createProfileCoverRouter({
         const input = join(dir, contentType === "video/webm" ? "source.webm" : "source.mp4");
         await fs.writeFile(input, bytes);
 
-        // Without a trim, the source itself must already be ≤30s.
+        // Without a trim, the source itself must already be ≤25s.
         if (!trim) {
           const sourceError = coverDurationError(await processor.probeDuration(input));
           if (sourceError) return res.status(400).json({ error: sourceError, code: "cover_too_long" });
