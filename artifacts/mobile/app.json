@@ -410,7 +410,8 @@
           "url": "https://sentry.io/"
         }
       ],
-      "./plugins/with-sentry-upload-guard"
+      "./plugins/with-sentry-upload-guard",
+      "./plugins/with-upload-live-activity"
     ],
     "experiments": {
       "typedRoutes": true,
