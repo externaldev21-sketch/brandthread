@@ -17,7 +17,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, Modal, Animated, Share, Linking, Alert, ScrollView, Platform, Pressable,
-  useWindowDimensions, type LayoutChangeEvent,
+  useWindowDimensions, type LayoutChangeEvent, type FlatList,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -437,7 +437,22 @@ export default function ProfileScreen() {
     return () => { alive = false; };
   }, [api, user?.id]));
 
+  // Posts/Saved use a different `numColumns` than Liked/Orders (FlatList
+  // can't change numColumns on a live instance, so the grid tabs force a
+  // `key` change below — a real remount). A remounted FlatList always
+  // starts at offset 0, which read as the whole profile "jumping to the
+  // top" on exactly those two tabs while Liked<->Orders (same numColumns,
+  // no remount) stayed put. Tracking the live offset here and handing it
+  // back to the next instance via an imperative `scrollToOffset` right
+  // after it mounts makes every tab switch behave like Instagram's: the
+  // scroll position itself never moves, only the content below the tab bar
+  // changes. (react-native-web's ScrollView never reads a `contentOffset`
+  // prop at all — it's a native-only mount option — so the restore has to
+  // be imperative to actually work on web, which is where this ships.)
+  const scrollYRef = useRef(0);
+  const listRef = useRef<FlatList<ListRow> | null>(null);
   const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
+    scrollYRef.current = event.nativeEvent.contentOffset.y;
     const next = event.nativeEvent.contentOffset.y < Math.max(heroHeight, 1);
     setHeroOnScreen((prev) => (prev === next ? prev : next));
   }, [heroHeight]);
@@ -634,6 +649,21 @@ export default function ProfileScreen() {
   }, [activeTab, postFilter, posts, savedItems, myOrders]);
 
   const numColumns = activeTab === 'Posts' ? layout.gridColumns : activeTab === 'Saved' ? savedColumns : 1;
+
+  // Posts/Saved force the FlatList above to remount (new `key`, since a
+  // live FlatList can't change numColumns) — restore the offset it had
+  // right before the remount so the switch never visibly scrolls, matching
+  // Liked<->Orders (same numColumns, no remount, already stayed put).
+  useEffect(() => {
+    // Guarded rather than a bare requestAnimationFrame call: not defined in
+    // the vitest/node test environment this screen's own tests run under.
+    const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (cb: () => void) => setTimeout(cb, 0) as unknown as number;
+    const caf = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : clearTimeout;
+    const frame = raf(() => {
+      listRef.current?.scrollToOffset({ offset: scrollYRef.current, animated: false });
+    });
+    return () => caf(frame);
+  }, [numColumns]);
 
   const renderRow = useCallback(({ item, index }: { item: ListRow; index: number }) => {
     if (item.kind === 'post') {
@@ -889,6 +919,7 @@ export default function ProfileScreen() {
       <ProfileEmptyAreaContext.Provider value={emptyArea.minHeight}>
       <Animated.FlatList
         key={`buyer-${numColumns}`}
+        ref={listRef as any}
         data={loading ? [] : rows}
         renderItem={renderRow as any}
         keyExtractor={keyForRow as any}
