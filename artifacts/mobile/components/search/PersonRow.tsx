@@ -30,6 +30,9 @@ export type SearchPerson = {
    *  source endpoint doesn't return a follower count (api.social.search
    *  doesn't today; only shown when a caller has one, never fabricated). */
   followersLabel?: string;
+  /** This person already follows the viewer — the pill reads "Follow back"
+   *  instead of "Follow" (e.g. the Activity "New followers" list). */
+  followsYou?: boolean;
 };
 
 /**
@@ -94,9 +97,12 @@ export function PersonRow({
       </Pressable>
       <FollowPill
         following={person.isFollowing}
+        followBack={!!person.followsYou}
         loading={loading}
         onPress={onToggleFollow}
-        accessibilityLabel={person.isFollowing ? `Unfollow ${person.name}` : `Follow ${person.name}`}
+        accessibilityLabel={person.isFollowing
+          ? `Unfollow ${person.name}`
+          : `${person.followsYou ? 'Follow back' : 'Follow'} ${person.name}`}
         testID={`search-follow-${person.userId}`}
       />
     </View>
@@ -112,12 +118,14 @@ export function PersonRow({
  */
 function FollowPill({
   following,
+  followBack,
   loading,
   onPress,
   accessibilityLabel,
   testID,
 }: {
   following: boolean;
+  followBack?: boolean;
   loading: boolean;
   onPress: () => void;
   accessibilityLabel: string;
@@ -140,7 +148,7 @@ function FollowPill({
           <ActivityIndicator size="small" color={following ? '#FFFFFF' : '#000000'} />
         ) : (
           <Text style={[pillStyles.label, following ? pillStyles.followingLabel : pillStyles.notFollowingLabel]} numberOfLines={1}>
-            {following ? 'Following' : 'Follow'}
+            {following ? 'Following' : followBack ? 'Follow back' : 'Follow'}
           </Text>
         )}
       </Animated.View>
