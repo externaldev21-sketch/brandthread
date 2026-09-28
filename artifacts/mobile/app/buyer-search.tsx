@@ -176,10 +176,10 @@ export default function BuyerSearchScreen() {
 
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
 
-  useEffect(() => {
-    const timer = setTimeout(() => inputRef.current?.focus(), Platform.OS === 'web' ? 0 : 260);
-    return () => clearTimeout(timer);
-  }, []);
+  // Deliberately no auto-focus on mount — Instagram's own search tab opens
+  // unfocused, showing its Explore grid, until the field is explicitly
+  // tapped (Mobbin "Instagram iOS Searching Instagram"). The pre-rebuild
+  // screen auto-focused; that's part of what this PR replaces.
 
   // A term handed in via ?q= (e.g. "See all" -> Recent Searches -> tap a
   // term navigates back here) submits immediately instead of just filling
