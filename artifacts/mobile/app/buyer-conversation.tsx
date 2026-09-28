@@ -3035,8 +3035,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: theme.text,
   },
   orderCardProduct: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    fontSize: FS.meta,
+    fontFamily: FONT.medium,
     color: theme.muted,
     marginTop: 2,
   },
@@ -3228,7 +3228,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   productViewChipText: {
     fontFamily: FONT.semibold,
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     color: theme.text,
   },
   // Order status card (item 71) — same row shape as productCard, with a
@@ -3286,8 +3286,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: theme.text,
   },
   attachSubtitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    fontSize: FS.meta,
+    fontFamily: FONT.medium,
     color: theme.muted,
     marginTop: 1,
   },

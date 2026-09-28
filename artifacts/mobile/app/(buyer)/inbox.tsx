@@ -139,7 +139,7 @@ const pillS = StyleSheet.create({
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 10, fontFamily: FONT.bold },
+  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
 });
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
@@ -1759,7 +1759,7 @@ export default function InboxScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{item.name}</Text>
-                      <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs }} numberOfLines={1}>{item.handle}</Text>
+                      <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta }} numberOfLines={1}>{item.handle}</Text>
                     </View>
                     {composeStartingId === item.userId && <ActivityIndicator color={theme.accent} size="small" />}
                   </PressableScale>
@@ -1936,7 +1936,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     maxWidth: 84, paddingHorizontal: 9, paddingVertical: 5,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
   },
-  noteBubbleText: { fontSize: 10.5, lineHeight: 13 },
+  noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14 },
   noteBubbleTail: {
     width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
     borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],
@@ -1950,13 +1950,13 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     width: '100%',
     alignSelf: 'center',
   },
-  noteComposeHint: { fontSize: FS.xs, fontFamily: FONT.regular, marginBottom: SP.sm },
+  noteComposeHint: { fontSize: FS.meta, fontFamily: FONT.medium, marginBottom: SP.sm },
   noteComposeInput: {
     minHeight: 72, maxHeight: 120, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth,
     padding: SP.md, fontSize: FS.md, fontFamily: FONT.regular, textAlignVertical: 'top',
   },
   noteComposeCount: {
-    fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'right',
+    fontSize: FS.meta, fontFamily: FONT.medium, textAlign: 'right',
     marginTop: SP.xs, marginBottom: SP.md,
   },
 
@@ -2034,10 +2034,10 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   officialAvatar: { borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   officialBadgeRow: { flexDirection: 'row', alignItems: 'center', marginRight: SP.xs },
   aiTag: {
-    marginLeft: 4, paddingHorizontal: 5, height: 15, borderRadius: 4,
+    marginLeft: 4, paddingHorizontal: 5, height: 17, borderRadius: 4,
     alignItems: 'center', justifyContent: 'center',
   },
-  aiTagText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  aiTagText: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.3 },
 
   // Requests-tab header: a small gray explainer line + a quiet "Delete all"
   // text action, right-aligned on its own line beneath — Instagram-style.

@@ -11,11 +11,12 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
-  View, Text, ScrollView, StyleSheet, Image,
+  View, Text, ScrollView, StyleSheet,
   ActivityIndicator, Alert, TextInput, TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, StickyFooter } from '@/components/layout';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -186,7 +187,7 @@ function CartItemRow({
 
       <View style={ir.img}>
         {item.imageUri
-          ? <Image source={{ uri: item.imageUri }} style={ir.productImage} resizeMode="cover" />
+          ? <CachedImage source={{ uri: item.imageUri }} style={ir.productImage} contentFit="cover" recyclingKey={item.imageUri} />
            : <Feather name="image" size={ICON.md} color={theme.muted} />}
       </View>
 
@@ -353,7 +354,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   stockWarnCriticalText: { color: theme.error },
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   priceBlock: { alignItems: 'flex-end' },
-  comparePrice: { fontSize: FS.xs, ...TABULAR_NUMS, fontFamily: FONT.regular, color: theme.subtle, textDecorationLine: 'line-through' },
+  comparePrice: { fontSize: FS.meta, ...TABULAR_NUMS, fontFamily: FONT.medium, color: theme.subtle, textDecorationLine: 'line-through' },
   price: { fontSize: FS.md, ...TABULAR_NUMS, fontFamily: FONT.bold, color: theme.text },
   priceDiscounted: { color: theme.success },
   // justify-content: space-between (not a flex-spacer + a full shared
@@ -416,7 +417,7 @@ function SellerGroup({
       >
         <View style={[sg.avatar, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
           {group.sellerAvatarUri ? (
-            <Image source={{ uri: group.sellerAvatarUri }} style={sg.avatarImage} resizeMode="cover" />
+            <CachedImage source={{ uri: group.sellerAvatarUri }} style={sg.avatarImage} contentFit="cover" recyclingKey={group.sellerAvatarUri} />
           ) : (
             <Text style={[sg.avatarText, { color: theme.accentLight }]}>{group.sellerInitial}</Text>
           )}
@@ -522,14 +523,14 @@ const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-  sellerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  sellerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
   // Softened to a fixed 6%-white hairline (same treatment as the header's
   // dividerVariant="subtle") — the full-strength theme.border read as a
   // heavier second divider right under the already-subtle header line.
   divider: { height: 1, backgroundColor: '#FFFFFF', opacity: 0.06, marginVertical: SP.xs },
   footer: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  footerText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  footerText: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
   groupSubtotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginTop: 4 },
 });
 
@@ -580,7 +581,7 @@ const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm },
   img: { width: 56, height: 70, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
-  variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginBottom: 2 },
+  variant: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginBottom: 2 },
   price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
   unavail: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, marginBottom: 4 },
   actions: { flexDirection: 'row', gap: SP.sm },
@@ -636,9 +637,9 @@ const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: SP.xs },
   totalLabel: { ...TYPE.subheading, color: theme.text },
   totalValue: { ...TYPE.subheading, ...TABULAR_NUMS, color: theme.text },
-  note: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: SP.sm },
+  note: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.subtle, marginTop: SP.sm },
   preOrderNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: SP.sm },
-  preOrderNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, flex: 1 },
+  preOrderNoteText: { fontSize: FS.meta, fontFamily: FONT.medium, flex: 1 },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -1326,14 +1327,14 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   loyaltyHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   loyaltyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
-  loyaltySub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+  loyaltySub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
   pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
   pointsInput: { flex: 1, height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, color: theme.text, fontFamily: FONT.regular, paddingHorizontal: SP.md },
-  pointsPreview: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: SP.xs, lineHeight: 17 },
+  pointsPreview: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: SP.xs, lineHeight: 17 },
   appliedPoints: { flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.success}26`, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },
-  appliedPointsSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
-  savedHint: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
+  appliedPointsSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
+  savedHint: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
   // Sticky checkout bar: total on the left, a white pill on the right —
   // Nike Bag / TikTok Shop checkout-bar reference, forced white/black
   // regardless of theme so it reads as the one fixed "pay" affordance.

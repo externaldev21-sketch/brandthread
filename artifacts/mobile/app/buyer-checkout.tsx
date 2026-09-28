@@ -829,7 +829,7 @@ export default function BuyerCheckoutScreen() {
 
 const styles = StyleSheet.create({
   previewNote: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -SP.xs, marginBottom: SP.sm + 4, paddingHorizontal: 2 },
-  previewNoteText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs + 1, lineHeight: 17 },
+  previewNoteText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.meta + 1, lineHeight: 17 },
   root: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center',
