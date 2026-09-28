@@ -16,10 +16,10 @@ import { LIVE_CHAT_VISIBLE, formatViewerCount } from '@/lib/live/liveOrdering';
 import type { LiveChatMessage, LiveHost, LiveProduct, LiveViewerAvatar } from '@/lib/live/types';
 import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { Glass } from '@/components/ui/Glass';
 import { LIVE_RED } from './LiveAvatarRing';
 
 const ND = Platform.OS !== 'web';
-const GLASS = 'rgba(0,0,0,0.38)';
 /** One consistent rail-icon treatment (point 4): every icon the same size on
  *  the same translucent circle — no bare icons mixed with disc'd ones. */
 const RAIL_ICON_SIZE = 28;
@@ -50,6 +50,7 @@ export function LiveHostPill({
 }) {
   return (
     <View style={styles.hostPill} testID="live-host-pill">
+      <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
       <Pressable
         onPress={onOpenHost}
         style={styles.hostTap}
@@ -78,6 +79,7 @@ export function LiveHostPill({
         hitSlop={6}
         testID="live-follow"
       >
+        {following && <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />}
         {following
           ? <Feather name="check" size={14} color="#fff" />
           : <Text style={styles.followText}>Follow</Text>}
@@ -133,6 +135,12 @@ function ChatRow({ msg, opacity }: { msg: LiveChatMessage; opacity: number }) {
     return (
       <Animated.View style={animatedStyle}>
         <View style={styles.eventPill}>
+          {/* Chat rows accumulate/scroll during a live stream — a real blur
+              per row would be a live BlurView per message, exactly what this
+              sweep's own performance guidance rules out. `noBlur` keeps the
+              specular edge + translucent fill (still reads as glass) without
+              the per-row blur cost. */}
+          <Glass variant="regular" tint="dark" radius={RADIUS.pill} noBlur style={StyleSheet.absoluteFill} />
           <Text style={styles.eventPillText} numberOfLines={1}>
             {msg.kind === 'purchase' ? '🛍️ ' : ''}
             <Text style={styles.chatUserMuted}>{msg.username}</Text>
@@ -230,6 +238,7 @@ const RailButton = forwardRef<View, {
   return (
     <Pressable ref={ref} onPress={onPress} style={styles.railBtn} accessibilityRole="button" accessibilityLabel={label} testID={testID} hitSlop={4}>
       <View style={styles.railIcon}>
+        <Glass variant="regular" tint="dark" radius={RAIL_ICON_CIRCLE / 2} style={StyleSheet.absoluteFill} />
         {icon}
         {badge != null && badge > 0 && (
           <View style={styles.railBadge}><Text style={styles.railBadgeText}>{badge}</Text></View>
@@ -396,7 +405,7 @@ const styles = StyleSheet.create({
   hostInitials: { color: '#fff', fontFamily: FONT.bold },
   hostPill: {
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 3, paddingRight: 4, paddingVertical: 3,
-    borderRadius: RADIUS.pill, overflow: 'hidden', backgroundColor: GLASS, maxWidth: 250,
+    borderRadius: RADIUS.pill, overflow: 'hidden', maxWidth: 250,
   },
   hostTap: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
   hostText: { flexShrink: 1, minWidth: 0 },
@@ -410,7 +419,7 @@ const styles = StyleSheet.create({
     minWidth: 58, height: 28, paddingHorizontal: 12, borderRadius: RADIUS.pill,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
-  followBtnOn: { backgroundColor: 'rgba(255,255,255,0.18)', minWidth: 34, paddingHorizontal: 0, width: 28 },
+  followBtnOn: { backgroundColor: 'transparent', overflow: 'hidden', minWidth: 34, paddingHorizontal: 0, width: 28 },
   followText: { color: '#000', fontFamily: FONT.bold, fontSize: 12 },
 
   // Fixed width (24 + 2×16 = 56 for up to 3 overlapping 24pt avatars, each
@@ -447,7 +456,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   eventPill: {
-    backgroundColor: 'rgba(0,0,0,0.32)', borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: RADIUS.pill, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 5,
   },
   eventPillText: { color: 'rgba(255,255,255,0.9)', fontFamily: FONT.regular, fontSize: 12 },
   chatUserMuted: { fontFamily: FONT.semibold, color: '#fff' },
@@ -470,7 +479,7 @@ const styles = StyleSheet.create({
   railBtn: { alignItems: 'center', minWidth: 44 },
   railIcon: {
     width: RAIL_ICON_CIRCLE, height: RAIL_ICON_CIRCLE, borderRadius: RAIL_ICON_CIRCLE / 2,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.28)',
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   railCount: { color: '#fff', fontFamily: FONT.semibold, fontSize: 11, marginTop: 3, textShadowColor: 'rgba(0,0,0,0.45)', textShadowRadius: 3 },
   railBadge: {

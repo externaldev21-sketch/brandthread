@@ -1,0 +1,11 @@
+{
+  "name": "upload-live-activity",
+  "version": "1.0.0",
+  "description": "Local Expo module bridging the app to the UploadLiveActivity ActivityKit widget extension (iOS only). Not published; used only within artifacts/mobile.",
+  "main": "index.js",
+  "license": "UNLICENSED",
+  "author": "Brandthread",
+  "homepage": "https://github.com/brandthread/brandthread",
+  "platforms": ["ios"],
+  "source": "index.ts"
+}

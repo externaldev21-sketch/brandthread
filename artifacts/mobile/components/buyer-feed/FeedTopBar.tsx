@@ -12,6 +12,7 @@ import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-nativ
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { Glass } from '@/components/ui/Glass';
 import { FONT, ON_DARK } from '@/lib/theme';
 
 export function FeedTopBar({
@@ -87,6 +88,14 @@ export function FeedTopBar({
               accessibilityLabel={hasActiveLive ? 'Jump to live' : 'Live'}
               testID="buyer-home-live"
             >
+              {hasActiveLive && (
+                // noBlur: this pill sits directly over the playing video —
+                // a live BlurView here re-samples the video every frame,
+                // which is the exact glitch `searchRow` below was moved off
+                // blur to avoid. The specular edge + translucent fill still
+                // reads as glass without that cost.
+                <Glass variant="regular" tint="dark" radius={15} noBlur style={StyleSheet.absoluteFill} />
+              )}
               {hasActiveLive && <View style={styles.liveDot} />}
               <Text style={[styles.liveText, hasActiveLive && styles.liveTextActive]}>LIVE</Text>
             </TouchableOpacity>
@@ -150,7 +159,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, borderRadius: 15, width: 52, justifyContent: 'center',
   },
   liveBtnActive: {
-    backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.55)', width: 'auto',
+    overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,59,48,0.55)', width: 'auto',
   },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
   liveText: {

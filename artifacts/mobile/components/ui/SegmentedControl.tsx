@@ -7,9 +7,8 @@
  * consistent app-wide.
  */
 import React, { useCallback, useRef, useState } from 'react';
-import { LayoutChangeEvent, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { LayoutChangeEvent, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { BlurView } from 'expo-blur';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { hapticToggle } from '@/lib/haptics';
@@ -18,6 +17,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { TAB_INDICATOR_SPRING } from '@/constants/motion';
+import { Glass } from '@/components/ui/Glass';
 
 export interface SegmentedControlProps {
   options: { id: string; label: string }[];
@@ -101,15 +101,15 @@ export function SegmentedControl({ options, selectedId, onChange, testID, varian
         styles.root,
         { height, borderRadius: RADII.pill },
         glass
-          ? { backgroundColor: 'rgba(0,0,0,0.28)', borderColor: 'rgba(255,255,255,0.28)', overflow: 'hidden' }
+          ? { overflow: 'hidden', borderWidth: 0 }
           : { backgroundColor: palette.card, borderColor: palette.border },
         style,
       ]}
       onLayout={onLayout}
       testID={testID}
     >
-      {glass && Platform.OS !== 'android' && (
-        <BlurView intensity={36} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
+      {glass && (
+        <Glass variant="regular" tint="dark" radius={RADII.pill} style={StyleSheet.absoluteFill} />
       )}
       {segmentWidth > 0 && (
         <Animated.View

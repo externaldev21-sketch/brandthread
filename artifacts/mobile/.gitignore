@@ -10,9 +10,10 @@ web-build/
 static-build/
 expo-env.d.ts
 
-# Native
-ios/
-android/
+# Native (top-level only — a local Expo module's own <module>/ios|android/
+# source directory, e.g. modules/*/ios/, must stay tracked)
+/ios/
+/android/
 *.orig.*
 *.jks
 *.p8
