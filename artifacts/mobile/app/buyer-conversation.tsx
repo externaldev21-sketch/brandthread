@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions,
-  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard,
+  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard, Linking,
 } from 'react-native';
 import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard-controller';
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
+import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { Chip } from '@/components/ui/Chip';
@@ -1090,18 +1091,70 @@ export default function BuyerConversationScreen() {
       );
     }
 
+    // Order status card (item 71) — Mobbin: Whatnot's order-status screen
+    // (status label + "Track your purchase" row with an external-link icon)
+    // adapted from a standalone screen into this inline card, the same way
+    // item 70 adapted Depop's persistent product header. Status/tracking are
+    // kept live server-side (see api-server's lib/orderAttachmentInfo.ts) —
+    // never the value cached on the message at send time, so a seller
+    // marking an order shipped shows up here immediately, not just on the
+    // order detail screen. Single tap target, same "no nested Pressable"
+    // technique as the product card above: the whole card is one
+    // PressableScale, and the Track/View chip is a plain View+Text.
+    if (att.type === 'order') {
+      const orderId = att.meta?.orderId;
+      const rawStatus = att.meta?.status;
+      const uiStatus = rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
+      const trackingNumber = att.meta?.trackingNumber;
+      const trackingUrl = trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
+      const chipLabel = trackingUrl ? 'Track' : 'View';
+      return (
+        <PressableScale rippleEnabled={false}
+          style={s.orderMsgCard}
+          activeOpacity={0.7}
+          accessibilityLabel={`${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${chipLabel}`}
+          testID="order-card-attachment"
+          onPress={() => {
+            if (trackingUrl) {
+              Linking.openURL(trackingUrl).catch(() => {});
+            } else if (orderId) {
+              router.push(('/buyer-order-detail?id=' + orderId) as never);
+            } else {
+              router.push('/(buyer)/orders' as never);
+            }
+          }}
+        >
+          <View style={s.orderMsgCardIconCircle}>
+            <Feather name="package" size={ICON.md} color={theme.accent} />
+          </View>
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Order'}</Text>
+            {uiStatus ? (
+              <View style={s.orderMsgCardBadgeRow}>
+                <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+              </View>
+            ) : (
+              <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle ?? 'Order'}</Text>
+            )}
+          </View>
+          <View style={s.productViewChip}>
+            <Text style={s.productViewChipText}>{chipLabel}</Text>
+            <Feather name={trackingUrl ? 'external-link' : 'chevron-right'} size={ICON.xs} color={theme.text} />
+          </View>
+        </PressableScale>
+      );
+    }
+
     // 'thread_cash', 'quick_replies' and 'agent_card' are handled in
     // renderItem() before this function is ever called for them — they're
     // standalone rows, not content that belongs inside a chat bubble.
-    // Default: order / post / profile card
+    // Default: post / profile card (order is handled above)
     return (
       <PressableScale rippleEnabled={false}
         style={s.attachCard}
-        activeOpacity={att.type === 'order' || att.type === 'post' ? 0.7 : 1}
+        activeOpacity={att.type === 'post' ? 0.7 : 1}
         onPress={() => {
-          if (att.type === 'order') {
-            router.push('/(buyer)/orders' as never);
-          } else if (att.type === 'post') {
+          if (att.type === 'post') {
             const postId = att.meta?.postId;
             if (postId) {
               const postAuthorName = att.meta?.authorName ?? participant?.name ?? 'Seller';
@@ -1125,7 +1178,7 @@ export default function BuyerConversationScreen() {
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
-        {(att.type === 'order' || att.type === 'post') && (
+        {att.type === 'post' && (
           <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
         )}
       </PressableScale>
@@ -3065,6 +3118,34 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.semibold,
     fontSize: FS.xs,
     color: theme.text,
+  },
+  // Order status card (item 71) — same row shape as productCard, with a
+  // package-glyph-in-a-circle in place of an image thumbnail (an order has
+  // no single photo the way a product listing does) and a status badge
+  // under the title instead of a plain subtitle line.
+  orderMsgCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 240,
+    backgroundColor: theme.card,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: SP.sm,
+    marginBottom: SP.xs,
+  },
+  orderMsgCardIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.cardElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  orderMsgCardBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
   },
   // A standalone agent info/deep-link card — full width, coin/icon-in-a-
   // circle, bold title, subtitle, chevron. Same row shape as the Thread Cash

@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView } from 'react-native';
+import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Linking } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,7 +14,8 @@ import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, StatusBadge } from '@/components/BrandthreadUI';
+import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { hapticPrimaryAction, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
@@ -39,6 +40,10 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import {
+  isSellerPreviewConversationId,
+  getSellerPreviewConversation, getSellerPreviewMessages,
+} from '@/lib/previewInbox';
 import type { CallLogEntry } from '@/lib/calls/types';
 import { SystemLine } from '@/components/chat/SystemLine';
 import { getConversationTheme } from '@/lib/conversationThemes';
@@ -199,6 +204,12 @@ export default function SellerConversationScreen() {
   const myId = user?.id ?? '';
   const { id } = useLocalSearchParams<{ id?: string }>();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
+  // The dev-web ?bt_preview=seller bypass never signs in through Clerk (see
+  // lib/devPreview.ts), so `myId` is '' in that mode — getSellerPreviewMessages
+  // (lib/previewInbox.ts) marks the SELLER's own seeded messages with
+  // fromId 'me', so "own message" bubbles must compare against 'me' here
+  // instead of an empty myId. Never taken for a real signed-in account.
+  const effectiveMyId = myId || (isSellerPreviewConversationId(id ?? '') ? 'me' : myId);
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -237,6 +248,14 @@ export default function SellerConversationScreen() {
 
   const loadMessages = useCallback(async (generation: number) => {
     if (!id) return;
+    // Dev/preview only: a seeded thread from lib/previewInbox.ts has no
+    // real backend record — skip the network call entirely rather than
+    // relying on its error path, same as app/buyer-conversation.tsx's
+    // identical isPreviewConversationId guard.
+    if (isSellerPreviewConversationId(id)) {
+      setMessages(getSellerPreviewMessages(id) as Msg[]);
+      return;
+    }
     // Prevent a slow poll from overlapping the next tick in the same focus
     // cycle. This keeps failures attributable to the current request stream.
     if (requestGenerationRef.current === generation) return;
@@ -262,6 +281,13 @@ export default function SellerConversationScreen() {
 
   const loadAll = useCallback(async (generation: number) => {
     if (!id) { setIsLoading(false); return; }
+    if (isSellerPreviewConversationId(id)) {
+      setConv(getSellerPreviewConversation(id) as unknown as ConvView);
+      setMessaging({ blockedByMe: false, unavailable: false });
+      await loadMessages(generation);
+      if (generationRef.current === generation) setIsLoading(false);
+      return;
+    }
     try {
       const [c] = await Promise.all([
         api.conversations.get(id),
@@ -284,7 +310,7 @@ export default function SellerConversationScreen() {
     // Mark the thread as read as soon as it opens. This is intentionally
     // independent of loading the conversation/messages so a slow or failed
     // read request cannot leave the seller's inbox badge stale.
-    if (id) {
+    if (id && !isSellerPreviewConversationId(id)) {
       api.conversations.markRead(id).catch(() => {
         notifyConversationReadFailure(id);
       });
@@ -645,15 +671,62 @@ export default function SellerConversationScreen() {
         </PressableScale>
       );
     }
+    // Order status card (item 71) — same treatment as buyer-conversation.tsx
+    // so the order card the seller sent looks identical from both sides of
+    // the DM: a status badge (matching the order detail screen's own badge
+    // colors/labels, see lib/orderStatusAdapter.ts) and a real Track/View
+    // action, both kept live server-side (see api-server's
+    // lib/orderAttachmentInfo.ts) rather than the value cached at send time
+    // — the seller's own "order shipped" update must show up here right
+    // away, not just on order-detail. Single tap target — see the product
+    // card above for why the chip isn't a second Pressable.
+    if (att.type === 'order') {
+      const orderId = att.meta?.orderId;
+      const rawStatus = att.meta?.status;
+      const uiStatus = rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
+      const trackingNumber = att.meta?.trackingNumber;
+      const trackingUrl = trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
+      const chipLabel = trackingUrl ? 'Track' : 'View';
+      return (
+        <PressableScale
+          style={s.orderMsgCard}
+          activeOpacity={0.7}
+          accessibilityLabel={`${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${chipLabel}`}
+          testID="order-card-attachment"
+          onPress={() => {
+            if (trackingUrl) {
+              Linking.openURL(trackingUrl).catch(() => {});
+            } else {
+              router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
+            }
+          }}
+        >
+          <View style={s.orderMsgCardIconCircle}>
+            <Feather name="package" size={ICON.md} color={PURPLE} />
+          </View>
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Order'}</Text>
+            {uiStatus ? (
+              <View style={s.orderMsgCardBadgeRow}>
+                <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+              </View>
+            ) : (
+              <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle ?? 'Order'}</Text>
+            )}
+          </View>
+          <View style={s.productViewChip}>
+            <Text style={s.productViewChipText}>{chipLabel}</Text>
+            <Feather name={trackingUrl ? 'external-link' : 'chevron-right'} size={ICON.xs} color={FG} />
+          </View>
+        </PressableScale>
+      );
+    }
     return (
       <PressableScale
         style={s.attachCard}
-        activeOpacity={att.type === 'order' || att.type === 'post' ? 0.7 : 1}
+        activeOpacity={att.type === 'post' ? 0.7 : 1}
         onPress={() => {
-          if (att.type === 'order') {
-            const orderId = att.meta?.orderId;
-            router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
-          } else if (att.type === 'post') {
+          if (att.type === 'post') {
             const postId = att.meta?.postId;
             if (postId) {
               const qs = [
@@ -674,7 +747,7 @@ export default function SellerConversationScreen() {
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
-        {(att.type === 'order' || att.type === 'post') && (
+        {att.type === 'post' && (
           <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
         )}
       </PressableScale>
@@ -819,7 +892,7 @@ export default function SellerConversationScreen() {
   }
 
   const myReactionOnSheet = activeSheetMsg ? myReactionIn(activeSheetMsg.reactions ?? [], myId) : null;
-  const isOwnSheetMsg = activeSheetMsg ? activeSheetMsg.fromId === myId : false;
+  const isOwnSheetMsg = activeSheetMsg ? activeSheetMsg.fromId === effectiveMyId : false;
 
   // ── Render helpers ──────────────────────────────────────────────────────────
 
@@ -842,7 +915,7 @@ export default function SellerConversationScreen() {
       );
     }
     const { msg, isFirstInGroup, isLastInGroup } = item;
-    const isOwn = msg.fromId === myId;
+    const isOwn = msg.fromId === effectiveMyId;
     if (msg.attachment?.type === 'system') {
       return (
         <SystemLine
@@ -1566,6 +1639,19 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingVertical: 4, paddingHorizontal: SP.xs, marginLeft: SP.xs,
   },
   productViewChipText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG },
+
+  // Order status card (item 71) — see buyer-conversation.tsx's matching styles.
+  orderMsgCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: BG, borderRadius: RADIUS.md,
+    padding: SP.sm, marginBottom: 2,
+    borderWidth: 1, borderColor: BORDER,
+  },
+  orderMsgCardIconCircle: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center',
+  },
+  orderMsgCardBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
 
   pendingAttachRow: {
     flexDirection: 'row', alignItems: 'center',

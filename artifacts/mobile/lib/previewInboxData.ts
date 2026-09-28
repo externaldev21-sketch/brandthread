@@ -250,17 +250,35 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantColor: '#1F2933',
     posterIndex: 4,
     lastMessage: 'Order #BT-10234',
-    lastMessageFromMe: true,
+    // The order card is sent BY the seller (Kuro Line) — only a seller can
+    // attach their linked order to a reply (see attachLinkedOrder() in
+    // app/seller-conversation.tsx / the "order" attachment branch in
+    // api-server's routes/conversations.ts, which requires order.ownerId to
+    // be the sender). A buyer never sends themselves an order card.
+    lastMessageFromMe: false,
     lastMessageType: 'order',
     minutesAgo: 200,
     unreadCount: 0,
     isRequest: false,
     contextOrderNumber: 'BT-10234',
     messages: [
-      { id: 'preview-msg-05-1', fromOfficialOrParticipant: 'them', text: 'Your jacket just shipped!', minutesAgo: 220 },
+      { id: 'preview-msg-05-1', fromOfficialOrParticipant: 'me', text: 'Hi! Just checking on my jacket order 🙂', minutesAgo: 240 },
       {
-        id: 'preview-msg-05-2', fromOfficialOrParticipant: 'me', text: '',
-        attachment: { type: 'order', title: 'Order #BT-10234', subtitle: 'Shipped · Asymmetric Layer Jacket' },
+        // Order status card (item 71) — live status/tracking normally kept
+        // fresh server-side by api-server's lib/orderAttachmentInfo.ts; this
+        // preview thread has no backend to re-fetch from, so the meta below
+        // (same shape the API enriches onto the real attachment) drives the
+        // status badge + Track action directly, the same way item 70's
+        // meta.unavailable drives the product card's preview state.
+        id: 'preview-msg-05-2', fromOfficialOrParticipant: 'them', text: 'Your jacket just shipped!',
+        attachment: {
+          type: 'order', title: 'Order #BT-10234',
+          meta: {
+            orderId: 'preview-order-bt-10234', status: 'shipped',
+            trackingNumber: '1Z999AA10123456784', carrier: 'UPS',
+            trackingStatus: 'in_transit', estimatedDelivery: '2026-10-02',
+          },
+        },
         minutesAgo: 200,
       },
     ],
@@ -375,4 +393,52 @@ export const PREVIEW_FOLLOWER_SEEDS: Array<{
   { id: 'preview-notif-follow-01', actorUserId: 'preview-seller-01', actorName: 'Atelier Noire', actorInitials: 'AN', actorColor: '#2E2A26', isRead: false, minutesAgo: 30 },
   { id: 'preview-notif-follow-02', actorUserId: 'preview-seller-04', actorName: 'Orison', actorInitials: 'OR', actorColor: '#D6D3D1', isRead: false, minutesAgo: 90 },
   { id: 'preview-notif-follow-03', actorUserId: 'preview-seller-07', actorName: 'Astrae', actorInitials: 'AS', actorColor: '#0EA5E9', isRead: true, minutesAgo: 300 },
+];
+
+// ─── Seller preview inbox (item 71) ────────────────────────────────────────
+//
+// Same `PreviewConversationSeed`/`PreviewMessageSeed` shapes as the buyer
+// seeds above, but read from the SELLER's side: `participant*` names the
+// BUYER the seller is talking to, and `fromOfficialOrParticipant: 'me'`
+// means the SELLER's own message. Kept as a separate small seed (not a
+// generic role-flip of the whole buyer inbox, which has no buyer identity
+// data to flip to) — see lib/previewInbox.ts's getSellerPreviewConversation.
+//
+// This mirrors preview-conversation-05 above one-for-one — same order
+// (BT-10234, meta.orderId 'preview-order-bt-10234'), same shipped status and
+// UPS tracking number — so the order card in the buyer preview and the
+// seller preview describe the identical order, the way the real shared
+// `orders` row backing both sides of a real DM would.
+export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
+  {
+    id: 'preview-seller-conversation-01',
+    participantUserId: 'preview-buyer-01',
+    participantName: 'Ava Chen',
+    participantHandle: '@ava.chen',
+    participantInitials: 'AC',
+    participantColor: '#8B5CF6',
+    posterIndex: 4,
+    lastMessage: 'Your jacket just shipped!',
+    lastMessageFromMe: true,
+    lastMessageType: 'order',
+    minutesAgo: 200,
+    unreadCount: 0,
+    isRequest: false,
+    contextOrderNumber: 'BT-10234',
+    messages: [
+      { id: 'preview-seller-msg-01-1', fromOfficialOrParticipant: 'them', text: 'Hi! Just checking on my jacket order 🙂', minutesAgo: 240 },
+      {
+        id: 'preview-seller-msg-01-2', fromOfficialOrParticipant: 'me', text: 'Your jacket just shipped!',
+        attachment: {
+          type: 'order', title: 'Order #BT-10234',
+          meta: {
+            orderId: 'preview-order-bt-10234', status: 'shipped',
+            trackingNumber: '1Z999AA10123456784', carrier: 'UPS',
+            trackingStatus: 'in_transit', estimatedDelivery: '2026-10-02',
+          },
+        },
+        minutesAgo: 200,
+      },
+    ],
+  },
 ];

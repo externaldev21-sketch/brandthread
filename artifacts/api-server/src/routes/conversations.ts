@@ -31,6 +31,7 @@ import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { isAgentUserId } from "../lib/brandthreadAgent";
 import { enrichProductAttachments } from "../lib/productAttachmentInfo";
+import { enrichOrderAttachments } from "../lib/orderAttachmentInfo";
 
 const router = Router();
 router.use(requireAuth);
@@ -549,6 +550,9 @@ router.get("/:id/messages", async (req, res) => {
   // honest "No longer available" state — never the stale value cached on the
   // message at send time. See lib/productAttachmentInfo.ts.
   await enrichProductAttachments(adapted);
+  // Order cards (item 71): always show the CURRENT status/tracking, not the
+  // value cached at send time — see lib/orderAttachmentInfo.ts.
+  await enrichOrderAttachments(adapted);
   return res.json(adapted);
 });
 
@@ -830,6 +834,7 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
     : undefined;
   const adapted = adaptMessage(msg, [], replyPreview);
   await enrichProductAttachments([adapted]);
+  await enrichOrderAttachments([adapted]);
   return res.status(201).json(adapted);
 });
 

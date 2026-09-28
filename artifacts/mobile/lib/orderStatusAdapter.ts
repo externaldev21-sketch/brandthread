@@ -51,3 +51,59 @@ export function dbStatusToPaymentStatus(dbStatus: string, paidAt?: string | Date
   if (dbStatus === 'pending' && paidAt) return 'paid';
   return DB_PAYMENT_STATUS_MAP[dbStatus] ?? 'pending';
 }
+
+export type OrderStatusBadgeVariant = 'info' | 'purple' | 'warning' | 'success' | 'neutral' | 'error';
+
+/**
+ * The order status badge's label/color mapping — mirrors
+ * app/buyer-order-detail.tsx's own (module-local) statusBadgeLabel/
+ * statusBadgeVariant exactly, so the chat order card (item 71) never shows
+ * a status badge that disagrees with the order detail screen's own badge
+ * for the identical order. Kept here, not imported from that screen, so a
+ * change to one doesn't silently change the other — if this ever drifts,
+ * fix both.
+ */
+export function orderStatusBadgeLabel(status: OrderStatus): string {
+  switch (status) {
+    case 'new':           return 'NEW';
+    case 'processing':    return 'PROCESSING';
+    case 'ready_to_ship': return 'READY TO SHIP';
+    case 'shipped':       return 'SHIPPED';
+    case 'delivered':     return 'DELIVERED';
+    case 'cancelled':     return 'CANCELLED';
+    case 'refunded':      return 'REFUNDED';
+    case 'disputed':      return 'DISPUTED';
+    default:              return (status as string).toUpperCase();
+  }
+}
+
+export function orderStatusBadgeVariant(status: OrderStatus): OrderStatusBadgeVariant {
+  switch (status) {
+    case 'new':           return 'info';
+    case 'processing':    return 'purple';
+    case 'ready_to_ship': return 'warning';
+    case 'shipped':       return 'warning';
+    case 'delivered':     return 'success';
+    case 'cancelled':     return 'neutral';
+    case 'refunded':      return 'error';
+    case 'disputed':      return 'error';
+    default:              return 'neutral';
+  }
+}
+
+/**
+ * Builds a real carrier tracking URL from the carrier name + tracking
+ * number — mirrors app/buyer-order-detail.tsx's own (module-local)
+ * carrierTrackingUrl exactly, for the same reason as the badge helpers
+ * above. Falls back to a tracking-number web search when the carrier isn't
+ * recognized.
+ */
+export function carrierTrackingUrl(carrier: string | undefined | null, trackingNumber: string): string {
+  const key = (carrier ?? '').toLowerCase();
+  const encoded = encodeURIComponent(trackingNumber);
+  if (key.includes('usps')) return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encoded}`;
+  if (key.includes('ups')) return `https://www.ups.com/track?tracknum=${encoded}`;
+  if (key.includes('fedex')) return `https://www.fedex.com/fedextrack/?trknbr=${encoded}`;
+  if (key.includes('dhl')) return `https://www.dhl.com/en/express/tracking.html?AWB=${encoded}`;
+  return `https://www.google.com/search?q=${encoded}+tracking`;
+}
