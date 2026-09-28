@@ -324,6 +324,23 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
       { id: 'preview-msg-07-1', fromOfficialOrParticipant: 'me', text: 'Does the mesh top run small?', minutesAgo: 2 },
       { id: 'preview-msg-07-2', fromOfficialOrParticipant: 'them', text: 'Let me check on that for you', minutesAgo: 1 },
       {
+        // Item 74 (photo/video upload progress ring): a completed/resting
+        // photo message — see toAttachment()'s `type === 'image'` branch in
+        // lib/previewInbox.ts, which fills in a real bundled poster photo as
+        // the uri. Demonstrates the RESTING state (no ring — that's only
+        // shown while an upload is actually in flight, see
+        // app/buyer-conversation.tsx's handlePickPhoto).
+        id: 'preview-msg-07-2b', fromOfficialOrParticipant: 'them', text: '',
+        attachment: { type: 'image' },
+        minutesAgo: 0.9,
+      },
+      {
+        // Item 74 — same treatment for a completed video message.
+        id: 'preview-msg-07-2c', fromOfficialOrParticipant: 'me', text: '',
+        attachment: { type: 'video', meta: { duration: '14' } },
+        minutesAgo: 0.7,
+      },
+      {
         // Item 73 (voice note waveform playback progress): a real, playable
         // seeded voice bubble — see toAttachment()'s `type === 'voice'`
         // branch in lib/previewInbox.ts for the bundled audio URI + waveform
@@ -474,6 +491,20 @@ export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
         id: 'preview-seller-msg-01-1b', fromOfficialOrParticipant: 'them', text: '',
         attachment: { type: 'voice' },
         minutesAgo: 239,
+      },
+      {
+        // Item 74 (photo/video upload progress ring), seller-side mirror of
+        // preview-msg-07-2b/2c on the buyer side — same real bundled photo/
+        // video, so the seller preview also has completed media messages to
+        // demo the resting state from, not only the buyer preview.
+        id: 'preview-seller-msg-01-1c', fromOfficialOrParticipant: 'them', text: '',
+        attachment: { type: 'image' },
+        minutesAgo: 210,
+      },
+      {
+        id: 'preview-seller-msg-01-1d', fromOfficialOrParticipant: 'me', text: '',
+        attachment: { type: 'video', meta: { duration: '14' } },
+        minutesAgo: 205,
       },
       {
         id: 'preview-seller-msg-01-2', fromOfficialOrParticipant: 'me', text: 'Your jacket just shipped!',

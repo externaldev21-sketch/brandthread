@@ -43,7 +43,10 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   isSellerPreviewConversationId,
   getSellerPreviewConversation, getSellerPreviewMessages,
+  isPreviewInboxEnabled, posterUri,
 } from '@/lib/previewInbox';
+import UploadRing from '@/components/chat/UploadRing';
+import MediaUploadThumb from '@/components/chat/MediaUploadThumb';
 import type { CallLogEntry } from '@/lib/calls/types';
 import { SystemLine } from '@/components/chat/SystemLine';
 import { getConversationTheme } from '@/lib/conversationThemes';
@@ -207,7 +210,8 @@ export default function SellerConversationScreen() {
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
   const { user } = useUser();
   const myId = user?.id ?? '';
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // bt_force_upload: item 74 verification aid only — see the effect below.
+  const { id, bt_force_upload } = useLocalSearchParams<{ id?: string; bt_force_upload?: string }>();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   // The dev-web ?bt_preview=seller bypass never signs in through Clerk (see
   // lib/devPreview.ts), so `myId` is '' in that mode — getSellerPreviewMessages
@@ -248,6 +252,26 @@ export default function SellerConversationScreen() {
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [products, setProducts] = useState<SellerProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  // Item 74 (photo/video upload progress ring) — see the identical comment
+  // in app/buyer-conversation.tsx.
+  const mediaUploadTokenRef = useRef(0);
+
+  // Item 74 verification aid — NOT a real feature. See the identical comment
+  // on this same effect in app/buyer-conversation.tsx: the real upload is too
+  // transient (and this sandbox has no reachable backend) to reliably
+  // screenshot mid-flight, so ?bt_preview=seller&bt_force_upload=1
+  // force-stages a real bundled photo as "uploading". Inert unless
+  // isPreviewInboxEnabled() is also true.
+  useEffect(() => {
+    if (bt_force_upload !== '1' || !isPreviewInboxEnabled()) return;
+    setPendingAttachment({
+      type: 'image', uri: posterUri(4),
+      title: 'Photo',
+      meta: { photoUris: JSON.stringify([posterUri(4)]), uploading: 'true' },
+    } as MsgAttachment);
+    setIsUploading(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bt_force_upload]);
 
   // ── Data loading ────────────────────────────────────────────────────────────
 
@@ -516,6 +540,16 @@ export default function SellerConversationScreen() {
     });
     if (result.canceled || !result.assets.length) return;
     setShowMediaSheet(false);
+    const token = ++mediaUploadTokenRef.current;
+    // Stage the REAL picked photo(s) immediately via their local URIs, same
+    // as app/buyer-conversation.tsx — meta.uploading drives MediaUploadThumb's
+    // ring overlay until the real upload resolves below.
+    const localUris = result.assets.map((a) => a.uri);
+    setPendingAttachment({
+      type: 'image', uri: localUris[0],
+      title: localUris.length > 1 ? `${localUris.length} photos` : 'Photo',
+      meta: { photoUris: JSON.stringify(localUris), uploading: 'true' },
+    });
     setIsUploading(true);
     try {
       const urls: string[] = [];
@@ -523,14 +557,20 @@ export default function SellerConversationScreen() {
         if (!asset.base64) continue;
         urls.push(await uploadMedia(asset.base64, 'image/jpeg', 'jpg'));
       }
-      if (!urls.length) return;
+      if (mediaUploadTokenRef.current !== token) return;
+      if (!urls.length) { setPendingAttachment(null); return; }
       setPendingAttachment({
         type: 'image', uri: urls[0],
         title: urls.length > 1 ? `${urls.length} photos` : 'Photo',
         meta: { photoUris: JSON.stringify(urls) },
       });
-    } catch { Alert.alert('Upload failed', 'Could not upload. Please try again.'); }
-    finally { setIsUploading(false); }
+    } catch {
+      if (mediaUploadTokenRef.current === token) {
+        setPendingAttachment(null);
+        Alert.alert('Upload failed', 'Could not upload. Please try again.');
+      }
+    }
+    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
   }
 
   async function handlePickVideo() {
@@ -547,13 +587,22 @@ export default function SellerConversationScreen() {
     if ((asset.duration ?? 0) > 60000) { Alert.alert('Video too long', 'Choose a video under 1 minute.'); return; }
     if (!asset.base64) { Alert.alert('Couldn’t read that video', 'Please try a different file.'); return; }
     setShowMediaSheet(false);
+    const token = ++mediaUploadTokenRef.current;
+    const durationLabel = String(Math.round((asset.duration ?? 0) / 1000));
+    setPendingAttachment({ type: 'video', title: 'Video clip', meta: { duration: durationLabel, uploading: 'true' } });
     setIsUploading(true);
     try {
       const ext = (asset.uri.split('.').pop() ?? 'mp4').replace(/\?.*/, '');
       const url = await uploadMedia(asset.base64, 'video/mp4', ext);
-      setPendingAttachment({ type: 'video', uri: url, title: 'Video clip', meta: { duration: String(Math.round((asset.duration ?? 0) / 1000)) } });
-    } catch { Alert.alert('Upload failed', 'Could not upload video. Please try again.'); }
-    finally { setIsUploading(false); }
+      if (mediaUploadTokenRef.current !== token) return;
+      setPendingAttachment({ type: 'video', uri: url, title: 'Video clip', meta: { duration: durationLabel } });
+    } catch {
+      if (mediaUploadTokenRef.current === token) {
+        setPendingAttachment(null);
+        Alert.alert('Upload failed', 'Could not upload video. Please try again.');
+      }
+    }
+    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
   }
 
   // ── Voice recording ───────────────────────────────────────────────────────────
@@ -1091,12 +1140,21 @@ export default function SellerConversationScreen() {
 
             {/* Attachment */}
             {msg.attachment && renderMsgAttachment(msg.attachment, isOwn)}
-            {/* Text — hide the single-space placeholder */}
+            {/* Text — hide the single-space placeholder. Item 74 found and
+                fixed a real bug here: `msg.text && msg.text.trim().length >
+                0 && (...)` renders the literal empty string as a stray text
+                node (a direct child of this bubble's View) whenever
+                msg.text is exactly '' — the short-circuit stops at the
+                falsy '' itself rather than reaching a boolean, which is
+                exactly what every attachment-only message (voice, image,
+                video, product, etc.) sends as its text. A ternary, like
+                app/buyer-conversation.tsx already uses for this same spot,
+                always resolves to either the Text element or null. */}
             {removed ? (
               <Text style={[s.msgText, { color: isOwn ? sentTextColor : MUTED, fontStyle: 'italic' }]}>{REMOVED_MESSAGE_TEXT}</Text>
-            ) : msg.text && msg.text.trim().length > 0 && (
+            ) : (msg.text?.trim().length ?? 0) > 0 ? (
               <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
-            )}
+            ) : null}
 
             {/* Inline bottom-right timestamp + read receipt (last bubble of
                 a run) — same automatic, group-boundary timestamp behavior as
@@ -1293,23 +1351,46 @@ export default function SellerConversationScreen() {
       )}
 
       {/* Pending attachment preview */}
-      {pendingAttachment && (
-        <View style={s.pendingAttachRow}>
-          <Feather name={attachmentIcon(pendingAttachment.type)} size={ICON.sm} color={PURPLE} />
+      {pendingAttachment && (() => {
+        const uploadingMedia = pendingAttachment.meta?.uploading === 'true';
+        const isMedia = pendingAttachment.type === 'image' || pendingAttachment.type === 'video';
+        return (
+        <View style={s.pendingAttachRow} testID="seller-conversation-selected-attachment">
+          {isMedia ? (
+            <MediaUploadThumb
+              type={pendingAttachment.type as 'image' | 'video'}
+              uri={pendingAttachment.type === 'image' ? pendingAttachment.uri : undefined}
+              uploading={uploadingMedia}
+              size={40}
+              ringColor={PURPLE}
+              iconColor={MUTED}
+              trackColor={BORDER}
+            />
+          ) : isUploading ? (
+            <UploadRing size={22} color={PURPLE} trackColor={BORDER} />
+          ) : (
+            <Feather name={attachmentIcon(pendingAttachment.type)} size={ICON.sm} color={PURPLE} />
+          )}
           <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.pendingAttachTitle} numberOfLines={1}>{pendingAttachment.title}</Text>
+            <Text style={s.pendingAttachTitle} numberOfLines={1}>
+              {uploadingMedia ? 'Uploading…' : pendingAttachment.title}
+            </Text>
             {pendingAttachment.subtitle ? (
               <Text style={s.pendingAttachSub} numberOfLines={1}>{pendingAttachment.subtitle}</Text>
             ) : null}
           </View>
           <PressableScale
-            onPress={() => setPendingAttachment(null)}
+            onPress={() => { mediaUploadTokenRef.current++; setPendingAttachment(null); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
+            testID="seller-conversation-selected-attachment-remove"
           >
             <Feather name="x" size={ICON.sm} color={MUTED} />
           </PressableScale>
         </View>
-      )}
+        );
+      })()}
 
       {/* Reply preview — mirrors app/buyer-conversation.tsx's own
           ReplyBanner (Mobbin: Instagram "Replying to a message",

@@ -53,6 +53,7 @@ import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { formatCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
 import UploadRing from '@/components/chat/UploadRing';
+import MediaUploadThumb from '@/components/chat/MediaUploadThumb';
 import MediaViewer from '@/components/chat/MediaViewer';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashBillMark } from '@/components/thread-cash/ChatAttachThreadCash';
@@ -68,6 +69,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   isPreviewConversationId, getPreviewConversation, getPreviewMessages,
   setPreviewConversationDisappearing, appendPreviewMessage, reactToPreviewMessage,
+  isPreviewInboxEnabled, posterUri,
 } from '@/lib/previewInbox';
 import {
   parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed,
@@ -248,6 +250,8 @@ export default function BuyerConversationScreen() {
     contextProductPriceCents?: string;
     contextProductImage?: string;
     contextSellerName?: string;
+    // Item 74 verification aid ONLY — see the effect below that reads it.
+    bt_force_upload?: string;
   }>();
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
@@ -319,6 +323,34 @@ export default function BuyerConversationScreen() {
 
   // Attachment state
   const [selectedAttachment, setSelectedAttachment] = useState<MessageAttachment | null>(null);
+  // Item 74 (photo/video upload progress ring): invalidates an in-flight
+  // pick/upload when a newer pick starts or the user removes the staged
+  // attachment while it's still uploading, so a stale upload can't clobber
+  // whatever the composer is showing by the time it resolves. uploadMedia()
+  // has no real cancel/abort — this only makes the UI stop listening to it.
+  const mediaUploadTokenRef = useRef(0);
+
+  // Item 74 verification aid — NOT a real feature. The upload-in-progress
+  // ring is inherently transient (uploadMedia() resolves/rejects as soon as
+  // the request completes), and this sandbox has no reachable backend for a
+  // real upload to actually hang on, so there's no reliable window to
+  // screenshot it mid-flight. Visiting the conversation with both
+  // ?bt_preview=buyer and &bt_force_upload=1 force-stages a real bundled
+  // photo as "uploading" so the ring state can be screenshotted
+  // deterministically. Inert unless isPreviewInboxEnabled() is also true
+  // (same __DEV__-plus-non-prod-base-URL gate every other preview seed in
+  // this file uses), so it can never fire for a real signed-in user.
+  useEffect(() => {
+    if (params.bt_force_upload !== '1' || !isPreviewInboxEnabled()) return;
+    setSelectedAttachment({
+      type: 'image', uri: posterUri(2),
+      title: 'Photo',
+      meta: { photoUris: JSON.stringify([posterUri(2)]), uploading: 'true' },
+    });
+    setIsUploading(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.bt_force_upload]);
+
   // "Message seller" from a product page stages that product's card in the
   // composer once, so the first message carries the product as context.
   const stagedProductRef = useRef<string | null>(null);
@@ -828,6 +860,17 @@ export default function BuyerConversationScreen() {
     });
     if (result.canceled || !result.assets.length) return;
     setShowMediaSheet(false);
+    const token = ++mediaUploadTokenRef.current;
+    // Stage the REAL picked photo(s) immediately, using their local URIs —
+    // so the composer shows an actual thumbnail (not a placeholder icon)
+    // while the upload is in flight. meta.uploading drives MediaUploadThumb's
+    // ring overlay; it's cleared once the real upload resolves below.
+    const localUris = result.assets.map((a) => a.uri);
+    setSelectedAttachment({
+      type: 'image', uri: localUris[0],
+      title: localUris.length > 1 ? `${localUris.length} photos` : 'Photo',
+      meta: { photoUris: JSON.stringify(localUris), uploading: 'true' },
+    });
     setIsUploading(true);
     try {
       const urls: string[] = [];
@@ -835,14 +878,20 @@ export default function BuyerConversationScreen() {
         if (!asset.base64) continue;
         urls.push(await uploadMedia(asset.base64, 'image/jpeg', 'jpg'));
       }
-      if (!urls.length) return;
+      if (mediaUploadTokenRef.current !== token) return; // superseded/cancelled
+      if (!urls.length) { setSelectedAttachment(null); return; }
       setSelectedAttachment({
         type: 'image', uri: urls[0],
         title: urls.length > 1 ? `${urls.length} photos` : 'Photo',
         meta: { photoUris: JSON.stringify(urls) },
       });
-    } catch { Alert.alert('Upload failed', 'Could not upload. Please try again.'); }
-    finally { setIsUploading(false); }
+    } catch {
+      if (mediaUploadTokenRef.current === token) {
+        setSelectedAttachment(null);
+        Alert.alert('Upload failed', 'Could not upload. Please try again.');
+      }
+    }
+    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
   }
 
   async function handlePickVideo() {
@@ -859,17 +908,29 @@ export default function BuyerConversationScreen() {
     if ((asset.duration ?? 0) > 60000) { Alert.alert('Video too long', 'Choose a video under 1 minute.'); return; }
     if (!asset.base64) { Alert.alert('Couldn’t read that video', 'Please try a different file.'); return; }
     setShowMediaSheet(false);
+    const token = ++mediaUploadTokenRef.current;
+    const durationLabel = String(Math.round((asset.duration ?? 0) / 1000));
+    setSelectedAttachment({
+      type: 'video', title: 'Video clip',
+      meta: { duration: durationLabel, uploading: 'true' },
+    });
     setIsUploading(true);
     try {
       const ext = (asset.uri.split('.').pop() ?? 'mp4').replace(/\?.*/, '');
       const url = await uploadMedia(asset.base64, 'video/mp4', ext);
+      if (mediaUploadTokenRef.current !== token) return; // superseded/cancelled
       setSelectedAttachment({
         type: 'video', uri: url,
         title: 'Video clip',
-        meta: { duration: String(Math.round((asset.duration ?? 0) / 1000)) },
+        meta: { duration: durationLabel },
       });
-    } catch { Alert.alert('Upload failed', 'Could not upload video. Please try again.'); }
-    finally { setIsUploading(false); }
+    } catch {
+      if (mediaUploadTokenRef.current === token) {
+        setSelectedAttachment(null);
+        Alert.alert('Upload failed', 'Could not upload video. Please try again.');
+      }
+    }
+    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
   }
 
   // ── Voice recording ────────────────────────────────────────────────────────────
@@ -1720,22 +1781,26 @@ export default function BuyerConversationScreen() {
             onPress={(e) => handleBubblePress(msg, e)}
             onLongPress={() => openReactionOverlay(msg)}
             delayLongPress={280}
-            // Voice, product and order attachments each render their own
-            // interactive control inside this bubble (VoiceMessageBubble's
-            // play/scrub/speed buttons; the product/order cards' own single
-            // PressableScale for View/Track — see items 70/71's "no nested
-            // Pressable" comments on those cards). On web,
-            // accessibilityRole="button" makes react-native-web render an
-            // actual <button>, and a <button> cannot legally contain other
-            // interactive controls (the HTML nested-button rule) — so those
-            // controls silently break the DOM tree even though there's only
-            // ever one logical tap target per row. Drop the role for all
-            // three attachment kinds so the bubble renders as a plain, still
-            // fully tappable/long-pressable <div> instead.
+            // Voice, product, order and (multi-photo) image attachments each
+            // render their own interactive control inside this bubble
+            // (VoiceMessageBubble's play/scrub/speed buttons; the product/
+            // order cards' own single PressableScale for View/Track — see
+            // items 70/71's "no nested Pressable" comments on those cards;
+            // and each photo cell below is its own PressableScale, opening
+            // the full-screen MediaViewer — item 74 found this same class of
+            // bug already present for image attachments and fixed it here).
+            // On web, accessibilityRole="button" makes react-native-web
+            // render an actual <button>, and a <button> cannot legally
+            // contain other interactive controls (the HTML nested-button
+            // rule) — so those controls silently break the DOM tree even
+            // though there's only ever one logical tap target per row. Drop
+            // the role for all four attachment kinds so the bubble renders
+            // as a plain, still fully tappable/long-pressable <div> instead.
             accessibilityRole={
               msg.attachment?.type === 'voice'
               || msg.attachment?.type === 'product'
               || msg.attachment?.type === 'order'
+              || msg.attachment?.type === 'image'
                 ? 'none' : 'button'
             }
             accessibilityLabel={isOwn ? 'Your message' : `Message from ${msg.fromName}`}
@@ -2164,15 +2229,26 @@ export default function BuyerConversationScreen() {
         />
       ) : !isDisabled ? (
         <View>
-          {selectedAttachment && (
-            <View style={s.selectedAttachment}>
-              {isUploading ? (
+          {selectedAttachment && (() => {
+            const uploadingMedia = selectedAttachment.meta?.uploading === 'true';
+            const isMedia = selectedAttachment.type === 'image' || selectedAttachment.type === 'video';
+            return (
+            <View style={s.selectedAttachment} testID="conversation-selected-attachment">
+              {isMedia ? (
+                <MediaUploadThumb
+                  type={selectedAttachment.type as 'image' | 'video'}
+                  uri={selectedAttachment.type === 'image' ? selectedAttachment.uri : undefined}
+                  uploading={uploadingMedia}
+                  size={40}
+                  ringColor={theme.accent}
+                  iconColor={theme.muted}
+                  trackColor={theme.border}
+                />
+              ) : isUploading ? (
                 <UploadRing size={22} color={theme.accent} trackColor={theme.border} />
               ) : (
                 <Feather
                   name={
-                    selectedAttachment.type === 'image' ? 'image' :
-                    selectedAttachment.type === 'video' ? 'video' :
                     selectedAttachment.type === 'voice' ? 'mic' :
                     selectedAttachment.type === 'post'  ? 'image' : 'shopping-bag'
                   }
@@ -2183,6 +2259,7 @@ export default function BuyerConversationScreen() {
               <View style={{ flex: 1, marginLeft: SP.sm }}>
                 <Text style={s.selectedAttachmentLabel}>
                   {
+                    uploadingMedia ? 'Uploading…' :
                     selectedAttachment.type === 'image' ? 'Photo attached' :
                     selectedAttachment.type === 'video' ? 'Video attached' :
                     selectedAttachment.type === 'voice' ? 'Voice message' :
@@ -2194,15 +2271,17 @@ export default function BuyerConversationScreen() {
                 </Text>
               </View>
               <PressableScale rippleEnabled={false}
-                onPress={() => setSelectedAttachment(null)}
+                onPress={() => { mediaUploadTokenRef.current++; setSelectedAttachment(null); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
-                accessibilityLabel="Remove attachment"
+                accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
+                testID="conversation-selected-attachment-remove"
               >
                 <Feather name="x" size={ICON.sm} color={theme.muted} />
               </PressableScale>
             </View>
-          )}
+            );
+          })()}
           <View style={[s.inputRow, { paddingBottom: composerBottomPad }]}>
             {voiceRecorder.phase !== 'idle' ? (
               <VoiceRecordingBar
