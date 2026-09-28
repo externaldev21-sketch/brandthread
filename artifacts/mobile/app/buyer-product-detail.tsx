@@ -417,6 +417,9 @@ function OptionPicker({ product, option, selections, onSelect }: {
               // convention) — see https://mobbin.com/screens/76430e6c-342a-42be-8fce-148ab5d9651e
               icon={available ? undefined : 'slash'}
               iconColor={theme.subtle}
+              strikethrough={!available}
+              accessibilityRole="radio"
+              accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', sold out'}`}
               onPress={() => onSelect(option.id, val.id)}
               testID={`option-${option.id}-${val.id}`}
             />

@@ -13,6 +13,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated as RNAnimated,
   Dimensions,
   Platform,
   StyleSheet,
@@ -38,6 +39,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
@@ -125,6 +127,8 @@ export function DiscoverPager() {
   const [addedToast, setAddedToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
   const addedToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cartIconRef = useRef<View>(null);
+  // Same bump as the feed's cart icon, fired only on a real add success.
+  const { scale: cartBumpScale, bump: bumpCart } = useCartBadgeBump();
 
   useEffect(() => () => { if (addedToastTimer.current) clearTimeout(addedToastTimer.current); }, []);
 
@@ -135,6 +139,7 @@ export function DiscoverPager() {
   }, []);
 
   useEffect(() => { refreshCartCount(); }, [refreshCartCount]);
+  const openCart = useCallback(() => push('/(buyer)/cart' as never), [push]);
 
   // ─ Fetch page ─────────────────────────────────────────────────────────────
   const fetchPage = useCallback(async (offset: number, append: boolean) => {
@@ -212,6 +217,7 @@ export function DiscoverPager() {
       const newCount = getSuccessfulCartCount(result);
       if (newCount == null) return;
       setCartCount(newCount);
+      bumpCart();
       const reduceMotion = false; // Discover always attempts the fly animation; measureCartTarget degrades gracefully.
       if (shouldAnimateCartSuccess(reduceMotion)) {
         const fallback = { x: viewport.width - 40, y: insets.top + 26 };
@@ -314,19 +320,21 @@ export function DiscoverPager() {
               onPress={back}
               style={styles.glassBtn}
             />
-            <View
+            <RNAnimated.View
               ref={cartIconRef}
               collapsable={false}
+              style={{ transform: [{ scale: cartBumpScale }] }}
+              testID="discover-cart-button"
             >
               <IconButton
                 name="shopping-cart"
                 variant="glass"
                 accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-                onPress={() => push('/(buyer)/cart' as never)}
+                onPress={openCart}
                 badge={cartCount}
                 style={styles.glassBtn}
               />
-            </View>
+            </RNAnimated.View>
           </View>
         </>
       )}

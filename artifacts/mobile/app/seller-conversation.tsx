@@ -1065,12 +1065,18 @@ export default function SellerConversationScreen() {
               },
             ]}
             accessibilityHint="Touch and hold to react or see more options"
-            // Voice messages render their own play/scrub/speed/transcription
-            // buttons inside this bubble — PressableScale defaults to rendering
-            // an actual <button> on web, which cannot legally contain other
-            // interactive controls. Drop the role only here so it's a plain,
-            // still fully long-pressable <div> instead. See buyer-conversation.tsx.
-            accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : undefined}
+            // Voice, product and order attachments each render their own
+            // interactive control inside this bubble — PressableScale defaults
+            // to rendering an actual <button> on web, which cannot legally
+            // contain other interactive controls. Drop the role for all three
+            // so it's a plain, still fully long-pressable <div> instead. See
+            // buyer-conversation.tsx.
+            accessibilityRole={
+              msg.attachment?.type === 'voice'
+              || msg.attachment?.type === 'product'
+              || msg.attachment?.type === 'order'
+                ? 'none' : undefined
+            }
           >
             {/* Quoted reply — same inline-quote-strip treatment as
                 app/buyer-conversation.tsx, so a thread reads identically from

@@ -42,6 +42,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { ResponsiveContainer } from '@/components/layout';
 import { OrderProgressTimeline } from '@/components/orders/OrderProgressTimeline';
+import { ShipmentHeadline, ShipmentMapPlaceholder, hasShipped, type ShipmentInfo } from '@/components/orders/ShipmentTracking';
 import { formatCents } from '@/lib/money';
 import { visibleOrderForBuyer } from '@/lib/buyerOrdersVisibility';
 import { canBuyerCancel } from '@/services/orderPolicy';
@@ -80,13 +81,15 @@ function formatRelativeUpdate(timestamp: number): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+// Monochrome (item 107): every normal order state is the neutral badge;
+// only real problems keep the error treatment.
 function statusBadgeVariant(status: OrderStatus): 'info' | 'purple' | 'warning' | 'success' | 'neutral' | 'error' {
   switch (status) {
-    case 'new':           return 'info';
-    case 'processing':    return 'purple';
-    case 'ready_to_ship': return 'warning';
-    case 'shipped':       return 'warning';
-    case 'delivered':     return 'success';
+    case 'new':           return 'neutral';
+    case 'processing':    return 'neutral';
+    case 'ready_to_ship': return 'neutral';
+    case 'shipped':       return 'neutral';
+    case 'delivered':     return 'neutral';
     case 'cancelled':     return 'neutral';
     case 'refunded':      return 'error';
     case 'disputed':      return 'error';
@@ -124,10 +127,10 @@ function trackingStatusLabel(ts: TrackingStatus): string {
 function trackingStatusVariant(ts: TrackingStatus): 'info' | 'purple' | 'warning' | 'success' | 'neutral' | 'error' {
   switch (ts) {
     case 'label_created': return 'neutral';
-    case 'accepted':      return 'info';
-    case 'in_transit':    return 'purple';
-    case 'out_for_delivery': return 'warning';
-    case 'delivered':     return 'success';
+    case 'accepted':      return 'neutral';
+    case 'in_transit':    return 'neutral';
+    case 'out_for_delivery': return 'neutral';
+    case 'delivered':     return 'neutral';
     case 'exception':     return 'error';
     case 'returned_to_sender': return 'error';
     default:              return 'neutral';
@@ -361,22 +364,31 @@ const rvs = StyleSheet.create({
 
 // ─── API adapter ──────────────────────────────────────────────────────────────
 
-function adaptOrderDetail(row: any): BuyerOrderView {
+/** What the order's fulfilment is, from its status (the API has no separate field). */
+export function fulfillmentFromStatus(status: OrderStatus): BuyerOrderView['fulfillmentStatus'] {
+  if (status === 'shipped' || status === 'delivered') return 'fulfilled';
+  if (status === 'cancelled' || status === 'refunded') return 'cancelled';
+  return 'unfulfilled';
+}
+
+export function adaptOrderDetail(row: any): BuyerOrderView {
   const dbAddr = row.shippingAddress;
   const items = Array.isArray(row.items) ? row.items : [];
   const shippingAddress: import('@/services/orderTypes').OrderAddress = dbAddr
     ? { name: dbAddr.name ?? '', line1: dbAddr.street ?? '', line2: '', city: dbAddr.city ?? '', state: dbAddr.state ?? '', zip: dbAddr.zip ?? '', country: dbAddr.country ?? 'US', phone: '' }
     : { name: '', line1: '', city: '', state: '', zip: '', country: 'US' };
 
+  const status = (row.status === 'pending' ? 'new' : row.status === 'fulfilled' ? 'ready_to_ship' : (row.status ?? 'new')) as OrderStatus;
   return {
     id:                row.id,
     orderNumber:       row.orderNumber,
     sellerId:          row.ownerId ?? '',
     sellerName:        row.sellerDisplayName ?? 'Seller',
     sellerHandle:      '',
-    status:            (row.status === 'pending' ? 'new' : row.status === 'fulfilled' ? 'ready_to_ship' : (row.status ?? 'new')) as OrderStatus,
-    paymentStatus:     row.stripePaymentIntentId ? 'paid' : 'pending',
-    fulfillmentStatus: 'unfulfilled',
+    status,
+    paymentStatus:     row.stripePaymentIntentId || row.paidAt ? 'paid' : 'pending',
+    // Was hard-coded 'unfulfilled', so a shipped order read "SHIPPED · Unfulfilled".
+    fulfillmentStatus: fulfillmentFromStatus(status),
     lineItems: items.map((item: any) => ({
       productId:      typeof item.productId === 'string' ? item.productId : null,
       productName:    item.productName,
@@ -397,6 +409,7 @@ function adaptOrderDetail(row: any): BuyerOrderView {
     trackingStatus:    row.trackingStatus    ?? undefined,
     estimatedDelivery: row.estimatedDelivery ?? undefined,
     shippedAt:         row.shippedAt         ?? undefined,
+    paidAt:            row.paidAt            ?? undefined,
     isPreOrder:        false,
     hasReturnRequest:  false,
     cancellationReason: row.cancellationReason ?? null,
@@ -765,6 +778,16 @@ export default function BuyerOrderDetailScreen() {
   }
 
   const isTerminal = TERMINAL_STATUSES.includes(order.status);
+  const shipment: ShipmentInfo = {
+    status: order.status,
+    trackingStatus: order.trackingStatus,
+    trackingCarrier: order.trackingCarrier,
+    estimatedDelivery: order.estimatedDelivery,
+    paidAt: order.paidAt,
+    sellerName: order.sellerName,
+    destinationCity: order.shippingAddress.city,
+    destinationState: order.shippingAddress.state,
+  };
   // Rating eligibility: delivered, real API order, not yet reviewed
   const canLeaveReview = order.status === 'delivered' && !reviewSubmitted && isRealOrderId(order.id);
 
@@ -819,12 +842,12 @@ export default function BuyerOrderDetailScreen() {
             )}
             {order.trackingNumber && (
               <View style={styles.trackingInfoRow}>
-                <Feather name="truck" size={ICON.xs} color={PURPLE_LIGHT} />
-                <Text style={[styles.trackingInfoText, { color: PURPLE_LIGHT }]}>
+                <Feather name="truck" size={ICON.xs} color={theme.muted} />
+                <Text style={[styles.trackingInfoText, { color: theme.text }]}>
                   Shipped via {order.trackingCarrier}
                 </Text>
-                <View style={[styles.trackingChip, { backgroundColor: PURPLE_DIM }]}>
-                  <Text style={[styles.trackingChipText, { color: PURPLE_LIGHT }]} numberOfLines={1}>{order.trackingNumber}</Text>
+                <View style={[styles.trackingChip, { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border }]}>
+                  <Text style={[styles.trackingChipText, { color: theme.muted }]} numberOfLines={1}>{order.trackingNumber}</Text>
                 </View>
               </View>
             )}
@@ -841,10 +864,16 @@ export default function BuyerOrderDetailScreen() {
         <View style={{ marginBottom: SP.md }}>
           <Text style={[sc.title, { color: theme.muted, paddingHorizontal: SP.md }]}>Order Progress</Text>
           <BrandthreadCard style={{ marginHorizontal: SP.md }} glow={!isTerminal}>
+            {/* Item 107: "where is it" headline + static route map (Shop
+                app tracking pattern) over the timeline. */}
+            <ShipmentHeadline info={shipment} />
+            {!isTerminal && hasShipped(shipment) ? <ShipmentMapPlaceholder info={shipment} /> : null}
             <OrderProgressTimeline
               status={order.status}
               createdAt={order.createdAt}
+              paidAt={order.paidAt}
               shippedAt={order.shippedAt}
+              estimatedDelivery={order.estimatedDelivery}
               trackingStatus={order.trackingStatus}
               trackingCarrier={order.trackingCarrier}
               trackingNumber={order.trackingNumber}
@@ -989,9 +1018,9 @@ export default function BuyerOrderDetailScreen() {
                 <StatusBadge label={trackingStatusLabel(order.trackingStatus)} variant={trackingStatusVariant(order.trackingStatus)} />
               )}
             </View>
-            {order.estimatedDelivery && (
+            {order.estimatedDelivery && order.status !== 'delivered' && (
               <View style={styles.estDeliveryRow}>
-                <Feather name="calendar" size={ICON.xs} color={theme.success} />
+                <Feather name="calendar" size={ICON.xs} color={theme.muted} />
                 <Text style={styles.estDeliveryText}>Est. delivery {fmtDate(order.estimatedDelivery)}</Text>
               </View>
             )}
@@ -1184,10 +1213,10 @@ const makeStyles = (theme: AppThemePreset) => {
 
     // Tracking
     trackingNumberDisplay: { fontSize: FS.base, fontFamily: 'Inter_400Regular', color: theme.text, letterSpacing: 1 },
-    carrierChip: { backgroundColor: theme.secondaryDim, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
-    carrierChipText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.secondary },
+    carrierChip: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
+    carrierChipText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
     estDeliveryRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm },
-    estDeliveryText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.success },
+    estDeliveryText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
 
     // Pre-order
     preOrderTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
