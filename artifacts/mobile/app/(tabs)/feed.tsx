@@ -957,6 +957,11 @@ type VideoVisualProps = {
   immersive?: boolean;
   /** When set, a thin playback progress line sits this far above the bottom. */
   progressBottom?: number;
+  /** Whether the scrub/progress line should actually be visible right now —
+   * true only on an explicit tap-hold gesture (pause-hold or speed-hold) or
+   * while the video is paused, never merely because the page is active. See
+   * `ScrubProgressBar`'s render condition in `LiveVideoVisual` below. */
+  scrubVisible?: boolean;
   /** Width / height of the page the clip is shown in. */
   pageAspect?: number;
   /** Playback rate — 2 while the right side of the video is pressed and held. */
@@ -1093,6 +1098,7 @@ function LiveVideoVisual({
   fallbackColor,
   immersive = false,
   progressBottom,
+  scrubVisible = false,
   pageAspect = 9 / 16,
   rate = 1,
   pageWidth,
@@ -1114,6 +1120,17 @@ function LiveVideoVisual({
   useEffect(() => {
     Animated.timing(pauseOverlayOpacity, { toValue: paused ? 1 : 0, duration: 180, useNativeDriver: true }).start();
   }, [paused, pauseOverlayOpacity]);
+  // Scrub/progress line: mounted the whole time the page is active (so it
+  // never has to pop in cold with zero layout), but only actually visible —
+  // faded in/out over 150ms — while `scrubVisible` is true. Kept mounted
+  // rather than conditionally rendered for the same reason as the pause
+  // glyph above: a conditional unmount can only pop the fade in, never fade
+  // it back out, since it's gone from the tree the instant the condition
+  // flips false.
+  const scrubOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(scrubOpacity, { toValue: scrubVisible ? 1 : 0, duration: 150, useNativeDriver: true }).start();
+  }, [scrubVisible, scrubOpacity]);
   // `playingChange`'s `isPlaying: true` (used alone, previously) fires the
   // instant `player.play()` is *called* — on web this is wired to the
   // HTMLVideoElement's `play` event (see expo-video's VideoPlayer.web.tsx
@@ -1264,7 +1281,21 @@ function LiveVideoVisual({
         </Animated.View>
       </View>
       {progressBottom != null && isActive && (
-        <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} externallyPaused={paused} />
+        // absoluteFill, not a plain View: ScrubProgressBar positions itself
+        // with `bottom: <progressBottom>` (absolute) against its nearest
+        // positioned ancestor. A plain wrapper here (React Native views
+        // default to `position: relative`) becomes that ancestor itself and
+        // — having no intrinsic size, since its only child is absolutely
+        // positioned — collapses to zero height, which breaks the bar's
+        // "this far above the bottom of the page" placement entirely.
+        // absoluteFill keeps the wrapper's box identical to its parent's, so
+        // wrapping it for the opacity fade doesn't move the bar at all.
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { opacity: scrubOpacity }]}
+          pointerEvents={scrubVisible ? 'auto' : 'none'}
+        >
+          <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} externallyPaused={paused} />
+        </Animated.View>
       )}
     </>
   );
@@ -1562,6 +1593,7 @@ function SpotlightPageImpl({
                 fallbackColor={item.accentColor}
                 immersive={immersive}
                 progressBottom={immersive ? bottomClearance : undefined}
+                scrubVisible={paused || holdPaused || speedActive}
                 pageAspect={pageHeight > 0 ? pageWidth / pageHeight : undefined}
                 pageWidth={pageWidth}
                 pageHeight={pageHeight}
