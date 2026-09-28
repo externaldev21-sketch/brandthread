@@ -28,6 +28,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
+import { getPreviewBuyerOrder } from '@/lib/previewOrders';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
@@ -472,6 +473,17 @@ export default function BuyerOrderDetailScreen() {
   const api = useApi();
   const { userId } = useAuth();
 
+  // The real order, or — only when that request fails in the dev-web
+  // preview (no account) — the seeded order a preview Activity row points
+  // at (lib/previewOrders.ts), instead of "Could not load order details".
+  const loadBuyerOrder = useCallback((orderId: string) => (
+    api.buyer.orders.get(orderId).catch((err: unknown) => {
+      const preview = getPreviewBuyerOrder(orderId);
+      if (preview) return preview;
+      throw err;
+    })
+  ), [api]);
+
   const [storedOrder, setOrder] = useState<BuyerOrderView | null>(null);
   const [orderOwnerId, setOrderOwnerId] = useState<string | null | undefined>(userId);
   const [loading, setLoading] = useState(true);
@@ -514,7 +526,7 @@ export default function BuyerOrderDetailScreen() {
     setIsFetching(true);
 
     function fetchOrder() {
-      api.buyer.orders.get(id!).then(row => {
+      loadBuyerOrder(id!).then(row => {
         if (!cancelled && accountGenerationRef.current === accountGeneration) {
           setOrder(adaptOrderDetail(row));
           setOrderOwnerId(userId);
@@ -557,14 +569,14 @@ export default function BuyerOrderDetailScreen() {
         timerRef.current = null;
       }
     };
-  }, [api, id, userId]));
+  }, [api, id, loadBuyerOrder, userId]));
 
   function handlePullRefresh() {
     if (!id || refreshing) return;
     const accountGeneration = accountGenerationRef.current;
     setRefreshing(true);
     setIsFetching(true);
-    api.buyer.orders.get(id).then(row => {
+    loadBuyerOrder(id).then(row => {
       if (accountGenerationRef.current !== accountGeneration) return;
       setOrder(adaptOrderDetail(row));
       setOrderOwnerId(userId);
