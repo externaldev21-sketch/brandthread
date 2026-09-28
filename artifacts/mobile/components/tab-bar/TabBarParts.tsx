@@ -3,7 +3,6 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
-  Easing,
   interpolate,
   useAnimatedStyle,
   useReducedMotion,
@@ -21,6 +20,7 @@ import { a11yHidden } from '@/lib/a11yHidden';
 import { FONT } from '@/lib/theme';
 import type { TabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
+import { Glass } from '@/components/ui/Glass';
 
 /**
  * Shared building blocks for the buyer and seller floating tab bars.
@@ -37,12 +37,11 @@ const PRESS_OUT = { mass: 0.6, stiffness: 420, damping: 11 } as const;
 // Selection pop: overshoot a little, then settle.
 const POP_UP = { mass: 0.5, stiffness: 650, damping: 14 } as const;
 const POP_SETTLE = { mass: 0.6, stiffness: 300, damping: 12 } as const;
-// Pill glide between tabs: a plain ease-out timing, not a spring — the
-// spring this replaced (mass 0.9/stiffness 360/damping 26, damping ratio
-// ~0.72) was deliberately underdamped for "a touch of overshoot," which is
-// exactly what the "FEEL 10x better" pass's own gate rules out (no bounce/
-// overshoot anywhere). 220ms sits in the requested 200-250ms window.
-const INDICATOR_TIMING = { duration: 220, easing: Easing.out(Easing.cubic) } as const;
+// Pill glide between tabs: a spring again (overnight-batch item 22
+// explicitly asks for "spring, no bounce overshoot >4%", superseding the
+// "FEEL 10x better" pass's own zero-overshoot rule for this one motion).
+// damping ratio 0.75 -> ~2.8% overshoot, safely under the 4% ceiling.
+const INDICATOR_SPRING = { mass: 0.9, stiffness: 360, damping: 27 } as const;
 const REDUCED_MOTION = { duration: 160 } as const;
 
 // Wraps Pressable so it can take a Reanimated-driven `style` (the buyer bar's
@@ -325,7 +324,7 @@ export function TabBarIndicator({
       // Appearing (e.g. back from Profile or search) fades in place; only a
       // move between tabs glides.
       if (opacity.get() < 0.5 || reduceMotion) x.set(reduceMotion ? withTiming(restingX, REDUCED_MOTION) : restingX);
-      else x.set(withTiming(restingX, INDICATOR_TIMING));
+      else x.set(withSpring(restingX, INDICATOR_SPRING));
     }
     opacity.set(withTiming(shown ? 1 : 0, { duration: 180 }));
   }, [shown, restingX, reduceMotion, x, target, opacity]);
@@ -361,13 +360,18 @@ export function TabBarIndicator({
     <Animated.View
       style={[
         styles.indicator,
-        {
-          backgroundColor: `${theme.accent}26`,
-          borderColor: `${theme.accent}59`,
-        },
+        { borderWidth: 0, overflow: 'hidden' },
         style,
       ]}
-    />
+    >
+      {/* Real glass (overnight-batch item 21), not a flat tinted fill —
+          `noBlur` because this sits inside the tab bar's own already-blurred
+          `TabBarGlass` surface (see above): a second live blur stacked
+          directly on top of the first would double the cost for no visible
+          gain (blurring an already-blurred backdrop). The specular edge +
+          border still read as glass on their own. */}
+      <Glass variant="regular" tint="dark" radius={metrics.indicatorHeight / 2} noBlur style={StyleSheet.absoluteFill} />
+    </Animated.View>
   );
 }
 
@@ -376,8 +380,8 @@ export function tabIconColor(theme: AppThemePreset, focused: boolean) {
   return focused ? theme.accent : theme.muted;
 }
 
-// Cross-fade duration for the outline -> filled icon swap — same 220ms
-// window as the pill's own glide (INDICATOR_TIMING) so both read as one
+// Cross-fade duration for the outline -> filled icon swap — close to the
+// pill's own glide settle time (INDICATOR_SPRING) so both read as one
 // motion instead of two out-of-sync ones.
 const ICON_CROSSFADE_MS = 220;
 
