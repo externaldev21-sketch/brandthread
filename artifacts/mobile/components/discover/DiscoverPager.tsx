@@ -312,7 +312,10 @@ export function DiscoverPager() {
           />
 
           {/* ─ Top chrome: back, brand handled per-card, cart icon ─ */}
-          <View style={[styles.topBar, { top: insets.top + 8 }]} pointerEvents="box-none">
+          <View
+            style={[styles.topBar, { top: insets.top + 8, left: SP.md + insets.left, right: SP.md + insets.right }]}
+            pointerEvents="box-none"
+          >
             <IconButton
               name="chevron-left"
               variant="glass"

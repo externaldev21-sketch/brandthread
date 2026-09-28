@@ -933,7 +933,7 @@ export default function BuyerProductDetailScreen() {
               shimmer/glitch PR #109 killed on the video feed, so this uses
               the same solid rgba(0,0,0,0.6) scrim pattern that PR used over
               other media chrome, not a frosted blur. */}
-          <View style={[s.backBtnWrap, { top: insets.top + SP.sm }]}>
+          <View style={[s.backBtnWrap, { top: insets.top + SP.sm, left: SP.md + insets.left }]}>
             <IconButton
               name="arrow-left"
               onPress={leaveProduct}
@@ -947,7 +947,7 @@ export default function BuyerProductDetailScreen() {
           <Animated.View
             ref={cartTargetRef}
             collapsable={false}
-            style={[s.cartBtnWrap, { top: insets.top + SP.sm, transform: [{ scale: cartPulse }] }]}
+            style={[s.cartBtnWrap, { top: insets.top + SP.sm, right: SP.md + insets.right, transform: [{ scale: cartPulse }] }]}
             testID="product-cart-button"
           >
             <IconButton
@@ -1782,8 +1782,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // over the swipeable gallery — see the comment where these render).
   backBtnWrap: { position: 'absolute', left: SP.md },
   cartBtnWrap: { position: 'absolute', right: SP.md },
+  // `right: 0` (was `-4`, pushing the badge outward past the button's
+  // own bounds) — same class of fix as the buyer feed top bar's cart
+  // badge (see feed.tsx): with a real device safe-area inset on top of
+  // an outward offset, the badge could sit past the screen's actual
+  // edge instead of just past the icon.
   cartBadge: {
-    position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
+    position: 'absolute', top: -4, right: 0, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
     backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
   },
   cartBadgeText: { color: '#000000', fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
