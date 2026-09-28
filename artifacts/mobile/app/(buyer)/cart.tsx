@@ -31,6 +31,7 @@ import { useScrollReset } from '@/hooks/useScrollReset';
 import { ThreadIllustration } from '@/components/illustrations/EmptyStateArt';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
+import { isPreviewCheckoutGroup } from '@/lib/previewCheckout';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { useApi } from '@/hooks/useApi';
 import SwipeableActions, { type SwipeAction } from '@/components/SwipeableActions';
@@ -933,8 +934,11 @@ export default function CartScreen() {
     const setBusy = opts.onBusy ?? setValidating;
     if (items.length === 0) return;
     setBusy(true);
+    // Dev-web preview only: seeded preview products have no server cart or
+    // seller payment account to check (lib/previewCheckout.ts).
+    const previewOnlyCheckout = groupCartBySeller(items).every(isPreviewCheckoutGroup);
     try {
-      if (isSignedIn) {
+      if (isSignedIn && !previewOnlyCheckout) {
         const validation = await validateCart(items);
         if (!validation.isValid) {
           const issues = validation.issues.map(i => `• ${i.message}`).join('\n');
@@ -959,6 +963,7 @@ export default function CartScreen() {
 
       if (isSignedIn) {
         for (const group of currentGroups) {
+          if (isPreviewCheckoutGroup(group)) continue;
           try {
             const status = await api.buyer.sellerPaymentStatus(group.sellerId);
             if (!status.ready) {
