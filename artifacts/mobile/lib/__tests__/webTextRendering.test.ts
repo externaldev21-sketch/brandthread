@@ -91,3 +91,68 @@ describe('injectWebFocusOutlineStyles — native no-op', () => {
     vi.doUnmock('react-native');
   });
 });
+
+/**
+ * Regression guard for the "no visible scrollbar anywhere" fix — Dev's rule,
+ * seen live as a white bar on the right edge of Discover's Brands/People
+ * tabs. Same reasoning as the focus-outline test above: app/+html.tsx
+ * already carries a near-identical (but merely thin, not hidden) rule that
+ * is dead code for this build, so this exercises the real injector.
+ */
+describe('injectWebScrollbarHideStyles', () => {
+  let fakeDocument: ReturnType<typeof makeFakeDocument>;
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doMock('react-native', () => ({ Platform: { OS: 'web' } }));
+    fakeDocument = makeFakeDocument();
+    vi.stubGlobal('document', fakeDocument);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.doUnmock('react-native');
+  });
+
+  it('appends a style tag that hides every scrollbar, vertical and horizontal', async () => {
+    const { injectWebScrollbarHideStyles } = await import('../webTextRendering');
+    injectWebScrollbarHideStyles();
+
+    expect(fakeDocument.head.appendChild).toHaveBeenCalledTimes(1);
+    const style = fakeDocument._created[0];
+    expect(style.id).toBe('bt-scrollbar-hide');
+    expect(style.textContent).toMatch(/scrollbar-width:\s*none/);
+    expect(style.textContent).toMatch(/-ms-overflow-style:\s*none/);
+    expect(style.textContent).toMatch(/::-webkit-scrollbar\s*\{[^}]*display:\s*none/);
+    expect(style.textContent).toMatch(/::-webkit-scrollbar\s*\{[^}]*width:\s*0/);
+    expect(style.textContent).toMatch(/::-webkit-scrollbar\s*\{[^}]*height:\s*0/);
+  });
+
+  it('never sets overflow itself — only hides the scrollbar paint', async () => {
+    const { injectWebScrollbarHideStyles } = await import('../webTextRendering');
+    injectWebScrollbarHideStyles();
+
+    const style = fakeDocument._created[0];
+    expect(style.textContent).not.toMatch(/overflow\s*:/);
+  });
+
+  it('is idempotent — a second call does not append a second style tag', async () => {
+    const { injectWebScrollbarHideStyles } = await import('../webTextRendering');
+    injectWebScrollbarHideStyles();
+    injectWebScrollbarHideStyles();
+
+    expect(fakeDocument.head.appendChild).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing when Platform.OS is not web', async () => {
+    vi.resetModules();
+    vi.doMock('react-native', () => ({ Platform: { OS: 'android' } }));
+    const nativeDocument = makeFakeDocument();
+    vi.stubGlobal('document', nativeDocument);
+
+    const { injectWebScrollbarHideStyles } = await import('../webTextRendering');
+    injectWebScrollbarHideStyles();
+
+    expect(nativeDocument.head.appendChild).not.toHaveBeenCalled();
+  });
+});

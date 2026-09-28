@@ -97,7 +97,7 @@ const previewReadIds = new Set<string>();
 let previewSeedServed = false;
 
 export function isPreviewActivityId(id: string): boolean {
-  return id.startsWith('preview-act-');
+  return isPreviewActivityEnabled() && id.startsWith('preview-act-');
 }
 
 /** Mark seeded preview rows read (ids that aren't preview rows are ignored). */
