@@ -191,6 +191,24 @@ export const BREAKPOINT = {
   desktopWeb: 1024,
 } as const;
 
+/**
+ * Overnight batch item 40 (dead top space): the one value every tab-page
+ * header (TabPageHeader, DiscoverSearchHeader, PageHeader/Header.tsx,
+ * buyer-conversation, buyer inbox, seller orders/products) used to
+ * hand-roll its own copy of, each as `Platform.OS === 'web' ? 67 : insets.top`.
+ *
+ * Outside a real device (or a preview frame that actually emulates one),
+ * react-native-safe-area-context's web implementation reads `insets.top`
+ * as 0, so every one of those screens needed a stand-in value for what a
+ * real device's status-bar inset would be — but `67` was a guess, and a
+ * high one: an iPhone 12/13/14-class device at this exact 390x844 size
+ * (the size the owner actually reviews at) has a real safe-area-inset-top
+ * of 47pt, not 67. That 20pt gap, stacked with each header's own
+ * additional title gap, is what read as dead space well past where
+ * Instagram's own title sits relative to the status bar.
+ */
+export const WEB_SAFE_AREA_TOP = 47;
+
 // Heading / body type scale (paired with FS above). Use these role names
 // instead of picking raw FS.* sizes per screen.
 export const TYPE = {

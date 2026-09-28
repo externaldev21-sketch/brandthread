@@ -7,7 +7,7 @@
 import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 
 export type ProfileEmptyTab =
-  | 'buyer:posts' | 'buyer:tagged' | 'buyer:reposts' | 'buyer:saved'
+  | 'buyer:posts' | 'buyer:draft' | 'buyer:tagged' | 'buyer:reposts' | 'buyer:saved'
   | 'buyer:liked' | 'buyer:orders'
   | 'seller:post' | 'seller:draft' | 'seller:schedule' | 'seller:videos' | 'seller:tagged'
   | 'shop';
@@ -52,6 +52,13 @@ const TABLE: Record<ProfileEmptyTab, {
     publicTitle: 'No posts yet',
     publicMessage: 'Posts they share will appear here.',
     cta: { label: 'Share your first thread', route: '/create-post?accountType=buyer' },
+  },
+  'buyer:draft': {
+    icon: 'file-text',
+    title: 'No drafts',
+    message: 'Threads you save as a draft wait here until you post them.',
+    publicMessage: 'Drafts are private.',
+    cta: { label: 'Start a draft', route: '/create-post?accountType=buyer' },
   },
   'buyer:tagged': {
     icon: 'tag',

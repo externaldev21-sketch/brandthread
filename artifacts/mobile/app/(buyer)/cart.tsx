@@ -33,6 +33,7 @@ import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { useApi } from '@/hooks/useApi';
+import SwipeableActions, { type SwipeAction } from '@/components/SwipeableActions';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
   FONT, FS, SP, RADIUS, COMP, ICON, TYPE, SHADOW_SM,
@@ -70,17 +71,22 @@ type RowPendingAction = 'qty_dec' | 'qty_inc' | 'remove' | 'save';
 // ─── Quantity Row ─────────────────────────────────────────────────────────────
 
 function QuantityControl({
-  value, max, onDec, onInc, pendingDec, pendingInc,
+  value, max, onDec, onInc, onRemove, pendingDec, pendingInc, itemLabel, testID,
 }: {
   value: number;
   max: number;
   onDec: () => void;
   onInc: () => void;
+  /** At qty 1 the − becomes a trash and removes the line (same flow + Undo as Remove). */
+  onRemove: () => void;
   pendingDec?: boolean;
   pendingInc?: boolean;
+  itemLabel: string;
+  testID?: string;
 }) {
   const { theme } = useAppTheme();
   const busy = pendingDec || pendingInc;
+  const handleChange = useCallback((next: number) => (next > value ? onInc() : onDec()), [value, onInc, onDec]);
   return (
     <View style={{ opacity: busy ? 0.5 : 1, flexDirection: 'row', alignItems: 'center', gap: SP.xs }}>
       <QuantityStepper
@@ -89,7 +95,10 @@ function QuantityControl({
         max={Math.max(max, 1)}
         disabled={busy}
         size="sm"
-        onChange={next => (next > value ? onInc() : onDec())}
+        onChange={handleChange}
+        onRemoveAtMin={onRemove}
+        itemLabel={itemLabel}
+        testID={testID}
       />
       {busy && <ActivityIndicator size="small" color={theme.text} style={{ marginLeft: 2 }} />}
     </View>
@@ -124,8 +133,36 @@ function CartItemRow({
   // Very low: highlight differently at 1
   const isCriticalStock = item.isAvailable && item.maxQuantity === 1;
 
+  // Swipe left to reveal Save for later + Remove — Mobbin: ZARA iOS shopping
+  // bag (row swiped left → SAVE / DELETE side by side). Same shared
+  // SwipeableActions as Activity rows; both actions run the exact handlers
+  // the row's own Save / Remove buttons use (same API, same undo toast).
+  // Monochrome: Save on a light-gray tint of the card (ZARA's dark SAVE), Remove
+  // white with a black trash (the screen's one solid "act" color, like the
+  // Checkout pill) — no red.
+  const swipeActions = useMemo<SwipeAction[]>(() => [
+    {
+      key: 'save',
+      icon: 'bookmark',
+      color: 'rgba(255,255,255,0.14)',
+      iconColor: theme.text,
+      accessibilityLabel: `Save ${item.productName} for later`,
+      onPress: onSaveForLater,
+    },
+    {
+      key: 'remove',
+      icon: 'trash-2',
+      color: '#FFFFFF',
+      iconColor: '#000000',
+      accessibilityLabel: `Remove ${item.productName} from cart`,
+      onPress: onRemove,
+    },
+  ], [item.productName, onRemove, onSaveForLater, theme.text]);
+
   return (
-    <View style={[ir.root, isRowBusy && ir.rowBusy]}>
+    <View style={ir.swipeBleed} testID={`cart-row-${item.id}`}>
+    <SwipeableActions actions={swipeActions} disabled={isRowBusy}>
+    <View style={[ir.root, ir.swipeFront, isRowBusy && ir.rowBusy]}>
       {/* Pending overlay for remove/save */}
       {isRowBusy && (
         <View style={ir.busyOverlay} pointerEvents="none">
@@ -199,6 +236,9 @@ function CartItemRow({
             max={item.maxQuantity}
             onDec={onQtyDec}
             onInc={onQtyInc}
+            onRemove={onRemove}
+            itemLabel={item.productName}
+            testID={`cart-qty-${item.id}`}
             pendingDec={pendingAction === 'qty_dec'}
             pendingInc={pendingAction === 'qty_inc'}
           />
@@ -264,12 +304,20 @@ function CartItemRow({
         </View>
       </View>
     </View>
+    </SwipeableActions>
+    </View>
   );
 }
 
 const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm, alignItems: 'flex-start' },
   rowBusy: { opacity: 0.7 },
+  // The swipe row spans the card's full inner width (edge to edge, cancelling
+  // the Card's 16pt padding) so the revealed actions sit flush with the card
+  // edge; the row pads itself back in, so at rest nothing moves. Opaque card
+  // fill so the actions never show through behind the row at rest (web).
+  swipeBleed: { marginHorizontal: -SP.md },
+  swipeFront: { paddingHorizontal: SP.md, backgroundColor: theme.card },
   checkbox: { width: COMP.minTouchTarget, height: 72, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
   checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {
@@ -345,13 +393,22 @@ function SellerGroup({
   const { theme } = useAppTheme();
   const sg = useMemo(() => makeSellerGroupStyles(theme), [theme]);
   const router = useRouter();
+  const openStore = useCallback(
+    () => router.push(('/seller-profile?id=' + encodeURIComponent(group.sellerId)) as never),
+    [router, group.sellerId],
+  );
   return (
-    <Card style={sg.root}>
+    <Card style={sg.root} testID={`cart-seller-${group.sellerId}`}>
       {/* Seller header — avatar, name, and a chevron to the store (the
-          whole row is the tap target, not a separate "Visit store" button). */}
+          whole row is the tap target, not a separate "Visit store" button).
+          Same per-seller grouping as checkout: both come from
+          groupCartBySeller (checkout's deliveryGroups are built from it in
+          createCheckoutSession), so a cart section = one checkout payment.
+          Only the lines below are swipeable/steppable — never this header. */}
       <PressableScale
         style={sg.sellerRow}
-        onPress={() => router.push(('/seller-profile?id=' + group.sellerId) as never)}
+        onPress={openStore}
+        testID={`cart-seller-header-${group.sellerId}`}
         accessibilityRole="button"
         accessibilityLabel={`Visit ${group.sellerName}'s store`}
         noMinHeight
@@ -374,18 +431,18 @@ function SellerGroup({
       {group.items.map((item, idx) => (
         <View key={item.id}>
           {idx > 0 && <View style={sg.divider} />}
-          <CartItemRow
+          <SellerGroupLine
             item={item}
             pendingAction={pendingByItemId[item.id]}
             selected={selectedIds.has(item.id)}
-            onToggleSelect={() => onToggleSelect(item.id)}
             buyingNow={buyingItemId === item.id}
-            onBuyNow={() => onBuyNow(item)}
-            onQtyDec={() => onQtyDec(item.id)}
-            onQtyInc={() => onQtyInc(item.id)}
-            onRemove={() => onRemove(item.id)}
-            onSaveForLater={() => onSaveForLater(item.id)}
-            onEditVariant={() => onEditVariant(item)}
+            onToggleSelect={onToggleSelect}
+            onBuyNow={onBuyNow}
+            onQtyDec={onQtyDec}
+            onQtyInc={onQtyInc}
+            onRemove={onRemove}
+            onSaveForLater={onSaveForLater}
+            onEditVariant={onEditVariant}
           />
         </View>
       ))}
@@ -405,6 +462,52 @@ function SellerGroup({
         <Text style={sg.groupSubtotal}>Group subtotal: {fmtPrice(group.subtotalCents)}</Text>
       </View>
     </Card>
+  );
+}
+
+/**
+ * One line inside a seller section: binds the section's id-based handlers to
+ * this line with stable callbacks (no inline arrows reaching the row's
+ * PressableScale buttons).
+ */
+function SellerGroupLine({
+  item, pendingAction, selected, buyingNow,
+  onToggleSelect, onBuyNow, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+}: {
+  item: CartItem;
+  pendingAction?: RowPendingAction;
+  selected: boolean;
+  buyingNow: boolean;
+  onToggleSelect: (itemId: string) => void;
+  onBuyNow: (item: CartItem) => void;
+  onQtyDec: (itemId: string) => void;
+  onQtyInc: (itemId: string) => void;
+  onRemove: (itemId: string) => void;
+  onSaveForLater: (itemId: string) => void;
+  onEditVariant: (item: CartItem) => void;
+}) {
+  const id = item.id;
+  const toggle = useCallback(() => onToggleSelect(id), [onToggleSelect, id]);
+  const buy = useCallback(() => onBuyNow(item), [onBuyNow, item]);
+  const dec = useCallback(() => onQtyDec(id), [onQtyDec, id]);
+  const inc = useCallback(() => onQtyInc(id), [onQtyInc, id]);
+  const remove = useCallback(() => onRemove(id), [onRemove, id]);
+  const save = useCallback(() => onSaveForLater(id), [onSaveForLater, id]);
+  const edit = useCallback(() => onEditVariant(item), [onEditVariant, item]);
+  return (
+    <CartItemRow
+      item={item}
+      pendingAction={pendingAction}
+      selected={selected}
+      onToggleSelect={toggle}
+      buyingNow={buyingNow}
+      onBuyNow={buy}
+      onQtyDec={dec}
+      onQtyInc={inc}
+      onRemove={remove}
+      onSaveForLater={save}
+      onEditVariant={edit}
+    />
   );
 }
 

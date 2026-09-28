@@ -14,7 +14,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, WEB_SAFE_AREA_TOP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, SearchBar, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
@@ -23,9 +23,10 @@ import { useScrollReset } from '@/hooks/useScrollReset';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
-import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct } from '@/services/productService';
+import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, updateProduct } from '@/services/productService';
 import { Product, ProductFilter } from '@/services/productTypes';
-import { formatCents } from '@/lib/money';
+import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { FormInput } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
@@ -55,9 +56,10 @@ interface ActionSheetProps {
   onClose: () => void;
   onRefresh: () => void;
   onDelete: (product: Product) => void;
+  onQuickEditPrice: (product: Product) => void;
 }
 
-function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionSheetProps) {
+function ActionSheet({ product, visible, onClose, onRefresh, onDelete, onQuickEditPrice }: ActionSheetProps) {
   const router = useRouter();
   const { theme } = useAppTheme();
   const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
@@ -107,6 +109,7 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionS
 
   const actions: ActionItem[] = [
     { label: 'Edit', icon: 'edit-2', onPress: () => { closeSheet(); router.push(('/product-detail?id=' + p.id) as never); } },
+    { label: 'Quick edit price', icon: 'dollar-sign', onPress: () => { closeSheet(); onQuickEditPrice(p); } },
     { label: 'View store page', icon: 'eye', onPress: () => { closeSheet(); router.push(('/product-store?id=' + p.id) as never); } },
     { label: 'Create content', icon: 'video', onPress: () => { closeSheet(); router.push(('/create-post?productId=' + p.id) as never); } },
     { label: 'Tag in post', icon: 'tag', onPress: () => { router.push(('/create-post?productId=' + p.id) as never); closeSheet(); } },
@@ -146,6 +149,102 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionS
             </PressableScale>
           ))}
         </ScrollView>
+      </SheetRise>
+    </Modal>
+  );
+}
+
+// ─── Quick Edit Price Sheet ──────────────────────────────────────────────────
+// Mirrors Depop's "Set discount" sheet (mobbin.com/screens/
+// d7f04eb6-64b3-4407-8a85-95b65517b8a7): current price shown read-only above
+// a single editable price field and a Save button, opened from the same
+// "..." action sheet. Depop's percent-off quick-select chips are dropped —
+// that's the separate Discounts feature (item 134), not a duplicate price
+// calculator here.
+
+function centsToInput(cents: number): string {
+  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
+}
+
+interface QuickEditPriceSheetProps {
+  product: Product | null;
+  visible: boolean;
+  onClose: () => void;
+  onSaved: (product: Product, newPriceCents: number, previousPriceCents: number) => void;
+}
+
+function QuickEditPriceSheet({ product, visible, onClose, onSaved }: QuickEditPriceSheetProps) {
+  const { theme } = useAppTheme();
+  const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
+  const [priceInput, setPriceInput] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (product) setPriceInput(centsToInput(product.pricing.priceCents));
+  }, [product]);
+
+  if (!product) return null;
+  const p = product;
+
+  function closeSheet() {
+    if (saving) return;
+    onClose();
+  }
+
+  async function handleSave() {
+    const newCents = parseDecimalToCents(priceInput);
+    if (newCents === null || newCents <= 0) {
+      Alert.alert('Enter a valid price', 'Price must be a positive amount, like 45.00.');
+      return;
+    }
+    const previousCents = p.pricing.priceCents;
+    if (newCents === previousCents) {
+      closeSheet();
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateProduct(p.id, { pricing: { ...p.pricing, priceCents: newCents } });
+      closeSheet();
+      onSaved(p, newCents, previousCents);
+    } catch {
+      Alert.alert('Could not update price', 'Your product was not updated. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      presentationStyle="overFullScreen"
+      onRequestClose={closeSheet}
+    >
+      <Pressable style={sh.overlay} onPress={closeSheet} />
+      <SheetRise style={sh.sheet}>
+        <View style={sh.handle} />
+        <Text style={sh.sheetTitle} numberOfLines={1}>Edit price · {p.name}</Text>
+        <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.md }}>
+          Current price: {formatCents(p.pricing.priceCents)}
+        </Text>
+        <FormInput
+          label="New price"
+          value={priceInput}
+          onChange={setPriceInput}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+          returnKeyType="done"
+          onSubmitEditing={handleSave}
+        />
+        <PrimaryButton
+          label="Save price"
+          onPress={handleSave}
+          loading={saving}
+          disabled={saving}
+          style={{ marginTop: SP.lg }}
+        />
       </SheetRise>
     </Modal>
   );
@@ -288,6 +387,8 @@ export default function ProductsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [actionProduct, setActionProduct] = useState<Product | null>(null);
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const [quickEditProduct, setQuickEditProduct] = useState<Product | null>(null);
+  const [quickEditVisible, setQuickEditVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -340,6 +441,17 @@ export default function ProductsScreen() {
     await duplicateProduct(id);
     Alert.alert('Duplicated', 'Product duplicated as a draft.');
     refresh();
+  }
+
+  function handleQuickEditPriceSaved(product: Product, newPriceCents: number, previousPriceCents: number) {
+    setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, pricing: { ...p.pricing, priceCents: newPriceCents } } : p)));
+    showUndo({
+      message: `Price updated to ${formatCents(newPriceCents)}`,
+      undo: async () => {
+        await updateProduct(product.id, { pricing: { ...product.pricing, priceCents: previousPriceCents } });
+        await loadProducts();
+      },
+    });
   }
 
   async function handleDelete(product: Product) {
@@ -515,7 +627,9 @@ export default function ProductsScreen() {
   return (
     <View style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
       {/* ── Fixed header ── */}
-      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? 67 : insets.top) + 12, backgroundColor: palette.surface ?? BG }]}>
+      {/* Overnight batch item 40: shared WEB_SAFE_AREA_TOP (lib/theme.ts),
+          not a hardcoded 67 — see its own comment. */}
+      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top) + 12, backgroundColor: palette.surface ?? BG }]}>
         {/* Title row */}
         <View style={s.titleRow}>
           <PressableScale
@@ -560,14 +674,18 @@ export default function ProductsScreen() {
 
         {/* Persistent search row */}
         <View style={s.searchRow}>
-          <View style={s.searchBox}>
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search products…"
-              style={s.searchInput}
-            />
-          </View>
+          {/* Overnight batch item 37: SearchBar is the box now (no border, at
+              rest or focus) — the outer `searchBox` wrapper used to draw a
+              second bordered card around it, and this file's own
+              `searchInput` style forced SearchBar's own fill to transparent
+              to compensate, which is exactly the doubled-up "rectangle bar"
+              the owner flagged. */}
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search products…"
+            style={s.searchBarFlex}
+          />
           <PressableScale
             style={[s.controlBtn, hasActiveFilter && s.controlBtnActive]}
             onPress={() => { hapticPrimaryAction(); setFilterModalVisible(true); }}
@@ -642,6 +760,18 @@ export default function ProductsScreen() {
         onClose={() => setActionSheetVisible(false)}
         onRefresh={refresh}
         onDelete={handleDelete}
+        onQuickEditPrice={(product) => {
+          setQuickEditProduct(product);
+          setQuickEditVisible(true);
+        }}
+      />
+
+      {/* Quick edit price sheet */}
+      <QuickEditPriceSheet
+        product={quickEditProduct}
+        visible={quickEditVisible}
+        onClose={() => setQuickEditVisible(false)}
+        onSaved={handleQuickEditPriceSaved}
       />
 
       {/* Filter modal */}
@@ -719,24 +849,7 @@ const createStyles = (theme: any) => {
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
   },
-  searchBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CARD,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: SP.sm,
-    height: 36,
-  },
-  searchInput: {
-    flex: 1,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    height: 36,
-  },
+  searchBarFlex: { flex: 1, height: 36 },
   controlBtn: {
     width: 36,
     height: 36,

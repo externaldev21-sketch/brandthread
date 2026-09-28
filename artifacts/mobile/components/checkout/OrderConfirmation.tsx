@@ -104,7 +104,7 @@ export function OrderConfirmation({
             <Feather name="clock" size={32} color={theme.text} />
           </View>
         ) : (
-          <SuccessCheck size={72} iconSize={34} haptic={false} />
+          <SuccessCheck variant="draw" size={72} haptic={false} testID="checkout-success-check" />
         )}
         <Text style={[styles.eyebrow, { color: theme.muted }]}>{finalizing ? 'PAYMENT RECEIVED' : 'ORDER CONFIRMED'}</Text>
         <Text style={[styles.headline, { color: theme.text }]}>{finalizing ? 'Almost there' : 'Thank you for your order'}</Text>
@@ -130,7 +130,7 @@ export function OrderConfirmation({
           {estimates.length > 0 ? estimates.map(estimate => (
             <Text key={estimate} style={[styles.detailText, { color: theme.text }]}>{estimate}</Text>
           )) : (
-            <Text style={[styles.detailText, { color: theme.text }]}>Tracking updates coming soon</Text>
+            <Text style={[styles.detailText, { color: theme.text }]}>Shared as soon as the seller ships</Text>
           )}
           {estimates.length > 1 ? (
             <Text style={[styles.detailSub, { color: theme.muted }]}>Arrives in {estimates.length} shipments</Text>

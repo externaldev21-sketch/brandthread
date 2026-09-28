@@ -25,15 +25,34 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/ui/Button';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { SuccessCheck } from '@/components/ui/SuccessCheck';
 import * as Haptics from 'expo-haptics';
 import { randomUUID } from 'expo-crypto';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { isPreviewConversationId } from '@/lib/previewInbox';
+import { isPreviewConversationId, isSellerPreviewConversationId } from '@/lib/previewInbox';
 import { authenticateForAppLock, getDeviceSecurity } from '@/lib/appLock';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
+
+/**
+ * How long the "sent" confirmation moment holds before the sheet dismisses
+ * and the real chat message is posted (`onSent` fires). Mobbin: Cash App
+ * "You sent $1 to {name}" (a big checkmark + a big "You sent…" headline,
+ * minimal chrome — https://mobbin.com/screens/4bdf43be-a22e-4594-bc27-9ef221c49362).
+ * Adapted monochrome per spec ("no green unless approved"): this app has no
+ * green checkmark convention to begin with — SuccessCheck's `variant="draw"`
+ * (white ring + white stroke check, no fill, no color, see
+ * components/ui/SuccessCheck.tsx) is the one "it's done" moment used
+ * everywhere else in the app (order confirmed, product published) and is
+ * reused here unchanged, same timing/easing, rather than inventing a new
+ * animation curve. The ring+check finishes drawing at ~730ms; this holds a
+ * further ~420ms so the amount/name headline is legible before the sheet
+ * closes and the real chat bubble takes over — under 1.2s total, "clean and
+ * quick, not bouncy".
+ */
+const SEND_CONFIRM_HOLD_MS = 1150;
 
 const MAX_NOTE_LENGTH = 140;
 const NUMPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
@@ -65,7 +84,9 @@ export function ThreadCashBillMark({
   return <ThreadCashBillIcon size={size} style={disabled ? { opacity: 0.5 } : undefined} />;
 }
 
-type SheetStep = 'amount' | 'keypad' | 'confirm';
+type SheetStep = 'amount' | 'keypad' | 'confirm' | 'sent';
+
+type SentResult = { transferId: string; amountCents: number; note: string | null };
 
 /** The "+" attach-menu entry. Render only when useFeatureFlag('threadCashSend'). */
 export function ThreadCashAttachButton({
@@ -101,7 +122,13 @@ export function ThreadCashAttachButton({
   const { theme } = useAppTheme();
   const router = useRouter();
   const api = useApi();
-  const preview = isPreviewConversationId(conversationId ?? '');
+  // This trigger/sheet is rendered from both app/buyer-conversation.tsx and
+  // app/seller-conversation.tsx (see their own doc comments); each side
+  // seeds preview conversations under its own id prefix
+  // (lib/previewInbox.ts), so both are checked here rather than only the
+  // buyer one — a seller-preview send must mock locally too, never attempt
+  // a real network call with no signed-in preview user behind it.
+  const preview = isPreviewConversationId(conversationId ?? '') || isSellerPreviewConversationId(conversationId ?? '');
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<SheetStep>('amount');
@@ -111,7 +138,11 @@ export function ThreadCashAttachButton({
   const [sending, setSending] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
+  const [sentResult, setSentResult] = useState<SentResult | null>(null);
   const idempotencyKey = useMemo(() => (open ? randomUUID() : null), [open]);
+  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (dismissTimer.current) clearTimeout(dismissTimer.current); }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -138,6 +169,8 @@ export function ThreadCashAttachButton({
     setCents(0);
     setNote('');
     setConfirming(false);
+    setSentResult(null);
+    if (dismissTimer.current) { clearTimeout(dismissTimer.current); dismissTimer.current = null; }
   }
 
   function pickChip(dollars: number) {
@@ -209,16 +242,35 @@ export function ThreadCashAttachButton({
         });
         transferId = result.transferId;
       }
-      onSent({ transferId, amountCents: cents, note: note.trim() || null });
+      // The transfer is already real/persisted by this point — `onSent`
+      // (which posts the actual chat message) is deliberately deferred
+      // until the confirmation moment finishes, not skipped: see the
+      // 'sent' step effect below.
+      const result: SentResult = { transferId, amountCents: cents, note: note.trim() || null };
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setOpen(false);
-      reset();
+      setSentResult(result);
+      setStep('sent');
     } catch (error: any) {
       Alert.alert('Could not send Thread Cash', error?.message ?? 'Please try again.');
     } finally {
       setSending(false);
     }
   }
+
+  // The animated "You sent $X to {name}" confirmation (Cash App structure,
+  // monochrome) holds briefly once a send actually succeeds, then hands off
+  // to the caller's onSent (which posts the real chat bubble) and closes.
+  useEffect(() => {
+    if (step !== 'sent' || !sentResult) return;
+    const result = sentResult;
+    dismissTimer.current = setTimeout(() => {
+      onSent(result);
+      setOpen(false);
+      reset();
+    }, SEND_CONFIRM_HOLD_MS);
+    return () => { if (dismissTimer.current) clearTimeout(dismissTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, sentResult]);
 
   const handle = recipientHandle ? `@${recipientHandle.replace(/^@/, '')}` : (recipientName || 'them');
   const canProceedToConfirm = cents > 0;
@@ -236,33 +288,63 @@ export function ThreadCashAttachButton({
           <ThreadCashBillMark size={18} color={theme.text} accent={theme.accent} disabled={disabled} />
         </TouchableOpacity>
       )}
-      <Modal transparent animationType="fade" visible={open} onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)} testID="thread-cash-backdrop" />
+      <Modal transparent animationType="fade" visible={open} onRequestClose={() => { if (step !== 'sent') setOpen(false); }}>
+        {/* The transfer is already sent by the time this confirmation shows
+            — no backdrop-dismiss race that could skip posting the chat
+            bubble (see the 'sent' step effect above, which owns closing). */}
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => { if (step !== 'sent') setOpen(false); }}
+          testID="thread-cash-backdrop"
+        />
         <SheetRise style={[styles.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {/* Circular badge, half in / half out of the sheet's top edge */}
           <View style={[styles.badge, { backgroundColor: theme.accent, borderColor: theme.card }]}>
             <ThreadCashBillMark size={26} color={theme.onAccent} accent={theme.onAccent} />
           </View>
 
-          <View style={styles.sheetHeader}>
-            <TouchableOpacity
-              onPress={() => setOpen(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              testID="thread-cash-collapse"
-            >
-              <Feather name="chevron-down" size={22} color={theme.muted} />
-            </TouchableOpacity>
-            <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-              <ThreadCashBillMark size={14} color={theme.text} accent={theme.accent} />
-              <Text style={[styles.balanceText, { color: theme.text }]} testID="thread-cash-balance">
-                {balanceCents == null ? '···' : formatCents(balanceCents)}
-              </Text>
+          {/* Cash App's confirmation screen drops the chrome around it (no
+              close affordance, no balance pill) — the checkmark + headline
+              are the whole screen for that one beat. */}
+          {step !== 'sent' && (
+            <View style={styles.sheetHeader}>
+              <TouchableOpacity
+                onPress={() => setOpen(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="thread-cash-collapse"
+              >
+                <Feather name="chevron-down" size={22} color={theme.muted} />
+              </TouchableOpacity>
+              <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
+                <ThreadCashBillMark size={14} color={theme.text} accent={theme.accent} />
+                <Text style={[styles.balanceText, { color: theme.text }]} testID="thread-cash-balance">
+                  {balanceCents == null ? '···' : formatCents(balanceCents)}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
-          {step === 'keypad' ? (
+          {step === 'sent' && sentResult ? (
+            // The animated send confirmation — Cash App's "You sent $1 to
+            // {name}" structure (big checkmark, big amount headline,
+            // minimal chrome), adapted monochrome: SuccessCheck's `draw`
+            // variant (white ring + white stroke check on theme.text — no
+            // fill, no color, see components/ui/SuccessCheck.tsx) stands in
+            // for Cash App's green filled circle, reusing that component's
+            // existing timing/easing rather than a new animation.
+            <View style={styles.sentBlock} testID="thread-cash-sent-confirmation">
+              {/* haptic=false: the success haptic already fired the moment
+                  the transfer was confirmed (see handleSend above), not
+                  re-fired here on mount. */}
+              <SuccessCheck variant="draw" size={72} haptic={false} testID="thread-cash-sent-check" />
+              <Text style={[styles.sentAmount, { color: theme.text }]}>
+                You sent {formatAmountDisplay(sentResult.amountCents)}
+              </Text>
+              <Text style={[styles.subtitle, { color: theme.muted, marginBottom: 0 }]}>to {handle}</Text>
+            </View>
+          ) : step === 'keypad' ? (
             <>
               <Text
                 style={[styles.bigAmount, { color: cents > 0 ? theme.text : theme.subtle }]}
@@ -358,20 +440,22 @@ export function ThreadCashAttachButton({
             </>
           )}
 
-          <Button
-            label={step === 'confirm'
-              ? `Confirm & Send · ${formatAmountDisplay(cents)}`
-              : step === 'keypad'
-                ? `Continue · ${formatAmountDisplay(cents)}`
-                : `Send · ${formatAmountDisplay(cents)}`}
-            variant="primary"
-            fullWidth
-            loading={sending || confirming}
-            disabled={!canProceedToConfirm || sending || confirming}
-            onPress={() => { step === 'confirm' ? handleConfirmAndSend() : setStep('confirm'); }}
-            accessibilityLabel={step === 'confirm' ? 'Confirm and send' : 'Continue'}
-            testID={step === 'confirm' ? 'thread-cash-confirm-send' : 'thread-cash-continue'}
-          />
+          {step !== 'sent' && (
+            <Button
+              label={step === 'confirm'
+                ? `Confirm & Send · ${formatAmountDisplay(cents)}`
+                : step === 'keypad'
+                  ? `Continue · ${formatAmountDisplay(cents)}`
+                  : `Send · ${formatAmountDisplay(cents)}`}
+              variant="primary"
+              fullWidth
+              loading={sending || confirming}
+              disabled={!canProceedToConfirm || sending || confirming}
+              onPress={() => { step === 'confirm' ? handleConfirmAndSend() : setStep('confirm'); }}
+              accessibilityLabel={step === 'confirm' ? 'Confirm and send' : 'Continue'}
+              testID={step === 'confirm' ? 'thread-cash-confirm-send' : 'thread-cash-continue'}
+            />
+          )}
         </SheetRise>
       </Modal>
     </>
@@ -535,6 +619,8 @@ const styles = StyleSheet.create({
   backToChips: { alignSelf: 'center', marginBottom: SP.md },
   backToChipsText: { fontSize: FS.sm, fontFamily: FONT.medium, textDecorationLine: 'underline' },
   confirmBlock: { alignItems: 'center', marginBottom: SP.lg },
+  sentBlock: { alignItems: 'center', paddingTop: SP.lg, paddingBottom: SP.xl, gap: SP.sm },
+  sentAmount: { fontSize: FS.h1, fontFamily: FONT.bold, textAlign: 'center', letterSpacing: -0.5, marginTop: SP.xs },
   confirmNote: { fontSize: FS.xs, fontFamily: FONT.regular, fontStyle: 'italic', marginTop: SP.xs },
   // Full-width row card: coin circle | title+subtitle | chevron/Accept.
   card: {

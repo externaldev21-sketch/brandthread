@@ -89,6 +89,7 @@ import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buy
 import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -420,11 +421,11 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$480',
     productOriginalPrice: null,
     accentColor: '#232323',
-    likes: 0,
+    likes: 12400,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 842,
+    shares: 2045,
+    saves: 3100,
     location: 'Paris, France',
     productId: 'preview-product-01',
     sellerId: 'preview-seller-01',
@@ -438,7 +439,7 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
       { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000 },
       { productId: 'preview-product-01b', productName: 'Leather Ankle Boots', priceCents: 21000 },
     ],
-    commentsCount: 0,
+    commentsCount: 980,
   },
   {
     id: 'preview-fashion-02',
@@ -458,16 +459,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$325',
     productOriginalPrice: '$390',
     accentColor: '#474747',
-    likes: 0,
+    likes: 9800,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 567,
+    shares: 1780,
+    saves: 2200,
     location: 'Milan, Italy',
     productId: 'preview-product-02',
     sellerId: 'preview-seller-02',
     productTags: [{ productId: 'preview-product-02', productName: 'Liquid Silver Dress', priceCents: 32500 }],
-    commentsCount: 0,
+    commentsCount: 1240,
   },
   {
     id: 'preview-fashion-03',
@@ -487,16 +488,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$560',
     productOriginalPrice: null,
     accentColor: '#171717',
-    likes: 0,
+    likes: 15600,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 910,
+    shares: 2600,
+    saves: 4300,
     location: 'New York, NY',
     productId: 'preview-product-03',
     sellerId: 'preview-seller-03',
     productTags: [{ productId: 'preview-product-03', productName: 'Oversized Tuxedo', priceCents: 56000 }],
-    commentsCount: 0,
+    commentsCount: 2100,
   },
   {
     id: 'preview-fashion-04',
@@ -516,16 +517,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$410',
     productOriginalPrice: null,
     accentColor: '#626262',
-    likes: 0,
+    likes: 8300,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 320,
+    shares: 990,
+    saves: 1500,
     location: 'London, UK',
     productId: 'preview-product-04',
     sellerId: 'preview-seller-04',
     productTags: [{ productId: 'preview-product-04', productName: 'Ivory Column Set', priceCents: 41000 }],
-    commentsCount: 0,
+    commentsCount: 640,
   },
   {
     id: 'preview-fashion-05',
@@ -545,16 +546,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$295',
     productOriginalPrice: '$350',
     accentColor: '#0F0F0F',
-    likes: 0,
+    likes: 22100,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 1200,
+    shares: 3200,
+    saves: 5800,
     location: 'Tokyo, Japan',
     productId: 'preview-product-05',
     sellerId: 'preview-seller-05',
     productTags: [{ productId: 'preview-product-05', productName: 'Asymmetric Layer Jacket', priceCents: 29500 }],
-    commentsCount: 0,
+    commentsCount: 3400,
   },
   {
     id: 'preview-fashion-06',
@@ -574,16 +575,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$375',
     productOriginalPrice: null,
     accentColor: '#353535',
-    likes: 0,
+    likes: 6700,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 210,
+    shares: 720,
+    saves: 1100,
     location: 'Berlin, Germany',
     productId: 'preview-product-06',
     sellerId: 'preview-seller-06',
     productTags: [{ productId: 'preview-product-06', productName: 'Draped Hardware Gown', priceCents: 37500 }],
-    commentsCount: 0,
+    commentsCount: 480,
   },
   {
     id: 'preview-fashion-07',
@@ -603,16 +604,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$245',
     productOriginalPrice: null,
     accentColor: '#555555',
-    likes: 0,
+    likes: 18900,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 1050,
+    shares: 2850,
+    saves: 4900,
     location: 'Los Angeles, CA',
     productId: 'preview-product-07',
     sellerId: 'preview-seller-07',
     productTags: [{ productId: 'preview-product-07', productName: 'Crystal Mesh Top', priceCents: 24500 }],
-    commentsCount: 0,
+    commentsCount: 2700,
   },
   {
     id: 'preview-fashion-08',
@@ -632,16 +633,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$520',
     productOriginalPrice: null,
     accentColor: '#292929',
-    likes: 0,
+    likes: 11200,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 610,
+    shares: 1650,
+    saves: 2600,
     location: 'Copenhagen, Denmark',
     productId: 'preview-product-08',
     sellerId: 'preview-seller-08',
     productTags: [{ productId: 'preview-product-08', productName: 'Reconstructed Trench', priceCents: 52000 }],
-    commentsCount: 0,
+    commentsCount: 890,
   },
   {
     id: 'preview-fashion-09',
@@ -661,16 +662,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$445',
     productOriginalPrice: '$510',
     accentColor: '#404040',
-    likes: 0,
+    likes: 27500,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 1600,
+    shares: 3900,
+    saves: 6700,
     location: 'Seoul, South Korea',
     productId: 'preview-product-09',
     sellerId: 'preview-seller-09',
     productTags: [{ productId: 'preview-product-09', productName: 'Satin Power Suit', priceCents: 44500 }],
-    commentsCount: 0,
+    commentsCount: 4100,
   },
   {
     id: 'preview-fashion-10',
@@ -690,16 +691,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$690',
     productOriginalPrice: null,
     accentColor: '#1E1E1E',
-    likes: 0,
+    likes: 5400,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 180,
+    shares: 610,
+    saves: 950,
     location: 'Paris, France',
     productId: 'preview-product-10',
     sellerId: 'preview-seller-10',
     productTags: [{ productId: 'preview-product-10', productName: 'Sculpted Silk Gown', priceCents: 69000 }],
-    commentsCount: 0,
+    commentsCount: 390,
   },
 ];
 
@@ -800,7 +801,9 @@ function initialEngagement(item: SpotlightItem): EngagementState {
     saved: item.savedByMe === true, saves: item.saves,
     reposted: item.repostedByMe === true, reposts: item.reposts,
     following: false,
-    comments: item.comments,
+    // Some feed items arrive without a comments array (e.g. posts restored
+    // from the feed cache); never let that reach the memo comparator below.
+    comments: item.comments ?? [],
   };
 }
 
@@ -1774,7 +1777,7 @@ function engagementEqual(a: EngagementState | undefined, b: EngagementState | un
   return a.liked === b.liked && a.likes === b.likes
     && a.saved === b.saved && a.saves === b.saves
     && a.reposted === b.reposted && a.reposts === b.reposts
-    && a.following === b.following && a.comments.length === b.comments.length;
+    && a.following === b.following && (a.comments?.length ?? 0) === (b.comments?.length ?? 0);
 }
 
 const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
@@ -1843,7 +1846,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     reposts: post.repostsCount,
     repostedByMe: post.repostedByMe,
     friendReposts: post.friendReposts,
-    shares: 0,
+    shares: Number((post as any).sharesCount ?? 0),
     saves: Number((post as any).savedCount ?? (post as any).savesCount ?? 0),
     savedByMe: post.savedByMe === true,
     location: (post as any).location ?? (post as any).locationName ?? undefined,
@@ -3222,7 +3225,7 @@ export default function FeedScreen({
         {showSearch ? (
           <View style={styles.searchRow}>
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, WEB_INPUT_RESET]}
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search creators, products..."

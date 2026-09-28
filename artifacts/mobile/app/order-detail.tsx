@@ -21,6 +21,7 @@ import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, Ret
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { getInitials } from '@/lib/format';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -80,7 +81,7 @@ export function adaptApiOrder(raw: any): Order {
 
   // Derive payment status from DB order status (shared with app/(tabs)/orders.tsx)
   type PaymentStatus = DbPaymentStatus;
-  const uiPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(raw.status);
+  const uiPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(raw.status, raw.paidAt);
   const isRefundPending = raw.status === 'refund_pending';
 
   // Parse shipping address (stored as JSON in DB)
@@ -452,6 +453,9 @@ export default function OrderDetailScreen() {
   // Tracking events modal
   const [trackingModalShipmentId, setTrackingModalShipmentId] = useState<string | null>(null);
 
+  // Message buyer
+  const [messagingBuyer, setMessagingBuyer] = useState(false);
+
   // Backoff: stop polling after 3 consecutive failures; resume on next focus.
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -548,6 +552,57 @@ export default function OrderDetailScreen() {
     hapticSuccessAction();
     try { await api.orders.updateStatus(id, 'delivered'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
+  }
+
+  // Opens (or creates) the real DM thread with this order's buyer — reuses
+  // the same api.conversations.createOrGet the buyer-side "Message" button
+  // already uses (see app/buyer-other-profile.tsx), just with the seller's
+  // own identity as `myInfo` instead of that screen's hardcoded buyer one.
+  // Never fabricates a buyer identity: bails if this order has no linked
+  // buyerUserId (e.g. a guest checkout with no Brandthread account).
+  async function handleMessageBuyer() {
+    if (!order || messagingBuyer) return;
+    const buyerUserId = order.customer.buyerUserId;
+    if (!buyerUserId) {
+      Alert.alert('No buyer account', 'This order has no linked Brandthread account to message.');
+      return;
+    }
+    hapticPrimaryAction();
+    setMessagingBuyer(true);
+    try {
+      const profile = await api.auth.me();
+      const sellerName = profile.brandName || profile.displayName || profile.name;
+      const conv = await api.conversations.createOrGet({
+        type: 'buyer_to_seller_order',
+        participant: {
+          userId: buyerUserId,
+          name: order.customer.name,
+          handle: '',
+          initials: order.customer.initials || getInitials(order.customer.name),
+          // Monochrome brand: the same theme.accent every avatar chip
+          // already falls back to when no color is stored (see
+          // `other.color || theme.accent` in seller-inbox.tsx /
+          // seller-conversation.tsx) — never a hardcoded brand color.
+          color: theme.accent,
+          accountType: 'buyer',
+        },
+        myInfo: {
+          name: sellerName,
+          handle: profile.username ? `@${profile.username}` : '',
+          initials: getInitials(sellerName),
+          color: theme.accent,
+          accountType: 'seller',
+        },
+        contextOrderId: order.id,
+        contextOrderNumber: order.orderNumber,
+        contextOrderStatus: order.status,
+      });
+      router.push(`/seller-conversation?id=${encodeURIComponent(conv.id)}` as never);
+    } catch {
+      Alert.alert("Couldn't open conversation", 'Check your connection and try again.');
+    } finally {
+      setMessagingBuyer(false);
+    }
   }
 
   async function handleCancelOrder() {
@@ -764,7 +819,7 @@ export default function OrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onMarkDelivered={handleMarkDelivered} onCancelPress={() => setShowCancelModal(true)} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
+        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onMarkDelivered={handleMarkDelivered} onCancelPress={() => setShowCancelModal(true)} onMessageBuyer={handleMessageBuyer} messagingBuyer={messagingBuyer} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
         {activeTab === 'customer'    && <CustomerTab order={order} />}
         {activeTab === 'payment'     && <PaymentTab order={order} />}
         {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onUpdateTracking={handleUpdateTracking} updatingTracking={updatingTracking} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
@@ -857,13 +912,15 @@ export default function OrderDetailScreen() {
 // TAB: OVERVIEW
 // ═══════════════════════════════════════════════════════
 
-function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onMarkDelivered, onCancelPress, router, reload, onAddTrackingQuick }: {
+function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onMarkDelivered, onCancelPress, onMessageBuyer, messagingBuyer, router, reload, onAddTrackingQuick }: {
   order: Order;
   onMarkProcessing: () => void;
   onMarkReadyToShip: () => void;
   onMarkShipped: () => void;
   onMarkDelivered: () => void;
   onCancelPress: () => void;
+  onMessageBuyer: () => void;
+  messagingBuyer: boolean;
   router: ReturnType<typeof useRouter>;
   reload: () => void;
   onAddTrackingQuick: (carrier: string, trackingNumber: string) => Promise<void>;
@@ -967,6 +1024,23 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       {/* Action Buttons */}
       <View style={s.actionSection}>
         <SectionHeader title="Actions" />
+        <View style={s.actionRow}>
+          <SecondaryButton
+            label={messagingBuyer ? 'Opening…' : 'Message Buyer'}
+            onPress={onMessageBuyer}
+            icon="message-circle"
+            disabled={messagingBuyer || !order.customer.buyerUserId}
+            style={{ flex: 1 }}
+          />
+          {order.payment.amountPaidCents > order.payment.amountRefundedCents && (
+            <SecondaryButton
+              label="Refund"
+              onPress={() => router.push(`/refund-detail?orderId=${order.id}` as never)}
+              icon="credit-card"
+              style={{ flex: 1 }}
+            />
+          )}
+        </View>
         {order.status === 'new' && (
           <View style={s.actionRow}>
             <PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" style={{ flex: 1 }} />
