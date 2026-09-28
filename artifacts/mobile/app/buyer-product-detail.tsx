@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, RefreshControl,
-  Animated, Dimensions, PanResponder,
+  Animated, Dimensions, PanResponder, Easing, AccessibilityInfo,
 } from 'react-native';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,6 +50,13 @@ import { ProductReviewsSection } from '@/components/ProductReviewsSection';
 import {
   messageSellerAboutProductHref, profileHref, profileVideosHref,
 } from '@/lib/profileNavigation';
+import { getPreviewBuyerProduct, getPreviewRelatedProducts, isPreviewProductId } from '@/lib/previewProducts';
+import { isPreviewSellerId } from '@/lib/previewCheckout';
+import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
+import {
+  CART_FLIGHT_ITEM_SIZE, flightSourceFromRect, getCartFlightVector, measureCartTarget, measureWindowRect,
+  shouldAnimateCartSuccess, type CartFlightPoint, type CartFlightSource,
+} from '@/lib/cartFlight';
 
 type ThemeAliases = {
   theme: AppThemePreset;
@@ -512,6 +519,27 @@ export default function BuyerProductDetailScreen() {
   const [reserveLoading,  setReserveLoading]  = useState(false);
   const [sizeChartOpen,   setSizeChartOpen]   = useState(false);
 
+  // Add to cart → the product photo flies to the bag icon, which bumps and
+  // shows the count (the feed / shop sheet pattern, #287 / #291).
+  const [cartCount, setCartCount] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
+  const { scale: cartPulse, bump: bumpCart } = useCartBadgeBump(reduceMotion);
+  const cartTargetRef = useRef<View>(null);
+  const galleryRef = useRef<View>(null);
+  const cartFlyProgress = useRef(new Animated.Value(0)).current;
+  const [flying, setFlying] = useState(false);
+  const [flight, setFlight] = useState<{ source: CartFlightSource | null; target: CartFlightPoint } | null>(null);
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled?.()
+      .then(enabled => { if (active) setReduceMotion(enabled); })
+      .catch(() => { if (active) setReduceMotion(false); });
+    void getCart().then(cart => {
+      if (active) setCartCount(cart.items.reduce((sum, item) => sum + item.quantity, 0));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
   // ── Buyer demand signals ─────────────────────────────────────────────────
   // Populated from server-supplied fields on publicProducts.get() response only.
   // Values are never fabricated — zero means the server did not supply them.
@@ -566,6 +594,11 @@ export default function BuyerProductDetailScreen() {
             }
           } catch { /* API unavailable — product will show as not found */ }
         }
+        // Dev-web preview only: a seeded `preview-product-*` has no catalog
+        // row, so the real request fails. Build the same BuyerProduct from
+        // the preview catalog (lib/previewProducts.ts; null for real ids and
+        // in production) so the page, sizes, cart and checkout all run.
+        if (!prod && isPreviewProductId(productId)) prod = getPreviewBuyerProduct(productId);
         // productName-only navigation is not supported; all entry points
         // must supply a productId so real variant data is loaded.
 
@@ -766,6 +799,9 @@ export default function BuyerProductDetailScreen() {
     setAddingToCart(false);
     if (result.success) {
       setAddedToCart(true);
+      setCartCount(result.cart.items.reduce((sum, item) => sum + item.quantity, 0));
+      await flyToCart();
+      bumpCart();
       setShowAddedSheet(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Auto-clear the icon-button checkmark after 2.5s; the sheet itself
@@ -775,6 +811,27 @@ export default function BuyerProductDetailScreen() {
     } else {
       Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
     }
+  }
+
+  /** The product photo lifts off the gallery and lands in the bag icon (skipped under Reduce Motion). */
+  async function flyToCart(): Promise<void> {
+    if (!shouldAnimateCartSuccess(reduceMotion)) return;
+    const fallback = { x: GALLERY_WIDTH - 40, y: insets.top + SP.sm + 22 };
+    const [target, photoRect] = await Promise.all([
+      measureCartTarget(cartTargetRef.current?.measureInWindow?.bind(cartTargetRef.current), fallback),
+      measureWindowRect(galleryRef.current?.measureInWindow?.bind(galleryRef.current)),
+    ]);
+    const source = flightSourceFromRect(photoRect, { top: 0, bottom: Dimensions.get('window').height });
+    setFlight({ source, target });
+    setFlying(true);
+    cartFlyProgress.setValue(0);
+    await new Promise<void>(resolve => {
+      requestAnimationFrame(() => {
+        Animated.timing(cartFlyProgress, {
+          toValue: 1, duration: 720, easing: Easing.inOut(Easing.cubic), useNativeDriver: true,
+        }).start(() => { setFlying(false); resolve(); });
+      });
+    });
   }
 
   // DM the seller about this product: opens (or reuses) the buyer↔seller
@@ -815,7 +872,8 @@ export default function BuyerProductDetailScreen() {
     try {
       // Check seller payment readiness before entering checkout
       const sellerId = product!.sellerId;
-      if (sellerId && isSignedIn) {
+      // A seeded preview seller has no payment account to check (dev-web preview only).
+      if (sellerId && isSignedIn && !isPreviewSellerId(sellerId)) {
         try {
           const status = await api.buyer.sellerPaymentStatus(sellerId);
           if (!status.ready) {
@@ -861,7 +919,7 @@ export default function BuyerProductDetailScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 144 }}
       >
         {/* Immersive product gallery */}
-        <View style={s.imageArea}>
+        <View style={s.imageArea} ref={galleryRef} collapsable={false}>
           <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} />
           {/* Back button — solid dark chrome over the full-bleed gallery. A
               BlurView-based "glass" variant re-samples whatever sits behind
@@ -880,17 +938,27 @@ export default function BuyerProductDetailScreen() {
             />
           </View>
           {/* Cart button */}
-          <View style={[s.cartBtnWrap, { top: insets.top + SP.sm }]}>
+          <Animated.View
+            ref={cartTargetRef}
+            collapsable={false}
+            style={[s.cartBtnWrap, { top: insets.top + SP.sm, transform: [{ scale: cartPulse }] }]}
+            testID="product-cart-button"
+          >
             <IconButton
               name="shopping-bag"
               onPress={() => router.push('/(buyer)/cart' as never)}
-              accessibilityLabel="Open cart"
+              accessibilityLabel={cartCount > 0 ? `Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}` : 'Open cart'}
               accessibilityHint="View items in your cart"
               variant="plain"
               color="#FFFFFF"
               style={s.mediaChromeBtn}
             />
-          </View>
+            {cartCount > 0 ? (
+              <View style={s.cartBadge} pointerEvents="none" testID="product-cart-badge">
+                <Text style={s.cartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
+              </View>
+            ) : null}
+          </Animated.View>
         </View>
 
         <ResponsiveContainer style={s.body}>
@@ -909,83 +977,12 @@ export default function BuyerProductDetailScreen() {
             )}
           </View>
 
-          {/* Title & Seller */}
+          {/* Page order (item: preview buy flow) follows real marketplace
+              product pages (SSENSE / Farfetch / Depop on Mobbin): photos →
+              title → price → sizes → the purchase bar (sticky) → seller →
+              About this piece → returns → purchase protection (once) →
+              you might also like → report links, small, at the very end. */}
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
-          <TouchableOpacity style={s.sellerCard} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
-            <Avatar name={product.sellerName} size={40} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
-              {!!product.sellerHandle && <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>}
-            </View>
-            <View style={s.sellerViewStore}>
-              <Text style={s.sellerViewStoreText}>View store</Text>
-              <Feather name="chevron-right" size={14} color={MUTED} />
-            </View>
-          </TouchableOpacity>
-          <Button
-            label="Message seller"
-            icon="message-circle"
-            onPress={handleMessageSeller}
-            variant="secondary"
-            size="small"
-            accessibilityHint="Opens a chat with the seller about this product"
-            style={{ alignSelf: 'flex-start', marginBottom: SP.md }}
-            testID="product-message-seller"
-          />
-
-          {/* Buyer protection — a single glanceable badge + one-line copy
-              (BuyerProtectionNote's `compact` mode), not a wall of trust
-              copy. Reference: Apple Store's compact delivery/protection strip
-              above its sticky CTA — https://mobbin.com/screens/65c853c9-7b34-40c4-af81-67ad778bacac */}
-          <BuyerProtectionNote preorder={product.isPreOrder} compact style={{ marginBottom: SP.md }} />
-
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.md, marginBottom: SP.md }}>
-            <TouchableOpacity
-              onPress={() => router.push(reportHref({
-                targetType: 'product',
-                targetId: product.id,
-                label: product.name,
-                ownerId: product.sellerId,
-                ownerName: product.sellerName,
-              }) as never)}
-              accessibilityRole="button"
-              accessibilityLabel="Report this listing"
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
-            >
-              <Feather name="flag" size={12} color={MUTED} />
-              <Text style={{ color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs, textDecorationLine: 'underline' }}>Report listing</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push(('/ip-report?listingId=' + encodeURIComponent(product.id)) as never)}
-              accessibilityRole="button"
-              accessibilityLabel="Report intellectual property infringement"
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-            >
-              <Text style={{ color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs, textDecorationLine: 'underline' }}>Report intellectual property infringement</Text>
-            </TouchableOpacity>
-          </View>
-           {paymentUnavailable && (
-             <View style={s.paymentWarningBanner} accessibilityRole="alert">
-               <Feather name="alert-triangle" size={ICON.xs} color={ORANGE} />
-               <View style={s.paymentWarningCopy}>
-                 <Text style={s.paymentWarningTitle}>Payments unavailable</Text>
-                 <Text style={s.paymentWarningText}>
-                   {sellerPaymentReason ?? "This seller can't accept payments right now."} You can still add this item to your cart.
-                 </Text>
-               </View>
-             </View>
-           )}
-          {sellerVacationMessage && (
-            <View style={s.vacationBanner} accessibilityRole="alert">
-              <Feather name="sun" size={ICON.sm} color={ORANGE} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.vacationTitle}>Seller is away</Text>
-                <Text style={s.vacationText}>{sellerVacationMessage}</Text>
-              </View>
-            </View>
-          )}
-
           {/* Price */}
           <View style={s.priceRow}>
             <Text style={[s.price, hasDiscount ? s.priceSale : undefined]}>{formatCents(variantPrice)}</Text>
@@ -1017,6 +1014,27 @@ export default function BuyerProductDetailScreen() {
             </View>
           )}
 
+           {paymentUnavailable && (
+             <View style={s.paymentWarningBanner} accessibilityRole="alert">
+               <Feather name="alert-triangle" size={ICON.xs} color={ORANGE} />
+               <View style={s.paymentWarningCopy}>
+                 <Text style={s.paymentWarningTitle}>Payments unavailable</Text>
+                 <Text style={s.paymentWarningText}>
+                   {sellerPaymentReason ?? "This seller can't accept payments right now."} You can still add this item to your cart.
+                 </Text>
+               </View>
+             </View>
+           )}
+          {sellerVacationMessage && (
+            <View style={s.vacationBanner} accessibilityRole="alert">
+              <Feather name="sun" size={ICON.sm} color={ORANGE} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.vacationTitle}>Seller is away</Text>
+                <Text style={s.vacationText}>{sellerVacationMessage}</Text>
+              </View>
+            </View>
+          )}
+
           {/* Pre-order info */}
           {product.isPreOrder && (
             <View style={s.preOrderCard}>
@@ -1040,7 +1058,6 @@ export default function BuyerProductDetailScreen() {
             </View>
           )}
 
-          {/* Divider */}
           <View style={s.divider} />
 
           {/* Options — unselected options highlight after the buyer attempts to add */}
@@ -1114,21 +1131,9 @@ export default function BuyerProductDetailScreen() {
             </View>
           )}
 
-          {/* Description */}
-          <View style={s.divider} />
-          <Text style={s.descTitle}>About this piece</Text>
-          <Text style={s.desc}>{product.description}</Text>
-
-          {/* Policies */}
-          <View style={s.divider} />
-          <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />
-          <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy} />
-          <BuyerProtectionNote preorder={product.isPreOrder} style={{ marginTop: SP.sm }} />
-
           {/* Size Chart — expandable table */}
           {!!(product as any).sizeChart && (
             <>
-              <View style={s.divider} />
               <TouchableOpacity
                 style={[sz.toggle, { borderTopColor: theme.border }]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeChartOpen(o => !o); }}
@@ -1144,6 +1149,48 @@ export default function BuyerProductDetailScreen() {
             </>
           )}
 
+
+          <View style={s.divider} />
+          <TouchableOpacity style={s.sellerCard} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
+            <Avatar name={product.sellerName} size={40} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
+              {!!product.sellerHandle && <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>}
+            </View>
+            <View style={s.sellerViewStore}>
+              <Text style={s.sellerViewStoreText}>View store</Text>
+              <Feather name="chevron-right" size={14} color={MUTED} />
+            </View>
+          </TouchableOpacity>
+          <Button
+            label="Message seller"
+            icon="message-circle"
+            onPress={handleMessageSeller}
+            variant="secondary"
+            size="small"
+            accessibilityHint="Opens a chat with the seller about this product"
+            style={{ alignSelf: 'flex-start', marginBottom: SP.md }}
+            testID="product-message-seller"
+          />
+
+          {/* About this piece — the product's own description (hidden when empty). */}
+          {product.description?.trim() ? (
+            <>
+              <View style={s.divider} />
+              <Text style={s.descTitle}>About this piece</Text>
+              <Text style={s.desc}>{product.description.trim()}</Text>
+            </>
+          ) : null}
+
+          {/* Returns & cancellation */}
+          <View style={s.divider} />
+          <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />
+          <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy} />
+
+          {/* Purchase protection — exactly once (it also rendered, compact,
+              under the seller row). */}
+          <BuyerProtectionNote preorder={product.isPreOrder} style={{ marginTop: SP.sm }} />
+
           {/* Reviews — shared with the Shop sheet so review UI never drifts
               between the two surfaces. Renders nothing when there are none. */}
           <ProductReviewsSection productId={product.id} productName={product.name} />
@@ -1151,13 +1198,63 @@ export default function BuyerProductDetailScreen() {
           {/* Worn in these videos */}
           <WornInVideos productId={product.id} productName={product.name} />
 
-          {/* Related Products */}
-          <View style={s.divider} />
-          <Text style={s.reviewsHeader}>You Might Also Like</Text>
-          <RelatedProducts productId={product.id} />
+          {/* You might also like — owns its header; renders nothing when empty. */}
+          <RelatedProducts productId={product.id} dividerStyle={s.divider} headerStyle={s.reviewsHeader} />
 
+          {/* Report links: de-emphasised, at the very bottom. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.md, marginTop: SP.lg, marginBottom: SP.md, opacity: 0.8 }}>
+            <TouchableOpacity
+              onPress={() => router.push(reportHref({
+                targetType: 'product',
+                targetId: product.id,
+                label: product.name,
+                ownerId: product.sellerId,
+                ownerName: product.sellerName,
+              }) as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Report this listing"
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+            >
+              <Feather name="flag" size={11} color={SUBTLE} />
+              <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs }}>Report listing</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push(('/ip-report?listingId=' + encodeURIComponent(product.id)) as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Report intellectual property infringement"
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            >
+              <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs }}>Report intellectual property infringement</Text>
+            </TouchableOpacity>
+          </View>
         </ResponsiveContainer>
       </ScrollView>
+
+      {flying && flight ? (() => {
+        const flySize = flight.source?.size ?? CART_FLIGHT_ITEM_SIZE;
+        const startLeft = flight.source ? flight.source.x - flySize / 2 : GALLERY_WIDTH / 2 - flySize / 2;
+        const startTop = flight.source ? flight.source.y - flySize / 2 : GALLERY_HEIGHT / 2 - flySize / 2;
+        const vector = getCartFlightVector(startLeft, startTop, flight.target, flySize);
+        const ratio = CART_FLIGHT_ITEM_SIZE / flySize;
+        return (
+          <Animated.View
+            testID="cart-fly-item"
+            pointerEvents="none"
+            style={[s.cartFlyItem, {
+              left: startLeft, top: startTop, width: flySize, height: flySize, borderRadius: 14 / ratio,
+              opacity: cartFlyProgress.interpolate({ inputRange: [0, 0.82, 1], outputRange: [1, 1, 0] }),
+              transform: [
+                { translateX: cartFlyProgress.interpolate({ inputRange: [0, 1], outputRange: [0, vector.x] }) },
+                { translateY: cartFlyProgress.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, -48, vector.y] }) },
+                { scale: cartFlyProgress.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0.72 * ratio, 0.28 * ratio] }) },
+              ],
+            }]}
+          >
+            {product.imageUris[0] ? <CachedImage source={{ uri: product.imageUris[0] }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+          </Animated.View>
+        );
+      })() : null}
 
       {/* Added-to-bag confirmation — a deliberate choice (UNIQLO-style), not
           an auto-dismissing toast: the buyer picks View bag or Keep shopping. */}
@@ -1207,26 +1304,27 @@ export default function BuyerProductDetailScreen() {
         accessibilityRole="toolbar"
         accessibilityLabel="Product purchase actions"
       >
+        {/* Real "Add to cart" + "Buy now" pair (it was an unlabeled bag icon). */}
         {addedToCart ? (
-          <IconButton
-            name="check"
+          <Button
+            label="In your bag"
+            icon="check"
+            variant="secondary"
             onPress={() => router.push('/(buyer)/cart' as never)}
-            accessibilityLabel="View cart"
-            color={SUCCESS}
-            style={s.addToCartIconBtn}
+            accessibilityLabel="In your bag. View cart"
+            style={s.buyNowBtn}
+            testID="product-view-cart"
           />
-        ) : addingToCart ? (
-          <View style={s.addToCartIconBtn}>
-            <ActivityIndicator color={PURPLE_LIGHT} size="small" />
-          </View>
         ) : (
-          <IconButton
-            name="shopping-bag"
+          <Button
+            label="Add to cart"
+            variant="secondary"
             onPress={handleAddToCart}
-            disabled={addingToCart || !inStock}
-            accessibilityLabel={!allSelected ? 'Select options to add to cart' : !inStock ? 'Out of stock' : 'Add to cart'}
-            color={allSelected && inStock ? PURPLE_LIGHT : SUBTLE}
-            style={s.addToCartIconBtn}
+            loading={addingToCart}
+            disabled={addingToCart || (allSelected && !inStock)}
+            accessibilityLabel={!allSelected ? 'Add to cart. Select a size first' : !inStock ? 'Out of stock' : 'Add to cart'}
+            style={s.buyNowBtn}
+            testID="product-add-to-cart"
           />
         )}
 
@@ -1389,7 +1487,17 @@ const wv = StyleSheet.create({
   authorName: { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: 4 },
 });
 
-function RelatedProducts({ productId }: { productId: string }) {
+/**
+ * "You might also like". Owns its header so an empty or failed row never
+ * leaves a bare section title behind (it did: "You Might Also Like" over
+ * nothing). Dev-web preview: seeded products get the same seller's other
+ * pieces, then similar ones, from the preview catalog.
+ */
+function RelatedProducts({ productId, dividerStyle, headerStyle }: {
+  productId: string;
+  dividerStyle?: object;
+  headerStyle?: object;
+}) {
   const { push } = useThreadPull();
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, GOLD } = useThemeAliases();
   const api = useApi();
@@ -1403,6 +1511,12 @@ function RelatedProducts({ productId }: { productId: string }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    const preview = isPreviewProductId(productId) ? getPreviewRelatedProducts(productId, 4) : [];
+    if (preview.length > 0) {
+      setProducts(preview);
+      setLoading(false);
+      return () => { cancelled = true; };
+    }
     api.publicProducts.related(productId, 5)
       .then((data) => {
         if (!cancelled) {
@@ -1424,21 +1538,14 @@ function RelatedProducts({ productId }: { productId: string }) {
     );
   }
 
-  if (error) {
+  if (error || products.length === 0) {
     return null;
   }
 
-  if (products.length === 0) {
-    return (
-      <View style={{ paddingVertical: SP.md }}>
-        <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE }}>
-          No related products found.
-        </Text>
-      </View>
-    );
-  }
-
   return (
+    <>
+    <View style={dividerStyle} />
+    <Text style={headerStyle} accessibilityRole="header">You might also like</Text>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -SP.md }} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.md }}>
       {products.map((p) => {
         let lowestPriceCents = 0;
@@ -1480,6 +1587,7 @@ function RelatedProducts({ productId }: { productId: string }) {
         );
       })}
     </ScrollView>
+    </>
   );
 }
 
@@ -1551,6 +1659,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // over the swipeable gallery — see the comment where these render).
   backBtnWrap: { position: 'absolute', left: SP.md },
   cartBtnWrap: { position: 'absolute', right: SP.md },
+  cartBadge: {
+    position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+  },
+  cartBadgeText: { color: '#000000', fontFamily: FONT.bold, fontSize: 10, lineHeight: 12 },
+  cartFlyItem: { position: 'absolute', overflow: 'hidden', zIndex: 50, backgroundColor: '#000000' },
   mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
   body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
