@@ -21,7 +21,7 @@ import {
 } from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
@@ -85,6 +85,7 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
@@ -1444,6 +1445,11 @@ function SpotlightPageImpl({
   // scale pop needs its own 0.8 -> 1.1 -> 1 sequence, not a value
   // interpolated off the fade's own progress.
   const heartBurstScale = useRef(new Animated.Value(0.8)).current;
+  // Counter, not boolean: bumping it on every double-tap (even in rapid
+  // succession) gives HeartBurstParticles a fresh value to key its
+  // Reanimated replay off, the same way a changing `key` would remount it
+  // but without paying for an unmount/remount each time.
+  const [heartBurstTrigger, setHeartBurstTrigger] = useState(0);
   const heartScale = useRef(new Animated.Value(1)).current;
   /** Ring that flashes out from behind the rail heart on like — a second,
    * smaller echo of the double-tap burst so a single tap on the rail icon
@@ -1492,6 +1498,7 @@ function SpotlightPageImpl({
       Animated.spring(heartBurstScale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 0 }),
     ]).start();
     Animated.timing(heartBurst, { toValue: 0, duration: 550, delay: 350, useNativeDriver: true }).start();
+    setHeartBurstTrigger(t => t + 1);
   }
 
   // 1 -> 1.15 -> 1 over 180ms total (was a 1.35 spring — stronger overshoot
@@ -1534,7 +1541,11 @@ function SpotlightPageImpl({
       onDoubleTapLike(item.id);
       bumpHeart();
       burstHeart();
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // Medium tier, not the "light" tier the rail's own like tap uses
+      // (hapticLight/hapticToggle, lib/haptics.ts) — double-tap-to-like is a
+      // bigger, more deliberate gesture with a full-screen burst to match,
+      // so it earns the stronger of the two impact tiers.
+      hapticMedium();
     } else {
       lastTap.current = now;
       pauseTimer.current = setTimeout(() => {
@@ -1644,6 +1655,7 @@ function SpotlightPageImpl({
           >
             <Feather name="heart" size={110} color={ON_DARK} />
           </Animated.View>
+          <HeartBurstParticles trigger={heartBurstTrigger} />
           {item.contentType === 'video' && (
             <Animated.View
               pointerEvents="none"
