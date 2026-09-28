@@ -79,6 +79,7 @@ function buildConversationView(
   const agentTypingUntil = (conv as { agentTypingUntil?: Date | null }).agentTypingUntil;
   const nicknameMap = (conv as { nicknames?: Record<string, string> | null }).nicknames ?? {};
   const myMutedUntil = me?.mutedUntil ?? null;
+  const myPinnedAt = me?.pinnedAt ?? null;
   return {
     id:   conv.id,
     type: conv.type,
@@ -107,7 +108,11 @@ function buildConversationView(
     unreadCount:        me?.unreadCount        ?? 0,
     isFriendshipActive: true,
     isArchived:         false,
-    isPinned:           isAgentThread ? true : undefined,
+    // The Brandthread Agent's welcome thread is always pinned regardless of
+    // this viewer's own real pin state (see the isPinned comment on
+    // Conversation in mobile's socialTypes.ts); everything else reflects the
+    // per-viewer pinnedAt column swipe-row Pin sets below.
+    isPinned:           isAgentThread || !!myPinnedAt ? true : undefined,
     isOfficial:         isAgentThread ? true : undefined,
     // Polled (no websocket layer) "typing…" signal, agent conversations only.
     agentTyping:        isAgentThread && !!agentTypingUntil && new Date(agentTypingUntil).getTime() > Date.now(),
@@ -906,6 +911,31 @@ router.patch("/:id/mute", async (req, res) => {
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
 
   return res.json({ ok: true, mutedUntil: mutedUntil?.toISOString() ?? null });
+});
+
+// ─── PATCH /api/conversations/:id/pin ────────────────────────────────────────
+// Inbox swipe-row > Pin (item 62). Body: { pinned: boolean }. Sets/clears
+// pinnedAt on the current user's own conversation_participants row — the
+// same per-membership pattern as mute above, so pinning one side of a
+// conversation never affects the other participant's inbox.
+router.patch("/:id/pin", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const { pinned } = req.body as { pinned?: boolean };
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  const pinnedAt = pinned ? new Date() : null;
+
+  await db.update(conversationParticipants)
+    .set({ pinnedAt })
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
+
+  return res.json({ ok: true, pinnedAt: pinnedAt?.toISOString() ?? null });
 });
 
 // ─── PATCH /api/conversations/:id/nickname ───────────────────────────────────

@@ -17,6 +17,7 @@ const { nativeComponent } = vi.hoisted(() => ({
 const {
   getConversationsMock, getNotificationsMock, markConversationReadMock,
   archiveConversationMock, muteUserMock, subscribeSocialMock, routerMock,
+  setConversationPinnedMock,
 } = vi.hoisted(() => ({
   getConversationsMock: vi.fn(),
   getNotificationsMock: vi.fn(),
@@ -25,6 +26,7 @@ const {
   muteUserMock: vi.fn(),
   subscribeSocialMock: vi.fn(() => () => {}),
   routerMock: { back: vi.fn(), push: vi.fn() },
+  setConversationPinnedMock: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -282,6 +284,7 @@ vi.mock('@/lib/previewInbox', () => ({
   getPreviewMessages: () => [],
   isPreviewConversationId: () => false,
   subscribePreviewTyping: () => () => {},
+  setPreviewConversationPinned: () => {},
 }));
 
 // previewStories.ts pulls in previewCatalog.ts, which imports expo-asset
@@ -322,6 +325,7 @@ vi.mock('@/services/socialService', () => ({
   createOrGetConversation: vi.fn(),
   getFriendSuggestions: vi.fn().mockResolvedValue([]),
   muteUser: muteUserMock,
+  setConversationPinned: setConversationPinnedMock,
   MY_USER_ID: 'me',
 }));
 
@@ -400,6 +404,7 @@ describe('buyer inbox', () => {
     markConversationReadMock.mockReset().mockResolvedValue(undefined);
     archiveConversationMock.mockReset().mockResolvedValue(undefined);
     muteUserMock.mockReset().mockResolvedValue(undefined);
+    setConversationPinnedMock.mockReset().mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -502,6 +507,43 @@ describe('buyer inbox', () => {
       await flushPromises();
     });
     expect(archiveConversationMock).toHaveBeenCalledWith('swipe-thread');
+  });
+
+  it('pins a conversation from the swipe action, optimistically and for real, and shows Unpin once pinned', async () => {
+    const convs: ConversationFixture[] = [conversation('pin-thread', 0, { isPinned: false })];
+    getConversationsMock.mockResolvedValue(convs);
+    renderer = await renderScreen();
+
+    const pinAction = () => renderer!.root.findByProps({ testID: 'inbox-swipe-pin-pin-thread' });
+    expect(pinAction().props.accessibilityLabel).toMatch(/^Pin /);
+
+    await act(async () => {
+      pinAction().props.onPress();
+      await flushPromises();
+    });
+
+    // Real conversation id: hits the real API (not the preview mutator).
+    expect(setConversationPinnedMock).toHaveBeenCalledWith('pin-thread', true);
+    // The row flips to "Unpin" once optimistically (and, here, durably) pinned.
+    expect(pinAction().findByType('Text' as never).props.children).toBe('Unpin');
+    expect(pinAction().props.accessibilityLabel).toMatch(/^Unpin /);
+  });
+
+  it('rolls back the optimistic pin if the request fails', async () => {
+    setConversationPinnedMock.mockRejectedValueOnce(new Error('network'));
+    const convs: ConversationFixture[] = [conversation('pin-fail-thread', 0, { isPinned: false })];
+    getConversationsMock.mockResolvedValue(convs);
+    renderer = await renderScreen();
+
+    const pinAction = () => renderer!.root.findByProps({ testID: 'inbox-swipe-pin-pin-fail-thread' });
+
+    await act(async () => {
+      pinAction().props.onPress();
+      await flushPromises();
+    });
+
+    // Reverted back to "Pin" after the failed request rolls back.
+    expect(pinAction().findByType('Text' as never).props.children).toBe('Pin');
   });
 
   it('shows a skeleton while loading, then a CTA empty state once loaded empty', async () => {
