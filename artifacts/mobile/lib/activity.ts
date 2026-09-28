@@ -30,6 +30,12 @@ export interface ActivityItem {
   targetType?: string;
   targetImageUrl?: string;
   cta?: string;
+  /**
+   * New-follower rows only: whether the viewer follows this person right
+   * now (live, from the feed endpoint). Absent from older servers/rows, in
+   * which case the stored `cta` is the only signal.
+   */
+  isFollowingActor?: boolean;
   createdAt: string;
 }
 
@@ -358,10 +364,62 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
 
 /** True for rows that render an inline "Follow back" button instead of navigating. */
 export function isFollowBackRow(row: ActivityRow): boolean {
-  return row.type === 'new_follower' && row.cta === 'Follow back' && row.actorCount === 1 && !!row.targetId;
+  return row.type === 'new_follower' && row.cta === 'Follow back' && row.actorCount === 1 && !!row.targetId
+    && row.isFollowingActor !== true;
+}
+
+/**
+ * The inline Follow back / Following pill on a single-person follow row
+ * ("bear.2123374 started following you · Follow back" — Instagram iOS
+ * Activity, https://mobbin.com/screens/1f627db9-fb0f-4870-b58d-35bec67239c7),
+ * or null when the row has no pill (merged rows, non-follow rows).
+ *
+ * `following` prefers the server's live `isFollowingActor`; without it, a
+ * row whose stored `cta` isn't "Follow back" was a follow-back ("…followed
+ * you back"), so the viewer already follows them.
+ */
+export function followControlState(row: ActivityRow): { userId: string; following: boolean } | null {
+  if (row.type !== 'new_follower' || row.actorCount !== 1 || !row.targetId) return null;
+  const following = typeof row.isFollowingActor === 'boolean'
+    ? row.isFollowingActor
+    : row.cta !== 'Follow back';
+  return { userId: row.targetId, following };
 }
 
 const q = encodeURIComponent;
+
+// ─── Grouped rows → people list ───────────────────────────────────────────────
+
+/** Most feed ids a people-list link carries (matches the server's cap). */
+export const GROUPED_PEOPLE_MAX_IDS = 100;
+
+/**
+ * True for a merged row of two or more people ("Jay and 12 others liked your
+ * post"). Tapping one opens the list of those people — Instagram's "View
+ * likes" pattern (https://mobbin.com/flows/c575ad7c-8644-4b26-a3d0-ae737f855c13)
+ * — instead of jumping straight to the post.
+ */
+export function isGroupedRow(row: Pick<ActivityRow, 'type' | 'actorCount'>): boolean {
+  return row.actorCount > 1 && AGGREGATED_TYPES.has(row.type);
+}
+
+/** Header for the people list a grouped row opens. */
+export function groupedPeopleTitle(type: string): string {
+  switch (type) {
+    case 'post_like':
+    case 'story_like': return 'Likes';
+    case 'post_comment': return 'Comments';
+    case 'repost': return 'Reposts';
+    case 'new_follower': return 'New followers';
+    default: return 'People';
+  }
+}
+
+/** Route for the people list behind a grouped row. */
+export function groupedPeopleHref(row: Pick<ActivityRow, 'type' | 'ids'>): string {
+  const ids = row.ids.slice(0, GROUPED_PEOPLE_MAX_IDS).join(',');
+  return `/activity-people?type=${q(row.type)}&ids=${q(ids)}`;
+}
 
 /**
  * Where tapping a row goes, or null when there is nowhere useful to go.

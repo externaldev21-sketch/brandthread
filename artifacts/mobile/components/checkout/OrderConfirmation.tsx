@@ -130,7 +130,7 @@ export function OrderConfirmation({
           {estimates.length > 0 ? estimates.map(estimate => (
             <Text key={estimate} style={[styles.detailText, { color: theme.text }]}>{estimate}</Text>
           )) : (
-            <Text style={[styles.detailText, { color: theme.text }]}>Tracking updates coming soon</Text>
+            <Text style={[styles.detailText, { color: theme.text }]}>Shared as soon as the seller ships</Text>
           )}
           {estimates.length > 1 ? (
             <Text style={[styles.detailSub, { color: theme.muted }]}>Arrives in {estimates.length} shipments</Text>
