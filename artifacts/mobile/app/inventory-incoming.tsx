@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, SUBTLE_WASH } from '@/lib/theme';
 import { Header } from '@/components/layout';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
@@ -860,7 +860,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   timelineDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', marginTop: 2, backgroundColor: CARD },
   timelineDotPast: { backgroundColor: PURPLE, borderColor: PURPLE },
   timelineDotActive: { borderColor: PURPLE },
-  timelineDotInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: SUBTLE },
+  timelineDotInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: SUBTLE_WASH },
   timelineLine: { position: 'absolute', left: 11, top: 26, width: 2, height: 24, backgroundColor: BORDER },
   timelineInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingBottom: SP.md },
   timelineLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
