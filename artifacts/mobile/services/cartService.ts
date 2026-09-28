@@ -5,6 +5,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { safeGetItem, safeSetItem, safeRemoveItem } from '@/lib/safeAsyncStorage';
+import { previewShippingRate } from '@/lib/previewCheckout';
+import { getPreviewBuyerProduct } from '@/lib/previewProducts';
 import { serviceRequest } from '@/lib/serviceConfig';
 import {
   Cart, CartItem, SavedCartItem, CartSellerGroup,
@@ -121,6 +123,11 @@ function adaptApiProduct(row: any): BuyerProduct {
     sellerName: row.sellerDisplayName ?? 'Seller',
     sellerHandle: row.sellerHandle ?? '',
     sellerAvatarUri: row.sellerAvatarUri ?? undefined,
+    // Real data: GET /api/public/products/:id already computes this
+    // server-side (deriveSellerVerified) — just not read into BuyerProduct
+    // until now.
+    sellerVerified: row.sellerVerified === true,
+    claimedUnits: typeof row.claimedUnits === 'number' ? row.claimedUnits : undefined,
     name: row.name,
     description: row.description ?? '',
     priceCents: variants.length > 0 ? Math.min(...variants.map(v => v.priceCents)) : 0,
@@ -148,8 +155,12 @@ export async function getBuyerProduct(productId: string): Promise<BuyerProduct |
     const row = await serviceRequest<any>(
       `/api/public/products/${encodeURIComponent(productId)}`,
     );
-    return row?.id ? adaptApiProduct(row) : null;
+    return row?.id ? adaptApiProduct(row) : getPreviewBuyerProduct(productId);
   } catch (error) {
+    // Dev-web preview only: seeded products have no catalog row (null for
+    // every real id and in production — lib/previewProducts.ts).
+    const preview = getPreviewBuyerProduct(productId);
+    if (preview) return preview;
     const message = error instanceof Error ? error.message : String(error);
     if (message.startsWith('API 404:')) return null;
     throw error;
@@ -560,6 +571,10 @@ async function fetchShippingRateDetails(
   sellerId: string,
   subtotalCents: number,
 ): Promise<{ id: string; name: string; amountCents: number }> {
+  // Dev-web preview only: a seeded preview seller has no rate row
+  // (lib/previewCheckout.ts; null for every real seller and in production).
+  const previewRate = previewShippingRate(sellerId, subtotalCents);
+  if (previewRate) return previewRate;
   const resp = await serviceRequest<{
     shippingCents: number;
     rateName: string;

@@ -9,8 +9,8 @@
  * this is the shared, general version for anything (now or later) that needs
  * more than one revealed button.
  */
-import React, { useMemo, useRef } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, PanResponder, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { hapticLight } from '@/lib/haptics';
 
@@ -46,8 +46,18 @@ export default function SwipeableActions({
   // True once this gesture is a horizontal swipe (vs a tap or a vertical scroll).
   const swipingRef = useRef(false);
   const isHorizontal = (dx: number, dy: number) => Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.25;
+  // Until when a click on the row content is swallowed (web): a mouse swipe
+  // ends with a mouseup over the row, which the browser turns into a click on
+  // whatever is under it — on Activity that's the whole-row tap target, so a
+  // swipe used to open the notification instead of revealing the actions
+  // (item 83). Also set when a gesture starts on an open row, which closes it.
+  const suppressClickUntil = useRef(0);
+  const holdClicks = () => { suppressClickUntil.current = Date.now() + 500; };
 
   const panResponder = useMemo(() => PanResponder.create({
+    // An open row takes the touch before its content does, so tapping it
+    // closes it (as in Instagram / Mail) instead of opening the row behind.
+    onStartShouldSetPanResponderCapture: () => !disabled && openRef.current,
     // Claim the touch on start (bubble phase — any pressable inside the row
     // still wins its own taps first). Move-only negotiation never reaches
     // this row: app/_layout.tsx wraps every screen in a keyboard-dismiss
@@ -62,12 +72,16 @@ export default function SwipeableActions({
         (gesture.dx < -8 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.25) ||
         (openRef.current && gesture.dx > 8)
       ),
-    onPanResponderGrant: () => { swipingRef.current = false; },
+    onPanResponderGrant: () => {
+      swipingRef.current = false;
+      if (openRef.current) holdClicks();
+    },
     onPanResponderMove: (_, gesture) => {
       if (!swipingRef.current) {
         if (!isHorizontal(gesture.dx, gesture.dy)) return;
         swipingRef.current = true;
       }
+      holdClicks();
       const base = openRef.current ? -revealWidth : 0;
       translateX.setValue(Math.max(-revealWidth, Math.min(0, base + gesture.dx)));
     },
@@ -78,6 +92,7 @@ export default function SwipeableActions({
         return;
       }
       swipingRef.current = false;
+      holdClicks();
       const base = openRef.current ? -revealWidth : 0;
       const projected = base + gesture.dx;
       if (projected <= -revealWidth / 2) {
@@ -97,6 +112,37 @@ export default function SwipeableActions({
 
   const close = () => animateTo(0);
 
+  // Web only (mouse): swallow the click a swipe ends with (see
+  // suppressClickUntil), and keep the browser's own image drag / text
+  // selection from starting, either of which ends the swipe mid-gesture.
+  const isWeb = Platform?.OS === 'web';
+  const frontRef = useRef<any>(null);
+  useEffect(() => {
+    const node = frontRef.current as { addEventListener?: Function; removeEventListener?: Function } | null;
+    if (!isWeb || !node?.addEventListener) return;
+    const onClick = (event: { stopPropagation(): void; preventDefault(): void }) => {
+      if (Date.now() < suppressClickUntil.current) { event.stopPropagation(); event.preventDefault(); }
+    };
+    // react-native-web ends the gesture on a `dragstart` (an image drag) or
+    // on a text selection change, both of which a mouse drag across the row
+    // starts — so stop them at mousedown. Clicks and the gesture itself are
+    // unaffected; form fields keep their default so they can still focus.
+    const onMouseDown = (event: { target?: { tagName?: string; isContentEditable?: boolean } | null; preventDefault(): void }) => {
+      const tag = event.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.target?.isContentEditable) return;
+      event.preventDefault();
+    };
+    const onDragStart = (event: { preventDefault(): void }) => event.preventDefault();
+    node.addEventListener('click', onClick, true);
+    node.addEventListener('mousedown', onMouseDown, true);
+    node.addEventListener('dragstart', onDragStart, true);
+    return () => {
+      node.removeEventListener?.('click', onClick, true);
+      node.removeEventListener?.('mousedown', onMouseDown, true);
+      node.removeEventListener?.('dragstart', onDragStart, true);
+    };
+  }, [isWeb]);
+
   return (
     <View style={styles.clip}>
       <View style={[styles.actionsRow, { width: revealWidth }]}>
@@ -112,7 +158,7 @@ export default function SwipeableActions({
           </Pressable>
         ))}
       </View>
-      <Animated.View style={[styles.front, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
+      <Animated.View ref={isWeb ? frontRef : undefined} style={[styles.front, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
         {children}
       </Animated.View>
     </View>

@@ -213,6 +213,26 @@ export function getPreviewActivity(): ActivityItem[] {
   return cached;
 }
 
+// Preview rows the viewer deleted (item 83). The preview has no backend to
+// delete from, so a deleted seed row is remembered here for the session and
+// stays gone when Activity is reopened — the same "survives a reload of the
+// screen" behaviour the real DELETE gives a signed-in account.
+const dismissedPreviewIds = new Set<string>();
+
+/** True for a seeded preview row id (never a real notification's id). */
+export function isPreviewActivityId(id: string): boolean {
+  return isPreviewActivityEnabled() && id.startsWith('preview-');
+}
+
+export function markPreviewActivityDismissed(id: string): void {
+  dismissedPreviewIds.add(id);
+}
+
+/** The seeded feed minus anything the viewer deleted this session. */
+export function getVisiblePreviewActivity(): ActivityItem[] {
+  return getPreviewActivity().filter((item) => !dismissedPreviewIds.has(item.id));
+}
+
 /** The seeded Activity row about a given preview comment (deep-link target). */
 /**
  * The viewer's own seeded post a preview Activity row points at (item 82),

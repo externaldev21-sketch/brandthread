@@ -11,11 +11,12 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
-  View, Text, ScrollView, StyleSheet, Image,
+  View, Text, ScrollView, StyleSheet,
   ActivityIndicator, Alert, TextInput, TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, StickyFooter } from '@/components/layout';
+import { CachedImage } from '@/components/CachedImage';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -31,6 +32,7 @@ import { useScrollReset } from '@/hooks/useScrollReset';
 import { ThreadIllustration } from '@/components/illustrations/EmptyStateArt';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
+import { isPreviewCheckoutGroup } from '@/lib/previewCheckout';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { useApi } from '@/hooks/useApi';
 import SwipeableActions, { type SwipeAction } from '@/components/SwipeableActions';
@@ -68,6 +70,8 @@ const STICKY_BAR_CONTENT_HEIGHT = SP.sm + COMP.buttonH;
 // spinner without blocking the whole cart.
 type RowPendingAction = 'qty_dec' | 'qty_inc' | 'remove' | 'save';
 
+const HIT_SLOP_8 = { top: 8, bottom: 8, left: 8, right: 8 };
+
 // ─── Quantity Row ─────────────────────────────────────────────────────────────
 
 function QuantityControl({
@@ -94,7 +98,6 @@ function QuantityControl({
         min={1}
         max={Math.max(max, 1)}
         disabled={busy}
-        size="sm"
         onChange={handleChange}
         onRemoveAtMin={onRemove}
         itemLabel={itemLabel}
@@ -108,14 +111,12 @@ function QuantityControl({
 // ─── Cart Item Row ─────────────────────────────────────────────────────────────
 
 function CartItemRow({
-  item, pendingAction, selected, onToggleSelect, buyingNow, onBuyNow, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+  item, pendingAction, selected, onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
 }: {
   item: CartItem;
   pendingAction?: RowPendingAction;
   selected: boolean;
   onToggleSelect: () => void;
-  buyingNow: boolean;
-  onBuyNow: () => void;
   onQtyDec: () => void;
   onQtyInc: () => void;
   onRemove: () => void;
@@ -126,7 +127,7 @@ function CartItemRow({
   const ir = useMemo(() => makeItemRowStyles(theme), [theme]);
   const lineTotal = item.priceCents * item.quantity;
   const hasDiscount = item.compareAtPriceCents && item.compareAtPriceCents > item.priceCents;
-  const isRowBusy = pendingAction === 'remove' || pendingAction === 'save' || buyingNow;
+  const isRowBusy = pendingAction === 'remove' || pendingAction === 'save';
 
   // Low stock: warn at ≤ 3 units
   const isLowStock = item.isAvailable && item.maxQuantity > 0 && item.maxQuantity <= 3;
@@ -183,23 +184,38 @@ function CartItemRow({
         </View>
       </PressableScale>
 
+      {/* Dev's line-item spec (Ulta Beauty bag; Amazon / Zalando for the
+          qty and remove pattern): a bigger 3:4 image, never cropped; name
+          with the price right-aligned on the title row; size + edit; the
+          stepper on its own row; one quiet grey text row at the bottom. No
+          purchase control on the line: checkout is per seller group (under
+          the group subtotal) and the main Checkout bar. */}
       <View style={ir.img}>
         {item.imageUri
-          ? <Image source={{ uri: item.imageUri }} style={ir.productImage} resizeMode="cover" />
-           : <Feather name="image" size={ICON.md} color={theme.muted} />}
+          ? <CachedImage source={{ uri: item.imageUri }} style={ir.productImage} contentFit="contain" recyclingKey={item.imageUri} />
+          : <Feather name="image" size={ICON.md} color={theme.muted} />}
       </View>
 
-      {/* Details */}
-      <View style={{ flex: 1 }}>
-        <Text style={ir.name} numberOfLines={2}>{item.productName}</Text>
+      <View style={ir.col}>
+        <View style={ir.titleRow}>
+          <Text style={ir.name} numberOfLines={3}>{item.productName}</Text>
+          <View style={ir.priceBlock}>
+            <Text style={[ir.price, hasDiscount ? ir.priceDiscounted : undefined]}>{fmtPrice(lineTotal)}</Text>
+            {hasDiscount && (
+              <Text style={ir.comparePrice}>{fmtPrice(item.compareAtPriceCents! * item.quantity)}</Text>
+            )}
+          </View>
+        </View>
         <PressableScale
           style={ir.variantRow}
           onPress={onEditVariant}
           disabled={isRowBusy}
+          noMinHeight
+          hitSlop={HIT_SLOP_8}
           accessibilityLabel={`Change options for ${item.productName}. Current: ${item.variantTitle}`}
         >
           <Text style={ir.variant}>{item.variantTitle}</Text>
-          <Feather name="edit-2" size={11} color={theme.accentLight} />
+          <Feather name="edit-2" size={12} color={theme.muted} />
         </PressableScale>
 
         {item.isPreOrder && (
@@ -229,8 +245,9 @@ function CartItemRow({
           </View>
         )}
 
-        {/* Price + qty */}
-        <View style={ir.bottomRow}>
+        {/* Qty on its own row. At 1 the − is a trash (QuantityStepper's
+            onRemoveAtMin): the same remove flow + Undo as the text link. */}
+        <View style={ir.qtyRow}>
           <QuantityControl
             value={item.quantity}
             max={item.maxQuantity}
@@ -242,64 +259,35 @@ function CartItemRow({
             pendingDec={pendingAction === 'qty_dec'}
             pendingInc={pendingAction === 'qty_inc'}
           />
-          <View style={ir.priceBlock}>
-            {hasDiscount && (
-              <Text style={ir.comparePrice}>{fmtPrice(item.compareAtPriceCents! * item.quantity)}</Text>
-            )}
-            <Text style={[ir.price, hasDiscount ? ir.priceDiscounted : undefined]}>{fmtPrice(lineTotal)}</Text>
-          </View>
         </View>
 
-        {/* Actions — Remove and Save for later are optional, never required to
-            buy. Save/Remove sit on the left (16pt apart); Buy is right-
-            aligned on the same row via justify-content: space-between —
-            never a flex-spacer + oversized shared Button, which is what let
-            Buy stick out past the card's own edge. */}
-        <View style={ir.actions}>
-          <View style={ir.actionsLeft}>
-            <PressableScale
-              style={ir.actionBtn}
-              onPress={onSaveForLater}
-              disabled={isRowBusy}
-              accessibilityLabel={`Save ${item.productName} for later`}
-              accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'save' }}
-            >
-               {pendingAction === 'save'
-                 ? <ActivityIndicator size="small" color={theme.muted} style={{ width: 12, height: 12 }} />
-                 : <Feather name="bookmark" size={12} color={theme.muted} />}
-              <Text style={ir.actionText}>Save</Text>
-            </PressableScale>
-            <PressableScale
-              style={ir.actionBtn}
-              onPress={onRemove}
-              disabled={isRowBusy}
-              accessibilityLabel={`Remove ${item.productName} from cart`}
-              accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'remove' }}
-            >
-               {pendingAction === 'remove'
-                 ? <ActivityIndicator size="small" color={theme.error} style={{ width: 12, height: 12 }} />
-                 : <Feather name="trash-2" size={12} color={theme.error} />}
-               <Text style={[ir.actionText, { color: theme.error }]}>Remove</Text>
-            </PressableScale>
-          </View>
-          {/* Buys just this line — its own variant + qty — through the shared
-              Buy Now flow. It never touches, or requires touching, the rest
-              of the cart. A bespoke pill (not the shared Button, which
-              forces a wider min-width/padding than fits this row at 375pt)
-              sized exactly like a secondary action. */}
+        {/* One quiet text row, left-aligned, grey 13pt (never red: red is
+            LIVE and end-call only), well away from any primary button. */}
+        <View style={ir.textActions}>
           <PressableScale
-            style={[ir.buyBtn, (isRowBusy || !item.isAvailable) && ir.buyBtnDisabled]}
-            onPress={onBuyNow}
-            disabled={isRowBusy || !item.isAvailable}
-            accessibilityRole="button"
-            accessibilityLabel="Buy"
-            accessibilityHint={`Buy just ${item.productName} now, ${fmtPrice(lineTotal)}`}
-            accessibilityState={{ disabled: isRowBusy || !item.isAvailable, busy: buyingNow }}
+            style={ir.textAction}
+            onPress={onSaveForLater}
+            disabled={isRowBusy}
             noMinHeight
+            rippleEnabled={false}
+            accessibilityLabel={`Save ${item.productName} for later`}
+            accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'save' }}
+            testID={`cart-save-${item.id}`}
           >
-            {buyingNow
-              ? <ActivityIndicator size="small" color={theme.onAccent} />
-              : <Text style={ir.buyBtnText}>Buy</Text>}
+            <Text style={ir.textActionLabel}>Save for later</Text>
+          </PressableScale>
+          <Text style={ir.textActionDot} importantForAccessibility="no" accessibilityElementsHidden>·</Text>
+          <PressableScale
+            style={ir.textAction}
+            onPress={onRemove}
+            disabled={isRowBusy}
+            noMinHeight
+            rippleEnabled={false}
+            accessibilityLabel={`Remove ${item.productName} from cart`}
+            accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'remove' }}
+            testID={`cart-remove-${item.id}`}
+          >
+            <Text style={ir.textActionLabel}>Remove</Text>
           </PressableScale>
         </View>
       </View>
@@ -324,14 +312,19 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
   },
+  // 3:4 and `contain`: the whole product shows, never cropped.
   img: {
-    width: 72, height: 72, borderRadius: RADII.card,
+    width: 84, height: 112, borderRadius: RADII.card,
     backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   productImage: { width: '100%', height: '100%' },
-  name: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
-  variantRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  // Root gap (8) + this margin (8) = the 16pt gutter between image and text.
+  col: { flex: 1, minWidth: 0, marginLeft: SP.sm },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
+  name: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: theme.text, flex: 1, minWidth: 0 },
+  // 28pt + 8pt hitSlop above and below = a 44pt target.
+  variantRow: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, alignSelf: 'flex-start', marginTop: 2 },
   variant: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   preOrderText: { fontSize: FS.xs, fontFamily: FONT.medium },
@@ -350,40 +343,33 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   stockWarnCritical: { backgroundColor: `${theme.error}26` },
   stockWarn: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.warning },
   stockWarnCriticalText: { color: theme.error },
-  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   priceBlock: { alignItems: 'flex-end' },
-  comparePrice: { fontSize: FS.xs, ...TABULAR_NUMS, fontFamily: FONT.regular, color: theme.subtle, textDecorationLine: 'line-through' },
+  comparePrice: { fontSize: FS.meta, ...TABULAR_NUMS, fontFamily: FONT.medium, color: theme.subtle, textDecorationLine: 'line-through' },
   price: { fontSize: FS.md, ...TABULAR_NUMS, fontFamily: FONT.bold, color: theme.text },
   priceDiscounted: { color: theme.success },
-  // justify-content: space-between (not a flex-spacer + a full shared
-  // Button) keeps Save/Remove flush left and Buy flush right without ever
-  // letting Buy's own intrinsic width push it past the card's edge.
-  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.xs },
-  actionsLeft: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 32 },
-  actionText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
-  // Sized like a secondary action — height 32, 14pt horizontal padding,
-  // 14pt semibold — not the shared Button's larger min-width/padding, which
-  // is what let this pill stick out past the card's own 16pt inner edge.
-  buyBtn: {
-    height: 32, paddingHorizontal: 14, borderRadius: RADII.pill,
-    backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center',
-  },
-  buyBtnDisabled: { opacity: 0.5 },
-  buyBtnText: { fontSize: 14, fontFamily: FONT.semibold, color: theme.onAccent },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
+  // Grey 13pt text links, each a 44pt-tall target, left-aligned.
+  textActions: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginLeft: -SP.xs },
+  textAction: { height: 44, justifyContent: 'center', paddingHorizontal: SP.xs },
+  textActionLabel: { fontSize: 13, fontFamily: FONT.medium, color: theme.muted },
+  textActionDot: { fontSize: 13, color: theme.subtle, marginHorizontal: 2 },
 });
+
 
 // ─── Seller Group ─────────────────────────────────────────────────────────────
 
 function SellerGroup({
-  group, pendingByItemId, selectedIds, buyingItemId, onToggleSelect, onBuyNow, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+  group, pendingByItemId, selectedIds, checkingOut, checkoutDisabled, onCheckoutGroup, onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
 }: {
   group: CartSellerGroup;
   pendingByItemId: Record<string, RowPendingAction>;
   selectedIds: Set<string>;
-  buyingItemId: string | null;
+  /** This seller's own checkout is starting. */
+  checkingOut: boolean;
+  /** Another checkout is already starting. */
+  checkoutDisabled: boolean;
+  onCheckoutGroup: (sellerId: string) => void;
   onToggleSelect: (itemId: string) => void;
-  onBuyNow: (item: CartItem) => void;
   onQtyDec: (itemId: string) => void;
   onQtyInc: (itemId: string) => void;
   onRemove: (itemId: string) => void;
@@ -397,6 +383,8 @@ function SellerGroup({
     () => router.push(('/seller-profile?id=' + encodeURIComponent(group.sellerId)) as never),
     [router, group.sellerId],
   );
+  const checkoutThisSeller = useCallback(() => onCheckoutGroup(group.sellerId), [onCheckoutGroup, group.sellerId]);
+  const hasAvailable = group.items.some(item => item.isAvailable);
   return (
     <Card style={sg.root} testID={`cart-seller-${group.sellerId}`}>
       {/* Seller header — avatar, name, and a chevron to the store (the
@@ -415,7 +403,7 @@ function SellerGroup({
       >
         <View style={[sg.avatar, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
           {group.sellerAvatarUri ? (
-            <Image source={{ uri: group.sellerAvatarUri }} style={sg.avatarImage} resizeMode="cover" />
+            <CachedImage source={{ uri: group.sellerAvatarUri }} style={sg.avatarImage} contentFit="cover" recyclingKey={group.sellerAvatarUri} />
           ) : (
             <Text style={[sg.avatarText, { color: theme.accentLight }]}>{group.sellerInitial}</Text>
           )}
@@ -435,9 +423,7 @@ function SellerGroup({
             item={item}
             pendingAction={pendingByItemId[item.id]}
             selected={selectedIds.has(item.id)}
-            buyingNow={buyingItemId === item.id}
             onToggleSelect={onToggleSelect}
-            onBuyNow={onBuyNow}
             onQtyDec={onQtyDec}
             onQtyInc={onQtyInc}
             onRemove={onRemove}
@@ -460,6 +446,19 @@ function SellerGroup({
           </View>
         )}
         <Text style={sg.groupSubtotal}>Group subtotal: {fmtPrice(group.subtotalCents)}</Text>
+        {/* The only per-line purchase path now: this seller's items, as one
+            payment (a cart section = one checkout delivery group). */}
+        <Button
+          label={`Checkout from ${group.sellerName}`}
+          variant="secondary"
+          fullWidth
+          loading={checkingOut}
+          disabled={!hasAvailable || checkoutDisabled}
+          onPress={checkoutThisSeller}
+          accessibilityHint={`Checks out only ${group.sellerName}'s items, ${fmtPrice(group.subtotalCents)}`}
+          style={sg.groupCheckout}
+          testID={`cart-group-checkout-${group.sellerId}`}
+        />
       </View>
     </Card>
   );
@@ -471,15 +470,13 @@ function SellerGroup({
  * PressableScale buttons).
  */
 function SellerGroupLine({
-  item, pendingAction, selected, buyingNow,
-  onToggleSelect, onBuyNow, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+  item, pendingAction, selected,
+  onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
 }: {
   item: CartItem;
   pendingAction?: RowPendingAction;
   selected: boolean;
-  buyingNow: boolean;
   onToggleSelect: (itemId: string) => void;
-  onBuyNow: (item: CartItem) => void;
   onQtyDec: (itemId: string) => void;
   onQtyInc: (itemId: string) => void;
   onRemove: (itemId: string) => void;
@@ -488,7 +485,6 @@ function SellerGroupLine({
 }) {
   const id = item.id;
   const toggle = useCallback(() => onToggleSelect(id), [onToggleSelect, id]);
-  const buy = useCallback(() => onBuyNow(item), [onBuyNow, item]);
   const dec = useCallback(() => onQtyDec(id), [onQtyDec, id]);
   const inc = useCallback(() => onQtyInc(id), [onQtyInc, id]);
   const remove = useCallback(() => onRemove(id), [onRemove, id]);
@@ -500,8 +496,6 @@ function SellerGroupLine({
       pendingAction={pendingAction}
       selected={selected}
       onToggleSelect={toggle}
-      buyingNow={buyingNow}
-      onBuyNow={buy}
       onQtyDec={dec}
       onQtyInc={inc}
       onRemove={remove}
@@ -521,15 +515,16 @@ const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
-  sellerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  sellerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
   // Softened to a fixed 6%-white hairline (same treatment as the header's
   // dividerVariant="subtle") — the full-strength theme.border read as a
   // heavier second divider right under the already-subtle header line.
   divider: { height: 1, backgroundColor: '#FFFFFF', opacity: 0.06, marginVertical: SP.xs },
   footer: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  footerText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  footerText: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
   groupSubtotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginTop: 4 },
+  groupCheckout: { marginTop: SP.sm },
 });
 
 // ─── Saved for Later ──────────────────────────────────────────────────────────
@@ -579,7 +574,7 @@ const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm },
   img: { width: 56, height: 70, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
-  variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginBottom: 2 },
+  variant: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginBottom: 2 },
   price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
   unavail: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, marginBottom: 4 },
   actions: { flexDirection: 'row', gap: SP.sm },
@@ -635,9 +630,9 @@ const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: SP.xs },
   totalLabel: { ...TYPE.subheading, color: theme.text },
   totalValue: { ...TYPE.subheading, ...TABULAR_NUMS, color: theme.text },
-  note: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: SP.sm },
+  note: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.subtle, marginTop: SP.sm },
   preOrderNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: SP.sm },
-  preOrderNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, flex: 1 },
+  preOrderNoteText: { fontSize: FS.meta, fontFamily: FONT.medium, flex: 1 },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -676,7 +671,7 @@ export default function CartScreen() {
   // just to check out everything.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const knownItemIdsRef = useRef<Set<string>>(new Set());
-  const [buyingItemId, setBuyingItemId] = useState<string | null>(null);
+  const [checkingOutSellerId, setCheckingOutSellerId] = useState<string | null>(null);
 
   // Header "Edit" toggle — reuses the existing per-item selection checkboxes
   // to drive a bulk "Remove selected" action instead of adding a second,
@@ -925,7 +920,7 @@ export default function CartScreen() {
 
   /**
    * Shared checkout entry for the whole cart, a "checkout selected" subset,
-   * or a single item's own Buy button — always through the same existing
+   * or one seller's section ("Checkout from {Seller}") — always through the same existing
    * order/payment APIs (isBuyNow=true just scopes which items build the
    * session; it never changes how payment itself works).
    */
@@ -933,8 +928,11 @@ export default function CartScreen() {
     const setBusy = opts.onBusy ?? setValidating;
     if (items.length === 0) return;
     setBusy(true);
+    // Dev-web preview only: seeded preview products have no server cart or
+    // seller payment account to check (lib/previewCheckout.ts).
+    const previewOnlyCheckout = groupCartBySeller(items).every(isPreviewCheckoutGroup);
     try {
-      if (isSignedIn) {
+      if (isSignedIn && !previewOnlyCheckout) {
         const validation = await validateCart(items);
         if (!validation.isValid) {
           const issues = validation.issues.map(i => `• ${i.message}`).join('\n');
@@ -959,6 +957,7 @@ export default function CartScreen() {
 
       if (isSignedIn) {
         for (const group of currentGroups) {
+          if (isPreviewCheckoutGroup(group)) continue;
           try {
             const status = await api.buyer.sellerPaymentStatus(group.sellerId);
             if (!status.ready) {
@@ -995,10 +994,13 @@ export default function CartScreen() {
     await startCheckout(selectedItems);
   }
 
-  async function handleBuyNow(item: CartItem) {
-    if (buyingItemId) return;
+  // "Checkout from {Seller}": that seller's available lines as one payment.
+  async function handleCheckoutGroup(sellerId: string) {
+    if (checkingOutSellerId) return;
+    const items = cart.items.filter(item => item.sellerId === sellerId && item.isAvailable);
+    if (items.length === 0) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await startCheckout([item], { onBusy: busy => setBuyingItemId(busy ? item.id : null) });
+    await startCheckout(items, { onBusy: busy => setCheckingOutSellerId(busy ? sellerId : null) });
   }
 
   if (loading) {
@@ -1072,7 +1074,9 @@ export default function CartScreen() {
               <Button
                 label="Remove"
                 size="compact"
-                variant="destructive"
+                // Monochrome: red is for LIVE and end-call only. Same grey
+                // secondary treatment as the row and swipe Remove actions.
+                variant="secondary"
                 onPress={handleRemoveSelected}
                 loading={removingSelected}
                 disabled={selectedItems.length === 0}
@@ -1122,9 +1126,10 @@ export default function CartScreen() {
                 group={group}
                 pendingByItemId={pendingByItemId}
                 selectedIds={selectedIds}
-                buyingItemId={buyingItemId}
+                checkingOut={checkingOutSellerId === group.sellerId}
+                checkoutDisabled={!!checkingOutSellerId && checkingOutSellerId !== group.sellerId}
+                onCheckoutGroup={handleCheckoutGroup}
                 onToggleSelect={toggleSelect}
-                onBuyNow={handleBuyNow}
                 onQtyDec={handleQtyDec}
                 onQtyInc={handleQtyInc}
                 onRemove={handleRemove}
@@ -1321,14 +1326,14 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   loyaltyHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   loyaltyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
-  loyaltySub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+  loyaltySub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
   pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
   pointsInput: { flex: 1, height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, color: theme.text, fontFamily: FONT.regular, paddingHorizontal: SP.md },
-  pointsPreview: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: SP.xs, lineHeight: 17 },
+  pointsPreview: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: SP.xs, lineHeight: 17 },
   appliedPoints: { flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.success}26`, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },
-  appliedPointsSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
-  savedHint: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
+  appliedPointsSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
+  savedHint: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
   // Sticky checkout bar: total on the left, a white pill on the right —
   // Nike Bag / TikTok Shop checkout-bar reference, forced white/black
   // regardless of theme so it reads as the one fixed "pay" affordance.

@@ -16,6 +16,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { File, Paths } from 'expo-file-system';
 
@@ -228,6 +229,7 @@ export default function AddProductScreen() {
   const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
+  const [sizeChartUploadStatus, setSizeChartUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [collections, setCollections] = useState<ProductCollection[]>([]);
@@ -698,6 +700,7 @@ export default function AddProductScreen() {
       tags:        productPayload.tags ?? [],
       styleTags:   productPayload.styleTags ?? [],
       variants:    productVariantsForServer,
+      sizeChartImageUrl: productPayload.sizeChartImageUrl ?? undefined,
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
@@ -711,6 +714,7 @@ export default function AddProductScreen() {
       images:      (productPayload.media ?? []).map((m: any) => m.uri ?? m.url ?? '').filter(Boolean),
       tags:        productPayload.tags ?? [],
       styleTags:   productPayload.styleTags ?? [],
+      sizeChartImageUrl: productPayload.sizeChartImageUrl ?? null,
       isPreOrder,
       preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
       preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
@@ -753,6 +757,58 @@ export default function AddProductScreen() {
     } catch {
       setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'error' } }));
     }
+  }
+
+  // ── Size chart photo (item: size chart photo) ────────────────────────────
+  // Same upload pipeline as product photos (api.products.uploadImage), one
+  // optional image rather than a media array.
+  async function uploadSizeChartPhoto(localUri: string) {
+    setSizeChartUploadStatus('uploading');
+    patchDraft({ sizeChartImageUrl: localUri });
+    try {
+      const uploaded = await api.products.uploadImage({ uri: localUri });
+      const remoteUri = (uploaded as any)?.objectPath || (uploaded as any)?.url || localUri;
+      setSizeChartUploadStatus('idle');
+      setDraftData(prev => ({ ...prev, sizeChartImageUrl: remoteUri }));
+    } catch {
+      setSizeChartUploadStatus('error');
+    }
+  }
+
+  function pickSizeChartPhoto() {
+    showActionSheet('Size chart photo', undefined, [
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert('Camera access needed', 'Allow camera access in Settings to take a photo.');
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+          if (!result.canceled && result.assets[0]) void uploadSizeChartPhoto(result.assets[0].uri);
+        },
+      },
+      {
+        text: 'Choose from Library',
+        onPress: async () => {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
+          if (!result.canceled && result.assets[0]) void uploadSizeChartPhoto(result.assets[0].uri);
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  function removeSizeChartPhoto() {
+    hapticToggle();
+    setSizeChartUploadStatus('idle');
+    patchDraft({ sizeChartImageUrl: null });
   }
 
   // ── Photos: reorder / set cover / crop / background removal ──────────────────
@@ -1252,6 +1308,7 @@ export default function AddProductScreen() {
           }}
           style={s.sectionHdr}
         />
+        <Text style={s.sectionHelper}>Add sizes, colors, materials or other choices buyers pick from.</Text>
 
         {localOptions.map((opt, idx) => (
           <BrandthreadCard key={opt.id} style={s.optionCard}>
@@ -1510,6 +1567,44 @@ export default function AddProductScreen() {
               );
             })}
           </>
+        )}
+
+        {/* Size chart photo — optional, right under Sizes/variants (item:
+            size chart photo). Uploads through the same api.products.uploadImage
+            pipeline as product photos. */}
+        <SectionHeader title="Size chart" style={s.sectionHdr} />
+        {draftData.sizeChartImageUrl ? (
+          <View style={s.sizeChartRow}>
+            <View style={s.sizeChartThumbWrap}>
+              <Image source={{ uri: draftData.sizeChartImageUrl }} style={s.sizeChartThumb} resizeMode="cover" />
+              {sizeChartUploadStatus === 'uploading' && (
+                <View style={s.mediaUploadOverlay}>
+                  <ActivityIndicator color={ON_DARK} />
+                </View>
+              )}
+              {sizeChartUploadStatus === 'error' && (
+                <TouchableOpacity style={s.mediaUploadOverlay} onPress={pickSizeChartPhoto} accessibilityLabel="Retry size chart photo upload">
+                  <Feather name="refresh-cw" size={16} color={ON_DARK} />
+                  <Text style={s.mediaRetryLabel}>Retry upload</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={s.sizeChartActions}>
+              <SecondaryButton label="Replace" icon="image" onPress={pickSizeChartPhoto} />
+              <TouchableOpacity style={s.deleteOptionBtn} onPress={removeSizeChartPhoto}>
+                <Feather name="trash-2" size={14} color={RED} />
+                <Text style={s.deleteOptionText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <GradientCard onPress={pickSizeChartPhoto} style={s.uploadZone}>
+            <View style={s.uploadInner}>
+              <Feather name="grid" size={28} color={PURPLE_LIGHT} />
+              <Text style={s.uploadLabel}>Add a size chart photo</Text>
+              <Text style={s.uploadHint}>Optional · Shown to buyers as "Size guide"</Text>
+            </View>
+          </GradientCard>
         )}
       </>
     );
@@ -1935,29 +2030,44 @@ export default function AddProductScreen() {
         </ScrollView>
 
         {/* The action area is outside the scroll view so it's always
-            available without losing the form's draft state or scroll position. */}
-        <View style={[s.stickyFooter, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
+            available without losing the form's draft state or scroll position.
+            Each button sits in its own flex:1 wrapper — PressableScale only
+            forwards a plain object/array `style` to its INNER Animated.View,
+            not the outer Pressable (it only forwards to the outer Pressable
+            when `style` is a function-as-child style), so passing flex:1
+            straight into SecondaryButton/PrimaryButton's own `style` prop
+            never reaches the actual flex item in this row: the outer
+            Pressable stays unstyled and shrink-wraps to its label text,
+            reading as two tiny squished pills. Wrapping in an outer View
+            (the same fix ProfileButton already uses) puts flex:1 on the true
+            flex item; the column-default alignItems:'stretch' then stretches
+            the unstyled Pressable to fill it. */}
+        <View style={[s.stickyFooter, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
           <View style={s.publishButtons}>
-            <SecondaryButton
-              label={stepIndex === 0 ? 'Cancel' : 'Back'}
-              onPress={goBack}
-              style={{ flex: 1 }}
-            />
-            {isLastStep ? (
-              <PrimaryButton
-                label={photosUploading ? 'Uploading photos…' : publishing ? 'Publishing...' : 'Publish'}
-                disabled={publishing || photosUploading}
-                onPress={handlePublish}
-                style={{ flex: 1 }}
+            <View style={s.footerBtnWrap}>
+              <SecondaryButton
+                label={stepIndex === 0 ? 'Cancel' : 'Back'}
+                onPress={goBack}
+                style={s.footerBtnFill}
               />
-            ) : (
-              <PrimaryButton
-                label="Next"
-                icon="arrow-right"
-                onPress={goNext}
-                style={{ flex: 1 }}
-              />
-            )}
+            </View>
+            <View style={s.footerBtnWrap}>
+              {isLastStep ? (
+                <PrimaryButton
+                  label={photosUploading ? 'Uploading photos…' : publishing ? 'Publishing...' : 'Publish'}
+                  disabled={publishing || photosUploading}
+                  onPress={handlePublish}
+                  style={s.footerBtnFill}
+                />
+              ) : (
+                <PrimaryButton
+                  label="Next"
+                  icon="arrow-right"
+                  onPress={goNext}
+                  style={s.footerBtnFill}
+                />
+              )}
+            </View>
           </View>
           <TouchableOpacity onPress={handleSaveDraftAndExit} style={{ alignSelf: 'center', paddingTop: 4 }}>
             <Text style={[s.headerSaveText, { color: MUTED }]}>Save as draft & exit</Text>
@@ -2118,11 +2228,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   publishButtons: {
     flexDirection: 'row',
-    gap: SP.sm,
+    gap: 12,
   },
+  footerBtnWrap: { flex: 1 },
+  footerBtnFill: { height: 52, width: '100%' },
 
   // Shared field helpers
   sectionHdr: { paddingHorizontal: 0 },
+  sectionHelper: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: -SP.xs, marginBottom: SP.md },
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
 
@@ -2151,6 +2264,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
   mediaRetryLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK },
+  sizeChartRow: { flexDirection: 'row', gap: SP.md, alignItems: 'flex-start' },
+  sizeChartThumbWrap: {
+    width: 100, height: 130, borderRadius: RADIUS.sm,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    overflow: 'hidden', position: 'relative',
+  },
+  sizeChartThumb: { width: '100%', height: '100%' },
+  sizeChartActions: { flex: 1, gap: SP.sm, justifyContent: 'center' },
   mediaCoverBadge: {
     position: 'absolute', bottom: 4, left: 4,
     backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2,
@@ -2221,7 +2342,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   customValueInput: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: FG },
   customValueAdd: { padding: SP.xs },
-  deleteOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, alignSelf: 'flex-start', marginTop: SP.xs },
+  deleteOptionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.xs, alignSelf: 'flex-start', marginTop: SP.xs,
+  },
   deleteOptionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: RED },
   variantCount: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   variantsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.xs },

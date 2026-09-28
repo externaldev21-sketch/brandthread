@@ -20,6 +20,7 @@ import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, 
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { hapticPrimaryAction, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import * as ImagePicker from 'expo-image-picker';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -28,7 +29,7 @@ import {
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
-import { VoiceMessageBubble } from '@/components/chat/VoiceMessageBubble';
+import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
@@ -44,7 +45,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   isSellerPreviewConversationId,
   getSellerPreviewConversation, getSellerPreviewMessages, getSellerPreviewBuyerOrders,
-  isPreviewInboxEnabled, posterUri,
+  isPreviewInboxEnabled, posterUri, previewAutoReplyText, previewAutoReplyDelayMs,
 } from '@/lib/previewInbox';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaUploadThumb from '@/components/chat/MediaUploadThumb';
@@ -58,6 +59,7 @@ import {
 } from '@/lib/chatGrouping';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
+import { ChatAttachmentCard } from '@/components/chat/ChatAttachmentCard';
 import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuItem } from '@/components/chat/ReactionOverlay';
 import { ReactionGlyph } from '@/components/chat/ReactionBar';
 import { applyOptimisticReaction, myReactionIn, groupReactionCounts } from '@/lib/reactionMutations';
@@ -82,6 +84,10 @@ interface ConvView {
   contextProductId?: string; contextProductName?: string;
   /** Chat details > Theme / Disappearing messages (conversation-level). */
   themeId?: string; disappearingEnabled?: boolean;
+  /** Real-time "X is typing…" — the buyer's own typing signal, polled via
+   *  GET /api/conversations/:id (see PATCH .../typing). Undefined for a
+   *  seeded preview thread (no real backend to poll). */
+  otherTyping?: boolean;
 }
 interface MsgAttachment {
   type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice' | 'system' | 'thread_cash';
@@ -244,6 +250,7 @@ export default function SellerConversationScreen() {
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
+  const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
   // Item 68 (chat reactions glass) — long-pressed message + its measured
@@ -265,6 +272,10 @@ export default function SellerConversationScreen() {
   // Item 74 (photo/video upload progress ring) — see the identical comment
   // in app/buyer-conversation.tsx.
   const mediaUploadTokenRef = useRef(0);
+  // Real-time "X is typing…" — same pattern as app/buyer-conversation.tsx's
+  // identical refs.
+  const isTypingSentRef = useRef(false);
+  const typingClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Item 144 — buyer context panel (Mobbin: Binance's chat-attached
   // account-context drawer, mobbin.com/screens/4b0152e6-df33-4d73-aa39-
@@ -376,6 +387,53 @@ export default function SellerConversationScreen() {
     };
   }, [api, id, loadAll, loadMessages]));
 
+  // "X is typing…" needs a tighter cadence than the 15s message poll above
+  // to read as live — same 3s cadence app/buyer-conversation.tsx's identical
+  // poll uses. Merges just otherTyping into conv rather than replacing it
+  // wholesale, so it never clobbers an in-flight local update elsewhere on
+  // this screen. Skipped for a seeded preview thread (no real backend/
+  // counterpart to poll).
+  useFocusEffect(useCallback(() => {
+    if (!id || isSellerPreviewConversationId(id)) return;
+    const interval = setInterval(() => {
+      api.conversations.get(id).then((fresh: { otherTyping?: boolean }) => {
+        setConv((prev) => (prev ? { ...prev, otherTyping: fresh?.otherTyping } : prev));
+      }).catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [api, id]));
+
+  useEffect(() => () => {
+    if (typingClearTimerRef.current) clearTimeout(typingClearTimerRef.current);
+  }, []);
+
+  /** Real-time "X is typing…": tells the server I'm composing (once per
+   *  burst of keystrokes) and schedules clearing it after a short pause —
+   *  see app/buyer-conversation.tsx's identical helper. No-ops for a seeded
+   *  preview thread (no real backend/counterpart). */
+  function sendTypingSignal(hasText: boolean) {
+    if (!id || isSellerPreviewConversationId(id)) return;
+    if (typingClearTimerRef.current) { clearTimeout(typingClearTimerRef.current); typingClearTimerRef.current = null; }
+    if (hasText) {
+      if (!isTypingSentRef.current) {
+        isTypingSentRef.current = true;
+        api.conversations.setTyping(id, true).catch(() => {});
+      }
+      typingClearTimerRef.current = setTimeout(() => {
+        isTypingSentRef.current = false;
+        api.conversations.setTyping(id, false).catch(() => {});
+      }, 3000);
+    } else if (isTypingSentRef.current) {
+      isTypingSentRef.current = false;
+      api.conversations.setTyping(id, false).catch(() => {});
+    }
+  }
+
+  function handleChangeText(next: string) {
+    setText(next);
+    sendTypingSignal(next.trim().length > 0);
+  }
+
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
@@ -432,6 +490,11 @@ export default function SellerConversationScreen() {
   const receivedTextColor = convTheme?.receivedText ?? FG;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
+  // Whether the composer actually has something to send — drives whether
+  // the send button shows at all (see the input row below), independent of
+  // `canSend`'s isSending/id gating so the button doesn't flicker away
+  // mid-send.
+  const hasComposerContent = text.trim().length > 0 || pendingAttachment != null;
   // Seen receipt: id of MY (the seller's) most recent message in this
   // thread — "Seen" only ever renders under that one message. See
   // lib/chatGrouping.ts's doc comment on the real, honest granularity this
@@ -766,98 +829,18 @@ export default function SellerConversationScreen() {
           onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
           onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
           onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+          onViewTranscription={() => {
+            setTranscriptionToast(true);
+            setTimeout(() => setTranscriptionToast(false), 2600);
+          }}
         />
       );
     }
-    // Product share card (item 70) — same treatment as buyer-conversation.tsx
-    // so a shared product card looks identical from both sides of the DM: a
-    // real image thumbnail, live name/price (or "No longer available" — kept
-    // fresh server-side, see api-server's lib/productAttachmentInfo.ts), and
-    // an explicit "View" chip. It's a single tap target — no nested
-    // pressable inside the bubble's own long-press/swipe handlers.
-    if (att.type === 'product') {
-      const unavailable = att.meta?.unavailable === 'true';
-      return (
-        <PressableScale
-          style={s.productCard}
-          activeOpacity={0.7}
-          accessibilityLabel={`${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`}
-          testID="product-card-attachment"
-          onPress={() => {
-            const pid = att.meta?.productId;
-            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
-          }}
-        >
-          <View style={[s.productCardImage, unavailable && s.productCardImageDim]}>
-            {att.uri ? (
-              <CachedImage source={{ uri: att.uri }} style={s.productCardImageFill} recyclingKey={att.uri} />
-            ) : (
-              <Feather name="shopping-bag" size={ICON.md} color={MUTED} />
-            )}
-          </View>
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Product'}</Text>
-            <Text style={[s.attachSubtitle, unavailable && s.productUnavailableText]} numberOfLines={1}>
-              {unavailable ? 'No longer available' : (att.subtitle ?? 'Product')}
-            </Text>
-          </View>
-          <View style={s.productViewChip}>
-            <Text style={s.productViewChipText}>View</Text>
-            <Feather name="chevron-right" size={ICON.xs} color={FG} />
-          </View>
-        </PressableScale>
-      );
-    }
-    // Order status card (item 71) — same treatment as buyer-conversation.tsx
-    // so the order card the seller sent looks identical from both sides of
-    // the DM: a status badge (matching the order detail screen's own badge
-    // colors/labels, see lib/orderStatusAdapter.ts) and a real Track/View
-    // action, both kept live server-side (see api-server's
-    // lib/orderAttachmentInfo.ts) rather than the value cached at send time
-    // — the seller's own "order shipped" update must show up here right
-    // away, not just on order-detail. Single tap target — see the product
-    // card above for why the chip isn't a second Pressable.
-    if (att.type === 'order') {
-      const orderId = att.meta?.orderId;
-      const rawStatus = att.meta?.status;
-      const uiStatus = rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
-      const trackingNumber = att.meta?.trackingNumber;
-      const trackingUrl = trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
-      const chipLabel = trackingUrl ? 'Track' : 'View';
-      return (
-        <PressableScale
-          style={s.orderMsgCard}
-          activeOpacity={0.7}
-          accessibilityLabel={`${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${chipLabel}`}
-          testID="order-card-attachment"
-          onPress={() => {
-            if (trackingUrl) {
-              Linking.openURL(trackingUrl).catch(() => {});
-            } else {
-              router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
-            }
-          }}
-        >
-          <View style={s.orderMsgCardIconCircle}>
-            <Feather name="package" size={ICON.md} color={PURPLE} />
-          </View>
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Order'}</Text>
-            {uiStatus ? (
-              <View style={s.orderMsgCardBadgeRow}>
-                <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
-              </View>
-            ) : (
-              <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle ?? 'Order'}</Text>
-            )}
-          </View>
-          <View style={s.productViewChip}>
-            <Text style={s.productViewChipText}>{chipLabel}</Text>
-            <Feather name={trackingUrl ? 'external-link' : 'chevron-right'} size={ICON.xs} color={FG} />
-          </View>
-        </PressableScale>
-      );
-    }
+    // 'product', 'order' and 'thread_cash' are handled standalone in
+    // renderItem() before this function is ever called for them — see its
+    // product/order branch (matches app/buyer-conversation.tsx's identical
+    // standalone treatment, so a card looks identical from both sides of
+    // the DM).
     return (
       <PressableScale
         style={s.attachCard}
@@ -937,6 +920,53 @@ export default function SellerConversationScreen() {
     setText('');
     setPendingAttachment(null);
     setReplyTo(null);
+    sendTypingSignal(false);
+
+    // Preview conversations have no real backend to post to — this branch
+    // was previously missing here (unlike every other send path on this
+    // screen, e.g. the Thread Cash onSent handler above), so sending a
+    // message under ?bt_preview=seller hit the real API with a fake
+    // conversation id and failed. Appends locally instead, same pattern as
+    // app/buyer-conversation.tsx's identical branch, and has the simulated
+    // buyer send back exactly one short auto-reply so the thread feels live.
+    if (isSellerPreviewConversationId(id)) {
+      const localMsg: Msg = {
+        id: `local-${Date.now()}`,
+        conversationId: id,
+        fromId: effectiveMyId,
+        fromName: 'You',
+        fromInitials: 'Y',
+        fromColor: PURPLE,
+        text: t,
+        attachment: att ?? undefined,
+        replyToId: replyingTo?.id,
+        replyPreview: replyingTo?.text,
+        replyToAuthorName: replyingTo?.fromName,
+        reactions: [],
+        status: 'sent',
+        ts: Date.now(),
+      };
+      setMessages((prev) => [...prev, localMsg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      setTimeout(() => {
+        const reply: Msg = {
+          id: `local-reply-${Date.now()}`,
+          conversationId: id,
+          fromId: other?.userId ?? 'preview-buyer',
+          fromName: other?.name ?? 'Buyer',
+          fromInitials: other?.initials ?? 'B',
+          fromColor: other?.color ?? PURPLE,
+          text: previewAutoReplyText(),
+          reactions: [],
+          status: 'sent',
+          ts: Date.now(),
+        };
+        setMessages((prev) => [...prev, reply]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      }, previewAutoReplyDelayMs());
+      return;
+    }
+
     setIsSending(true);
     try {
       const msg = await api.conversations.send(id, {
@@ -1124,6 +1154,66 @@ export default function SellerConversationScreen() {
       );
     }
 
+    // Standalone product/order card (Dev's chat-card-redesign feedback) —
+    // NEVER rendered inside the text-message bubble, same standalone
+    // treatment as app/buyer-conversation.tsx so the card looks identical
+    // from both sides of the DM. See components/chat/ChatAttachmentCard.tsx.
+    if (msg.attachment?.type === 'product' || msg.attachment?.type === 'order') {
+      const att = msg.attachment;
+      const isProduct = att.type === 'product';
+      const unavailable = isProduct && att.meta?.unavailable === 'true';
+      const orderId = att.meta?.orderId;
+      const rawStatus = att.meta?.status;
+      const uiStatus = !isProduct && rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
+      const trackingNumber = att.meta?.trackingNumber;
+      const trackingUrl = !isProduct && trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
+      const footerLabel = isProduct ? 'View' : (trackingUrl ? 'Track' : 'View');
+      const footerIcon = !isProduct && trackingUrl ? 'external-link' : 'chevron-right';
+      const accessibilityLabel = isProduct
+        ? `${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`
+        : `${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${footerLabel}`;
+      return (
+        <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? SP.sm : 2 }]}>
+          {!isOwn && (
+            isLastInGroup ? (
+              <View style={[s.msgAvatar, { backgroundColor: msg.fromColor || PURPLE }]}>
+                <Text style={s.msgAvatarInitials}>{msg.fromInitials || (msg.fromName?.[0] ?? '?')}</Text>
+              </View>
+            ) : <View style={s.msgAvatarSpacer} />
+          )}
+          <ChatAttachmentCard
+            theme={theme}
+            isMe={isOwn}
+            imageUri={isProduct ? att.uri : undefined}
+            icon={isProduct ? 'shopping-bag' : 'package'}
+            iconColor={PURPLE}
+            title={att.title || (isProduct ? 'Product' : 'Order')}
+            priceLabel={isProduct ? att.subtitle : undefined}
+            statusBadge={!isProduct && uiStatus ? (
+              <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+            ) : (!isProduct && !uiStatus && att.subtitle ? (
+              <Text style={[s.attachSubtitle, { marginTop: 0 }]} numberOfLines={1}>{att.subtitle}</Text>
+            ) : undefined)}
+            unavailable={unavailable}
+            footerLabel={footerLabel}
+            footerIcon={footerIcon}
+            testID={isProduct ? 'product-card-attachment' : 'order-card-attachment'}
+            accessibilityLabel={accessibilityLabel}
+            onPress={() => {
+              if (isProduct) {
+                const pid = att.meta?.productId;
+                if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
+              } else if (trackingUrl) {
+                Linking.openURL(trackingUrl).catch(() => {});
+              } else {
+                router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
+              }
+            }}
+          />
+        </View>
+      );
+    }
+
     const removed = (msg as { removedByModeration?: boolean }).removedByModeration === true;
     const isRead = msg.status === 'read' || !!msg.readAt;
     return (
@@ -1167,16 +1257,15 @@ export default function SellerConversationScreen() {
               },
             ]}
             accessibilityHint="Touch and hold to react or see more options"
-            // Voice, product and order attachments each render their own
-            // interactive control inside this bubble — PressableScale defaults
-            // to rendering an actual <button> on web, which cannot legally
-            // contain other interactive controls. Drop the role for all three
-            // so it's a plain, still fully long-pressable <div> instead. See
-            // buyer-conversation.tsx.
+            // Voice attachments render their own interactive control inside
+            // this bubble — PressableScale defaults to rendering an actual
+            // <button> on web, which cannot legally contain other
+            // interactive controls. Drop the role so it's a plain, still
+            // fully long-pressable <div> instead. Product/order cards no
+            // longer render inside this bubble at all — see renderItem's
+            // standalone product/order branch. See buyer-conversation.tsx.
             accessibilityRole={
               msg.attachment?.type === 'voice'
-              || msg.attachment?.type === 'product'
-              || msg.attachment?.type === 'order'
                 ? 'none' : undefined
             }
           >
@@ -1283,87 +1372,102 @@ export default function SellerConversationScreen() {
       )}
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <PressableScale
-          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
-          style={s.headerBack}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Feather name="arrow-left" size={ICON.lg} color={FG} />
-        </PressableScale>
-        <PressableScale
-          style={s.headerCenterRow}
-          disabled={!other || !id}
-          onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
-          testID="seller-conversation-header-name"
-          accessibilityRole="button"
-          accessibilityLabel={`${displayName} — chat details`}
-        >
-          {other && (
-            <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
-              <Text style={s.headerAvatarInitials}>
-                {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
-              </Text>
+      <View style={[s.header, { paddingTop: insets.top + SP.sm, paddingRight: SP.md + insets.right }]}>
+        <View style={s.headerLeftGroup}>
+          <PressableScale
+            onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
+            style={s.headerBack}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
+            <Feather name="arrow-left" size={ICON.lg} color={FG} />
+          </PressableScale>
+          <PressableScale
+            style={s.headerCenterRow}
+            disabled={!other || !id}
+            onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+            testID="seller-conversation-header-name"
+            accessibilityRole="button"
+            accessibilityLabel={`${displayName} — chat details`}
+          >
+            {other && (
+              <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
+                <Text style={s.headerAvatarInitials}>
+                  {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={s.headerCenter}>
+              <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+              {/* Real-time "X is typing…" (conv.otherTyping) takes priority
+                  over the static handle line when present — same field/poll
+                  app/buyer-conversation.tsx's statusLine reads, just no
+                  existing subtitle slot there to reuse before now. */}
+              {conv?.otherTyping
+                ? <Text style={s.headerHandle} numberOfLines={1}>typing…</Text>
+                : (other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null)}
             </View>
+          </PressableScale>
+        </View>
+
+        {/* Icon group hard-right-aligned to the header edge, per Mobbin
+            (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — not
+            centered/adjacent to the name. s.header's justifyContent:
+            'space-between' pushes this group to the far right. */}
+        <View style={s.headerIconGroup}>
+          {id && (
+            <>
+              <PressableScale
+                style={s.headerCallBtn}
+                onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Voice call"
+              >
+                <Feather name="phone" size={ICON.lg} color={MUTED} />
+              </PressableScale>
+              <PressableScale
+                style={s.headerCallBtn}
+                onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Video call"
+              >
+                <Feather name="video" size={ICON.lg} color={MUTED} />
+              </PressableScale>
+            </>
           )}
-          <View style={s.headerCenter}>
-            <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
-            {other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null}
-          </View>
-        </PressableScale>
-        {id && (
-          <>
+          {other ? (
             <PressableScale
               style={s.headerCallBtn}
-              onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+              onPress={openBuyerContext}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="seller-conversation-buyer-context-btn"
               accessibilityRole="button"
-              accessibilityLabel="Voice call"
+              accessibilityLabel={`${displayName} — orders and cart`}
             >
-              <Feather name="phone" size={ICON.md} color={MUTED} />
+              <Feather name="clipboard" size={ICON.lg} color={MUTED} />
             </PressableScale>
+          ) : null}
+          {other ? (
             <PressableScale
               style={s.headerCallBtn}
-              onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
+              onPress={() => { hapticPrimaryAction(); openConversationOptions({
+                router,
+                social: api.social,
+                counterpart: { userId: other.userId, name: other.name },
+                messaging,
+                onChange: setMessaging,
+              }); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
-              accessibilityLabel="Video call"
+              accessibilityLabel="Conversation options"
             >
-              <Feather name="video" size={ICON.md} color={MUTED} />
+              <Feather name="more-horizontal" size={ICON.lg} color={FG} />
             </PressableScale>
-          </>
-        )}
-        {other ? (
-          <PressableScale
-            style={s.headerCallBtn}
-            onPress={openBuyerContext}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            testID="seller-conversation-buyer-context-btn"
-            accessibilityRole="button"
-            accessibilityLabel={`${displayName} — orders and cart`}
-          >
-            <Feather name="clipboard" size={ICON.md} color={MUTED} />
-          </PressableScale>
-        ) : null}
-        {other ? (
-          <PressableScale
-            style={s.headerCallBtn}
-            onPress={() => { hapticPrimaryAction(); openConversationOptions({
-              router,
-              social: api.social,
-              counterpart: { userId: other.userId, name: other.name },
-              messaging,
-              onChange: setMessaging,
-            }); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel="Conversation options"
-          >
-            <Feather name="more-horizontal" size={ICON.md} color={FG} />
-          </PressableScale>
-        ) : null}
+          ) : null}
+        </View>
       </View>
 
       {/* Order context card */}
@@ -1513,9 +1617,14 @@ export default function SellerConversationScreen() {
           <Feather name="paperclip" size={ICON.md} color={pendingAttachment ? PURPLE : MUTED} />
         </PressableScale>
 
-        {/* Media */}
+        {/* Media — IG-style camera-circle trigger (Mobbin: Instagram DM
+            composer, mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7),
+            same treatment as app/buyer-conversation.tsx's camera-circle
+            attach button: a solid white circle with a black camera glyph.
+            Same action as before (opens the Photo/Video sheet), just a new
+            visual. */}
         <PressableScale
-          style={s.attachBtn}
+          style={s.cameraCircleBtn}
           onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
           disabled={isUploading || isSending}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1523,8 +1632,8 @@ export default function SellerConversationScreen() {
           accessibilityLabel="Photo or video"
         >
           {isUploading
-            ? <ActivityIndicator size="small" color={PURPLE} />
-            : <Feather name="camera" size={ICON.md} color={MUTED} />
+            ? <ActivityIndicator size="small" color="#000000" />
+            : <Feather name="camera" size={20} color="#000000" />
           }
         </PressableScale>
 
@@ -1622,29 +1731,46 @@ export default function SellerConversationScreen() {
         ) : null}
 
         <TextInput
-          style={s.textInput}
+          style={[s.textInput, WEB_INPUT_RESET]}
           value={text}
-          onChangeText={setText}
+          onChangeText={handleChangeText}
           placeholder="Message…"
           placeholderTextColor={SUBTLE}
           multiline
           returnKeyType="default"
+          onKeyPress={Platform.OS === 'web' ? (e: any) => {
+            // Web hardware-keyboard Enter sends; Shift+Enter still inserts
+            // a newline (native platforms use their own return-key
+            // handling and never see this multiline <textarea> key event,
+            // so this is web-only).
+            if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+              e.preventDefault();
+              hapticPrimaryAction();
+              handleSend();
+            }
+          } : undefined}
         />
-        <PressableScale
-          style={[
-            s.sendBtn,
-            canSend
-              ? { backgroundColor: PURPLE, borderColor: PURPLE }
-              : { backgroundColor: CARD, borderColor: BORDER },
-          ]}
-          onPress={() => { hapticPrimaryAction(); handleSend(); }}
-          disabled={!canSend}
-          accessibilityRole="button"
-          accessibilityLabel="Send message"
-          activeOpacity={0.8}
-        >
-          <Feather name="send" size={ICON.sm} color={canSend ? ON_DARK : MUTED} />
-        </PressableScale>
+        {/* Send only appears once there's actually something to send —
+            matches app/buyer-conversation.tsx's mic⇄send morph condition
+            (showSendButton), instead of always showing a disabled send
+            button next to an empty input. */}
+        {hasComposerContent ? (
+          <PressableScale
+            style={[
+              s.sendBtn,
+              canSend
+                ? { backgroundColor: PURPLE, borderColor: PURPLE }
+                : { backgroundColor: CARD, borderColor: BORDER },
+            ]}
+            onPress={() => { hapticPrimaryAction(); handleSend(); }}
+            disabled={!canSend}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            activeOpacity={0.8}
+          >
+            <Feather name="send" size={ICON.sm} color={canSend ? ON_DARK : MUTED} />
+          </PressableScale>
+        ) : null}
         </>)}
       </View>
       )}
@@ -1943,6 +2069,12 @@ export default function SellerConversationScreen() {
       />
 
       <Snackbar
+        visible={transcriptionToast}
+        message={TRANSCRIPTION_STUB}
+        onDismiss={() => setTranscriptionToast(false)}
+      />
+
+      <Snackbar
         visible={threadCashNotice != null}
         message={threadCashNotice ?? ''}
         actionLabel="Follow"
@@ -1983,20 +2115,30 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   header: {
     flexDirection: 'row', alignItems: 'center',
+    // Left group (back + avatar + name) stays left; the icon group is
+    // pushed to the far right edge — not centered/adjacent to the name.
+    justifyContent: 'space-between',
     backgroundColor: BG,
-    paddingHorizontal: SP.md, paddingBottom: SP.sm,
+    // Right edge padding is set inline (needs insets.right) — see the
+    // header's own JSX. Mobbin: Instagram DM header
+    // (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — the icon
+    // group is hard-right-aligned to the edge, evenly spaced, 16pt inset
+    // from the screen edge.
+    paddingLeft: SP.md, paddingBottom: SP.sm,
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
+  headerLeftGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  headerIconGroup: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   headerBack: { marginRight: SP.sm },
   headerAvatar: {
     width: 34, height: 34, borderRadius: 17,
     alignItems: 'center', justifyContent: 'center', marginRight: SP.sm,
   },
   headerAvatarInitials: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
-  headerCenterRow: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  headerCenter: { flex: 1 },
+  headerCenterRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  headerCenter: { flexShrink: 1 },
   headerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  headerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  headerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
   orderCard: {
     flexDirection: 'row', alignItems: 'center',
@@ -2005,7 +2147,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER,
   },
   orderNumber: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  orderProduct: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  orderProduct: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
   orderBadge: {
     backgroundColor: PURPLE_DIM, borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm, paddingVertical: SP.xs,
@@ -2081,41 +2223,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER,
   },
   attachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  attachSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  attachSubtitle: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
-  // Product share card (item 70) — see buyer-conversation.tsx's matching styles.
-  productCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: BG, borderRadius: RADIUS.md,
-    padding: SP.sm, marginBottom: 2,
-    borderWidth: 1, borderColor: BORDER,
-  },
-  productCardImage: {
-    width: 44, height: 44, borderRadius: RADIUS.sm,
-    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-  },
-  productCardImageDim: { opacity: 0.5 },
-  productCardImageFill: { width: '100%', height: '100%' },
-  productUnavailableText: { fontFamily: FONT.medium },
-  productViewChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 2,
-    borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill,
-    paddingVertical: 4, paddingHorizontal: SP.xs, marginLeft: SP.xs,
-  },
-  productViewChipText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG },
-
-  // Order status card (item 71) — see buyer-conversation.tsx's matching styles.
-  orderMsgCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: BG, borderRadius: RADIUS.md,
-    padding: SP.sm, marginBottom: 2,
-    borderWidth: 1, borderColor: BORDER,
-  },
-  orderMsgCardIconCircle: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center',
-  },
-  orderMsgCardBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
+  // Product/order chat cards (item 70/71) moved to the standalone
+  // ChatAttachmentCard component (components/chat/ChatAttachmentCard.tsx) —
+  // no bubble, no border, own the tap target. See renderItem's product/
+  // order branch.
 
   pendingAttachRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -2125,7 +2238,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },
   pendingAttachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  pendingAttachSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  pendingAttachSub: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end',
@@ -2139,11 +2252,31 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 2,
   },
+  // IG-style camera-circle attach trigger — same visual as
+  // app/buyer-conversation.tsx's cameraCircleBtn: a solid white circle
+  // with a black camera glyph, 36pt diameter, fixed white/black regardless
+  // of theme (Mobbin: mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7).
+  cameraCircleBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.12)',
+  },
   textInput: {
     flex: 1, backgroundColor: CARD, borderRadius: RADIUS.xl,
     borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    fontSize: FS.base, fontFamily: FONT.regular, color: FG, maxHeight: 120,
+    fontSize: FS.base, fontFamily: FONT.regular, color: FG,
+    // ~44pt at rest for a single line (matches buyer-conversation.tsx's
+    // pill height) — only grows past that as the user types more lines,
+    // never fixed-tall. Symmetric vertical padding keeps the placeholder
+    // centered within that height on every platform (textAlignVertical is
+    // Android-only).
+    minHeight: 44,
+    maxHeight: 120,
+    textAlignVertical: 'center',
   },
   sendBtn: {
     width: 36, height: 36, borderRadius: 18,
@@ -2177,7 +2310,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
   },
   sheetOptionLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  sheetOptionDesc: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  sheetOptionDesc: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
 
   // Product picker sheet
   productSheet: {
@@ -2201,7 +2334,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginRight: SP.sm,
   },
   productName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  productPrice: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  productPrice: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 },
   emptyState: { alignItems: 'center', paddingVertical: SP.xxl },
   emptyText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm, textAlign: 'center', paddingHorizontal: SP.lg },
 
@@ -2233,7 +2366,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   buyerContextCartNoteText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, lineHeight: 17 },
 
   // ── Call + media styles ──────────────────────────────────────────────────────
-  headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: SP.xs },
+  headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   recordingBtn:  { backgroundColor: 'rgba(255,59,48,0.12)', borderRadius: RADIUS.pill },
 
   // Photo grid

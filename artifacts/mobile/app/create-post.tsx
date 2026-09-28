@@ -44,6 +44,8 @@ import type { TextOverlay } from '@/lib/videoEditing';
 import { TextOverlayEditor, OverlayChip } from '@/components/TextOverlayEditor';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+import { startPostUpload, updatePostUploadProgress, completePostUpload, failPostUpload } from '@/lib/postUploadProgress';
+import { startUploadActivity, updateUploadActivity, endUploadActivity } from '@/lib/uploadLiveActivity';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -1978,6 +1980,7 @@ export default function CreatePostScreen() {
             <TouchableOpacity
               style={[ts.postBtn, isPublishing && { opacity: 0.55 }]}
               activeOpacity={0.85}
+              testID="post-details-publish-btn"
               disabled={isPublishing}
               onPress={async () => {
                 haptic(() => {});
@@ -1989,21 +1992,61 @@ export default function CreatePostScreen() {
                     return;
                   }
                 }
-                setIsPublishing(true);
-                setStep('publishing');
-                try {
-                  if (editId) {
-                    await persistSellerPost(false);
-                  } else {
-                    await completeSetupTaskAfter('first_post', () => persistSellerPost(false));
+                // Editing an existing post or scheduling keeps the existing
+                // blocking publishing/done screens — only a brand-new
+                // immediate post hands off to the feed-header progress pill
+                // (item 118), since that's the one case Instagram itself
+                // lets you navigate away from mid-upload.
+                if (editId || scheduleMode === 'schedule') {
+                  setIsPublishing(true);
+                  setStep('publishing');
+                  try {
+                    if (editId) {
+                      await persistSellerPost(false);
+                    } else {
+                      await completeSetupTaskAfter('first_post', () => persistSellerPost(false));
+                    }
+                    setStep('done');
+                  } catch (error) {
+                    setStep('post-details');
+                    Alert.alert('Publish failed', "Couldn't post. Your edits are safe — try again.");
+                  } finally {
+                    setIsPublishing(false);
                   }
-                  setStep('done');
-                } catch (error) {
-                  setStep('post-details');
-                  Alert.alert('Publish failed', "Couldn't post. Your edits are safe — try again.");
-                } finally {
-                  setIsPublishing(false);
+                  return;
                 }
+
+                // Guards the same double-tap the blocking branch above guards
+                // with isPublishing — this path unmounts almost immediately
+                // (leaveSetupDestination below), so it can't rely on a state
+                // flag surviving to block a second tap.
+                setIsPublishing(true);
+
+                const uploadId = `post-${Date.now()}`;
+                const thumbnailUri = composedVideo?.thumbnailUrl
+                  ?? composedSlideshow?.thumbnailUrl
+                  ?? slidePhotos[0]?.uri
+                  ?? editableSlides[0]?.uri;
+
+                const runPersist = () => {
+                  startPostUpload({ id: uploadId, kind: 'thread', thumbnailUri, retry: runPersist });
+                  startUploadActivity({ id: uploadId, kind: 'thread', thumbnailUri });
+                  updatePostUploadProgress(uploadId, 0.4);
+                  updateUploadActivity(uploadId, 0.4);
+                  completeSetupTaskAfter('first_post', () => persistSellerPost(false))
+                    .then(() => {
+                      completePostUpload(uploadId);
+                      endUploadActivity(uploadId, { status: 'success' });
+                    })
+                    .catch(() => {
+                      failPostUpload(uploadId, runPersist);
+                      endUploadActivity(uploadId, { status: 'failed' });
+                    });
+                };
+                runPersist();
+                // The upload continues in the background via the module-level
+                // store above — safe to leave the composer immediately.
+                leaveSetupDestination();
               }}
             >
               <LinearGradient

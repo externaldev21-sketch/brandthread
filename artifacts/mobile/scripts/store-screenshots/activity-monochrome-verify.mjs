@@ -68,11 +68,16 @@ async function installFakeApi(context, feed) {
 /** Every non-neutral text/glyph colour inside the Activity list (excluding images). */
 async function colourAudit(page) {
   return page.evaluate(() => {
+    // Allowed accents (owner decision): LIVE red, end-call red, and Thread
+    // Cash green (#155C22 deep / #3DBE4F mid / #5FDD70 bright) — everything
+    // else on Activity must be gray.
+    const THREAD_CASH_GREENS = [[21, 92, 34], [61, 190, 79], [95, 221, 112]];
     const neutral = (c) => {
       const m = c.match(/rgba?\(([^)]+)\)/);
       if (!m) return true;
       const [r, g, b, a = 1] = m[1].split(',').map((v) => parseFloat(v));
       if (a === 0) return true;
+      if (THREAD_CASH_GREENS.some(([tr, tg, tb]) => Math.abs(r - tr) <= 4 && Math.abs(g - tg) <= 4 && Math.abs(b - tb) <= 4)) return true;
       return Math.max(r, g, b) - Math.min(r, g, b) <= 12; // gray within a hair
     };
     const offenders = [];

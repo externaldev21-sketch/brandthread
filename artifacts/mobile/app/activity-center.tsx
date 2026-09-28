@@ -48,18 +48,23 @@ import { FONT, FS, GRAD_DARK_FADE, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/components/layout';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+import { useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FollowPill } from '@/components/search/PersonRow';
 import { ThemedRefreshControl } from '@/components/ui';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import SwipeableActions from '@/components/SwipeableActions';
 import { RemoveFollowerSheet } from '@/components/social/RemoveFollowerSheet';
 import { CenteredToast } from '@/components/social/CenteredToast';
+import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-cash/ThreadCashBill';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
-import { isPreviewActivityEnabled, getPreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri } from '@/lib/previewActivity';
+import {
+  isPreviewActivityEnabled, getVisiblePreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri,
+  isPreviewActivityId, markPreviewActivityDismissed,
+} from '@/lib/previewActivity';
 import { applyPreviewFollowState, getPreviewFollowing } from '@/lib/previewFollowStore';
 import { Chip } from '@/components/ui/Chip';
 import {
@@ -78,6 +83,8 @@ import {
   applyRead,
   buildActivitySections,
   createReadTracker,
+  createDeferredDelete,
+  ACTIVITY_UNDO_MS,
   isFollowBackRow,
   relativeTime,
   type ActivityActor,
@@ -98,8 +105,6 @@ import {
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
 
-const EMPTY_ICON = 'activity' as const;
-const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
 const AVATAR_SIZE = 40;
 
 type Styles = ReturnType<typeof makeStyles>;
@@ -181,12 +186,14 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
 
 function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }) {
   const { theme } = useAppTheme();
-  // Monochrome like every other type badge — the green bill artwork was one
-  // of the Activity screen's only non-LIVE colour accents.
+  // Thread Cash keeps its green — the one deliberate exception to Activity's
+  // otherwise-monochrome rule (owner decision: LIVE red, end-call red, and
+  // Thread Cash green are the only allowed accents). Every other badge below
+  // stays monochrome.
   if (row.type === 'thread_cash_received') {
     return (
       <View style={styles.typeBadge}>
-        <Feather name="dollar-sign" size={10} color={theme.accentLight} />
+        <ThreadCashBillIcon size={14} />
       </View>
     );
   }
@@ -595,6 +602,58 @@ export default function ActivityCenterScreen() {
   }), []);
   useEffect(() => () => tracker.dispose(), [tracker]);
 
+  // ── Swipe → trash, with Undo (item 83) ─────────────────────────────────────
+  // The row leaves at once; the real DELETE waits out the Undo window (the
+  // server delete is permanent, so Undo means "never sent"). Rows are kept
+  // here so Undo — or a failed delete — can put them back in place.
+  const { showUndo, dismissUndo } = useUndoToast();
+  // Sit the toast just above the floating tab bar (both roles), not over it.
+  const undoBottom = useBuyerTabBarTopInset() + SP.sm;
+  const deletedRowsRef = useRef(new Map<string, ActivityItem>());
+  const restoreRows = useCallback((ids: string[]) => {
+    const back = ids.map((id) => deletedRowsRef.current.get(id)).filter((item): item is ActivityItem => !!item);
+    for (const id of ids) deletedRowsRef.current.delete(id);
+    if (back.length === 0) return;
+    setItems((prev) => {
+      const have = new Set(prev.map((item) => item.id));
+      const merged = [...prev, ...back.filter((item) => !have.has(item.id))];
+      return merged.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    });
+  }, []);
+  const deferredDelete = useMemo(() => createDeferredDelete({
+    delayMs: ACTIVITY_UNDO_MS,
+    commit: async (ids) => {
+      const results = await Promise.allSettled(ids.map(async (id) => {
+        // Seeded preview rows have no server copy — remember the delete locally.
+        if (isPreviewActivityId(id)) { markPreviewActivityDismissed(id); return; }
+        await dismissActivity(id);
+      }));
+      const failed = ids.filter((_, index) => results[index].status === 'rejected');
+      for (const id of ids) if (!failed.includes(id)) deletedRowsRef.current.delete(id);
+      return failed;
+    },
+    onFailed: (failed) => {
+      restoreRows(failed);
+      Alert.alert('Could not delete', 'Check your connection and try again.');
+    },
+  }), [restoreRows]);
+  // Leaving Activity sends a waiting delete now rather than dropping it.
+  const undoVisibleUntil = useRef(0);
+  useEffect(() => () => {
+    deferredDelete.flush();
+    if (Date.now() < undoVisibleUntil.current) dismissUndo();
+  }, [deferredDelete, dismissUndo]);
+  const deferredDeleteRef = useRef(deferredDelete);
+  deferredDeleteRef.current = deferredDelete;
+  // …and so does leaving it without unmounting (the buyer's Activity is a
+  // tab, and opening a row pushes on top): send the delete, drop the toast.
+  useFocusEffect(useCallback(() => () => {
+    deferredDeleteRef.current.flush();
+    if (Date.now() < undoVisibleUntil.current) { undoVisibleUntil.current = 0; dismissUndo(); }
+  }, [dismissUndo]));
+  /** Drops rows whose delete is waiting or in flight, so a refresh can't bring them back. */
+  const withoutPendingDeletes = (list: ActivityItem[]) => list.filter((item) => !deferredDeleteRef.current.isPending(item.id));
+
   // Seeded suggestions, with anyone already followed this preview session
   // (lib/previewFollowStore) shown as "Following" instead of "Follow" again.
   const showPreviewSuggestions = useCallback(() => {
@@ -631,7 +690,7 @@ export default function ActivityCenterScreen() {
       // The dev-web preview has no live backend to seed a real feed from —
       // show the same rich seeded world every other preview screen uses
       // instead of an empty "Activity will show up here".
-      const resolved = page.length === 0 && isPreviewActivityEnabled() ? applyPreviewFollowState(getPreviewActivity()) : page;
+      const resolved = withoutPendingDeletes(page.length === 0 && isPreviewActivityEnabled() ? applyPreviewFollowState(getVisiblePreviewActivity()) : page);
       setItems(resolved);
       setSessionNew(new Set(resolved.filter((item) => !item.isRead).map((item) => item.id)));
       setHasMore(page.length === ACTIVITY_PAGE_SIZE);
@@ -643,7 +702,7 @@ export default function ActivityCenterScreen() {
         // Never show a false error in the dev-web preview — there is no
         // backend to reach at all, so a fetch failure here is expected.
         retriedRef.current = false;
-        const seeded = applyPreviewFollowState(getPreviewActivity());
+        const seeded = withoutPendingDeletes(applyPreviewFollowState(getVisiblePreviewActivity()));
         setItems(seeded);
         setSessionNew(new Set(seeded.filter((item) => !item.isRead).map((item) => item.id)));
         setHasMore(false);
@@ -695,7 +754,7 @@ export default function ActivityCenterScreen() {
       if (id !== requestId.current) return;
       setItems((prev) => {
         const seen = new Set(prev.map((item) => item.id));
-        return [...prev, ...page.filter((item) => !seen.has(item.id))];
+        return [...prev, ...withoutPendingDeletes(page).filter((item) => !seen.has(item.id))];
       });
       setHasMore(page.length === ACTIVITY_PAGE_SIZE);
     } catch {
@@ -716,7 +775,19 @@ export default function ActivityCenterScreen() {
     () => items.filter((item) => matchesActivityChip(item, chip)),
     [items, chip],
   );
-  const chipEmpty = activityChipEmpty(chip);
+  const chipEmpty = activityChipEmpty(chip, role);
+  const emptyActionHref = chipEmpty.action?.href;
+  const handleEmptyAction = useCallback(() => {
+    if (emptyActionHref) router.push(emptyActionHref as never);
+  }, [emptyActionHref, router]);
+  const emptyStateProps = {
+    icon: chipEmpty.icon as any,
+    title: chipEmpty.title,
+    message: chipEmpty.message,
+    actionLabel: chipEmpty.action?.label,
+    onAction: chipEmpty.action ? handleEmptyAction : undefined,
+    testID: `activity-empty-${chip}`,
+  };
 
   const sections: ListSection[] = useMemo(() => {
     const raw = buildActivitySections(
@@ -806,22 +877,28 @@ export default function ActivityCenterScreen() {
     if (href) router.push(href as never);
   }, [api, role, router, tracker, user?.id]);
 
-  const handleDismiss = useCallback(async (row: ActivityRow) => {
+  // Trash: the row goes now, "Notification deleted · Undo" shows, and the
+  // server delete is sent when the Undo window closes (Mobbin: LinkedIn
+  // https://mobbin.com/screens/25b887e8-1c04-4f3e-b83d-ab614dc4f83a,
+  // OpenPhone https://mobbin.com/screens/969deed2-c091-402c-b4e1-d8ad3e5296f8).
+  const handleDismiss = useCallback((row: ActivityRow) => {
     const removed = new Set(row.ids);
-    const snapshot = itemsRef.current;
+    for (const item of itemsRef.current) if (removed.has(item.id)) deletedRowsRef.current.set(item.id, item);
     setItems((prev) => prev.filter((item) => !removed.has(item.id)));
-    const results = await Promise.allSettled(row.ids.map((id) => dismissActivity(id)));
-    const failed = row.ids.filter((_, index) => results[index].status === 'rejected');
-    if (failed.length > 0) {
-      const failedSet = new Set(failed);
-      setItems((prev) => {
-        const restored = snapshot.filter((item) => failedSet.has(item.id));
-        const merged = [...prev, ...restored];
-        return merged.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      });
-      Alert.alert('Could not dismiss', 'Check your connection and try again.');
-    }
-  }, []);
+    const token = deferredDelete.schedule(row.ids);
+    undoVisibleUntil.current = Date.now() + ACTIVITY_UNDO_MS;
+    showUndo({
+      message: 'Notification deleted',
+      durationMs: ACTIVITY_UNDO_MS,
+      tone: 'monochrome',
+      testID: 'activity-undo-toast',
+      bottom: undoBottom,
+      undo: () => {
+        undoVisibleUntil.current = 0;
+        if (deferredDelete.undo(token)) restoreRows(row.ids);
+      },
+    });
+  }, [deferredDelete, restoreRows, showUndo, undoBottom]);
 
   // Follow back / unfollow from a follow row's inline pill — the same
   // POST/DELETE /api/social/follow every other Follow pill uses. Optimistic,
@@ -1071,12 +1148,12 @@ export default function ActivityCenterScreen() {
           )}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
-              {/* A filter with nothing in it says so specifically (minimal
-                  per-chip copy — full empty-state polish is item 85). */}
+              {/* A filter with nothing in it says so specifically, per role,
+                  with one next step where there's a real one (item 85). */}
               {chip === 'all' ? (
-                <EmptyState icon={EMPTY_ICON} illustration="bell" message={EMPTY_MESSAGE} />
+                <EmptyState {...emptyStateProps} illustration="bell" />
               ) : (
-                <EmptyState icon={chipEmpty.icon as any} message={chipEmpty.message} testID={`activity-empty-${chip}`} />
+                <EmptyState {...emptyStateProps} />
               )}
             </View>
           )}
@@ -1299,10 +1376,12 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontSize: FS.sm,
     lineHeight: 18,
   },
-  // Thread Cash "+$5.00": bold, theme text colour — never green (the only
-  // colour accents allowed are LIVE red and end-call red).
+  // Thread Cash "+$5.00": bold, and green — the owner's one deliberate
+  // exception to Activity's monochrome rule (allowed accents: LIVE red,
+  // end-call red, and Thread Cash green). Every other detail line stays
+  // theme-text monochrome.
   cashAmount: {
-    color: theme.text,
+    color: THREAD_CASH_GREEN_MID,
     fontFamily: FONT.bold,
   },
 

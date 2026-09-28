@@ -19,14 +19,19 @@ const sheetSource = readFileSync(
  * and no visible feedback at the buyer's actual scroll position. That's
  * indistinguishable from "the button is broken."
  *
- * The fix (rejectMissingVariant): scroll the option chips into view AND
- * mirror the same message into the sticky action bar, which is always on
- * screen regardless of scroll position. This locks that fix in place as a
- * static source check, matching this file's existing convention (see
- * ShopProductSheet.structure.test.ts) rather than a full component render,
- * which this codebase doesn't do for this screen (see
+ * The fix (rejectMissingVariant): scroll the option chips into view so the
+ * one inline message next to them (rendered once, right where the chips
+ * are) is always what's on screen when it fires. This locks that fix in
+ * place as a static source check, matching this file's existing convention
+ * (see ShopProductSheet.structure.test.ts) rather than a full component
+ * render, which this codebase doesn't do for this screen (see
  * tests/buyer-shopping-no-nested-pressables.test.ts's static-analysis
  * approach for the same reason).
+ *
+ * Overnight follow-up: this used to ALSO mirror the same message a second
+ * time into the sticky action bar below, so it rendered twice at once —
+ * found live. The mirror is gone; the message now renders exactly once,
+ * next to the option chips it's about (see the last two tests below).
  */
 describe('ShopProductSheet — a missing-variant error is always visible, not just below the fold', () => {
   it('handleAddToCart and handleBuyNow route their validation failures through rejectMissingVariant, not a bare setVariantError', () => {
@@ -64,19 +69,33 @@ describe('ShopProductSheet — a missing-variant error is always visible, not ju
 
   it('the main content ScrollView is wired to contentScrollRef', () => {
     const scrollViewOpen = sheetSource.slice(
-      sheetSource.indexOf('{(phase === \'ready\' || phase === \'adding\' || phase === \'buying\' || phase === \'added\') && product && (\n          <ScrollView'),
+      sheetSource.indexOf('sheetStep === \'detail\' && (phase === \'ready\' || phase === \'adding\' || phase === \'buying\' || phase === \'added\') && product && (\n          <ScrollView'),
     ).slice(0, 780);
     expect(scrollViewOpen).toContain('ref={contentScrollRef}');
   });
 
-  it('the sticky action bar (always on screen) mirrors the variant error message', () => {
-    const stickyBar = sheetSource.slice(
-      sheetSource.indexOf('{/* Sticky Add to Cart + Buy Now'),
-      sheetSource.indexOf('{/* Sticky Add to Cart + Buy Now') + 800,
-    );
-    expect(stickyBar).toContain('ss.stickyActionsWrap');
-    expect(stickyBar).toContain('!!variantError &&');
-    expect(stickyBar).toContain('ss.stickyVariantError');
-    expect(stickyBar).toContain('accessibilityRole="alert"');
+  it('the variant error message renders exactly once — not mirrored into the sticky action bar', () => {
+    // Only one JSX render site for `ss.variantError` in the whole file (the
+    // one next to the option chips) — the earlier duplicate in the sticky
+    // bar (`ss.stickyVariantError`) is gone entirely.
+    const variantErrorRenders = sheetSource.match(/style=\{ss\.variantError\}/g) ?? [];
+    expect(variantErrorRenders.length).toBe(1);
+    expect(sheetSource).not.toContain('ss.stickyVariantError');
+    expect(sheetSource).not.toContain('stickyVariantError:');
+  });
+
+  it('the one variant error message is announced to assistive tech and sits right next to the option chips', () => {
+    const variantErrorIdx = sheetSource.indexOf('style={ss.variantError}');
+    const optionsBlock = sheetSource.slice(variantErrorIdx, variantErrorIdx + 300);
+    expect(optionsBlock).toContain('style={ss.variantError}');
+    expect(optionsBlock).toContain('accessibilityRole="alert"');
+    expect(optionsBlock).toContain('accessibilityLiveRegion="polite"');
+
+    // And it comes right after the Qty/options block, before the sticky
+    // action bar — i.e. it's still inside the scrollable content next to
+    // the chips, not floating disconnected near the bottom.
+    const stickyBarIdx = sheetSource.indexOf('{/* Sticky Add to Cart + Buy Now');
+    expect(variantErrorIdx).toBeGreaterThan(0);
+    expect(variantErrorIdx).toBeLessThan(stickyBarIdx);
   });
 });

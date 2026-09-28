@@ -10,6 +10,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
@@ -139,7 +140,7 @@ const pillS = StyleSheet.create({
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  pillCountText: { fontSize: 10, fontFamily: FONT.bold },
+  pillCountText: { fontSize: 11, fontFamily: FONT.bold },
 });
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
@@ -240,6 +241,7 @@ type StoryTrayRow = {
    *  the story viewer, so no story needs to be resolved). */
   storyId: string | null;
   seen: boolean;
+  closeFriendsOnly: boolean;
   latestCreatedAt: number;
 };
 
@@ -372,7 +374,7 @@ export default function InboxScreen() {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
           authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
-          seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+          seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
         })));
         setMyStoryId(PREVIEW_MY_STORY.id);
         cacheStoriesForViewer([
@@ -394,7 +396,7 @@ export default function InboxScreen() {
       setStoryTrayRows(others.map(r => ({
         authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
         color: r.authorColor, avatarUri: r.avatarUrl ?? undefined,
-        storyId: r.storyIds[r.storyIds.length - 1] ?? null, seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+        storyId: r.storyIds[r.storyIds.length - 1] ?? null, seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
       })));
       // Resolve the real (media-bearing) Story objects so the viewer — which
       // reads its queue purely from local storage — can actually show them.
@@ -408,7 +410,7 @@ export default function InboxScreen() {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
           authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
-          seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+          seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
         })));
         setMyStoryId(PREVIEW_MY_STORY.id);
         cacheStoriesForViewer([
@@ -738,7 +740,10 @@ export default function InboxScreen() {
 
   function longPressConversation(conv: Conversation) {
     hapticDestructiveConfirm();
-    Alert.alert('Options', undefined, [
+    // Alert.alert() with a button array is a silent no-op on web — this left
+    // the row long-press menu completely dead in the web preview. See
+    // components/ui/ActionSheet.tsx's header comment.
+    showActionSheet('Options', undefined, [
       { text: 'Archive', onPress: () => swipeArchiveConversation(conv), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -1020,7 +1025,12 @@ export default function InboxScreen() {
   }
 
   function openFilterMenu() {
-    Alert.alert('Filter messages', 'Coming soon.');
+    // Alert.alert() is a silent no-op on web (react-native-web has no
+    // native dialog to defer to), so it left this button dead in the web
+    // preview — no dialog, no honest "not available" state, nothing. Use
+    // the screen's existing snackbar (already the pattern for every other
+    // inbox affordance above) so the tap always gives real feedback.
+    showSnackbar('Message filters — coming soon');
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -1596,7 +1606,7 @@ export default function InboxScreen() {
                     onPress={() => openStoryViewerFor(row.authorId)}
                     rippleEnabled={NO_RIPPLE}
                     accessibilityRole="button"
-                    accessibilityLabel={`${row.name}${row.seen ? '' : ', new story'}${note ? `, note: ${note.text}` : ''}`}
+                    accessibilityLabel={`${row.name}${row.seen ? '' : ', new story'}${row.closeFriendsOnly ? ', Close Friends' : ''}${note ? `, note: ${note.text}` : ''}`}
                     testID={`inbox-story-tray-${row.authorId}`}
                   >
                     {noteBubble}
@@ -1613,6 +1623,11 @@ export default function InboxScreen() {
                       ) : (
                         <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
                           <Text style={s.activeRailInitials}>{row.initials}</Text>
+                        </View>
+                      )}
+                      {row.closeFriendsOnly && (
+                        <View style={[s.closeFriendsBadge, { borderColor: theme.background }]} pointerEvents="none">
+                          <Feather name="star" size={10} color="#000000" />
                         </View>
                       )}
                     </View>
@@ -1753,7 +1768,7 @@ export default function InboxScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{item.name}</Text>
-                      <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs }} numberOfLines={1}>{item.handle}</Text>
+                      <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.meta }} numberOfLines={1}>{item.handle}</Text>
                     </View>
                     {composeStartingId === item.userId && <ActivityIndicator color={theme.accent} size="small" />}
                   </PressableScale>
@@ -1899,6 +1914,14 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10,
     borderWidth: 2, alignItems: 'center', justifyContent: 'center',
   },
+  // Close Friends badge — Instagram marks this with a green ring; Brandthread
+  // stays monochrome, so the story ring itself doesn't change color and this
+  // white star badge (matching the same star used in the composer's Close
+  // Friends toggle) is the ring's distinct "close friends" indicator instead.
+  closeFriendsBadge: {
+    position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10,
+    borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF',
+  },
   activeRailInitials: { fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
   activeRailName: { fontSize: 11, fontFamily: FONT.medium, width: 72, textAlign: 'center' },
   storyTrayFade: {
@@ -1922,7 +1945,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     maxWidth: 84, paddingHorizontal: 9, paddingVertical: 5,
     borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
   },
-  noteBubbleText: { fontSize: 10.5, lineHeight: 13 },
+  noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14 },
   noteBubbleTail: {
     width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
     borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],
@@ -1936,13 +1959,13 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     width: '100%',
     alignSelf: 'center',
   },
-  noteComposeHint: { fontSize: FS.xs, fontFamily: FONT.regular, marginBottom: SP.sm },
+  noteComposeHint: { fontSize: FS.meta, fontFamily: FONT.medium, marginBottom: SP.sm },
   noteComposeInput: {
     minHeight: 72, maxHeight: 120, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth,
     padding: SP.md, fontSize: FS.md, fontFamily: FONT.regular, textAlignVertical: 'top',
   },
   noteComposeCount: {
-    fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'right',
+    fontSize: FS.meta, fontFamily: FONT.medium, textAlign: 'right',
     marginTop: SP.xs, marginBottom: SP.md,
   },
 
@@ -2020,10 +2043,10 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   officialAvatar: { borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   officialBadgeRow: { flexDirection: 'row', alignItems: 'center', marginRight: SP.xs },
   aiTag: {
-    marginLeft: 4, paddingHorizontal: 5, height: 15, borderRadius: 4,
+    marginLeft: 4, paddingHorizontal: 5, height: 17, borderRadius: 4,
     alignItems: 'center', justifyContent: 'center',
   },
-  aiTagText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  aiTagText: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 0.3 },
 
   // Requests-tab header: a small gray explainer line + a quiet "Delete all"
   // text action, right-aligned on its own line beneath — Instagram-style.
