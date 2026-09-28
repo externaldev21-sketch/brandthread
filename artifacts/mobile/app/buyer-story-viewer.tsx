@@ -3,8 +3,10 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, Pressable, TextInput, Animated, Easing,
   Dimensions, PanResponder, StyleSheet, Alert, Modal, FlatList,
-  Image, Linking, Platform, Share,
+  Linking, Platform, Share,
 } from 'react-native';
+import { CachedImage } from '@/components/CachedImage';
+import { prefetchImage } from '@/lib/prefetch';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -364,7 +366,7 @@ export default function BuyerStoryViewer() {
     const nextStory = stories[storyIdx + 1];
     const nextSlide = nextStory?.media[0];
     if (nextSlide?.imageUri && nextSlide.type !== 'text') {
-      Image.prefetch(nextSlide.imageUri).catch(() => {});
+      prefetchImage(nextSlide.imageUri);
     }
   }, [storyIdx, stories]);
 
@@ -468,10 +470,10 @@ export default function BuyerStoryViewer() {
         ) : currentSlide.imageUri && currentSlide.type === 'video' ? (
           <StorySlideVideo uri={currentSlide.imageUri} paused={isPaused} />
         ) : currentSlide.imageUri ? (
-          <Image
+          <CachedImage
             source={{ uri: currentSlide.imageUri }}
             style={StyleSheet.absoluteFill}
-            resizeMode="cover"
+            contentFit="cover"
           />
         ) : (
           <View style={[styles.slideContent, { backgroundColor: currentSlide.backgroundColor || SURFACE }]}>
@@ -513,11 +515,11 @@ export default function BuyerStoryViewer() {
               ? 140 * (overlay.gifH / overlay.gifW)
               : 140;
             return (
-              <Image
+              <CachedImage
                 key={overlay.id}
                 source={{ uri: overlay.gifUrl }}
                 style={{ position: 'absolute', left: overlay.x, top: overlay.y, width: 140, height: gH }}
-                resizeMode="contain"
+                contentFit="contain"
               />
             );
           }
@@ -714,7 +716,7 @@ export default function BuyerStoryViewer() {
                     style={[styles.seenByAvatar, { marginLeft: i === 0 ? 0 : -10, zIndex: 3 - i }]}
                   >
                     {v.avatarUrl ? (
-                      <Image source={{ uri: v.avatarUrl }} style={styles.seenByAvatarImg} />
+                      <CachedImage source={{ uri: v.avatarUrl }} style={styles.seenByAvatarImg} />
                     ) : (
                       <Text style={styles.seenByInitials}>{v.name.charAt(0).toUpperCase()}</Text>
                     )}

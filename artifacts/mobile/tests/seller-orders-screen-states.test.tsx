@@ -192,7 +192,19 @@ vi.mock('@/hooks/useApi', () => ({
   }),
 }));
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OrdersScreen from '@/app/(tabs)/orders';
+
+// The screen now calls useQueryClient() (order-detail cache seeding for
+// stale-while-revalidate — see app/(tabs)/orders.tsx), so every mount needs
+// a real provider in the tree, same as the seller Products tab's own test.
+function renderOrdersScreen() {
+  return React.createElement(
+    QueryClientProvider,
+    { client: new QueryClient() },
+    React.createElement(OrdersScreen),
+  );
+}
 
 function textContent(renderer: ReactTestRenderer): string {
   return renderer.root
@@ -236,7 +248,7 @@ describe('seller Orders screen states', () => {
 
     let renderer!: ReactTestRenderer;
     act(() => {
-      renderer = create(<OrdersScreen />);
+      renderer = create(renderOrdersScreen());
     });
 
     const skeletons = renderer.root.findAll((node: any) => node.type === 'SkeletonBlock');
@@ -252,7 +264,7 @@ describe('seller Orders screen states', () => {
 
     let renderer!: ReactTestRenderer;
     await act(async () => {
-      renderer = create(<OrdersScreen />);
+      renderer = create(renderOrdersScreen());
     });
     await flush();
 
@@ -270,7 +282,7 @@ describe('seller Orders screen states', () => {
 
     let renderer!: ReactTestRenderer;
     await act(async () => {
-      renderer = create(<OrdersScreen />);
+      renderer = create(renderOrdersScreen());
     });
     await flush();
 
@@ -285,7 +297,7 @@ describe('seller Orders screen states', () => {
 
     let renderer!: ReactTestRenderer;
     await act(async () => {
-      renderer = create(<OrdersScreen />);
+      renderer = create(renderOrdersScreen());
     });
     await flush();
 
@@ -312,7 +324,7 @@ describe('seller Orders screen states', () => {
 
     let renderer!: ReactTestRenderer;
     await act(async () => {
-      renderer = create(<OrdersScreen />);
+      renderer = create(renderOrdersScreen());
     });
     await flush();
 
@@ -322,7 +334,7 @@ describe('seller Orders screen states', () => {
     // Auth finishes loading — no re-focus event follows, only a re-render.
     mockAuthLoaded = true;
     await act(async () => {
-      renderer.update(<OrdersScreen />);
+      renderer.update(renderOrdersScreen());
     });
     await flush();
 
@@ -349,7 +361,7 @@ describe('seller Orders screen states', () => {
 
     let renderer!: ReactTestRenderer;
     await act(async () => {
-      renderer = create(<OrdersScreen />);
+      renderer = create(renderOrdersScreen());
     });
     await flush();
 
@@ -372,7 +384,7 @@ describe('seller Orders screen states', () => {
 
       let renderer!: ReactTestRenderer;
       act(() => {
-        renderer = create(<OrdersScreen />);
+        renderer = create(renderOrdersScreen());
       });
       expect(renderer.root.findAll((node: any) => node.type === 'SkeletonBlock').length).toBeGreaterThan(0);
 
