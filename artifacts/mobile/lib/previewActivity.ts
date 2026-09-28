@@ -17,6 +17,7 @@
 import { Asset } from 'expo-asset';
 import { isPreviewCatalogEnabled } from './previewCatalog';
 import type { ActivityItem } from './activity';
+import { pickAvatarColor } from './avatarColors';
 
 export function isPreviewActivityEnabled(): boolean {
   return isPreviewCatalogEnabled();
@@ -43,16 +44,16 @@ function posterUri(index: number): string {
 // gets the matching preview poster as a stand-in profile photo (no real
 // headshots in this seed set), same convention as previewInbox.ts.
 const PEOPLE = [
-  { userId: 'preview-seller-01', name: 'Atelier Noire', initials: 'AN', color: '#2E2A26', avatarUrl: posterUri(0) },
-  { userId: 'preview-seller-02', name: 'Maison Vela', initials: 'MV', color: '#7C3AED', avatarUrl: posterUri(1) },
-  { userId: 'preview-seller-03', name: 'Saint Rue', initials: 'SR', color: '#111827', avatarUrl: posterUri(2) },
-  { userId: 'preview-seller-04', name: 'Orison', initials: 'OR', color: '#D6D3D1', avatarUrl: posterUri(3) },
-  { userId: 'preview-seller-05', name: 'Kuro Line', initials: 'KL', color: '#1F2937', avatarUrl: posterUri(4) },
-  { userId: 'preview-seller-06', name: 'Forme 22', initials: 'F2', color: '#B45309', avatarUrl: posterUri(5) },
-  { userId: 'preview-seller-07', name: 'Astrae', initials: 'AS', color: '#0EA5E9', avatarUrl: posterUri(6) },
-  { userId: 'preview-seller-08', name: 'Noma Archive', initials: 'NA', color: '#65A30D', avatarUrl: posterUri(7) },
-  { userId: 'preview-seller-09', name: 'Echelon', initials: 'EC', color: '#DB2777', avatarUrl: posterUri(8) },
-  { userId: 'preview-seller-10', name: 'Vale Studio', initials: 'VS', color: '#EA580C' },
+  { userId: 'preview-seller-01', name: 'Atelier Noire', initials: 'AN', color: pickAvatarColor('preview-seller-01'), avatarUrl: posterUri(0) },
+  { userId: 'preview-seller-02', name: 'Maison Vela', initials: 'MV', color: pickAvatarColor('preview-seller-02'), avatarUrl: posterUri(1) },
+  { userId: 'preview-seller-03', name: 'Saint Rue', initials: 'SR', color: pickAvatarColor('preview-seller-03'), avatarUrl: posterUri(2) },
+  { userId: 'preview-seller-04', name: 'Orison', initials: 'OR', color: pickAvatarColor('preview-seller-04'), avatarUrl: posterUri(3) },
+  { userId: 'preview-seller-05', name: 'Kuro Line', initials: 'KL', color: pickAvatarColor('preview-seller-05'), avatarUrl: posterUri(4) },
+  { userId: 'preview-seller-06', name: 'Forme 22', initials: 'F2', color: pickAvatarColor('preview-seller-06'), avatarUrl: posterUri(5) },
+  { userId: 'preview-seller-07', name: 'Astrae', initials: 'AS', color: pickAvatarColor('preview-seller-07'), avatarUrl: posterUri(6) },
+  { userId: 'preview-seller-08', name: 'Noma Archive', initials: 'NA', color: pickAvatarColor('preview-seller-08'), avatarUrl: posterUri(7) },
+  { userId: 'preview-seller-09', name: 'Echelon', initials: 'EC', color: pickAvatarColor('preview-seller-09'), avatarUrl: posterUri(8) },
+  { userId: 'preview-seller-10', name: 'Vale Studio', initials: 'VS', color: pickAvatarColor('preview-seller-10') },
 ];
 
 // Real photos (the same asset pool the rest of the buyer preview already
