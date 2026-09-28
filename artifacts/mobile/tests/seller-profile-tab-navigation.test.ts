@@ -17,7 +17,10 @@ describe('seller Profile tab navigation', () => {
 
     expect(buyerProfile).toContain('testID="buyer-profile-account-switcher"');
     expect(buyerProfile).toContain('accessibilityLabel="Switch account"');
-    expect(buyerProfile).toContain("router.push('/account-switcher' as never)");
+    // The switcher is a sheet on the profile screen now (see
+    // components/AccountSwitcherSheet.tsx), not a pushed route.
+    expect(buyerProfile).toContain('setAccountSwitcherOpen(true)');
+    expect(buyerProfile).toContain('<AccountSwitcherSheet');
     expect(buyerProfile).toContain('{displayHandle || displayName}</Text>');
     expect(buyerProfile).toContain('name={displayName}');
     expect(buyerProfile).toContain('name="chevron-down"');

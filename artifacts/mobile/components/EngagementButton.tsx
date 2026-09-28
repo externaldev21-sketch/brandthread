@@ -426,12 +426,17 @@ const ebStyles = StyleSheet.create({
   // shadow, whether the count is under a bright or a dark patch of video.
   count: {
     fontSize: 12, lineHeight: 15, fontFamily: FONT.semibold, textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+    textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   // Matches RightActionRail's own `iconShadow` — see that file's comment
-  // for why this was strengthened (bright/high-key clip legibility).
+  // for why this was strengthened again (bug-fix round: repost/save/share
+  // — the thinner-stroke FontAwesome glyphs, with far less filled ink area
+  // than heart/comment's bold shapes — were reading grey/washed-out
+  // against a bright, high-key clip even with the previous 0.45/radius-4
+  // shadow, since a thin stroke's edge pixels (where the shadow does its
+  // work) are a much larger share of its total ink than a filled glyph's).
   iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
+    textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6,
   },
 });
 

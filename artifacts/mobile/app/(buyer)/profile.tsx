@@ -23,7 +23,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useAuth, useUser } from '@clerk/expo';
+import { useUser } from '@clerk/expo';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { hapticLight, hapticMedium, hapticSelection, hapticDestructiveConfirm } from '@/lib/haptics';
 import { FONT, FS, SP, RADIUS, ICON, OVERLAY } from '@/lib/theme';
@@ -38,6 +38,7 @@ import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
+import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
 import { getBuyerOrdersWithStatus } from '@/services/orderService';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
@@ -57,7 +58,6 @@ import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { ProfileStoriesRow, type ProfileStoryItem } from '@/components/profile/ProfileStoriesRow';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import { Button } from '@/components/ui/Button';
-import { Glass } from '@/components/ui/Glass';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { ProfileEmptyAreaContext } from '@/components/profile/ProfileEmptyAreaContext';
@@ -101,16 +101,10 @@ function BottomSheet({
   visible,
   onClose,
   children,
-  glass,
 }: {
   visible: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  /** Frosted `<Glass>` fill instead of the flat `theme.card` — for a menu
-   *  that reads as chrome over the page (the hamburger menu) rather than a
-   *  solid card. Defaults to false: the post long-press sheet on this same
-   *  screen keeps its current solid look. */
-  glass?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
@@ -133,16 +127,21 @@ function BottomSheet({
   return (
     <Modal transparent animationType="none" onRequestClose={onClose} visible={mounted}>
       <View style={[sheetStyles.backdrop, { backgroundColor: OVERLAY }]}>
-        <PressableScale style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} accessibilityLabel="Close menu" />
+        {/* Plain Pressable, not PressableScale: PressableScale only forwards
+            a plain-object `style` prop to its *inner* Animated.View, never
+            the outer Pressable that actually receives touches — so this
+            backdrop had no real hit area and tapping it did nothing (a
+            press-scale animation on a full-screen dismiss backdrop makes no
+            visual sense anyway, so there's no feature lost dropping it). */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu" />
         <Animated.View
           style={[
             sheetStyles.sheet,
-            { backgroundColor: glass ? 'transparent' : theme.card, borderColor: theme.border },
+            { backgroundColor: theme.card, borderColor: theme.border },
             { paddingBottom: insets.bottom + SP.md },
             { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [120, 0] }) }] },
           ]}
         >
-          {glass ? <Glass variant="regular" tint="dark" radius={0} style={StyleSheet.absoluteFill} /> : null}
           <View style={[sheetStyles.sheetHandle, { backgroundColor: theme.border }]} />
           <ScrollView style={sheetStyles.sheetScroll} showsVerticalScrollIndicator={false}>
             {children}
@@ -287,7 +286,6 @@ export default function ProfileScreen() {
   const barInset = useBuyerTabBarInset();
   const insets = useSafeAreaInsets();
   const router  = useRouter();
-  const { signOut } = useAuth();
   const { user } = useUser();
   const api     = useApi();
   const { theme } = useAppTheme();
@@ -355,8 +353,8 @@ export default function ProfileScreen() {
   const coverFlow = useProfileCover({ own: true, cover: serverCover, userId: user?.id });
 
   // Sheets
-  const [menuOpen, setMenuOpen] = useState(false);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
 
   const loadCounts = useCallback(async () => {
@@ -507,31 +505,18 @@ export default function ProfileScreen() {
   }), [user?.id]);
 
   // ── Menu actions ──
+  // The hamburger opens a separate full-screen pushed page
+  // (app/buyer-settings-menu.tsx) instead of a bottom sheet — see that
+  // file's header comment for why (the old translucent sheet had no
+  // backdrop dim and no reliable way to close).
   const handleMenu = () => {
     hapticLight();
-    setMenuOpen(true);
+    router.push('/buyer-settings-menu' as any);
   };
 
   const handleShareProfile = () => {
-    setMenuOpen(false);
     hapticLight();
     setShareSheetOpen(true);
-  };
-
-  const handleSignOut = () => {
-    setMenuOpen(false);
-    Alert.alert('Sign out of Brandthread?', undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          hapticDestructiveConfirm();
-          try { await signOut(); } catch {}
-          router.replace('/sign-in' as never);
-        },
-      },
-    ]);
   };
 
   const handleTabPress = useCallback((tab: string) => {
@@ -735,7 +720,7 @@ export default function ProfileScreen() {
         style={styles.topBarLeft}
         onPress={() => {
           hapticLight();
-          router.push('/account-switcher' as never);
+          setAccountSwitcherOpen(true);
         }}
         activeOpacity={0.75}
         accessibilityRole="button"
@@ -950,26 +935,6 @@ export default function ProfileScreen() {
       />
       </ProfileEmptyAreaContext.Provider>
 
-      {/* ── Profile Menu Sheet ── */}
-      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} glass>
-        <Text style={[sheetStyles.sheetTitle, { color: theme.muted }]}>Profile</Text>
-        <SheetRow icon="edit-3" label="Edit profile" onPress={() => { setMenuOpen(false); router.push('/(buyer)/edit-profile'); }} />
-        <SheetRow icon="share-2" label="Share profile" onPress={handleShareProfile} />
-        <SheetRow icon="users" label="Friends" onPress={() => { setMenuOpen(false); router.push('/(buyer)/friends' as any); }} />
-        <SheetRow icon="star" label="Close friends" onPress={() => { setMenuOpen(false); router.push('/buyer-close-friends' as any); }} />
-        <SheetRow icon="archive" label="Archive" onPress={() => { setMenuOpen(false); router.push('/buyer-archive' as any); }} />
-        <SheetRow icon="activity" label="Your activity" onPress={() => { setMenuOpen(false); router.push('/buyer-your-activity' as any); }} />
-        <SheetRow icon="package" label="Orders" onPress={() => { setMenuOpen(false); router.push('/(buyer)/orders'); }} />
-        <SheetRow icon="briefcase" label="Freelancer jobs" onPress={() => { setMenuOpen(false); router.push('/freelancer-jobs' as any); }} />
-        <SheetRow icon="gift" label="Rewards" onPress={() => { setMenuOpen(false); router.push('/loyalty' as any); }} />
-        <SheetRow icon="bookmark" label="Saved" onPress={() => { setMenuOpen(false); router.push('/buyer-saved' as any); }} />
-        <SheetRow icon="grid" label="QR code" onPress={() => { setMenuOpen(false); router.push('/buyer-qr-code' as any); }} />
-        <SheetRow icon="image" label="Highlights" onPress={() => { setMenuOpen(false); router.push('/buyer-highlights-manager' as any); }} />
-        <SheetRow icon="settings" label="Settings" last onPress={() => { setMenuOpen(false); router.push('/settings' as any); }} />
-        <View style={[sheetStyles.sheetDivider, { backgroundColor: theme.border }]} />
-        <SheetRow icon="log-out" label="Sign out" destructive onPress={handleSignOut} />
-      </BottomSheet>
-
       <CoverCoachmarkSheet
         visible={coverFlow.coachmarkVisible}
         onAdd={() => { coverFlow.dismissCoachmark(); coverFlow.startAdd(); }}
@@ -988,6 +953,8 @@ export default function ProfileScreen() {
           topPosts: publishedPosts.slice(0, 3).map(p => ({ id: p.id, uri: p.mediaUrl })),
         }}
       />
+
+      <AccountSwitcherSheet visible={accountSwitcherOpen} onClose={() => setAccountSwitcherOpen(false)} />
 
       {/* ── Post Long-Press Sheet ── */}
       <BottomSheet visible={!!postSheet} onClose={() => setPostSheet(null)}>
