@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
@@ -14,17 +14,22 @@ import type { OrderStatus, TrackingStatus } from '@/services/orderTypes';
  * detail screen — it's specific to this screen's "here's exactly where your
  * package is" job, not a replacement for the shared component.
  *
- * Timestamps are only ever real data (order placed / shipped) — steps we
- * don't have a server timestamp for (processing start, out-for-delivery,
+ * Timestamps are only ever real data (order placed / payment confirmed /
+ * shipped) — steps we don't have a server timestamp for (out-for-delivery,
  * delivered) render without a clock time rather than showing a fabricated
- * one.
+ * one; a not-yet-delivered order shows the carrier's real estimate on the
+ * Delivered step instead.
+ *
+ * Monochrome (item 107): done / current steps use the theme's text colour,
+ * not its accent, so colored themes don't tint the tracker. The current
+ * step's pulse is skipped under Reduce Motion.
  */
 
-type StepKey = 'placed' | 'processing' | 'shipped' | 'out_for_delivery' | 'delivered';
+type StepKey = 'placed' | 'confirmed' | 'shipped' | 'out_for_delivery' | 'delivered';
 
 const STEPS: { key: StepKey; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { key: 'placed', label: 'Order placed', icon: 'shopping-bag' },
-  { key: 'processing', label: 'Processing', icon: 'loader' },
+  { key: 'confirmed', label: 'Confirmed', icon: 'clipboard' },
   { key: 'shipped', label: 'Shipped', icon: 'package' },
   { key: 'out_for_delivery', label: 'Out for delivery', icon: 'truck' },
   { key: 'delivered', label: 'Delivered', icon: 'check-circle' },
@@ -38,12 +43,23 @@ const EXCEPTION_COPY: Record<'cancelled' | 'refunded' | 'disputed' | 'returned_t
   exception: { label: 'Delivery problem', icon: 'alert-triangle' },
 };
 
-function stepIndex(status: OrderStatus, trackingStatus: TrackingStatus | undefined): number {
+export function stepIndex(status: OrderStatus, trackingStatus: TrackingStatus | undefined, paidAt?: string): number {
   if (status === 'delivered' || trackingStatus === 'delivered') return 4;
   if (trackingStatus === 'out_for_delivery') return 3;
   if (status === 'shipped' || trackingStatus === 'in_transit' || trackingStatus === 'accepted' || trackingStatus === 'label_created') return 2;
-  if (status === 'processing' || status === 'ready_to_ship') return 1;
+  // Confirmed = the seller has it (processing / ready to ship) or payment
+  // has been captured for a still-"new" order.
+  if (status === 'processing' || status === 'ready_to_ship' || !!paidAt) return 1;
   return 0;
+}
+
+/** "Est. Oct 1" from a YYYY-MM-DD (orders.estimated_delivery) or ISO string, read as a calendar date. */
+export function fmtEstimate(value: string | undefined): string {
+  if (!value) return '';
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const d = ymd ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])) : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `Est. ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 }
 
 function fmtTimestamp(iso: string): string {
@@ -59,7 +75,9 @@ function fmtTimestamp(iso: string): string {
 export function OrderProgressTimeline({
   status,
   createdAt,
+  paidAt,
   shippedAt,
+  estimatedDelivery,
   trackingStatus,
   trackingCarrier,
   trackingNumber,
@@ -67,7 +85,11 @@ export function OrderProgressTimeline({
 }: {
   status: OrderStatus;
   createdAt: string;
+  /** When payment was captured (orders.paid_at) — the "Confirmed" time. */
+  paidAt?: string;
   shippedAt?: string;
+  /** Carrier estimate, shown on the Delivered step until it's delivered. */
+  estimatedDelivery?: string;
   trackingStatus?: TrackingStatus;
   trackingCarrier?: string;
   trackingNumber?: string;
@@ -75,6 +97,15 @@ export function OrderProgressTimeline({
 }) {
   const { theme } = useAppTheme();
   const pulse = useRef(new Animated.Value(0.5)).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    AccessibilityInfo?.isReduceMotionEnabled?.()
+      .then(value => { if (alive) setReduceMotion(value); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const exceptionKey =
     status === 'cancelled' ? 'cancelled'
@@ -84,11 +115,11 @@ export function OrderProgressTimeline({
     : trackingStatus === 'exception' ? 'exception'
     : null;
 
-  const activeIndex = stepIndex(status, trackingStatus);
+  const activeIndex = stepIndex(status, trackingStatus, paidAt);
   const isFullyDelivered = activeIndex === 4;
 
   useEffect(() => {
-    if (exceptionKey || isFullyDelivered) return;
+    if (exceptionKey || isFullyDelivered || reduceMotion) { pulse.setValue(1); return; }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
@@ -97,7 +128,7 @@ export function OrderProgressTimeline({
     );
     loop.start();
     return () => loop.stop();
-  }, [exceptionKey, isFullyDelivered, pulse]);
+  }, [exceptionKey, isFullyDelivered, pulse, reduceMotion]);
 
   if (exceptionKey) {
     const copy = EXCEPTION_COPY[exceptionKey];
@@ -116,17 +147,21 @@ export function OrderProgressTimeline({
         const done = i < activeIndex || (i === activeIndex && isFullyDelivered);
         const active = i === activeIndex && !isFullyDelivered;
         const future = i > activeIndex;
-        const dotColor = done || active ? theme.accent : theme.border;
-        const timestamp = step.key === 'placed' ? createdAt : step.key === 'shipped' ? shippedAt : undefined;
+        const dotColor = done || active ? theme.text : theme.border;
+        const timestamp = step.key === 'placed' ? createdAt
+          : step.key === 'confirmed' ? paidAt
+          : step.key === 'shipped' ? shippedAt
+          : undefined;
+        const estimate = step.key === 'delivered' && !isFullyDelivered ? fmtEstimate(estimatedDelivery) : '';
 
         return (
-          <View key={step.key} style={styles.stepRow}>
+          <View key={step.key} style={styles.stepRow} testID={`order-step-${step.key}`} accessibilityState={{ selected: active || (isFullyDelivered && i === 4) }}>
             <View style={styles.railCol}>
               <Animated.View
                 style={[
                   styles.dot,
                   {
-                    backgroundColor: done ? theme.accent : theme.surface,
+                    backgroundColor: done ? theme.text : theme.surface,
                     borderColor: dotColor,
                     opacity: active ? pulse : 1,
                   },
@@ -135,11 +170,11 @@ export function OrderProgressTimeline({
                 <Feather
                   name={done ? 'check' : step.icon}
                   size={13}
-                  color={done ? theme.onAccent : active ? theme.accent : theme.muted}
+                  color={done ? theme.background : active ? theme.text : theme.muted}
                 />
               </Animated.View>
               {i < STEPS.length - 1 ? (
-                <View style={[styles.connector, { backgroundColor: i < activeIndex ? theme.accent : theme.border }]} />
+                <View style={[styles.connector, { backgroundColor: i < activeIndex ? theme.text : theme.border }]} />
               ) : null}
             </View>
 
@@ -150,7 +185,9 @@ export function OrderProgressTimeline({
               {timestamp ? (
                 <Text style={[styles.stepTimestamp, { color: theme.muted }]}>{fmtTimestamp(timestamp)}</Text>
               ) : active ? (
-                <Text style={[styles.stepTimestamp, { color: theme.accent }]}>In progress</Text>
+                <Text style={[styles.stepTimestamp, { color: theme.text }]}>In progress</Text>
+              ) : estimate ? (
+                <Text style={[styles.stepTimestamp, { color: theme.muted }]}>{estimate}</Text>
               ) : null}
 
               {step.key === 'shipped' && (done || active) && trackingNumber ? (

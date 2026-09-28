@@ -60,6 +60,7 @@ import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { isPreviewActivityEnabled, getPreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri } from '@/lib/previewActivity';
+import { applyPreviewFollowState, getPreviewFollowing } from '@/lib/previewFollowStore';
 import { Chip } from '@/components/ui/Chip';
 import {
   ACTIVITY_PAGE_SIZE,
@@ -69,7 +70,7 @@ import {
   matchesActivityChip,
   type ActivityChip,
   activityDetail,
-  activityHref,
+  activityRowHref,
   activityIcon,
   followControlState,
   activityKind,
@@ -77,9 +78,7 @@ import {
   applyRead,
   buildActivitySections,
   createReadTracker,
-  groupedPeopleHref,
   isFollowBackRow,
-  isGroupedRow,
   relativeTime,
   type ActivityActor,
   type ActivityItem,
@@ -395,6 +394,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
         style={({ pressed }) => [styles.tapArea, pressed && styles.tapAreaPressed]}
         onPress={() => onPress(row)}
         onLongPress={longPress}
+        testID={`activity-row-${row.key}`}
         accessibilityRole="button"
         accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
       >
@@ -595,15 +595,30 @@ export default function ActivityCenterScreen() {
   }), []);
   useEffect(() => () => tracker.dispose(), [tracker]);
 
+  // Seeded suggestions, with anyone already followed this preview session
+  // (lib/previewFollowStore) shown as "Following" instead of "Follow" again.
+  const showPreviewSuggestions = useCallback(() => {
+    const people = getPreviewSuggestedPeople();
+    setSuggested(people);
+    setSuggestedFollowState((prev) => {
+      const next = { ...prev };
+      for (const person of people) {
+        if (getPreviewFollowing(person.userId)) next[person.userId] = 'done';
+      }
+      return next;
+    });
+  }, []);
+
   const loadSuggested = useCallback(async () => {
     try {
       const people = await getSuggestedPeople();
       if (people.length > 0 || !isPreviewActivityEnabled()) { setSuggested(people); return; }
-      setSuggested(getPreviewSuggestedPeople());
+      showPreviewSuggestions();
     } catch {
-      setSuggested(isPreviewActivityEnabled() ? getPreviewSuggestedPeople() : []);
+      if (isPreviewActivityEnabled()) showPreviewSuggestions();
+      else setSuggested([]);
     }
-  }, []);
+  }, [showPreviewSuggestions]);
 
   const loadFirstPage = useCallback(async (mode: 'initial' | 'refresh' | 'focus') => {
     const id = ++requestId.current;
@@ -616,7 +631,7 @@ export default function ActivityCenterScreen() {
       // The dev-web preview has no live backend to seed a real feed from —
       // show the same rich seeded world every other preview screen uses
       // instead of an empty "Activity will show up here".
-      const resolved = page.length === 0 && isPreviewActivityEnabled() ? getPreviewActivity() : page;
+      const resolved = page.length === 0 && isPreviewActivityEnabled() ? applyPreviewFollowState(getPreviewActivity()) : page;
       setItems(resolved);
       setSessionNew(new Set(resolved.filter((item) => !item.isRead).map((item) => item.id)));
       setHasMore(page.length === ACTIVITY_PAGE_SIZE);
@@ -628,7 +643,7 @@ export default function ActivityCenterScreen() {
         // Never show a false error in the dev-web preview — there is no
         // backend to reach at all, so a fetch failure here is expected.
         retriedRef.current = false;
-        const seeded = getPreviewActivity();
+        const seeded = applyPreviewFollowState(getPreviewActivity());
         setItems(seeded);
         setSessionNew(new Set(seeded.filter((item) => !item.isRead).map((item) => item.id)));
         setHasMore(false);
@@ -786,7 +801,8 @@ export default function ActivityCenterScreen() {
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
     // A merged row ("Jay and 12 others liked your post") opens the list of
     // those people — Instagram's "View likes" pattern, see app/activity-people.tsx.
-    const href = isGroupedRow(row) ? groupedPeopleHref(row) : activityHref(row, role);
+    // Merged comment rows open the comments themselves (activityRowHref).
+    const href = activityRowHref(row, role);
     if (href) router.push(href as never);
   }, [api, role, router, tracker, user?.id]);
 

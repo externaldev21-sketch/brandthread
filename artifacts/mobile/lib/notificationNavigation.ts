@@ -1,5 +1,5 @@
 import type * as Notifications from 'expo-notifications';
-import { isBuyerOrderNotification } from './activity';
+import { activityHref, isBuyerOrderNotification } from './activity';
 
 export type NotificationRouter = {
   push: (href: string) => void;
@@ -33,6 +33,7 @@ export function createNotificationResponseHandler(
       targetId?: unknown;
       targetType?: unknown;
       type?: unknown;
+      commentId?: unknown;
     } | undefined;
 
     if (data?.route === '/subscription') {
@@ -99,8 +100,23 @@ export function createNotificationResponseHandler(
       router.push('/payouts');
       return;
     }
-    if (data?.targetType === 'post' && typeof data.targetId === 'string' && data.targetId) {
-      router.push('/(tabs)/feed');
+    // Social pushes (likes, comments, replies, mentions, reposts, story likes,
+    // follows, Thread Cash) open the same exact destination the Activity row
+    // does — the post, the comment itself, the story, the profile — instead
+    // of a generic feed.
+    if (
+      (data?.targetType === 'post' || data?.targetType === 'story' || data?.targetType === 'user'
+        || data?.targetType === 'thread_cash_transfer')
+      && typeof data.targetId === 'string' && data.targetId
+    ) {
+      const href = activityHref({
+        id: '', category: 'social', title: '', body: '', isRead: true, createdAt: '',
+        type: typeof data.type === 'string' ? data.type : '',
+        targetType: data.targetType,
+        targetId: data.targetId,
+        commentId: typeof data.commentId === 'string' && data.commentId ? data.commentId : undefined,
+      });
+      if (href) router.push(href);
     }
   };
 }
