@@ -111,4 +111,22 @@ describe('SwipeableActions', () => {
     config.onPanResponderRelease({}, g(1, 1));
     expect(captured.springs).toEqual([-REVEAL, 0]);
   });
+
+  it('covers colored actions with the row surface without changing swipe layout', () => {
+    let tree!: ReturnType<typeof create>;
+    act(() => { tree = create(
+      <SwipeableActions actions={ACTIONS} backgroundColor="#0A0A0B"><></></SwipeableActions>,
+    ); });
+    const views = tree.root.findAll(node => String(node.type) === 'View');
+    const clip = views[0];
+    const front = tree.root.find(node => String(node.type) === 'Animated.View');
+    const clipStyle = Object.assign({}, ...(clip.props.style as object[]));
+    const frontStyle = Object.assign({}, ...(front.props.style as object[]));
+    expect(clipStyle).toMatchObject({ width: '100%', overflow: 'hidden', backgroundColor: '#0A0A0B' });
+    expect(frontStyle).toMatchObject({ width: '100%', zIndex: 1, backgroundColor: '#0A0A0B' });
+    expect(views[1].props.style).toEqual(expect.arrayContaining([
+      expect.objectContaining({ zIndex: 0 }),
+    ]));
+    act(() => { tree.unmount(); });
+  });
 });

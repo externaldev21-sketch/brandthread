@@ -373,7 +373,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
   ], [onDismiss, onOpenMenu, row, theme.cardElevated, theme.error, theme.text]);
 
   return (
-    <SwipeableActions actions={swipeActions}>
+    <SwipeableActions actions={swipeActions} backgroundColor={theme.background}>
     <View style={styles.row}>
       {/*
         The Follow back / Following control is a real interactive element,

@@ -29,10 +29,13 @@ export default function SwipeableActions({
   children,
   actions,
   disabled = false,
+  backgroundColor,
 }: {
   children: React.ReactNode;
   actions: SwipeAction[];
   disabled?: boolean;
+  /** Match the row surface so the action colors cannot bleed through subpixel seams. */
+  backgroundColor?: string;
 }) {
   const revealWidth = actions.length * ACTION_WIDTH;
   const translateX = useRef(new Animated.Value(0)).current;
@@ -98,7 +101,7 @@ export default function SwipeableActions({
   const close = () => animateTo(0);
 
   return (
-    <View style={styles.clip}>
+    <View style={[styles.clip, backgroundColor ? { backgroundColor } : null]}>
       <View style={[styles.actionsRow, { width: revealWidth }]}>
         {actions.map((action) => (
           <Pressable
@@ -112,7 +115,7 @@ export default function SwipeableActions({
           </Pressable>
         ))}
       </View>
-      <Animated.View style={[styles.front, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
+      <Animated.View style={[styles.front, backgroundColor ? { backgroundColor } : null, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
         {children}
       </Animated.View>
     </View>
@@ -126,7 +129,9 @@ const styles = StyleSheet.create({
   // trailing edge that let the absolutely-positioned action buttons behind
   // it show through even at rest (translateX: 0).
   clip: { overflow: 'hidden', position: 'relative', width: '100%' },
-  front: { width: '100%' },
-  actionsRow: { position: 'absolute', top: 0, right: 0, bottom: 0, flexDirection: 'row' },
+  // Explicit stacking order on web and native: at rest the opaque front
+  // fully covers the colored actions, even at fractional-pixel row edges.
+  front: { width: '100%', zIndex: 1 },
+  actionsRow: { position: 'absolute', top: 0, right: 0, bottom: 0, flexDirection: 'row', zIndex: 0 },
   action: { alignItems: 'center', justifyContent: 'center' },
 });
