@@ -28,7 +28,10 @@ export function previewLiveBuyerProduct(stream: LiveStream, product: LiveProduct
     category: 'High Fashion',
     isPreOrder: false,
     cancellationPolicy: 'Preview item — no real order will be placed.',
-    refundPolicy: 'Preview item — no payment will be collected.',
+    // Same fix as feed.tsx's buildPreviewShopProduct — this internal
+    // disclaimer used to leak into ShopProductSheet's buyer-facing shipping
+    // line (`{SHIPPING_ESTIMATE_COPY} · {product.refundPolicy}`).
+    refundPolicy: 'Returns accepted within 14 days of delivery for unworn items with tags attached.',
     options: [{ id: optionId, name: 'Size', values: sizes }],
     variants: sizes.map((size, index) => ({
       id: `${product.productId}-variant-${size.label.toLowerCase()}`,
