@@ -704,14 +704,14 @@ export default function BuyerCheckoutScreen() {
             gated behind the same OFF-by-default 'threadCashCheckoutDiscount'
             flag. See components/thread-cash/UseThreadCashCard.tsx and
             docs/payments/thread-cash-checkout-todo.md — no checkout money
-            logic is touched here. When the flag is off the row still shows,
-            disabled, with an explanation, rather than disappearing. */}
-        {isSignedIn && !multiSeller && (
+            logic is touched here. Hidden while the flag is off (like the
+            cart does) — a disabled "Coming soon" toggle was a dead control
+            on the one screen where every row must do something. */}
+        {isSignedIn && !multiSeller && threadCashCheckoutEnabled && (
           <View style={{ marginBottom: SP.sm + 4 }}>
             <UseThreadCashCard
               maxDiscountCents={Math.max(0, current.summary.subtotalCents + current.summary.shippingTotalCents - 1)}
               redemption={current.threadCashRedemption ?? null}
-              disabledReason={threadCashCheckoutEnabled ? undefined : 'Coming soon — not yet available at checkout'}
               onApply={(redemption) => void persist({ ...current, threadCashRedemption: redemption })}
               onRemove={() => void persist({ ...current, threadCashRedemption: undefined })}
             />
