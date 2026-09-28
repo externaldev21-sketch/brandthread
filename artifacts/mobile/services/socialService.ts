@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
+import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
@@ -101,7 +102,7 @@ export const MY_USER_ID = 'me';
 export const MY_NAME    = 'Jordan';
 export const MY_HANDLE  = '@jordan';
 export const MY_INITIALS = 'J';
-export const MY_COLOR    = '#8B5CF6';
+export const MY_COLOR    = MY_AVATAR_COLOR;
 
 // ─── Pub/Sub ─────────────────────────────────────────────────────────────────
 
@@ -543,7 +544,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     authorName,
     authorHandle:    '@' + authorName.toLowerCase().replace(/[^a-z0-9]/g, ''),
     authorInitials:  authorName.slice(0, 2).toUpperCase(),
-    authorColor:     '#8B5CF6',
+    authorColor:     pickAvatarColor(p.userId ?? userId),
     sellerId:        p.userId ?? userId,
     brandId:         p.userId ?? userId,
     feedEligibility: 'thread_eligible',
@@ -1046,7 +1047,7 @@ export async function createOrGetConversation(params: {
       participant: {
         userId: params.participant.userId, name: params.participant.name,
         handle: params.participant.handle ?? '', initials: params.participant.initials ?? '',
-        color: params.participant.color ?? '#8B5CF6', accountType: params.participant.accountType ?? 'seller',
+        color: params.participant.color ?? pickAvatarColor(params.participant.userId ?? params.participant.name), accountType: params.participant.accountType ?? 'seller',
       },
       myInfo: { name: profile.name, handle: `@${profile.username}`, initials: profile.avatarInitials, color: profile.avatarColor, accountType: 'buyer' },
       contextOrderId: params.contextOrderId, contextOrderNumber: params.contextOrderNumber,
