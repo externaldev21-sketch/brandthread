@@ -92,3 +92,4 @@
 - [Swipe action color bleed](swipe-action-color-bleed.md) — colored actions behind Activity rows can appear as thin lines on device even when web looks clean; closed rows must not mount them.
 - [Recently watched semantics](recently-watched-semantics.md) — watch history means actual video playback, not a feed impression; show only the last 36 hours and currently accessible posts.
 - [Expo DevTools on Nix](expo-devtools-nix.md) — the optional RN DevTools binary can lack libglib while Metro and the web preview still work.
+- [Large source exports](large-source-exports.md) — downloadable asset registration rejected a project archive above 100 MiB; package runnable source separately from visual-reference captures.
