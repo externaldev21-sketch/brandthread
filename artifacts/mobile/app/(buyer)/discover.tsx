@@ -28,6 +28,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
@@ -133,6 +134,9 @@ export default function DiscoverScreen() {
   const { isSignedIn } = useAuth();
 
   const [filter, setFilter] = useState<DiscoverFilterKey>('forYou');
+  // Drives the sticky filter row's Glass backdrop — off at the very top,
+  // on once the grid below has scrolled (see handleContentScroll).
+  const [chipsElevated, setChipsElevated] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   // Rails, shared by the For You grid. Errors quietly drop the rail (it
@@ -298,20 +302,26 @@ export default function DiscoverScreen() {
   }
 
   const header = (
-    <>
-      <TabPageHeader
-        title="Discover"
-        actions={[
-          { name: 'search', onPress: () => router.push('/buyer-search' as never), accessibilityLabel: 'Search products and brands' },
-          ...(isSignedIn ? [{ name: 'bell' as const, onPress: () => router.push('/(buyer)/inbox' as never), accessibilityLabel: 'Notifications' }] : []),
-        ]}
-      />
-      <DiscoverFilterRow active={filter} onChange={setFilter} />
-    </>
+    <TabPageHeader
+      title="Discover"
+      actions={[
+        { name: 'search', onPress: () => router.push('/buyer-search' as never), accessibilityLabel: 'Search products and brands' },
+        ...(isSignedIn ? [{ name: 'bell' as const, onPress: () => router.push('/(buyer)/inbox' as never), accessibilityLabel: 'Notifications' }] : []),
+      ]}
+    />
   );
+
+  const handleContentScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    setChipsElevated((prev) => (y > 4) !== prev ? y > 4 : prev);
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
+      {header}
+      <View style={styles.stickyChips}>
+        <DiscoverFilterRow active={filter} onChange={setFilter} elevated={chipsElevated} />
+      </View>
       {filter === 'forYou' && (
         <DiscoverGrid
           ref={listRef}
@@ -329,7 +339,8 @@ export default function DiscoverScreen() {
           onTilePress={(post, idx) => openViewer(post, idx, forYouPosts)}
           onTileLongPress={setSafetyMenuPost}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
-          ListHeaderComponent={header as never}
+          onScroll={handleContentScroll}
+          scrollEventThrottle={16}
         />
       )}
 
@@ -349,7 +360,8 @@ export default function DiscoverScreen() {
           onTilePress={(post, idx) => openViewer(post, idx, fitsPosts)}
           onTileLongPress={setSafetyMenuPost}
           contentContainerStyle={{ paddingBottom: barInset + SP.md }}
-          ListHeaderComponent={header as never}
+          onScroll={handleContentScroll}
+          scrollEventThrottle={16}
         />
       )}
 
@@ -360,8 +372,9 @@ export default function DiscoverScreen() {
           keyExtractor={(b) => b.id}
           numColumns={2}
           columnWrapperStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}
-          contentContainerStyle={{ gap: SP.sm, paddingBottom: barInset + SP.md }}
-          ListHeaderComponent={header}
+          contentContainerStyle={{ gap: SP.sm, paddingTop: SP.md, paddingBottom: barInset + SP.md }}
+          onScroll={handleContentScroll}
+          scrollEventThrottle={16}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => <DiscoverBrandCard brand={item} />}
           ListEmptyComponent={brandsLoading ? (
@@ -381,8 +394,9 @@ export default function DiscoverScreen() {
           ref={listRef as never}
           data={people}
           keyExtractor={(p) => p.userId}
-          contentContainerStyle={{ paddingBottom: barInset + SP.md }}
-          ListHeaderComponent={header}
+          contentContainerStyle={{ paddingTop: SP.md, paddingBottom: barInset + SP.md }}
+          onScroll={handleContentScroll}
+          scrollEventThrottle={16}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => <PersonListRow person={item} />}
           ListEmptyComponent={peopleLoading ? (
@@ -403,7 +417,8 @@ export default function DiscoverScreen() {
           data={drops}
           keyExtractor={(d) => d.id}
           contentContainerStyle={{ paddingTop: SP.md, paddingBottom: barInset + SP.md }}
-          ListHeaderComponent={header}
+          onScroll={handleContentScroll}
+          scrollEventThrottle={16}
           refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => <DiscoverDropRow drop={item} />}
           ListEmptyComponent={dropsLoading ? (
@@ -462,6 +477,7 @@ export default function DiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
+  stickyChips: { zIndex: 1 },
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   personRowTapArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   personAvatar: { width: 48, height: 48, borderRadius: 24 },
