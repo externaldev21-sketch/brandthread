@@ -2351,6 +2351,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingVertical: SP.sm, marginBottom: SP.xs,
     borderRadius: RADIUS.md,
   },
+  // Compact icon circle + badge row for a buyer-context list row (smaller
+  // than components/chat/ChatAttachmentCard.tsx's 56×56 — that one fills a
+  // full-width chat card, this is one row in a scrollable list).
+  orderMsgCardIconCircle: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: CARD,
+  },
+  orderMsgCardBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   buyerContextOrderMeta: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   buyerContextOrderTotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginLeft: SP.xs },
   buyerContextRetry: {
