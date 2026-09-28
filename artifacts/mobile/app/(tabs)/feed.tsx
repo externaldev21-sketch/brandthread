@@ -88,7 +88,7 @@ import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
-import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
+import { ShopTagBackdrop, ShopTagPill, useShopTagPill } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
@@ -457,9 +457,18 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     // now a real seeded catalog product (lib/previewCatalog.ts,
     // `preview-product-11`) with its own photo and full seller data, same
     // as every other tagged product in the app.
+    //
+    // Photo audit follow-up: this used to carry FASHION_PREVIEW_POSTER_URIS[3]
+    // (the "Ivory Column Set" white gown photo — correct THERE, wrong here),
+    // which put a white bridal dress on a boots listing. No bundled poster
+    // in this set actually shows footwear (see the audit note in
+    // lib/previewCatalog.ts), so this tag now carries no `imageUri`
+    // fallback at all — the list row falls back to its hydrated catalog
+    // product (also photo-less, see previewCatalog.ts) and renders the
+    // app's existing no-photo placeholder instead of a wrong photo.
     productTags: [
       { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000, imageUri: FASHION_PREVIEW_POSTER_URIS[0] },
-      { productId: 'preview-product-11', productName: 'Leather Ankle Boots', priceCents: 21000, imageUri: FASHION_PREVIEW_POSTER_URIS[3] },
+      { productId: 'preview-product-11', productName: 'Leather Ankle Boots', priceCents: 21000 },
     ],
     commentsCount: 980,
   },
@@ -1453,6 +1462,10 @@ function SpotlightPageImpl({
   const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+  // Shop tag pill's shared expand/collapse state — see ShopSideTab.tsx's
+  // module comment for why this is lifted up here (its backdrop and its
+  // visual pill render in two different places below).
+  const shopTagPillState = useShopTagPill(isActive);
   // Real rendered height of the caption/sound stack below — see
   // CaptionBlock's `onHeightChange` and ScrubProgressBar's own comment.
   // Starts at the taller of the two nominal minimums so the very first
@@ -1696,17 +1709,16 @@ function SpotlightPageImpl({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
-      {/* ─ Shop side tab (components/buyer-feed/ShopSideTab) ─ collapsed
-          against the left edge (mirrors the rail on the right), only when
-          this video has a tagged product. Lives at this top level, not
-          inside CaptionBlock — it's a screen-edge affordance, not part of
-          that stack's flow. */}
+      {/* ─ Shop tag pill (components/buyer-feed/ShopSideTab) ─ resting
+          pill now lives inside CaptionBlock's stack (its `topSlot`, below)
+          instead of floating at this top level. Only this full-screen
+          "tap outside collapses it" backdrop stays here — it has to cover
+          the whole video, not just the small caption-stack box the pill
+          itself renders inside. */}
       {!!item.productTags?.length && (
-        <ShopSideTab
-          tag={item.productTags[0]}
-          extraCount={Math.max(0, item.productTags.length - 1)}
-          onPress={() => onShopTag(item, item.productTags![0])}
-          isActive={isActive}
+        <ShopTagBackdrop
+          visible={shopTagPillState.expanded}
+          onPress={shopTagPillState.collapse}
         />
       )}
 
@@ -1791,6 +1803,14 @@ function SpotlightPageImpl({
         onToggleCaptionExpanded={() => setCaptionExpanded(v => !v)}
         onOpenCreator={() => onOpenCreator(item)}
         onHeightChange={setCaptionBlockHeight}
+        topSlot={!!item.productTags?.length && (
+          <ShopTagPill
+            tag={item.productTags[0]}
+            extraCount={Math.max(0, item.productTags.length - 1)}
+            onPress={() => onShopTag(item, item.productTags![0])}
+            state={shopTagPillState}
+          />
+        )}
       />
     </View>
   );
@@ -2826,6 +2846,8 @@ export default function FeedScreen({
       previewProduct: item.id.startsWith('preview-fashion-')
         ? buildPreviewShopProduct(item, tag)
         : undefined,
+      postCreatorName: item.creator,
+      postCreatorVerified: item.verified,
     });
   }, []);
 

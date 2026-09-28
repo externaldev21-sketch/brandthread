@@ -83,10 +83,14 @@ describe('buyer Home feed behind the bar', () => {
     expect(feed).toContain('const RAIL_BOTTOM_GAP = 24;');
     // PR #133 shrank CAPTION_BOTTOM_GAP again (12 -> 10) on top of #129.
     expect(feed).toContain('const CAPTION_BOTTOM_GAP = 10;');
-    // The shop trigger is a collapsed side tab on the left screen edge (see
-    // components/buyer-feed/ShopSideTab.tsx), not part of the bottom-left
-    // flex column at all.
-    expect(feed).toContain('<ShopSideTab');
+    // Resting-pill redesign: the shop trigger no longer floats at the
+    // screen edge — its pill renders inside CaptionBlock's own stack (see
+    // components/buyer-feed/ShopSideTab.tsx's `ShopTagPill`, passed as
+    // CaptionBlock's `topSlot`); only its full-screen collapse backdrop
+    // stays at this top level.
+    expect(feed).toContain('<ShopTagBackdrop');
+    expect(feed).toContain('topSlot={');
+    expect(feed).toContain('<ShopTagPill');
     expect(feed).not.toContain('bottom: bottomClearance + (hasRepostIdentity ? 158 : 122)');
     // The scrub line sits exactly at the seam where the sharp video is
     // clipped and the blurred tab-bar strip begins — no offset gap.
