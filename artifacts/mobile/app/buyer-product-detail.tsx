@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, RefreshControl,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl,
   Animated, Dimensions, PanResponder, Easing, AccessibilityInfo,
 } from 'react-native';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
@@ -151,6 +151,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     variants,
     isActive:           true,
     tags:               row.tags ?? [],
+    sizeChartImageUrl:  row.sizeChartImageUrl ?? null,
   };
 }
 
@@ -467,7 +468,8 @@ const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 const qs = StyleSheet.create({
   root: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   label: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  stock: { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE },
+  // Monochrome: urgency is carried by weight, not an orange tone.
+  stock: { fontSize: FS.meta, fontFamily: FONT.semibold, color: FG },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -518,6 +520,7 @@ export default function BuyerProductDetailScreen() {
   const [reserved,        setReserved]        = useState(false);
   const [reserveLoading,  setReserveLoading]  = useState(false);
   const [sizeChartOpen,   setSizeChartOpen]   = useState(false);
+  const [sizeGuideOpen,   setSizeGuideOpen]   = useState(false);
 
   // Add to cart → the product photo flies to the bag icon, which bumps and
   // shows the count (the feed / shop sheet pattern, #287 / #291).
@@ -1083,11 +1086,38 @@ export default function BuyerProductDetailScreen() {
             );
           })}
 
+          {/* "Size guide" text link — only when the seller uploaded a size
+              chart photo, right under the size chips (mobbin.com/screens/
+              0c16f080-0cb8-487a-8928-6a7631cb205c). No placeholder link
+              when absent. */}
+          {!!product.sizeChartImageUrl && (
+            <TouchableOpacity
+              style={s.sizeGuideLink}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeGuideOpen(true); }}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Size guide"
+              testID="product-size-guide-link"
+            >
+              <Feather name="maximize" size={13} color={PURPLE_LIGHT} />
+              <Text style={[s.sizeGuideLinkText, { color: PURPLE_LIGHT }]}>Size guide</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Stock status */}
           {allSelected && variant && (
-            <View style={s.stockRow}>
-              <View style={[s.stockDot, { backgroundColor: variant.isAvailable ? SUCCESS : RED }]} />
-              <Text style={[s.stockText, { color: variant.isAvailable ? SUCCESS : RED }]}>
+            <View style={s.stockRow} testID="product-stock-line">
+              {/* Monochrome (no green/red): low stock is white and bold,
+                  plain in-stock and sold-out are grey. */}
+              <View style={[s.stockDot, {
+                backgroundColor: variant.isAvailable && variant.inventoryQuantity <= 5 ? FG : variant.isAvailable ? MUTED : SUBTLE,
+              }]} />
+              <Text style={[
+                s.stockText,
+                variant.isAvailable && variant.inventoryQuantity <= 5
+                  ? { color: FG, fontFamily: FONT.bold }
+                  : { color: MUTED },
+              ]}>
                 {variant.isAvailable
                   ? variant.inventoryQuantity <= 5
                     ? `Only ${variant.inventoryQuantity} left in stock`
@@ -1201,8 +1231,12 @@ export default function BuyerProductDetailScreen() {
           {/* You might also like — owns its header; renders nothing when empty. */}
           <RelatedProducts productId={product.id} dividerStyle={s.divider} headerStyle={s.reviewsHeader} />
 
-          {/* Report links: de-emphasised, at the very bottom. */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.md, marginTop: SP.lg, marginBottom: SP.md, opacity: 0.8 }}>
+          {/* Report links: de-emphasised via SUBTLE text color alone (below) —
+              a resting `opacity < 1` on the row would make its already-dim
+              small text subpixel-antialias against the background instead
+              of rendering as one crisp color, the exact "blurry fine
+              print" bug this pass fixes elsewhere. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.md, marginTop: SP.lg, marginBottom: SP.md }}>
             <TouchableOpacity
               onPress={() => router.push(reportHref({
                 targetType: 'product',
@@ -1217,7 +1251,7 @@ export default function BuyerProductDetailScreen() {
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
             >
               <Feather name="flag" size={11} color={SUBTLE} />
-              <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs }}>Report listing</Text>
+              <Text style={{ color: SUBTLE, fontFamily: FONT.medium, fontSize: FS.meta }}>Report listing</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push(('/ip-report?listingId=' + encodeURIComponent(product.id)) as never)}
@@ -1225,7 +1259,7 @@ export default function BuyerProductDetailScreen() {
               accessibilityLabel="Report intellectual property infringement"
               hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             >
-              <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs }}>Report intellectual property infringement</Text>
+              <Text style={{ color: SUBTLE, fontFamily: FONT.medium, fontSize: FS.meta }}>Report intellectual property infringement</Text>
             </TouchableOpacity>
           </View>
         </ResponsiveContainer>
@@ -1293,6 +1327,12 @@ export default function BuyerProductDetailScreen() {
           />
         </View>
       </BottomSheet>
+
+      <SizeGuideSheet
+        visible={sizeGuideOpen}
+        imageUri={product.sizeChartImageUrl ?? null}
+        onClose={() => setSizeGuideOpen(false)}
+      />
 
       {/* Persistent purchase bar remains visible while product content scrolls.
           This screen is pushed as a root stack card over the whole app (not
@@ -1398,6 +1438,86 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
     </ScrollView>
   );
 }
+
+// ─── Size Guide Sheet (photo) ─────────────────────────────────────────────────
+// A seller-uploaded photo of their own size chart — distinct from the
+// structured SizeChartViewer table above. Mobbin refs: SHEIN's "Size Guide"
+// text link directly under the size chips (mobbin.com/screens/
+// 0c16f080-0cb8-487a-8928-6a7631cb205c) and Polarsteps' full-bleed,
+// pinch-zoomable photo viewer (mobbin.com/screens/
+// 7d855183-6163-4eb9-8776-7ac07592c47f) for the zoom behavior — adapted to
+// the app's own shared BottomSheet rather than a full-screen viewer, since
+// a translucent Glass blur over the chart photo itself would work against
+// the one thing this sheet exists to show clearly.
+
+function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imageUri: string | null; onClose: () => void }) {
+  const { theme, FG, MUTED } = useThemeAliases();
+  const scale = useRef(new Animated.Value(1)).current;
+  const currentScale = useRef(1);
+  const pinchStartDistance = useRef(0);
+  const pinchStartScale = useRef(1);
+
+  const distance = (touches: readonly any[]) => {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const resetZoom = () => {
+    currentScale.current = 1;
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 4 }).start();
+  };
+
+  const responder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: event => event.nativeEvent.touches.length === 2,
+    onMoveShouldSetPanResponderCapture: event => event.nativeEvent.touches.length === 2,
+    onPanResponderGrant: event => {
+      pinchStartDistance.current = distance(event.nativeEvent.touches);
+      pinchStartScale.current = currentScale.current;
+    },
+    onPanResponderMove: event => {
+      const nextDistance = distance(event.nativeEvent.touches);
+      if (!pinchStartDistance.current || !nextDistance) return;
+      const nextScale = Math.max(1, Math.min(3.5, pinchStartScale.current * nextDistance / pinchStartDistance.current));
+      currentScale.current = nextScale;
+      scale.setValue(nextScale);
+    },
+    onPanResponderRelease: () => {
+      if (currentScale.current < 1.06) resetZoom();
+    },
+    onPanResponderTerminate: () => {
+      if (currentScale.current < 1.06) resetZoom();
+    },
+  })).current;
+
+  if (!imageUri) return null;
+
+  return (
+    <BottomSheet visible={visible} onClose={() => { resetZoom(); onClose(); }} testID="size-guide-sheet">
+      <View style={sgs.header}>
+        <Text style={[sgs.title, { color: FG }]}>Size guide</Text>
+        <IconButton name="x" size={20} variant="plain" onPress={() => { resetZoom(); onClose(); }} accessibilityLabel="Close size guide" />
+      </View>
+      <View style={sgs.imageWrap} {...responder.panHandlers}>
+        <Animated.Image
+          source={{ uri: imageUri }}
+          resizeMode="contain"
+          style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
+          accessibilityLabel="Size guide photo. Pinch with two fingers to zoom."
+        />
+      </View>
+      <Text style={[sgs.hint, { color: MUTED }]}>Pinch to zoom</Text>
+    </BottomSheet>
+  );
+}
+
+const sgs = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, marginBottom: SP.sm },
+  title: { fontFamily: FONT.bold, fontSize: FS.lg },
+  imageWrap: { width: '100%', aspectRatio: 4 / 3, backgroundColor: '#000', overflow: 'hidden' },
+  hint: { textAlign: 'center', fontFamily: FONT.regular, fontSize: FS.xs, marginTop: SP.sm, marginBottom: SP.xs },
+});
 
 function WornInVideos({ productId, productName }: { productId: string; productName: string }) {
   const router = useRouter();
@@ -1571,7 +1691,7 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
           >
             <View style={{ width: 140, height: 180, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm }}>
               {(p.images && p.images[0]) ? (
-                <Image source={{ uri: p.images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                <CachedImage source={{ uri: p.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={p.images[0]} />
               ) : (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                   <Feather name="image" size={24} color={MUTED} />
@@ -1579,7 +1699,7 @@ function RelatedProducts({ productId, dividerStyle, headerStyle }: {
               )}
             </View>
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG }} numberOfLines={1}>{p.name}</Text>
-            <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }} numberOfLines={1}>
+            <Text style={{ fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 2 }} numberOfLines={1}>
               {p.sellerDisplayName || 'Independent Seller'}
             </Text>
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>{formatCents(lowestPriceCents)}</Text>
@@ -1606,8 +1726,8 @@ const makeSizeChartStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => 
   headerCell: { backgroundColor: PURPLE_DIM },
   headerText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: PURPLE_LIGHT, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.4 },
   sizeText:   { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG, textAlign: 'center' },
-  valueText:  { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
-  notes:      { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: SP.sm, lineHeight: 17 },
+  valueText:  { fontFamily: FONT.medium, fontSize: FS.meta, color: MUTED, textAlign: 'center' },
+  notes:      { fontFamily: FONT.medium, fontSize: FS.meta, color: SUBTLE, marginTop: SP.sm, lineHeight: 17 },
   });
 };
 
@@ -1628,7 +1748,7 @@ function PolicyRow({ icon, label, value }: { icon: keyof typeof Feather.glyphMap
 const pr = StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
   label: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  value: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 2, lineHeight: 17 },
+  value: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 2, lineHeight: 17 },
 });
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
@@ -1663,7 +1783,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
     backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
   },
-  cartBadgeText: { color: '#000000', fontFamily: FONT.bold, fontSize: 10, lineHeight: 12 },
+  cartBadgeText: { color: '#000000', fontFamily: FONT.bold, fontSize: 11, lineHeight: 13 },
   cartFlyItem: { position: 'absolute', overflow: 'hidden', zIndex: 50, backgroundColor: '#000000' },
   mediaChromeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill },
   body: { paddingVertical: SP.md },
@@ -1704,14 +1824,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   paymentWarningCopy: { flex: 1, gap: 2 },
   paymentWarningTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ORANGE },
-  paymentWarningText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 17 },
+  paymentWarningText: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, lineHeight: 17 },
   vacationBanner: {
     flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
     borderWidth: 1, borderColor: `${ORANGE}66`, backgroundColor: `${ORANGE}12`,
     borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md,
   },
   vacationTitle: { color: ORANGE, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
-  vacationText: { color: FG, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
+  vacationText: { color: FG, fontFamily: FONT.medium, fontSize: FS.meta, lineHeight: 18 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
   priceSale: { color: SUCCESS },
@@ -1721,8 +1841,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   preOrderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   preOrderTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: CYAN },
   preOrderDetail: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  preOrderDisclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 4, lineHeight: 17 },
+  preOrderDisclaimer: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 4, lineHeight: 17 },
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.md },
+  sizeGuideLink: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -SP.xs, marginBottom: SP.sm },
+  sizeGuideLinkText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   stockRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SP.sm },
   stockDot: { width: 8, height: 8, borderRadius: 4 },
   stockText: { fontSize: FS.sm, fontFamily: FONT.medium },
@@ -1745,8 +1867,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   reviewRow: { marginBottom: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   reviewStars: { fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD, marginBottom: 2 },
-  reviewBody: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
-  reviewDate: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 2 },
+  reviewBody: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, lineHeight: 20 },
+  reviewDate: { fontSize: FS.meta, fontFamily: FONT.medium, color: SUBTLE, marginTop: 2 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   ratingAvg: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   ratingCount: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },

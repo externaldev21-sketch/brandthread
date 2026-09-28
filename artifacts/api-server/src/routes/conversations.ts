@@ -13,6 +13,7 @@
  * PUT    /api/conversations/:id/messages/:messageId/reactions   — set my reaction (upsert)
  * DELETE /api/conversations/:id/messages/:messageId/reactions   — remove my reaction
  * PATCH  /api/conversations/:id/read      — mark read
+ * PATCH  /api/conversations/:id/typing    — set/clear my "typing…" signal (polled by the other side)
  * PATCH  /api/conversations/:id/accept    — accept a message request
  * DELETE /api/conversations/:id           — decline / delete conversation
  */
@@ -79,6 +80,15 @@ function buildConversationView(
   // isPinned/isOfficial comment on Conversation in mobile's socialTypes.ts.
   const isAgentThread = parts.some((p) => isAgentUserId(p.userId));
   const agentTypingUntil = (conv as { agentTypingUntil?: Date | null }).agentTypingUntil;
+  // Real-time "X is typing…" for ordinary (non-agent) conversations —
+  // migration 102's conversation_participants.typing_until. True when ANY
+  // other participant (not me) is currently within their typing window.
+  // Polled, same as agentTyping below — no websocket layer exists for DMs.
+  const otherTyping = !isAgentThread && parts.some((p) => {
+    if (p.userId === myUserId) return false;
+    const until = (p as { typingUntil?: Date | null }).typingUntil;
+    return !!until && new Date(until).getTime() > Date.now();
+  });
   const nicknameMap = (conv as { nicknames?: Record<string, string> | null }).nicknames ?? {};
   const myMutedUntil = me?.mutedUntil ?? null;
   const myPinnedAt = me?.pinnedAt ?? null;
@@ -118,6 +128,8 @@ function buildConversationView(
     isOfficial:         isAgentThread ? true : undefined,
     // Polled (no websocket layer) "typing…" signal, agent conversations only.
     agentTyping:        isAgentThread && !!agentTypingUntil && new Date(agentTypingUntil).getTime() > Date.now(),
+    // Same signal for ordinary human-to-human conversations — see otherTyping above.
+    otherTyping,
     // Use the DB column — true only for follow-based pending requests
     isRequest:          conv.isRequest,
     requestedBy:        conv.requestedBy       ?? undefined,
@@ -946,6 +958,35 @@ router.patch("/:id/read", async (req, res) => {
       .set({ status: "read", readAt, ...(disappearAt ? { disappearAt } : {}) })
       .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`)),
   ]);
+
+  return res.json({ ok: true });
+});
+
+// ─── PATCH /api/conversations/:id/typing ─────────────────────────────────────
+// Real-time "X is typing…" (migration 102). Body: { typing: boolean }. The
+// client calls this with `typing: true` while the composer has text (re-sent
+// every few seconds so the window keeps sliding forward) and `typing: false`
+// immediately on send/clear/blur. No websocket layer exists, so the other
+// side picks this up on its own light poll of the conversation — see
+// otherTyping in buildConversationView above.
+router.patch("/:id/typing", rateLimit("mutation"), async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params as { id: string };
+  const typing = req.body?.typing === true;
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  // A short window (a couple of poll cycles) — long enough that a normal
+  // typing cadence looks continuous, short enough that a client that never
+  // clears it (crash, background) doesn't leave a stale "typing…" showing.
+  const typingUntil = typing ? new Date(Date.now() + 8000) : null;
+  await db.update(conversationParticipants)
+    .set({ typingUntil })
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
 
   return res.json({ ok: true });
 });

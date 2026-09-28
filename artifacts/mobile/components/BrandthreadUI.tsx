@@ -807,6 +807,12 @@ export function SectionHeader({ title, action, style }: SectionHeaderProps) {
           onPress={action.onPress}
           accessibilityLabel={action.label}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          // Keeps the action's own box the height of its text — PressableScale
+          // otherwise enforces a 44pt minimum touch target on its rendered
+          // box, which is taller than the title's row and reads as the
+          // action floating on its own lower line. hitSlop above keeps the
+          // full tap target for accessibility without the visual height.
+          noMinHeight
         >
           <Text style={[shS.action, { color: theme.accentLight }]} numberOfLines={1}>{action.label}</Text>
         </PressableScale>

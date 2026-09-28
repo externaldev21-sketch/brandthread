@@ -444,14 +444,22 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     // any OTHER tag in the row falls back to a bag-icon placeholder until
     // it's tapped. Sculpted Wool Coat (the tag opened first) always reads
     // as hydrated, so it never showed the gap; Leather Ankle Boots, never
-    // the initially-active tag, did. Both now carry this post's own poster
-    // as their `imageUri` — the same bundled asset this preview post
-    // already uses for its own poster/gallery/seller-avatar fallbacks (see
-    // buildPreviewGalleryUris/buildPreviewShopProduct below) — so the tag
-    // card always has a real photo instead of a placeholder, active or not.
+    // the initially-active tag, did. Both carry an `imageUri` fallback so
+    // the tag card always has a real photo instead of a placeholder, active
+    // or not.
+    //
+    // Bug fix (live-check follow-up): Leather Ankle Boots used to carry
+    // both the SAME `imageUri` as Sculpted Wool Coat (this post's own
+    // poster) and a made-up productId ('preview-product-01b') with no
+    // matching catalog row, so it never actually hydrated through
+    // getBuyerProduct()/getPreviewBuyerProduct() — no seller row, and the
+    // list/detail steps always fell back to that shared poster image. It's
+    // now a real seeded catalog product (lib/previewCatalog.ts,
+    // `preview-product-11`) with its own photo and full seller data, same
+    // as every other tagged product in the app.
     productTags: [
       { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000, imageUri: FASHION_PREVIEW_POSTER_URIS[0] },
-      { productId: 'preview-product-01b', productName: 'Leather Ankle Boots', priceCents: 21000, imageUri: FASHION_PREVIEW_POSTER_URIS[0] },
+      { productId: 'preview-product-11', productName: 'Leather Ankle Boots', priceCents: 21000, imageUri: FASHION_PREVIEW_POSTER_URIS[3] },
     ],
     commentsCount: 980,
   },
@@ -1930,7 +1938,13 @@ function buildPreviewShopProduct(
     category: 'High Fashion',
     isPreOrder: false,
     cancellationPolicy: 'Preview item — no real order will be placed.',
-    refundPolicy: 'Preview item — no payment will be collected.',
+    // Bug fix (live-check follow-up): this used to be a dev-mode disclaimer
+    // ('Preview item — no payment will be collected.') that leaked straight
+    // into the buyer-facing shipping/returns line in ShopProductSheet.tsx
+    // (`{SHIPPING_ESTIMATE_COPY} · {product.refundPolicy}`) — real per-
+    // product returns copy, same convention as the seeded catalog's own
+    // RETURNS_POLICY (lib/previewProducts.ts), not an internal note.
+    refundPolicy: 'Returns accepted within 14 days of delivery for unworn items with tags attached.',
     options: [{ id: optionId, name: 'Size', values: sizes }],
     variants: sizes.map((size, index) => ({
       id: `${tag.productId}-variant-${size.label.toLowerCase()}`,
@@ -1992,11 +2006,16 @@ export default function FeedScreen({
   // truth so BuyerHighDemandPage's content never renders underneath it
   // (see styles.topBar / styles.buyerTopRow below).
   const buyerHeaderHeight = previewTopInset + 4 + TOP_TABS_ROW_HEIGHT + 6;
-  // 14pt gaps between each cluster's icons at comfortable widths, shrinking
-  // to a 12pt floor under 380pt so the two clusters (3 left, 2 right, all
-  // 24pt) never crowd the absolutely-centered tabs — see the PR description
-  // for the exact per-width math this was sized against.
-  const topRowIconGap = windowWidth < 380 ? 12 : 14;
+  // Bug fix (urgent rail-fixes pass): the previous 14pt/12pt gaps left only
+  // ~9pt of clearance between the left cluster's third icon (TV/Live) and
+  // the centered "Following" label at 390pt width — well under the 16pt
+  // minimum clear-space this row needs, and it read as the TV icon almost
+  // touching the tab text. Tightened to 8pt/6pt between icons *within* each
+  // cluster (each cluster stays evenly spaced internally, just narrower
+  // overall) — that alone reclaims enough width to clear 16pt+ to the
+  // centered tabs on both sides, at both 375pt and 390pt, without dropping
+  // any icon into an overflow menu.
+  const topRowIconGap = windowWidth < 380 ? 6 : 8;
   // The feed is the buyer Home tab, always shown with the tab bar's compact
   // (Instagram iOS 26-style) sizing — see BuyerTabBar/buyerTabBarMetrics —
   // so its own layout math uses the compact inset, not the regular one every
@@ -3594,7 +3613,14 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center',
   },
-  buyerCartBadge: { top: 3, right: 1 },
+  // Bug fix (urgent rail-fixes pass): was `top: 3, right: 1`, which sat the
+  // badge mostly *inside* the cart glyph's own silhouette (covering its
+  // basket) instead of offset to the icon's corner. Pulled to a true
+  // top-right corner position, matching this app's other notification-
+  // count-dot convention (see `unreadDot` above) — center of the badge
+  // lands just outside the glyph's top-right corner, with only a small,
+  // intentional overlap onto it (the standard iOS/Android badge look).
+  buyerCartBadge: { top: -4, right: -6 },
   // Same shadow as the rail's icons (RightActionRail's iconShadow) — the
   // top-row search icon sits directly on video with nothing behind it, so
   // it needs the same legibility treatment.

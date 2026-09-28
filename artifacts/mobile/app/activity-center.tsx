@@ -62,6 +62,7 @@ import { findActivityArrivals } from '@/lib/activity';
 import {
   deliverPreviewLiveArrival, hasPendingPreviewLiveArrival, PREVIEW_LIVE_ARRIVAL_DELAY_MS,
 } from '@/lib/previewActivity';
+import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-cash/ThreadCashBill';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
@@ -112,8 +113,6 @@ import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser 
 
 /** Within this many points of the top, live arrivals come straight in (item 84). */
 const LIVE_TOP_SLOP = 48;
-const EMPTY_ICON = 'activity' as const;
-const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
 const AVATAR_SIZE = 40;
 
 type Styles = ReturnType<typeof makeStyles>;
@@ -195,12 +194,14 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
 
 function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }) {
   const { theme } = useAppTheme();
-  // Monochrome like every other type badge — the green bill artwork was one
-  // of the Activity screen's only non-LIVE colour accents.
+  // Thread Cash keeps its green — the one deliberate exception to Activity's
+  // otherwise-monochrome rule (owner decision: LIVE red, end-call red, and
+  // Thread Cash green are the only allowed accents). Every other badge below
+  // stays monochrome.
   if (row.type === 'thread_cash_received') {
     return (
       <View style={styles.typeBadge}>
-        <Feather name="dollar-sign" size={10} color={theme.accentLight} />
+        <ThreadCashBillIcon size={14} />
       </View>
     );
   }
@@ -840,7 +841,19 @@ export default function ActivityCenterScreen() {
     () => items.filter((item) => matchesActivityChip(item, chip)),
     [items, chip],
   );
-  const chipEmpty = activityChipEmpty(chip);
+  const chipEmpty = activityChipEmpty(chip, role);
+  const emptyActionHref = chipEmpty.action?.href;
+  const handleEmptyAction = useCallback(() => {
+    if (emptyActionHref) router.push(emptyActionHref as never);
+  }, [emptyActionHref, router]);
+  const emptyStateProps = {
+    icon: chipEmpty.icon as any,
+    title: chipEmpty.title,
+    message: chipEmpty.message,
+    actionLabel: chipEmpty.action?.label,
+    onAction: chipEmpty.action ? handleEmptyAction : undefined,
+    testID: `activity-empty-${chip}`,
+  };
 
   const sections: ListSection[] = useMemo(() => {
     const raw = buildActivitySections(
@@ -1238,12 +1251,12 @@ export default function ActivityCenterScreen() {
           )}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
-              {/* A filter with nothing in it says so specifically (minimal
-                  per-chip copy — full empty-state polish is item 85). */}
+              {/* A filter with nothing in it says so specifically, per role,
+                  with one next step where there's a real one (item 85). */}
               {chip === 'all' ? (
-                <EmptyState icon={EMPTY_ICON} illustration="bell" message={EMPTY_MESSAGE} />
+                <EmptyState {...emptyStateProps} illustration="bell" />
               ) : (
-                <EmptyState icon={chipEmpty.icon as any} message={chipEmpty.message} testID={`activity-empty-${chip}`} />
+                <EmptyState {...emptyStateProps} />
               )}
             </View>
           )}
@@ -1509,10 +1522,12 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontSize: FS.sm,
     lineHeight: 18,
   },
-  // Thread Cash "+$5.00": bold, theme text colour — never green (the only
-  // colour accents allowed are LIVE red and end-call red).
+  // Thread Cash "+$5.00": bold, and green — the owner's one deliberate
+  // exception to Activity's monochrome rule (allowed accents: LIVE red,
+  // end-call red, and Thread Cash green). Every other detail line stays
+  // theme-text monochrome.
   cashAmount: {
-    color: theme.text,
+    color: THREAD_CASH_GREEN_MID,
     fontFamily: FONT.bold,
   },
 

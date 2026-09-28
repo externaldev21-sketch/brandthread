@@ -1967,7 +1967,15 @@ export default function OnboardingScreen() {
               setSelectedThemeId(isAppThemeId(draft.selectedThemeId) ? draft.selectedThemeId : 'monochrome');
             }
           } catch { /* bad json, ignore */ }
-        } else if (pendingFlow === 'buyer' || pendingFlow === 'seller') {
+        } else if (!isAddAccount && (pendingFlow === 'buyer' || pendingFlow === 'seller')) {
+          // Never honored when adding a second account: PENDING_FLOW_KEY /
+          // PENDING_USERNAME_KEY are a single global, device-scoped pair (not
+          // per-user), meant only to resume a first-time device's own
+          // abandoned attempt. Reading them here for "create new account"
+          // while already signed in as a different account is exactly what
+          // silently pre-selected that account's role and skipped straight
+          // past the Buyer/Seller question — a fresh add-account flow must
+          // always start clean at ACCOUNT_TYPE.
           setFlow(pendingFlow);
           setSelectedFlow(pendingFlow);
           setStep(
@@ -1975,11 +1983,17 @@ export default function OnboardingScreen() {
               ? pendingFlow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME
               : pendingFlow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH,
           );
+        } else if (isAddAccount && (pendingFlow || pendingUsername)) {
+          // Defensively clear the stale global pair so nothing later in this
+          // same add-account session (a remount across the postAuth redirect,
+          // for instance) can pick them back up.
+          await AsyncStorage.multiRemove([PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
         }
         // The Auth step's typed username lives only in this component's state
         // until a Clerk user exists to key the per-user draft. A remount before
         // then (e.g. the web postAuth redirect) would otherwise lose it silently.
-        if (pendingUsername) {
+        // Never for add-account — see above.
+        if (pendingUsername && !isAddAccount) {
           setUsername((current) => current || pendingUsername);
         }
       } catch {

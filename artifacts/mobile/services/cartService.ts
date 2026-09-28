@@ -123,6 +123,11 @@ function adaptApiProduct(row: any): BuyerProduct {
     sellerName: row.sellerDisplayName ?? 'Seller',
     sellerHandle: row.sellerHandle ?? '',
     sellerAvatarUri: row.sellerAvatarUri ?? undefined,
+    // Real data: GET /api/public/products/:id already computes this
+    // server-side (deriveSellerVerified) — just not read into BuyerProduct
+    // until now.
+    sellerVerified: row.sellerVerified === true,
+    claimedUnits: typeof row.claimedUnits === 'number' ? row.claimedUnits : undefined,
     name: row.name,
     description: row.description ?? '',
     priceCents: variants.length > 0 ? Math.min(...variants.map(v => v.priceCents)) : 0,

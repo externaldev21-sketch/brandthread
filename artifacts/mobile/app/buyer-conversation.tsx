@@ -25,6 +25,7 @@ import {
   MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
 import { pickAvatarColor } from '@/lib/avatarColors';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import type { CallLogEntry } from '@/lib/calls/types';
@@ -67,12 +68,13 @@ import { applyOptimisticReaction, myReactionIn, groupReactionCounts } from '@/li
 import { SystemLine } from '@/components/chat/SystemLine';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
+import { ChatAttachmentCard } from '@/components/chat/ChatAttachmentCard';
 import { getConversationTheme } from '@/lib/conversationThemes';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   isPreviewConversationId, getPreviewConversation, getPreviewMessages,
   setPreviewConversationDisappearing, appendPreviewMessage, reactToPreviewMessage,
-  isPreviewInboxEnabled, posterUri,
+  isPreviewInboxEnabled, posterUri, previewAutoReplyText, previewAutoReplyDelayMs,
 } from '@/lib/previewInbox';
 import {
   parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed,
@@ -333,6 +335,12 @@ export default function BuyerConversationScreen() {
   // whatever the composer is showing by the time it resolves. uploadMedia()
   // has no real cancel/abort — this only makes the UI stop listening to it.
   const mediaUploadTokenRef = useRef(0);
+  // Real-time "X is typing…": true once we've told the server we're
+  // composing (PATCH /api/conversations/:id/typing), so handleChangeText
+  // doesn't re-send it on every keystroke, and a timer that clears it after
+  // a pause, since the server-side window (8s) is a safety net, not the UX.
+  const isTypingSentRef = useRef(false);
+  const typingClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Item 74 verification aid — NOT a real feature. The upload-in-progress
   // ring is inherently transient (uploadMedia() resolves/rejects as soon as
@@ -514,6 +522,25 @@ export default function BuyerConversationScreen() {
     return () => clearInterval(interval);
   }, [conv?.id]));
 
+  // The "X is typing…" signal (conv.otherTyping) needs a noticeably tighter
+  // cadence than the 12s message poll above to read as live — same 3s
+  // cadence lib/live/apiLiveProvider.ts already uses for live-chat polling.
+  // Merges just otherTyping into the existing conv object rather than
+  // replacing it wholesale, so it never clobbers an in-flight local update
+  // (e.g. the optimistic theme/disappearing toggles elsewhere in this file).
+  // Skipped for the agent thread (its own agentTyping is client-driven, see
+  // sendToAgent) and for a seeded preview thread (no real backend to poll).
+  useFocusEffect(useCallback(() => {
+    if (!conv?.id || isPreviewConversationId(conv.id) || conv.isOfficial) return;
+    const interval = setInterval(() => {
+      getConversation(conv.id).then((fresh) => {
+        if (!fresh) return;
+        setConv((prev) => (prev && prev.id === fresh.id ? { ...prev, otherTyping: fresh.otherTyping } : prev));
+      }).catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [conv?.id, conv?.isOfficial]));
+
   // Scroll to end after messages load — unless there's an unread divider we
   // still need to scroll to first (handled by the effect below).
   useEffect(() => {
@@ -525,6 +552,12 @@ export default function BuyerConversationScreen() {
   useEffect(() => {
     if (voicePlayerStatus.didJustFinish) setPlayingVoiceUri(null);
   }, [voicePlayerStatus.didJustFinish]);
+
+  // Clears the pending "typing…" timeout on unmount/navigation-away — leaving
+  // the chat mid-type shouldn't leave a dangling timer.
+  useEffect(() => () => {
+    if (typingClearTimerRef.current) clearTimeout(typingClearTimerRef.current);
+  }, []);
 
   // Keep the last message pinned above the composer as the keyboard opens —
   // the KeyboardAvoidingView above resizes this screen frame-by-frame with
@@ -589,12 +622,15 @@ export default function BuyerConversationScreen() {
 
   // Presence line under the header name. `isOnline`/`lastSeenAt` are the only
   // presence signals ConversationParticipant carries; the backend does not
-  // currently populate them (see socialTypes.ts), so this line is simply
-  // omitted rather than fabricating an "online"/"typing…" state from nothing.
+  // currently populate them (see socialTypes.ts), so that part is simply
+  // omitted. "typing…" IS real for an ordinary conversation now — see
+  // conv.otherTyping (PATCH/GET /api/conversations/:id/typing) — populated
+  // the same way agentTyping is for the agent thread, just from the OTHER
+  // human participant's own typing signal instead of a client-local flag.
   const isAgentConv = !!conv?.isOfficial || participant?.userId === BRANDTHREAD_AGENT_USER_ID;
   const statusLine = isAgentConv
     ? (agentTyping ? 'typing…' : 'AI assistant')
-    : (participant?.isOnline ? 'Active now' : statusLineFor(participant));
+    : (conv?.otherTyping ? 'typing…' : (participant?.isOnline ? 'Active now' : statusLineFor(participant)));
   // react-native-web doesn't fill in a real top safe-area inset (no notch/
   // dynamic-island polyfill), so insets.top reads 0 on web and the header
   // clipped under the dynamic island in a device-frame screenshot — same
@@ -1132,105 +1168,31 @@ export default function BuyerConversationScreen() {
         />
       );
     }
-    // Product share card (item 70): image, name, price/"No longer available"
-    // (kept live server-side — see lib/productAttachmentInfo.ts on the API),
-    // and an explicit "View" button. It's a single tap target, same as the
-    // other structured cards below — a second, nested Pressable for "View"
-    // would both violate the no-nested-pressables rule and get swallowed by
-    // the bubble's own long-press/swipe handlers, so "View" is a plain
-    // View+Text chip inside the one PressableScale that owns the whole card.
-    if (att.type === 'product') {
-      const unavailable = att.meta?.unavailable === 'true';
+    // Story reply (Mobbin: Instagram "Replying to a story") — a small
+    // square thumbnail of the replied-to slide + "Replied to your story",
+    // then the actual reply text renders below as the bubble's own text
+    // (unchanged rendering, same as every other message).
+    if (att.type === 'story_reply') {
       return (
-        <PressableScale rippleEnabled={false}
-          style={s.productCard}
-          activeOpacity={0.7}
-          accessibilityLabel={`${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`}
-          testID="product-card-attachment"
-          onPress={() => {
-            const pid = att.meta?.productId;
-            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
-          }}
-        >
-          <View style={[s.productCardImage, unavailable && s.productCardImageDim]}>
-            {att.uri ? (
-              <CachedImage source={{ uri: att.uri }} style={s.productCardImageFill} recyclingKey={att.uri} />
-            ) : (
-              <Feather name="shopping-bag" size={ICON.md} color={theme.muted} />
-            )}
-          </View>
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Product'}</Text>
-            <Text style={[s.attachSubtitle, unavailable && s.productUnavailableText]} numberOfLines={1}>
-              {unavailable ? 'No longer available' : (att.subtitle ?? 'Product')}
-            </Text>
-          </View>
-          <View style={s.productViewChip}>
-            <Text style={s.productViewChipText}>View</Text>
-            <Feather name="chevron-right" size={ICON.xs} color={theme.text} />
-          </View>
-        </PressableScale>
+        <View style={s.storyReplyCard}>
+          {att.uri ? (
+            <CachedImage source={{ uri: att.uri }} style={s.storyReplyThumb} recyclingKey={att.uri} />
+          ) : (
+            <View style={[s.storyReplyThumb, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Feather name="camera" size={ICON.sm} color={theme.muted} />
+            </View>
+          )}
+          <Text style={s.storyReplyLabel} numberOfLines={1}>{att.title || 'Replied to your story'}</Text>
+        </View>
       );
     }
 
-    // Order status card (item 71) — Mobbin: Whatnot's order-status screen
-    // (status label + "Track your purchase" row with an external-link icon)
-    // adapted from a standalone screen into this inline card, the same way
-    // item 70 adapted Depop's persistent product header. Status/tracking are
-    // kept live server-side (see api-server's lib/orderAttachmentInfo.ts) —
-    // never the value cached on the message at send time, so a seller
-    // marking an order shipped shows up here immediately, not just on the
-    // order detail screen. Single tap target, same "no nested Pressable"
-    // technique as the product card above: the whole card is one
-    // PressableScale, and the Track/View chip is a plain View+Text.
-    if (att.type === 'order') {
-      const orderId = att.meta?.orderId;
-      const rawStatus = att.meta?.status;
-      const uiStatus = rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
-      const trackingNumber = att.meta?.trackingNumber;
-      const trackingUrl = trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
-      const chipLabel = trackingUrl ? 'Track' : 'View';
-      return (
-        <PressableScale rippleEnabled={false}
-          style={s.orderMsgCard}
-          activeOpacity={0.7}
-          accessibilityLabel={`${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${chipLabel}`}
-          testID="order-card-attachment"
-          onPress={() => {
-            if (trackingUrl) {
-              Linking.openURL(trackingUrl).catch(() => {});
-            } else if (orderId) {
-              router.push(('/buyer-order-detail?id=' + orderId) as never);
-            } else {
-              router.push('/(buyer)/orders' as never);
-            }
-          }}
-        >
-          <View style={s.orderMsgCardIconCircle}>
-            <Feather name="package" size={ICON.md} color={theme.accent} />
-          </View>
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Order'}</Text>
-            {uiStatus ? (
-              <View style={s.orderMsgCardBadgeRow}>
-                <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
-              </View>
-            ) : (
-              <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle ?? 'Order'}</Text>
-            )}
-          </View>
-          <View style={s.productViewChip}>
-            <Text style={s.productViewChipText}>{chipLabel}</Text>
-            <Feather name={trackingUrl ? 'external-link' : 'chevron-right'} size={ICON.xs} color={theme.text} />
-          </View>
-        </PressableScale>
-      );
-    }
-
-    // 'thread_cash', 'quick_replies' and 'agent_card' are handled in
-    // renderItem() before this function is ever called for them — they're
-    // standalone rows, not content that belongs inside a chat bubble.
-    // Default: post / profile card (order is handled above)
+    // 'thread_cash', 'quick_replies', 'agent_card', 'product' and 'order'
+    // are all handled in renderItem() before this function is ever called
+    // for them — they're standalone rows, not content that belongs inside a
+    // chat bubble (see the "Standalone product/order card" comment on
+    // renderItem's own product/order branch for why).
+    // Default: post / profile card
     return (
       <PressableScale rippleEnabled={false}
         style={s.attachCard}
@@ -1389,6 +1351,36 @@ export default function BuyerConversationScreen() {
     void sendToAgent(reply.value);
   }
 
+  /** Real-time "X is typing…": tells the server I'm composing (once per burst
+   *  of keystrokes, not per keystroke) and schedules clearing it after a
+   *  short pause — same idea as any chat app's typing indicator, just
+   *  polled instead of pushed (see PATCH /api/conversations/:id/typing).
+   *  No-ops for a seeded preview thread (no real backend/counterpart) and
+   *  the agent thread (its "typing…" is the AI's own, client-driven —
+   *  see sendToAgent/setAgentTyping). */
+  function sendTypingSignal(hasText: boolean) {
+    if (!conv?.id || isPreviewConversationId(conv.id) || conv.isOfficial) return;
+    if (typingClearTimerRef.current) { clearTimeout(typingClearTimerRef.current); typingClearTimerRef.current = null; }
+    if (hasText) {
+      if (!isTypingSentRef.current) {
+        isTypingSentRef.current = true;
+        api.conversations.setTyping(conv.id, true).catch(() => {});
+      }
+      typingClearTimerRef.current = setTimeout(() => {
+        isTypingSentRef.current = false;
+        if (conv?.id) api.conversations.setTyping(conv.id, false).catch(() => {});
+      }, 3000);
+    } else if (isTypingSentRef.current) {
+      isTypingSentRef.current = false;
+      api.conversations.setTyping(conv.id, false).catch(() => {});
+    }
+  }
+
+  function handleChangeText(next: string) {
+    setText(next);
+    sendTypingSignal(next.trim().length > 0);
+  }
+
   async function handleSend() {
     if (!conv || !canSend) return;
     const t = text.trim();
@@ -1397,6 +1389,7 @@ export default function BuyerConversationScreen() {
     setText('');
     setSelectedAttachment(null);
     setReplyTo(null);
+    sendTypingSignal(false);
 
     if (isAgentConv && !att && !replyingTo) {
       await sendToAgent(t);
@@ -1431,6 +1424,28 @@ export default function BuyerConversationScreen() {
       appendPreviewMessage(conv.id, localMsg);
       setMessages((prev) => [...prev, localMsg]);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      // Preview-only: the other (simulated) side sends back exactly one
+      // short reply so the thread reads as live during a demo — see
+      // previewAutoReplyText's own doc comment in lib/previewInbox.ts.
+      const convIdAtSend = conv.id;
+      setTimeout(() => {
+        const reply: Message = {
+          id: `local-reply-${Date.now()}`,
+          conversationId: convIdAtSend,
+          fromId: participant?.userId ?? conv.participants[0]?.userId ?? 'preview-participant',
+          fromName: displayName,
+          fromInitials: participant?.initials ?? 'B',
+          fromColor: participant?.color ?? theme.cardElevated,
+          text: previewAutoReplyText(),
+          reactions: [],
+          status: 'sent',
+          ts: Date.now(),
+          deletedForMe: false,
+        };
+        appendPreviewMessage(convIdAtSend, reply);
+        setMessages((prev) => [...prev, reply]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      }, previewAutoReplyDelayMs());
       return;
     }
 
@@ -1767,6 +1782,77 @@ export default function BuyerConversationScreen() {
       );
     }
 
+    // Standalone product/order card (Dev's chat-card-redesign feedback) —
+    // NEVER rendered inside the text-message bubble. Bubbles are only for
+    // actual text, so this uses the exact same msgOuter row + avatar +
+    // left/right alignment a text bubble uses just below, but swaps the
+    // bubble for the free-floating ChatAttachmentCard (no border, no bubble
+    // wrapper, one tap target for the whole card). See
+    // components/chat/ChatAttachmentCard.tsx.
+    if (msg.attachment?.type === 'product' || msg.attachment?.type === 'order') {
+      const att = msg.attachment;
+      const isProduct = att.type === 'product';
+      const unavailable = isProduct && att.meta?.unavailable === 'true';
+      const orderId = att.meta?.orderId;
+      const rawStatus = att.meta?.status;
+      const uiStatus = !isProduct && rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
+      const trackingNumber = att.meta?.trackingNumber;
+      const trackingUrl = !isProduct && trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
+      const footerLabel = isProduct ? 'View' : (trackingUrl ? 'Track' : 'View');
+      const footerIcon = !isProduct && trackingUrl ? 'external-link' : 'chevron-right';
+      const accessibilityLabel = isProduct
+        ? `${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`
+        : `${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${footerLabel}`;
+      return (
+        <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? 12 : 2 }]}>
+          {!isOwn && (
+            isLastInGroup ? (
+              isAgentConv ? (
+                <View style={[s.msgAvatar, s.msgAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  <BrandthreadLogo size={16} />
+                </View>
+              ) : (
+                <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
+                  <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+                </View>
+              )
+            ) : <View style={s.msgAvatarSpacer} />
+          )}
+          <ChatAttachmentCard
+            theme={theme}
+            isMe={isOwn}
+            imageUri={isProduct ? att.uri : undefined}
+            icon={isProduct ? 'shopping-bag' : 'package'}
+            iconColor={theme.accent}
+            title={att.title || (isProduct ? 'Product' : 'Order')}
+            priceLabel={isProduct ? att.subtitle : undefined}
+            statusBadge={!isProduct && uiStatus ? (
+              <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+            ) : (!isProduct && !uiStatus && att.subtitle ? (
+              <Text style={[s.attachSubtitle, { marginTop: 0 }]} numberOfLines={1}>{att.subtitle}</Text>
+            ) : undefined)}
+            unavailable={unavailable}
+            footerLabel={footerLabel}
+            footerIcon={footerIcon}
+            testID={isProduct ? 'product-card-attachment' : 'order-card-attachment'}
+            accessibilityLabel={accessibilityLabel}
+            onPress={() => {
+              if (isProduct) {
+                const pid = att.meta?.productId;
+                if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
+              } else if (trackingUrl) {
+                Linking.openURL(trackingUrl).catch(() => {});
+              } else if (orderId) {
+                router.push(('/buyer-order-detail?id=' + orderId) as never);
+              } else {
+                router.push('/(buyer)/orders' as never);
+              }
+            }}
+          />
+        </View>
+      );
+    }
+
     return (
       <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? 12 : 2 }]}>
         {/* Other-user avatar — only on the last bubble of a run, vertically
@@ -1815,25 +1901,23 @@ export default function BuyerConversationScreen() {
             // request-mode UI otherwise fully hides.
             onLongPress={isRequestMode ? undefined : () => openReactionOverlay(msg)}
             delayLongPress={280}
-            // Voice, product, order and (multi-photo) image attachments each
-            // render their own interactive control inside this bubble
-            // (VoiceMessageBubble's play/scrub/speed buttons; the product/
-            // order cards' own single PressableScale for View/Track — see
-            // items 70/71's "no nested Pressable" comments on those cards;
-            // and each photo cell below is its own PressableScale, opening
-            // the full-screen MediaViewer — item 74 found this same class of
-            // bug already present for image attachments and fixed it here).
+            // Voice and (multi-photo) image attachments each render their
+            // own interactive control inside this bubble
+            // (VoiceMessageBubble's play/scrub/speed buttons; each photo
+            // cell below is its own PressableScale, opening the full-screen
+            // MediaViewer — item 74 found this same class of bug already
+            // present for image attachments and fixed it here). Product and
+            // order cards no longer render inside this bubble at all — see
+            // renderItem's standalone product/order branch above.
             // On web, accessibilityRole="button" makes react-native-web
             // render an actual <button>, and a <button> cannot legally
             // contain other interactive controls (the HTML nested-button
             // rule) — so those controls silently break the DOM tree even
             // though there's only ever one logical tap target per row. Drop
-            // the role for all four attachment kinds so the bubble renders
-            // as a plain, still fully tappable/long-pressable <div> instead.
+            // the role for both attachment kinds so the bubble renders as a
+            // plain, still fully tappable/long-pressable <div> instead.
             accessibilityRole={
               msg.attachment?.type === 'voice'
-              || msg.attachment?.type === 'product'
-              || msg.attachment?.type === 'order'
               || msg.attachment?.type === 'image'
                 ? 'none' : 'button'
             }
@@ -2004,97 +2088,105 @@ export default function BuyerConversationScreen() {
       {/* Plain flat header — no card, no pill, no background decoration.
           Sits directly on the theme background with a hairline border
           underneath instead of a floating "glass" card. */}
-      <View style={[s.headerWrap, { paddingTop: headerTopPad + SP.xs }]}>
-        <PressableScale rippleEnabled={false}
-          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
-          style={s.roundBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          testID="conversation-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-        </PressableScale>
+      <View style={[s.headerWrap, { paddingTop: headerTopPad + SP.xs, paddingRight: SP.md + insets.right }]}>
+        <View style={s.headerLeftGroup}>
+          <PressableScale rippleEnabled={false}
+            onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
+            style={s.roundBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            testID="conversation-back"
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
+            <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+          </PressableScale>
 
-        <PressableScale rippleEnabled={false}
-          style={s.headerCenter}
-          activeOpacity={participant ? 0.7 : 1}
-          disabled={!participant}
-          onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
-          testID="conversation-header-name"
-          accessibilityRole="button"
-          accessibilityLabel={`${displayName} — chat details`}
-        >
-          {participant && (
-            <View style={s.headerAvatarWrap} testID="conversation-avatar">
-              {isAgentConv ? (
-                <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <BrandthreadLogo size={18} />
-                </View>
-              ) : (
-                <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                  <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
-                </View>
-              )}
-              {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
-            </View>
-          )}
-          <View style={s.headerTextCol}>
-            <View style={s.headerNameRow}>
-              <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
-              {isAgentConv && (
-                <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
-                  <Feather name="check-circle" size={14} color={theme.accent} style={{ marginLeft: 4 }} />
-                  <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
-                    <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
+          <PressableScale rippleEnabled={false}
+            style={s.headerCenter}
+            activeOpacity={participant ? 0.7 : 1}
+            disabled={!participant}
+            onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+            testID="conversation-header-name"
+            accessibilityRole="button"
+            accessibilityLabel={`${displayName} — chat details`}
+          >
+            {participant && (
+              <View style={s.headerAvatarWrap} testID="conversation-avatar">
+                {isAgentConv ? (
+                  <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                    <BrandthreadLogo size={18} />
                   </View>
-                </View>
-              )}
+                ) : (
+                  <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
+                    <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                  </View>
+                )}
+                {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
+              </View>
+            )}
+            <View style={s.headerTextCol}>
+              <View style={s.headerNameRow}>
+                <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+                {isAgentConv && (
+                  <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
+                    <Feather name="check-circle" size={14} color={theme.accent} style={{ marginLeft: 4 }} />
+                    <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
+                      <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+              {statusLine ? (
+                <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
+                  {statusLine}
+                </Text>
+              ) : null}
             </View>
-            {statusLine ? (
-              <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
-                {statusLine}
-              </Text>
-            ) : null}
-          </View>
-        </PressableScale>
+          </PressableScale>
+        </View>
 
-        {/* An AI account can't take a call — no voice/video icons for it,
-            just the info icon below. */}
-        {conv && !isAgentConv && (
+        {/* Icon group hard-right-aligned to the header edge, per Mobbin
+            (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — not
+            centered/adjacent to the name. headerWrap's justifyContent:
+            'space-between' pushes this group to the far right. */}
+        <View style={s.headerIconGroup}>
+          {/* An AI account can't take a call — no voice/video icons for it,
+              just the info icon below. */}
+          {conv && !isAgentConv && (
+            <PressableScale rippleEnabled={false}
+              style={s.roundBtn}
+              onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="conversation-call-voice"
+              accessibilityRole="button"
+              accessibilityLabel="Voice call"
+            >
+              <Feather name="phone" size={ICON.lg} color={theme.muted} />
+            </PressableScale>
+          )}
+          {conv && !isAgentConv && (
+            <PressableScale rippleEnabled={false}
+              style={s.roundBtn}
+              onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="conversation-call-video"
+              accessibilityRole="button"
+              accessibilityLabel="Video call"
+            >
+              <Feather name="video" size={ICON.lg} color={theme.muted} />
+            </PressableScale>
+          )}
           <PressableScale rippleEnabled={false}
             style={s.roundBtn}
-            onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
+            onPress={() => { hapticPrimaryAction(); openOptions(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            testID="conversation-call-voice"
+            testID="conversation-options"
             accessibilityRole="button"
-            accessibilityLabel="Voice call"
+            accessibilityLabel={isAgentConv ? 'About Brandthread Agent' : 'More options'}
           >
-            <Feather name="phone" size={ICON.sm} color={theme.muted} />
+            <Feather name={isAgentConv ? 'info' : 'more-horizontal'} size={ICON.lg} color={theme.muted} />
           </PressableScale>
-        )}
-        {conv && !isAgentConv && (
-          <PressableScale rippleEnabled={false}
-            style={s.roundBtn}
-            onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            testID="conversation-call-video"
-            accessibilityRole="button"
-            accessibilityLabel="Video call"
-          >
-            <Feather name="video" size={ICON.sm} color={theme.muted} />
-          </PressableScale>
-        )}
-        <PressableScale rippleEnabled={false}
-          style={s.roundBtn}
-          onPress={() => { hapticPrimaryAction(); openOptions(); }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          testID="conversation-options"
-          accessibilityRole="button"
-          accessibilityLabel={isAgentConv ? 'About Brandthread Agent' : 'More options'}
-        >
-          <Feather name={isAgentConv ? 'info' : 'more-horizontal'} size={ICON.sm} color={theme.muted} />
-        </PressableScale>
+        </View>
       </View>
 
       {/* Request-mode profile header — Instagram's message-request chat
@@ -2332,12 +2424,19 @@ export default function BuyerConversationScreen() {
               />
             ) : (<>
             {/* Attach — photos, video, Thread Cash (Apple-Cash-style), and
-                (for seller chats) products/posts. A plain "+" inside a
-                hairline circle, aligned to the pill's own center. */}
+                (for seller chats) products/posts, via the same "Add to
+                message" sheet as before. IG-style camera-circle trigger
+                (Mobbin: mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7)
+                — a solid white circle with a black camera glyph, replacing
+                the bare "+" glyph. Same action as before (opens the
+                multi-option sheet: Photos / Video clip / Product or post),
+                just a new visual — the sheet has more than one real option,
+                so this stays an entry point to that sheet rather than a
+                direct camera action. */}
             <PressableScale rippleEnabled={false}
               bounce={false}
               onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
-              style={[s.roundInputBtn, { backgroundColor: theme.cardElevated, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border }]}
+              style={s.cameraCircleBtn}
               disabled={isUploading || isSending}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="conversation-attach"
@@ -2345,8 +2444,8 @@ export default function BuyerConversationScreen() {
               accessibilityLabel="Attach"
             >
               {isUploading
-                ? <UploadRing size={ICON.md} color={theme.accent} />
-                : <Feather name="plus" size={ICON.md} color={theme.text} />
+                ? <UploadRing size={ICON.md} color="#000000" />
+                : <Feather name="camera" size={20} color="#000000" />
               }
             </PressableScale>
 
@@ -2357,14 +2456,25 @@ export default function BuyerConversationScreen() {
               <TextInput
                 ref={textInputRef}
                 nativeID={CHAT_INPUT_NATIVE_ID}
-                style={[s.textInput, { height: composerInputHeight }]}
+                style={[s.textInput, WEB_INPUT_RESET, { height: composerInputHeight }]}
                 value={text}
-                onChangeText={setText}
+                onChangeText={handleChangeText}
                 placeholder="Message…"
                 placeholderTextColor={theme.muted}
                 multiline
                 returnKeyType="default"
                 autoCapitalize="sentences"
+                onKeyPress={Platform.OS === 'web' ? (e: any) => {
+                  // Web hardware-keyboard Enter sends; Shift+Enter still
+                  // inserts a newline (native platforms use their own
+                  // return-key handling and never see this multiline
+                  // <textarea> key event, so this is web-only).
+                  if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                    e.preventDefault();
+                    hapticPrimaryAction();
+                    handleSend();
+                  }
+                } : undefined}
               />
 
               {/* Mic ⇄ Send morph, inside the pill's own bounds */}
@@ -2922,13 +3032,30 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    // Left group (back + avatar + name) stays left; the icon group is
+    // pushed to the far right edge — not centered/adjacent to the name.
+    // Mobbin: Instagram DM header
+    // (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — the icon
+    // group is hard-right-aligned to the edge, evenly spaced, 16pt inset
+    // from the screen edge (paddingRight is set inline: SP.md + insets.right).
+    justifyContent: 'space-between',
     backgroundColor: theme.background,
-    paddingHorizontal: SP.xs,
+    paddingLeft: SP.xs,
     paddingBottom: SP.sm,
-    gap: 2,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.border,
     zIndex: 5,
+  },
+  headerLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    gap: SP.sm,
+  },
+  headerIconGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
   },
   roundBtn: {
     width: 36,
@@ -2938,11 +3065,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     justifyContent: 'center',
   },
   headerCenter: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SP.xs,
+    flexShrink: 1,
     gap: SP.sm,
   },
   headerTextCol: {
@@ -3052,8 +3177,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: theme.text,
   },
   orderCardProduct: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    fontSize: FS.meta,
+    fontFamily: FONT.medium,
     color: theme.muted,
     marginTop: 2,
   },
@@ -3199,82 +3324,26 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     padding: SP.sm,
     marginBottom: SP.xs,
   },
-  // Product share card (item 70) — same row shape as attachCard but with a
-  // real image thumbnail instead of a leading glyph, and an explicit "View"
-  // chip in place of the bare chevron.
-  productCard: {
-    flexDirection: 'row',
+  // Product/order chat cards (item 70/71) moved to the standalone
+  // ChatAttachmentCard component (components/chat/ChatAttachmentCard.tsx) —
+  // no bubble, no border, own the tap target. See renderItem's product/
+  // order branch.
+  storyReplyCard: {
     alignItems: 'center',
-    width: 240,
-    backgroundColor: theme.card,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: theme.border,
-    padding: SP.sm,
     marginBottom: SP.xs,
   },
-  productCardImage: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.sm,
+  storyReplyThumb: {
+    width: 72,
+    height: 108,
+    borderRadius: RADIUS.md,
     backgroundColor: theme.cardElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
     overflow: 'hidden',
   },
-  productCardImageDim: {
-    opacity: 0.5,
-  },
-  productCardImageFill: {
-    width: '100%',
-    height: '100%',
-  },
-  productUnavailableText: {
-    fontFamily: FONT.medium,
-  },
-  productViewChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: RADIUS.pill,
-    paddingVertical: 4,
-    paddingHorizontal: SP.xs,
-    marginLeft: SP.xs,
-  },
-  productViewChipText: {
-    fontFamily: FONT.semibold,
+  storyReplyLabel: {
+    marginTop: 4,
     fontSize: FS.xs,
-    color: theme.text,
-  },
-  // Order status card (item 71) — same row shape as productCard, with a
-  // package-glyph-in-a-circle in place of an image thumbnail (an order has
-  // no single photo the way a product listing does) and a status badge
-  // under the title instead of a plain subtitle line.
-  orderMsgCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 240,
-    backgroundColor: theme.card,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: theme.border,
-    padding: SP.sm,
-    marginBottom: SP.xs,
-  },
-  orderMsgCardIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.cardElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  orderMsgCardBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 3,
+    fontFamily: FONT.regular,
+    color: theme.muted,
   },
   // A standalone agent info/deep-link card — full width, coin/icon-in-a-
   // circle, bold title, subtitle, chevron. Same row shape as the Thread Cash
@@ -3303,8 +3372,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: theme.text,
   },
   attachSubtitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    fontSize: FS.meta,
+    fontFamily: FONT.medium,
     color: theme.muted,
     marginTop: 1,
   },
@@ -3419,19 +3488,38 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingTop: SP.sm,
     gap: SP.sm,
   },
-  // A light, borderless "+" — no filled grey blob. The visual glyph sits at
-  // COMPOSER_CONTROL (matching every other circular control in the row) but
-  // keeps a generous hitSlop at the call site for a full 44pt tap target.
+  // A light, borderless "+" — no filled grey blob. Sized a touch larger than
+  // the glyph controls inside the pill (COMPOSER_CONTROL+4) so it optically
+  // centers against the pill's own ~44pt height (see `pill` below); keeps a
+  // generous hitSlop at the call site for a full 44pt tap target.
   roundInputBtn: {
+    width: COMPOSER_CONTROL + 4,
+    height: COMPOSER_CONTROL + 4,
+    borderRadius: (COMPOSER_CONTROL + 4) / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  // IG-style camera-circle attach trigger — a solid white circle with a
+  // black camera glyph, 36pt diameter (Mobbin: Instagram DM composer,
+  // mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7). Fixed
+  // white/black regardless of theme, same as Instagram's own control, with
+  // a hairline border for definition against a light-theme background.
+  cameraCircleBtn: {
     width: COMPOSER_CONTROL,
     height: COMPOSER_CONTROL,
     borderRadius: COMPOSER_CONTROL / 2,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.12)',
   },
   // The single composer pill — holds the TextInput, the Thread Cash coin,
-  // and the mic⇄send morph, all inside one rounded surface.
+  // and the mic⇄send morph, all inside one rounded surface. ~44pt tall at
+  // rest for a single line (Dev feedback: the bar read as too tall/thick
+  // before) and only grows as composerInputHeight grows with typed lines.
   pill: {
     flex: 1,
     flexDirection: 'row',
@@ -3443,7 +3531,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingLeft: SP.sm,
     paddingRight: SP.xs,
     gap: SP.sm,
-    minHeight: COMPOSER_CONTROL + SP.xs,
+    minHeight: COMPOSER_CONTROL + SP.sm,
   },
   textInput: {
     flex: 1,
@@ -3460,6 +3548,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     // composerContentHeight) is what actually keeps it at rest/growing
     // correctly; this minHeight is just a native-platform floor.
     minHeight: COMPOSER_CONTROL,
+    // Matches the icons' own marginBottom below so the placeholder/typed
+    // text sits on the exact same baseline as the mic/send/gallery glyphs —
+    // without this the text box (flush to the pill's bottom edge) sat ~4pt
+    // lower than the icons, reading as "placeholder sits low/off-center".
+    marginBottom: SP.xs,
     ...(Platform.OS === 'web' ? { paddingTop: COMPOSER_TEXT_V_PADDING, paddingBottom: COMPOSER_TEXT_V_PADDING } : null),
   },
   // Sits inside the pill, after mic/send and gallery.
@@ -3642,7 +3735,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   mediaSheetOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.md, gap: SP.sm },
   mediaSheetIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
   mediaSheetLabel:  { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
-  mediaSheetDesc:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+  mediaSheetDesc:   { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
 
   // Photo grid
   photoGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 2, borderRadius: RADIUS.md, overflow: 'hidden' },

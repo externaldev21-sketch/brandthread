@@ -31,7 +31,18 @@ export function DiscoverTileView({
       style={{ width, height }}
     >
       {post.imageUri ? (
-        <CachedImage source={{ uri: post.imageUri }} style={styles.image} contentFit="cover" cachePolicy="memory-disk" />
+        // Tiles are portrait (3:4) so a full-length look fits; a "cover" fit
+        // still has to crop *some* height off a taller source photo — anchor
+        // it to the top so a chopped edge lands at the feet, not the head
+        // (item 46 fix: heads were getting cropped with the default center
+        // anchor).
+        <CachedImage
+          source={{ uri: post.imageUri }}
+          style={styles.image}
+          contentFit="cover"
+          contentPosition="top center"
+          cachePolicy="memory-disk"
+        />
       ) : (
         // Some real posts (e.g. the current public Trending endpoint) carry
         // no image at all — a monochrome text card instead of a broken
