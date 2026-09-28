@@ -53,6 +53,7 @@ import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { composeDiscoverPosts, type DiscoverPost } from '@/lib/discoverFeed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
@@ -590,7 +591,7 @@ export default function BuyerSearchScreen() {
             onChangeText={handleChangeText}
             placeholder="Search"
             placeholderTextColor="#9A9AA0"
-            style={[styles.fieldInput, { color: '#FFFFFF' }, Platform.OS === 'web' && styles.fieldInputWebNoOutline]}
+            style={[styles.fieldInput, { color: '#FFFFFF' }, WEB_INPUT_RESET]}
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
@@ -707,11 +708,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     // theme-exempt: fixed dark fill per spec, same pattern as profile.tsx's
     // store-details section — regardless of light/dark theme.
     backgroundColor: '#1f1f1f',
-    borderWidth: 1, borderColor: 'transparent',
+    borderWidth: 0,
   },
-  fieldFocused: { borderColor: 'rgba(255,255,255,0.2)' },
+  // Focused state stays the same pill as unfocused — no border/box appears.
+  // Only a very subtle fill change signals focus (the browser's own default
+  // outline is separately suppressed via WEB_INPUT_RESET on the TextInput).
+  fieldFocused: { backgroundColor: 'rgba(255,255,255,0.10)' },
   fieldInput: { flex: 1, ...TYPE_SCALE.body, padding: 0 },
-  fieldInputWebNoOutline: { outlineStyle: 'none', outlineWidth: 0 } as any,
   headerSideButton: { minWidth: 24, alignItems: 'flex-end' },
   headerSideButtonText: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   sectionHeaderRow: {

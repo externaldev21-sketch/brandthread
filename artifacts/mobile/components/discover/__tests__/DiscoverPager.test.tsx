@@ -103,7 +103,9 @@ vi.mock('react-native-reanimated', () => {
       ListHeaderComponent ?? null, items, ListFooterComponent ?? null);
   }
 
-  const AnimatedDefault = { View: el('AnimatedView'), FlatList };
+  // createAnimatedComponent: components/ui's SuccessCheck (draw variant) wraps
+  // svg Circle/Path at module load.
+  const AnimatedDefault = { View: el('AnimatedView'), FlatList, createAnimatedComponent: (Component: unknown) => Component };
   return {
     default: AnimatedDefault,
     FlatList,
@@ -130,7 +132,7 @@ vi.mock('react-native-reanimated', () => {
 
 vi.mock('expo-blur', () => ({ BlurView: () => null }));
 vi.mock('expo-linear-gradient', () => ({ LinearGradient: () => null }));
-vi.mock('react-native-svg', () => ({ default: () => null, Line: () => null }));
+vi.mock('react-native-svg', () => ({ default: () => null, Line: () => null, Circle: () => null, Path: () => null }));
 vi.mock('expo-image', () => ({ Image: { prefetch: vi.fn(async () => {}) } }));
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(async () => {}),

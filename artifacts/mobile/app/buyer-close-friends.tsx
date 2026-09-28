@@ -21,6 +21,7 @@ import { ListRow, StickyBottomCTA } from '@/components/ui';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 export default function BuyerCloseFriends() {
   const colors = useColors();
@@ -108,7 +109,7 @@ export default function BuyerCloseFriends() {
       <View style={s.searchWrap}>
         <Feather name="search" size={16} color={colors.mutedForeground} />
         <TextInput
-          style={s.searchInput}
+          style={[s.searchInput, WEB_INPUT_RESET]}
           value={query}
           onChangeText={setQuery}
           placeholder="Search friends"

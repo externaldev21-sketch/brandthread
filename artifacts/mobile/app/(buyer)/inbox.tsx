@@ -10,6 +10,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth, useUser } from '@clerk/expo';
@@ -1319,15 +1320,18 @@ export default function InboxScreen() {
                 s.searchRow,
                 s.searchRowInHeader,
                 {
-                  backgroundColor: theme.cardElevated,
-                  borderColor: messagesSearchFocused ? theme.border : 'transparent',
+                  // Focused state stays the same pill as unfocused — no
+                  // border/box appears on focus, only a very subtle fill
+                  // change (never anything boxy). borderWidth is 0 on the
+                  // base style itself (searchRow) at both rest and focus.
+                  backgroundColor: messagesSearchFocused ? 'rgba(255,255,255,0.10)' : theme.cardElevated,
                 },
               ]}
             >
               <Feather name="search" size={16} color={theme.muted} />
               <TextInput
                 ref={messagesSearchInputRef}
-                style={[s.searchInput, { color: theme.text }, Platform.OS === 'web' && s.searchInputWebNoOutline]}
+                style={[s.searchInput, { color: theme.text }, WEB_INPUT_RESET]}
                 value={messagesSearchQuery}
                 onChangeText={setMessagesSearchQuery}
                 placeholder="Search"
@@ -1838,8 +1842,8 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     marginBottom: SP.md,
     paddingHorizontal: SP.md,
     height: 44,
-    borderRadius: RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    borderWidth: 0,
   },
   // The header's search-open state: the field sits inline with Cancel
   // instead of stacked full-width below a title, so it drops searchRow's own

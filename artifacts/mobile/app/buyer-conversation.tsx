@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions,
@@ -71,6 +71,10 @@ import {
   type AgentQuickReply,
 } from '@/lib/agentChat';
 import { EMOJI_FONT_STACK } from '@/lib/appleEmoji';
+import {
+  formatDate as sharedFormatDate, formatTime as sharedFormatTime,
+  sameSenderClose, groupCornerRadii, lastOwnMessageId,
+} from '@/lib/chatGrouping';
 
 /** Well-known clerkId of the official Brandthread Agent account — matches
  *  the preview seed (lib/previewInboxData.ts) and the api-server system
@@ -108,41 +112,12 @@ function timeAgo(ts: number): string {
   return `${Math.floor(hrs / 24)}d`;
 }
 
-function formatDate(ts: number): string {
-  const d = new Date(ts);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 86400000);
-  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  if (msgDay.getTime() === today.getTime()) return 'Today';
-  if (msgDay.getTime() === yesterday.getTime()) return 'Yesterday';
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  const h = d.getHours();
-  const m = String(d.getMinutes()).padStart(2, '0');
-  return `${h % 12 || 12}:${m} ${h < 12 ? 'AM' : 'PM'}`;
-}
-
-// Consecutive messages from the same sender within this gap are visually
-// grouped: tighter spacing, a shared "tail" only on the run's last bubble,
-// and only the last bubble in a run carries the inline timestamp/receipt.
-const GROUP_GAP_MS = 5 * 60_000;
-// agent_card / thread_cash / quick_replies render as standalone rows with
-// their own layout, never through the avatar-bearing bubble path below — so
-// a message next to one of them must never be treated as "not last in its
-// group" (that silently ate the avatar off the preceding bubble, since the
-// special row that followed it never draws one either).
-function breaksGroup(msg: Message): boolean {
-  const t = msg.attachment?.type;
-  return t === 'agent_card' || t === 'thread_cash' || t === 'quick_replies';
-}
-function sameSenderClose(a: Message, b: Message): boolean {
-  if (breaksGroup(a) || breaksGroup(b)) return false;
-  return a.fromId === b.fromId && Math.abs(a.ts - b.ts) < GROUP_GAP_MS && formatDate(a.ts) === formatDate(b.ts);
-}
+// formatDate / formatTime / GROUP_GAP_MS / sameSenderClose now live in
+// lib/chatGrouping.ts, shared with app/seller-conversation.tsx, so both
+// sides of the same thread group identically — see that module's doc
+// comment for why the two screens' JSX itself isn't fully consolidated.
+const formatDate = sharedFormatDate;
+const formatTime = sharedFormatTime;
 
 type DateRow = { type: 'date'; date: string; ts: number; key: string };
 type UnreadRow = { type: 'unread'; key: string };
@@ -528,6 +503,17 @@ export default function BuyerConversationScreen() {
   }, [text, selectedAttachment, micSendMorph]);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
+
+  // Seen receipt: id of MY most recent message in the thread (accounting for
+  // both the real Clerk userId and the legacy 'me' literal — see myId
+  // above). Computed once per messages change, not per row, since
+  // lastOwnMessageId scans the whole list. "Seen" only ever renders under
+  // this one message — see isSeenReceipt's own doc comment in
+  // lib/chatGrouping.ts for why the granularity stops there.
+  const lastOwnMsgId = useMemo(
+    () => lastOwnMessageId(messages.map(m => ({ ...m, fromId: (m.fromId === MY_USER_ID ? myId : m.fromId) })), myId),
+    [messages, myId],
+  );
 
   // API conversations include both participants, and SQL does not guarantee their
   // order. Resolve the seller explicitly so attachment pickers never load the
@@ -1578,10 +1564,10 @@ export default function BuyerConversationScreen() {
                 // IG-style grouping: the corner touching an adjacent bubble
                 // in the same group (same side as the avatar column) is
                 // reduced to 6pt; every outer corner stays the full 18pt.
-                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? 6 : RADIUS.lg,
-                borderTopRightRadius: (isOwn && !isFirstInGroup) ? 6 : RADIUS.lg,
-                borderBottomRightRadius: (isOwn && !isLastInGroup) ? 6 : RADIUS.lg,
-                borderBottomLeftRadius: (!isOwn && !isLastInGroup) ? 6 : RADIUS.lg,
+                // Shared with app/seller-conversation.tsx via chatGrouping.ts
+                // so a grouped run looks identical from both sides of the
+                // same thread.
+                ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, RADIUS.lg),
                 alignSelf: isOwn ? 'flex-end' : 'flex-start',
                 shadowColor: theme.shadowColor,
                 shadowOffset: { width: 0, height: 2 },
@@ -1661,6 +1647,18 @@ export default function BuyerConversationScreen() {
                 </PressableScale>
               ))}
             </View>
+          )}
+
+          {/* Seen receipt (Mobbin: Instagram DM "Seen just now" —
+              mobbin.com/screens/674b1826-5513-4f83-ad23-89b4454e2129). Real
+              conversation-level readAt from the backend, not a fake
+              indicator — see lib/chatGrouping.ts's isSeenReceipt for the
+              exact granularity this reflects. Shows once, under my own
+              most recent message, once they've read up through it. */}
+          {isOwn && msg.id === lastOwnMsgId && !!msg.readAt && (
+            <Text style={s.seenReceipt}>
+              Seen {formatTime(new Date(msg.readAt!).getTime())}
+            </Text>
           )}
         </View>
       </View>
@@ -2987,6 +2985,17 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexWrap: 'wrap',
     gap: SP.xs,
     marginTop: 4,
+  },
+  // Seen receipt (Instagram DM "Seen just now" reference) — small muted
+  // text under the sender's own last message, right-aligned to match its
+  // own bubble alignment.
+  seenReceipt: {
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    color: theme.muted,
+    alignSelf: 'flex-end',
+    marginTop: 3,
+    marginRight: 2,
   },
   reactionChip: {
     flexDirection: 'row',

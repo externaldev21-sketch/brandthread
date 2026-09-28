@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/hooks/useApi';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 export interface AddressSelection {
   line1: string;
@@ -102,7 +103,7 @@ export function AddressAutocompleteInput({
           autoComplete="street-address"
           textContentType="fullStreetAddress"
           accessibilityLabel="Shipping address search"
-          style={styles.input}
+          style={[styles.input, WEB_INPUT_RESET]}
         />
         {loading ? <ActivityIndicator size="small" color={theme.text} /> : null}
       </View>

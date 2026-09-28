@@ -13,6 +13,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButt
 import { getIncoming, createIncoming, updateIncomingStatus, receiveIncoming, getInventoryItems, getLocations } from '@/services/inventoryService';
 import { IncomingInventory, IncomingStatus, InventoryItem, InventoryLocation } from '@/services/inventoryTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -369,7 +370,7 @@ export default function IncomingInventoryScreen() {
           <View style={s.searchBox}>
             <Feather name="search" size={ICON.sm} color={MUTED} />
             <TextInput
-              style={s.searchInput}
+              style={[s.searchInput, WEB_INPUT_RESET]}
               value={newSearch}
               onChangeText={setNewSearch}
               placeholder="Search products…"

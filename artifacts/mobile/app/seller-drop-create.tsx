@@ -33,6 +33,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
 
 interface SellerProductRow {
@@ -641,7 +642,7 @@ export default function SellerDropCreate() {
             </TouchableOpacity>
           </View>
           <TextInput
-            style={[styles.input, { margin: SP.md, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
+            style={[styles.input, { margin: SP.md, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }, WEB_INPUT_RESET]}
             value={tzFilter}
             onChangeText={setTzFilter}
             placeholder="Search timezones…"

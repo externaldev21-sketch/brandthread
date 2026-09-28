@@ -14,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Glass } from '@/components/ui/Glass';
 import { FONT, ON_DARK } from '@/lib/theme';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 export function FeedTopBar({
   topInset,
@@ -55,7 +56,7 @@ export function FeedTopBar({
         <View style={styles.searchRow}>
           <Feather name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, WEB_INPUT_RESET]}
             value={searchQuery}
             onChangeText={onChangeSearchQuery}
             placeholder="Search creators, products…"

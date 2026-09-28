@@ -20,6 +20,7 @@ import { hapticDestructiveConfirm, hapticWarning } from '@/lib/haptics';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 export default function MutedAccountsScreen() {
   const { theme } = useAppTheme();
@@ -72,7 +73,7 @@ export default function MutedAccountsScreen() {
         <View style={styles.search}>
           <Feather name="search" size={16} color={theme.muted} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, WEB_INPUT_RESET]}
             value={query}
             onChangeText={setQuery}
             placeholder="Search muted accounts"

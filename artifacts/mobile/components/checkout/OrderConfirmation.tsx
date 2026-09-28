@@ -104,7 +104,7 @@ export function OrderConfirmation({
             <Feather name="clock" size={32} color={theme.text} />
           </View>
         ) : (
-          <SuccessCheck size={72} iconSize={34} haptic={false} />
+          <SuccessCheck variant="draw" size={72} haptic={false} testID="checkout-success-check" />
         )}
         <Text style={[styles.eyebrow, { color: theme.muted }]}>{finalizing ? 'PAYMENT RECEIVED' : 'ORDER CONFIRMED'}</Text>
         <Text style={[styles.headline, { color: theme.text }]}>{finalizing ? 'Almost there' : 'Thank you for your order'}</Text>

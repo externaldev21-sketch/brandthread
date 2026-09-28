@@ -13,6 +13,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButt
 import { getInventoryItems, getLocations, adjustStock } from '@/services/inventoryService';
 import { InventoryItem, InventoryLocation, AdjustmentType, ADJUSTMENT_TYPES } from '@/services/inventoryTypes';
 import { Header } from '@/components/layout';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 export default function InventoryAdjustScreen() {
   const { theme } = useAppTheme();
@@ -198,7 +199,7 @@ export default function InventoryAdjustScreen() {
             <View style={styles.searchRow}>
               <Feather name="search" size={ICON.sm} color={MUTED} style={styles.searchIcon} />
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, WEB_INPUT_RESET]}
                 value={itemSearch}
                 onChangeText={setItemSearch}
                 placeholder="Search by name, variant, or SKU…"
