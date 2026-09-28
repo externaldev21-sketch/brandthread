@@ -294,6 +294,19 @@ export interface StoryOverlay {
   color?: string;
   size?: number;
   align?: 'left' | 'center' | 'right';
+  /** Named story-text font (see TEXT_FONTS in buyer-story-create.tsx). Undefined = the default system font. */
+  fontKey?: string;
+  /** Text background box style — matches Instagram's "A" toggle. */
+  bgStyle?: 'none' | 'solid' | 'translucent';
+  /** Text render style — outline/glow are drawn with extra text-shadow layers. */
+  textEffect?: 'plain' | 'outline' | 'glow';
+  /**
+   * Selected story-text entrance animation (Instagram: Emphasize/Drift Up/
+   * Loud/Speedy/Fall/Headline/Slide Up). Persisted so a future story-viewer
+   * pass can play it back — this repo's viewer does not yet animate text on
+   * playback, so today it only affects a light preview in the composer.
+   */
+  textAnimation?: string;
   // mention sticker
   mentionHandle?: string;
   // location sticker
