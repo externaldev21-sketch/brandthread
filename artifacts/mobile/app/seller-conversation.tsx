@@ -27,7 +27,7 @@ import {
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
-import { VoiceMessageBubble } from '@/components/chat/VoiceMessageBubble';
+import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
@@ -235,6 +235,7 @@ export default function SellerConversationScreen() {
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
+  const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
   // Item 68 (chat reactions glass) — long-pressed message + its measured
@@ -719,6 +720,10 @@ export default function SellerConversationScreen() {
           onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
           onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
           onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+          onViewTranscription={() => {
+            setTranscriptionToast(true);
+            setTimeout(() => setTranscriptionToast(false), 2600);
+          }}
         />
       );
     }
@@ -1743,6 +1748,12 @@ export default function SellerConversationScreen() {
           ].filter(Boolean) as ReactionOverlayMenuItem[]
         ) : []}
         onClose={closeMessageSheet}
+      />
+
+      <Snackbar
+        visible={transcriptionToast}
+        message={TRANSCRIPTION_STUB}
+        onDismiss={() => setTranscriptionToast(false)}
       />
 
       <Snackbar
