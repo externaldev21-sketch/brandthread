@@ -240,6 +240,7 @@ type StoryTrayRow = {
    *  the story viewer, so no story needs to be resolved). */
   storyId: string | null;
   seen: boolean;
+  closeFriendsOnly: boolean;
   latestCreatedAt: number;
 };
 
@@ -372,7 +373,7 @@ export default function InboxScreen() {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
           authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
-          seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+          seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
         })));
         setMyStoryId(PREVIEW_MY_STORY.id);
         cacheStoriesForViewer([
@@ -394,7 +395,7 @@ export default function InboxScreen() {
       setStoryTrayRows(others.map(r => ({
         authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
         color: r.authorColor, avatarUri: r.avatarUrl ?? undefined,
-        storyId: r.storyIds[r.storyIds.length - 1] ?? null, seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+        storyId: r.storyIds[r.storyIds.length - 1] ?? null, seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
       })));
       // Resolve the real (media-bearing) Story objects so the viewer — which
       // reads its queue purely from local storage — can actually show them.
@@ -408,7 +409,7 @@ export default function InboxScreen() {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
           authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
-          seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+          seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
         })));
         setMyStoryId(PREVIEW_MY_STORY.id);
         cacheStoriesForViewer([
@@ -1596,7 +1597,7 @@ export default function InboxScreen() {
                     onPress={() => openStoryViewerFor(row.authorId)}
                     rippleEnabled={NO_RIPPLE}
                     accessibilityRole="button"
-                    accessibilityLabel={`${row.name}${row.seen ? '' : ', new story'}${note ? `, note: ${note.text}` : ''}`}
+                    accessibilityLabel={`${row.name}${row.seen ? '' : ', new story'}${row.closeFriendsOnly ? ', Close Friends' : ''}${note ? `, note: ${note.text}` : ''}`}
                     testID={`inbox-story-tray-${row.authorId}`}
                   >
                     {noteBubble}
@@ -1613,6 +1614,11 @@ export default function InboxScreen() {
                       ) : (
                         <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
                           <Text style={s.activeRailInitials}>{row.initials}</Text>
+                        </View>
+                      )}
+                      {row.closeFriendsOnly && (
+                        <View style={[s.closeFriendsBadge, { borderColor: theme.background }]} pointerEvents="none">
+                          <Feather name="star" size={10} color="#000000" />
                         </View>
                       )}
                     </View>
@@ -1898,6 +1904,14 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   addStoryBadge: {
     position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10,
     borderWidth: 2, alignItems: 'center', justifyContent: 'center',
+  },
+  // Close Friends badge — Instagram marks this with a green ring; Brandthread
+  // stays monochrome, so the story ring itself doesn't change color and this
+  // white star badge (matching the same star used in the composer's Close
+  // Friends toggle) is the ring's distinct "close friends" indicator instead.
+  closeFriendsBadge: {
+    position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10,
+    borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF',
   },
   activeRailInitials: { fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
   activeRailName: { fontSize: 11, fontFamily: FONT.medium, width: 72, textAlign: 'center' },

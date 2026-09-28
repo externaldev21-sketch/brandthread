@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { UploadProgressPill } from '@/components/feed/UploadProgressPill';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
@@ -3448,6 +3449,10 @@ export default function FeedScreen({
 
       {isBuyerSurface && (
         <FeedGestureGuide visible={showGestureGuide} onDismiss={dismissGestureGuide} />
+      )}
+
+      {!isCreatorFeed && (
+        <UploadProgressPill topInset={buyerHeaderHeight} />
       )}
 
     </View>
