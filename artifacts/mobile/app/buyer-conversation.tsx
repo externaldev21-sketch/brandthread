@@ -681,6 +681,22 @@ export default function BuyerConversationScreen() {
 
   // ── Other-participant profile ─────────────────────────────────────────────────
 
+  // Used by the request-mode profile header's "View profile" pill (see
+  // isRequestMode below) — a direct link straight to their profile, distinct
+  // from openChatDetails() below (chat details, reached via the header tap
+  // once a conversation is no longer a pending request).
+  function openParticipantProfile() {
+    if (!participant) return;
+    const qs = new URLSearchParams({
+      userId: participant.userId,
+      name: participant.name,
+      handle: participant.handle,
+      initials: participant.initials,
+      color: participant.color,
+    });
+    router.push(('/buyer-other-profile?' + qs.toString()) as never);
+  }
+
   // ── Chat details ───────────────────────────────────────────────────────────────
 
   function openChatDetails() {
