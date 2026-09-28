@@ -2,14 +2,14 @@
  * Profile cover video rules — pure, so they're unit-testable without ffmpeg,
  * object storage or a database.
  *
- * - A cover is at most 30 seconds (validated server-side on the probed
+ * - A cover is at most 25 seconds (validated server-side on the probed
  *   duration of what was actually uploaded, after any requested trim).
  * - A cover can change at most once per 24 hours. Setting a cover and
  *   removing one BOTH count as a change, so "remove, then re-add" can't be
  *   used to cycle covers faster than once a day.
  */
 
-export const COVER_MAX_SECONDS = 30;
+export const COVER_MAX_SECONDS = 25;
 /** Container durations are rarely exact; allow a few frames of slack. */
 export const COVER_DURATION_TOLERANCE_SECONDS = 0.25;
 export const COVER_SUGGESTED_TRIM_SECONDS = 20;
@@ -43,7 +43,7 @@ export type TrimRequest = { start: number; duration: number } | null;
 
 /**
  * Parse an optional client trim (`trimStart`, `trimDuration` seconds). The
- * client shows a trim UI for clips over 30s; the server applies the trim and
+ * client shows a trim UI for clips over 25s; the server applies the trim and
  * then re-validates the result, so a client can never skip the limit.
  */
 export function parseTrim(startRaw: unknown, durationRaw: unknown): TrimRequest | { error: string } {

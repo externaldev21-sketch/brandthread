@@ -1,42 +1,81 @@
+/**
+ * Share Profile — full-screen page opened from the "Share profile" action on
+ * both the buyer and seller profile screens (same component, same props,
+ * for all three call sites: app/(buyer)/profile.tsx, app/seller-profile.tsx,
+ * app/(tabs)/profile.tsx).
+ *
+ * This is a 1:1 layout match of the Mobbin "Share profile" flow reference
+ * (Instagram, https://mobbin.com/flows/6e9d4c03-bb6d-4434-ad64-b2b53391ea9f),
+ * skinned in Brandthread's monochrome brand instead of Instagram's colorful
+ * gradients:
+ *   - X top-left closes back to the profile.
+ *   - A style pill top-center cycles three background variants on tap:
+ *     COLOR (monochrome gradient), EMOJI (tiled Brandthread glyph pattern),
+ *     SELFIE (the signed-in user's own photo, blurred full-bleed).
+ *   - A scan-QR icon top-right opens a full-screen QR scanner
+ *     (components/ShareProfileQrScanner.tsx, matching the Mobbin QR-scanner
+ *     reference https://mobbin.com/flows/3fecc679-85bc-4a28-a356-a9239118872a)
+ *     that navigates to a scanned user's profile.
+ *   - A centered white rounded card holds a real, scannable QR code encoding
+ *     the same canonical deep link used everywhere else in the app
+ *     (lib/shareProfile.ts `buildCanonicalProfileUrl`, resolved by
+ *     app/u/[username].tsx both in-app and on the web), with the Brandthread
+ *     mark in the QR's center and "@handle" beneath it.
+ *   - Three equal tiles below: Share profile, Copy link, Download — each
+ *     reusing the app's existing share/clipboard/capture utilities.
+ *
+ * Only the background and card content change between variants; the header
+ * chrome, card and tiles are structurally identical across all three, same
+ * as the Mobbin reference's COLOR vs. EMOJI screenshots.
+ */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  Animated, Image, Modal, Platform, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 
 import { FONT, FS, SP, RADIUS, ICON, SUCCESS, RED } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { SheetRise } from '@/components/motion/SheetRise';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticToggle, hapticLight, hapticSuccess } from '@/lib/haptics';
 import { buildCanonicalProfileUrl, normalizeUsername, shareLinkWithFallback } from '@/lib/shareProfile';
-import {
-  captureShareCard, saveCardImageToLibrary, shareCardToInstagramStories,
-  type BuyerShareCardData, type SellerShareCardData, type ShareCardVariant, type CardThumbnail,
-} from '@/lib/shareCard';
-import { BuyerShareCard } from '@/components/share-cards/BuyerShareCard';
-import { SellerShareCard } from '@/components/share-cards/SellerShareCard';
+import { captureCardAtNaturalSize, saveCardImageToLibrary, triggerWebImageDownload } from '@/lib/shareCard';
+import { LOGO_SOURCE } from '@/constants/branding';
+import { ShareProfileQrScanner } from '@/components/ShareProfileQrScanner';
 
-const VARIANTS: ShareCardVariant[] = ['portrait', 'grid'];
-const CARD_GAP = SP.md;
+// Lazy: keeps react-native-svg's QR codegen out of every screen that merely
+// imports ShareProfileSheet (mirrors the pattern in ShareCardFrame.tsx).
+const QRCode = React.lazy(() => import('react-native-qrcode-svg'));
+
+const QR_CARD_SIZE = 240;
+const QR_SIZE = 200;
+
+type BackgroundVariant = 'color' | 'emoji' | 'selfie';
+const VARIANTS: BackgroundVariant[] = ['color', 'emoji', 'selfie'];
+const VARIANT_LABEL: Record<BackgroundVariant, string> = {
+  color: 'COLOR', emoji: 'EMOJI', selfie: 'SELFIE',
+};
 
 interface BuyerExtra {
   statLabel: string;
   statValue: number;
-  topPosts: CardThumbnail[];
+  topPosts: { id: string; uri?: string }[];
 }
 
 interface SellerExtra {
   rating: { avgRating: number; totalCount: number } | null;
-  products: CardThumbnail[];
+  products: { id: string; uri?: string }[];
 }
 
 interface ShareProfileSheetProps {
   visible: boolean;
   onClose: () => void;
-  /** Avatar/logo image the caller already has loaded — api.auth.me() doesn't return one. */
+  /** Avatar/logo image the caller already has loaded — api.auth.me() doesn't return one. Doubles as the SELFIE background source. */
   avatarUrl?: string | null;
   buyerExtra?: BuyerExtra;
   sellerExtra?: SellerExtra;
@@ -49,31 +88,26 @@ interface OwnIdentity {
   accountType: 'buyer' | 'seller' | null;
 }
 
-type BusyAction = 'stories' | 'save' | 'copy' | 'more' | null;
+type BusyAction = 'share' | 'copy' | 'download' | null;
 
-/**
- * Bottom sheet for sharing the signed-in user's own profile: a swipeable
- * carousel of IG-story-ready cards (buyer or seller design, based on the
- * account's own type), plus Share to Instagram Stories / Save image / Copy
- * Link / More actions. Each card is captured to a 1080x1920 PNG on demand —
- * nothing is pre-rendered at full size, so the sheet stays cheap to open.
- */
-export function ShareProfileSheet({ visible, onClose, avatarUrl, buyerExtra, sellerExtra }: ShareProfileSheetProps) {
+export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileSheetProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const api = useApi();
   const router = useRouter();
+  const topInset = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
 
   const [identity, setIdentity] = useState<OwnIdentity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [pageIndex, setPageIndex] = useState(0);
+  const [variant, setVariant] = useState<BackgroundVariant>('color');
+  const [screen, setScreen] = useState<'share' | 'scanner'>('share');
   const [busy, setBusy] = useState<BusyAction>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean; variant: 'success' | 'error' }>({
     message: '', visible: false, variant: 'success',
   });
 
-  const cardRefs = useRef<Array<View | null>>([]);
+  const cardRef = useRef<View | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -96,7 +130,8 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl, buyerExtra, sel
 
   useEffect(() => {
     if (!visible) return;
-    setPageIndex(0);
+    setScreen('share');
+    setVariant('color');
     void load();
   }, [visible, load]);
 
@@ -104,46 +139,18 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl, buyerExtra, sel
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
   }, []);
 
-  const showToast = useCallback((message: string, variant: 'success' | 'error' = 'success') => {
+  const showToast = useCallback((message: string, variantKind: 'success' | 'error' = 'success') => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ message, visible: true, variant });
+    setToast({ message, visible: true, variant: variantKind });
     toastTimerRef.current = setTimeout(() => setToast(t => ({ ...t, visible: false })), 2200);
   }, []);
 
   const normalizedUsername = normalizeUsername(identity?.username);
   const canonicalUrl = buildCanonicalProfileUrl(identity?.username);
   const handle = normalizedUsername ? `@${normalizedUsername}` : '';
-
-  const cardData: (BuyerShareCardData | SellerShareCardData) | null = useMemo(() => {
-    if (!identity) return null;
-    if (identity.accountType === 'seller') {
-      return {
-        kind: 'seller',
-        brandName: identity.brandName || identity.displayName || 'Brandthread Seller',
-        handle,
-        logoUri: avatarUrl ?? null,
-        rating: sellerExtra?.rating ?? null,
-        products: sellerExtra?.products ?? [],
-      };
-    }
-    return {
-      kind: 'buyer',
-      name: identity.displayName || 'Brandthread Member',
-      handle,
-      avatarUri: avatarUrl ?? null,
-      statLabel: buyerExtra?.statLabel ?? 'friends',
-      statValue: buyerExtra?.statValue ?? 0,
-      topPosts: buyerExtra?.topPosts ?? [],
-    };
-  }, [identity, handle, avatarUrl, buyerExtra, sellerExtra]);
-
-  const handleEditProfile = useCallback(() => {
-    onClose();
-    router.push((identity?.accountType === 'seller' ? '/edit-profile' : '/(buyer)/edit-profile') as never);
-  }, [identity?.accountType, onClose, router]);
+  const shareName = identity?.brandName || identity?.displayName || null;
 
   const runAction = useCallback(async (action: Exclude<BusyAction, null>, fn: () => Promise<void>) => {
-    if (busy) return;
     setBusy(action);
     try {
       await fn();
@@ -152,64 +159,30 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl, buyerExtra, sel
     } finally {
       setBusy(null);
     }
-  }, [busy, showToast]);
+  }, [showToast]);
 
-  const captureCurrentCard = useCallback(async () => {
-    const ref = cardRefs.current[pageIndex];
-    if (!ref) throw new Error('card-not-ready');
-    return captureShareCard({ current: ref });
-  }, [pageIndex]);
+  const handleCyclePill = useCallback(() => {
+    hapticToggle();
+    setVariant(v => VARIANTS[(VARIANTS.indexOf(v) + 1) % VARIANTS.length]);
+  }, []);
 
-  const handleCopyLink = useCallback(() => {
-    if (!canonicalUrl) return;
-    void runAction('copy', async () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      if (Platform.OS === 'web') {
-        if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(canonicalUrl);
-      } else {
-        const Clipboard = await import('expo-clipboard');
-        await Clipboard.setStringAsync(canonicalUrl);
-      }
-      showToast('Copied!');
-    });
-  }, [canonicalUrl, runAction, showToast]);
+  const handleOpenScanner = useCallback(() => {
+    hapticLight();
+    setScreen('scanner');
+  }, []);
 
-  const handleInstagramStories = useCallback(() => {
-    void runAction('stories', async () => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const imageUri = await captureCurrentCard();
-      const result = await shareCardToInstagramStories(imageUri);
-      if (result === 'cancelled') return;
-      if (result === 'system') showToast('Shared');
-    });
-  }, [captureCurrentCard, runAction, showToast]);
+  const handleCloseScanner = useCallback(() => {
+    setScreen('share');
+  }, []);
 
-  const handleSaveImage = useCallback(() => {
-    void runAction('save', async () => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const imageUri = await captureCurrentCard();
-      const result = await saveCardImageToLibrary(imageUri);
-      if (result.ok) {
-        showToast('Saved to Photos');
-      } else {
-        showToast('Enable Photos access to save this card.', 'error');
-      }
-    });
-  }, [captureCurrentCard, runAction, showToast]);
-
-  // "More" opens the system share sheet with the profile's real
-  // brandthread.app link. Web uses the Web Share API when the browser has it
-  // and otherwise copies the link (react-native-web's Share.share throws
-  // without navigator.share).
-  const handleMore = useCallback(() => {
-    if (!canonicalUrl) return;
-    void runAction('more', async () => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleShareProfile = useCallback(() => {
+    if (!canonicalUrl || busy) return;
+    void runAction('share', async () => {
+      hapticLight();
       const { Share } = await import('react-native');
-      const name = cardData?.kind === 'seller' ? cardData.brandName : cardData?.name;
       const result = await shareLinkWithFallback({
         url: canonicalUrl,
-        message: name ? `${name} on Brandthread` : 'Find me on Brandthread',
+        message: shareName ? `${shareName} on Brandthread` : 'Find me on Brandthread',
         platformOS: Platform.OS,
         nativeShare: (content) => Share.share(content),
         webNavigator: typeof navigator !== 'undefined' ? (navigator as any) : null,
@@ -217,228 +190,385 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl, buyerExtra, sel
       if (result === 'copied') showToast('Link copied');
       else if (result === 'unavailable') showToast("Sharing isn't available here. Use Copy link.", 'error');
     });
-  }, [canonicalUrl, cardData, runAction, showToast]);
+  }, [busy, canonicalUrl, runAction, shareName, showToast]);
 
-  const onScrollEnd = useCallback((e: { nativeEvent: { contentOffset: { x: number } } }) => {
-    const width = 252 + CARD_GAP;
-    const next = Math.round(e.nativeEvent.contentOffset.x / width);
-    setPageIndex(Math.max(0, Math.min(VARIANTS.length - 1, next)));
-  }, []);
+  const handleCopyLink = useCallback(() => {
+    if (!canonicalUrl || busy) return;
+    void runAction('copy', async () => {
+      hapticSuccess();
+      if (Platform.OS === 'web') {
+        if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(canonicalUrl);
+      } else {
+        const Clipboard = await import('expo-clipboard');
+        await Clipboard.setStringAsync(canonicalUrl);
+      }
+      showToast('Link copied');
+    });
+  }, [busy, canonicalUrl, runAction, showToast]);
 
-  // Mounting nothing while closed keeps this sheet cheap to embed in every
-  // profile screen — it never renders its carousel, QR code, or capture refs
-  // until the user actually taps Share.
+  const handleDownload = useCallback(() => {
+    if (busy || !cardRef.current) return;
+    void runAction('download', async () => {
+      hapticLight();
+      const uri = await captureCardAtNaturalSize({ current: cardRef.current }, QR_CARD_SIZE);
+      if (Platform.OS === 'web') {
+        triggerWebImageDownload(uri, `${normalizedUsername || 'brandthread'}-qr.png`);
+        showToast('Downloaded');
+      } else {
+        const result = await saveCardImageToLibrary(uri);
+        if (result.ok) showToast('Saved to Photos');
+        else showToast('Enable Photos access to save this.', 'error');
+      }
+    });
+  }, [busy, normalizedUsername, runAction, showToast]);
+
   if (!visible) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={[styles.backdrop, { backgroundColor: `${theme.background}55` }]} onPress={onClose} />
-      <SheetRise style={[styles.sheet, { backgroundColor: theme.card, borderColor: theme.border, paddingBottom: Math.max(insets.bottom, SP.md) }]}>
-        <View style={styles.header}>
-          <View style={styles.headerSpacer} />
-          <Text style={[styles.title, { color: theme.text }]}>Share Profile</Text>
-          <Pressable onPress={onClose} style={[styles.close, { backgroundColor: theme.surface }]} accessibilityLabel="Close share sheet" testID="share-profile-sheet-close">
-            <Feather name="x" size={20} color={theme.text} />
-          </Pressable>
-        </View>
+    <Modal
+      visible
+      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      onRequestClose={screen === 'scanner' ? handleCloseScanner : onClose}
+      presentationStyle={Platform.OS === 'ios' ? 'fullScreen' : undefined}
+    >
+      {screen === 'scanner' ? (
+        <ShareProfileQrScanner onClose={handleCloseScanner} />
+      ) : (
+        <View style={styles.root}>
+          <ShareBackground variant={variant} avatarUrl={avatarUrl ?? null} />
 
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator color={theme.text} />
-          </View>
-        ) : error ? (
-          <View style={styles.centered}>
-            <Text style={[styles.errorText, { color: theme.muted }]}>Couldn't load your profile.</Text>
-            <Pressable onPress={() => void load()} accessibilityRole="button">
-              <Text style={[styles.retryText, { color: theme.text }]}>Retry</Text>
-            </Pressable>
-          </View>
-        ) : !normalizedUsername || !cardData ? (
-          <View style={styles.centered}>
-            <Text style={[styles.errorText, { color: theme.muted }]}>
-              Set a username to get a shareable profile card.
-            </Text>
-            <Pressable onPress={handleEditProfile} accessibilityRole="button">
-              <Text style={[styles.retryText, { color: theme.text }]}>Set Username</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <>
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={252 + CARD_GAP}
-              decelerationRate="fast"
-              contentContainerStyle={styles.carousel}
-              onMomentumScrollEnd={onScrollEnd}
+          <View style={[styles.headerRow, { top: topInset + SP.sm }]}>
+            <PressableScale
+              onPress={onClose}
+              style={styles.headerIcon}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              testID="share-profile-close"
+              noMinHeight
             >
-              {VARIANTS.map((variant, index) => (
-                <View key={variant} style={{ marginRight: index === VARIANTS.length - 1 ? 0 : CARD_GAP }}>
-                  {cardData.kind === 'seller' ? (
-                    <SellerShareCard
-                      ref={node => { cardRefs.current[index] = node; }}
-                      theme={theme}
-                      data={cardData}
-                      variant={variant}
-                      qrValue={canonicalUrl}
+              <Feather name="x" size={ICON.md} color={theme.text} />
+            </PressableScale>
+
+            <PressableScale
+              onPress={handleCyclePill}
+              style={styles.pill}
+              accessibilityRole="button"
+              accessibilityLabel={`Background style: ${VARIANT_LABEL[variant]}. Tap to change.`}
+              testID="share-profile-style-pill"
+              noMinHeight
+            >
+              <Text style={[styles.pillText, { color: theme.text }]}>{VARIANT_LABEL[variant]}</Text>
+            </PressableScale>
+
+            <PressableScale
+              onPress={handleOpenScanner}
+              style={styles.headerIcon}
+              accessibilityRole="button"
+              accessibilityLabel="Scan QR code"
+              testID="share-profile-scan"
+              noMinHeight
+            >
+              <Feather name="maximize" size={ICON.md} color={theme.text} />
+            </PressableScale>
+          </View>
+
+          <View style={styles.contentWrap}>
+          <View style={styles.centerWrap}>
+            {loading ? (
+              <View style={[styles.card, { alignItems: 'center', justifyContent: 'center' }]}>
+                <Feather name="loader" size={24} color="#0A0A0B" />
+              </View>
+            ) : error ? (
+              <View style={[styles.card, styles.stateCard]}>
+                <Feather name="wifi-off" size={28} color="#0A0A0B" />
+                <Text style={styles.stateText}>Couldn't load profile</Text>
+                <PressableScale onPress={load} accessibilityRole="button" accessibilityLabel="Retry">
+                  <Text style={styles.retryText}>Retry</Text>
+                </PressableScale>
+              </View>
+            ) : !normalizedUsername || !canonicalUrl ? (
+              <View style={[styles.card, styles.stateCard]}>
+                <Feather name="at-sign" size={28} color="#0A0A0B" />
+                <Text style={styles.stateText}>Set a username to get a shareable QR code.</Text>
+              </View>
+            ) : (
+              <>
+                <View ref={cardRef} collapsable={false} style={styles.card} testID="share-profile-qr-card">
+                  <React.Suspense fallback={null}>
+                    <QRCode
+                      value={canonicalUrl}
+                      size={QR_SIZE}
+                      backgroundColor="#FFFFFF"
+                      color="#0A0A0B"
+                      logo={LOGO_SOURCE}
+                      logoSize={QR_SIZE * 0.2}
+                      logoBackgroundColor="#FFFFFF"
+                      logoBorderRadius={8}
+                      logoMargin={4}
+                      quietZone={12}
                     />
-                  ) : (
-                    <BuyerShareCard
-                      ref={node => { cardRefs.current[index] = node; }}
-                      theme={theme}
-                      data={cardData}
-                      variant={variant}
-                      qrValue={canonicalUrl}
-                    />
-                  )}
+                  </React.Suspense>
                 </View>
-              ))}
-            </ScrollView>
+                <View style={styles.handlePill}>
+                  <Text style={[styles.handleText, { color: theme.text }]} numberOfLines={1}>{handle}</Text>
+                </View>
+              </>
+            )}
+          </View>
 
-            <View style={styles.dots}>
-              {VARIANTS.map((variant, index) => (
-                <View
-                  key={variant}
-                  style={[
-                    styles.dot,
-                    { backgroundColor: index === pageIndex ? theme.text : theme.border },
-                  ]}
-                />
-              ))}
-            </View>
-
-            <View style={styles.actionRow}>
-              <ShareSheetAction
-                theme={theme}
-                icon="instagram"
-                label="Instagram"
-                busy={busy === 'stories'}
-                onPress={handleInstagramStories}
+          {!loading && !error && normalizedUsername && canonicalUrl && (
+            <View style={styles.tilesRow}>
+              <ShareTile
+                icon="share"
+                label="Share profile"
+                busy={busy === 'share'}
+                onPress={handleShareProfile}
+                textColor={theme.text}
               />
-              <ShareSheetAction
-                theme={theme}
-                icon="download"
-                label="Save image"
-                busy={busy === 'save'}
-                onPress={handleSaveImage}
-              />
-              <ShareSheetAction
-                theme={theme}
+              <ShareTile
                 icon={busy === 'copy' ? 'check' : 'link-2'}
                 label="Copy link"
                 busy={busy === 'copy'}
                 onPress={handleCopyLink}
+                textColor={theme.text}
               />
-              <ShareSheetAction
-                theme={theme}
-                icon="more-horizontal"
-                label="More"
-                busy={busy === 'more'}
-                onPress={handleMore}
+              <ShareTile
+                icon="download"
+                label="Download"
+                busy={busy === 'download'}
+                onPress={handleDownload}
+                textColor={theme.text}
               />
             </View>
-          </>
-        )}
-      </SheetRise>
+          )}
+          </View>
 
-      <View pointerEvents="none" style={[styles.toastWrap, { bottom: insets.bottom + 90 }]}>
-        <ShareToast message={toast.message} visible={toast.visible} variant={toast.variant} theme={theme} />
-      </View>
+          <View pointerEvents="none" style={[styles.toastWrap, { bottom: insets.bottom + 96 }]}>
+            <ShareToast message={toast.message} visible={toast.visible} variant={toast.variant} />
+          </View>
+        </View>
+      )}
     </Modal>
   );
 }
 
-function ShareToast({
-  message, visible, variant, theme,
-}: {
-  message: string;
-  visible: boolean;
-  variant: 'success' | 'error';
-  theme: { card: string };
-}) {
+// ─── Backgrounds ────────────────────────────────────────────────────────────
+
+/** Fixed monochrome gradient — grayscale/tonal, never Instagram's warm color. */
+const COLOR_GRADIENT = ['#050506', '#1C1C20', '#54545C'] as const;
+
+function ShareBackground({ variant, avatarUrl }: { variant: BackgroundVariant; avatarUrl: string | null }) {
+  if (variant === 'selfie' && avatarUrl) {
+    return (
+      <View style={StyleSheet.absoluteFill}>
+        <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} blurRadius={Platform.OS === 'android' ? 18 : 0} resizeMode="cover" />
+        {Platform.OS !== 'android' && (
+          <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
+        )}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+      </View>
+    );
+  }
+  if (variant === 'emoji') {
+    return <EmojiPatternBackground />;
+  }
+  return (
+    <LinearGradient
+      colors={COLOR_GRADIENT}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={StyleSheet.absoluteFill}
+    />
+  );
+}
+
+/** Repeating tiled pattern of the Brandthread glyph — the app's own brand
+ * mark standing in for Instagram's smiley-emoji tile, at low opacity over a
+ * near-black field so the QR card still reads clearly on top. */
+function EmojiPatternBackground() {
+  const { width, height } = useWindowDimensions();
+  const tile = 56;
+  const cols = Math.ceil(width / tile) + 2;
+  const rows = Math.ceil(height / tile) + 2;
+  const glyphs = useMemo(() => {
+    const items: { key: string; left: number; top: number }[] = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const offset = r % 2 === 0 ? 0 : tile / 2;
+        items.push({ key: `${r}-${c}`, left: c * tile + offset - tile, top: r * tile - tile });
+      }
+    }
+    return items;
+  }, [cols, rows]);
+
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0B0B0D', overflow: 'hidden' }]}>
+      {glyphs.map(g => (
+        <Image
+          key={g.key}
+          source={LOGO_SOURCE}
+          style={{
+            position: 'absolute', left: g.left, top: g.top,
+            width: 22, height: 22, opacity: 0.16, transform: [{ rotate: '-12deg' }],
+            tintColor: '#FFFFFF',
+          }}
+          resizeMode="contain"
+        />
+      ))}
+    </View>
+  );
+}
+
+// ─── Small pieces ───────────────────────────────────────────────────────────
+
+function ShareToast({ message, visible, variant }: { message: string; visible: boolean; variant: 'success' | 'error' }) {
   const opacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(opacity, { toValue: visible ? 1 : 0, duration: 150, useNativeDriver: true }).start();
   }, [visible, opacity]);
   const color = variant === 'success' ? SUCCESS : RED;
   return (
-    <Animated.View style={[styles.toast, { opacity, backgroundColor: theme.card, borderColor: `${color}44` }]}>
+    <Animated.View style={[styles.toast, { opacity, borderColor: `${color}44` }]}>
       <Feather name={variant === 'success' ? 'check-circle' : 'alert-circle'} size={ICON.sm} color={color} />
       <Text style={[styles.toastText, { color }]}>{message}</Text>
     </Animated.View>
   );
 }
 
-function ShareSheetAction({
-  theme, icon, label, busy, onPress,
+function ShareTile({
+  icon, label, busy, onPress, textColor,
 }: {
-  theme: { text: string; surface: string; background: string; border: string };
   icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
   busy?: boolean;
   onPress: () => void;
+  textColor: string;
 }) {
   return (
-    <Pressable
-      style={styles.action}
+    <PressableScale
+      style={styles.tile}
       onPress={onPress}
       disabled={busy}
       accessibilityRole="button"
       accessibilityLabel={label}
-      testID={`share-profile-action-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      testID={`share-profile-tile-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <View style={[styles.actionCircle, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        {busy ? <ActivityIndicator color={theme.text} /> : <Feather name={icon} size={20} color={theme.text} />}
+      <View style={styles.tileIconCircle}>
+        <Feather name={icon} size={20} color={textColor} />
       </View>
-      <Text style={[styles.actionLabel, { color: theme.text }]} numberOfLines={1}>{label}</Text>
-    </Pressable>
+      <Text style={[styles.tileLabel, { color: textColor }]} numberOfLines={1}>{label}</Text>
+    </PressableScale>
   );
 }
 
+// ─── Styles ─────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFill },
-  sheet: {
+  root: { flex: 1, backgroundColor: '#0A0A0B' },
+  headerRow: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    borderTopWidth: 1,
-  },
-  header: {
-    height: 52,
+    left: SP.md,
+    right: SP.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    zIndex: 2,
+  },
+  headerIcon: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  pill: {
     paddingHorizontal: SP.md,
+    paddingVertical: SP.xs,
+    borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
-  headerSpacer: { width: 34 },
-  title: { fontFamily: FONT.bold, fontSize: FS.md },
-  close: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: SP.xxl, gap: SP.md, paddingHorizontal: SP.lg },
-  errorText: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
-  retryText: { fontFamily: FONT.semibold, fontSize: FS.sm },
-  carousel: { paddingHorizontal: SP.lg, paddingTop: SP.md },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: SP.md },
-  dot: { width: 6, height: 6, borderRadius: 3 },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  pillText: {
+    color: '#FFFFFF',
+    fontFamily: FONT.bold,
+    fontSize: FS.xs,
+    letterSpacing: 1.2,
+  },
+  contentWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  centerWrap: {
+    alignItems: 'center',
+    gap: SP.md,
     paddingHorizontal: SP.lg,
-    paddingTop: SP.lg,
+    width: '100%',
   },
-  action: { width: 72, alignItems: 'center', gap: 7 },
-  actionCircle: {
-    width: 52, height: 52, borderRadius: 26,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1,
+  card: {
+    width: QR_CARD_SIZE,
+    height: QR_CARD_SIZE,
+    borderRadius: RADIUS.xl,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 10,
   },
-  actionLabel: { fontFamily: FONT.medium, fontSize: FS.xs, textAlign: 'center' },
-  toastWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  stateCard: { paddingHorizontal: SP.lg, gap: SP.sm },
+  stateText: { fontFamily: FONT.medium, fontSize: FS.sm, color: '#0A0A0B', textAlign: 'center' },
+  retryText: { fontFamily: FONT.bold, fontSize: FS.sm, color: '#0A0A0B', textDecorationLine: 'underline' },
+  handlePill: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.xs,
+    borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  handleText: {
+    fontFamily: FONT.bold,
+    fontSize: FS.lg,
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+  tilesRow: {
+    flexDirection: 'row',
+    width: '100%',
+    paddingHorizontal: SP.lg,
+    marginTop: SP.lg,
+  },
+  tile: {
+    flex: 1,
+    alignItems: 'center',
+    gap: SP.xs,
+  },
+  tileIconCircle: {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  tileLabel: {
+    fontFamily: FONT.medium,
+    fontSize: FS.xs,
+    color: '#FFFFFF',
+  },
+  toastWrap: {
+    position: 'absolute',
+    left: 0, right: 0,
+    alignItems: 'center',
+  },
   toast: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    backgroundColor: '#18181B',
   },
-  toastText: { fontSize: FS.sm, fontFamily: FONT.medium },
+  toastText: {
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
+  },
 });

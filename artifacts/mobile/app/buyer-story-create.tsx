@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Modal, PanResponder, Platform,
+  ActivityIndicator, Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Modal, PanResponder, Platform,
   Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +21,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { captureRef } from 'react-native-view-shot';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useUser } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,7 +29,8 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import {
   CARD, BORDER, FG, MUTED, ON_DARK, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
-import { createStory, MY_COLOR } from '@/services/socialService';
+import { createStory, MY_COLOR, searchProfiles, createOrGetConversation, sendMessage } from '@/services/socialService';
+import type { ProfileSearchResult } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import type { StoryMedia, StoryOverlay, StoryOverlayType, StoryPrivacySettings } from '@/services/socialTypes';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
@@ -38,6 +40,8 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
 import { hapticLight, hapticToggle, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+import { TEXT_FONTS, storyFontFamily, loadStoryFontsAsync, type StoryFontKey } from '@/lib/storyFonts';
+import { startUploadActivity, updateUploadActivity, endUploadActivity } from '@/lib/uploadLiveActivity';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -46,6 +50,17 @@ type Step = 'camera' | 'create' | 'edit';
 type CaptureMode = 'story' | 'post' | 'live';
 type CapturedMedia = { kind: 'photo' | 'video'; uri: string };
 type SharePayload = { type: 'photo' | 'video' | 'text'; uri?: string; bg?: string; text?: string; textColor?: string; ovs: StoryOverlay[] };
+
+// ─── Layout capture grids — Instagram's 6-option "Changing grid" popover ───
+type GridSpec = { id: string; cols: number; rows: number };
+const GRID_SPECS: GridSpec[] = [
+  { id: '2x1', cols: 1, rows: 2 },
+  { id: '1x2', cols: 2, rows: 1 },
+  { id: '3x1', cols: 1, rows: 3 },
+  { id: '1x3', cols: 3, rows: 1 },
+  { id: '2x2', cols: 2, rows: 2 },
+  { id: '3x2', cols: 3, rows: 2 },
+];
 
 // ─── Monochrome-leaning "Create" backgrounds ───────────────────────────────
 // Pure black / off-white / charcoal / graphite / a couple of subtle
@@ -230,6 +245,122 @@ const postingStyles = StyleSheet.create({
   },
 });
 
+// ─── Grid-layout option icon (camera Layout popover) ───────────────────────
+function GridIcon({ spec, active }: { spec: GridSpec; active: boolean }) {
+  const cells = [];
+  for (let i = 0; i < spec.cols * spec.rows; i++) cells.push(i);
+  return (
+    <View style={{ width: 24, height: 24, flexDirection: 'row', flexWrap: 'wrap', borderRadius: 3, overflow: 'hidden', borderWidth: active ? 1.5 : 1, borderColor: active ? '#FFFFFF' : 'rgba(255,255,255,0.4)' }}>
+      {cells.map((i) => (
+        <View
+          key={i}
+          style={{
+            width: `${100 / spec.cols}%`,
+            height: `${100 / spec.rows}%`,
+            borderWidth: 0.5,
+            borderColor: 'rgba(255,255,255,0.3)',
+            backgroundColor: active ? 'rgba(255,255,255,0.25)' : 'transparent',
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ─── Vertical size slider (text tool, left edge) ───────────────────────────
+function VerticalSizeSlider({ value, min, max, onChange }: { value: number; min: number; max: number; onChange: (v: number) => void }) {
+  const trackHeight = useRef(0);
+  const frac = (value - min) / (max - min);
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_e, g) => {
+        const h = trackHeight.current;
+        if (!h) return;
+        // g.moveY is absolute; approximate via accumulated dy against the last frac.
+        const delta = -g.dy / h;
+        const next = Math.max(min, Math.min(max, value + delta * (max - min)));
+        onChange(Math.round(next));
+      },
+    }),
+  ).current;
+
+  return (
+    <View
+      style={styles.sizeSlider}
+      onLayout={(e) => { trackHeight.current = e.nativeEvent.layout.height; }}
+      {...responder.panHandlers}
+    >
+      <View style={styles.sizeSliderTrack} />
+      <View style={[styles.sizeSliderThumb, { top: `${(1 - frac) * 100}%`, marginTop: -11 }]} />
+    </View>
+  );
+}
+
+// ─── HSB color picker (text/draw color sheets) ──────────────────────────────
+function hsbToHex(h: number, s: number, b: number): string {
+  const c = (b / 100) * (s / 100);
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = b / 100 - c;
+  let [r, g, bl] = [0, 0, 0];
+  if (h < 60) [r, g, bl] = [c, x, 0];
+  else if (h < 120) [r, g, bl] = [x, c, 0];
+  else if (h < 180) [r, g, bl] = [0, c, x];
+  else if (h < 240) [r, g, bl] = [0, x, c];
+  else if (h < 300) [r, g, bl] = [x, 0, c];
+  else [r, g, bl] = [c, 0, x];
+  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(bl)}`.toUpperCase();
+}
+
+function HsbSlider({ label, value, max, colors, onChange }: {
+  label: string; value: number; max: number; colors: readonly [string, string, ...string[]]; onChange: (v: number) => void;
+}) {
+  const trackWidth = useRef(0);
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (e) => {
+        const w = trackWidth.current;
+        if (!w) return;
+        // locationX is relative to the track view itself.
+        const x = Math.max(0, Math.min(w, e.nativeEvent.locationX));
+        onChange(Math.round((x / w) * max));
+      },
+    }),
+  ).current;
+  const frac = value / max;
+  return (
+    <View>
+      <Text style={styles.hsbLabel}>{label}</Text>
+      <View
+        style={styles.hsbTrack}
+        onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
+        {...responder.panHandlers}
+      >
+        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} />
+        <View style={[styles.hsbThumb, { left: `${frac * 100}%`, marginLeft: -11 }]} />
+      </View>
+    </View>
+  );
+}
+
+function HsbPicker({ color, onChange }: { color: string; onChange: (hex: string) => void }) {
+  const [hue, setHue] = useState(0);
+  const [sat, setSat] = useState(100);
+  const [bri, setBri] = useState(100);
+  const commit = (h: number, s: number, b: number) => onChange(hsbToHex(h, s, b));
+  return (
+    <View style={styles.hsbPicker}>
+      <HsbSlider label="Hue" value={hue} max={359} colors={['#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#FF00FF', '#FF0000']} onChange={(v) => { setHue(v); commit(v, sat, bri); }} />
+      <HsbSlider label="Saturation" value={sat} max={100} colors={['#FFFFFF', color]} onChange={(v) => { setSat(v); commit(hue, v, bri); }} />
+      <HsbSlider label="Brightness" value={bri} max={100} colors={['#000000', color]} onChange={(v) => { setBri(v); commit(hue, sat, v); }} />
+    </View>
+  );
+}
+
 // ─── Freehand draw canvas ───────────────────────────────────────────────────
 type DrawStroke = { color: string; width: number; d: string };
 
@@ -334,11 +465,27 @@ export default function StoryComposer() {
   const recordTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordStart = useRef(0);
 
+  // ── Camera left rail: Create / Boomerang / Layout / Hands-free ──
+  const [railExpanded, setRailExpanded] = useState(false);
+  const [handsFree, setHandsFree] = useState(false);
+  const [boomerangOn, setBoomerangOn] = useState(false);
+  const [gridSpec, setGridSpec] = useState<GridSpec | null>(null);
+  const [gridPopoverOpen, setGridPopoverOpen] = useState(false);
+  const [gridCells, setGridCells] = useState<(string | null)[]>([]);
+  const gridCompositeRef = useRef<View>(null);
+  const [compositing, setCompositing] = useState(false);
+
   useEffect(() => {
     void (async () => {
-      if (IS_WEB) return;
-      if (!cameraPermission?.granted) await requestCameraPermission();
-      if (!micPermission?.granted) await requestMicPermission();
+      // expo-camera supports the browser's getUserMedia permission prompt
+      // too, so this now runs on web as well as native.
+      try {
+        if (!cameraPermission?.granted) await requestCameraPermission();
+        if (!micPermission?.granted) await requestMicPermission();
+      } catch {
+        // No camera device (e.g. a headless/sandboxed browser) — the
+        // permission-denied fallback view covers this case either way.
+      }
     })();
   }, []);
 
@@ -358,9 +505,16 @@ export default function StoryComposer() {
   const [textToolOpen, setTextToolOpen] = useState(false);
   const [textDraft, setTextDraft] = useState('');
   const [textDraftColor, setTextDraftColor] = useState('#FFFFFF');
-  const [textDraftFontIdx, setTextDraftFontIdx] = useState(0);
+  const [textDraftFontKey, setTextDraftFontKey] = useState<StoryFontKey>('classic');
+  const [textDraftSize, setTextDraftSize] = useState(30);
   const [textDraftAlign, setTextDraftAlign] = useState<Align>('center');
-  const [textDraftBg, setTextDraftBg] = useState(false);
+  const [textDraftBgStyle, setTextDraftBgStyle] = useState<'none' | 'solid' | 'translucent'>('none');
+  const [textDraftEffect, setTextDraftEffect] = useState<'plain' | 'outline' | 'glow'>('plain');
+  const [textDraftAnimation, setTextDraftAnimation] = useState<string | undefined>(undefined);
+  const [textColorSheetOpen, setTextColorSheetOpen] = useState(false);
+  const [textAnimationSheetOpen, setTextAnimationSheetOpen] = useState(false);
+  const [textEffectSheetOpen, setTextEffectSheetOpen] = useState(false);
+  const [fontsReady, setFontsReady] = useState(false);
   const [stickerSheetOpen, setStickerSheetOpen] = useState(false);
   const [drawOpen, setDrawOpen] = useState(false);
   const [drawColor, setDrawColor] = useState('#FFFFFF');
@@ -373,6 +527,18 @@ export default function StoryComposer() {
   const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
   const [captionDraft, setCaptionDraft] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  // Instagram's own Share sheet: tapping send opens this instead of posting
+  // immediately. "Message" (send as a DM attachment before ever publishing
+  // the story) is intentionally not a row here — see docs/story-flows.md.
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [pendingSharePayload, setPendingSharePayload] = useState<SharePayload | null>(null);
+  // Instagram's "Also share to" sheet, shown once the story is live.
+  const [alsoShareOpen, setAlsoShareOpen] = useState(false);
+  const [alsoShareQuery, setAlsoShareQuery] = useState('');
+  const [alsoShareResults, setAlsoShareResults] = useState<ProfileSearchResult[]>([]);
+  const [alsoShareSearching, setAlsoShareSearching] = useState(false);
+  const [alsoShareSendingId, setAlsoShareSendingId] = useState<string | null>(null);
+  const [alsoShareSentIds, setAlsoShareSentIds] = useState<Set<string>>(new Set());
   // Drives the "Your story is uploading… NN%" pill (see doShare) — always
   // completes to 100%, same as Instagram's own composer.
   const postingProgress = useRef(new Animated.Value(0)).current;
@@ -425,18 +591,86 @@ export default function StoryComposer() {
     }
   }, [clearRecordTimer, stopRecording]);
 
+  // Boomerang: a short forward clip, same recorder as hold-to-record. True
+  // bounce-loop (play forward then reverse) needs client- or server-side
+  // video frame processing this session doesn't have time to build safely —
+  // see docs/story-flows.md. The capture itself is real, not stubbed.
+  const BOOMERANG_SECONDS = 1.5;
+  const startBoomerang = useCallback(async () => {
+    if (!cameraRef.current || recordingRef.current) return;
+    recordingRef.current = true;
+    setIsRecording(true);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const result = await cameraRef.current.recordAsync({ maxDuration: BOOMERANG_SECONDS });
+      if (result?.uri) {
+        setMedia({ kind: 'video', uri: result.uri });
+        setStep('edit');
+      }
+    } catch {
+      // Falls through — user can just try again.
+    } finally {
+      recordingRef.current = false;
+      setIsRecording(false);
+    }
+    // Auto-stop after BOOMERANG_SECONDS — recordAsync's maxDuration already
+    // caps it, this just guards platforms where that option is ignored.
+  }, []);
+  useEffect(() => {
+    if (!isRecording || !boomerangOn) return;
+    const t = setTimeout(() => { if (recordingRef.current) cameraRef.current?.stopRecording(); }, BOOMERANG_SECONDS * 1000 + 200);
+    return () => clearTimeout(t);
+  }, [isRecording, boomerangOn]);
+
+  const compositeGrid = useCallback(async (cells: string[]) => {
+    setCompositing(true);
+    try {
+      const uri = await captureRef(gridCompositeRef, { format: 'png', quality: 0.92, result: 'tmpfile' });
+      setMedia({ kind: 'photo', uri });
+      setStep('edit');
+    } catch {
+      Alert.alert('Could not combine those photos', 'Please try the layout again.');
+    } finally {
+      setCompositing(false);
+      setGridCells([]);
+      setGridSpec(null);
+    }
+  }, []);
+
   const takePhoto = useCallback(async () => {
     if (!cameraRef.current) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const result = await cameraRef.current.takePictureAsync({ quality: 0.9 });
-      if (result?.uri) {
-        setMedia({ kind: 'photo', uri: result.uri });
-        setStep('edit');
+      if (!result?.uri) return;
+      if (gridSpec) {
+        setGridCells((prev) => {
+          const next = [...prev];
+          const emptyIdx = next.findIndex((c) => !c);
+          if (emptyIdx >= 0) next[emptyIdx] = result.uri;
+          const filled = next.every((c) => !!c);
+          if (filled) setTimeout(() => void compositeGrid(next as string[]), 50);
+          return next;
+        });
+        return;
       }
+      setMedia({ kind: 'photo', uri: result.uri });
+      setStep('edit');
     } catch {
       Alert.alert('Could not capture that photo', 'Please try again.');
     }
+  }, [gridSpec, compositeGrid]);
+
+  const selectGrid = useCallback((spec: GridSpec) => {
+    hapticToggle();
+    setGridSpec(spec);
+    setGridCells(Array(spec.cols * spec.rows).fill(null));
+    setGridPopoverOpen(false);
+  }, []);
+
+  const clearGrid = useCallback(() => {
+    setGridSpec(null);
+    setGridCells([]);
   }, []);
 
   const openGallery = useCallback(async () => {
@@ -486,8 +720,12 @@ export default function StoryComposer() {
         type: 'text',
         text,
         color: textDraftColor,
-        size: 30,
+        size: textDraftSize,
         align: textDraftAlign,
+        fontKey: textDraftFontKey,
+        bgStyle: textDraftBgStyle,
+        textEffect: textDraftEffect,
+        textAnimation: textDraftAnimation,
       });
     }
     setTextDraft('');
@@ -529,7 +767,14 @@ export default function StoryComposer() {
     setIsPosting(true);
     setPostingPercent(0);
     postingProgress.setValue(0);
-    const progressListener = postingProgress.addListener(({ value }) => setPostingPercent(Math.round(value)));
+    // Drives the in-app "uploading… NN%" pill everywhere, plus the iOS Dynamic
+    // Island / Lock Screen Live Activity on 16.1+ (no-op elsewhere/on Expo Go).
+    const activityId = `story_${Date.now()}`;
+    startUploadActivity({ kind: 'story', id: activityId, thumbnailUri: payload.uri });
+    const progressListener = postingProgress.addListener(({ value }) => {
+      setPostingPercent(Math.round(value));
+      updateUploadActivity(activityId, value / 100);
+    });
     Animated.timing(postingProgress, { toValue: 96, duration: 1100, useNativeDriver: false }).start();
     try {
       const media: StoryMedia[] = [{
@@ -569,25 +814,79 @@ export default function StoryComposer() {
         Animated.timing(postingProgress, { toValue: 100, duration: 180, useNativeDriver: false }).start(() => resolve());
       });
       postingProgress.removeListener(progressListener);
+      endUploadActivity(activityId, { status: 'success' });
       await showArchiveNoticeOnce();
-      goBackOr(router);
+      setShareSheetOpen(false);
+      setPendingSharePayload(null);
+      // Instagram's own "Also share to" sheet appears once the story is
+      // live — this replaces the previous immediate goBackOr(router).
+      setAlsoShareOpen(true);
     } catch {
       postingProgress.removeListener(progressListener);
+      endUploadActivity(activityId, { status: 'failed' });
       Alert.alert("Couldn't share your story", 'Try again.');
       setIsPosting(false);
     }
-  }, [api, myName, myHandle, myInitials, params.accountType, router, closeFriendsOnly, postingProgress, showArchiveNoticeOnce]);
+  }, [api, myName, myHandle, myInitials, params.accountType, closeFriendsOnly, postingProgress, showArchiveNoticeOnce]);
 
-  const shareFromEdit = () => {
+  // Tapping send/Share opens Instagram's own Share sheet rather than posting
+  // immediately (see docs/story-flows.md for what's shown there).
+  const openShareSheetFromEdit = () => {
     if (!media || isPosting) return;
-    hapticPrimaryAction();
-    void doShare({ type: media.kind, uri: media.uri, text: captionDraft.trim() || undefined, ovs: overlays });
+    hapticLight();
+    setPendingSharePayload({ type: media.kind, uri: media.uri, text: captionDraft.trim() || undefined, ovs: overlays });
+    setShareSheetOpen(true);
   };
 
-  const shareFromCreate = () => {
+  const openShareSheetFromCreate = () => {
     if (!createText.trim() || isPosting) return;
+    hapticLight();
+    setPendingSharePayload({ type: 'text', bg: swatches[bgIdx].colors[0], text: createText.trim(), textColor: createColor, ovs: [] });
+    setShareSheetOpen(true);
+  };
+
+  const confirmShareSheet = () => {
+    if (!pendingSharePayload || isPosting) return;
     hapticPrimaryAction();
-    void doShare({ type: 'text', bg: swatches[bgIdx].colors[0], text: createText.trim(), textColor: createColor, ovs: [] });
+    void doShare(pendingSharePayload);
+  };
+
+  // "Also share to" — search people, forward the just-posted story as a DM.
+  useEffect(() => {
+    if (!alsoShareOpen) return;
+    const q = alsoShareQuery.trim();
+    if (!q) { setAlsoShareResults([]); return; }
+    let cancelled = false;
+    setAlsoShareSearching(true);
+    const t = setTimeout(() => {
+      void searchProfiles(q).then((results) => { if (!cancelled) setAlsoShareResults(results); }).finally(() => { if (!cancelled) setAlsoShareSearching(false); });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [alsoShareOpen, alsoShareQuery]);
+
+  const sendAlsoShareTo = async (person: ProfileSearchResult) => {
+    setAlsoShareSendingId(person.userId);
+    try {
+      const conv = await createOrGetConversation({
+        type: 'buyer_to_buyer',
+        participant: { userId: person.userId, name: person.name, handle: person.handle, initials: person.initials, color: person.color, accountType: person.accountType },
+      });
+      await sendMessage(conv.id, 'Sent you my story ✨');
+      hapticLight();
+      setAlsoShareSentIds((prev) => new Set(prev).add(person.userId));
+    } catch {
+      Alert.alert("Couldn't send that", 'Try again.');
+    } finally {
+      setAlsoShareSendingId(null);
+    }
+  };
+
+  const finishAlsoShare = () => {
+    setAlsoShareOpen(false);
+    setAlsoShareQuery('');
+    setAlsoShareResults([]);
+    setAlsoShareSentIds(new Set());
+    goBackOr(router);
   };
 
   const closeAll = () => goBackOr(router);
@@ -595,21 +894,22 @@ export default function StoryComposer() {
   // ── CAMERA STEP ───────────────────────────────────────────────────────────
 
   if (step === 'camera') {
-    const hasPermission = IS_WEB ? true : !!cameraPermission?.granted;
+    // expo-camera's CameraView works in the browser (getUserMedia) too, so
+    // web gets a real live preview like native — the fallback only shows
+    // when permission is actually denied/unavailable (no camera hardware,
+    // e.g. this app running headless), same branch either platform hits.
+    const hasPermission = !!cameraPermission?.granted;
     return (
       <View style={[styles.root, { backgroundColor: '#000' }]}>
         <StatusBar style="light" />
-        {IS_WEB ? (
-          <View style={[styles.root, styles.webFallback]}>
-            <Feather name="camera-off" size={40} color="rgba(255,255,255,0.4)" />
-            <Text style={styles.webFallbackText}>Camera capture is mobile-only here.{"\n"}Choose media from your library to continue.</Text>
-          </View>
-        ) : hasPermission ? (
+        {hasPermission ? (
           <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} flash={flash} mode={isRecording ? 'video' : 'picture'} />
         ) : (
           <View style={[styles.root, styles.webFallback]}>
             <Feather name="camera-off" size={40} color="rgba(255,255,255,0.4)" />
-            <Text style={styles.webFallbackText}>Camera access is required to post a story.</Text>
+            <Text style={styles.webFallbackText}>
+              {IS_WEB ? 'Allow camera access in your browser to capture a story here, or choose from your library.' : 'Camera access is required to post a story.'}
+            </Text>
             <TouchableOpacity style={[styles.permBtn, { backgroundColor: theme.accent }]} onPress={() => { requestCameraPermission(); requestMicPermission(); }}>
               <Text style={[styles.permBtnText, getOnAccentTextStyle(theme)]}>Grant access</Text>
             </TouchableOpacity>
@@ -639,7 +939,7 @@ export default function StoryComposer() {
           </TouchableOpacity>
         </View>
 
-        {/* Left-side vertical tool rail — Create shortcut */}
+        {/* Left-side vertical tool rail — Create / Boomerang / Layout / Hands-free */}
         <View style={[styles.leftRail, { top: topInset + 90 }]}>
           <TouchableOpacity
             style={styles.railBtn}
@@ -648,9 +948,70 @@ export default function StoryComposer() {
             accessibilityRole="button"
           >
             <Text style={styles.railAa}>Aa</Text>
-            <Text style={styles.railLabel}>Create</Text>
+            {railExpanded && <Text style={styles.railLabel}>Create</Text>}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.railBtn}
+            onPress={() => { hapticToggle(); setBoomerangOn((v) => !v); if (gridSpec) clearGrid(); }}
+            accessibilityLabel="Boomerang"
+            accessibilityRole="button"
+            accessibilityState={{ selected: boomerangOn }}
+          >
+            <Feather name="repeat" size={20} color={boomerangOn ? theme.accent : ON_DARK} />
+            {railExpanded && <Text style={[styles.railLabel, boomerangOn && { color: theme.accent }]}>Boomerang</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.railBtn}
+            onPress={() => { hapticToggle(); setGridPopoverOpen((v) => !v); if (boomerangOn) setBoomerangOn(false); }}
+            accessibilityLabel="Layout"
+            accessibilityRole="button"
+            accessibilityState={{ selected: !!gridSpec }}
+          >
+            <Feather name="grid" size={20} color={gridSpec ? theme.accent : ON_DARK} />
+            {railExpanded && <Text style={[styles.railLabel, gridSpec && { color: theme.accent }]}>Layout</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.railBtn}
+            onPress={() => { hapticToggle(); setHandsFree((v) => !v); }}
+            accessibilityLabel="Hands-free"
+            accessibilityRole="button"
+            accessibilityState={{ selected: handsFree }}
+          >
+            <Feather name="video" size={20} color={handsFree ? theme.accent : ON_DARK} />
+            {railExpanded && <Text style={[styles.railLabel, handsFree && { color: theme.accent }]}>Hands-free</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.railBtn}
+            onPress={() => { hapticLight(); setRailExpanded((v) => !v); }}
+            accessibilityLabel={railExpanded ? 'Collapse tools' : 'Expand tools'}
+            accessibilityRole="button"
+          >
+            <Feather name={railExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={ON_DARK} />
+          </TouchableOpacity>
+
+          {gridPopoverOpen && (
+            <View style={styles.gridPopover}>
+              {GRID_SPECS.map((spec) => (
+                <TouchableOpacity key={spec.id} style={styles.gridOption} onPress={() => selectGrid(spec)} accessibilityRole="button" accessibilityLabel={`Grid ${spec.cols} by ${spec.rows}`}>
+                  <GridIcon spec={spec} active={gridSpec?.id === spec.id} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
+
+        {/* "Change grid" pill — shown once a layout is active, like Instagram's own label under the rail */}
+        {gridSpec && (
+          <TouchableOpacity style={[styles.changeGridPill, { top: topInset + 90 + 190 }]} onPress={() => setGridPopoverOpen(true)} accessibilityRole="button" accessibilityLabel="Change grid">
+            <Feather name="grid" size={14} color={ON_DARK} />
+            <Text style={styles.changeGridText}>Change grid</Text>
+            <Feather name="chevron-down" size={14} color={ON_DARK} />
+          </TouchableOpacity>
+        )}
 
         {/* Bottom controls */}
         <View style={[styles.camBottom, { paddingBottom: insets.bottom + SP.md }]}>
@@ -701,23 +1062,42 @@ export default function StoryComposer() {
               )}
             </TouchableOpacity>
 
-            {/* Shutter — tap for photo, hold for video */}
+            {/* Shutter — tap for photo, hold for video (or hands-free/boomerang/grid-cell capture) */}
             <Pressable
               style={styles.shutterWrap}
-              onPress={takePhoto}
-              onLongPress={startRecording}
-              onPressOut={() => { if (recordingRef.current) stopRecording(); }}
+              onPress={() => {
+                if (compositing) return;
+                if (gridSpec) { void takePhoto(); return; }
+                if (boomerangOn) { void startBoomerang(); return; }
+                if (handsFree) { if (isRecording) stopRecording(); else void startRecording(); return; }
+                void takePhoto();
+              }}
+              onLongPress={gridSpec || boomerangOn || handsFree ? undefined : startRecording}
+              onPressOut={() => { if (recordingRef.current && !handsFree) stopRecording(); }}
               delayLongPress={220}
-              accessibilityLabel="Tap for photo, hold for video"
+              accessibilityLabel={handsFree ? (isRecording ? 'Stop recording' : 'Start recording') : gridSpec ? 'Capture next grid cell' : boomerangOn ? 'Capture Boomerang' : 'Tap for photo, hold for video'}
               accessibilityRole="button"
             >
               <View style={styles.shutterRing}>
                 {isRecording ? (
                   <View style={[styles.progressRing, { transform: [{ rotate: `${recordProgress * 360}deg` }] }]} />
                 ) : null}
-                <View style={[styles.shutterInner, isRecording && { backgroundColor: '#F87171' }]} />
+                {compositing ? (
+                  <ActivityIndicator color="#000" />
+                ) : gridSpec ? (
+                  <Feather name="grid" size={22} color="#000" />
+                ) : (
+                  <View style={[styles.shutterInner, isRecording && { backgroundColor: '#F87171' }]} />
+                )}
               </View>
             </Pressable>
+            {gridSpec && (
+              <View style={styles.gridDots}>
+                {gridCells.map((c, i) => (
+                  <View key={i} style={[styles.gridDot, c && { backgroundColor: theme.accent }]} />
+                ))}
+              </View>
+            )}
 
             {/* Flip camera */}
             <TouchableOpacity
@@ -731,11 +1111,146 @@ export default function StoryComposer() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.hint}>Tap for photo · Hold for video</Text>
+          <Text style={styles.hint}>
+            {gridSpec ? `Cell ${gridCells.filter(Boolean).length + 1} of ${gridCells.length}`
+              : handsFree ? (isRecording ? 'Tap to stop' : 'Tap to start recording')
+              : boomerangOn ? 'Tap for a Boomerang'
+              : 'Tap for photo · Hold for video'}
+          </Text>
+        </View>
+
+        {/* Off-screen grid composite — captureRef flattens this into one PNG once every cell is filled */}
+        <View
+          ref={gridCompositeRef}
+          collapsable={false}
+          style={[styles.gridComposite, { width: W, height: H }]}
+          pointerEvents="none"
+        >
+          {gridSpec && gridCells.map((uri, i) => {
+            if (!uri) return null;
+            const col = i % gridSpec.cols;
+            const row = Math.floor(i / gridSpec.cols);
+            const cw = W / gridSpec.cols;
+            const ch = H / gridSpec.rows;
+            return (
+              <Image
+                key={i}
+                source={{ uri }}
+                style={{ position: 'absolute', left: col * cw, top: row * ch, width: cw, height: ch }}
+                resizeMode="cover"
+              />
+            );
+          })}
         </View>
       </View>
     );
   }
+
+  // ── Share sheet + "Also share to" sheet — shared by CREATE and EDIT ────────
+  const renderShareSheets = () => (
+    <>
+      <Modal visible={shareSheetOpen} transparent animationType="slide" onRequestClose={() => setShareSheetOpen(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setShareSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+        <View style={[styles.shareSheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>Share</Text>
+
+          <TouchableOpacity
+            style={styles.shareRow}
+            onPress={() => { hapticToggle(); setCloseFriendsOnly(false); }}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: !closeFriendsOnly }}
+          >
+            <View style={styles.shareRowAvatar}><Text style={styles.myAvatarText}>{myInitials}</Text></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.shareRowTitle}>Your story</Text>
+              <Text style={styles.shareRowSubtitle}>Sharing options</Text>
+            </View>
+            <View style={[styles.radioOuter, !closeFriendsOnly && styles.radioOuterActive]}>
+              {!closeFriendsOnly && <View style={styles.radioInner} />}
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shareRow}
+            onPress={() => { hapticToggle(); setCloseFriendsOnly(true); }}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: closeFriendsOnly }}
+          >
+            <View style={[styles.shareRowAvatar, { backgroundColor: 'transparent' }]}>
+              <Feather name="star" size={20} color={ON_DARK} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.shareRowTitle}>Close Friends</Text>
+              <Text style={styles.shareRowSubtitle}>Add people</Text>
+            </View>
+            <View style={[styles.radioOuter, closeFriendsOnly && styles.radioOuterActive]}>
+              {closeFriendsOnly && <View style={styles.radioInner} />}
+            </View>
+          </TouchableOpacity>
+
+          <Button label={isPosting ? 'Sharing…' : 'Share'} onPress={confirmShareSheet} loading={isPosting} fullWidth style={{ marginTop: SP.md }} />
+        </View>
+      </Modal>
+
+      <Modal visible={alsoShareOpen} transparent animationType="slide" onRequestClose={finishAlsoShare}>
+        <View style={[styles.alsoShareSheet, { paddingTop: insets.top + SP.md, paddingBottom: insets.bottom + SP.md }]}>
+          <View style={styles.textToolTop}>
+            <Text style={styles.sheetTitle}>Also share to</Text>
+            <TouchableOpacity onPress={finishAlsoShare} accessibilityRole="button" accessibilityLabel="Done">
+              <Text style={styles.textToolDone}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.alsoShareSearchWrap}>
+            <Feather name="search" size={16} color={MUTED} />
+            <TextInput
+              style={styles.alsoShareSearchInput}
+              placeholder="Search"
+              placeholderTextColor={MUTED}
+              value={alsoShareQuery}
+              onChangeText={setAlsoShareQuery}
+            />
+          </View>
+          {/* Highlights aren't in this app yet (shipping in a follow-up PR),
+              so this sheet doesn't show a fake "Add to Highlights" row. */}
+          {alsoShareSearching ? (
+            <ActivityIndicator style={{ marginTop: SP.lg }} color={ON_DARK} />
+          ) : (
+            <ScrollView style={{ marginTop: SP.sm }}>
+              {alsoShareResults.map((p) => {
+                const sent = alsoShareSentIds.has(p.userId);
+                return (
+                  <View key={p.userId} style={styles.alsoShareRow}>
+                    <View style={[styles.shareRowAvatar, { backgroundColor: p.color }]}><Text style={styles.myAvatarText}>{p.initials}</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.shareRowTitle}>{p.name}</Text>
+                      <Text style={styles.shareRowSubtitle}>@{p.handle}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.alsoShareSendBtn, sent && styles.alsoShareSendBtnSent]}
+                      onPress={() => void sendAlsoShareTo(p)}
+                      disabled={sent || alsoShareSendingId === p.userId}
+                      accessibilityRole="button"
+                      accessibilityLabel={sent ? `Sent to ${p.name}` : `Send to ${p.name}`}
+                    >
+                      {alsoShareSendingId === p.userId ? (
+                        <ActivityIndicator size="small" color={ON_DARK} />
+                      ) : (
+                        <Text style={[styles.alsoShareSendText, sent && { color: ON_DARK }]}>{sent ? 'Sent' : 'Send'}</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+              {!alsoShareQuery.trim() && (
+                <Text style={styles.alsoShareHint}>Search for people to send this story to.</Text>
+              )}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
+    </>
+  );
 
   // ── CREATE STEP (text-only story) ───────────────────────────────────────
 
@@ -757,7 +1272,7 @@ export default function StoryComposer() {
           <Button
             label="Share"
             size="compact"
-            onPress={shareFromCreate}
+            onPress={openShareSheetFromCreate}
             disabled={!createText.trim() || isPosting}
           />
         </View>
@@ -830,6 +1345,7 @@ export default function StoryComposer() {
             </PressableScale>
           ))}
         </View>
+        {renderShareSheets()}
       </View>
     );
   }
@@ -874,7 +1390,23 @@ export default function StoryComposer() {
         <View style={{ flex: 1 }} />
         {/* Right-side tool row */}
         <View style={styles.editToolRow}>
-          <TouchableOpacity style={styles.camIconBtn} onPress={() => { setTextDraft(''); setTextDraftColor('#FFFFFF'); setTextDraftFontIdx(0); setTextDraftAlign('center'); setTextDraftBg(false); setTextToolOpen(true); }} accessibilityLabel="Add text" accessibilityRole="button">
+          <TouchableOpacity
+            style={styles.camIconBtn}
+            onPress={() => {
+              setTextDraft('');
+              setTextDraftColor('#FFFFFF');
+              setTextDraftFontKey('classic');
+              setTextDraftSize(30);
+              setTextDraftAlign('center');
+              setTextDraftBgStyle('none');
+              setTextDraftEffect('plain');
+              setTextDraftAnimation(undefined);
+              setTextToolOpen(true);
+              loadStoryFontsAsync().then(() => setFontsReady(true));
+            }}
+            accessibilityLabel="Add text"
+            accessibilityRole="button"
+          >
             <Text style={styles.aaIcon}>Aa</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.camIconBtn} onPress={() => { hapticLight(); setStickerSheetOpen(true); }} accessibilityLabel="Add sticker" accessibilityRole="button">
@@ -940,7 +1472,7 @@ export default function StoryComposer() {
           </TouchableOpacity>
           <PressableScale
             style={[styles.sendBtn, isPosting && { opacity: 0.6 }]}
-            onPress={shareFromEdit}
+            onPress={openShareSheetFromEdit}
             disabled={isPosting}
             accessibilityRole="button"
             accessibilityLabel={isPosting ? 'Posting story' : 'Send story'}
@@ -958,13 +1490,17 @@ export default function StoryComposer() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? topInset : 0}
         >
           <View style={[styles.textToolTop, { paddingTop: topInset + SP.sm }]}>
-            <TouchableOpacity onPress={() => setTextToolOpen(false)} accessibilityLabel="Cancel" accessibilityRole="button">
-              <Text style={styles.textToolCancel}>Cancel</Text>
+            <TouchableOpacity onPress={() => setTextToolOpen(false)} accessibilityLabel="Close" accessibilityRole="button">
+              <Feather name="x" size={22} color={ON_DARK} />
             </TouchableOpacity>
             <TouchableOpacity onPress={commitTextOverlay} accessibilityLabel="Done" accessibilityRole="button">
               <Text style={styles.textToolDone}>Done</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Vertical size slider — left edge, drag to grow/shrink text (16-64pt) */}
+          <VerticalSizeSlider value={textDraftSize} min={16} max={64} onChange={setTextDraftSize} />
+
           <View style={styles.textToolCenter}>
             <TextInput
               autoFocus
@@ -976,20 +1512,53 @@ export default function StoryComposer() {
               style={[
                 styles.textToolInput,
                 {
-                  color: textDraftBg ? (textDraftColor === '#FFFFFF' ? '#000' : textDraftColor) : textDraftColor,
-                  backgroundColor: textDraftBg ? (textDraftColor === '#FFFFFF' ? '#FFFFFF' : 'rgba(255,255,255,0.9)') : 'transparent',
+                  color: textDraftBgStyle !== 'none' ? (textDraftColor === '#FFFFFF' ? '#000' : '#FFF') : textDraftColor,
+                  backgroundColor: textDraftBgStyle === 'solid' ? textDraftColor
+                    : textDraftBgStyle === 'translucent' ? `${textDraftColor}CC`
+                    : 'transparent',
                   textAlign: textDraftAlign,
-                  fontWeight: FONT_PRESETS[textDraftFontIdx].weight,
-                  fontStyle: FONT_PRESETS[textDraftFontIdx].italic ? 'italic' : 'normal',
+                  fontSize: textDraftSize,
+                  fontFamily: fontsReady ? storyFontFamily(textDraftFontKey) : FONT.bold,
+                  textShadowColor: textDraftEffect === 'outline' ? '#000' : textDraftEffect === 'glow' ? textDraftColor : 'transparent',
+                  textShadowRadius: textDraftEffect === 'outline' ? 3 : textDraftEffect === 'glow' ? 12 : 0,
+                  textShadowOffset: { width: 0, height: 0 },
                 },
               ]}
               maxLength={200}
             />
           </View>
+
           <View style={[styles.textToolBottom, { paddingBottom: insets.bottom + SP.md }]}>
+            {/* Font-chip row — Instagram's scrollable "Bubble / Deco / Squeeze / Typewriter…" row */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fontChipRow} contentContainerStyle={{ gap: SP.xs }}>
+              {TEXT_FONTS.map((f) => {
+                const active = textDraftFontKey === f.key;
+                return (
+                  <TouchableOpacity
+                    key={f.key}
+                    style={[styles.fontChip, active && { backgroundColor: ON_DARK }]}
+                    onPress={() => { hapticToggle(); setTextDraftFontKey(f.key); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Font: ${f.label}`}
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Text style={[styles.fontChipText, { fontFamily: fontsReady ? f.fontFamily : FONT.medium }, active && { color: '#000' }]}>
+                      {f.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
             <View style={styles.textToolRow}>
-              <TouchableOpacity style={styles.textToolChip} onPress={() => setTextDraftFontIdx((i) => (i + 1) % FONT_PRESETS.length)} accessibilityLabel="Cycle font" accessibilityRole="button">
-                <Text style={styles.textToolChipText}>Aa</Text>
+              <TouchableOpacity style={styles.textToolChip} onPress={() => setTextColorSheetOpen(true)} accessibilityLabel="Text color" accessibilityRole="button">
+                <LinearGradient colors={['#F87171', '#FBBF24', '#34D399', '#60A5FA', '#C084FC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.colorWheelDot} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.textToolChip} onPress={() => setTextAnimationSheetOpen(true)} accessibilityLabel="Text animation" accessibilityRole="button">
+                <Text style={styles.textToolChipGlyph}>//A</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.textToolChip} onPress={() => setTextEffectSheetOpen(true)} accessibilityLabel="Text effect" accessibilityRole="button">
+                <Feather name="zap" size={16} color={ON_DARK} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.textToolChip}
@@ -999,23 +1568,117 @@ export default function StoryComposer() {
               >
                 <Feather name={textDraftAlign === 'left' ? 'align-left' : textDraftAlign === 'right' ? 'align-right' : 'align-center'} size={18} color={ON_DARK} />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.textToolChip, textDraftBg && { backgroundColor: theme.accentDim }]} onPress={() => setTextDraftBg((v) => !v)} accessibilityLabel="Toggle background highlight" accessibilityRole="button">
-                <Feather name="square" size={18} color={ON_DARK} />
+              <TouchableOpacity
+                style={[styles.textToolChip, textDraftBgStyle !== 'none' && { backgroundColor: theme.accentDim }]}
+                onPress={() => { hapticToggle(); setTextDraftBgStyle((v) => (v === 'none' ? 'solid' : v === 'solid' ? 'translucent' : 'none')); }}
+                accessibilityLabel={`Background: ${textDraftBgStyle}`}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.textToolChipGlyph, { fontSize: 16 }]}>A</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.textToolColorRow}>
-              {['#FFFFFF', '#000000', '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#C084FC'].map((c) => (
-                <PressableScale
-                  key={c}
-                  style={[styles.colorCircle, { backgroundColor: c }, textDraftColor === c && styles.colorCircleActive, c === '#000000' && styles.colorCircleBorder]}
-                  onPress={() => setTextDraftColor(c)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Text color ${c}`}
-                />
-              ))}
+
+            {/* Above-keyboard row — Instagram's quick Mention/Location shortcuts. Rewrite is
+                intentionally omitted: it needs a real LLM call, which is out of scope here
+                rather than a fake button (see docs/story-flows.md). */}
+            <View style={styles.textAccessoryRow}>
+              <TouchableOpacity
+                style={styles.textAccessoryItem}
+                onPress={() => { addOverlay({ type: 'mention', mentionHandle: '@friend' }); setTextToolOpen(false); }}
+                accessibilityRole="button"
+                accessibilityLabel="Add mention"
+              >
+                <Feather name="at-sign" size={14} color={ON_DARK} />
+                <Text style={styles.textAccessoryLabel}>Mention</Text>
+              </TouchableOpacity>
+              <View style={styles.textAccessoryDivider} />
+              <TouchableOpacity
+                style={styles.textAccessoryItem}
+                onPress={() => { addOverlay({ type: 'location', locationLabel: 'Add location' }); setTextToolOpen(false); }}
+                accessibilityRole="button"
+                accessibilityLabel="Add location"
+              >
+                <Feather name="map-pin" size={14} color={ON_DARK} />
+                <Text style={styles.textAccessoryLabel}>Location</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Text color sheet — swatch page + hue/saturation/brightness ── */}
+      <Modal visible={textColorSheetOpen} transparent animationType="fade" onRequestClose={() => setTextColorSheetOpen(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setTextColorSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+        <View style={[styles.textColorSheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>Text color</Text>
+          <View style={styles.textToolColorRow}>
+            {['#FFFFFF', '#000000', '#C084FC', '#60A5FA', '#34D399', '#FBBF24', '#F97316', '#F87171'].map((c) => (
+              <PressableScale
+                key={c}
+                style={[styles.colorCircle, { backgroundColor: c }, textDraftColor === c && styles.colorCircleActive, c === '#000000' && styles.colorCircleBorder]}
+                onPress={() => { hapticToggle(); setTextDraftColor(c); }}
+                accessibilityRole="button"
+                accessibilityLabel={`Text color ${c}`}
+                accessibilityState={{ selected: textDraftColor === c }}
+              />
+            ))}
+          </View>
+          <HsbPicker color={textDraftColor} onChange={setTextDraftColor} />
+        </View>
+      </Modal>
+
+      {/* ── Text animation sheet ── */}
+      <Modal visible={textAnimationSheetOpen} transparent animationType="fade" onRequestClose={() => setTextAnimationSheetOpen(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setTextAnimationSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+        <View style={[styles.textColorSheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>Text animation</Text>
+          <Text style={styles.sheetSubtitle}>Plays back when story-viewer animation support ships — selection is saved now.</Text>
+          <View style={styles.animationGrid}>
+            {['Emphasize', 'Drift Up', 'Loud', 'Speedy', 'Fall', 'Headline', 'Slide Up'].map((a) => {
+              const active = textDraftAnimation === a;
+              return (
+                <TouchableOpacity
+                  key={a}
+                  style={[styles.animationChip, active && { backgroundColor: ON_DARK }]}
+                  onPress={() => { hapticToggle(); setTextDraftAnimation(active ? undefined : a); setTextAnimationSheetOpen(false); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Animation ${a}`}
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text style={[styles.animationChipText, active && { color: '#000' }]}>{a}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Text effect sheet ── */}
+      <Modal visible={textEffectSheetOpen} transparent animationType="fade" onRequestClose={() => setTextEffectSheetOpen(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setTextEffectSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+        <View style={[styles.textColorSheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>Text effect</Text>
+          <View style={styles.animationGrid}>
+            {([['plain', 'Plain'], ['outline', 'Outline'], ['glow', 'Neon']] as const).map(([key, label]) => {
+              const active = textDraftEffect === key;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.animationChip, active && { backgroundColor: ON_DARK }]}
+                  onPress={() => { hapticToggle(); setTextDraftEffect(key); setTextEffectSheetOpen(false); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Effect ${label}`}
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text style={[styles.animationChipText, active && { color: '#000' }]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       </Modal>
 
       {/* ── Sticker sheet ── */}
@@ -1113,6 +1776,7 @@ export default function StoryComposer() {
           </View>
         </View>
       </Modal>
+      {renderShareSheets()}
     </View>
   );
 }
@@ -1130,8 +1794,24 @@ function StickerTile({ icon, label, onPress, custom }: { icon: keyof typeof Feat
 // ─── Overlay content renderer (edit-screen canvas) ──────────────────────────
 function renderOverlayContent(ov: StoryOverlay) {
   switch (ov.type) {
-    case 'text':
-      return <Text style={{ color: ov.color ?? '#FFF', fontSize: ov.size ?? 28, fontFamily: FONT.bold, textAlign: ov.align ?? 'center' }}>{ov.text}</Text>;
+    case 'text': {
+      const textColor = ov.bgStyle && ov.bgStyle !== 'none' ? (ov.color === '#FFFFFF' ? '#000' : '#FFF') : (ov.color ?? '#FFF');
+      const bg = ov.bgStyle === 'solid' ? (ov.color ?? '#FFFFFF')
+        : ov.bgStyle === 'translucent' ? `${ov.color ?? '#000000'}CC`
+        : 'transparent';
+      const effectStyle = ov.textEffect === 'outline'
+        ? { textShadowColor: '#000', textShadowRadius: 3, textShadowOffset: { width: 0, height: 0 } }
+        : ov.textEffect === 'glow'
+        ? { textShadowColor: ov.color ?? '#FFF', textShadowRadius: 12, textShadowOffset: { width: 0, height: 0 } }
+        : null;
+      return (
+        <View style={bg !== 'transparent' ? { backgroundColor: bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 } : undefined}>
+          <Text style={[{ color: textColor, fontSize: ov.size ?? 28, fontFamily: storyFontFamily(ov.fontKey), textAlign: ov.align ?? 'center' }, effectStyle]}>
+            {ov.text}
+          </Text>
+        </View>
+      );
+    }
     case 'mention':
       return <View style={styles.pillChip}><Feather name="at-sign" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.mentionHandle}</Text></View>;
     case 'location':
@@ -1200,9 +1880,23 @@ const styles = StyleSheet.create({
   // Same 44pt width as camIconBtn (the X button directly above it), sharing
   // its left inset, so the "Aa" glyph's own center lines up exactly with
   // the X icon's center instead of sitting ~4pt further right.
-  railBtn: { alignItems: 'center', gap: 4, width: 44, minHeight: 44 },
+  railBtn: { alignItems: 'center', gap: 4, minWidth: 44, minHeight: 44, marginBottom: SP.sm },
   railAa: { color: ON_DARK, fontSize: FS.lg, fontFamily: FONT.bold },
   railLabel: { color: 'rgba(255,255,255,0.85)', fontSize: FS.xs, fontFamily: FONT.medium },
+  gridPopover: {
+    position: 'absolute', left: 50, top: 100, backgroundColor: 'rgba(30,30,34,0.95)',
+    borderRadius: RADIUS.md, padding: SP.sm, flexDirection: 'row', flexWrap: 'wrap', width: 92,
+  },
+  gridOption: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', margin: 2 },
+  changeGridPill: {
+    position: 'absolute', alignSelf: 'center', left: 0, right: 0, marginHorizontal: 'auto', width: 140,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6, zIndex: 15,
+  },
+  changeGridText: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold },
+  gridDots: { flexDirection: 'row', gap: 4, marginTop: SP.xs, justifyContent: 'center' },
+  gridDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
+  gridComposite: { position: 'absolute', left: -9999, top: 0, backgroundColor: '#000' },
 
   camBottom: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, alignItems: 'center' },
   modeRow: { flexDirection: 'row', gap: SP.lg, marginBottom: SP.md, position: 'relative' },
@@ -1291,12 +1985,33 @@ const styles = StyleSheet.create({
   textToolCancel: { color: 'rgba(255,255,255,0.7)', fontSize: FS.base, fontFamily: FONT.medium },
   textToolDone: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.bold },
   textToolCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
-  textToolInput: { fontSize: 30, fontFamily: FONT.bold, minWidth: 60, paddingHorizontal: 8, borderRadius: 6 },
+  textToolInput: { fontFamily: FONT.bold, minWidth: 60, paddingHorizontal: 8, borderRadius: 6 },
   textToolBottom: { paddingHorizontal: SP.md, gap: SP.sm },
   textToolRow: { flexDirection: 'row', gap: SP.sm },
   textToolChip: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   textToolChipText: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.bold },
-  textToolColorRow: { flexDirection: 'row', gap: SP.sm },
+  textToolChipGlyph: { color: ON_DARK, fontSize: 13, fontFamily: FONT.bold },
+  textToolColorRow: { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
+  colorWheelDot: { width: 22, height: 22, borderRadius: 11 },
+  fontChipRow: { maxHeight: 34 },
+  fontChip: { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: 'rgba(255,255,255,0.12)' },
+  fontChipText: { color: ON_DARK, fontSize: FS.sm },
+  textAccessoryRow: { flexDirection: 'row', alignItems: 'center', paddingTop: SP.xs },
+  textAccessoryItem: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center', paddingVertical: SP.xs },
+  textAccessoryLabel: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.medium },
+  textAccessoryDivider: { width: StyleSheet.hairlineWidth, height: 16, backgroundColor: 'rgba(255,255,255,0.25)' },
+  textColorSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.md },
+  sheetSubtitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: -SP.sm, marginBottom: SP.md },
+  animationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.sm },
+  animationChip: { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.1)' },
+  animationChipText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
+  sizeSlider: { position: 'absolute', left: SP.sm, top: '25%', bottom: '25%', width: 32, alignItems: 'center', justifyContent: 'center', zIndex: 30 },
+  sizeSliderTrack: { width: 3, flex: 1, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
+  sizeSliderThumb: { position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: ON_DARK, borderWidth: 2, borderColor: '#000' },
+  hsbPicker: { marginTop: SP.md, gap: SP.sm },
+  hsbLabel: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium },
+  hsbTrack: { height: 28, borderRadius: 14, justifyContent: 'center' },
+  hsbThumb: { position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', borderWidth: 2, borderColor: '#000', top: 3 },
 
   // Sticker sheet
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
@@ -1309,6 +2024,26 @@ const styles = StyleSheet.create({
   emptyText: { color: MUTED, fontSize: FS.sm, textAlign: 'center', padding: SP.lg },
   productRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   productRowText: { color: FG, fontSize: FS.base, fontFamily: FONT.medium },
+
+  // Share sheet
+  shareSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.md },
+  shareRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
+  shareRowAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#444', alignItems: 'center', justifyContent: 'center' },
+  shareRowTitle: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
+  shareRowSubtitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
+  radioOuterActive: { borderColor: ON_DARK },
+  radioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: ON_DARK },
+
+  // "Also share to"
+  alsoShareSheet: { flex: 1, backgroundColor: '#000', paddingHorizontal: SP.md },
+  alsoShareSearchWrap: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: RADIUS.md, paddingHorizontal: SP.sm, marginTop: SP.sm },
+  alsoShareSearchInput: { flex: 1, color: ON_DARK, fontSize: FS.base, paddingVertical: SP.sm },
+  alsoShareRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
+  alsoShareSendBtn: { paddingHorizontal: SP.md, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: ON_DARK, minWidth: 64, alignItems: 'center' },
+  alsoShareSendBtnSent: { backgroundColor: 'rgba(255,255,255,0.15)' },
+  alsoShareSendText: { color: '#000', fontFamily: FONT.semibold, fontSize: FS.sm },
+  alsoShareHint: { color: MUTED, fontSize: FS.sm, textAlign: 'center', marginTop: SP.xl },
 
   overlayModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   overlayModalCard: { width: W - SP.xl * 2, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md },
