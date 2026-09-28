@@ -5,10 +5,12 @@
  *
  * A nested button is invalid HTML (browsers print "<button> cannot contain
  * a nested <button>" and the outer/inner press handlers fight each other).
- * This bit the Discover "For You" card, where a HeartToggle (itself a
- * Pressable) was rendered inside the card's own navigation Pressable — see
- * app/(buyer)/discover.tsx's ProductShowcase, where the heart is now a
- * sibling positioned absolutely on top of the card instead of a descendant.
+ * This bit the old commerce-first Discover page's "For You" card, where a
+ * HeartToggle (itself a Pressable) was rendered inside the card's own
+ * navigation Pressable — fixed there by making the heart a sibling
+ * positioned absolutely on top of the card instead of a descendant. That
+ * card no longer exists (Discover was rebuilt into an Explore-style grid),
+ * but the general scan below still guards every file listed.
  *
  * This is a lightweight tag-nesting scan, not a full JSX/TSX parse — it's a
  * guardrail against reintroducing this exact class of bug in these files,
@@ -80,15 +82,10 @@ describe('buyer shopping cards never nest a Pressable/Touchable inside another',
     });
   }
 
-  it('Discover\'s product showcase card renders its save heart as a sibling, not a descendant, of the card Pressable', () => {
-    const source = readFileSync(resolve(process.cwd(), 'app/(buyer)/discover.tsx'), 'utf8');
-    const cardOpen = source.indexOf('onPress={() => openProduct(item)}');
-    const cardClose = source.indexOf('</Pressable>', cardOpen);
-    const cardBody = source.slice(cardOpen, cardClose);
-    expect(cardBody).not.toContain('<HeartToggle');
-
-    // The heart must still be rendered, just after (a sibling of) the card.
-    const afterCard = source.slice(cardClose, cardClose + 400);
-    expect(afterCard).toContain('<HeartToggle');
-  });
+  // The old commerce-first Discover page's "For You" ProductShowcase card
+  // (the one this guard originally targeted) was removed when Discover was
+  // rebuilt into the Explore-style grid/viewer/filters screen — there is no
+  // longer a card-level Pressable with a HeartToggle sibling on this screen
+  // to test. The general nested-Pressable scan above still covers
+  // app/(buyer)/discover.tsx.
 });

@@ -146,13 +146,27 @@ function publicDrop(drop) {
 }
 
 const TRENDING = [
-  { brand: 'northline', caption: 'Drop 04 is live. Ember hoodies restocked in every size.' },
-  { brand: 'field', caption: 'Trail Runner 02 — built for city miles and weekend trails.' },
-  { brand: 'quiet', caption: 'Moss, midnight and bone. The loopback capsule lands Friday.' },
-  { brand: 'ember', caption: 'Behind the seams: how we cut the Onyx anorak.' },
-  { brand: 'northline', caption: 'Studio day. Sampling the FW26 cargo in rust.' },
-  { brand: 'field', caption: 'Clay or stone? Vote for the next colourway.' },
-].map((row, i) => ({ id: `post_trending_${i + 1}`, rank: i + 1, brand: BRANDS[row.brand].name, brandId: BRANDS[row.brand].id, caption: row.caption }));
+  // No `imageUri` here on purpose — the real /api/public/trending contract
+  // has no image field today (metadata only), so this fixture matches that
+  // real gap rather than papering over it; Discover's grid falls back to a
+  // monochrome initials+caption tile for these. The first row does carry a
+  // productTags array so the Discover viewer's "Shop the look" pill (which
+  // only ever shows for a post with a real seller product tag) has one real
+  // example to open in a screenshot — a forward-compatible field our own
+  // client mapping (lib/discoverFeed.ts) reads defensively, not something
+  // the real endpoint sends yet.
+  { brand: 'northline', caption: 'Drop 04 is live. Ember hoodies restocked in every size.', mediaType: 'photo', likesCount: 4210, commentsCount: 96, verified: true, productTags: [{ productId: 'prod_nl_hoodie_ember', productName: 'Heavyweight Hoodie — Ember', priceCents: 9800 }] },
+  { brand: 'field', caption: 'Trail Runner 02 — built for city miles and weekend trails.', mediaType: 'photo', likesCount: 3180, commentsCount: 54, verified: true },
+  { brand: 'quiet', caption: 'Moss, midnight and bone. The loopback capsule lands Friday.', mediaType: 'video', likesCount: 2870, commentsCount: 41 },
+  { brand: 'ember', caption: 'Behind the seams: how we cut the Onyx anorak.', mediaType: 'video', likesCount: 2340, commentsCount: 38, verified: true },
+  { brand: 'northline', caption: 'Studio day. Sampling the FW26 cargo in rust.', mediaType: 'photo', likesCount: 1920, commentsCount: 22 },
+  { brand: 'field', caption: 'Clay or stone? Vote for the next colourway.', mediaType: 'photo', likesCount: 1440, commentsCount: 65 },
+].map((row, i) => ({
+  id: `post_trending_${i + 1}`, rank: i + 1, brand: BRANDS[row.brand].name, brandId: BRANDS[row.brand].id,
+  caption: row.caption, mediaType: row.mediaType,
+  likesCount: row.likesCount, commentsCount: row.commentsCount, verified: !!row.verified,
+  productTags: row.productTags,
+}));
 
 // ─── Buyer Search screen (search / suggested / categories / people) ───────────
 

@@ -1,82 +1,60 @@
 /**
- * Discover — curated shopping home for buyers.
+ * Discover — where buyers discover PEOPLE and BRANDS.
  *
- * Full-bleed, editorial rebuild (GOAT-style product story hero, big magazine
- * section titles, floating product cutouts on theme-tinted gradients, glass
- * info cards) over the same sections/data/actions as before:
+ * Rebuilt from the previous commerce-only editorial page into an Instagram
+ * Explore / TikTok Discover-style grid, per Mobbin references:
+ *   - Explore grid, 3 cols + periodic 2x2 feature tile:
+ *     https://mobbin.com/screens/09675c3d-91fb-4d71-a2e1-f41fab098867 (Instagram)
+ *   - Post detail viewer (like/comment/share/save):
+ *     https://mobbin.com/screens/c5be0cd7-9185-48c0-92df-7ff3e4530983 (Instagram)
+ *   - Suggested people row with Follow pill:
+ *     https://mobbin.com/screens/b0953c8a-b220-4f36-9a33-386cd308b158 (TikTok)
+ *   - Filter pill row, right fade, active = white pill / black text:
+ *     Pinterest-style category chips, matched against this app's own
+ *     SegmentedTabs (components/search/SegmentedTabs.tsx) pattern.
+ *   - "Shop the look" pill on a tagged photo post:
+ *     https://mobbin.com/screens/3a51c82f-62f5-4ebd-b00a-72066021ee52 (Depop)
  *
- *   Just Dropped — same catalogue as For You (publicProducts.list), shown as
- *                  an immersive full-bleed swipeable hero with a glass
- *                  "Best price / Sold / Want" info card, mirroring GOAT's
- *                  product-story layout (attached_assets/image_1790033866493.png).
+ * Home (app/(tabs)/feed.tsx) stays seller videos. Discover is now community
+ * + brands: a For You grid mixing buyer posts and brand posts, a Fits filter
+ * (buyer posts only), a Brands grid, a People list and a Drops list.
  *
- *   High Demand  — publicProducts.highDemand(6)
- *                  Only qualified product-backed rows. Empty = nothing qualifies.
- *                  NEVER sourced from trending posts; trending posts have no
- *                  productId and no demand fields.
- *
- *   For You      — publicProducts.list({ limit: 8 })
- *                  General product catalogue, full-bleed floating cards.
- *
- *   From Brands You Follow — composed client-side from api.social.following()
- *                  + api.publicSellers.get() per followed seller (no dedicated
- *                  endpoint exists yet). Signed-in only.
- *
- *   Trending     — publicTrending.get(20)
- *                  Engagement-ranked posts. Posts only — no commerce signals.
- *                  Navigates to seller profile via brandId, not to product detail.
- *
- * Urgency accent is always theme.accent — never the error color constants.
- * Product imagery prefers `cutoutUri` (background-removed PNG) when the API
- * supplies one, falling back to the first framed product photo — so this
- * screen upgrades automatically once cutouts are plumbed through end to end.
+ * Scope note (this is PR A of a two-PR split, per the owner's own request):
+ * the For You mix is composed client-side from existing endpoints — public
+ * Trending for brand/seller posts, friend activity for buyer posts, no new
+ * backend. A dedicated ranking endpoint is PR B. Buyers never tag products
+ * (owner correction) — "Shop the look" only appears on posts that carry a
+ * seller product tag.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  LayoutAnimation,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
-import { FONT, SP, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAuth } from '@clerk/expo';
-import { formatCents } from '@/lib/money';
-import { CachedImage } from '@/components/CachedImage';
-import { CardSkeleton, ListSkeleton, ResponsiveContainer, SkeletonBlock } from '@/components/layout';
+import { ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
-import { LinearGradient } from 'expo-linear-gradient';
-import { EmptyState } from '@/components/BrandthreadUI';
-import { saveItem, removeSavedItem, getSavedItems } from '@/services/socialService';
-import { SaveToCollectionSheet, SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
-import {
-  CommerceSignalRow,
-  ClaimedRemainingLabel,
-  TimeRemainingLabel,
-  UrgencyBar,
-  URGENCY_UNITS_THRESHOLD,
-  type CommerceSignalData,
-} from '@/components/CommerceSignal';
-import { SectionError } from '@/components/InlineFeedback';
+import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { useScrollReset } from '@/hooks/useScrollReset';
-import { Card, HeartToggle, ThemedRefreshControl, GlassPanel } from '@/components/ui';
-import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
-import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
-import { RADII } from '@/constants/radii';
-import { hapticLight, hapticMedium, hapticToggle } from '@/lib/haptics';
+import { ThemedRefreshControl } from '@/components/ui';
+import { hapticLight } from '@/lib/haptics';
 import { isPreviewCatalogEnabled, getPreviewCatalog, getPreviewCatalogByDemand } from '@/lib/previewCatalog';
-
-// ─── API-backed types ──────────────────────────────────────────────────────────
+import type { EditorialTileItem } from '@/components/discover/EditorialTile';
+import { DiscoverFilterRow, type DiscoverFilterKey } from '@/components/discover/DiscoverFilterRow';
+import { DiscoverGrid } from '@/components/discover/DiscoverGrid';
+import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
+import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
+import { DiscoverBrandCard } from '@/components/discover/DiscoverBrandCard';
+import { DiscoverDropRow } from '@/components/discover/DiscoverDropRow';
+import FollowButton from '@/components/social/FollowButton';
+import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
+import { getFriendSuggestions, muteUser } from '@/services/socialService';
+import {
+  composeDiscoverPosts, composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops,
+  type DiscoverPost, type DiscoverBrandCard as BrandCardData, type DiscoverPersonSuggestion, type DiscoverDrop,
+} from '@/lib/discoverFeed';
 
 interface LiveProduct {
   id: string;
@@ -93,944 +71,228 @@ interface LiveProduct {
   variants?: Array<{ priceCents?: number }>;
 }
 
-/** Pick the best available product image: a background-removed cutout first, else the framed photo. */
 function pickImage(cutoutUri?: string | null, images?: string[] | null): string | undefined {
   return cutoutUri ?? (images ?? [])[0] ?? undefined;
 }
 
-// ─── Editorial section head — big magazine-style title + optional "Shop all" ──
-
-function EditorialSectionHead({
-  kicker, title, sub, action, onAction, theme,
-}: {
-  kicker?: string; title: string; sub?: string; action?: string; onAction?: () => void;
-  theme: AppThemePreset;
-}) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
-      <View style={{ flex: 1 }}>
-        {!!kicker && (
-          <Text style={[esh.kicker, { color: theme.accent }]} numberOfLines={1}>{kicker}</Text>
-        )}
-        <Text style={[esh.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>
-        {!!sub && (
-          <Text style={[TYPE_SCALE.footnote, { color: theme.muted, marginTop: 3 }]} numberOfLines={1}>{sub}</Text>
-        )}
-      </View>
-      {!!action && (
-        <Pressable
-          onPress={() => { hapticToggle(); onAction?.(); }}
-          accessibilityRole="button"
-          accessibilityLabel={`${action}, ${title}`}
-          style={[esh.pill, { borderColor: theme.border, backgroundColor: theme.card }]}
-          hitSlop={8}
-        >
-          <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]}>{action}</Text>
-          <Feather name="arrow-up-right" size={13} color={theme.text} />
-        </Pressable>
-      )}
-    </View>
-  );
+function mapToEditorialTile(prefix: string, row: LiveProduct, i: number): EditorialTileItem {
+  const fallbackPrice = (row.variants ?? [])[0]?.priceCents ?? null;
+  const remaining = typeof row.remainingUnits === 'number' ? row.remainingUnits : 0;
+  return {
+    id: `${prefix}_${row.id ?? i}`,
+    productId: row.id,
+    brand: row.sellerDisplayName ?? 'Seller',
+    name: row.name,
+    imageUri: pickImage(row.cutoutUri, row.images),
+    initials: (row.name ?? 'P')[0].toUpperCase(),
+    priceCents: row.currentPriceCents ?? fallbackPrice,
+    isUrgent: remaining > 0 && remaining <= 4,
+  };
 }
 
-const esh = StyleSheet.create({
-  kicker: { fontSize: 11, fontFamily: FONT.bold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 },
-  title:  { fontSize: 28, lineHeight: 32, fontFamily: FONT.bold, letterSpacing: -0.4, textTransform: 'uppercase' },
-  pill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    minHeight: 36, paddingHorizontal: 14, borderRadius: RADII.pill, borderWidth: 1,
-  },
-});
+// ─── People list row (People filter — one per row, not the horizontal card) ───
 
-// ─── Editorial tile — used by High Demand + From Brands You Follow rails ──────
-
-interface EditorialTileItem {
-  id: string;
-  productId: string;
-  brand: string;
-  name: string;
-  imageUri?: string;
-  initials: string;
-  priceCents?: number | null;
-  isUrgent?: boolean;
-}
-
-const TILE_WIDTH = 152;
-// Consistent 3:4 (width:height) tile image, matching the Mobbin references
-// used elsewhere in this pass (TikTok/Instagram shop-grid tiles).
-const TILE_IMAGE_HEIGHT = Math.round((TILE_WIDTH * 4) / 3);
-
-const EditorialTile = React.memo(function EditorialTile({ item, theme }: { item: EditorialTileItem; theme: AppThemePreset }) {
-  const { push } = useThreadPull();
-  return (
-    <Pressable
-      onPress={() => {
-        hapticLight();
-        push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}`) as never);
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={`${item.name} by ${item.brand}${item.priceCents != null ? `, ${formatCents(item.priceCents)}` : ''}`}
-      style={{ width: TILE_WIDTH }}
-    >
-      <LinearGradient
-        colors={theme.heroGradient}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[tile.imageWrap, { width: TILE_WIDTH, height: TILE_IMAGE_HEIGHT }]}
-      >
-        {item.imageUri ? (
-          <CachedImage source={{ uri: item.imageUri }} style={tile.image} contentFit="cover" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, tile.fallback]}>
-            <Text style={tile.fallbackText}>{item.initials}</Text>
-          </View>
-        )}
-        {item.isUrgent && (
-          <View style={[tile.urgentDot, { backgroundColor: theme.accent }]} />
-        )}
-      </LinearGradient>
-      {/* Image, then name / brand / price below it with a tight 4-6pt rhythm
-          — never an overlay pill sitting on the image's bottom edge, which
-          clipped against the image and crowded the name below it. */}
-      <Text style={[tile.name, { color: theme.text }]} numberOfLines={2}>{item.name}</Text>
-      <Text style={[tile.brand, { color: theme.muted }]} numberOfLines={1}>{item.brand}</Text>
-      {item.priceCents != null && (
-        <Text style={[tile.price, TABULAR_NUMS, { color: theme.text }]}>
-          {formatCents(item.priceCents)}
-        </Text>
-      )}
-    </Pressable>
-  );
-});
-
-const tile = StyleSheet.create({
-  imageWrap: { borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  image: { width: '100%', height: '100%' },
-  fallback: { alignItems: 'center', justifyContent: 'center' },
-  fallbackText: { fontSize: 34, fontFamily: FONT.bold, color: '#FFFFFF' },
-  // A thin white ring so this reads clearly against a bright product photo —
-  // a bare accent-colored dot could disappear against similarly-colored
-  // imagery (e.g. an accent-red product on a red-toned photo).
-  urgentDot: {
-    position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4,
-    borderWidth: 1.5, borderColor: '#FFFFFF',
-  },
-  name: { fontSize: 14, fontFamily: FONT.semibold, marginTop: 6 },
-  brand: { fontSize: 12, fontFamily: FONT.regular, marginTop: 4 },
-  price: { fontSize: 13, fontFamily: FONT.semibold, marginTop: 4 },
-});
-
-function TileRailSkeleton() {
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: GUTTER }}>
-      {[0, 1, 2, 3].map(i => (
-        <View key={i} style={{ width: TILE_WIDTH, gap: 8 }}>
-          <SkeletonBlock width={TILE_WIDTH} height={TILE_IMAGE_HEIGHT} radius={RADII.sheet} />
-          <SkeletonBlock width="80%" height={12} />
-          <SkeletonBlock width="50%" height={11} />
-          <SkeletonBlock width="35%" height={11} />
-        </View>
-      ))}
-    </ScrollView>
-  );
-}
-
-// ─── High Demand rail ───────────────────────────────────────────────────────────
-// Uses publicProducts.highDemand() — only qualified product-backed rows.
-// Always navigates to thread-product-detail via real productId.
-// Trending posts are NEVER mixed in here.
-
-// ─── Swipeable product showcase (For You) ─────────────────────────────────────
-
-interface ProductCardItem {
-  id: string;
-  productId?: string;
-  brand: string;
-  name: string;
-  imageUri?: string;
-  initials: string;
-  colorHex: string;
-  tag?: string;
-  commerce: CommerceSignalData;
-}
-
-const SHOWCASE_GAP = 14;
-
-// Declared once: an inline separator component would be a new component type
-// on every render, remounting every separator in the carousel.
-function ShowcaseGap() {
-  return <View style={{ width: SHOWCASE_GAP }} />;
-}
-
-function ProductShowcase({ items }: { items: ProductCardItem[] }) {
-  const { push } = useThreadPull();
-  const { theme } = useAppTheme();
-  const showcase = React.useMemo(() => makeShowcaseStyles(theme), [theme]);
-  const { width: viewportWidth } = useWindowDimensions();
-  const [listWidth, setListWidth] = useState(viewportWidth);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
-  const [saveToSheetItem, setSaveToSheetItem] = useState<SaveToCollectionItem | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    getSavedItems().then(saved => {
-      if (cancelled) return;
-      const savedTargetIds = new Set(saved.map(item => item.targetId));
-      setSavedIds(current => {
-        const next = { ...current };
-        for (const item of items) {
-          if (savedTargetIds.has(item.productId ?? item.id)) next[item.id] = true;
-        }
-        return next;
-      });
-    }).catch(() => {});
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const measuredWidth = Math.max(1, listWidth);
-  const cardWidth = Math.min(Math.max(measuredWidth - 54, 1), 370);
-  const snapInterval = cardWidth + SHOWCASE_GAP;
-  const sideInset = Math.max(0, (measuredWidth - cardWidth) / 2);
-  const snapOffsets = items.map((_, index) => index * snapInterval);
-
-  function openProduct(item: ProductCardItem) {
-    const pid = encodeURIComponent(item.productId ?? item.id);
-    push((`/thread-product-detail?productId=${pid}&productName=${encodeURIComponent(item.name)}`) as never);
-  }
-
-  return (
-    <View
-      style={showcase.shell}
-      onLayout={({ nativeEvent }) => {
-        const nextWidth = Math.round(nativeEvent.layout.width);
-        if (nextWidth > 0 && nextWidth !== listWidth) setListWidth(nextWidth);
-      }}
-    >
-      <Animated.FlatList
-        horizontal
-        data={items}
-        keyExtractor={item => item.id}
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToOffsets={snapOffsets}
-        snapToAlignment="start"
-        disableIntervalMomentum
-        nestedScrollEnabled
-        removeClippedSubviews={false}
-        bounces={items.length > 1}
-        ListHeaderComponent={<View style={{ width: sideInset }} />}
-        ListFooterComponent={<View style={{ width: sideInset }} />}
-        ItemSeparatorComponent={ShowcaseGap}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: true },
-        )}
-        scrollEventThrottle={16}
-        onMomentumScrollEnd={event => {
-          const nextIndex = Math.round(event.nativeEvent.contentOffset.x / snapInterval);
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          setActiveIndex(Math.max(0, Math.min(items.length - 1, nextIndex)));
-          hapticToggle();
-        }}
-        renderItem={({ item, index }) => {
-          const isUrgent =
-            (item.commerce.remainingUnits ?? 0) > 0 &&
-            (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
-          const saved = !!savedIds[item.id];
-          const inputRange = [
-            (index - 1) * snapInterval,
-            index * snapInterval,
-            (index + 1) * snapInterval,
-          ];
-          const scale = scrollX.interpolate({
-            inputRange,
-            outputRange: [0.92, 1, 0.92],
-            extrapolate: 'clamp',
-          });
-          const opacity = scrollX.interpolate({
-            inputRange,
-            outputRange: [0.64, 1, 0.64],
-            extrapolate: 'clamp',
-          });
-
-          return (
-            <Animated.View style={{ width: cardWidth, opacity, transform: [{ scale }], position: 'relative' }}>
-              {/* This card's own navigation Pressable renders as a real DOM
-                  <button> on web. The save heart below is rendered as a
-                  sibling (not a descendant) positioned absolutely on top of
-                  it — a real <button> can never contain another <button>,
-                  so the heart must live outside this Pressable's subtree. */}
-              <Pressable
-                onPress={() => openProduct(item)}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.name} by ${item.brand}${item.commerce.currentPriceCents != null ? `, ${formatCents(item.commerce.currentPriceCents)}` : ''}`}
-              >
-                <View style={showcase.card}>
-                  <LinearGradient
-                    colors={theme.heroGradient}
-                    start={{ x: 0.1, y: 0 }}
-                    end={{ x: 0.9, y: 1 }}
-                    style={[showcase.visual, isUrgent && { borderWidth: 1, borderColor: `${theme.accent}66` }]}
-                  >
-                    <View style={showcase.topline} pointerEvents="box-none">
-                      {/* Brand pill and the "tag" chip share this same
-                          top-left corner — they used to be two independently
-                          absolutely-positioned elements landing directly on
-                          top of each other whenever a post had a tag. Now
-                          they're one row: the tag (when present) leads, the
-                          brand pill follows, so they read side by side
-                          instead of overlapping. */}
-                      {item.tag && (
-                        <View style={showcase.tag}>
-                          <Text style={[TYPE_SCALE.caption, { color: '#FFFFFF', letterSpacing: 0.7, textTransform: 'uppercase' }]} numberOfLines={1}>{item.tag}</Text>
-                        </View>
-                      )}
-                      <View style={showcase.brandPill}>
-                        <Text style={showcase.brandPillText} numberOfLines={1}>{item.brand}</Text>
-                      </View>
-                      {/* Reserves the same row space the heart used to occupy
-                          so the brand pill doesn't stretch full-width now
-                          that the heart is a sibling, not a flex child here. */}
-                      <View style={showcase.heartSpacer} />
-                    </View>
-
-                    {item.imageUri ? (
-                      <CachedImage source={{ uri: item.imageUri }} style={showcase.productImage} contentFit="cover" />
-                    ) : (
-                      <View style={[showcase.productImage, showcase.visualFallback]}>
-                        <Text style={showcase.initials}>{item.initials}</Text>
-                      </View>
-                    )}
-                    {item.commerce.currentPriceCents != null && (
-                      <View style={showcase.pricePill}>
-                        <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: '#0A0A0B' }]}>{formatCents(item.commerce.currentPriceCents)}</Text>
-                      </View>
-                    )}
-                  </LinearGradient>
-
-                  <View style={{ paddingHorizontal: 2 }}>
-                    <Text style={[TYPE_SCALE.headline, { marginTop: 12, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.2 }]} numberOfLines={1}>{item.name}</Text>
-                    <View style={showcase.signalRow}>
-                      <ClaimedRemainingLabel
-                        claimedUnits={item.commerce.claimedUnits ?? 0}
-                        remainingUnits={item.commerce.remainingUnits ?? 0}
-                        urgent={isUrgent}
-                        accent={theme.accent}
-                      />
-                      {!!item.commerce.endsAt && (
-                        <TimeRemainingLabel endsAt={item.commerce.endsAt} accent={theme.accent} />
-                      )}
-                    </View>
-                    {isUrgent && (
-                      <UrgencyBar
-                        claimedUnits={item.commerce.claimedUnits ?? 0}
-                        remainingUnits={item.commerce.remainingUnits ?? 0}
-                        accentColor={theme.accent}
-                        style={{ marginTop: 8 }}
-                      />
-                    )}
-                  </View>
-                </View>
-              </Pressable>
-              <View style={showcase.heartWrap} pointerEvents="box-none">
-                <HeartToggle
-                  liked={saved}
-                  onChange={(nextSaved) => {
-                    setSavedIds(current => ({ ...current, [item.id]: nextSaved }));
-                    const targetId = item.productId ?? item.id;
-                    const action = nextSaved
-                      ? saveItem({ type: 'product', targetId, title: item.name, subtitle: item.brand, accentColor: item.colorHex, priceCents: item.commerce.currentPriceCents ?? undefined })
-                      : removeSavedItem(targetId);
-                    action.catch(() => {
-                      setSavedIds(current => ({ ...current, [item.id]: !nextSaved }));
-                    });
-                  }}
-                  onLongPress={() => {
-                    hapticMedium();
-                    setSavedIds(current => ({ ...current, [item.id]: true }));
-                    setSaveToSheetItem({
-                      type: 'product',
-                      targetId: item.productId ?? item.id,
-                      title: item.name,
-                      subtitle: item.brand,
-                      accentColor: item.colorHex,
-                      priceCents: item.commerce.currentPriceCents ?? undefined,
-                    });
-                  }}
-                  accessibilityLabel={saved ? 'Remove from saved' : 'Save product'}
-                />
-              </View>
-            </Animated.View>
-          );
-        }}
-      />
-      {items.length > 1 && (
-        <View style={showcase.pagination} accessibilityLabel={`Product ${activeIndex + 1} of ${items.length}`}>
-          {items.map((item, index) => (
-            <View
-              key={item.id}
-              style={[showcase.dot, index === activeIndex && showcase.dotActive]}
-            />
-          ))}
-        </View>
-      )}
-      <SaveToCollectionSheet
-        visible={!!saveToSheetItem}
-        item={saveToSheetItem}
-        onClose={() => setSaveToSheetItem(null)}
-      />
-    </View>
-  );
-}
-
-const makeShowcaseStyles = (theme: AppThemePreset) => StyleSheet.create({
-  shell:          { marginBottom: 32 },
-  card:           {},
-  topline:        { position: 'absolute', top: 12, left: 12, right: 12, zIndex: 2, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  brandPill:      { flexShrink: 1, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADII.pill, backgroundColor: 'rgba(0,0,0,0.4)' },
-  brandPillText:  { fontSize: 11, fontFamily: FONT.semibold, color: '#FFFFFF' },
-  // Reserves the same 22pt the heart used to occupy inside `topline`, and
-  // pushes the brand pill/tag to the left instead of stretching full-width.
-  heartSpacer:    { width: 22, height: 22, marginLeft: 'auto' },
-  // The heart lives outside the card's Pressable (a real <button> on web) so
-  // it's a DOM sibling, not a nested <button> — positioned to land exactly
-  // where it used to sit inside `topline` (top:12, right edge of the card).
-  heartWrap:      { position: 'absolute', top: 12, right: 12, zIndex: 3 },
-  visual:         { height: 380, position: 'relative', overflow: 'hidden', borderRadius: RADII.sheet, alignItems: 'center', justifyContent: 'center' },
-  productImage:   { width: '100%', height: '100%' },
-  visualFallback: { alignItems: 'center', justifyContent: 'center' },
-  initials:       { fontSize: 56, fontFamily: FONT.bold, color: '#FFFFFF' },
-  tag:            { flexShrink: 0, paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADII.chip, backgroundColor: 'rgba(0,0,0,0.72)' },
-  pricePill:      { position: 'absolute', bottom: 14, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 9, borderRadius: RADII.pill, backgroundColor: '#FFFFFF' },
-  signalRow:      { minHeight: 30, marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 10 },
-  pagination:     { height: 22, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  dot:            { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.subtle },
-  dotActive:      { width: 16, backgroundColor: theme.text },
-});
-
-// ─── Trending post row ────────────────────────────────────────────────────────
-// Trending items are engagement-ranked posts. They carry no productId and no
-// product demand fields. We show brand/caption, navigate to seller profile via
-// brandId. No commerce signals displayed here.
-
-interface TrendingRowItem {
-  id: string;
-  rank: number;
-  brand: string;
-  brandId?: string;
-  name: string;
-  initials: string;
-  colorHex: string;
-}
-
-const TrendingRow = React.memo(function TrendingRow({ item }: { item: TrendingRowItem }) {
+function PersonListRow({ person }: { person: DiscoverPersonSuggestion }) {
   const router = useRouter();
   const { theme } = useAppTheme();
-
-  function handlePress() {
-    hapticLight();
-    if (item.brandId) {
-      // Trending posts navigate to seller profile via brandId — they have no productId
-      router.push((`/seller-profile?id=${encodeURIComponent(item.brandId)}`) as never);
-    }
-  }
-
   return (
-    <Card
-      onPress={handlePress}
-      accessibilityLabel={`#${item.rank}, ${item.name} by ${item.brand}`}
-      style={tr.row}
+    <PressableScale
+      onPress={() => router.push(`/buyer-other-profile?userId=${encodeURIComponent(person.userId)}&name=${encodeURIComponent(person.name)}&handle=${encodeURIComponent(person.handle)}&initials=${encodeURIComponent(person.initials)}` as never)}
+      style={styles.personRow}
     >
-      <Text style={[TYPE_SCALE.title2, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.accent, width: 32 }]}>{item.rank}</Text>
-      <View style={[tr.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.bold, color: theme.text }]}>{item.initials}</Text>
-      </View>
+      {person.avatarUrl ? (
+        <Image source={{ uri: person.avatarUrl }} style={styles.personAvatar} />
+      ) : (
+        <View style={[styles.personAvatar, { backgroundColor: person.color, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={styles.personInitials}>{person.initials}</Text>
+        </View>
+      )}
       <View style={{ flex: 1 }}>
-        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
-        {/* No commerce signals — trending posts have no product demand data */}
+        <Text style={[styles.personName, { color: theme.text }]} numberOfLines={1}>{person.name}</Text>
+        <Text style={[styles.personReason, { color: theme.muted }]} numberOfLines={1}>{person.reason}</Text>
       </View>
-    </Card>
-  );});
-
-const tr = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
-  avatar:   { width: 44, height: 44, borderRadius: RADII.chip, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-});
-
-// ─── Discover Hero — full-bleed "Just Dropped" product story ──────────────────
-//
-// Layout inspired by GOAT's immersive drop page (see attached_assets/
-// image_1790033866493.png): full-bleed theme-tinted gradient backdrop with
-// soft glow, one product cutout floating centered with an idle bob, a glass
-// top bar (counter chip · JUST DROPPED · Shop all pill), a glass price pill,
-// a glass "Best price / Sold / Want" info card, and horizontal swipe between
-// products with the next one peeking + scaling in from the edge.
-function DiscoverHero({
-  items, theme, onOpenProduct, onShopAll,
-}: {
-  items: ProductCardItem[];
-  theme: AppThemePreset;
-  onOpenProduct: (item: ProductCardItem) => void;
-  onShopAll: () => void;
-}) {
-  // Measured from the hero's own container, not useWindowDimensions(): on
-  // web, WebAppShell clips the app to a centered column (WEB_SHELL_MAX_WIDTH)
-  // narrower than the raw browser window once past its breakpoint, and
-  // sizing off the window would push the product page past the visible
-  // column's edge.
-  const { width: windowWidth } = useWindowDimensions();
-  const [measuredWidth, setMeasuredWidth] = useState(windowWidth);
-  const heroWidth = measuredWidth || windowWidth;
-  const [activeIndex, setActiveIndex] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const heroHeight = Math.min(620, Math.max(480, heroWidth * 1.32));
-  // Page is narrower than the viewport so the next card peeks in at the edge.
-  const pagePeek = 46;
-  const pageWidth = Math.min(heroWidth, GRID_MAX_WIDTH) - pagePeek;
-  const snapInterval = pageWidth;
-  const sideInset = (heroWidth - pageWidth) / 2;
-
-  // Gentle continuous idle float for the active product cutout.
-  const floatY = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatY, { toValue: -10, duration: 1900, useNativeDriver: true }),
-        Animated.timing(floatY, { toValue: 0, duration: 1900, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [floatY]);
-
-  if (items.length === 0) return null;
-  const active = items[Math.min(activeIndex, items.length - 1)];
-  const isUrgent =
-    (active.commerce.remainingUnits ?? 0) > 0 &&
-    (active.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
-
-  return (
-    <View
-      style={{ height: heroHeight, marginBottom: SP.xl }}
-      onLayout={({ nativeEvent }) => {
-        const next = Math.round(nativeEvent.layout.width);
-        if (next > 0 && next !== measuredWidth) setMeasuredWidth(next);
-      }}
-    >
-      <LinearGradient
-        colors={theme.heroGradient}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      {/* A single, subtle top highlight — not the two large soft-edged
-          circles this used to have, which read as cheap decoration rather
-          than depth. */}
-      <LinearGradient
-        pointerEvents="none"
-        colors={[`${theme.glowGradient[0]}33`, 'transparent']}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={dh.topHighlight}
-      />
-
-      {/* ─ Story bar: counter chip · JUST DROPPED · Shop all pill ─ */}
-      <View style={[dh.topBar, { paddingHorizontal: Math.max(SP.md, sideInset) }]}>
-        <View style={dh.counterChip}>
-          <Text style={dh.counterChipText}>{activeIndex + 1}/{items.length}</Text>
-        </View>
-        <Text style={dh.title} numberOfLines={1}>Just Dropped</Text>
-        <Pressable onPress={onShopAll} style={dh.shopAllPill} accessibilityRole="button" accessibilityLabel="Shop all" hitSlop={8}>
-          <Text style={dh.shopAllText}>Shop all</Text>
-        </Pressable>
-      </View>
-
-      <Animated.ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled={false}
-        snapToInterval={snapInterval}
-        decelerationRate="fast"
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: sideInset }}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: true })}
-        scrollEventThrottle={16}
-        onMomentumScrollEnd={(e) => {
-          const next = Math.round(e.nativeEvent.contentOffset.x / snapInterval);
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          setActiveIndex(Math.max(0, Math.min(items.length - 1, next)));
-          hapticToggle();
-        }}
-      >
-        {items.map((item, index) => {
-          const inputRange = [(index - 1) * snapInterval, index * snapInterval, (index + 1) * snapInterval];
-          const scale = scrollX.interpolate({ inputRange, outputRange: [0.86, 1, 0.86], extrapolate: 'clamp' });
-          const opacity = scrollX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
-          return (
-            <Pressable
-              key={item.id}
-              onPress={() => onOpenProduct(item)}
-              style={{ width: pageWidth, alignItems: 'center' }}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.name} by ${item.brand}${item.commerce.currentPriceCents != null ? `, ${formatCents(item.commerce.currentPriceCents)}` : ''}`}
-            >
-              <Animated.View style={[dh.productWrap, { opacity, transform: [{ scale }, { translateY: index === activeIndex ? floatY : 0 }] }]}>
-                {item.imageUri ? (
-                  <CachedImage source={{ uri: item.imageUri }} style={dh.productImage} contentFit="cover" />
-                ) : (
-                  <View style={[dh.productImage, dh.productImageFallback, { backgroundColor: `${theme.onAccent}22` }]}>
-                    <Text style={[dh.productFallbackInitials, { color: theme.onAccent }]}>{item.initials}</Text>
-                  </View>
-                )}
-              </Animated.View>
-            </Pressable>
-          );
-        })}
-      </Animated.ScrollView>
-
-      {/* ─ Name/brand + price pill + glass "Sold / Want" info card ─ */}
-      <View style={[dh.bottomChrome, { paddingHorizontal: Math.max(SP.md, sideInset) }]} pointerEvents="box-none">
-        <View style={dh.identityBlock}>
-          <Text style={dh.productName} numberOfLines={1}>{active.name}</Text>
-          <Text style={dh.productBrand} numberOfLines={1}>{active.brand}</Text>
-        </View>
-        {active.commerce.currentPriceCents != null && (
-          <View style={dh.pricePill}>
-            <Text style={dh.pricePillText}>{formatCents(active.commerce.currentPriceCents)}</Text>
-          </View>
-        )}
-        <HeroStatCard item={active} isUrgent={isUrgent} theme={theme} />
-        {items.length > 1 && (
-          <View style={dh.dots} accessibilityLabel={`Product ${activeIndex + 1} of ${items.length}`}>
-            {items.map((it, i) => (
-              <View key={it.id} style={[dh.dot, i === activeIndex && dh.dotActive]} />
-            ))}
-          </View>
-        )}
-      </View>
-    </View>
+      <FollowButton userId={person.userId} initial={{ isFollowing: person.isFollowing, isFollowedBy: false, isMutual: false }} size="compact" />
+    </PressableScale>
   );
 }
-
-function HeroStatCard({ item, isUrgent, theme }: { item: ProductCardItem; isUrgent: boolean; theme: AppThemePreset }) {
-  // Price already shows once, in the price pill above this card — this row
-  // never repeats it, only the stats the pill doesn't cover.
-  const sold = item.commerce.claimedUnits ?? 0;
-  const want = item.commerce.demandCount;
-  const stats: { label: string; value: string }[] = [];
-  if (sold > 0) stats.push({ label: 'Sold', value: sold.toLocaleString() });
-  if (want != null && want > 0) stats.push({ label: 'Want', value: want.toLocaleString() });
-  if (stats.length === 0) return null;
-
-  return (
-    <GlassPanel style={dh.statCard} intensity={35}>
-      <View style={dh.statRow}>
-        {stats.map((stat, i) => (
-          <React.Fragment key={stat.label}>
-            {i > 0 && <View style={dh.statDivider} />}
-            <View style={dh.statCol}>
-              <Text style={dh.statLabel}>{stat.label.toUpperCase()}</Text>
-              <Text style={[dh.statValue, isUrgent ? { color: theme.accentLight } : null]}>{stat.value}</Text>
-            </View>
-          </React.Fragment>
-        ))}
-      </View>
-    </GlassPanel>
-  );
-}
-
-const dh = StyleSheet.create({
-  topHighlight: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: 160,
-  },
-  topBar: {
-    marginTop: SP.lg,
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-  },
-  counterChip: {
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADII.pill,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
-  counterChipText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
-  title: {
-    flex: 1, textAlign: 'center', color: '#FFFFFF', fontFamily: FONT.bold,
-    fontSize: 13, letterSpacing: 2.4, textTransform: 'uppercase',
-  },
-  shopAllPill: {
-    minHeight: 32, justifyContent: 'center',
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADII.pill,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
-  shopAllText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 12 },
-  productWrap: {
-    width: '100%', height: 240, alignItems: 'center', justifyContent: 'center', marginTop: 14,
-  },
-  productImage: {
-    width: '100%', height: '100%', borderRadius: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 6,
-  },
-  productImageFallback: { alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
-  productFallbackInitials: { fontFamily: FONT.bold, fontSize: 40 },
-  bottomChrome: {
-    position: 'absolute', bottom: SP.lg, left: 0, right: 0, alignItems: 'center', gap: 12,
-  },
-  identityBlock: { alignItems: 'center', gap: 2 },
-  productName: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 15, textAlign: 'center' },
-  productBrand: { color: 'rgba(255,255,255,0.68)', fontFamily: FONT.medium, fontSize: 12, textAlign: 'center' },
-  pricePill: {
-    paddingHorizontal: 18, paddingVertical: 9, borderRadius: RADII.pill,
-    backgroundColor: '#FFFFFF',
-    // A little lift so it reads as a floating chip above the image, matching
-    // the depth the glass stat card right below it already has — previously
-    // flat, it looked pasted on rather than part of the same floating stack.
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.22, shadowRadius: 6, elevation: 4,
-  },
-  pricePillText: { color: '#0A0A0B', fontFamily: FONT.bold, fontSize: 16, ...TABULAR_NUMS },
-  statCard: { width: '100%', maxWidth: 360 },
-  statRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8 },
-  statCol: { flex: 1, alignItems: 'center' },
-  statDivider: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,0.18)' },
-  statValue: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 15, marginTop: 3, ...TABULAR_NUMS },
-  statLabel: { color: 'rgba(255,255,255,0.68)', fontFamily: FONT.semibold, fontSize: 9, letterSpacing: 0.8 },
-  dots: { flexDirection: 'row', gap: 6 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
-  dotActive: { width: 16, backgroundColor: '#FFFFFF' },
-});
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DiscoverScreen() {
-  const scrollResetRef = useScrollReset<ScrollView>();
+  const listRef = useScrollReset<FlatList<any>>();
   const barInset = useBuyerTabBarInset();
-  const router    = useRouter();
-  const { push }  = useThreadPull();
-  const api       = useApi();
+  const router = useRouter();
+  const api = useApi();
   const { theme } = useAppTheme();
   const { isSignedIn } = useAuth();
 
-  const { width: winWidth } = useWindowDimensions();
-  const showcaseSkeletonWidth = Math.min(Math.max(winWidth - 54 - GUTTER * 2, 1), 370);
-
-  // ─ Each section has independent loading, error, and data ──────────
-
+  const [filter, setFilter] = useState<DiscoverFilterKey>('forYou');
   const [refreshing, setRefreshing] = useState(false);
 
-  // High Demand — publicProducts.highDemand(6) only.
-  // Never sourced from trending posts. Empty array = nothing qualifies.
-  const [highDemandItems,   setHighDemandItems]   = useState<EditorialTileItem[]>([]);
-  const [highDemandLoading, setHighDemandLoading] = useState(true);
-  const [highDemandError,   setHighDemandError]   = useState<string | null>(null);
+  // Rails, shared by the For You grid. Errors quietly drop the rail (it
+  // simply doesn't get inserted into the grid) rather than blocking the
+  // whole screen — the grid's own posts are the primary content.
+  const [justDroppedItems, setJustDroppedItems] = useState<EditorialTileItem[]>([]);
+  const [, setJustDroppedLoading] = useState(true);
 
-  const [forYouItems,    setForYouItems]    = useState<ProductCardItem[]>([]);
-  const [forYouLoading,  setForYouLoading]  = useState(true);
-  const [forYouError,    setForYouError]    = useState<string | null>(null);
+  const [highDemandItems, setHighDemandItems] = useState<EditorialTileItem[]>([]);
+  const [, setHighDemandLoading] = useState(true);
 
-  const [followedItems,   setFollowedItems]   = useState<EditorialTileItem[]>([]);
-  const [followedLoading, setFollowedLoading] = useState(true);
-  const [followedError,   setFollowedError]   = useState<string | null>(null);
+  const [people, setPeople] = useState<DiscoverPersonSuggestion[]>([]);
+  const [peopleLoading, setPeopleLoading] = useState(true);
 
-  const [trendingItems,   setTrendingItems]   = useState<TrendingRowItem[]>([]);
-  const [trendingLoading, setTrendingLoading] = useState(true);
-  const [trendingError,   setTrendingError]   = useState<string | null>(null);
+  // For You / Fits grid state (kept separate so switching filters doesn't refetch).
+  const [forYouPosts, setForYouPosts] = useState<DiscoverPost[]>([]);
+  const [forYouLoading, setForYouLoading] = useState(true);
+  const [forYouLoadingMore, setForYouLoadingMore] = useState(false);
+  const forYouLimit = useRef(30);
 
-  // ─ Fetch High Demand ────────────────────────────────────────────────────
-  // publicProducts.highDemand(limit) → any[] (direct array, no wrapper)
-  // Only qualified product-backed rows. Empty = nothing meets criteria.
-  // No fallback to publicProducts.list() — empty array shows empty state.
+  const [fitsPosts, setFitsPosts] = useState<DiscoverPost[]>([]);
+  const [fitsLoading, setFitsLoading] = useState(true);
+  const [fitsLoadingMore, setFitsLoadingMore] = useState(false);
+  const fitsLimit = useRef(30);
+
+  const [brands, setBrands] = useState<BrandCardData[]>([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+  const [brandsFetched, setBrandsFetched] = useState(false);
+
+  const [drops, setDrops] = useState<DiscoverDrop[]>([]);
+  const [dropsLoading, setDropsLoading] = useState(true);
+  const [dropsFetched, setDropsFetched] = useState(false);
+
+  const [viewer, setViewer] = useState<{ posts: DiscoverPost[]; startIndex: number } | null>(null);
+  const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
+  const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
+
+  const fetchJustDropped = useCallback(async () => {
+    setJustDroppedLoading(true);
+    try {
+      const rows = await api.publicProducts.list({ limit: 8 });
+      let safe: LiveProduct[] = Array.isArray(rows) ? rows : [];
+      if (safe.length === 0 && isPreviewCatalogEnabled()) safe = getPreviewCatalog();
+      setJustDroppedItems(safe.map((row, i) => mapToEditorialTile('jd', row, i)));
+    } catch {
+      // Rail simply doesn't render — see comment on the state above.
+    } finally {
+      setJustDroppedLoading(false);
+    }
+  }, [api]);
+
   const fetchHighDemand = useCallback(async () => {
     setHighDemandLoading(true);
-    setHighDemandError(null);
     try {
       const rows = await api.publicProducts.highDemand(6);
-      let safe = Array.isArray(rows) ? rows : [];
-      // Nothing testable without real sellers yet: in preview/dev only, seed
-      // from the bundled preview catalog so this rail has real-looking data
-      // to browse. Never used when the real API actually returned rows, and
-      // never compiled into a production build (isPreviewCatalogEnabled is
-      // hard-gated on __DEV__).
-      if (safe.length === 0 && isPreviewCatalogEnabled()) {
-        safe = getPreviewCatalogByDemand(6);
-      }
-      setHighDemandItems(safe.map((p: any): EditorialTileItem => {
-        const fallbackPrice = (p.variants ?? [])[0]?.priceCents ?? null;
-        const remaining = typeof p.remainingUnits === 'number' ? p.remainingUnits : 0;
-        return {
-          id:        `hd_${p.id}`,
-          productId: p.id,  // real productId — thread-product-detail navigation
-          brand:     p.sellerDisplayName ?? 'Seller',
-          name:      p.name,
-          imageUri:  pickImage(p.cutoutUri, p.images),
-          initials:  (p.name ?? 'P')[0].toUpperCase(),
-          priceCents: p.currentPriceCents ?? fallbackPrice,
-          isUrgent:  remaining > 0 && remaining <= URGENCY_UNITS_THRESHOLD,
-        };
-      }));
+      let safe: LiveProduct[] = Array.isArray(rows) ? rows : [];
+      if (safe.length === 0 && isPreviewCatalogEnabled()) safe = getPreviewCatalogByDemand(6);
+      setHighDemandItems(safe.map((row, i) => mapToEditorialTile('hd', row, i)));
     } catch {
-      // Do NOT reset highDemandItems — keep previous data visible if available
-      setHighDemandError('Could not load high demand products. Tap to retry.');
+      // Rail simply doesn't render — see comment on the state above.
     } finally {
       setHighDemandLoading(false);
     }
   }, [api]);
 
-  // ─ Fetch For You products ─────────────────────────────────────────────
-  // publicProducts.list returns any[] directly — no {items} wrapper.
-  const fetchProducts = useCallback(async () => {
-    setForYouLoading(true);
-    setForYouError(null);
+  const fetchPeople = useCallback(async () => {
+    setPeopleLoading(true);
     try {
-      const rows = await api.publicProducts.list({ limit: 8 });
-      let safe: LiveProduct[] = Array.isArray(rows) ? rows : [];
-      if (safe.length === 0 && isPreviewCatalogEnabled()) {
-        safe = getPreviewCatalog();
-      }
-      setForYouItems(safe.map((row, i): ProductCardItem => {
-        const fallbackPrice = (row.variants ?? [])[0]?.priceCents ?? null;
-        return {
-          id:         `fy_${i}`,
-          productId:  row.id,
-          brand:      row.sellerDisplayName ?? 'Seller',
-          name:       row.name,
-          imageUri:   pickImage(row.cutoutUri, row.images),
-          initials:   (row.name ?? 'P')[0].toUpperCase(),
-          colorHex:   theme.accent,
-          tag:        (row.tags as string[] | undefined)?.[0],
-          commerce: {
-            currentPriceCents: row.currentPriceCents ?? fallbackPrice,
-            claimedUnits:      row.claimedUnits  ?? 0,
-            remainingUnits:    row.remainingUnits ?? 0,
-            demandCount:       row.demandCount   ?? null,
-            endsAt:            row.endsAt ?? null,
-          },
-        };
-      }));
-    } catch {
-      // Do NOT reset forYouItems — keep previous data visible if available
-      setForYouError('Could not load products. Tap to retry.');
+      setPeople(await composeDiscoverPeople({ getFriendSuggestions }));
     } finally {
-      setForYouLoading(false);
+      setPeopleLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme.accent]);
+  }, []);
 
-  // ─ Fetch From Brands You Follow ─────────────────────────────────────────
-  // Composed client-side: api.social.following() → per-seller
-  // api.publicSellers.get() → first product(s) per followed seller. No
-  // dedicated endpoint exists yet. Signed-in only; empty when signed out.
-  const fetchFollowed = useCallback(async () => {
-    if (!isSignedIn) {
-      setFollowedLoading(false);
-      setFollowedItems([]);
-      setFollowedError(null);
-      return;
-    }
-    setFollowedLoading(true);
-    setFollowedError(null);
+  const fetchForYou = useCallback(async (append = false) => {
+    if (append) setForYouLoadingMore(true); else setForYouLoading(true);
     try {
-      const following = await api.social.following();
-      const sellers = (Array.isArray(following) ? following : []).slice(0, 6);
-      const perSeller = await Promise.all(sellers.map(async (f): Promise<EditorialTileItem[]> => {
-        try {
-          const data = await api.publicSellers.get(f.userId);
-          const prods = Array.isArray(data?.products) ? data.products : [];
-          const brandName = (data?.profile as any)?.brandName ?? (data?.profile as any)?.displayName ?? f.name ?? 'Brand';
-          return prods.slice(0, 2).map((p: any): EditorialTileItem => ({
-            id:        `fb_${p.id}`,
-            productId: p.id,
-            brand:     brandName,
-            name:      p.name,
-            imageUri:  pickImage(p.cutoutUri, p.images),
-            initials:  (brandName ?? 'B').slice(0, 2).toUpperCase(),
-            priceCents: (p.variants ?? [])[0]?.priceCents ?? null,
-          }));
-        } catch {
-          return [];
-        }
-      }));
-      setFollowedItems(perSeller.flat().slice(0, 10));
-    } catch {
-      setFollowedError('Could not load brands you follow. Tap to retry.');
+      const rows = await composeDiscoverPosts({ api, isSignedIn: !!isSignedIn, filter: 'forYou', limit: forYouLimit.current });
+      setForYouPosts(rows);
     } finally {
-      setFollowedLoading(false);
+      if (append) setForYouLoadingMore(false); else setForYouLoading(false);
     }
   }, [api, isSignedIn]);
 
-  // ─ Fetch Trending posts ───────────────────────────────────────────────
-  // publicTrending.get(limit: number) → { trending: TrendingItem[] }
-  // TrendingItem = post: id, rank, brand, brandId, caption.
-  // Posts have NO productId and NO product demand fields.
-  // We display brand/caption under "Trending" only — never in High Demand.
-  // finalScore/organicScore are NOT mapped to demandCount (they are post metrics, not demand signals).
-  const fetchTrending = useCallback(async () => {
-    setTrendingLoading(true);
-    setTrendingError(null);
+  const fetchFits = useCallback(async (append = false) => {
+    if (append) setFitsLoadingMore(true); else setFitsLoading(true);
     try {
-      // Correct signature: get(limit: number) — not get({ limit })
-      const data = await api.publicTrending.get(20);
-      let rows: any[] = Array.isArray(data?.trending)
-        ? data.trending.map((t: any) => ({ ...t, caption: t.caption ?? undefined }))
-        : [];
-      // Same preview-catalog pattern already used for High Demand/For You:
-      // in dev preview with no live engagement data, this section otherwise
-      // renders an empty state on every load, which makes it unreviewable.
-      // A real empty account still sees the real empty state — this only
-      // fires when the API genuinely returns zero trending posts.
-      if (rows.length === 0 && isPreviewCatalogEnabled()) {
-        rows = getPreviewCatalog().map((p, i) => ({
-          id: p.id,
-          rank: i + 1,
-          brand: p.sellerDisplayName,
-          brandId: p.sellerId,
-          caption: p.name,
-        }));
-      }
-      setTrendingItems(rows.map((t, i): TrendingRowItem => ({
-        id:       t.id,
-        rank:     t.rank ?? i + 1,
-        brand:    t.brand ?? 'Brand',
-        brandId:  t.brandId,
-        // Navigate to seller-profile via brandId — trending posts have no productId
-        name:     t.caption ? String(t.caption).slice(0, 60) : (t.brand ?? 'Trending'),
-        initials: (t.brand ?? 'B').slice(0, 2).toUpperCase(),
-        colorHex: theme.accent,
-        // No commerce fields — trending posts are not product demand rows
-      })));
-    } catch {
-      // Do NOT reset trendingItems — keep previous data visible if available
-      setTrendingError('Could not load trending posts. Tap to retry.');
+      const rows = await composeDiscoverPosts({ api, isSignedIn: !!isSignedIn, filter: 'fits', limit: fitsLimit.current });
+      setFitsPosts(rows);
     } finally {
-      setTrendingLoading(false);
+      if (append) setFitsLoadingMore(false); else setFitsLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme.accent]);
+  }, [api, isSignedIn]);
+
+  const fetchBrands = useCallback(async () => {
+    setBrandsLoading(true);
+    try {
+      setBrands(await composeDiscoverBrands({ api, isSignedIn: !!isSignedIn }));
+    } finally {
+      setBrandsLoading(false);
+      setBrandsFetched(true);
+    }
+  }, [api, isSignedIn]);
+
+  const fetchDrops = useCallback(async () => {
+    setDropsLoading(true);
+    try {
+      setDrops(await composeDiscoverDrops({ api }));
+    } finally {
+      setDropsLoading(false);
+      setDropsFetched(true);
+    }
+  }, [api]);
 
   useEffect(() => {
+    fetchJustDropped();
     fetchHighDemand();
-    fetchProducts();
-    fetchFollowed();
-    fetchTrending();
-  }, [fetchHighDemand, fetchProducts, fetchFollowed, fetchTrending]);
+    fetchPeople();
+    fetchForYou();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (filter === 'fits' && fitsPosts.length === 0 && fitsLoading) fetchFits();
+    if (filter === 'brands' && !brandsFetched) fetchBrands();
+    if (filter === 'drops' && !dropsFetched) fetchDrops();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     hapticLight();
-    Promise.all([fetchHighDemand(), fetchProducts(), fetchFollowed(), fetchTrending()])
-      .finally(() => setRefreshing(false));
-  }, [fetchHighDemand, fetchProducts, fetchFollowed, fetchTrending]);
+    forYouLimit.current = 30;
+    fitsLimit.current = 30;
+    Promise.all([
+      fetchJustDropped(), fetchHighDemand(), fetchPeople(),
+      filter === 'fits' ? fetchFits() : fetchForYou(),
+      filter === 'brands' ? fetchBrands() : Promise.resolve(),
+      filter === 'drops' ? fetchDrops() : Promise.resolve(),
+    ]).finally(() => setRefreshing(false));
+  }, [filter, fetchJustDropped, fetchHighDemand, fetchPeople, fetchForYou, fetchFits, fetchBrands, fetchDrops]);
 
-  return (
-    <ScrollView
-      ref={scrollResetRef}
-      style={{ flex: 1, backgroundColor: theme.background }}
-      contentContainerStyle={{ paddingBottom: barInset + SP.md }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
-    >
+  function openViewer(post: DiscoverPost, flatIndex: number, allPosts: DiscoverPost[]) {
+    hapticLight();
+    setViewer({ posts: allPosts, startIndex: flatIndex });
+  }
+
+  function openShopTheLook(post: DiscoverPost) {
+    const tags = post.productTags ?? [];
+    if (tags.length === 0) return;
+    setShopSelection({
+      postId: post.id,
+      postSellerId: post.authorAccountType === 'seller' ? post.authorId : undefined,
+      tags,
+      activeTagIndex: 0,
+    });
+  }
+
+  function removePostFromLists(authorId: string, onlyPostId?: string) {
+    const filterFn = (p: DiscoverPost) => (onlyPostId ? p.id !== onlyPostId : p.authorId !== authorId);
+    setForYouPosts((prev) => prev.filter(filterFn));
+    setFitsPosts((prev) => prev.filter(filterFn));
+  }
+
+  const header = (
+    <>
       <TabPageHeader
         title="Discover"
         actions={[
@@ -1038,182 +300,165 @@ export default function DiscoverScreen() {
           ...(isSignedIn ? [{ name: 'bell' as const, onPress: () => router.push('/(buyer)/inbox' as never), accessibilityLabel: 'Notifications' }] : []),
         ]}
       />
+      <DiscoverFilterRow active={filter} onChange={setFilter} />
+    </>
+  );
 
-      {/* ─ Hero — full-bleed "Just Dropped" story. Sourced from the same For
-          You catalogue fetched below (no separate endpoint yet). ─ */}
-      {forYouLoading ? (
-        <View style={{ marginBottom: SP.xl }}>
-          <SkeletonBlock width="100%" height={520} radius={0} />
-        </View>
-      ) : forYouError ? (
-        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <View style={{ paddingTop: SP.md }}>
-            <SectionError message={forYouError} onRetry={fetchProducts} />
-          </View>
-        </ResponsiveContainer>
-      ) : forYouItems.length === 0 ? (
-        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <View style={{ paddingTop: SP.md }}>
-            <EmptyState
-              icon="package"
-              title="No products available right now"
-              description="New arrivals show up here as sellers add them."
-              action={{ label: 'Search products', onPress: () => router.push('/buyer-search' as never) }}
-            />
-          </View>
-        </ResponsiveContainer>
-      ) : (
-        <DiscoverHero
-          items={forYouItems.slice(0, 6)}
-          theme={theme}
-          onOpenProduct={(item) => {
-            hapticLight();
-            const pid = encodeURIComponent(item.productId ?? item.id);
-            push((`/thread-product-detail?productId=${pid}&productName=${encodeURIComponent(item.name)}`) as never);
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      {filter === 'forYou' && (
+        <DiscoverGrid
+          ref={listRef}
+          posts={forYouPosts}
+          loading={forYouLoading}
+          loadingMore={forYouLoadingMore}
+          justDroppedItems={justDroppedItems}
+          highDemandItems={highDemandItems}
+          people={people}
+          onEndReached={() => {
+            if (forYouLoadingMore || forYouLoading || forYouLimit.current >= 120) return;
+            forYouLimit.current += 30;
+            fetchForYou(true);
           }}
-          onShopAll={() => router.push('/buyer-search' as never)}
+          onTilePress={(post, idx) => openViewer(post, idx, forYouPosts)}
+          onTileLongPress={setSafetyMenuPost}
+          contentContainerStyle={{ paddingBottom: barInset + SP.md }}
+          ListHeaderComponent={header as never}
         />
       )}
 
-      {/* ─ High Demand — publicProducts.highDemand(6) only, no trending posts ─ */}
-      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-        <EditorialSectionHead
-          kicker="Moving fast"
-          title="High Demand"
-          sub="Products moving fast across the platform"
-          theme={theme}
+      {filter === 'fits' && (
+        <DiscoverGrid
+          ref={listRef}
+          posts={fitsPosts}
+          loading={fitsLoading}
+          loadingMore={fitsLoadingMore}
+          showRails={false}
+          people={people}
+          onEndReached={() => {
+            if (fitsLoadingMore || fitsLoading || fitsLimit.current >= 120) return;
+            fitsLimit.current += 30;
+            fetchFits(true);
+          }}
+          onTilePress={(post, idx) => openViewer(post, idx, fitsPosts)}
+          onTileLongPress={setSafetyMenuPost}
+          contentContainerStyle={{ paddingBottom: barInset + SP.md }}
+          ListHeaderComponent={header as never}
         />
-        {highDemandLoading ? (
-          <TileRailSkeleton />
-        ) : highDemandError ? (
-          <SectionError message={highDemandError} onRetry={fetchHighDemand} />
-        ) : highDemandItems.length === 0 ? (
-          <EmptyState
-            icon="trending-up"
-            title="No high-demand products right now"
-            description="Check back soon, or browse everything sellers have listed."
-            action={{ label: 'Browse products', onPress: () => router.push('/buyer-search' as never) }}
-          />
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} decelerationRate="fast" snapToInterval={TILE_WIDTH + 16} snapToAlignment="start" contentContainerStyle={{ gap: 16, paddingRight: GUTTER }}>
-            {highDemandItems.map(item => (
-              <EditorialTile key={item.id} item={item} theme={theme} />
-            ))}
-          </ScrollView>
-        )}
-      </ResponsiveContainer>
-
-      {/* ─ For You — full-bleed floating product cards ─ */}
-      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
-        <EditorialSectionHead kicker="Just for you" title="For You" sub="Products from across the platform" theme={theme} />
-      </ResponsiveContainer>
-
-      {/* ─ Entry point into the full-screen, swipeable Discover pager ─ */}
-      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.md }}>
-        <Card
-          onPress={() => push('/(buyer)/discover-feed' as never)}
-          accessibilityLabel="Open full-screen For You feed"
-          style={fy.banner}
-        >
-          <View style={[fy.bannerIcon, { backgroundColor: theme.accentDim }]}>
-            <Feather name="zap" size={18} color={theme.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]}>For You, full screen</Text>
-            <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]}>Swipe through products one at a time</Text>
-          </View>
-          <Feather name="chevron-right" size={18} color={theme.muted} />
-        </Card>
-      </ResponsiveContainer>
-      {forYouLoading ? (
-        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <CardSkeleton width={showcaseSkeletonWidth} />
-        </ResponsiveContainer>
-      ) : forYouError ? (
-        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <SectionError message={forYouError} onRetry={fetchProducts} />
-        </ResponsiveContainer>
-      ) : forYouItems.length === 0 ? (
-        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <EmptyState
-            icon="package"
-            title="No products available right now"
-            description="New arrivals show up here as sellers add them."
-            action={{ label: 'Search products', onPress: () => router.push('/buyer-search' as never) }}
-          />
-        </ResponsiveContainer>
-      ) : (
-        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
-          <ProductShowcase items={forYouItems} />
-        </ResponsiveContainer>
       )}
 
-      {/* ─ From Brands You Follow — signed-in only, composed client-side ─ */}
-      {isSignedIn && (
-        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <EditorialSectionHead
-            kicker="Your people"
-            title="From Brands You Follow"
-            sub="New from sellers you follow"
-            theme={theme}
-          />
-          {followedLoading ? (
-            <TileRailSkeleton />
-          ) : followedError ? (
-            <SectionError message={followedError} onRetry={fetchFollowed} />
-          ) : followedItems.length === 0 ? (
-            <EmptyState
-              icon="users"
-              title="Follow a brand to see them here"
-              description="Products from sellers you follow will show up in this row."
-              action={{ label: 'Find brands to follow', onPress: () => router.push('/buyer-search' as never) }}
-              compact
-            />
+      {filter === 'brands' && (
+        <FlatList
+          ref={listRef as never}
+          data={brands}
+          keyExtractor={(b) => b.id}
+          numColumns={2}
+          columnWrapperStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}
+          contentContainerStyle={{ gap: SP.sm, paddingBottom: barInset + SP.md }}
+          ListHeaderComponent={header}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          renderItem={({ item }) => <DiscoverBrandCard brand={item} />}
+          ListEmptyComponent={brandsLoading ? (
+            <ResponsiveContainer style={{ paddingHorizontal: SP.md, marginTop: SP.md }}>
+              <ListSkeleton rows={3} />
+            </ResponsiveContainer>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} decelerationRate="fast" snapToInterval={TILE_WIDTH + 16} snapToAlignment="start" contentContainerStyle={{ gap: 16, paddingRight: GUTTER }}>
-              {followedItems.map(item => (
-                <EditorialTile key={item.id} item={item} theme={theme} />
-              ))}
-            </ScrollView>
+            <View style={{ paddingHorizontal: SP.md, marginTop: SP.md }}>
+              <EmptyState icon="shopping-bag" title="No brands yet" description="Brands will show up here as sellers join." />
+            </View>
           )}
-        </ResponsiveContainer>
+        />
       )}
 
-      {/* ─ Trending — engagement-ranked posts, separate from High Demand ─ */}
-      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
-        <EditorialSectionHead kicker="Right now" title="Trending" sub="Real-time engagement across the platform" theme={theme} />
-      </ResponsiveContainer>
-      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-        <View style={{ gap: 10 }}>
-          {trendingLoading ? (
-            <ListSkeleton rows={3} />
-          ) : trendingError ? (
-            <SectionError message={trendingError} onRetry={fetchTrending} />
-          ) : trendingItems.length === 0 ? (
-            <EmptyState
-              icon="activity"
-              illustration="trending"
-              title="No trending posts right now"
-              description="Posts with the most likes and saves across the platform show up here."
-              action={{ label: 'Explore feed', onPress: () => router.push('/(buyer)/feed' as never) }}
-            />
+      {filter === 'people' && (
+        <FlatList
+          ref={listRef as never}
+          data={people}
+          keyExtractor={(p) => p.userId}
+          contentContainerStyle={{ paddingBottom: barInset + SP.md }}
+          ListHeaderComponent={header}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          renderItem={({ item }) => <PersonListRow person={item} />}
+          ListEmptyComponent={peopleLoading ? (
+            <ResponsiveContainer style={{ paddingHorizontal: SP.md, marginTop: SP.md }}>
+              <ListSkeleton rows={4} />
+            </ResponsiveContainer>
           ) : (
-            trendingItems.slice(0, 10).map(item => <TrendingRow key={item.id} item={item} />)
+            <View style={{ paddingHorizontal: SP.md, marginTop: SP.md }}>
+              <EmptyState icon="users" illustration="friends" title="No suggestions yet" description="Follow a few brands and buyers to get suggestions." />
+            </View>
           )}
-        </View>
-      </ResponsiveContainer>
+        />
+      )}
 
-      {/* ─ Recently viewed ─ */}
-      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginTop: SP.xl }}>
-        <RecentlyViewedRow />
-      </ResponsiveContainer>
-    </ScrollView>
+      {filter === 'drops' && (
+        <FlatList
+          ref={listRef as never}
+          data={drops}
+          keyExtractor={(d) => d.id}
+          contentContainerStyle={{ paddingTop: SP.md, paddingBottom: barInset + SP.md }}
+          ListHeaderComponent={header}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          renderItem={({ item }) => <DiscoverDropRow drop={item} />}
+          ListEmptyComponent={dropsLoading ? (
+            <ResponsiveContainer style={{ paddingHorizontal: SP.md }}>
+              <ListSkeleton rows={4} />
+            </ResponsiveContainer>
+          ) : (
+            <View style={{ paddingHorizontal: SP.md }}>
+              <EmptyState icon="zap" title="No drops yet" description="Upcoming drops from sellers will show up here." />
+            </View>
+          )}
+        />
+      )}
+
+      {viewer && (
+        <DiscoverPostViewer
+          posts={viewer.posts}
+          startIndex={viewer.startIndex}
+          onClose={() => setViewer(null)}
+          onOpenShopTheLook={openShopTheLook}
+          onSafetyMenu={setSafetyMenuPost}
+        />
+      )}
+
+      {shopSelection && (
+        <ShopProductSheet
+          selection={shopSelection}
+          onClose={() => setShopSelection(null)}
+          reduceMotion={null}
+        />
+      )}
+
+      {safetyMenuPost && (
+        <DiscoverSafetyMenu
+          visible
+          authorName={safetyMenuPost.authorName}
+          onNotInterested={() => removePostFromLists(safetyMenuPost.authorId, safetyMenuPost.id)}
+          onMute={() => {
+            muteUser({
+              userId: safetyMenuPost.authorId,
+              name: safetyMenuPost.authorName,
+              handle: safetyMenuPost.authorHandle,
+              initials: safetyMenuPost.authorInitials,
+              color: safetyMenuPost.authorColor,
+            }).catch(() => {});
+            removePostFromLists(safetyMenuPost.authorId);
+          }}
+          onReport={() => {
+            api.reports.submit({ targetType: 'post', targetId: safetyMenuPost.id, reason: 'other', note: 'Reported from Discover' }).catch(() => {});
+          }}
+          onClose={() => setSafetyMenuPost(null)}
+        />
+      )}
+    </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const fy = StyleSheet.create({
-  banner:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
-  bannerIcon: { width: 40, height: 40, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center' },
+const styles = StyleSheet.create({
+  personRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  personAvatar: { width: 48, height: 48, borderRadius: 24 },
+  personInitials: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.sm },
+  personName: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  personReason: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
 });
