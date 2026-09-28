@@ -108,23 +108,32 @@ describe('seller dashboard stat grid', () => {
     expect(onSelect).toHaveBeenCalledWith('aov');
   });
 
-  it('colors deltas by direction: success for up, error for down, muted for flat', async () => {
+  it('is monochrome: direction is conveyed only by an arrow glyph, never by color (up/down/flat all read as theme text/muted)', async () => {
     await act(async () => {
       renderer = create(
         <SellerDashboardStatGrid tiles={tiles} activeKey="orders" onSelect={vi.fn()} theme={theme} />,
       );
     });
 
-    const up = renderer!.root.findByProps({ testID: 'seller-dashboard-stat-tile-orders' });
-    const upDelta = up.findAllByType('Text' as React.ElementType).find((t) => t.props.children === '+12%')!;
-    expect(flattenStyle(upDelta.props.style).color).toBe(theme.success);
+    const findDeltaText = (testID: string, label: string) => {
+      const tile = renderer!.root.findByProps({ testID });
+      return tile.findAllByType('Text' as React.ElementType).find((t) => {
+        const children = Array.isArray(t.props.children) ? t.props.children.join('') : t.props.children;
+        return typeof children === 'string' && children.includes(label);
+      })!;
+    };
 
-    const down = renderer!.root.findByProps({ testID: 'seller-dashboard-stat-tile-visitors' });
-    const downDelta = down.findAllByType('Text' as React.ElementType).find((t) => t.props.children === '-3%')!;
-    expect(flattenStyle(downDelta.props.style).color).toBe(theme.error);
+    const upDelta = findDeltaText('seller-dashboard-stat-tile-orders', '+12%');
+    expect(flattenStyle(upDelta.props.style).color).toBe(theme.text);
+    expect(flattenStyle(upDelta.props.style).color).not.toBe(theme.success);
+    expect(Array.isArray(upDelta.props.children) ? upDelta.props.children.join('') : upDelta.props.children).toContain('↑');
 
-    const flat = renderer!.root.findByProps({ testID: 'seller-dashboard-stat-tile-conversion' });
-    const flatDelta = flat.findAllByType('Text' as React.ElementType).find((t) => t.props.children === '—')!;
+    const downDelta = findDeltaText('seller-dashboard-stat-tile-visitors', '-3%');
+    expect(flattenStyle(downDelta.props.style).color).toBe(theme.text);
+    expect(flattenStyle(downDelta.props.style).color).not.toBe(theme.error);
+    expect(Array.isArray(downDelta.props.children) ? downDelta.props.children.join('') : downDelta.props.children).toContain('↓');
+
+    const flatDelta = findDeltaText('seller-dashboard-stat-tile-conversion', '—');
     expect(flattenStyle(flatDelta.props.style).color).toBe(theme.muted);
   });
 });
