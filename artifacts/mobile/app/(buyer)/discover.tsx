@@ -87,6 +87,7 @@ function mapToEditorialTile(prefix: string, row: LiveProduct, i: number): Editor
     initials: (row.name ?? 'P')[0].toUpperCase(),
     priceCents: row.currentPriceCents ?? fallbackPrice,
     isUrgent: remaining > 0 && remaining <= 4,
+    endsAt: row.endsAt,
   };
 }
 
