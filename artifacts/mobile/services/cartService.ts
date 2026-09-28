@@ -761,6 +761,12 @@ export async function applyDiscount(
       errorMessage: undefined,
     } as CheckoutDiscount;
   } catch (err: any) {
+    // Only a 4xx answer is the server saying "this code isn't valid". A
+    // network failure, timeout or 5xx means the code was never checked —
+    // rethrow so the caller shows "couldn't check that code" instead of
+    // wrongly telling the buyer their code is invalid or expired.
+    const status = typeof err?.status === 'number' ? err.status : null;
+    if (status === null || status === 408 || status === 429 || status >= 500) throw err;
     // Parse error code from API response body
     let errCode = 'UNKNOWN';
     try {
