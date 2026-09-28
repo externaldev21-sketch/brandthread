@@ -52,6 +52,24 @@ const POSTER_SOURCES = [
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const LOGO_SOURCE = require('../assets/images/brandthread-logo.png');
 
+// Item 73 (voice note waveform playback progress): the only bundled audio
+// asset in the app (assets/sounds/order_received.wav — registered for real by
+// expo-notifications, see its own README.md) reused purely as a real,
+// playable audio source for a seeded voice-message bubble. There is no real
+// voice recording available in this sandbox to seed instead, and no network
+// access to fetch one; requiring it here only reads its bundled file URI, it
+// does not touch its separate notification-sound registration. Its actual
+// length is ~1.28s — short for a voice note, but real: the seeded duration
+// label below (VOICE_NOTE_DURATION_SEC) matches it exactly so the label and
+// the live waveform position never drift apart.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const VOICE_NOTE_SOURCE = require('../assets/sounds/order_received.wav');
+export const VOICE_NOTE_DURATION_SEC = 1.3;
+
+export function voiceNoteUri(): string {
+  return Asset.fromModule(VOICE_NOTE_SOURCE).uri;
+}
+
 // Exported so other preview seed modules (e.g. lib/previewStories.ts, the
 // Messages stories tray) can reuse the same 10 bundled runway photos as
 // avatar/story-slide images instead of re-requiring the assets themselves.
@@ -235,6 +253,42 @@ function toAttachment(seed: PreviewMessageSeed['attachment'], conv: PreviewConve
   // in place of the real API's lib/productAttachmentInfo.ts.
   if (seed.type === 'product' && typeof conv.posterIndex === 'number') {
     attachment.uri = posterUri(conv.posterIndex);
+  }
+  // Voice notes (item 73): a real, playable bundled audio URI plus a
+  // deterministic waveform (VoiceMessageBubble already generates a fallback
+  // sine-wave shape itself when `waveform` is empty, but the actual message
+  // that ships in production always carries one recorded client-side, so a
+  // seeded one here — same math the real recorder's amplitude sampling
+  // approximates — keeps preview honest about the shape data flowing
+  // through). meta.duration is stamped from the real bundled clip's actual
+  // length (VOICE_NOTE_DURATION_SEC) so the label and the live
+  // audio-time-driven progress bar never disagree.
+  // Photo/video messages (item 74, upload progress ring): reuse the same
+  // bundled poster photos as the real thumbnail — for an image message this
+  // is genuinely what the attachment shows (photoUris drives the sent
+  // bubble's photo grid, see renderAttachment in app/buyer-conversation.tsx
+  // and renderMsgAttachment in app/seller-conversation.tsx). For a video
+  // message, the sent bubble already renders `uri` as the thumbnail image
+  // (not a real extracted video frame — see MediaUploadThumb.tsx's doc
+  // comment on that pre-existing gap), so a real bundled jpg poster here is
+  // honest and consistent with that existing contract.
+  if (seed.type === 'image' && typeof conv.posterIndex === 'number') {
+    const uri = posterUri(conv.posterIndex);
+    attachment.uri = uri;
+    attachment.meta = { ...attachment.meta, photoUris: JSON.stringify([uri]) };
+  }
+  if (seed.type === 'video' && typeof conv.posterIndex === 'number') {
+    attachment.uri = posterUri(conv.posterIndex);
+  }
+  if (seed.type === 'voice') {
+    attachment.uri = voiceNoteUri();
+    attachment.meta = {
+      ...attachment.meta,
+      duration: String(VOICE_NOTE_DURATION_SEC),
+      waveform: JSON.stringify(
+        Array.from({ length: 24 }, (_, i) => 0.25 + Math.abs(Math.sin(i * 0.7)) * 0.55),
+      ),
+    };
   }
   return attachment;
 }

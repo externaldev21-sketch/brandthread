@@ -5,6 +5,7 @@ import {
   activityChipEmpty,
   matchesActivityChip,
   activityHref,
+  activityRowHref,
   activityIcon,
   activityKind,
   activityMessage,
@@ -298,6 +299,19 @@ describe('classification and routing', () => {
     expect(activityKind({ category: 'messages', type: 'new_friend_message' })).toBe('other');
   });
 
+  it('deep-links comment, reply and mention rows to the exact comment', () => {
+    for (const type of ['post_comment', 'comment_reply', 'mention']) {
+      expect(activityHref(item({ type, targetType: 'post', targetId: 'p1', commentId: 'c 9' })))
+        .toBe('/buyer-post-comments?postId=p1&commentId=c%209');
+      // Older rows without a comment id still open that post's comments.
+      expect(activityHref(item({ type, targetType: 'post', targetId: 'p1' })))
+        .toBe('/buyer-post-comments?postId=p1');
+    }
+    // A like never carries a comment: it opens the post itself.
+    expect(activityHref(item({ type: 'post_like', targetType: 'post', targetId: 'p1', commentId: 'c9' })))
+      .toBe('/buyer-post-viewer?postId=p1');
+  });
+
   it('routes rows to existing screens', () => {
     expect(activityHref(item({ type: 'new_order_received', targetType: 'order', targetId: 'o 1' }), 'seller'))
       .toBe('/order-detail?id=o%201');
@@ -475,6 +489,19 @@ describe('grouped rows → people list', () => {
     const params = new URLSearchParams(href.split('?')[1]);
     expect(params.get('type')).toBe('post_like');
     expect(params.get('ids')!.split(',')).toEqual(merged.ids);
+  });
+
+  it('opens a merged comment row at the newest comment, other merged rows at the people list', () => {
+    const comment = (actor: string, commentId: string) => like(actor, 'post1', {
+      type: 'post_comment', title: `${actor} commented on your post`, commentId,
+    });
+    const [comments] = aggregateActivity([comment('Jay', 'c2'), comment('Mina', 'c1')]);
+    expect(isGroupedRow(comments)).toBe(true);
+    expect(activityRowHref(comments)).toBe('/buyer-post-comments?postId=post1&commentId=c2');
+    const [likes] = aggregateActivity([like('Jay', 'post1'), like('Mina', 'post1')]);
+    expect(activityRowHref(likes)).toBe(groupedPeopleHref(likes));
+    const [single] = aggregateActivity([like('Jay', 'post1')]);
+    expect(activityRowHref(single, 'seller')).toBe('/buyer-post-viewer?postId=post1');
   });
 
   it('caps the ids a link carries', () => {

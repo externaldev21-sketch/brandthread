@@ -53,11 +53,15 @@ import type {
   CheckoutAttribution,
 } from '@/services/cartTypes';
 import {
+  CART_FLIGHT_ITEM_SIZE,
   getCartFlightVector,
   getSuccessfulCartCount,
+  flightSourceFromRect,
   measureCartTarget,
+  measureWindowRect,
   shouldAnimateCartSuccess,
   type CartFlightPoint,
+  type CartFlightSource,
 } from '@/lib/cartFlight';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -344,6 +348,13 @@ export function ShopProductSheet({
   const [flyingToCart, setFlyingToCart] = useState(false);
   const [showAddedConfirmation, setShowAddedConfirmation] = useState(false);
   const [cartTarget, setCartTarget] = useState<CartFlightPoint | null>(null);
+  // Where the flight lifts off, measured at tap time: the product photo if
+  // it's visible in the sheet's scroll area, else the selected product's
+  // card thumbnail (multi-product posts), else the default start above the
+  // Add to cart bar.
+  const [flightSource, setFlightSource] = useState<CartFlightSource | null>(null);
+  const productPhotoRef = useRef<View>(null);
+  const activeTagImageRef = useRef<View>(null);
   const addedConfirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // cart-fly-to-icon animation only (unrelated to the sheet's own
@@ -433,11 +444,20 @@ export function ShopProductSheet({
       showCartSuccess(newCount);
       return;
     }
-    const target = await measureCartTarget(
-      cartTargetRef?.current?.measureInWindow.bind(cartTargetRef.current),
-      safeFallbackTarget,
-    );
+    const scrollNode = contentScrollRef.current as unknown as { measureInWindow?: View['measureInWindow'] } | null;
+    const [target, photoRect, scrollRect, tagRect] = await Promise.all([
+      measureCartTarget(
+        cartTargetRef?.current?.measureInWindow.bind(cartTargetRef.current),
+        safeFallbackTarget,
+      ),
+      measureWindowRect(productPhotoRef.current?.measureInWindow?.bind(productPhotoRef.current)),
+      measureWindowRect(scrollNode?.measureInWindow?.bind(scrollNode)),
+      measureWindowRect(activeTagImageRef.current?.measureInWindow?.bind(activeTagImageRef.current)),
+    ]);
+    const screenClip = { top: 0, bottom: windowHeight };
+    const scrollClip = scrollRect ? { top: scrollRect.y, bottom: scrollRect.y + scrollRect.height } : screenClip;
     setCartTarget(target);
+    setFlightSource(flightSourceFromRect(photoRect, scrollClip) ?? flightSourceFromRect(tagRect, screenClip));
     setFlyingToCart(true);
     cartFlyProgress.setValue(0);
     requestAnimationFrame(() => {
@@ -551,6 +571,61 @@ export function ShopProductSheet({
     channel: 'thread',
   };
 
+  /**
+   * Quick add-to-cart from the tag list ("Item lineup" row — see the Mobbin
+   * reference in ShopSideTab.tsx). Lets a buyer add a SECOND (or third…)
+   * tagged product without first navigating away or manually switching +
+   * scrolling to find its own Add to cart button.
+   *
+   * Tapping the row's own Add-to-cart button when that row is already the
+   * active tag and its product is hydrated (`phase === 'ready'`) adds it
+   * immediately through the exact same `handleAddToCart()` used by the
+   * sticky bar — no parallel add-to-cart implementation. Tapping it for a
+   * different row switches `activeTagIdx` to hydrate that product first;
+   * `pendingQuickAddRef` remembers which product this was for, and the
+   * effect below finishes the add once that product's own `phase` settles.
+   */
+  const pendingQuickAddRef = useRef<string | null>(null);
+
+  function handleQuickAdd(idx: number) {
+    Haptics.selectionAsync();
+    const tag = selection.tags[idx];
+    if (!tag) return;
+    if (idx === activeTagIdx) {
+      if (phase === 'ready') {
+        void handleAddToCart();
+      } else if (phase === 'loading') {
+        pendingQuickAddRef.current = tag.productId;
+      }
+      return;
+    }
+    pendingQuickAddRef.current = tag.productId;
+    setActiveTagIdx(idx);
+  }
+
+  // Finishes a quick add once the just-switched-to product hydrates: adds
+  // it straight away when it needs no variant pick (loadProduct auto-fills
+  // `selections` for a 0/1-variant product), otherwise scrolls its option
+  // chips into view — the same non-dead-end behavior `rejectMissingVariant`
+  // already guarantees for the sticky bar, just reached from this row
+  // instead.
+  useEffect(() => {
+    if (!pendingQuickAddRef.current || activeTag?.productId !== pendingQuickAddRef.current) return;
+    if (phase === 'ready') {
+      pendingQuickAddRef.current = null;
+      if (allOptionsSelected) {
+        void handleAddToCart();
+      } else {
+        requestAnimationFrame(() => {
+          contentScrollRef.current?.scrollTo({ y: Math.max(0, optionsSectionY.current - 12), animated: true });
+        });
+      }
+    } else if (phase === 'sold_out' || phase === 'unavailable' || phase === 'error') {
+      pendingQuickAddRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, activeTag, allOptionsSelected]);
+
   // Add to cart
   /**
    * Real root cause of "I tapped Add to cart and nothing happened": the
@@ -655,17 +730,34 @@ export function ShopProductSheet({
     });
   }
 
+  // Same route/pattern as handleViewDetail above, but for any tagged
+  // product in the list — not just the currently active one. Tapping a
+  // product ROW in the tag list (its image/name/price — not its own Add to
+  // cart button, a sibling, never nested inside this) navigates straight to
+  // that product's page.
+  function handleViewTagDetail(tag: ShopTag) {
+    navigateAndDismiss(() => {
+      push(
+        `/thread-product-detail?productId=${encodeURIComponent(tag.productId)}&sourcePostId=${encodeURIComponent(selection.postId)}` as never,
+      );
+    });
+  }
+
   function handleViewCart() {
     navigateAndDismiss(() => router.push('/(buyer)/cart' as never));
   }
 
   const accent = theme.accent;
   const isBusy = phase === 'adding' || phase === 'buying';
-  const flyStartLeft = windowWidth / 2 - 24;
-  const flyStartTop = windowHeight - Math.min(330, windowHeight * 0.4);
+  const flySize = flightSource?.size ?? CART_FLIGHT_ITEM_SIZE;
+  const flyStartLeft = flightSource ? flightSource.x - flySize / 2 : windowWidth / 2 - CART_FLIGHT_ITEM_SIZE / 2;
+  const flyStartTop = flightSource ? flightSource.y - flySize / 2 : windowHeight - Math.min(330, windowHeight * 0.4);
+  // The copy starts at the photo's own size and shrinks to the same small
+  // end size (0.28 × 48pt) at the cart as before.
+  const flySizeRatio = CART_FLIGHT_ITEM_SIZE / flySize;
   const safeFallbackTarget = { x: windowWidth - 54, y: insets.top + 26 };
   const resolvedCartTarget = cartTarget ?? safeFallbackTarget;
-  const flightVector = getCartFlightVector(flyStartLeft, flyStartTop, resolvedCartTarget);
+  const flightVector = getCartFlightVector(flyStartLeft, flyStartTop, resolvedCartTarget, flySize);
   // Capture phase as string to allow comparison across JSX blocks without narrowing conflicts
   const currentPhase: string = phase;
 
@@ -723,35 +815,69 @@ export function ShopProductSheet({
                   selection.previewProduct?.id === tag.productId ? selection.previewProduct : null
                 );
                 const thumbUri = tagPreview?.imageUris?.[0];
+                // Busy/added state for THIS row's own Add-to-cart button —
+                // only meaningful while this row is also the active tag
+                // (its product is the one actually being hydrated/added).
+                const cardAdding = isActiveTag && (
+                  phase === 'adding' || (phase === 'loading' && pendingQuickAddRef.current === tag.productId)
+                );
+                const cardAdded = isActiveTag && phase === 'added';
+                const cardSoldOut = isActiveTag && (phase === 'sold_out' || phase === 'unavailable');
                 return (
-                  <TouchableOpacity
+                  // A plain View, not a pressable — its two children below
+                  // (row nav, Add-to-cart) are SIBLING TouchableOpacitys, not
+                  // nested inside one another (tests/buyer-shopping-no-
+                  // nested-pressables.test.ts guards this file specifically).
+                  <View
                     key={tag.productId + idx}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setActiveTagIdx(idx);
-                    }}
                     style={[
                       ss.tagCard,
                       isActiveTag && { borderColor: accent, borderWidth: 2 },
                     ]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isActiveTag }}
-                    accessibilityLabel={`Switch to ${tag.productName}, ${formatCents(tag.priceCents)}`}
                   >
-                    <View style={ss.tagCardImageWrap}>
-                      {thumbUri ? (
-                        <CachedImage source={{ uri: thumbUri }} style={ss.tagCardImage} contentFit="cover" />
+                    <TouchableOpacity
+                      style={ss.tagCardBody}
+                      onPress={() => handleViewTagDetail(tag)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View ${tag.productName}, ${formatCents(tag.priceCents)}`}
+                    >
+                      <View style={ss.tagCardImageWrap} ref={isActiveTag ? activeTagImageRef : undefined} collapsable={false}>
+                        {thumbUri ? (
+                          <CachedImage source={{ uri: thumbUri }} style={ss.tagCardImage} contentFit="cover" />
+                        ) : (
+                          <View style={[ss.tagCardImage, ss.productImagePlaceholder]}>
+                            <Feather name="shopping-bag" size={16} color={theme.subtle} />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={[ss.tagCardName, isActiveTag && { color: accent }]} numberOfLines={2}>
+                        {tag.productName}
+                      </Text>
+                      <Text style={ss.tagCardPrice}>{formatCents(tag.priceCents)}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleQuickAdd(idx)}
+                      disabled={cardSoldOut}
+                      activeOpacity={0.8}
+                      style={[ss.tagCardAddBtn, cardAdded && ss.tagCardAddBtnAdded, cardSoldOut && ss.tagCardAddBtnDisabled]}
+                      accessibilityRole="button"
+                      accessibilityLabel={cardAdded ? `${tag.productName} added to cart` : `Add ${tag.productName} to cart`}
+                    >
+                      {cardAdding ? (
+                        <ActivityIndicator size="small" color={theme.text} />
+                      ) : cardAdded ? (
+                        <>
+                          <Feather name="check" size={12} color={theme.background} />
+                          <Text style={[ss.tagCardAddBtnText, ss.tagCardAddBtnTextAdded]}>Added</Text>
+                        </>
                       ) : (
-                        <View style={[ss.tagCardImage, ss.productImagePlaceholder]}>
-                          <Feather name="shopping-bag" size={16} color={theme.subtle} />
-                        </View>
+                        <>
+                          <Feather name="shopping-cart" size={12} color={theme.text} />
+                          <Text style={ss.tagCardAddBtnText}>Add</Text>
+                        </>
                       )}
-                    </View>
-                    <Text style={[ss.tagCardName, isActiveTag && { color: accent }]} numberOfLines={2}>
-                      {tag.productName}
-                    </Text>
-                    <Text style={ss.tagCardPrice}>{formatCents(tag.priceCents)}</Text>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                  </View>
                 );
               })}
             </ScrollView>
@@ -823,7 +949,10 @@ export function ShopProductSheet({
             bounces={false}
           >
             {/* Swipeable image gallery */}
-            <ProductImageCarousel imageUris={product.imageUris} />
+            {/* Measured at Add-to-cart time: the flight lifts off this photo. */}
+            <View ref={productPhotoRef} collapsable={false}>
+              <ProductImageCarousel imageUris={product.imageUris} />
+            </View>
 
             {/* Product header row — no thumbnail: the carousel above already
                 shows this exact photo full-size directly above it. */}
@@ -1002,12 +1131,16 @@ export function ShopProductSheet({
 
       {flyingToCart && (
         <Animated.View
+          testID="cart-fly-item"
           pointerEvents="none"
           style={[
             ss.cartFlyItem,
             {
               left: flyStartLeft,
               top: flyStartTop,
+              width: flySize,
+              height: flySize,
+              borderRadius: 14 / flySizeRatio,
               opacity: cartFlyProgress.interpolate({
                 inputRange: [0, 0.82, 1],
                 outputRange: [1, 1, 0],
@@ -1024,7 +1157,7 @@ export function ShopProductSheet({
                     inputRange: [0, 0.55, 1],
                     outputRange: [
                       0,
-                      -Math.min(windowHeight * 0.27, Math.max(48, flyStartTop - resolvedCartTarget.y) * 0.45),
+                      -Math.min(windowHeight * 0.27, Math.max(48, flyStartTop + flySize / 2 - resolvedCartTarget.y) * 0.45),
                       flightVector.y,
                     ],
                   }),
@@ -1032,7 +1165,7 @@ export function ShopProductSheet({
                 {
                   scale: cartFlyProgress.interpolate({
                     inputRange: [0, 0.7, 1],
-                    outputRange: [1, 0.72, 0.28],
+                    outputRange: [1, 0.72 * flySizeRatio, 0.28 * flySizeRatio],
                   }),
                 },
                 {
@@ -1465,6 +1598,11 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     padding: 8,
     gap: 4,
   },
+  // The nav row's own layout (image, name, price) — a TouchableOpacity, but
+  // a SIBLING of tagCardAddBtn below, not their shared parent (that's the
+  // plain View `tagCard` is applied to at the call site) — see the no-
+  // nested-pressables comment in the JSX.
+  tagCardBody: { gap: 4 },
   tagCardImageWrap: { width: '100%', aspectRatio: 1, borderRadius: 10, overflow: 'hidden', backgroundColor: theme.cardElevated },
   tagCardImage: { width: '100%', height: '100%' },
   tagCardName: {
@@ -1475,6 +1613,34 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
     minHeight: 30,
   },
   tagCardPrice: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.muted },
+  // Per-product quick Add to cart — a compact chip under the price, sized to
+  // the 112pt-wide tag card. Monochrome: outline chip by default, inverted
+  // (solid text-color fill) only for the momentary "Added" confirmation —
+  // the same white-fill/dark-icon "chip" allowance ShopSideTab's own count
+  // badge already uses, not a new color.
+  tagCardAddBtn: {
+    marginTop: 2,
+    height: 26,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.cardElevated,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  tagCardAddBtnAdded: {
+    backgroundColor: theme.text,
+    borderColor: theme.text,
+  },
+  tagCardAddBtnDisabled: { opacity: 0.5 },
+  tagCardAddBtnText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: theme.text,
+  },
+  tagCardAddBtnTextAdded: { color: theme.background },
 
   // Loading / error
   centerBox: {

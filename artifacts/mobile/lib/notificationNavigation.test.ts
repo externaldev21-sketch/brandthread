@@ -113,6 +113,25 @@ describe('notification response navigation', () => {
     expect(router.push).toHaveBeenCalledWith('/return-detail?returnId=ret-abc');
   });
 
+  it('opens social pushes at the same exact place the Activity row does', () => {
+    const router = { push: vi.fn() };
+    const handler = createNotificationResponseHandler(router);
+    handler(targetResponse('c-1', { targetType: 'post', targetId: 'p1', type: 'post_comment', commentId: 'c9' }));
+    handler(targetResponse('m-1', { targetType: 'post', targetId: 'p1', type: 'mention', commentId: 'c10' }));
+    handler(targetResponse('l-1', { targetType: 'post', targetId: 'p1', type: 'post_like' }));
+    handler(targetResponse('s-1', { targetType: 'story', targetId: 's1', type: 'story_like' }));
+    handler(targetResponse('f-1', { targetType: 'user', targetId: 'u1', type: 'new_follower' }));
+    handler(targetResponse('t-1', { targetType: 'thread_cash_transfer', targetId: 't1', type: 'thread_cash_received' }));
+    expect(router.push.mock.calls.map((call) => call[0])).toEqual([
+      '/buyer-post-comments?postId=p1&commentId=c9',
+      '/buyer-post-comments?postId=p1&commentId=c10',
+      '/buyer-post-viewer?postId=p1',
+      '/buyer-story-viewer?storyId=s1&allStoryIds=s1',
+      '/buyer-other-profile?userId=u1',
+      '/thread-cash',
+    ]);
+  });
+
   it('routes a payout notification to the payouts screen', () => {
     const router = { push: vi.fn() };
     const handler = createNotificationResponseHandler(router);

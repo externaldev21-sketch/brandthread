@@ -474,6 +474,8 @@ export interface BuyerOrderView {
   estimatedDelivery?: string;
   /** When the order was actually marked shipped (server timestamp), if known. */
   shippedAt?: string;
+  /** When payment was captured (orders.paid_at), if known — the "Confirmed" step. */
+  paidAt?: string;
   isPreOrder: boolean;
   preOrderEstShipDate?: string;
   hasReturnRequest: boolean;

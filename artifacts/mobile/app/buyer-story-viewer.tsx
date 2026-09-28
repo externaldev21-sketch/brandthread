@@ -26,7 +26,9 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
 import {
   getStories, trackStoryView, subscribeSocial, muteUser, createOrGetConversation, sendMessage,
+  MY_USER_ID, MY_NAME, MY_HANDLE, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
+import { getPreviewActivityStory } from '@/lib/previewActivity';
 import { useAuth } from '@clerk/expo';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import type { Story, StoryMedia } from '@/services/socialTypes';
@@ -70,6 +72,25 @@ function StorySlideVideo({ uri, paused }: { uri: string; paused: boolean }) {
   );
 }
 
+/**
+ * Preview only: the viewer's own seeded story or highlight an Activity row
+ * points at (item 82), used when the real lookup finds nothing. Kept open
+ * (highlights don't expire). `null` for every id outside the preview seed.
+ */
+function previewStory(id: string): Story | null {
+  const seed = getPreviewActivityStory(id);
+  if (!seed) return null;
+  return {
+    id: seed.id, authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE,
+    authorInitials: MY_INITIALS, authorColor: MY_COLOR, authorAccountType: 'buyer',
+    media: [{ id: `${seed.id}-slide`, type: 'photo', backgroundColor: '#000000', duration: 5, imageUri: seed.imageUri }],
+    privacy: { visibility: 'public', replyPermission: 'everyone', hiddenFromUserIds: [], closeFriendsOnly: false },
+    viewers: [], repliesDisabled: false,
+    createdAt: seed.createdAt, expiresAt: Date.now() + 24 * 60 * 60_000,
+    likesCount: seed.likesCount,
+  } as Story;
+}
+
 export default function BuyerStoryViewer() {
   const colors = useColors();
   const { theme } = useAppTheme();
@@ -110,12 +131,16 @@ export default function BuyerStoryViewer() {
   const loadStories = useCallback(async () => {
     const generation = ++loadGeneration.current;
     try {
-      const all = await getStories();
+      const all = await getStories().catch(() => [] as Story[]);
       if (loadGeneration.current !== generation) return;
       const now = Date.now();
-      const filtered = ids
+      const found = ids
         .map(id => all.find(s => s.id === id))
         .filter((s): s is Story => !!s && s.expiresAt > now);
+      // Preview only: seeded stories the Activity rows point at (item 82).
+      const filtered = found.length > 0
+        ? found
+        : ids.map(previewStory).filter((s): s is Story => !!s);
       setStories(filtered);
       if (storyId) {
         const idx = filtered.findIndex(s => s.id === storyId);

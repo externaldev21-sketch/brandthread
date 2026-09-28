@@ -76,7 +76,7 @@ export const BRANDTHREAD_AGENT_SEED: PreviewConversationSeed = {
   participantName: 'Brandthread Agent',
   participantHandle: '@brandthread',
   participantInitials: 'BT',
-  participantColor: '#0A0A0B',
+  participantColor: pickAvatarColor('brandthread-agent'),
   isBrandMark: true,
   isPinned: true,
   isOfficial: true,
@@ -143,7 +143,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Atelier Noire',
     participantHandle: '@atelier_noire',
     participantInitials: 'AN',
-    participantColor: '#2E2A26',
+    participantColor: pickAvatarColor('preview-seller-01'),
     posterIndex: 0,
     lastMessage: 'Just restocked the Sculpted Wool Coat in your size!',
     lastMessageFromMe: false,
@@ -196,7 +196,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Saint Rue',
     participantHandle: '@saint_rue',
     participantInitials: 'SR',
-    participantColor: '#111827',
+    participantColor: pickAvatarColor('preview-seller-03'),
     posterIndex: 2,
     lastMessage: 'Hi! Interested in custom sizing for the tuxedo.',
     lastMessageFromMe: false,
@@ -213,7 +213,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Orison',
     participantHandle: '@orison',
     participantInitials: 'OR',
-    participantColor: '#D6D3D1',
+    participantColor: pickAvatarColor('preview-seller-04'),
     posterIndex: 3,
     lastMessage: 'Ivory Column Set',
     lastMessageFromMe: false,
@@ -249,7 +249,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Kuro Line',
     participantHandle: '@kuro_line',
     participantInitials: 'KL',
-    participantColor: '#1F2933',
+    participantColor: pickAvatarColor('preview-seller-05'),
     posterIndex: 4,
     lastMessage: 'Order #BT-10234',
     // The order card is sent BY the seller (Kuro Line) — only a seller can
@@ -291,7 +291,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Forme 22',
     participantHandle: '@forme22',
     participantInitials: 'F2',
-    participantColor: '#6D28D9',
+    participantColor: pickAvatarColor('preview-seller-06'),
     posterIndex: 5,
     lastMessage: 'Sent you Thread Cash',
     lastMessageFromMe: false,
@@ -314,16 +314,43 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Astrae',
     participantHandle: '@astrae',
     participantInitials: 'AS',
-    participantColor: '#0EA5E9',
+    participantColor: pickAvatarColor('preview-seller-07'),
     posterIndex: 6,
-    lastMessage: 'Let me check on that for you',
-    lastMessageFromMe: false,
-    minutesAgo: 1,
+    lastMessage: 'Voice message',
+    lastMessageFromMe: true,
+    lastMessageType: 'voice',
+    minutesAgo: 0.5,
     unreadCount: 1,
     isRequest: false,
     messages: [
       { id: 'preview-msg-07-1', fromOfficialOrParticipant: 'me', text: 'Does the mesh top run small?', minutesAgo: 2 },
       { id: 'preview-msg-07-2', fromOfficialOrParticipant: 'them', text: 'Let me check on that for you', minutesAgo: 1 },
+      {
+        // Item 74 (photo/video upload progress ring): a completed/resting
+        // photo message — see toAttachment()'s `type === 'image'` branch in
+        // lib/previewInbox.ts, which fills in a real bundled poster photo as
+        // the uri. Demonstrates the RESTING state (no ring — that's only
+        // shown while an upload is actually in flight, see
+        // app/buyer-conversation.tsx's handlePickPhoto).
+        id: 'preview-msg-07-2b', fromOfficialOrParticipant: 'them', text: '',
+        attachment: { type: 'image' },
+        minutesAgo: 0.9,
+      },
+      {
+        // Item 74 — same treatment for a completed video message.
+        id: 'preview-msg-07-2c', fromOfficialOrParticipant: 'me', text: '',
+        attachment: { type: 'video', meta: { duration: '14' } },
+        minutesAgo: 0.7,
+      },
+      {
+        // Item 73 (voice note waveform playback progress): a real, playable
+        // seeded voice bubble — see toAttachment()'s `type === 'voice'`
+        // branch in lib/previewInbox.ts for the bundled audio URI + waveform
+        // it attaches here.
+        id: 'preview-msg-07-3', fromOfficialOrParticipant: 'me', text: '',
+        attachment: { type: 'voice' },
+        minutesAgo: 0.5,
+      },
     ],
   },
   {
@@ -332,7 +359,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Noma Archive',
     participantHandle: '@noma_archive',
     participantInitials: 'NA',
-    participantColor: '#78716C',
+    participantColor: pickAvatarColor('preview-seller-08'),
     posterIndex: 7,
     lastMessage: 'Would love to know more about the trench!',
     lastMessageFromMe: false,
@@ -349,7 +376,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Echelon',
     participantHandle: '@echelon',
     participantInitials: 'EC',
-    participantColor: '#0F172A',
+    participantColor: pickAvatarColor('preview-seller-09'),
     posterIndex: 8,
     lastMessage: 'It\'s on its way to you now.',
     lastMessageFromMe: false,
@@ -367,7 +394,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Vale Studio',
     participantHandle: '@vale_studio',
     participantInitials: 'VS',
-    participantColor: '#44403C',
+    participantColor: pickAvatarColor('preview-seller-10'),
     posterIndex: 9,
     lastMessage: 'Hi! Is the silk gown still available in size S?',
     lastMessageFromMe: false,
@@ -392,9 +419,9 @@ export const PREVIEW_FOLLOWER_SEEDS: Array<{
   isRead: boolean;
   minutesAgo: number;
 }> = [
-  { id: 'preview-notif-follow-01', actorUserId: 'preview-seller-01', actorName: 'Atelier Noire', actorInitials: 'AN', actorColor: '#2E2A26', isRead: false, minutesAgo: 30 },
-  { id: 'preview-notif-follow-02', actorUserId: 'preview-seller-04', actorName: 'Orison', actorInitials: 'OR', actorColor: '#D6D3D1', isRead: false, minutesAgo: 90 },
-  { id: 'preview-notif-follow-03', actorUserId: 'preview-seller-07', actorName: 'Astrae', actorInitials: 'AS', actorColor: '#0EA5E9', isRead: true, minutesAgo: 300 },
+  { id: 'preview-notif-follow-01', actorUserId: 'preview-seller-01', actorName: 'Atelier Noire', actorInitials: 'AN', actorColor: pickAvatarColor('preview-seller-01'), isRead: false, minutesAgo: 30 },
+  { id: 'preview-notif-follow-02', actorUserId: 'preview-seller-04', actorName: 'Orison', actorInitials: 'OR', actorColor: pickAvatarColor('preview-seller-04'), isRead: false, minutesAgo: 90 },
+  { id: 'preview-notif-follow-03', actorUserId: 'preview-seller-07', actorName: 'Astrae', actorInitials: 'AS', actorColor: pickAvatarColor('preview-seller-07'), isRead: true, minutesAgo: 300 },
 ];
 
 // ─── Seller preview inbox (item 71) ────────────────────────────────────────
@@ -423,7 +450,7 @@ export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Maya Torres',
     participantHandle: '@mayatorres',
     participantInitials: 'MT',
-    participantColor: '#0EA5E9',
+    participantColor: pickAvatarColor('preview-buyer-02'),
     posterIndex: 2,
     lastMessage: 'Sent you Thread Cash',
     lastMessageFromMe: false,
@@ -457,6 +484,30 @@ export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     contextOrderNumber: 'BT-10234',
     messages: [
       { id: 'preview-seller-msg-01-1', fromOfficialOrParticipant: 'them', text: 'Hi! Just checking on my jacket order 🙂', minutesAgo: 240 },
+      {
+        // Item 73 (voice note waveform playback progress), seller-side
+        // mirror of preview-msg-03-2 on the buyer side above — same real
+        // bundled voice bubble, rendered here as an incoming message from
+        // the buyer (Ava Chen) so the seller preview also has a genuinely
+        // playable voice note to demo, not only the buyer preview.
+        id: 'preview-seller-msg-01-1b', fromOfficialOrParticipant: 'them', text: '',
+        attachment: { type: 'voice' },
+        minutesAgo: 239,
+      },
+      {
+        // Item 74 (photo/video upload progress ring), seller-side mirror of
+        // preview-msg-07-2b/2c on the buyer side — same real bundled photo/
+        // video, so the seller preview also has completed media messages to
+        // demo the resting state from, not only the buyer preview.
+        id: 'preview-seller-msg-01-1c', fromOfficialOrParticipant: 'them', text: '',
+        attachment: { type: 'image' },
+        minutesAgo: 210,
+      },
+      {
+        id: 'preview-seller-msg-01-1d', fromOfficialOrParticipant: 'me', text: '',
+        attachment: { type: 'video', meta: { duration: '14' } },
+        minutesAgo: 205,
+      },
       {
         id: 'preview-seller-msg-01-2', fromOfficialOrParticipant: 'me', text: 'Your jacket just shipped!',
         attachment: {

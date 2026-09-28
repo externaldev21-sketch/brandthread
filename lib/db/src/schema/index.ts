@@ -1012,6 +1012,10 @@ export const notificationsFeed = pgTable('notifications_feed', {
   // Thumbnail of the related post/product/order. Either an absolute URL or a
   // private `/objects/…` path that the feed route signs at read time.
   targetImageUrl: text('target_image_url'),
+  // The specific comment a post_comment / comment_reply / mention row is
+  // about (target_id is the post), so a tap lands on that comment
+  // (migration 101). Null for every other type and for older rows.
+  commentId:     text('comment_id'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   userCreatedIdx: index('notifications_feed_user_created_idx')
