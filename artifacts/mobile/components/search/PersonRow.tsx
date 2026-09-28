@@ -26,6 +26,10 @@ export type SearchPerson = {
   roleTag?: string;
   /** Real uploaded/Clerk avatar photo; falls back to the initials circle when absent. */
   avatarUrl?: string | null;
+  /** Pre-formatted follower count (e.g. "1.2K followers") — omitted when the
+   *  source endpoint doesn't return a follower count (api.social.search
+   *  doesn't today; only shown when a caller has one, never fabricated). */
+  followersLabel?: string;
 };
 
 /**
@@ -76,12 +80,13 @@ export function PersonRow({
             <View style={styles.nameRow}>
               <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{person.name}</Text>
               {person.verified && (
-                <Feather name="check-circle" size={13} color={theme.accent} style={styles.verifiedBadge} />
+                <Feather name="check-circle" size={13} color={theme.text} style={styles.verifiedBadge} />
               )}
             </View>
             <Text style={[styles.sub, { color: theme.muted }]} numberOfLines={1}>
               {person.handle}
               {person.roleTag ? ` · ${person.roleTag}` : ''}
+              {person.followersLabel ? ` · ${person.followersLabel}` : ''}
               {person.bio ? ` · ${person.bio.slice(0, 40)}` : ''}
             </Text>
           </View>

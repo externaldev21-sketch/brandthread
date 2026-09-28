@@ -1271,7 +1271,7 @@ export default function InboxScreen() {
               <Feather name="search" size={16} color={theme.muted} />
               <TextInput
                 ref={messagesSearchInputRef}
-                style={[s.searchInput, { color: theme.text }]}
+                style={[s.searchInput, { color: theme.text }, Platform.OS === 'web' && s.searchInputWebNoOutline]}
                 value={messagesSearchQuery}
                 onChangeText={setMessagesSearchQuery}
                 placeholder="Search"
@@ -1297,6 +1297,7 @@ export default function InboxScreen() {
               )}
             </View>
             <PressableScale
+              style={s.searchCancelPressable}
               onPress={cancelMessagesSearch}
               rippleEnabled={NO_RIPPLE}
               accessibilityRole="button"
@@ -1797,6 +1798,15 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     flex: 1,
     marginBottom: 0,
   },
+  // Explicit height + centered content, matching searchRowInHeader's own
+  // 44pt box, rather than leaning on the parent row's alignItems: 'center'
+  // — a Text node's line-height/font-metric box doesn't always center the
+  // same way a sibling View's cross-axis size does, which read as Cancel
+  // sitting a few px above the field's true vertical center.
+  searchCancelPressable: {
+    height: 44,
+    justifyContent: 'center',
+  },
   searchCancelText: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
@@ -1807,6 +1817,11 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     fontFamily: FONT.regular,
     height: 40,
   },
+  // The web <input> underneath RNW's TextInput otherwise keeps the browser's
+  // own default focus ring (a thick amber/orange outline) on top of our
+  // themed border — suppressed here the same way buyer-search.tsx does for
+  // its own web text fields.
+  searchInputWebNoOutline: { outlineStyle: 'none', outlineWidth: 0 } as any,
   // minWidth: 0 is required for a flex:1 row to actually truncate its text
   // instead of growing past its share and pushing convTrailing off-row —
   // React Native (like web flexbox) defaults a flex item's min-width to its

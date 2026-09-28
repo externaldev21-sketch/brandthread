@@ -496,7 +496,7 @@ export default function ProfileScreen() {
           </>
         )}
         meta={(
-          <ProfileMeta bio={profile?.bio} overMedia={coverFlow.hasCover}>
+          <ProfileMeta bio={profile?.bio}>
             <ProfileChip label={planLabel} icon={hasPaidPlan ? 'award' : 'layers'} tone={hasPaidPlan ? 'accent' : 'muted'} />
           </ProfileMeta>
         )}

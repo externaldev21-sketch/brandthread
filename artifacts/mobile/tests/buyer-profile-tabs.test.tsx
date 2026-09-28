@@ -667,6 +667,27 @@ describe('buyer profile — Instagram layout', () => {
     expect([...new Set(keys)]).toEqual(['profile-stat-posts', 'profile-stat-followers', 'profile-stat-following']);
   });
 
+  it('puts the avatar and stats on the same row (Instagram order), with name/@handle/bio below it', async () => {
+    renderer = await renderScreen();
+    const identityStack = renderer.root.findByProps({ testID: 'profile-identity-stack' });
+    // The mocked Pressable exposes the same testID on both its composite and
+    // host instances, so count only host ('string' type) nodes — same
+    // pattern as the "orders the stats" test above.
+    const hostNodesWithTestID = (root: typeof identityStack, testID: string) => root.findAll(
+      (node) => node.props.testID === testID && typeof node.type === 'string',
+    );
+    // The avatar and the stats row are both inside the measured
+    // identity-stack (what the video hero sizes itself to) — i.e. the same
+    // row, not stats on their own line further down the screen.
+    expect(hostNodesWithTestID(identityStack, 'profile-avatar')).toHaveLength(1);
+    expect(hostNodesWithTestID(identityStack, 'profile-stats-row')).toHaveLength(1);
+    // Name/@handle/bio render in a separate block AFTER the identity-stack,
+    // on the solid background below the fade — not beside the avatar.
+    const meta = renderer.root.findByProps({ testID: 'profile-identity-meta' });
+    expect(hostNodesWithTestID(meta, 'profile-avatar')).toHaveLength(0);
+    expect(hostNodesWithTestID(meta, 'profile-stats-row')).toHaveLength(0);
+  });
+
   it('renders no video layer (and no empty band) without a profile video', async () => {
     renderer = await renderScreen();
     await act(async () => {

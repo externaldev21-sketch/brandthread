@@ -681,10 +681,11 @@ export default function BuyerConversationScreen() {
 
   // ── Other-participant profile ─────────────────────────────────────────────────
 
-  // Used by the request-mode profile header's "View profile" pill (see
-  // isRequestMode below) — a direct link straight to their profile, distinct
-  // from openChatDetails() below (chat details, reached via the header tap
-  // once a conversation is no longer a pending request).
+  // Still referenced elsewhere (e.g. avatar taps) as a direct link straight
+  // to their profile, distinct from openChatDetails() below (chat details,
+  // reached via the header tap once a conversation is no longer a pending
+  // request). #220 moved the request-mode "View profile" pill itself to a
+  // direct router.push to /seller-profile — see the pill's onPress below.
   function openParticipantProfile() {
     if (!participant) return;
     const qs = new URLSearchParams({
@@ -1835,7 +1836,10 @@ export default function BuyerConversationScreen() {
           <PressableScale
             rippleEnabled={false}
             style={s.requestProfilePill}
-            onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
+            onPress={() => {
+              hapticPrimaryAction();
+              if (participant) router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
+            }}
             accessibilityRole="button"
             accessibilityLabel={`View ${participant.name}'s profile`}
             testID="conversation-request-view-profile"

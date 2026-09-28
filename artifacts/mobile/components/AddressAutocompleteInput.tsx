@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -89,13 +90,13 @@ export function AddressAutocompleteInput({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>Shipping address</Text>
+      <Text style={styles.label}>Street address</Text>
       <View style={styles.inputWrap}>
         <Feather name="search" size={17} color={theme.muted} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
-          placeholder="Start typing your street address"
+          placeholder="Start typing your address"
           placeholderTextColor={theme.subtle}
           autoCapitalize="words"
           autoComplete="street-address"
@@ -133,10 +134,12 @@ export function AddressAutocompleteInput({
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   wrap: { marginBottom: SP.sm },
+  // Matches the checkout's labeled field (components/checkout/CheckoutPrimitives
+  // CheckoutField): static label above a rounded, bordered box.
   label: {
     color: theme.muted,
     fontFamily: FONT.medium,
-    fontSize: FS.xs,
+    fontSize: FS.sm,
     marginBottom: 6,
   },
   inputWrap: {
@@ -146,7 +149,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     gap: 9,
     borderWidth: 1,
     borderColor: theme.border,
-    backgroundColor: theme.cardElevated,
+    borderRadius: 10,
+    backgroundColor: theme.background,
     paddingHorizontal: 12,
   },
   input: {
@@ -155,11 +159,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     fontFamily: FONT.regular,
     fontSize: FS.base,
     paddingVertical: 12,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
   },
   suggestions: {
     borderWidth: 1,
-    borderTopWidth: 0,
     borderColor: theme.border,
+    borderRadius: 10,
+    marginTop: 4,
+    overflow: 'hidden',
     backgroundColor: theme.cardElevated,
   },
   suggestion: {
