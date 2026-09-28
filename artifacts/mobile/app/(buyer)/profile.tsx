@@ -133,7 +133,13 @@ function BottomSheet({
   return (
     <Modal transparent animationType="none" onRequestClose={onClose} visible={mounted}>
       <View style={[sheetStyles.backdrop, { backgroundColor: OVERLAY }]}>
-        <PressableScale style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} accessibilityLabel="Close menu" />
+        {/* Plain Pressable, not PressableScale: PressableScale only forwards
+            a plain-object `style` prop to its *inner* Animated.View, never
+            the outer Pressable that actually receives touches — so this
+            backdrop had no real hit area and tapping it did nothing (a
+            press-scale animation on a full-screen dismiss backdrop makes no
+            visual sense anyway, so there's no feature lost dropping it). */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu" />
         <Animated.View
           style={[
             sheetStyles.sheet,
