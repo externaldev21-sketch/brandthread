@@ -42,6 +42,7 @@ import {
 } from "../lib/brandthreadEmail";
 import { publishNotification } from "./notifications-feed";
 import { productThumbnail } from "../lib/activityEvents";
+import { notifyBuyerOrderCancelled, notifyBuyerOrderConfirmed } from "../lib/orderNotifications";
 import { sendPushToUser, stableNotificationId } from "../lib/push";
 import { connectReadiness } from "./manufacturer-connect";
 import { recordPaidPhysicalOrder } from "../lib/sellerTaxLedger";
@@ -964,7 +965,7 @@ export async function handleCheckoutPaid(
     );
     if (piId && createdOrderId) {
       try {
-        await refundOrder({
+        const refund = await refundOrder({
           orderId: createdOrderId,
           reason: "oversold",
           initiatedBy: "system:checkout-webhook",
@@ -976,6 +977,20 @@ export async function handleCheckoutPaid(
           },
         });
         logger.info({ paymentIntentId: piId, stripeSessionId: sessionId }, "Automatic refund issued for oversold order");
+        // Until now the buyer only learned this by email.
+        if (buyerId && !refund.duplicate) {
+          const [cancelled] = await db.select({ orderNumber: orders.orderNumber })
+            .from(orders).where(eq(orders.id, createdOrderId)).limit(1);
+          if (cancelled) {
+            await notifyBuyerOrderCancelled({
+              buyerId,
+              orderId: createdOrderId,
+              orderNumber: cancelled.orderNumber,
+              refundedCents: refund.amountCents,
+              reason: "sold_out",
+            });
+          }
+        }
       } catch (refundErr) {
         // The order stays refund_pending (visible for review). A webhook
         // retry or a person can re-run it with the same idempotency key.
@@ -1017,6 +1032,16 @@ export async function handleCheckoutPaid(
             pushSound: "order-received.wav",
             pushChannelId: "orders",
           });
+          // The buyer's side of the same event (guest checkouts have no feed).
+          if (buyerId) {
+            await notifyBuyerOrderConfirmed({
+              buyerId,
+              orderId: createdOrderId,
+              orderNumber: createdOrder.orderNumber,
+              totalCents: createdOrder.totalCents,
+              targetImageUrl: productThumbnail(firstItem?.images),
+            });
+          }
         } catch (err) {
           // The order is committed even if notification delivery is unavailable.
           logger.error({ err, orderId: createdOrderId }, "New order notification delivery failed");

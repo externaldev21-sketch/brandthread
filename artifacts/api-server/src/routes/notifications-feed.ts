@@ -102,7 +102,7 @@ async function resolveTargetImage(value: string | null): Promise<string | null> 
 }
 
 /** Feed categories the Activity Center shows under "Orders". */
-export const ORDER_ACTIVITY_CATEGORIES = ["orders", "order", "payout", "payouts", "payment", "production"] as const;
+export const ORDER_ACTIVITY_CATEGORIES = ["orders", "order", "payout", "payouts", "payment", "production", "returns"] as const;
 /** Inventory alerts are inserted without an orders category but belong there. */
 export const ORDER_ACTIVITY_TYPES = ["low_stock", "out_of_stock"] as const;
 /**

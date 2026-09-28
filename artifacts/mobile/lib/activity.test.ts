@@ -10,6 +10,7 @@ import {
   createReadTracker,
   groupByRecency,
   isFollowBackRow,
+  isBuyerOrderNotification,
   newFollowersSummary,
   relativeTime,
   type ActivityItem,
@@ -283,6 +284,26 @@ describe('classification and routing', () => {
       .toBe('/thread-cash');
     expect(activityHref(item({ type: 'repost', targetType: 'post', targetId: 'p1' })))
       .toBe('/buyer-post-viewer?postId=p1');
+  });
+
+  it("routes buyer order updates to the buyer's order screen, whatever targetType they were stored with", () => {
+    for (const type of ['order_confirmed', 'order_shipped', 'order_out_for_delivery', 'order_delivered', 'order_cancelled', 'order_exception', 'order_returned_to_sender']) {
+      expect(activityHref(item({ type, category: 'orders', targetType: 'order', targetId: 'o1' }))).toBe('/buyer-order-detail?id=o1');
+      expect(activityHref(item({ type, category: 'orders', targetType: 'buyer_order', targetId: 'o1' }))).toBe('/buyer-order-detail?id=o1');
+      expect(isBuyerOrderNotification(type)).toBe(true);
+    }
+    // Seller-side order events keep the seller screen.
+    for (const type of ['new_order_received', 'order_cancelled_by_buyer', 'shopify_order_cancelled']) {
+      expect(activityHref(item({ type, category: 'orders', targetType: 'order', targetId: 'o2' }), 'seller')).toBe('/order-detail?id=o2');
+      expect(isBuyerOrderNotification(type)).toBe(false);
+    }
+    // Return status rows: Orders filter, and the same screen the push opens.
+    expect(activityKind({ category: 'returns', type: 'return_refunded' })).toBe('orders');
+    expect(activityHref(item({ type: 'return_approved', category: 'returns', targetType: 'return', targetId: 'r1' })))
+      .toBe('/return-detail?returnId=r1');
+    expect(activityIcon({ type: 'order_confirmed', category: 'orders' })).toBe('check-circle');
+    expect(activityIcon({ type: 'order_cancelled_by_buyer', category: 'orders' })).toBe('x-circle');
+    expect(activityIcon({ type: 'return_refunded', category: 'returns' })).toBe('rotate-ccw');
   });
 
   it('icons the new event types', () => {
