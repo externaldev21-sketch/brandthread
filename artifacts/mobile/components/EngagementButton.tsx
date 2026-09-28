@@ -175,7 +175,11 @@ export interface EngagementButtonProps {
   activeIcon?: FeatherNames;
   /** Optional solid Font Awesome icon used instead of the Feather outline icon. */
   solidIcon?: React.ComponentProps<typeof FontAwesome>['name'];
-  /** Formatted count label; omit to show no count */
+  /** Formatted count label (see lib/engagementUtils#formatCount — pass its
+   *  output directly, including the empty string it returns for 0).
+   *  Passing a string (even "") always reserves the count row's layout
+   *  space; omit the prop entirely only when this button has no count
+   *  concept at all. */
   count?: string;
   /** Whether the button is in the "active" (liked/saved/reposted/following) state */
   active?: boolean;

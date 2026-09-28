@@ -4,11 +4,35 @@ import { Feather } from '@expo/vector-icons';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { SP } from '@/lib/theme';
+import { ICON, SP } from '@/lib/theme';
 import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { ProfileGridSkeleton } from './ProfileVideoGrid';
 import type { ProfileLayout } from './profileLayout';
 import { ProfileEmptyAreaContext } from './ProfileEmptyAreaContext';
+
+/**
+ * Three hairline-bordered ghost tiles standing in for the grid this empty
+ * state will fill in — the middle one carries the CTA icon — instead of a
+ * single lone icon floating with no relation to what's coming.
+ */
+function EmptyGridPreview({ layout }: { layout: ProfileLayout }) {
+  const { theme } = useAppTheme();
+  return (
+    <View style={styles.previewRow} testID="profile-empty-grid-preview">
+      {[0, 1, 2].map((i) => (
+        <View
+          key={i}
+          style={[
+            styles.previewTile,
+            { width: layout.tileWidth, height: layout.tileHeight, borderColor: theme.border },
+          ]}
+        >
+          {i === 1 ? <Feather name="plus" size={ICON.sm} color={theme.subtle} /> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 /**
  * What a profile grid shows when it has no tiles: skeleton while loading,
@@ -30,6 +54,7 @@ export function ProfileGridPlaceholder({
   testID,
   compact,
   actionStyle,
+  showGridPreview,
 }: {
   loading: boolean;
   error: boolean;
@@ -45,6 +70,9 @@ export function ProfileGridPlaceholder({
   compact?: boolean;
   /** `text` = Instagram-style link action instead of a pill button. */
   actionStyle?: 'button' | 'text';
+  /** The posts grid's empty state: three ghost tiles above the copy, instead
+   * of a lone icon with no relation to the grid it's standing in for. */
+  showGridPreview?: boolean;
 }) {
   const areaHeight = useContext(ProfileEmptyAreaContext);
   const fill = areaHeight ? { minHeight: areaHeight, justifyContent: 'center' as const } : null;
@@ -61,18 +89,21 @@ export function ProfileGridPlaceholder({
     );
   }
   return (
-    <EmptyState
-      testID={testID ?? 'profile-empty-state'}
-      style={fill}
-      icon={icon}
-      illustration={illustration}
-      title={title}
-      message={description ?? ''}
-      actionLabel={action?.label}
-      onAction={action?.onPress}
-      compact={compact}
-      actionStyle={actionStyle}
-    />
+    <>
+      {showGridPreview ? <EmptyGridPreview layout={layout} /> : null}
+      <EmptyState
+        testID={testID ?? 'profile-empty-state'}
+        style={fill}
+        icon={icon}
+        illustration={illustration}
+        title={title}
+        message={description ?? ''}
+        actionLabel={action?.label}
+        onAction={action?.onPress}
+        compact={compact}
+        actionStyle={actionStyle}
+      />
+    </>
   );
 }
 
@@ -89,4 +120,11 @@ export function ProfileGridFooter({ loadingMore }: { loadingMore: boolean }) {
 
 const styles = StyleSheet.create({
   footer: { paddingVertical: SP.lg, alignItems: 'center' },
+  previewRow: { flexDirection: 'row', gap: 1, marginBottom: SP.md },
+  previewTile: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

@@ -16,8 +16,13 @@ import { formatCount } from '@/lib/engagementUtils';
 // ─── formatCount ─────────────────────────────────────────────────────────────
 
 describe('formatCount', () => {
-  it('returns "0" for zero', () => {
-    expect(formatCount(0)).toBe('0');
+  it('returns "" for zero (blank, reserved-space label)', () => {
+    expect(formatCount(0)).toBe('');
+  });
+
+  it('returns "" for negative/non-finite input', () => {
+    expect(formatCount(-1)).toBe('');
+    expect(formatCount(NaN)).toBe('');
   });
 
   it('returns exact count below 1000', () => {
@@ -25,22 +30,24 @@ describe('formatCount', () => {
     expect(formatCount(999)).toBe('999');
   });
 
-  it('abbreviates thousands with no decimal when multiple of 1000', () => {
-    expect(formatCount(1000)).toBe('1K');
-    expect(formatCount(2000)).toBe('2K');
+  it('comma-groups 1000–9999 without abbreviating', () => {
+    expect(formatCount(1000)).toBe('1,000');
+    expect(formatCount(1203)).toBe('1,203');
+    expect(formatCount(9900)).toBe('9,900');
   });
 
-  it('abbreviates thousands with one decimal when remainder ≥ 100', () => {
-    expect(formatCount(1100)).toBe('1.1K');
-    expect(formatCount(9900)).toBe('9.9K');
+  it('abbreviates 10000+ with a truncated one decimal', () => {
+    expect(formatCount(12_400)).toBe('12.4K');
+    expect(formatCount(99_900)).toBe('99.9K');
   });
 
-  it('abbreviates thousands without decimal when remainder < 100', () => {
-    expect(formatCount(10050)).toBe('10K');
+  it('abbreviates thousands without decimal when the tenth is exactly 0', () => {
+    expect(formatCount(10_000)).toBe('10K');
+    expect(formatCount(20_000)).toBe('20K');
   });
 
   it('abbreviates millions', () => {
-    expect(formatCount(1_000_000)).toBe('1.0M');
+    expect(formatCount(1_000_000)).toBe('1M');
     expect(formatCount(2_500_000)).toBe('2.5M');
   });
 });

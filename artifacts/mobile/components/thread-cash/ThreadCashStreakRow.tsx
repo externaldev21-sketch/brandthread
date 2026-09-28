@@ -11,8 +11,8 @@
  * claim starts a fresh week — this row always reflects exactly that state,
  * it never re-derives it locally.
  */
-import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
@@ -20,6 +20,29 @@ import { ThreadCashBillIcon } from './ThreadCashBill';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
 const WEEKDAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+/**
+ * Today's check gets a single settle-in (scale + fade, no overshoot — this
+ * app's no-bounce standard, see PRESS_SPRING in constants/motion.ts) so
+ * claiming it reads as a small confirmation instead of just appearing on
+ * mount; every other already-claimed day renders its check straight in —
+ * history shouldn't re-animate every time the card mounts.
+ */
+function TodayCheck() {
+  const progress = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [progress]);
+  return (
+    <Animated.View style={{ opacity: progress, transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }}>
+      <Feather name="check" size={16} color="#000000" /* theme-exempt: black check on the solid white circle */ />
+    </Animated.View>
+  );
+}
 
 export function ThreadCashStreakRow({
   streak,
@@ -80,7 +103,7 @@ export function ThreadCashStreakRow({
                       : [styles.circleFuture, { borderColor: theme.borderSubtle }],
                 ]}
               >
-                {claimed ? <Feather name="check" size={16} color="#000000" /* theme-exempt: black check on the solid white circle */ /> : null}
+                {claimed ? (isToday ? <TodayCheck /> : <Feather name="check" size={16} color="#000000" /* theme-exempt: black check on the solid white circle */ />) : null}
               </View>
             </View>
           );
@@ -93,9 +116,9 @@ export function ThreadCashStreakRow({
 const styles = StyleSheet.create({
   // Card: 16pt side gutters (matching the rest of the page), 14 radius, 10pt
   // padding, with the days row 8pt below the title row.
-  wrap: { marginHorizontal: SP.md, borderRadius: 14, padding: 10 },
+  wrap: { marginHorizontal: SP.md, borderRadius: 14, padding: 9 },
   wrapPressed: { opacity: 0.75 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   title: { fontSize: FS.sm, fontFamily: FONT.semibold },
@@ -103,9 +126,9 @@ const styles = StyleSheet.create({
   // No inter-column `gap` — `justifyContent: 'space-between'` alone spreads
   // all 7 columns evenly across the card's full width.
   daysRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dayCol: { alignItems: 'center', gap: 4 },
+  dayCol: { alignItems: 'center', gap: 3 },
   weekdayLabel: { fontSize: 11, fontFamily: FONT.semibold },
-  circle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  circle: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   circleClaimed: { backgroundColor: '#FFFFFF' /* theme-exempt: solid white completed mark per spec */ },
   circleToday: { borderWidth: 2, borderColor: '#FFFFFF' /* theme-exempt: white ring per spec */ },
   circleFuture: { borderWidth: 1 },
