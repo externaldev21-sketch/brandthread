@@ -299,8 +299,23 @@ export function activityDetail(row: ActivityRow): string | null {
 // ─── Classification ───────────────────────────────────────────────────────────
 
 /** Mirrors the server's `filter=orders` definition in notifications-feed.ts. */
-const ORDER_CATEGORIES = new Set(['orders', 'order', 'payout', 'payouts', 'payment', 'production']);
+const ORDER_CATEGORIES = new Set(['orders', 'order', 'payout', 'payouts', 'payment', 'production', 'returns']);
 const ORDER_TYPES = new Set(['low_stock', 'out_of_stock']);
+
+/**
+ * Order updates published to the BUYER (routes/orders.ts, webhooks-shippo,
+ * webhooks-shopify, dropLifecycle, lib/orderNotifications.ts). Seller-side
+ * order types (new_order_received, order_cancelled_by_buyer,
+ * shopify_order_cancelled) are deliberately absent.
+ */
+const BUYER_ORDER_TYPES = new Set([
+  'order_confirmed', 'order_shipped', 'order_out_for_delivery', 'order_delivered',
+  'order_cancelled', 'order_exception', 'order_returned_to_sender',
+]);
+
+export function isBuyerOrderNotification(type: string | undefined | null): boolean {
+  return !!type && BUYER_ORDER_TYPES.has(type);
+}
 // price_drop/back_in_stock/new_product are published under category "stock"
 // (seller alerts) or "social" (buyer alerts) depending on the publisher, but
 // they're always a buyer-facing "things you follow/saved" event for the
@@ -396,7 +411,9 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'order_shipped':
     case 'order_out_for_delivery': return 'truck';
     case 'order_delivered': return 'package';
-    case 'order_cancelled': return 'x-circle';
+    case 'order_cancelled':
+    case 'order_cancelled_by_buyer': return 'x-circle';
+    case 'order_confirmed': return 'check-circle';
     case 'order_exception': return 'alert-triangle';
     default:
       break;
@@ -410,6 +427,7 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'payout':
     case 'payment': return 'dollar-sign';
     case 'production': return 'tool';
+    case 'returns': return 'rotate-ccw';
     case 'subscription': return 'credit-card';
     case 'social': return 'users';
     default: return 'bell';
@@ -486,7 +504,16 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
   const id = row.targetId;
   switch (row.targetType) {
     case 'order':
+      // Older buyer rows (shipped/delivered/cancelled…) were published with
+      // targetType "order" too — send those to the buyer's own order screen,
+      // not the seller's /order-detail.
+      if (isBuyerOrderNotification(row.type)) {
+        return id ? `/buyer-order-detail?id=${q(id)}` : '/(buyer)/orders';
+      }
       return id ? `/order-detail?id=${q(id)}` : '/(tabs)/orders';
+    case 'return':
+      // Same screen the return-status push opens (lib/notificationNavigation.ts).
+      return id ? `/return-detail?returnId=${q(id)}` : null;
     case 'buyer_order':
       return id ? `/buyer-order-detail?id=${q(id)}` : '/(buyer)/orders';
     case 'sample_order':
