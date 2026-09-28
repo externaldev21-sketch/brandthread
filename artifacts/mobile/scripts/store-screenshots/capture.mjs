@@ -62,7 +62,7 @@ export const SCREENS = [
     },
     fallback: { path: '/buyer-product-detail?productId=prod_nl_jacket_rust', ready: 'Field Shell Jacket — Rust', label: 'product page (the sheet opens from the feed)' },
   },
-  { id: 'discover', title: 'Discover', role: 'buyer', path: '/discover', ready: 'Heavyweight Hoodie — Ember' },
+  { id: 'discover', title: 'Discover', role: 'buyer', path: '/discover', ready: 'For You' },
   { id: 'cart', title: 'Cart', role: 'buyer', path: '/cart', ready: 'Order summary' },
   { id: 'checkout', title: 'Checkout', role: 'buyer', path: '/buyer-checkout?source=cart', ready: '1120 NW Everett Street' },
   { id: 'seller-dashboard', title: 'Seller dashboard', role: 'seller', path: '/(tabs)', ready: '$1,842.50' },
