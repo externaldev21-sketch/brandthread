@@ -1,15 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ACTIVITY_CHIPS,
+  activityCategory,
+  activityChipEmpty,
+  matchesActivityChip,
   activityHref,
   activityIcon,
   activityKind,
   activityMessage,
   aggregateActivity,
+  followControlState,
   applyRead,
   buildActivitySections,
   createReadTracker,
   groupByRecency,
+  groupedPeopleHref,
+  groupedPeopleTitle,
+  GROUPED_PEOPLE_MAX_IDS,
+  isGroupedRow,
   isFollowBackRow,
+  isBuyerOrderNotification,
   newFollowersSummary,
   relativeTime,
   type ActivityItem,
@@ -285,10 +295,67 @@ describe('classification and routing', () => {
       .toBe('/buyer-post-viewer?postId=p1');
   });
 
+  it("routes buyer order updates to the buyer's order screen, whatever targetType they were stored with", () => {
+    for (const type of ['order_confirmed', 'order_shipped', 'order_out_for_delivery', 'order_delivered', 'order_cancelled', 'order_exception', 'order_returned_to_sender']) {
+      expect(activityHref(item({ type, category: 'orders', targetType: 'order', targetId: 'o1' }))).toBe('/buyer-order-detail?id=o1');
+      expect(activityHref(item({ type, category: 'orders', targetType: 'buyer_order', targetId: 'o1' }))).toBe('/buyer-order-detail?id=o1');
+      expect(isBuyerOrderNotification(type)).toBe(true);
+    }
+    // Seller-side order events keep the seller screen.
+    for (const type of ['new_order_received', 'order_cancelled_by_buyer', 'shopify_order_cancelled']) {
+      expect(activityHref(item({ type, category: 'orders', targetType: 'order', targetId: 'o2' }), 'seller')).toBe('/order-detail?id=o2');
+      expect(isBuyerOrderNotification(type)).toBe(false);
+    }
+    // Return status rows: Orders filter, and the same screen the push opens.
+    expect(activityKind({ category: 'returns', type: 'return_refunded' })).toBe('orders');
+    expect(activityHref(item({ type: 'return_approved', category: 'returns', targetType: 'return', targetId: 'r1' })))
+      .toBe('/return-detail?returnId=r1');
+    expect(activityIcon({ type: 'order_confirmed', category: 'orders' })).toBe('check-circle');
+    expect(activityIcon({ type: 'order_cancelled_by_buyer', category: 'orders' })).toBe('x-circle');
+    expect(activityIcon({ type: 'return_refunded', category: 'returns' })).toBe('rotate-ccw');
+  });
+
   it('icons the new event types', () => {
     expect(activityIcon({ type: 'story_like', category: 'social' })).toBe('heart');
     expect(activityIcon({ type: 'repost', category: 'social' })).toBe('repeat');
     expect(activityIcon({ type: 'thread_cash_received', category: 'social' })).toBe('dollar-sign');
+  });
+});
+
+describe('filter chips', () => {
+  const of = (type: string, category = 'social') => item({ type, category });
+
+  it('offers exactly All / Follows / Likes / Comments / Orders / Thread Cash, in that order', () => {
+    expect(ACTIVITY_CHIPS.map((c) => c.label)).toEqual(['All', 'Follows', 'Likes', 'Comments', 'Orders', 'Thread Cash']);
+  });
+
+  it('puts each notification type under one chip', () => {
+    expect(activityCategory(of('new_follower'))).toBe('follows');
+    expect(activityCategory(of('post_like'))).toBe('likes');
+    expect(activityCategory(of('story_like'))).toBe('likes');
+    expect(activityCategory(of('post_comment'))).toBe('comments');
+    expect(activityCategory(of('comment_reply'))).toBe('comments');
+    expect(activityCategory(of('mention'))).toBe('comments');
+    expect(activityCategory(of('thread_cash_received'))).toBe('thread_cash');
+    expect(activityCategory(of('order_shipped', 'orders'))).toBe('orders');
+    expect(activityCategory(of('order_delivered', 'orders'))).toBe('orders');
+    expect(activityCategory(of('payout_sent', 'payout'))).toBe('orders');
+    expect(activityCategory(of('low_stock', 'stock'))).toBe('orders');
+    expect(activityCategory(of('repost'))).toBe('other');
+  });
+
+  it('keeps orders out of All but shows every social row there', () => {
+    expect(matchesActivityChip(of('order_shipped', 'orders'), 'all')).toBe(false);
+    expect(matchesActivityChip(of('repost'), 'all')).toBe(true);
+    expect(matchesActivityChip(of('thread_cash_received'), 'all')).toBe(true);
+    expect(matchesActivityChip(of('order_shipped', 'orders'), 'orders')).toBe(true);
+    expect(matchesActivityChip(of('post_like'), 'comments')).toBe(false);
+  });
+
+  it('has a specific empty message for every chip', () => {
+    const messages = ACTIVITY_CHIPS.map((c) => activityChipEmpty(c.key).message);
+    expect(new Set(messages).size).toBe(ACTIVITY_CHIPS.length);
+    expect(activityChipEmpty('thread_cash').message).toContain('Thread Cash');
   });
 });
 
@@ -313,6 +380,41 @@ describe('aggregateActivity — reposts and story likes', () => {
   });
 });
 
+describe('follow row inline pill', () => {
+  const follow = (name: string, overrides: Partial<ActivityItem> = {}) => item({
+    type: 'new_follower', title: `${name} started following you`,
+    actorId: `u_${name}`, actorName: name, targetId: `u_${name}`, targetType: 'user', cta: 'Follow back',
+    ...overrides,
+  });
+
+  it('offers Follow back while the viewer does not follow them', () => {
+    const [row] = aggregateActivity([follow('Jay', { isFollowingActor: false })]);
+    expect(followControlState(row)).toEqual({ userId: 'u_Jay', following: false });
+    expect(isFollowBackRow(row)).toBe(true);
+  });
+
+  it('reads Following once the server says the viewer follows them, even with a stale cta', () => {
+    const [row] = aggregateActivity([follow('Jay', { isFollowingActor: true })]);
+    expect(followControlState(row)).toEqual({ userId: 'u_Jay', following: true });
+    // No longer a pinned Highlights follow-back.
+    expect(isFollowBackRow(row)).toBe(false);
+  });
+
+  it('falls back to the stored cta when the server sends no live state', () => {
+    const [pending] = aggregateActivity([follow('Jay')]);
+    expect(followControlState(pending)?.following).toBe(false);
+    const [mutual] = aggregateActivity([follow('Mina', { cta: undefined, title: 'Mina followed you back' })]);
+    expect(followControlState(mutual)?.following).toBe(true);
+  });
+
+  it('has no pill on merged or non-follow rows', () => {
+    const [merged] = aggregateActivity([follow('Jay'), follow('Mina')]);
+    expect(followControlState(merged)).toBeNull();
+    const [liked] = aggregateActivity([like('Jay', 'post1')]);
+    expect(followControlState(liked)).toBeNull();
+  });
+});
+
 describe('newFollowersSummary', () => {
   it('returns null when there are no follow events', () => {
     expect(newFollowersSummary([like('Jay', 'post1')])).toBeNull();
@@ -328,5 +430,39 @@ describe('newFollowersSummary', () => {
     expect(summary!.count).toBe(2);
     expect(summary!.actors.map((a) => a.name)).toEqual(['Jay', 'Mina']);
     expect(summary!.hasUnread).toBe(true);
+  });
+});
+
+describe('grouped rows → people list', () => {
+  it('treats a merged row of 2+ people as grouped, never a single-actor or order row', () => {
+    const [merged] = aggregateActivity([like('Jay', 'post1'), like('Mina', 'post1'), like('Ola', 'post1')]);
+    expect(merged.actorCount).toBe(3);
+    expect(isGroupedRow(merged)).toBe(true);
+    const [single] = aggregateActivity([like('Jay', 'post2')]);
+    expect(isGroupedRow(single)).toBe(false);
+    expect(isGroupedRow({ type: 'order_shipped', actorCount: 2 })).toBe(false);
+  });
+
+  it("links to the people list with the row's own feed ids and type", () => {
+    const [merged] = aggregateActivity([like('Jay', 'post1'), like('Mina', 'post1')]);
+    const href = groupedPeopleHref(merged);
+    expect(href.startsWith('/activity-people?')).toBe(true);
+    const params = new URLSearchParams(href.split('?')[1]);
+    expect(params.get('type')).toBe('post_like');
+    expect(params.get('ids')!.split(',')).toEqual(merged.ids);
+  });
+
+  it('caps the ids a link carries', () => {
+    const ids = Array.from({ length: GROUPED_PEOPLE_MAX_IDS + 20 }, (_, i) => `n${i}`);
+    const params = new URLSearchParams(groupedPeopleHref({ type: 'post_like', ids }).split('?')[1]);
+    expect(params.get('ids')!.split(',')).toHaveLength(GROUPED_PEOPLE_MAX_IDS);
+  });
+
+  it('titles the list by what the people did', () => {
+    expect(groupedPeopleTitle('post_like')).toBe('Likes');
+    expect(groupedPeopleTitle('story_like')).toBe('Likes');
+    expect(groupedPeopleTitle('post_comment')).toBe('Comments');
+    expect(groupedPeopleTitle('repost')).toBe('Reposts');
+    expect(groupedPeopleTitle('new_follower')).toBe('New followers');
   });
 });

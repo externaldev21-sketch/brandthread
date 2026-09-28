@@ -15,6 +15,7 @@ import { FONT, GUTTER } from '@/lib/theme';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { hapticLight } from '@/lib/haptics';
+import { formatTimeRemaining } from '@/lib/countdown';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
 export interface EditorialTileItem {
@@ -26,6 +27,10 @@ export interface EditorialTileItem {
   initials: string;
   priceCents?: number | null;
   isUrgent?: boolean;
+  /** Drop/pre-order closing time — drives the countdown badge. Only ever
+   *  set from a real endsAt the API returns (a product's pre-order closing
+   *  date, or its parent drop's own end time), never fabricated. */
+  endsAt?: string | null;
 }
 
 export const TILE_WIDTH = 152;
@@ -35,6 +40,7 @@ export const TILE_IMAGE_HEIGHT = Math.round((TILE_WIDTH * 4) / 3);
 
 export const EditorialTile = React.memo(function EditorialTile({ item, theme }: { item: EditorialTileItem; theme: AppThemePreset }) {
   const { push } = useThreadPull();
+  const countdownLabel = formatTimeRemaining(item.endsAt);
   return (
     <Pressable
       onPress={() => {
@@ -60,6 +66,11 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
         )}
         {item.isUrgent && (
           <View style={[tile.urgentDot, { backgroundColor: theme.accent }]} />
+        )}
+        {!!countdownLabel && (
+          <View style={tile.countdownBadge}>
+            <Text style={tile.countdownText} numberOfLines={1}>{countdownLabel}</Text>
+          </View>
         )}
       </LinearGradient>
       {/* Image, then name / brand / price below it with a tight 4-6pt rhythm
@@ -88,6 +99,15 @@ const tile = StyleSheet.create({
     position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4,
     borderWidth: 1.5, borderColor: '#FFFFFF',
   },
+  // theme-exempt: fixed monochrome badge (black pill/white text) regardless
+  // of theme — same fixed-dark-chrome pattern as Discover/Search's other
+  // over-image overlays; red is reserved for LIVE/end-call only.
+  countdownBadge: {
+    position: 'absolute', top: 8, left: 8,
+    backgroundColor: 'rgba(0,0,0,0.72)', borderRadius: RADII.pill,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  countdownText: { fontSize: 11, fontFamily: FONT.semibold, color: '#FFFFFF' },
   name: { fontSize: 14, fontFamily: FONT.semibold, marginTop: 6 },
   brand: { fontSize: 12, fontFamily: FONT.regular, marginTop: 4 },
   price: { fontSize: 13, fontFamily: FONT.semibold, marginTop: 4 },
