@@ -13,6 +13,7 @@ import { getLocations, getInventoryItems, getTransfer, getTransfers, createTrans
 import { InventoryLocation, InventoryItem, InventoryTransfer, TransferStatus } from '@/services/inventoryTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -756,7 +757,7 @@ export default function InventoryTransferScreen() {
             <View style={styles.searchRow}>
               <Feather name="search" size={ICON.sm} color={MUTED} />
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, WEB_INPUT_RESET]}
                 value={itemSearch}
                 onChangeText={setItemSearch}
                 placeholder="Search items…"
