@@ -824,6 +824,13 @@ export const conversationParticipants = pgTable('conversation_participants', {
   // Per-membership, like unreadCount/lastReadAt above, since mute is a
   // setting the viewer chose for their own copy of this conversation.
   mutedUntil:     timestamp('muted_until'),
+  // Inbox swipe-row > Pin (item 62): null = not pinned, a timestamp = when
+  // this viewer pinned it. Per-membership, exactly like mutedUntil above —
+  // pinning is personal, each side of a conversation can pin/unpin
+  // independently. The value itself is only used as a presence flag today
+  // (pinned vs not); it's a timestamp rather than a boolean so a future
+  // "most-recently-pinned first" ordering has something to sort by for free.
+  pinnedAt:       timestamp('pinned_at'),
   joinedAt:       timestamp('joined_at').defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.conversationId, table.userId] }),

@@ -14,7 +14,7 @@
  * repost/creator row with no leftover gap where the pill used to sit.
  */
 import React from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { CachedImage } from '@/components/CachedImage';
@@ -27,12 +27,22 @@ export interface RepostFriend {
   avatarUrl?: string | null;
 }
 
+// This block's own reserved height (see `root`/`rootWithRepost` below) —
+// exported so callers that need to keep some *other* overlay clear of this
+// whole stack (not just its own bottom edge) can compute that without
+// hand-copying these numbers. See feed.tsx's ScrubProgressBar bubble, which
+// used to hardcode its own clearance and drifted out of sync with this
+// block, letting the drag-time bubble render behind the sound/mute pill.
+export const CAPTION_BLOCK_HEIGHT = 56;
+export const CAPTION_BLOCK_HEIGHT_WITH_REPOST = 92;
+
 export function CaptionBlock({
   creator, verified, caption, taggedPeople, sound, soundOn, onToggleSound,
   friendReposts, hasRepostIdentity, repostLabel, onOpenRepostIdentity,
   captionExpanded, onToggleCaptionExpanded,
   onOpenCreator,
   style,
+  onHeightChange,
 }: {
   creator: string;
   verified: boolean;
@@ -52,11 +62,23 @@ export function CaptionBlock({
   onToggleCaptionExpanded: () => void;
   onOpenCreator: () => void;
   style?: any;
+  /** Reports this block's real rendered height — bigger than the
+   *  `CAPTION_BLOCK_HEIGHT`/`_WITH_REPOST` *minimums* whenever a 2-line
+   *  caption, a repost row, or just different font metrics push it taller.
+   *  Callers that need to keep some other overlay clear of the whole stack
+   *  (the feed's scrub-bubble; see ScrubProgressBar in feed.tsx) should use
+   *  this measured height, not the nominal constants, to actually guarantee
+   *  no overlap. */
+  onHeightChange?: (height: number) => void;
 }) {
+  const handleLayout = onHeightChange
+    ? (e: LayoutChangeEvent) => onHeightChange(e.nativeEvent.layout.height)
+    : undefined;
   return (
     <Animated.View
       style={[styles.root, hasRepostIdentity && styles.rootWithRepost, style]}
       pointerEvents="box-none"
+      onLayout={handleLayout}
     >
       {hasRepostIdentity && (
         <TouchableOpacity
@@ -157,10 +179,10 @@ const styles = StyleSheet.create({
   // pill + 12pt gap (56pt) accordingly, so there's no leftover reserved
   // space where it used to sit.
   root: {
-    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 56,
+    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: CAPTION_BLOCK_HEIGHT,
     justifyContent: 'flex-end',
   },
-  rootWithRepost: { minHeight: 92 },
+  rootWithRepost: { minHeight: CAPTION_BLOCK_HEIGHT_WITH_REPOST },
   repostIdentity: {
     alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,
