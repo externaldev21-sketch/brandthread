@@ -21,7 +21,7 @@ import {
   db, conversations, conversationParticipants, messages, messageReactions, blocks, follows, users,
   products, orders, posts,
 } from "@workspace/db";
-import { eq, and, desc, inArray, sql, or } from "drizzle-orm";
+import { eq, and, desc, inArray, sql, or, ilike } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
@@ -77,6 +77,8 @@ function buildConversationView(
   // isPinned/isOfficial comment on Conversation in mobile's socialTypes.ts.
   const isAgentThread = parts.some((p) => isAgentUserId(p.userId));
   const agentTypingUntil = (conv as { agentTypingUntil?: Date | null }).agentTypingUntil;
+  const nicknameMap = (conv as { nicknames?: Record<string, string> | null }).nicknames ?? {};
+  const myMutedUntil = me?.mutedUntil ?? null;
   return {
     id:   conv.id,
     type: conv.type,
@@ -87,7 +89,13 @@ function buildConversationView(
       initials:    p.initials,
       color:       p.color,
       accountType: p.accountType,
+      // Chat details > Nicknames: the CURRENT viewer's nickname for this
+      // participant, if they've set one — never another viewer's.
+      nickname:    nicknameMap[`${myUserId}:${p.userId}`] || undefined,
     })),
+    // Chat details > Mute. Present only when actively muted (a past
+    // mutedUntil behaves as unmuted on the client).
+    mutedUntil: myMutedUntil && myMutedUntil.getTime() > Date.now() ? myMutedUntil.toISOString() : undefined,
     lastMessage:        lastMessagePreview ?? conv.lastMessage ?? undefined,
     lastMessageTs:      conv.lastMessageAt
       ? new Date(conv.lastMessageAt).getTime()
@@ -236,18 +244,28 @@ router.get("/", async (req, res) => {
   )));
 });
 
+type ParticipantInput = { userId: string; name: string; handle: string; initials: string; color: string; accountType: string };
+
 // ─── POST /api/conversations ──────────────────────────────────────────────────
 router.post("/", rateLimit("messaging"), async (req, res) => {
   const myUserId = (req as any).clerkUserId as string;
   const {
     type,
     participant,
+    participants,
     myInfo,
     contextOrderId, contextOrderNumber, contextOrderStatus,
     contextProductId, contextProductName, contextSellerName,
   } = req.body as {
     type: string;
-    participant: { userId: string; name: string; handle: string; initials: string; color: string; accountType: string };
+    participant?: ParticipantInput;
+    // Chat details > Create a group chat: 2+ participants instead of one.
+    // A deliberately minimal path (see docs/dm-flows.md) — no dedupe against
+    // an existing group with the exact same members, no per-member DM-privacy
+    // or seller-vacation checks (those are 1:1-specific concepts), just a
+    // straightforward create. Block enforcement between the creator and each
+    // invitee still applies below.
+    participants?: ParticipantInput[];
     myInfo?: { name: string; handle: string; initials: string; color: string; accountType: string };
     contextOrderId?: string;
     contextOrderNumber?: string;
@@ -256,6 +274,32 @@ router.post("/", rateLimit("messaging"), async (req, res) => {
     contextProductName?: string;
     contextSellerName?: string;
   };
+
+  if (Array.isArray(participants) && participants.length >= 2) {
+    if (participants.length > 20) return res.status(400).json({ error: "A group chat can have at most 20 other members." });
+    for (const p of participants) {
+      if (!p?.userId) return res.status(400).json({ error: "Every participant needs a userId." });
+      const relation = await blockRelation(myUserId, p.userId);
+      if (relation !== "none") {
+        return res.status(403).json({ error: `Unable to add ${p.name || "that person"} to the group.`, code: "BLOCKED" });
+      }
+    }
+    const [conv] = await db.insert(conversations).values({ type: "group" }).returning();
+    await db.insert(conversationParticipants).values([
+      {
+        conversationId: conv.id, userId: myUserId,
+        name: myInfo?.name ?? "", handle: myInfo?.handle ?? "",
+        initials: myInfo?.initials ?? "", color: myInfo?.color ?? "#8B5CF6",
+        accountType: myInfo?.accountType ?? "buyer",
+      },
+      ...participants.map((p) => ({
+        conversationId: conv.id, userId: p.userId, name: p.name, handle: p.handle,
+        initials: p.initials, color: p.color, accountType: p.accountType,
+      })),
+    ]);
+    const parts = await db.select().from(conversationParticipants).where(eq(conversationParticipants.conversationId, conv.id));
+    return res.status(201).json(buildConversationView(conv, parts, myUserId));
+  }
 
   if (!participant?.userId) return res.status(400).json({ error: "participant.userId required" });
 
@@ -415,6 +459,11 @@ router.get("/:id/messages", async (req, res) => {
   const { id } = req.params;
   const limit = Math.min(parseInt(String(req.query.limit ?? 50), 10), 100);
   const before = req.query.before as string | undefined;
+  // Search-in-chat (chat details > Search): when `q` is present this becomes
+  // a search over this conversation's own message history only, not global
+  // search — newest-first like the normal timeline, `before`/pagination
+  // don't apply to a search result set.
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
 
   const [isMember] = await db.select({ userId: conversationParticipants.userId })
     .from(conversationParticipants)
@@ -423,14 +472,16 @@ router.get("/:id/messages", async (req, res) => {
 
   if (!isMember) return res.status(403).json({ error: "Not a participant" });
 
-  const whereClause = before
-    ? and(eq(messages.conversationId, id), sql`${messages.createdAt} < ${new Date(before)}`)
-    : eq(messages.conversationId, id);
+  const whereClause = q
+    ? and(eq(messages.conversationId, id), ilike(messages.body, `%${q}%`))
+    : before
+      ? and(eq(messages.conversationId, id), sql`${messages.createdAt} < ${new Date(before)}`)
+      : eq(messages.conversationId, id);
 
   const msgs = await db.select().from(messages)
     .where(whereClause)
     .orderBy(desc(messages.createdAt))
-    .limit(limit);
+    .limit(q ? Math.min(limit, 50) : limit);
 
   const parts = await db.select().from(conversationParticipants)
     .where(eq(conversationParticipants.conversationId, id));
@@ -659,15 +710,28 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
       .where(and(eq(conversationParticipants.conversationId, id), sql`user_id != ${userId}`)),
   ]);
 
-  // Notify each recipient of the new message (non-critical, fire-and-forget)
+  // Notify each recipient of the new message (non-critical, fire-and-forget).
+  // Chat details > Mute: a recipient who muted this conversation gets no
+  // notification for it — this is the actual notification-suppression half
+  // of "Mute", not just a cosmetic toggle.
   if (otherIds.length > 0) {
     (async () => {
       try {
         const [conv] = await db.select({ type: conversations.type })
           .from(conversations).where(eq(conversations.id, id)).limit(1);
+        const recipientRows = await db.select({ userId: conversationParticipants.userId, mutedUntil: conversationParticipants.mutedUntil })
+          .from(conversationParticipants)
+          .where(and(eq(conversationParticipants.conversationId, id), inArray(conversationParticipants.userId, otherIds)));
+        const now = Date.now();
+        const mutedIds = new Set(
+          recipientRows
+            .filter((r: { userId: string; mutedUntil: Date | null }) => r.mutedUntil && r.mutedUntil.getTime() > now)
+            .map((r: { userId: string; mutedUntil: Date | null }) => r.userId),
+        );
         // Map conversation type to the notification type the mobile client expects
         const notifType = conv?.type === "buyer_to_buyer" ? "new_friend_message" : "new_order_message";
         for (const recipientId of otherIds) {
+          if (mutedIds.has(recipientId)) continue;
           await publishNotification({
             userId:        recipientId,
             category:      "messages",
@@ -792,6 +856,79 @@ router.patch("/:id/read", async (req, res) => {
   ]);
 
   return res.json({ ok: true });
+});
+
+// A far-future sentinel for "Until I turn it back on" (never auto-expires in
+// practice) — avoids a second boolean column for one extra mute option.
+const MUTE_FOREVER = new Date("9999-12-31T00:00:00.000Z");
+
+// ─── PATCH /api/conversations/:id/mute ───────────────────────────────────────
+// Chat details > Mute. Body: { durationMinutes?: number | null }.
+//   - a positive number  → muted for that many minutes from now
+//   - -1                 → muted "Until I turn it back on"
+//   - null / 0 / omitted → unmuted
+router.patch("/:id/mute", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const { durationMinutes } = req.body as { durationMinutes?: number | null };
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  const mutedUntil = durationMinutes == null || durationMinutes <= 0
+    ? null
+    : durationMinutes === -1
+      ? MUTE_FOREVER
+      : new Date(Date.now() + durationMinutes * 60_000);
+
+  await db.update(conversationParticipants)
+    .set({ mutedUntil })
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
+
+  return res.json({ ok: true, mutedUntil: mutedUntil?.toISOString() ?? null });
+});
+
+// ─── PATCH /api/conversations/:id/nickname ───────────────────────────────────
+// Chat details > Nicknames. Body: { targetUserId: string, nickname: string }.
+// An empty/whitespace-only nickname clears it back to the real name.
+router.patch("/:id/nickname", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const { targetUserId, nickname } = req.body as { targetUserId?: string; nickname?: string };
+  if (!targetUserId || typeof targetUserId !== "string") {
+    return res.status(400).json({ error: "targetUserId is required" });
+  }
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  const targetIsMember = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, targetUserId)))
+    .limit(1);
+  if (!targetIsMember.length) return res.status(400).json({ error: "Not a participant in this conversation" });
+
+  const [conv] = await db.select({ nicknames: conversations.nicknames })
+    .from(conversations)
+    .where(eq(conversations.id, id))
+    .limit(1);
+  if (!conv) return res.status(404).json({ error: "Conversation not found" });
+
+  const key = `${userId}:${targetUserId}`;
+  const nicknames: Record<string, string> = { ...(conv.nicknames as Record<string, string> | null ?? {}) };
+  const trimmed = (nickname ?? "").trim();
+  if (trimmed) nicknames[key] = trimmed.slice(0, 60);
+  else delete nicknames[key];
+
+  await db.update(conversations).set({ nicknames }).where(eq(conversations.id, id));
+
+  return res.json({ ok: true, nickname: nicknames[key] ?? null });
 });
 
 // ─── PATCH /api/conversations/:id/accept — accept a message request ───────────

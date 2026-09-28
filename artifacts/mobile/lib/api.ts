@@ -1448,8 +1448,23 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         contextOrderId?: string; contextOrderNumber?: string; contextOrderStatus?: string;
         contextProductId?: string; contextProductName?: string; contextSellerName?: string;
       }) => post<any>('/api/conversations', body),
+      /** Chat details > Create a group chat — a minimal group create (see docs/dm-flows.md). */
+      createGroup: (body: {
+        participants: Array<{ userId: string; name: string; handle: string; initials: string; color: string; accountType: string }>;
+        myInfo?: { name: string; handle: string; initials: string; color: string; accountType: string };
+      }) => post<any>('/api/conversations', { type: 'group', ...body }),
       messages:   (id: string, limit = 50) =>
         get<any[]>(`/api/conversations/${encodeURIComponent(id)}/messages?limit=${limit}`),
+      /** Search-in-chat (chat details > Search): this conversation's own
+       *  message history only, never global search. */
+      searchMessages: (id: string, q: string) =>
+        get<any[]>(`/api/conversations/${encodeURIComponent(id)}/messages?q=${encodeURIComponent(q)}`),
+      /** Chat details > Mute. durationMinutes: -1 = "Until I turn it back on", null/0 = unmute. */
+      mute: (id: string, durationMinutes: number | null) =>
+        patch<{ ok: boolean; mutedUntil: string | null }>(`/api/conversations/${encodeURIComponent(id)}/mute`, { durationMinutes }),
+      /** Chat details > Nicknames. An empty nickname clears it. */
+      setNickname: (id: string, targetUserId: string, nickname: string) =>
+        patch<{ ok: boolean; nickname: string | null }>(`/api/conversations/${encodeURIComponent(id)}/nickname`, { targetUserId, nickname }),
       send:       (id: string, body: { text: string; attachment?: any; replyToId?: string }) =>
         post<any>(`/api/conversations/${encodeURIComponent(id)}/messages`, body),
       markRead:   (id: string) =>

@@ -533,7 +533,10 @@ export default function BuyerConversationScreen() {
     ?? conv?.participants.find((p) => p.userId !== myId && p.userId !== MY_USER_ID)
     ?? conv?.participants[0]
     ?? null;
-  const displayName = participant?.name ?? params.participantName ?? 'Unknown';
+  // Chat details > Nicknames: once set, the nickname replaces the real name
+  // everywhere this screen shows the counterpart — header, request-mode
+  // profile header, media-sheet copy, etc.
+  const displayName = participant?.nickname || participant?.name || params.participantName || 'Unknown';
   const isDisabled = conv?.isFriendshipActive === false;
   // Request mode (Instagram-style): the composer is hidden and replaced with
   // the accept/block/delete bottom panel below until the recipient accepts.
@@ -665,16 +668,22 @@ export default function BuyerConversationScreen() {
 
   // ── Other-participant profile ─────────────────────────────────────────────────
 
-  function openParticipantProfile() {
-    if (!participant) return;
+  // ── Chat details ───────────────────────────────────────────────────────────────
+
+  function openChatDetails() {
+    if (!conv || !participant) return;
     const qs = new URLSearchParams({
-      userId: participant.userId,
-      name: participant.name,
-      handle: participant.handle,
-      initials: participant.initials,
-      color: participant.color,
+      id: conv.id, role: 'buyer',
+      isBlocked: messaging.blockedByMe ? '1' : '0',
+      participantUserId: participant.userId,
+      participantName: participant.name,
+      participantHandle: participant.handle ?? '',
+      participantInitials: participant.initials ?? '',
+      participantColor: participant.color ?? '#8B5CF6',
+      participantAvatarUri: participant.avatarUri ?? '',
+      participantNickname: participant.nickname ?? '',
     });
-    router.push(('/buyer-other-profile?' + qs.toString()) as never);
+    router.push(('/conversation-details?' + qs.toString()) as never);
   }
 
   // ── Request mode: accept / delete / block ───────────────────────────────────
@@ -1630,9 +1639,10 @@ export default function BuyerConversationScreen() {
           style={s.headerCenter}
           activeOpacity={participant ? 0.7 : 1}
           disabled={!participant}
-          onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
+          onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+          testID="conversation-header-name"
           accessibilityRole="button"
-          accessibilityLabel={`View ${displayName}'s profile`}
+          accessibilityLabel={`${displayName} — chat details`}
         >
           {participant && (
             <View style={s.headerAvatarWrap} testID="conversation-avatar">

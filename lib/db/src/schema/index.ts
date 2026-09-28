@@ -788,6 +788,11 @@ export const conversations = pgTable('conversations', {
   // nudge was sent in this conversation — gates the "at most one nudge every
   // few days" anti-spam rule in brandthreadAgent.ts.
   agentLastNudgeAt:   timestamp('agent_last_nudge_at', { withTimezone: true }),
+  // Chat details (DM flows PR 2): per-viewer nicknames for the other
+  // participant(s) in this conversation, keyed by "<viewerUserId>:<targetUserId>".
+  // A jsonb map here (instead of a join table) keeps a 1:1 DM's nickname a
+  // single cheap read/write and still scales to a future group chat.
+  nicknames:          json('nicknames').$type<Record<string, string>>().notNull().default({}),
   createdAt:          timestamp('created_at').defaultNow().notNull(),
   updatedAt:          timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -806,6 +811,11 @@ export const conversationParticipants = pgTable('conversation_participants', {
   accountType:    text('account_type').notNull().default('buyer'),
   unreadCount:    integer('unread_count').notNull().default(0),
   lastReadAt:     timestamp('last_read_at'),
+  // Chat details (DM flows PR 2) mute: null = not muted; a timestamp = muted
+  // until then (a far-future sentinel represents "Until I turn it back on").
+  // Per-membership, like unreadCount/lastReadAt above, since mute is a
+  // setting the viewer chose for their own copy of this conversation.
+  mutedUntil:     timestamp('muted_until'),
   joinedAt:       timestamp('joined_at').defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.conversationId, table.userId] }),
