@@ -52,7 +52,7 @@ import { formatProfileCount } from '@/services/profileService';
 import { ProfileMeta } from '@/components/profile/ProfileShell';
 import { InteractionLayer, ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-import { ProfileVideoAffordance, ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
+import { ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
 import { ProfileStoryAvatar } from '@/components/profile/ProfileStoryAvatar';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { ProfileStoriesRow, type ProfileStoryItem } from '@/components/profile/ProfileStoriesRow';
@@ -79,14 +79,16 @@ import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 const PREVIEW_NAME = 'Ava Buyer';
 const PREVIEW_HANDLE = '@ava';
 
-const TABS = ['Posts', 'Saved', 'Liked', 'Orders'] as const;
+// Orders used to be its own top-level tab (package icon) alongside Posts /
+// Saved / Liked — now folded into the Posts tab's own Published / Drafts /
+// Orders segmented control below, so there is exactly one path to it.
+const TABS = ['Posts', 'Saved', 'Liked'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_ITEMS: ProfileTab[] = [
   { key: 'Posts', label: 'Posts', icon: 'grid' },
   { key: 'Saved', label: 'Saved', icon: 'bookmark' },
   { key: 'Liked', label: 'Liked', icon: 'heart' },
-  { key: 'Orders', label: 'Orders', icon: 'package' },
 ];
 
 function savedTypeIcon(type: string): keyof typeof Feather.glyphMap {
@@ -331,7 +333,7 @@ export default function ProfileScreen() {
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Posts');
-  const [postFilter, setPostFilter] = useState<'Published' | 'Drafts'>('Published');
+  const [postFilter, setPostFilter] = useState<'Published' | 'Drafts' | 'Orders'>('Published');
   const [refreshing, setRefreshing] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   // Set only when the buyer has a moving profile picture — the poster frame
@@ -623,17 +625,21 @@ export default function ProfileScreen() {
   // ── Per-tab rows ──
   const rows: ListRow[] = useMemo(() => {
     if (activeTab === 'Posts') {
+      // Orders now lives inside the Posts tab's own segmented control
+      // (Published / Drafts / Orders) rather than a separate top-level tab.
+      if (postFilter === 'Orders') return myOrders.map((order) => ({ kind: 'order' as const, order }));
       const filtered = posts.filter(p => postFilter === 'Drafts' ? p.isDraft : !p.isDraft);
       return filtered.map((post) => ({ kind: 'post' as const, post, item: gridItemFromBuyerPost(post) }));
     }
     if (activeTab === 'Saved') return savedItems.map((saved) => ({ kind: 'saved' as const, saved }));
-    if (activeTab === 'Orders') return myOrders.map((order) => ({ kind: 'order' as const, order }));
     // Liked has no backing data yet — a clean empty slot rather than
     // inventing engagement history.
     return [];
   }, [activeTab, postFilter, posts, savedItems, myOrders]);
 
-  const numColumns = activeTab === 'Posts' ? layout.gridColumns : activeTab === 'Saved' ? savedColumns : 1;
+  const numColumns = activeTab === 'Posts'
+    ? (postFilter === 'Orders' ? 1 : layout.gridColumns)
+    : activeTab === 'Saved' ? savedColumns : 1;
 
   // Posts/Saved force the FlatList above to remount (new `key`, since a
   // live FlatList can't change numColumns) — restore the offset it had
@@ -672,7 +678,9 @@ export default function ProfileScreen() {
   ), []);
 
   // One table decides every tab's empty copy + CTA (own profile → CTA).
-  const emptyTabKey = activeTab === 'Posts' && postFilter === 'Drafts' ? 'buyer:draft' : `buyer:${activeTab.toLowerCase()}`;
+  const emptyTabKey = activeTab === 'Posts'
+    ? (postFilter === 'Drafts' ? 'buyer:draft' : postFilter === 'Orders' ? 'buyer:orders' : 'buyer:posts')
+    : `buyer:${activeTab.toLowerCase()}`;
   const empty = profileEmptyState(emptyTabKey as ProfileEmptyTab, true);
   const emptyIcon = empty.icon as keyof typeof Feather.glyphMap;
   const emptyIllustration = empty.illustration;
@@ -798,14 +806,6 @@ export default function ProfileScreen() {
             onOpenWebsite={(url) => { void Linking.openURL(url); }}
           />
         ) : null}
-        coverAffordance={(
-          <ProfileVideoAffordance
-            hasVideo={hasCover}
-            busy={coverFlow.busy}
-            onAdd={coverFlow.startAdd}
-            onManage={coverFlow.openManage}
-          />
-        )}
         stats={stats}
         statsLoading={loading}
       />
@@ -871,11 +871,13 @@ export default function ProfileScreen() {
         <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} variant="iconOnly" />
       </View>
 
-      {/* Posts sub-filter (Published / Drafts) — same pattern as the seller
-          profile's own filter row, minus Scheduled (buyers can't schedule). */}
+      {/* Posts sub-filter: Published / Drafts / Orders — an equal-width
+          segmented control spanning the grid's content width (Orders used to
+          be its own top-level tab; folding it in here leaves exactly one
+          path to it). */}
       {activeTab === 'Posts' && (
         <View style={styles.filterRow} accessibilityRole="tablist" testID="buyer-post-filters">
-          {(['Published', 'Drafts'] as const).map((filter) => {
+          {(['Published', 'Drafts', 'Orders'] as const).map((filter) => {
             const selected = filter === postFilter;
             return (
               <Pressable
@@ -887,7 +889,7 @@ export default function ProfileScreen() {
                 testID={`buyer-post-filter-${filter.toLowerCase()}`}
                 style={({ pressed }) => [
                   styles.filterChip,
-                  { borderColor: selected ? theme.text : theme.border, backgroundColor: selected ? theme.text : 'transparent' },
+                  { backgroundColor: selected ? theme.text : theme.cardElevated },
                   pressed && styles.filterChipPressed,
                 ]}
               >
@@ -930,7 +932,7 @@ export default function ProfileScreen() {
             description={emptyDescription}
             action={emptyAction}
             actionStyle="text"
-            showGridPreview={activeTab === 'Posts'}
+            showGridPreview={activeTab === 'Posts' && postFilter !== 'Orders'}
           />
         )}
         showsVerticalScrollIndicator={false}
@@ -1005,10 +1007,11 @@ function makeStyles(theme: AppThemePreset) {
     // (Instagram's grid starts right under the underline).
     tabsBlock: { paddingTop: 16, paddingBottom: 1 },
 
-    // Posts sub-filter (Published / Drafts) — same pattern as the seller
-    // profile's own filterRow, buyer has no Scheduled (buyers can't schedule).
+    // Posts sub-filter: Published / Drafts / Orders — an equal-width
+    // segmented control spanning the 16px content gutters, each third the
+    // same width, 36pt tall, 8pt gaps between segments.
     filterRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xs },
-    filterChip: { height: 30, borderRadius: 15, borderWidth: 1, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+    filterChip: { flex: 1, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
     filterChipPressed: { opacity: 0.7 },
     filterText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   });
