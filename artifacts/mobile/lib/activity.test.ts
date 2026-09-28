@@ -54,7 +54,7 @@ function like(actor: string, postId: string, overrides: Partial<ActivityItem> = 
     actorId: `user_${actor}`,
     actorName: actor,
     actorInitials: actor.slice(0, 2).toUpperCase(),
-    actorColor: '#8B5CF6',
+    actorColor: '#3D3D42',
     targetId: postId,
     targetType: 'post',
     targetImageUrl: `https://cdn.test/${postId}.jpg`,
