@@ -75,6 +75,12 @@ async function notifyOrderShipped(
 // GET /api/orders
 router.get("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  // Item 144 (seller chat buyer context panel): an optional buyerId filter
+  // so a seller can pull just one buyer's order history with them — always
+  // ANDed with the existing ownerId scope below, so this can only ever
+  // narrow a seller's own orders down to one buyer, never expose another
+  // seller's orders for that buyer.
+  const buyerId = typeof req.query.buyerId === "string" && req.query.buyerId ? req.query.buyerId : null;
   const rows = await db
     .select({
       id: orders.id,
@@ -105,7 +111,7 @@ router.get("/", async (req, res) => {
     .leftJoin(users, eq(orders.buyerId, users.clerkId))
     .leftJoin(drops, eq(orders.dropId, drops.id))
     .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
-    .where(eq(orders.ownerId, ownerId))
+    .where(buyerId ? and(eq(orders.ownerId, ownerId), eq(orders.buyerId, buyerId)) : eq(orders.ownerId, ownerId))
     .groupBy(orders.id, customers.name, customers.email, drops.name, drops.type, users.displayName, users.name, users.email)
     .orderBy(desc(orders.createdAt));
   res.json(rows);

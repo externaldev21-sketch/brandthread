@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS } from '@/lib/theme';
-import { getUnreadActivityCount, subscribeActivity, watchActivityRealtime } from '@/services/activityService';
+import { getUnreadActivityCount, subscribeActivity, subscribeUnreadOverride, watchActivityRealtime } from '@/services/activityService';
 
 /**
  * Unread Activity Center count. Refreshes when the host screen gains focus,
@@ -34,12 +34,17 @@ export function useActivityUnreadCount(): number {
       if (debounce.current) clearTimeout(debounce.current);
       debounce.current = setTimeout(refresh, 400);
     });
+    // "Mark all read" zeroes the badge immediately (see markAllActivityRead).
+    const unsubscribeOverride = subscribeUnreadOverride((next) => {
+      if (mounted.current) setCount(next);
+    });
     const realtime = watchActivityRealtime(({ count: next }) => {
       if (mounted.current) setCount(next);
     });
     return () => {
       mounted.current = false;
       unsubscribe();
+      unsubscribeOverride();
       realtime.stop();
       if (debounce.current) clearTimeout(debounce.current);
     };

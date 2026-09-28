@@ -86,8 +86,52 @@ function minutesAgo(mins: number): string {
 
 let cached: ActivityItem[] | null = null;
 
-/** The full seeded preview Activity feed. Gate on `isPreviewActivityEnabled()`. */
+// ─── Preview read state ───────────────────────────────────────────────────────
+// The dev-web preview (?bt_preview=buyer|seller) has no backend to persist
+// "read", so mark-read / mark-all-read / the unread badge count use this
+// in-memory state instead — the unread dots, the Activity tab badge and the
+// "Mark all read" action then behave in the preview exactly as they do
+// against the real API. Resets on reload, like the rest of the preview world.
+
+const previewReadIds = new Set<string>();
+let previewSeedServed = false;
+
+export function isPreviewActivityId(id: string): boolean {
+  return id.startsWith('preview-act-');
+}
+
+/** Mark seeded preview rows read (ids that aren't preview rows are ignored). */
+export function markPreviewActivityRead(ids: Iterable<string>): void {
+  for (const id of ids) if (isPreviewActivityId(id)) previewReadIds.add(id);
+}
+
+export function markAllPreviewActivityRead(): void {
+  for (const item of seedPreviewActivity()) previewReadIds.add(item.id);
+}
+
+/** Whether the Activity screen is currently showing the seeded preview feed. */
+export function isPreviewActivitySeedServed(): boolean {
+  return previewSeedServed;
+}
+
+/** Unread, unmuted seeded rows — the preview's stand-in for GET /unread-count. */
+export function previewUnreadActivityCount(): number {
+  return seedPreviewActivity()
+    .filter((item) => !item.isRead && !item.isMuted && !previewReadIds.has(item.id)).length;
+}
+
+/**
+ * The full seeded preview Activity feed, with this session's preview read
+ * state applied. Gate on `isPreviewActivityEnabled()`.
+ */
 export function getPreviewActivity(): ActivityItem[] {
+  previewSeedServed = true;
+  return seedPreviewActivity().map((item) => (
+    !item.isRead && previewReadIds.has(item.id) ? { ...item, isRead: true } : item
+  ));
+}
+
+function seedPreviewActivity(): ActivityItem[] {
   if (cached) return withPreviewLiveArrivals(cached);
   const p = PEOPLE;
   cached = [
@@ -254,11 +298,6 @@ export function deliverPreviewLiveArrival(): boolean {
 // stays gone when Activity is reopened — the same "survives a reload of the
 // screen" behaviour the real DELETE gives a signed-in account.
 const dismissedPreviewIds = new Set<string>();
-
-/** True for a seeded preview row id (never a real notification's id). */
-export function isPreviewActivityId(id: string): boolean {
-  return isPreviewActivityEnabled() && id.startsWith('preview-');
-}
 
 export function markPreviewActivityDismissed(id: string): void {
   dismissedPreviewIds.add(id);
