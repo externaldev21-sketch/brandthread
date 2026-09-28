@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey, doublePrecision } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
@@ -1098,6 +1098,22 @@ export const postTaggedProducts = pgTable('post_tagged_products', {
 }, (table) => ({
   postIdx: index('ptp_post_id_idx').on(table.postId),
   productIdx: index('ptp_product_id_idx').on(table.productId),
+}));
+
+/** "Tag people" on a Thread — mirrors post_tagged_products' shape (one row
+ *  per tag, cascade-deleted with the post). x/y are normalized 0-1 positions
+ *  on the tagged slide, matching how PostOverlay places text overlays. */
+export const postTaggedPeople = pgTable('post_tagged_people', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  postId:       uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
+  taggedUserId: text('tagged_user_id').notNull(),
+  x:            doublePrecision('x').notNull().default(0.5),
+  y:            doublePrecision('y').notNull().default(0.5),
+  slideIndex:   integer('slide_index').notNull().default(0),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  postIdx: index('ptpl_post_id_idx').on(table.postId),
+  taggedUserIdx: index('ptpl_tagged_user_id_idx').on(table.taggedUserId),
 }));
 
 // ─── Server-side stories (buyers + sellers, 24 h TTL) ────────────────────────
