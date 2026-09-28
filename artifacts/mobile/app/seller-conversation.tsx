@@ -19,6 +19,7 @@ import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, 
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { hapticPrimaryAction, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import * as ImagePicker from 'expo-image-picker';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -1665,13 +1666,24 @@ export default function SellerConversationScreen() {
         ) : null}
 
         <TextInput
-          style={s.textInput}
+          style={[s.textInput, WEB_INPUT_RESET]}
           value={text}
           onChangeText={handleChangeText}
           placeholder="Message…"
           placeholderTextColor={SUBTLE}
           multiline
           returnKeyType="default"
+          onKeyPress={Platform.OS === 'web' ? (e: any) => {
+            // Web hardware-keyboard Enter sends; Shift+Enter still inserts
+            // a newline (native platforms use their own return-key
+            // handling and never see this multiline <textarea> key event,
+            // so this is web-only).
+            if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+              e.preventDefault();
+              hapticPrimaryAction();
+              handleSend();
+            }
+          } : undefined}
         />
         {/* Send only appears once there's actually something to send —
             matches app/buyer-conversation.tsx's mic⇄send morph condition

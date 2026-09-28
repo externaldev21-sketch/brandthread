@@ -25,6 +25,7 @@ import {
   MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
 import { pickAvatarColor } from '@/lib/avatarColors';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import type { CallLogEntry } from '@/lib/calls/types';
@@ -2455,7 +2456,7 @@ export default function BuyerConversationScreen() {
               <TextInput
                 ref={textInputRef}
                 nativeID={CHAT_INPUT_NATIVE_ID}
-                style={[s.textInput, { height: composerInputHeight }]}
+                style={[s.textInput, WEB_INPUT_RESET, { height: composerInputHeight }]}
                 value={text}
                 onChangeText={handleChangeText}
                 placeholder="Message…"
@@ -2463,6 +2464,17 @@ export default function BuyerConversationScreen() {
                 multiline
                 returnKeyType="default"
                 autoCapitalize="sentences"
+                onKeyPress={Platform.OS === 'web' ? (e: any) => {
+                  // Web hardware-keyboard Enter sends; Shift+Enter still
+                  // inserts a newline (native platforms use their own
+                  // return-key handling and never see this multiline
+                  // <textarea> key event, so this is web-only).
+                  if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                    e.preventDefault();
+                    hapticPrimaryAction();
+                    handleSend();
+                  }
+                } : undefined}
               />
 
               {/* Mic ⇄ Send morph, inside the pill's own bounds */}
