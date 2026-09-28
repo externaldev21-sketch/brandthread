@@ -1206,6 +1206,34 @@ export async function setConversationNickname(conversationId: string, targetUser
   return result.nickname ?? null;
 }
 
+/** Chat details > Theme. null resets to the default monochrome look. Returns
+ *  the posted "You changed the theme..." system message so the caller can
+ *  append it without a full refetch. */
+export async function setConversationTheme(conversationId: string, themeId: string | null): Promise<{ themeId: string | null; message: Message }> {
+  const k = K();
+  const result = await serviceRequest<{ ok: boolean; themeId: string | null; message: Message }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/theme`,
+    { method: 'PATCH', body: JSON.stringify({ themeId }) },
+  );
+  const convs = await load<Conversation[]>(k.conversations, []);
+  await save(k.conversations, convs.map(c => c.id === conversationId ? { ...c, themeId: result.themeId ?? undefined } : c));
+  notify();
+  return { themeId: result.themeId ?? null, message: result.message };
+}
+
+/** Chat details > Disappearing messages. Returns the posted system message. */
+export async function setConversationDisappearing(conversationId: string, enabled: boolean): Promise<{ enabled: boolean; message: Message }> {
+  const k = K();
+  const result = await serviceRequest<{ ok: boolean; disappearingEnabled: boolean; message: Message }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/disappearing`,
+    { method: 'PATCH', body: JSON.stringify({ enabled }) },
+  );
+  const convs = await load<Conversation[]>(k.conversations, []);
+  await save(k.conversations, convs.map(c => c.id === conversationId ? { ...c, disappearingEnabled: result.disappearingEnabled } : c));
+  notify();
+  return { enabled: result.disappearingEnabled, message: result.message };
+}
+
 // ─── Stories ─────────────────────────────────────────────────────────────────
 
 async function loadStories(k: SocialKeys = K()): Promise<Story[]> {

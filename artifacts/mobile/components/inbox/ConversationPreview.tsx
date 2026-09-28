@@ -17,6 +17,7 @@ const ATTACHMENT_META: Record<MessageAttachmentType, { icon: keyof typeof Feathe
   thread_cash: { icon: 'dollar-sign', label: 'Thread Cash' },
   agent_card: { icon: 'square', label: 'Card' },
   quick_replies: { icon: 'message-circle', label: 'Quick replies' },
+  system: { icon: 'info', label: 'Chat settings changed' },
 };
 
 interface ConversationPreviewProps {
