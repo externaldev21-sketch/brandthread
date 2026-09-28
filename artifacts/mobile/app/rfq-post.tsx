@@ -19,6 +19,7 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { Header } from '@/components/layout';
 import { FormInput, PrimaryButton, EmptyState, StatusBadge } from '@/components/BrandthreadUI';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { createRfq, getRfqTargetManufacturers, type RfqTargetManufacturer } from '@/services/manufacturerRfq';
 
@@ -137,7 +138,7 @@ export default function RfqPostScreen() {
         <View style={s.searchRow}>
           <Feather name="search" size={ICON.sm} color={theme.subtle} />
           <TextInput
-            style={s.searchInput}
+            style={[s.searchInput, WEB_INPUT_RESET]}
             value={query}
             onChangeText={setQuery}
             placeholder="Search manufacturers…"

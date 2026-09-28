@@ -7,15 +7,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import type { DiscoverDrop } from '@/lib/discoverFeed';
-
-function timeUntil(iso?: string | null): string {
-  if (!iso) return '';
-  const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return 'Live now';
-  const hours = Math.round(ms / 3_600_000);
-  if (hours < 24) return `In ${hours}h`;
-  return `In ${Math.round(hours / 24)}d`;
-}
+import { formatTimeUntil } from '@/lib/countdown';
 
 export function DiscoverDropRow({ drop }: { drop: DiscoverDrop }) {
   const router = useRouter();
@@ -36,7 +28,7 @@ export function DiscoverDropRow({ drop }: { drop: DiscoverDrop }) {
       </View>
       <View style={[styles.badge, { backgroundColor: drop.live ? theme.accent : theme.cardElevated }]}>
         <Text style={[styles.badgeText, { color: drop.live ? theme.onAccent : theme.text }]}>
-          {drop.live ? 'Live' : timeUntil(drop.releaseAt)}
+          {drop.live ? 'Live' : formatTimeUntil(drop.releaseAt)}
         </Text>
       </View>
     </PressableScale>

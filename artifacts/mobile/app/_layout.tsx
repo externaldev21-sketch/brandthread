@@ -1140,6 +1140,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="activity-center"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="activity-people"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />

@@ -35,7 +35,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useAuth } from '@clerk/expo';
 import { ListSkeleton, ResponsiveContainer } from '@/components/layout';
-import { TabPageHeader } from '@/components/layout/TabPageHeader';
+import { DiscoverSearchHeader } from '@/components/discover/DiscoverSearchHeader';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { ThemedRefreshControl } from '@/components/ui';
@@ -87,6 +87,7 @@ function mapToEditorialTile(prefix: string, row: LiveProduct, i: number): Editor
     initials: (row.name ?? 'P')[0].toUpperCase(),
     priceCents: row.currentPriceCents ?? fallbackPrice,
     isUrgent: remaining > 0 && remaining <= 4,
+    endsAt: row.endsAt,
   };
 }
 
@@ -299,12 +300,10 @@ export default function DiscoverScreen() {
 
   const header = (
     <>
-      <TabPageHeader
+      <DiscoverSearchHeader
         title="Discover"
-        actions={[
-          { name: 'search', onPress: () => router.push('/buyer-search' as never), accessibilityLabel: 'Search products and brands' },
-          ...(isSignedIn ? [{ name: 'bell' as const, onPress: () => router.push('/(buyer)/inbox' as never), accessibilityLabel: 'Notifications' }] : []),
-        ]}
+        onSearchPress={() => router.push('/buyer-search' as never)}
+        onBellPress={isSignedIn ? () => router.push('/(buyer)/inbox' as never) : undefined}
       />
       <DiscoverFilterRow active={filter} onChange={setFilter} />
     </>
