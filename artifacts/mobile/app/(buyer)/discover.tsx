@@ -95,24 +95,30 @@ function mapToEditorialTile(prefix: string, row: LiveProduct, i: number): Editor
 function PersonListRow({ person }: { person: DiscoverPersonSuggestion }) {
   const router = useRouter();
   const { theme } = useAppTheme();
+  // Two SIBLING tap targets, never nested — see DiscoverPeopleRow's own
+  // comment on why (a Pressable inside a Pressable is invalid on web and
+  // the press handlers fight each other). See
+  // tests/discover-no-nested-pressables.test.ts.
   return (
-    <PressableScale
-      onPress={() => router.push(`/buyer-other-profile?userId=${encodeURIComponent(person.userId)}&name=${encodeURIComponent(person.name)}&handle=${encodeURIComponent(person.handle)}&initials=${encodeURIComponent(person.initials)}` as never)}
-      style={styles.personRow}
-    >
-      {person.avatarUrl ? (
-        <Image source={{ uri: person.avatarUrl }} style={styles.personAvatar} />
-      ) : (
-        <View style={[styles.personAvatar, { backgroundColor: person.color, alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={styles.personInitials}>{person.initials}</Text>
+    <View style={styles.personRow}>
+      <PressableScale
+        onPress={() => router.push(`/buyer-other-profile?userId=${encodeURIComponent(person.userId)}&name=${encodeURIComponent(person.name)}&handle=${encodeURIComponent(person.handle)}&initials=${encodeURIComponent(person.initials)}` as never)}
+        style={styles.personRowTapArea}
+      >
+        {person.avatarUrl ? (
+          <Image source={{ uri: person.avatarUrl }} style={styles.personAvatar} />
+        ) : (
+          <View style={[styles.personAvatar, { backgroundColor: person.color, alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={styles.personInitials}>{person.initials}</Text>
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.personName, { color: theme.text }]} numberOfLines={1}>{person.name}</Text>
+          <Text style={[styles.personReason, { color: theme.muted }]} numberOfLines={1}>{person.reason}</Text>
         </View>
-      )}
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.personName, { color: theme.text }]} numberOfLines={1}>{person.name}</Text>
-        <Text style={[styles.personReason, { color: theme.muted }]} numberOfLines={1}>{person.reason}</Text>
-      </View>
+      </PressableScale>
       <FollowButton userId={person.userId} initial={{ isFollowing: person.isFollowing, isFollowedBy: false, isMutual: false }} size="compact" />
-    </PressableScale>
+    </View>
   );
 }
 
@@ -457,6 +463,7 @@ export default function DiscoverScreen() {
 
 const styles = StyleSheet.create({
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  personRowTapArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   personAvatar: { width: 48, height: 48, borderRadius: 24 },
   personInitials: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.sm },
   personName: { fontFamily: FONT.semibold, fontSize: FS.sm },
