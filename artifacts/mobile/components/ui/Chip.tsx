@@ -40,9 +40,19 @@ export interface ChipProps {
   /** 32pt tall / hairline border / 14pt text — Instagram-style quick-reply
    *  chip, instead of the default filter-chip sizing. */
   variant?: 'default' | 'quickReply';
+  /** Strike the label through — the sold-out size treatment (with `disabled`
+   *  and a leading `slash` icon), Nike / GOAT / alias size-grid convention. */
+  strikethrough?: boolean;
+  /** Overrides the default spoken label (e.g. "Size, M, sold out"). */
+  accessibilityLabel?: string;
+  /** Defaults to "button"; option pickers pass "radio". */
+  accessibilityRole?: 'button' | 'radio';
 }
 
-export function Chip({ label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel, variant = 'default' }: ChipProps) {
+export function Chip({
+  label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel, variant = 'default',
+  strikethrough = false, accessibilityLabel, accessibilityRole = 'button',
+}: ChipProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
@@ -51,8 +61,8 @@ export function Chip({ label, selected, onPress, count, disabled, testID, icon, 
 
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={count !== undefined ? `${label}, ${count}` : label}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel ?? (count !== undefined ? `${label}, ${count}` : label)}
       accessibilityState={{ selected, disabled: !!disabled }}
       disabled={disabled}
       onPress={() => { hapticToggle(); onPress(); }}
@@ -75,7 +85,7 @@ export function Chip({ label, selected, onPress, count, disabled, testID, icon, 
         ]}
       >
         {icon && <Feather name={icon} size={12} color={iconColor ?? contentColor} />}
-        <Text style={[TYPE_SCALE.footnote, isQuickReply && { fontSize: 14 }, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }]}>
+        <Text style={[TYPE_SCALE.footnote, isQuickReply && { fontSize: 14 }, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }, strikethrough && styles.struck]}>
           {label}
         </Text>
         {count !== undefined && (
@@ -136,5 +146,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm, height: 34, borderWidth: 1,
   },
   count: { borderRadius: RADII.pill, paddingHorizontal: 5, paddingVertical: 1 },
+  struck: { textDecorationLine: 'line-through' },
   group: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs },
 });

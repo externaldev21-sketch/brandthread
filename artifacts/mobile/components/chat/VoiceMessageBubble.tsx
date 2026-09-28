@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, PanResponder, GestureResponderEvent,
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
+import { isBarPlayed, remainingTimeLabel } from '@/lib/voicePlayback';
 
 export const TRANSCRIPTION_STUB =
   "Transcription isn't wired up to a real speech-to-text service yet — this is placeholder text standing in for it.";
@@ -36,7 +37,6 @@ export function VoiceMessageBubble({
   const widthRef = useRef(1);
 
   const bars = waveform.length ? waveform : Array.from({ length: 24 }, (_, i) => 0.3 + Math.abs(Math.sin(i * 0.8)) * 0.5);
-  const playedCount = Math.round(progress * bars.length);
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -57,9 +57,7 @@ export function VoiceMessageBubble({
     onSpeedChange?.(SPEEDS[next]);
   }
 
-  const dur = Math.max(0, Math.round(durationSec * (1 - progress)));
-  const mm = String(Math.floor(dur / 60)).padStart(2, '0');
-  const ss = String(dur % 60).padStart(2, '0');
+  const clockLabel = remainingTimeLabel(durationSec, progress);
   const onColor = isOwn ? theme.onAccent : theme.text;
   const dim = isOwn ? theme.onAccent + '99' : theme.subtle;
 
@@ -87,13 +85,13 @@ export function VoiceMessageBubble({
               key={i}
               style={[
                 vs.bar,
-                { height: 3 + amp * 16, backgroundColor: i < playedCount ? onColor : dim },
+                { height: 3 + amp * 16, backgroundColor: isBarPlayed(i, progress, bars.length) ? onColor : dim },
               ]}
             />
           ))}
         </View>
 
-        <Text style={[vs.duration, { color: onColor }]}>{durationSec ? `${mm}:${ss}` : '0:00'}</Text>
+        <Text style={[vs.duration, { color: onColor }]}>{clockLabel}</Text>
       </View>
 
       <View style={vs.footerRow}>

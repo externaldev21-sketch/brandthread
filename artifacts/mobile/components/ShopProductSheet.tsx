@@ -53,11 +53,15 @@ import type {
   CheckoutAttribution,
 } from '@/services/cartTypes';
 import {
+  CART_FLIGHT_ITEM_SIZE,
   getCartFlightVector,
   getSuccessfulCartCount,
+  flightSourceFromRect,
   measureCartTarget,
+  measureWindowRect,
   shouldAnimateCartSuccess,
   type CartFlightPoint,
+  type CartFlightSource,
 } from '@/lib/cartFlight';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -344,6 +348,13 @@ export function ShopProductSheet({
   const [flyingToCart, setFlyingToCart] = useState(false);
   const [showAddedConfirmation, setShowAddedConfirmation] = useState(false);
   const [cartTarget, setCartTarget] = useState<CartFlightPoint | null>(null);
+  // Where the flight lifts off, measured at tap time: the product photo if
+  // it's visible in the sheet's scroll area, else the selected product's
+  // card thumbnail (multi-product posts), else the default start above the
+  // Add to cart bar.
+  const [flightSource, setFlightSource] = useState<CartFlightSource | null>(null);
+  const productPhotoRef = useRef<View>(null);
+  const activeTagImageRef = useRef<View>(null);
   const addedConfirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // cart-fly-to-icon animation only (unrelated to the sheet's own
@@ -433,11 +444,20 @@ export function ShopProductSheet({
       showCartSuccess(newCount);
       return;
     }
-    const target = await measureCartTarget(
-      cartTargetRef?.current?.measureInWindow.bind(cartTargetRef.current),
-      safeFallbackTarget,
-    );
+    const scrollNode = contentScrollRef.current as unknown as { measureInWindow?: View['measureInWindow'] } | null;
+    const [target, photoRect, scrollRect, tagRect] = await Promise.all([
+      measureCartTarget(
+        cartTargetRef?.current?.measureInWindow.bind(cartTargetRef.current),
+        safeFallbackTarget,
+      ),
+      measureWindowRect(productPhotoRef.current?.measureInWindow?.bind(productPhotoRef.current)),
+      measureWindowRect(scrollNode?.measureInWindow?.bind(scrollNode)),
+      measureWindowRect(activeTagImageRef.current?.measureInWindow?.bind(activeTagImageRef.current)),
+    ]);
+    const screenClip = { top: 0, bottom: windowHeight };
+    const scrollClip = scrollRect ? { top: scrollRect.y, bottom: scrollRect.y + scrollRect.height } : screenClip;
     setCartTarget(target);
+    setFlightSource(flightSourceFromRect(photoRect, scrollClip) ?? flightSourceFromRect(tagRect, screenClip));
     setFlyingToCart(true);
     cartFlyProgress.setValue(0);
     requestAnimationFrame(() => {
@@ -661,11 +681,15 @@ export function ShopProductSheet({
 
   const accent = theme.accent;
   const isBusy = phase === 'adding' || phase === 'buying';
-  const flyStartLeft = windowWidth / 2 - 24;
-  const flyStartTop = windowHeight - Math.min(330, windowHeight * 0.4);
+  const flySize = flightSource?.size ?? CART_FLIGHT_ITEM_SIZE;
+  const flyStartLeft = flightSource ? flightSource.x - flySize / 2 : windowWidth / 2 - CART_FLIGHT_ITEM_SIZE / 2;
+  const flyStartTop = flightSource ? flightSource.y - flySize / 2 : windowHeight - Math.min(330, windowHeight * 0.4);
+  // The copy starts at the photo's own size and shrinks to the same small
+  // end size (0.28 × 48pt) at the cart as before.
+  const flySizeRatio = CART_FLIGHT_ITEM_SIZE / flySize;
   const safeFallbackTarget = { x: windowWidth - 54, y: insets.top + 26 };
   const resolvedCartTarget = cartTarget ?? safeFallbackTarget;
-  const flightVector = getCartFlightVector(flyStartLeft, flyStartTop, resolvedCartTarget);
+  const flightVector = getCartFlightVector(flyStartLeft, flyStartTop, resolvedCartTarget, flySize);
   // Capture phase as string to allow comparison across JSX blocks without narrowing conflicts
   const currentPhase: string = phase;
 
@@ -738,7 +762,7 @@ export function ShopProductSheet({
                     accessibilityState={{ selected: isActiveTag }}
                     accessibilityLabel={`Switch to ${tag.productName}, ${formatCents(tag.priceCents)}`}
                   >
-                    <View style={ss.tagCardImageWrap}>
+                    <View style={ss.tagCardImageWrap} ref={isActiveTag ? activeTagImageRef : undefined} collapsable={false}>
                       {thumbUri ? (
                         <CachedImage source={{ uri: thumbUri }} style={ss.tagCardImage} contentFit="cover" />
                       ) : (
@@ -823,7 +847,10 @@ export function ShopProductSheet({
             bounces={false}
           >
             {/* Swipeable image gallery */}
-            <ProductImageCarousel imageUris={product.imageUris} />
+            {/* Measured at Add-to-cart time: the flight lifts off this photo. */}
+            <View ref={productPhotoRef} collapsable={false}>
+              <ProductImageCarousel imageUris={product.imageUris} />
+            </View>
 
             {/* Product header row — no thumbnail: the carousel above already
                 shows this exact photo full-size directly above it. */}
@@ -1002,12 +1029,16 @@ export function ShopProductSheet({
 
       {flyingToCart && (
         <Animated.View
+          testID="cart-fly-item"
           pointerEvents="none"
           style={[
             ss.cartFlyItem,
             {
               left: flyStartLeft,
               top: flyStartTop,
+              width: flySize,
+              height: flySize,
+              borderRadius: 14 / flySizeRatio,
               opacity: cartFlyProgress.interpolate({
                 inputRange: [0, 0.82, 1],
                 outputRange: [1, 1, 0],
@@ -1024,7 +1055,7 @@ export function ShopProductSheet({
                     inputRange: [0, 0.55, 1],
                     outputRange: [
                       0,
-                      -Math.min(windowHeight * 0.27, Math.max(48, flyStartTop - resolvedCartTarget.y) * 0.45),
+                      -Math.min(windowHeight * 0.27, Math.max(48, flyStartTop + flySize / 2 - resolvedCartTarget.y) * 0.45),
                       flightVector.y,
                     ],
                   }),
@@ -1032,7 +1063,7 @@ export function ShopProductSheet({
                 {
                   scale: cartFlyProgress.interpolate({
                     inputRange: [0, 0.7, 1],
-                    outputRange: [1, 0.72, 0.28],
+                    outputRange: [1, 0.72 * flySizeRatio, 0.28 * flySizeRatio],
                   }),
                 },
                 {

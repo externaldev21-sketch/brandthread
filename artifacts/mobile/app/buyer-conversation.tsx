@@ -1721,14 +1721,24 @@ export default function BuyerConversationScreen() {
             onPress={(e) => handleBubblePress(msg, e)}
             onLongPress={() => openReactionOverlay(msg)}
             delayLongPress={280}
-            // Voice messages render their own play/scrub/speed/transcription
-            // buttons inside this bubble (see VoiceMessageBubble) — on web,
+            // Voice, product and order attachments each render their own
+            // interactive control inside this bubble (VoiceMessageBubble's
+            // play/scrub/speed buttons; the product/order cards' own single
+            // PressableScale for View/Track — see items 70/71's "no nested
+            // Pressable" comments on those cards). On web,
             // accessibilityRole="button" makes react-native-web render an
             // actual <button>, and a <button> cannot legally contain other
-            // interactive controls (the HTML nested-button rule). Drop the
-            // role only for voice bubbles so it renders as a plain, still
+            // interactive controls (the HTML nested-button rule) — so those
+            // controls silently break the DOM tree even though there's only
+            // ever one logical tap target per row. Drop the role for all
+            // three attachment kinds so the bubble renders as a plain, still
             // fully tappable/long-pressable <div> instead.
-            accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : 'button'}
+            accessibilityRole={
+              msg.attachment?.type === 'voice'
+              || msg.attachment?.type === 'product'
+              || msg.attachment?.type === 'order'
+                ? 'none' : 'button'
+            }
             accessibilityLabel={isOwn ? 'Your message' : `Message from ${msg.fromName}`}
             accessibilityHint="Double tap to like, or touch and hold for more actions"
             style={[
