@@ -34,6 +34,7 @@ import {
   reserveThreadCashRedemption,
   ThreadCashError,
 } from "../lib/threadCash/wallet";
+import { releaseThreadCashFromAbandonedCheckout } from "../lib/threadCash/checkoutRelease";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
 import { logger } from "../lib/logger";
@@ -968,7 +969,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       const remainingAfterOtherDiscounts = Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents);
       try {
         const reservationId = `checkout:${crypto.randomUUID()}`;
-        const reserved = await reserveThreadCashRedemption(
+        const reserve = () => reserveThreadCashRedemption(
           buyerId,
           normalizedThreadCashToken,
           reservationId,
@@ -977,6 +978,18 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
             : remainingAfterOtherDiscounts,
           STRIPE_MIN_CARD_CHARGE_CENTS,
         );
+        let reserved: Awaited<ReturnType<typeof reserve>>;
+        try {
+          reserved = await reserve();
+        } catch (reserveError) {
+          // Item 109: the buyer changed their order after closing Stripe's
+          // page, so this is a new checkout and the token is still held by
+          // the abandoned, unpaid one. Expire that one and release the token
+          // (never a paid one: see checkoutRelease.ts), then reserve again.
+          if (!(reserveError instanceof ThreadCashError) || reserveError.code !== "THREAD_CASH_TOKEN_RESERVED") throw reserveError;
+          await releaseThreadCashFromAbandonedCheckout(stripe, buyerId, normalizedThreadCashToken);
+          reserved = await reserve();
+        }
         threadCashReservation = { buyerId, token: reserved.token, reservationId };
         threadCashRedemption = { token: reserved.token, discountCents: reserved.discountCents };
       } catch (err) {
@@ -1342,6 +1355,9 @@ router.get("/orders", async (req, res) => {
         paidAt:                  orders.paidAt,
         shippingAddress:         orders.shippingAddress,
         stripePaymentIntentId:   orders.stripePaymentIntentId,
+        taxCents:                orders.taxCents,
+        discountAmountCents:     orders.discountAmountCents,
+        threadCashAppliedCents:  orders.threadCashAppliedCents,
         cancellationReason:      orders.cancellationReason,
         createdAt:               orders.createdAt,
       })
@@ -1377,6 +1393,9 @@ router.get("/orders/:id", async (req, res) => {
         paidAt:                  orders.paidAt,
         shippingAddress:         orders.shippingAddress,
         stripePaymentIntentId:   orders.stripePaymentIntentId,
+        taxCents:                orders.taxCents,
+        discountAmountCents:     orders.discountAmountCents,
+        threadCashAppliedCents:  orders.threadCashAppliedCents,
         cancellationReason:      orders.cancellationReason,
         cancellationNotes:       orders.cancellationNotes,
         createdAt:               orders.createdAt,
