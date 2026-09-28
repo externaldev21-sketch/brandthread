@@ -15,6 +15,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PressableScale, StatusBadge } from '@/components/BrandthreadUI';
+import { Glass } from '@/components/ui/Glass';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
@@ -42,7 +43,7 @@ import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   isSellerPreviewConversationId,
-  getSellerPreviewConversation, getSellerPreviewMessages,
+  getSellerPreviewConversation, getSellerPreviewMessages, getSellerPreviewBuyerOrders,
   isPreviewInboxEnabled, posterUri,
 } from '@/lib/previewInbox';
 import UploadRing from '@/components/chat/UploadRing';
@@ -114,6 +115,15 @@ interface Msg {
 interface SellerProduct {
   id: string; name: string; priceCents?: number; status?: string;
   variants?: Array<{ priceCents: number }>;
+}
+/** Item 144 (buyer context panel) — one row of this buyer's order history
+ *  with the current seller. Shape mirrors GET /api/orders' existing row
+ *  (see api-server's routes/orders.ts), filtered server-side by `buyerId` so
+ *  it can only ever be THIS seller's own orders for THIS buyer — never a
+ *  different seller's history with them. */
+interface BuyerOrderRow {
+  id: string; orderNumber: string; status: string; totalCents: number;
+  itemCount?: number; createdAt: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -255,6 +265,18 @@ export default function SellerConversationScreen() {
   // Item 74 (photo/video upload progress ring) — see the identical comment
   // in app/buyer-conversation.tsx.
   const mediaUploadTokenRef = useRef(0);
+
+  // Item 144 — buyer context panel (Mobbin: Binance's chat-attached
+  // account-context drawer, mobbin.com/screens/4b0152e6-df33-4d73-aa39-
+  // 2b1a6cc4c8cd, and eBay's inline buyer/item card in seller chat,
+  // mobbin.com/screens/1ffce781-c643-4728-895c-a322433564c0 — no exact
+  // "seller inbox buyer CRM" pattern exists on Mobbin, so this is an honest
+  // adaptation of those two, same as items 70/71 for the order/product
+  // cards). `null` = not loaded yet, `[]` = loaded and genuinely empty.
+  const [showBuyerContext, setShowBuyerContext] = useState(false);
+  const [buyerOrders, setBuyerOrders] = useState<BuyerOrderRow[] | null>(null);
+  const [loadingBuyerOrders, setLoadingBuyerOrders] = useState(false);
+  const [buyerOrdersError, setBuyerOrdersError] = useState(false);
 
   // Item 74 verification aid — NOT a real feature. See the identical comment
   // on this same effect in app/buyer-conversation.tsx: the real upload is too
@@ -495,6 +517,37 @@ export default function SellerConversationScreen() {
       participantNickname: other.nickname ?? '',
     });
     router.push(('/conversation-details?' + qs.toString()) as never);
+  }
+
+  // Item 144 — buyer context panel: this buyer's real order history with
+  // THIS seller (server-scoped, see api-server's buyerId filter above).
+  // Loaded on demand when the sheet first opens, then cached for the rest
+  // of this screen's life — same lazy-load-once pattern as loadProducts.
+  async function loadBuyerOrders() {
+    if (!other?.userId) { setBuyerOrders([]); return; }
+    // Preview/QA conversations have no real backend to call — use that
+    // seed's own seeded order history (lib/previewInboxData.ts's
+    // `buyerOrders`, [] when a seed sets none), same "seed or honest empty"
+    // contract loadMessages' identical preview guard above already uses for
+    // messages, rather than a real network call.
+    if (isSellerPreviewConversationId(id ?? '')) { setBuyerOrders(getSellerPreviewBuyerOrders(id ?? '')); return; }
+    setLoadingBuyerOrders(true);
+    setBuyerOrdersError(false);
+    try {
+      const rows = await api.orders.listForBuyer(other.userId);
+      setBuyerOrders(rows as BuyerOrderRow[]);
+    } catch {
+      setBuyerOrdersError(true);
+    } finally {
+      setLoadingBuyerOrders(false);
+    }
+  }
+
+  function openBuyerContext() {
+    if (!other) return;
+    hapticPrimaryAction();
+    setShowBuyerContext(true);
+    if (buyerOrders === null && !loadingBuyerOrders) void loadBuyerOrders();
   }
 
   // Theme system line's "Change" — reopens the picker directly.
@@ -1285,6 +1338,18 @@ export default function SellerConversationScreen() {
         {other ? (
           <PressableScale
             style={s.headerCallBtn}
+            onPress={openBuyerContext}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            testID="seller-conversation-buyer-context-btn"
+            accessibilityRole="button"
+            accessibilityLabel={`${displayName} — orders and cart`}
+          >
+            <Feather name="clipboard" size={ICON.md} color={MUTED} />
+          </PressableScale>
+        ) : null}
+        {other ? (
+          <PressableScale
+            style={s.headerCallBtn}
             onPress={() => { hapticPrimaryAction(); openConversationOptions({
               router,
               social: api.social,
@@ -1725,6 +1790,125 @@ export default function SellerConversationScreen() {
         </SheetRise>
       </Modal>
 
+      {/* ── Buyer context panel (item 144) ──────────────────────────────────
+          Mobbin: Binance's chat-attached context drawer surfacing account
+          data from a conversation header (mobbin.com/screens/4b0152e6-df33-
+          4d73-aa39-2b1a6cc4c8cd) and eBay's inline buyer/item card in seller
+          chat (mobbin.com/screens/1ffce781-c643-4728-895c-a322433564c0) — no
+          exact "seller inbox buyer CRM/context panel" exists on Mobbin, so
+          this combines those two: a drawer off the header, surfacing this
+          buyer's REAL order history with this seller (server-scoped, see
+          api-server's GET /api/orders buyerId filter). Cart is honestly
+          omitted below — see the note in that empty section. */}
+      <Modal
+        visible={showBuyerContext}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBuyerContext(false)}
+      >
+        <PressableScale
+          style={s.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowBuyerContext(false)}
+        />
+        <SheetRise style={[s.buyerContextSheetWrap, { paddingBottom: insets.bottom + SP.md }]}>
+          <Glass variant="regular" tint="dark" radius={RADIUS.xl} style={StyleSheet.absoluteFill} />
+          <View style={s.sheetHandle} />
+          <View style={s.buyerContextHeader}>
+            {other && (
+              <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE, marginRight: SP.sm }]}>
+                <Text style={s.headerAvatarInitials}>
+                  {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={s.sheetTitle}>{displayName}</Text>
+              <Text style={s.buyerContextSubtitle}>Orders with you</Text>
+            </View>
+            <PressableScale onPress={() => setShowBuyerContext(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close">
+              <Feather name="x" size={ICON.md} color={MUTED} />
+            </PressableScale>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+            {loadingBuyerOrders ? (
+              <View style={{ paddingVertical: SP.lg }}>
+                <SkeletonBlock width="100%" height={56} radius={RADIUS.md} />
+                <View style={{ height: SP.sm }} />
+                <SkeletonBlock width="100%" height={56} radius={RADIUS.md} />
+              </View>
+            ) : buyerOrdersError ? (
+              <View style={s.emptyState}>
+                <Feather name="alert-circle" size={28} color={MUTED} />
+                <Text style={s.emptyText}>Couldn't load {displayName}'s orders</Text>
+                <PressableScale style={s.buyerContextRetry} onPress={() => void loadBuyerOrders()} accessibilityRole="button" accessibilityLabel="Retry">
+                  <Text style={s.buyerContextRetryText}>Retry</Text>
+                </PressableScale>
+              </View>
+            ) : (buyerOrders?.length ?? 0) === 0 ? (
+              <View style={s.emptyState}>
+                <Feather name="package" size={28} color={MUTED} />
+                <Text style={s.emptyText}>No other orders from {displayName} yet</Text>
+              </View>
+            ) : (
+              buyerOrders!.map((row) => {
+                const uiStatus = dbStatusToOrderStatus(row.status);
+                const dateLabel = new Date(row.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                return (
+                  <PressableScale
+                    key={row.id}
+                    style={s.buyerContextOrderRow}
+                    activeOpacity={0.7}
+                    testID={`buyer-context-order-${row.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${row.orderNumber}, ${orderStatusBadgeLabel(uiStatus)}, ${formatCents(row.totalCents)}`}
+                    onPress={() => {
+                      hapticSelection();
+                      setShowBuyerContext(false);
+                      router.push(('/order-detail?id=' + row.id) as never);
+                    }}
+                  >
+                    <View style={s.orderMsgCardIconCircle}>
+                      <Feather name="package" size={ICON.md} color={PURPLE} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: SP.sm }}>
+                      <Text style={s.attachTitle} numberOfLines={1}>{row.orderNumber}</Text>
+                      <View style={s.orderMsgCardBadgeRow}>
+                        <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+                        <Text style={s.buyerContextOrderMeta}>
+                          {'  ·  '}{dateLabel}{row.itemCount ? ` · ${row.itemCount} item${row.itemCount === 1 ? '' : 's'}` : ''}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={s.buyerContextOrderTotal}>{formatCents(row.totalCents)}</Text>
+                    <Feather name="chevron-right" size={ICON.xs} color={MUTED} style={{ marginLeft: SP.xs }} />
+                  </PressableScale>
+                );
+              })
+            )}
+
+            {/* Cart — honestly omitted. Brandthread's cart (lib/db's
+                cart_items table, see api-server's cart-db.ts) is
+                self-scoped storage keyed only by the shopper's own userId —
+                every route that reads it filters `WHERE userId = <the
+                authenticated caller>`, with no seller-facing endpoint or
+                concept of "whose cart is this seller's product in" at all.
+                There's nothing real to show here, so rather than fabricate
+                a cart panel to check a box, this says so plainly instead —
+                same honesty this pass has used elsewhere tonight (items
+                70/71) when a Mobbin precedent didn't map onto real,
+                queryable Brandthread data. */}
+            <View style={s.buyerContextCartNote}>
+              <Feather name="shopping-cart" size={16} color={SUBTLE} />
+              <Text style={s.buyerContextCartNoteText}>
+                Cart contents are private to the buyer — Brandthread doesn't give sellers visibility into what's in someone's cart before checkout.
+              </Text>
+            </View>
+          </ScrollView>
+        </SheetRise>
+      </Modal>
+
       {/* Long-press reactions — Glass overlay, same component/behavior as
           app/buyer-conversation.tsx (Mobbin: Instagram DM "Tap and hold to
           super react" — mobbin.com/screens/5d13fdd9-75ad-43d6-9089-
@@ -2019,7 +2203,34 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   productName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   productPrice: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   emptyState: { alignItems: 'center', paddingVertical: SP.xxl },
-  emptyText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
+  emptyText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm, textAlign: 'center', paddingHorizontal: SP.lg },
+
+  // Buyer context panel (item 144)
+  buyerContextSheetWrap: {
+    borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    paddingTop: SP.sm, paddingHorizontal: SP.md,
+    overflow: 'hidden',
+  },
+  buyerContextHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SP.sm },
+  buyerContextSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: -SP.sm + 2 },
+  buyerContextOrderRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: SP.sm, marginBottom: SP.xs,
+    borderRadius: RADIUS.md,
+  },
+  buyerContextOrderMeta: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  buyerContextOrderTotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginLeft: SP.xs },
+  buyerContextRetry: {
+    marginTop: SP.sm, paddingVertical: SP.xs, paddingHorizontal: SP.md,
+    borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER,
+  },
+  buyerContextRetryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE },
+  buyerContextCartNote: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
+    marginTop: SP.md, marginBottom: SP.lg,
+    paddingTop: SP.md, borderTopWidth: 1, borderTopColor: BORDER,
+  },
+  buyerContextCartNoteText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, lineHeight: 17 },
 
   // ── Call + media styles ──────────────────────────────────────────────────────
   headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: SP.xs },
