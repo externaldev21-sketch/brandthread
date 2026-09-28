@@ -21,9 +21,12 @@ import { Asset } from 'expo-asset';
 import { isPreviewCatalogEnabled } from './previewCatalog';
 import {
   BRANDTHREAD_AGENT_SEED, PREVIEW_CONVERSATION_SEEDS, PREVIEW_FOLLOWER_SEEDS,
+  SELLER_PREVIEW_CONVERSATION_SEEDS,
   type PreviewConversationSeed, type PreviewMessageSeed,
 } from './previewInboxData';
-import type { Conversation, Message, MessageAttachment, Notification } from '@/services/socialTypes';
+import type {
+  Conversation, Message, MessageAttachment, MessageReaction, Notification, ReactionType,
+} from '@/services/socialTypes';
 import { acceptConversationInList, removeConversationFromList } from './conversationListMutations';
 
 export function isPreviewInboxEnabled(): boolean {
@@ -220,12 +223,65 @@ export function getPreviewNotifications(): Notification[] {
   return cachedNotifications;
 }
 
-function toAttachment(seed: PreviewMessageSeed['attachment']): MessageAttachment | undefined {
+function toAttachment(seed: PreviewMessageSeed['attachment'], conv: PreviewConversationSeed): MessageAttachment | undefined {
   if (!seed) return undefined;
   const attachment: MessageAttachment = { type: seed.type, meta: seed.meta };
   if (seed.title) attachment.title = seed.title;
   if (seed.subtitle) attachment.subtitle = seed.subtitle;
+  // Product share cards (item 70): a real bundled poster image, same as the
+  // conversation's own avatar — preview mode has no backend to re-fetch live
+  // product data from, so a seed's `meta.unavailable: 'true'` (see
+  // previewInboxData.ts) drives the "No longer available" state directly,
+  // in place of the real API's lib/productAttachmentInfo.ts.
+  if (seed.type === 'product' && typeof conv.posterIndex === 'number') {
+    attachment.uri = posterUri(conv.posterIndex);
+  }
   return attachment;
+}
+
+/** The reactions a seeded message starts with, from its `reactionSeed` —
+ *  same `MessageReaction` shape the real backend returns (see
+ *  components/chat/ReactionBar.tsx's reactionAuthorId/reactionKind, which
+ *  read both this local shape and the server's interchangeably). */
+function seedReactions(seed: PreviewConversationSeed, m: PreviewMessageSeed): MessageReaction[] {
+  if (!m.reactionSeed?.length) return [];
+  return m.reactionSeed.map((r) => ({
+    emoji: r.type as ReactionType,
+    reactionType: r.type as ReactionType,
+    fromId: r.from === 'me' ? 'me' : seed.participantUserId,
+    fromName: r.from === 'me' ? 'You' : seed.participantName,
+    createdAt: new Date(Date.now() - m.minutesAgo * 60_000 + 30_000).toISOString(),
+  }));
+}
+
+// Item 68 (chat reactions glass), preview mode: reactions the viewer adds/
+// removes themselves during this session, keyed by message id — same
+// module-level-cache trick as setPreviewConversationTheme/Pinned above.
+// Overrides the static `reactionSeed` entirely once the viewer has reacted
+// (their tap replaces the whole "my reaction" slot, same as the real
+// one-reaction-per-user rule server-side), so it's seeded from the base list
+// the first time a given message is touched.
+const previewReactionOverrides = new Map<string, MessageReaction[]>();
+
+/** Chat > long-press reaction overlay, in preview mode: toggles `myId`'s
+ *  reaction on a seeded message (re-tapping the same kind removes it,
+ *  tapping a different kind replaces it) — mirrors the real PUT/DELETE
+ *  .../reactions endpoint's one-reaction-per-user rule. No-ops for an id
+ *  this module doesn't know about. */
+export function reactToPreviewMessage(
+  conversationId: string, messageId: string, type: ReactionType, myId: string, myName: string,
+): void {
+  const seed = seedById(conversationId);
+  const msgSeed = seed?.messages?.find((m) => m.id === messageId);
+  if (!seed || !msgSeed) return;
+  const current = previewReactionOverrides.get(messageId) ?? seedReactions(seed, msgSeed);
+  const isMine = (r: MessageReaction) => r.fromId === myId || r.fromId === 'me';
+  const isToggleOff = current.some((r) => isMine(r) && (r.reactionType ?? r.emoji) === type);
+  const others = current.filter((r) => !isMine(r));
+  const next: MessageReaction[] = isToggleOff
+    ? others
+    : [...others, { emoji: type, reactionType: type, fromId: myId, fromName: myName, createdAt: new Date().toISOString() }];
+  previewReactionOverrides.set(messageId, next);
 }
 
 /** Seeded messages for one seeded conversation id, in the exact `Message`
@@ -256,10 +312,10 @@ export function getPreviewMessages(conversationId: string): Message[] {
       fromId: isMe ? 'me' : seed.participantUserId,
       fromName: isMe ? 'You' : seed.participantName,
       fromInitials: isMe ? 'Y' : seed.participantInitials,
-      fromColor: isMe ? '#8B5CF6' : seed.participantColor,
+      fromColor: isMe ? '#F7F7FA' : seed.participantColor,
       text: m.text,
-      attachment: toAttachment(m.attachment),
-      reactions: [],
+      attachment: toAttachment(m.attachment, seed),
+      reactions: previewReactionOverrides.get(m.id) ?? seedReactions(seed, m),
       status: 'read',
       // Real conversations get `readAt` from the backend once the other
       // participant marks the thread read (see
@@ -274,6 +330,88 @@ export function getPreviewMessages(conversationId: string): Message[] {
     };
   });
   return [...base, ...(previewExtraMessages.get(conversationId) ?? [])];
+}
+
+// ─── Seller preview inbox (item 71) ────────────────────────────────────────
+//
+// app/seller-inbox.tsx and app/seller-conversation.tsx have no seeded data
+// of their own today — under ?bt_preview=seller (no real Clerk sign-in, no
+// reachable backend, same as the buyer preview above) they call the real
+// API, get nothing back, and render an empty/error state instead of a demo.
+// This gives them the one seeded thread from
+// SELLER_PREVIEW_CONVERSATION_SEEDS to fall back to, same gating contract as
+// the buyer functions above: try the real API first, only fall back here
+// when it returns nothing or fails, never for a real signed-in account.
+const SELLER_ID_PREFIX = 'preview-seller-conversation-';
+
+export function isSellerPreviewConversationId(id: string | null | undefined): boolean {
+  return !!id && id.startsWith(SELLER_ID_PREFIX);
+}
+
+function sellerSeedById(id: string): PreviewConversationSeed | undefined {
+  return SELLER_PREVIEW_CONVERSATION_SEEDS.find(s => s.id === id);
+}
+
+function toSellerConversation(seed: PreviewConversationSeed): Conversation {
+  const now = Date.now();
+  const ts = now - seed.minutesAgo * 60_000;
+  return {
+    id: seed.id,
+    type: 'buyer_to_seller',
+    participants: [{
+      userId: seed.participantUserId,
+      name: seed.participantName,
+      handle: seed.participantHandle,
+      initials: seed.participantInitials,
+      color: seed.participantColor,
+      accountType: 'buyer',
+      avatarUri: avatarUriFor(seed),
+    }],
+    lastMessage: seed.lastMessage,
+    lastMessageTs: ts,
+    lastMessageSenderId: seed.lastMessageFromMe ? 'me' : seed.participantUserId,
+    lastMessageType: seed.lastMessageType,
+    unreadCount: seed.unreadCount,
+    isFriendshipActive: true,
+    isArchived: false,
+    isRequest: seed.isRequest,
+    contextOrderNumber: seed.contextOrderNumber,
+    contextProductName: seed.contextProductName,
+    updatedAt: new Date(ts).toISOString(),
+  };
+}
+
+export function getSellerPreviewConversations(): Conversation[] {
+  return SELLER_PREVIEW_CONVERSATION_SEEDS.map(toSellerConversation);
+}
+
+export function getSellerPreviewConversation(id: string): Conversation | null {
+  const seed = sellerSeedById(id);
+  return seed ? toSellerConversation(seed) : null;
+}
+
+export function getSellerPreviewMessages(conversationId: string): Message[] {
+  const seed = sellerSeedById(conversationId);
+  if (!seed?.messages) return [];
+  return seed.messages.map((m): Message => {
+    const isMe = m.fromOfficialOrParticipant === 'me'; // 'me' = the seller here
+    const ts = Date.now() - m.minutesAgo * 60_000;
+    return {
+      id: m.id,
+      conversationId,
+      fromId: isMe ? 'me' : seed.participantUserId,
+      fromName: isMe ? 'You' : seed.participantName,
+      fromInitials: isMe ? 'Y' : seed.participantInitials,
+      fromColor: isMe ? '#F7F7FA' : seed.participantColor,
+      text: m.text,
+      attachment: toAttachment(m.attachment, seed),
+      reactions: [],
+      status: 'read',
+      readAt: isMe ? new Date(ts + 45_000).toISOString() : undefined,
+      ts,
+      deletedForMe: false,
+    };
+  });
 }
 
 // ─── Transient "typing…" simulation (preview-only, demonstrates the real

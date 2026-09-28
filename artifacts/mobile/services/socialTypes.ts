@@ -219,6 +219,9 @@ export interface Message {
   attachment?: MessageAttachment;
   replyToId?: string;
   replyPreview?: string;
+  /** The quoted message's own sender name, resolved server-side alongside
+   *  replyPreview — see api-server's adaptMessage/loadReplyPreviews. */
+  replyToAuthorName?: string;
   reactions: MessageReaction[];
   status: MessageStatus;   // delivered/read only shown with backend confirmation
   /** ISO timestamp the recipient's device received the message, when known. */

@@ -153,6 +153,7 @@ vi.mock('@/lib/theme', () => ({
   CYAN: '#22d3ee',
   CYAN_DIM: '#164e63',
   GUTTER: 16,
+  WEB_SAFE_AREA_TOP: 47,
   SECTION_GAP: 24,
   CONTENT_MAX_WIDTH: 720,
   GRID_MAX_WIDTH: 1080,

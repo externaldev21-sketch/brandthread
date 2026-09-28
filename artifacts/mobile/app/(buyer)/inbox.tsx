@@ -15,7 +15,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth, useUser } from '@clerk/expo';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONT, FS, SP, RADIUS, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, SCREEN_BG, CONTENT_MAX_WIDTH, WEB_SAFE_AREA_TOP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
@@ -253,10 +253,10 @@ export default function InboxScreen() {
   // ScrollViews, one FlashList) mounts at a time, so sharing this ref is safe.
   const scrollResetRef = useScrollReset<any>();
   const insets = useSafeAreaInsets();
-  // Matches TabPageHeader's own topPad exactly, so the search-mode header row
-  // sits at the identical vertical position as the title/icon row it swaps
-  // with — see that component for why web needs the fixed 67 fallback.
-  const headerTopPad = Platform.OS === 'web' ? 67 : insets.top;
+  // Matches TabPageHeader's own topPad exactly (shared WEB_SAFE_AREA_TOP,
+  // overnight batch item 40), so the search-mode header row sits at the
+  // identical vertical position as the title/icon row it swaps with.
+  const headerTopPad = Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top;
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const api = useApi();
