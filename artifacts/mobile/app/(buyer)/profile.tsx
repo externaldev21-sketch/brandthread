@@ -839,7 +839,7 @@ export default function ProfileScreen() {
             title={emptyTitle}
             description={emptyDescription}
             action={emptyAction}
-            compact
+            actionStyle="text"
           />
         )}
         showsVerticalScrollIndicator={false}

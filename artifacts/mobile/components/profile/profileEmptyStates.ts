@@ -46,10 +46,12 @@ const TABLE: Record<ProfileEmptyTab, {
   'buyer:posts': {
     icon: 'video',
     illustration: 'spool',
-    title: 'No posts yet',
-    message: 'Photos and videos you post to your profile appear here.',
+    // Instagram's empty own profile: title, one line, a text-style action.
+    title: 'Share your fits',
+    message: 'When you post photos and videos, they’ll appear on your profile.',
+    publicTitle: 'No posts yet',
     publicMessage: 'Posts they share will appear here.',
-    cta: { label: 'Post your first video', route: '/create-post?accountType=buyer' },
+    cta: { label: 'Share your first thread', route: '/create-post?accountType=buyer' },
   },
   'buyer:tagged': {
     icon: 'tag',
