@@ -145,6 +145,8 @@ router.post("/", requireRole("manager"), async (req, res) => {
     name, description, category = "apparel", status = "draft", images = [], tags = [], styleTags = [], variant, variants,
     // Pre-order fields — mirrors PUT /:id so a listing can be created directly as a pre-order.
     isPreOrder, preOrderClosingDate, preOrderEstShipDate, dropId,
+    // A photo of the seller's own size chart.
+    sizeChartImageUrl,
   } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
@@ -205,6 +207,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
         ...(preOrderClosingDate ? { preOrderClosingDate: new Date(preOrderClosingDate) } : {}),
         ...(preOrderEstShipDate ? { preOrderEstShipDate: new Date(preOrderEstShipDate) } : {}),
         ...(dropId !== undefined && { dropId: dropId ?? null }),
+        ...(sizeChartImageUrl !== undefined && { sizeChartImageUrl: sizeChartImageUrl ?? null }),
       })
       .returning();
 
@@ -260,6 +263,9 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
     isPreOrder, preOrderClosingDate, preOrderEstShipDate, dropId,
     // Size chart
     sizeChart,
+    // A photo of the seller's own size chart — distinct from the structured
+    // `sizeChart` table data above.
+    sizeChartImageUrl,
   } = req.body;
 
   const updateValues = {
@@ -277,6 +283,7 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       ...(dropId                 !== undefined && { dropId: dropId ?? null }),
       // Size chart (pass null to clear)
       ...(sizeChart              !== undefined && { sizeChart: sizeChart ?? null }),
+      ...(sizeChartImageUrl      !== undefined && { sizeChartImageUrl: sizeChartImageUrl ?? null }),
       updatedAt: new Date(),
   };
 

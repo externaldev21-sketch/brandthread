@@ -191,6 +191,9 @@ export const products = pgTable('products', {
   // ── Size chart ────────────────────────────────────────────────────────────
   // { columns: string[], rows: [{size:string, values:string[]}], unit?:string, notes?:string }
   sizeChart:             json('size_chart').$type<Record<string, unknown> | null>(),
+  // A photo of the seller's own size chart — distinct from the structured
+  // table data above. Optional; shown to buyers as a "Size guide" link.
+  sizeChartImageUrl:     text('size_chart_image_url'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

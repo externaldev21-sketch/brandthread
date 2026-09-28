@@ -276,6 +276,10 @@ export interface Product {
 
   // Media
   media: ProductMedia[];
+  /** A photo of the seller's own size chart (not the structured `sizeChart`
+   *  data the server also supports) — shown to buyers as a "Size guide"
+   *  link once a product has sizes. Optional; absent means no link shows. */
+  sizeChartImageUrl?: string | null;
 
   // Pricing
   pricing: ProductPricing;
