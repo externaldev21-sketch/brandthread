@@ -369,6 +369,8 @@ export default function BuyerCheckoutScreen() {
             },
           );
         } else {
+          // Guest checkout: signed-out buyers pay without an account; the
+          // Contact card's email is where the receipt and order updates go.
           result = await api.guest.checkout.createSession(
             group.items.map(item => ({ variantId: item.variantId, productId: item.productId, quantity: item.quantity })),
             {
