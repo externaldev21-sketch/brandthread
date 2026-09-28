@@ -3,7 +3,7 @@
  * These test the pure logic and URL construction — no native renderer needed.
  */
 import { describe, expect, it } from 'vitest';
-import { buildCanonicalProfileUrl, normalizeUsername } from '@/lib/shareProfile';
+import { buildCanonicalProfileUrl, normalizeUsername, parseProfileDeepLink } from '@/lib/shareProfile';
 
 // ─── Routing / navigation guards ─────────────────────────────────────────────
 
@@ -92,5 +92,34 @@ describe('share-profile: missing username state', () => {
   it('no QR and no fake URL for a very short username', () => {
     const url = buildCanonicalProfileUrl('ab');
     expect(url).toBeNull();
+  });
+});
+
+// ─── QR scanner: scanned-link parsing ────────────────────────────────────────
+
+describe('share-profile: parsing a scanned QR / deep link back to a username', () => {
+  it('parses the canonical https URL', () => {
+    expect(parseProfileDeepLink('https://brandthread.app/u/janedoe')).toBe('janedoe');
+  });
+
+  it('parses the www. and http variants', () => {
+    expect(parseProfileDeepLink('https://www.brandthread.app/u/janedoe')).toBe('janedoe');
+    expect(parseProfileDeepLink('http://brandthread.app/u/janedoe')).toBe('janedoe');
+  });
+
+  it('parses the native deep-link scheme', () => {
+    expect(parseProfileDeepLink('brandthread://u/janedoe')).toBe('janedoe');
+  });
+
+  it('is the exact inverse of buildCanonicalProfileUrl', () => {
+    const url = buildCanonicalProfileUrl('shopowner')!;
+    expect(parseProfileDeepLink(url)).toBe('shopowner');
+  });
+
+  it('rejects a foreign / unrelated QR code payload', () => {
+    expect(parseProfileDeepLink('https://instagram.com/u/janedoe')).toBeNull();
+    expect(parseProfileDeepLink('not a url at all')).toBeNull();
+    expect(parseProfileDeepLink('')).toBeNull();
+    expect(parseProfileDeepLink(null)).toBeNull();
   });
 });

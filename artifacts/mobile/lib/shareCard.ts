@@ -11,6 +11,42 @@ import { Linking, Platform, Share } from 'react-native';
 export const STORY_CARD_WIDTH = 1080;
 export const STORY_CARD_HEIGHT = 1920;
 
+/**
+ * Renders an arbitrary view (e.g. the share-profile QR card, not a fixed
+ * story-sized frame) to a PNG, scaled up from its on-screen dp size for a
+ * crisp download. Used by the share-profile "Download" tile, which saves
+ * just the QR + handle card — never the surrounding background.
+ */
+export async function captureCardAtNaturalSize(
+  ref: React.RefObject<any>,
+  onScreenSize: number,
+  scale = 3,
+): Promise<string> {
+  const { captureRef } = await import('react-native-view-shot');
+  return captureRef(ref, {
+    format: 'png',
+    quality: 1,
+    result: Platform.OS === 'web' ? 'data-uri' : 'tmpfile',
+    width: onScreenSize * scale,
+    height: onScreenSize * scale,
+  });
+}
+
+/**
+ * Triggers a browser download of a data-URI image. Web-only counterpart to
+ * `saveCardImageToLibrary` (native), reusing the same anchor-click pattern
+ * used elsewhere in the app (see app/design-canvas.tsx `triggerWebDownload`).
+ */
+export function triggerWebImageDownload(dataUrl: string, filename: string): void {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 export type ShareCardVariant = 'portrait' | 'grid';
 
 export interface CardThumbnail {

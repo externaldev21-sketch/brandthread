@@ -549,6 +549,36 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/public/search/suggested') return searchSuggested();
   if (p === '/public/search/categories') return searchCategories();
   if (p === '/social/search') return searchPeople();
+  // Own-profile screens (app/(buyer)/profile.tsx) resolve the signed-in
+  // user's own social profile + posts through these — used only by
+  // scripts/share-profile-1to1-screenshots.mjs for the share-profile
+  // rebuild's live verification; not part of the shipped app.
+  if ((match = p.match(/^\/social\/profile\/([^/]+)$/))) {
+    const user = role === 'seller' ? SELLER_USER : BUYER_USER;
+    const p2 = profileFor(role);
+    return {
+      userId: match[1], name: p2.name, username: p2.username,
+      displayName: p2.displayName, bio: p2.bio, avatarUrl: user.imageUrl,
+      accountType: p2.accountType, initials: p2.name.slice(0, 2).toUpperCase(), color: '#7A7A7A',
+      handle: `@${p2.username}`, followersCount: 1280, followingCount: 340, postsCount: 6,
+      isFollowing: false, isFollowedBy: false, isMutual: false, iBlockedThem: false,
+    };
+  }
+  if (p.match(/^\/social\/profile\/[^/]+\/posts$/)) return [];
+  if (p === '/buyer/notifications/unread-count') return { count: 0 };
+  if (p === '/buyer/saved') return [];
+  if (p === '/buyer/orders') return [];
+  if (p === '/profile/cover-coachmark') return { seen: true };
+  if (p === '/thread-cash') return { balanceCents: 0, history: [] };
+  if (p === '/seller/profile') {
+    const p2 = profileFor('seller');
+    return {
+      id: p2.id, clerkId: p2.clerkId, displayName: p2.displayName, brandName: p2.brandName,
+      bio: p2.bio, website: null, username: p2.username, profileImageUrl: SELLER_USER.imageUrl,
+      logoUrl: SELLER_USER.imageUrl, bannerUrl: null, category: null, tags: [], location: null,
+      socialLinks: {}, contactEmail: null,
+    };
+  }
   if ((match = p.match(/^\/public\/products\/([^/]+)\/related$/))) return PUBLIC_PRODUCTS.filter((item) => item.id !== match[1]).slice(0, 5);
   if ((match = p.match(/^\/public\/products\/([^/]+)$/))) return byId(PUBLIC_PRODUCTS)(match[1]);
   if (p.startsWith('/reviews/product/')) return REVIEWS;
@@ -650,6 +680,10 @@ export function localStorageSeed(role, options = {}) {
   if (role === 'buyer') {
     seed[`bt:checkout:${user.id}:v1`] = JSON.stringify(checkoutSession());
     seed['bt:repost-education:preview:v1'] = '1';
+    // Own avatar (local-only field — see lib/buyerProfile.ts) so the
+    // share-profile SELFIE background variant has something to show;
+    // used only by scripts/share-profile-1to1-screenshots.mjs.
+    seed[`bt:buyer-profile:${user.id}:v2`] = JSON.stringify({ avatarUri: user.imageUrl });
   }
   if (role === 'seller') {
     // A finished "Set up your business" checklist, so the dashboard shows the business, not onboarding.
