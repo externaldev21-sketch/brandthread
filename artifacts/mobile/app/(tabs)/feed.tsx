@@ -1298,9 +1298,7 @@ function LiveVideoVisual({
           nativeControls={false}
         />
         <Animated.View style={[styles.pauseOverlay, { opacity: pauseOverlayOpacity }]} pointerEvents="none">
-          <View style={styles.pauseOverlayCircle}>
-            <Feather name="play" size={56} color={ON_DARK} />
-          </View>
+          <FontAwesome name="play" size={56} color={ON_DARK} />
         </Animated.View>
       </View>
       {progressBottom != null && isActive && (
@@ -3449,12 +3447,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_BG },
 
   pauseOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  // 30% black circle behind the 56pt play glyph — sized with room to spare
-  // around the icon, not a tight fit.
-  pauseOverlayCircle: {
-    width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(0,0,0,0.3)',
-    alignItems: 'center', justifyContent: 'center',
-  },
   mediaPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#17131D' },
   heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
