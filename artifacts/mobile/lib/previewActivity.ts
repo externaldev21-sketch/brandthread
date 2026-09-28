@@ -38,7 +38,6 @@ const POSTER_SOURCES = [
 function posterUri(index: number): string {
   return Asset.fromModule(POSTER_SOURCES[index]).uri;
 }
-
 // Same names/ids as previewCatalog.ts's SEED, so a buyer sees one consistent
 // cast of brands across Feed, Discover, Search, Shop and now Activity. Each
 // gets the matching preview poster as a stand-in profile photo (no real
@@ -99,12 +98,11 @@ export function getPreviewActivity(): ActivityItem[] {
       actorId: p[0].userId, actorName: p[0].name, actorInitials: p[0].initials, actorColor: p[0].color, actorAvatarUrl: p[0].avatarUrl,
       targetId: p[0].userId, targetType: 'user', cta: 'Follow back', createdAt: minutesAgo(4),
     },
-    {
-      id: 'preview-act-followback-01', category: 'social', type: 'new_follower',
-      title: `${p[4].name} followed you back`, body: '', isRead: false,
-      actorId: p[4].userId, actorName: p[4].name, actorInitials: p[4].initials, actorColor: p[4].color, actorAvatarUrl: p[4].avatarUrl,
-      targetId: p[4].userId, targetType: 'user', createdAt: minutesAgo(11),
-    },
+    // (The two follows further down merge into one "X and Y started following
+    // you" row. They're already read, so they sit in a different recency
+    // section from this unread one and never merge with it — even under the
+    // Follows chip, where the rows in between are filtered out — keeping a
+    // single-person row with its own "Follow back" pill there to demo.)
     {
       id: 'preview-act-like-group-01', category: 'social', type: 'post_like',
       title: `${p[1].name} liked your post`, body: '', isRead: false,
@@ -136,6 +134,18 @@ export function getPreviewActivity(): ActivityItem[] {
       targetId: 'preview-transfer-01', targetType: 'thread_cash_transfer', createdAt: minutesAgo(28),
     },
     // ── Today ────────────────────────────────────────────────────────────
+    {
+      id: 'preview-act-follow-new-02', category: 'social', type: 'new_follower',
+      title: `${p[2].name} started following you`, body: '', isRead: true,
+      actorId: p[2].userId, actorName: p[2].name, actorInitials: p[2].initials, actorColor: p[2].color, actorAvatarUrl: p[2].avatarUrl,
+      targetId: p[2].userId, targetType: 'user', cta: 'Follow back', createdAt: minutesAgo(40),
+    },
+    {
+      id: 'preview-act-followback-01', category: 'social', type: 'new_follower',
+      title: `${p[4].name} followed you back`, body: '', isRead: true,
+      actorId: p[4].userId, actorName: p[4].name, actorInitials: p[4].initials, actorColor: p[4].color, actorAvatarUrl: p[4].avatarUrl,
+      targetId: p[4].userId, targetType: 'user', createdAt: minutesAgo(45),
+    },
     {
       id: 'preview-act-comment-01', category: 'social', type: 'post_comment',
       title: `${p[5].name} commented on your post`, body: 'obsessed with this fit 😍', isRead: true,
