@@ -43,6 +43,24 @@ export function isValidNormalizedUsername(username: string): boolean {
   return /^[a-z0-9_]{3,30}$/.test(username);
 }
 
+/**
+ * Extracts a normalized username from a scanned Brandthread profile QR code
+ * or deep link — the exact inverse of `buildCanonicalProfileUrl`. Accepts:
+ *   - https://brandthread.app/u/<username>  (and www./http:// variants)
+ *   - brandthread://u/<username>            (native deep-link scheme)
+ * Returns null for anything else so the QR scanner never routes to a page
+ * from an untrusted/foreign QR code.
+ */
+export function parseProfileDeepLink(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  const match = trimmed.match(
+    /^(?:https?:\/\/(?:www\.)?brandthread\.app|brandthread:\/\/)\/?u\/([^/?#]+)/i,
+  );
+  if (!match) return null;
+  return normalizeUsername(match[1]);
+}
+
 export type ShareLinkResult = 'shared' | 'copied' | 'unavailable';
 
 /**

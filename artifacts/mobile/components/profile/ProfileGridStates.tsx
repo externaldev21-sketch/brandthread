@@ -29,6 +29,7 @@ export function ProfileGridPlaceholder({
   action,
   testID,
   compact,
+  actionStyle,
 }: {
   loading: boolean;
   error: boolean;
@@ -42,6 +43,8 @@ export function ProfileGridPlaceholder({
   testID?: string;
   /** Tighter icon/padding — for a screen tight on height above a floating tab bar. */
   compact?: boolean;
+  /** `text` = Instagram-style link action instead of a pill button. */
+  actionStyle?: 'button' | 'text';
 }) {
   const areaHeight = useContext(ProfileEmptyAreaContext);
   const fill = areaHeight ? { minHeight: areaHeight, justifyContent: 'center' as const } : null;
@@ -68,6 +71,7 @@ export function ProfileGridPlaceholder({
       actionLabel={action?.label}
       onAction={action?.onPress}
       compact={compact}
+      actionStyle={actionStyle}
     />
   );
 }

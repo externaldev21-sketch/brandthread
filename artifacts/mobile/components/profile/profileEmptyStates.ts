@@ -9,7 +9,7 @@ import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 export type ProfileEmptyTab =
   | 'buyer:posts' | 'buyer:tagged' | 'buyer:reposts' | 'buyer:saved'
   | 'buyer:liked' | 'buyer:orders'
-  | 'seller:post' | 'seller:draft' | 'seller:schedule' | 'seller:videos'
+  | 'seller:post' | 'seller:draft' | 'seller:schedule' | 'seller:videos' | 'seller:tagged'
   | 'shop';
 
 export interface ProfileEmptyCopy {
@@ -46,10 +46,12 @@ const TABLE: Record<ProfileEmptyTab, {
   'buyer:posts': {
     icon: 'video',
     illustration: 'spool',
-    title: 'No posts yet',
-    message: 'Photos and videos you post to your profile appear here.',
+    // Instagram's empty own profile: title, one line, a text-style action.
+    title: 'Share your fits',
+    message: 'When you post photos and videos, they’ll appear on your profile.',
+    publicTitle: 'No posts yet',
     publicMessage: 'Posts they share will appear here.',
-    cta: { label: 'Post your first video', route: '/create-post?accountType=buyer' },
+    cta: { label: 'Share your first thread', route: '/create-post?accountType=buyer' },
   },
   'buyer:tagged': {
     icon: 'tag',
@@ -107,6 +109,12 @@ const TABLE: Record<ProfileEmptyTab, {
     message: 'Schedule a post and it will publish itself at the time you pick.',
     publicMessage: 'Scheduled posts are private.',
     cta: { label: 'Schedule a post', route: '/create-post?mode=schedule' },
+  },
+  'seller:tagged': {
+    icon: 'tag',
+    title: 'No tagged posts',
+    message: 'When shoppers tag your brand in a post, it shows up here.',
+    publicMessage: 'Posts that tag this brand will appear here.',
   },
   'seller:videos': {
     icon: 'film',

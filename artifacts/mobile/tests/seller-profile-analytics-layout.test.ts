@@ -26,8 +26,10 @@ describe('seller profile action layout', () => {
     expect(profileSource).not.toContain("label: 'New Campaign'");
   });
 
-  it('keeps only Post, Draft, and Schedule content buttons', () => {
-    expect(profileSource).toContain("const CONTENT_TABS = ['Post', 'Draft', 'Schedule']");
+  it('uses Instagram Posts / Shop / Tagged tabs, keeping drafts and scheduled posts as a Posts sub-filter', () => {
+    expect(profileSource).toContain("const CONTENT_TABS = ['Posts', 'Shop', 'Tagged']");
+    expect(profileSource).toContain("const POST_FILTERS = ['Published', 'Drafts', 'Scheduled']");
+    expect(profileSource).toContain('tabsVariant="iconOnly"');
     expect(profileSource).not.toContain('Store performance');
   });
 
@@ -37,7 +39,7 @@ describe('seller profile action layout', () => {
     expect(profileSource).not.toContain('Share something with');
     // The empty Post tab offers "Create your first post" through the shared
     // profile empty-state table (components/profile/profileEmptyStates.ts).
-    expect(profileSource).toContain("'seller:post', 'seller:draft', 'seller:schedule'");
+    expect(profileSource).toContain("{ Published: 'seller:post', Drafts: 'seller:draft', Scheduled: 'seller:schedule' }");
     expect(fs.readFileSync(path.join(__dirname, '../components/profile/profileEmptyStates.ts'), 'utf8'))
       .toContain("label: 'Create your first post', route: '/create-post'");
   });

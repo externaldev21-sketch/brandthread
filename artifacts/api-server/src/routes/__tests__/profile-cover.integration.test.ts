@@ -1,6 +1,6 @@
 /**
  * Profile cover video: server-enforced 24h change limit (set AND remove),
- * ≤30s duration validation, the once-only first-visit coach mark, and the
+ * ≤25s duration validation, the once-only first-visit coach mark, and the
  * cover URLs on public profile responses. ffmpeg/ffprobe and object storage
  * are injected fakes (CI has no ffmpeg); the database is real.
  */
@@ -115,15 +115,15 @@ describe("cover change rules (pure)", () => {
     expect(coverChangeMessage(20 * 60 * 1000)).toBe("You can change your cover again in 1 hour");
   });
 
-  it("rejects trims longer than 30s", () => {
+  it("rejects trims longer than 25s", () => {
     expect(parseTrim("0", "20")).toEqual({ start: 0, duration: 20 });
-    expect(parseTrim("0", "31")).toHaveProperty("error");
+    expect(parseTrim("0", "26")).toHaveProperty("error");
     expect(parseTrim(undefined, undefined)).toBeNull();
   });
 });
 
 describe("POST /api/profile/cover-video", () => {
-  it("rejects a video longer than 30 seconds", async () => {
+  it("rejects a video longer than 25 seconds", async () => {
     probe.source = 42;
     const response = await call("POST", "/api/profile/cover-video", seller, MP4);
     expect(response.status).toBe(400);
@@ -134,7 +134,7 @@ describe("POST /api/profile/cover-video", () => {
 
   it("accepts a trimmed long clip, then re-validates the rendered result", async () => {
     probe.source = 42;
-    probe.rendered = 31.5; // a broken render must still be refused
+    probe.rendered = 26.5; // a broken render must still be refused
     const bad = await call("POST", "/api/profile/cover-video?trimStart=4&trimDuration=20", seller, MP4);
     expect(bad.status).toBe(400);
     probe.rendered = 20;

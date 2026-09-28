@@ -157,9 +157,13 @@ export function Button({
         ) : (
           <>
             {icon && <Feather name={icon} size={18} color={variantStyle.fg} />}
-            <Text style={[styles.label, TYPE_SCALE.headline, { color: variantStyle.fg }]} numberOfLines={1}>
-              {label}
-            </Text>
+            {/* An icon-only button passes label="" (with an accessibilityLabel)
+                — no empty Text, so the icon sits dead centre. */}
+            {label ? (
+              <Text style={[styles.label, TYPE_SCALE.headline, { color: variantStyle.fg }]} numberOfLines={1}>
+                {label}
+              </Text>
+            ) : null}
           </>
         )}
       </Animated.View>

@@ -51,7 +51,11 @@ const ALLOWLIST: Record<string, string> = {
   // either button's own: each button (removeBtn/cancelBtn) is a plain
   // full-width text row with no background/border of its own — the actual
   // "delegate to Button/Chip" case this test guards against doesn't apply.
-  'app/activity-center.tsx': 'RemoveFollowerSheet\'s bottom-sheet container Pressable (its own backgroundColor is the sheet surface, not either action button\'s chrome)',
+  // RemoveFollowerSheet moved out of app/activity-center.tsx into its own
+  // shared component (components/social/RemoveFollowerSheet.tsx, reused by
+  // the standalone Followers list) — same shape as above, still just the
+  // sheet's own container Pressable/backdrop, not either button's chrome.
+  'components/social/RemoveFollowerSheet.tsx': 'RemoveFollowerSheet\'s bottom-sheet container/backdrop Pressable (its own backgroundColor is the sheet surface, not either action button\'s chrome)',
 };
 
 const TAG_NAMES = ['Pressable', 'TouchableOpacity', 'TouchableHighlight'];

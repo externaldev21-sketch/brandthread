@@ -1,14 +1,20 @@
 /**
- * Seller's own Profile tab — the same ProfileShell as the public brand
- * profile, with the owner's tools: account switcher, notifications / share /
- * settings, Edit Profile (brand name + bio sheet), Go Live, Create Post,
- * quick actions, Post / Draft / Schedule content filters, and the floating
- * "Shop N products" pill into the seller's live listings.
+ * Seller's own Profile tab — ProfileShell in its Instagram own-profile
+ * `headerVariant="video"` (profile video behind the controls, avatar, name
+ * and bio, fading to solid at the stats row), with the owner's tools:
+ * account switcher, notifications / share / settings, Edit Profile (brand
+ * name + bio sheet), Go Live, Create Post, quick actions, and Instagram's
+ * icon-only Posts / Shop / Tagged tabs over a 4:5 grid.
+ *
+ * Drafts and scheduled posts (formerly their own tabs) are a sub-filter under
+ * Posts (Published / Drafts / Scheduled) so nothing a seller relied on is
+ * lost; the Shop tab shows the live listings (tap → product), and Tagged is
+ * an honest empty state (sellers have no tagged-post data yet).
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput, Pressable,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
@@ -16,7 +22,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 import { useApi } from '@/lib/api';
-import { isSellerDevPreview } from '@/lib/devPreview';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { reportNetworkError } from '@/lib/networkNotice';
 import {
@@ -27,8 +32,8 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { Button } from '@/components/ui/Button';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
-import { connectionsHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
-import { formatProfileCount } from '@/services/profileService';
+import { connectionsHref, productDetailHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
+import { formatProfileCount, getSellerShopPage, type ShopProduct } from '@/services/profileService';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
   ProfileButton, ProfileChip, ProfileGlassButton, ShopPill, type ProfileStat, type ProfileTab,
@@ -37,9 +42,11 @@ import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import {
-  CoverCoachmarkSheet, CoverHeroAffordance, CoverManageSheet, CoverTrimSheet, useProfileCover,
+  CoverCoachmarkSheet, CoverManageSheet, CoverTrimSheet, useProfileCover,
 } from '@/components/profile/ProfileCover';
-import { useProfileLayout } from '@/components/profile/profileLayout';
+import { ProfileVideoAffordance } from '@/components/profile/ProfileVideoHeader';
+import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
+import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
@@ -74,12 +81,21 @@ const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route
   { icon: 'message-circle', label: 'Messages',  route: '/seller-inbox' },
 ];
 
-const CONTENT_TABS = ['Post', 'Draft', 'Schedule'];
+const CONTENT_TABS = ['Posts', 'Shop', 'Tagged'] as const;
+type ContentTab = typeof CONTENT_TABS[number];
 const CONTENT_TAB_ITEMS: ProfileTab[] = [
-  { key: 'Post', label: 'Post', icon: 'grid' },
-  { key: 'Draft', label: 'Draft', icon: 'file-text' },
-  { key: 'Schedule', label: 'Schedule', icon: 'clock' },
+  { key: 'Posts', label: 'Posts', icon: 'grid' },
+  { key: 'Shop', label: 'Shop', icon: 'shopping-bag' },
+  { key: 'Tagged', label: 'Tagged', icon: 'tag' },
 ];
+
+/** Sub-filter under Posts — keeps the seller's drafts and scheduled posts one tap away. */
+const POST_FILTERS = ['Published', 'Drafts', 'Scheduled'] as const;
+type PostFilter = typeof POST_FILTERS[number];
+
+function shopTile(product: ShopProduct): ProfileGridItem {
+  return { id: product.id, kind: 'photo', posterUri: product.imageUri, caption: product.name, productCount: 0 };
+}
 
 // ─── Screen ─────────────────────────────────────────────────────────────────
 
@@ -87,12 +103,16 @@ export default function ProfileScreen() {
   const router  = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
-  const layout = useProfileLayout();
+  // Instagram's own-profile grid: 3 columns, 1pt gutters, 4:5 tiles.
+  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_4_5 });
   // The seller tab bar floats over content (same metrics as the global bar).
   const sellerBarInset = useTabBarMetrics(2).occupiedHeight;
   const { isLoaded: authLoaded, userId } = useAuth();
-  const sellerPreview = isSellerDevPreview() && (!authLoaded || !userId);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState<ContentTab>('Posts');
+  const [postFilter, setPostFilter] = useState<PostFilter>('Published');
+  const [shopProducts, setShopProducts] = useState<ShopProduct[]>([]);
+  const [shopLoading, setShopLoading] = useState(false);
+  const [shopError, setShopError] = useState(false);
   const [sellerPosts, setSellerPosts] = useState<SellerThreadPost[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
   const [postsError, setPostsError] = useState(false);
@@ -114,7 +134,7 @@ export default function ProfileScreen() {
   const requestUserRef = useRef<string | null>(null);
 
   const loadPosts = useCallback(async () => {
-    if (sellerPreview || !authLoaded || !userId) return;
+    if (!authLoaded || !userId) return;
     const requestUser = userId;
     setPostsError(false);
     try {
@@ -126,23 +146,19 @@ export default function ProfileScreen() {
     } finally {
       if (requestUserRef.current === requestUser) setPostsLoading(false);
     }
-  }, [authLoaded, sellerPreview, userId]);
+  }, [authLoaded, userId]);
 
   const loadMyStories = useCallback(async () => {
-    if (sellerPreview || !authLoaded || !userId) return;
+    if (!authLoaded || !userId) return;
     const requestUser = userId;
     try {
       const rows = await api.social.myStories();
-      const now  = Date.now();
-      const active = (Array.isArray(rows) ? rows : [])
-        .filter((s: any) => s.expiresAt > now)
-        .map((s: any) => s.id as string);
-      if (requestUserRef.current === requestUser) setMyStoryIds(active);
+      if (requestUserRef.current === requestUser) setMyStoryIds(activeStoryIds(rows));
     } catch { /* stories are optional profile content */ }
-  }, [api, authLoaded, sellerPreview, userId]);
+  }, [api, authLoaded, userId]);
 
   const loadProfile = useCallback(async () => {
-    if (sellerPreview || !authLoaded || !userId) return;
+    if (!authLoaded || !userId) return;
     const requestUser = userId;
     try {
       const data = await api.seller.getProfile();
@@ -167,10 +183,10 @@ export default function ProfileScreen() {
       });
       setSocialCounts((current) => ({ ...current, likes: data.totalLikes ?? 0 }));
     } catch { /* nullable profile fields already render safely */ }
-  }, [api, authLoaded, sellerPreview, userId]);
+  }, [api, authLoaded, userId]);
 
   const loadSocialCounts = useCallback(async () => {
-    if (sellerPreview || !authLoaded || !userId) return;
+    if (!authLoaded || !userId) return;
     const requestUser = userId;
     try {
       // True totals from the profile endpoint — the follower/following lists
@@ -198,7 +214,7 @@ export default function ProfileScreen() {
         following: Array.isArray(followingArr) ? followingArr.length : 0,
       }));
     } catch { /* zero counts remain visible */ }
-  }, [api, authLoaded, sellerPreview, userId]);
+  }, [api, authLoaded, userId]);
 
   const loadShopCount = useCallback(async () => {
     if (!authLoaded || !userId) return;
@@ -211,13 +227,13 @@ export default function ProfileScreen() {
   }, [api, authLoaded, userId]);
 
   const loadPage = useCallback(() => {
-    if (sellerPreview || !authLoaded || !userId) return;
+    if (!authLoaded || !userId) return;
     void loadPosts();
     void loadMyStories();
     void loadSocialCounts();
     void loadProfile();
     void loadShopCount();
-  }, [authLoaded, sellerPreview, userId, loadPosts, loadMyStories, loadProfile, loadSocialCounts, loadShopCount]);
+  }, [authLoaded, userId, loadPosts, loadMyStories, loadProfile, loadSocialCounts, loadShopCount]);
 
   useEffect(() => {
     requestUserRef.current = userId ?? null;
@@ -227,11 +243,11 @@ export default function ProfileScreen() {
     setPostsLoading(true);
     setSocialCounts({ followers: 0, following: 0, likes: 0 });
     if (authLoaded && userId) void loadPage();
-    if (sellerPreview || (authLoaded && !userId)) setPostsLoading(false);
+    if (authLoaded && !userId) setPostsLoading(false);
     // New / edited / deleted posts publish through socialService — refresh.
     const unsub = subscribeSocial(() => { loadPosts(); loadMyStories(); });
     return unsub;
-  }, [authLoaded, sellerPreview, userId, loadPage, loadPosts, loadMyStories]);
+  }, [authLoaded, userId, loadPage, loadPosts, loadMyStories]);
 
   // Returning from add-product / create-post / edit-profile refreshes counts.
   useFocusEffect(useCallback(() => {
@@ -247,6 +263,26 @@ export default function ProfileScreen() {
     setSocialCounts((counts) => ({ ...counts, following: Math.max(0, counts.following + (event.isFollowing ? 1 : -1)) }));
   }), [userId]);
 
+  // Shop tab: the seller's live listings (same source as the full products page).
+  const loadShopProducts = useCallback(async () => {
+    if (!authLoaded || !userId) return;
+    const requestUser = userId;
+    setShopError(false);
+    setShopLoading(true);
+    try {
+      const page = await getSellerShopPage(userId, 0);
+      if (requestUserRef.current === requestUser) setShopProducts(page.products);
+    } catch {
+      if (requestUserRef.current === requestUser) setShopError(true);
+    } finally {
+      if (requestUserRef.current === requestUser) setShopLoading(false);
+    }
+  }, [authLoaded, userId]);
+
+  useEffect(() => {
+    if (activeTab === 'Shop') void loadShopProducts();
+  }, [activeTab, loadShopProducts]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.resolve(loadPage());
@@ -255,10 +291,6 @@ export default function ProfileScreen() {
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (sellerPreview && ['/edit-profile', '/seller-go-live'].includes(route)) {
-      Alert.alert('Sign in required', 'Seller actions are unavailable in the signed-out preview.');
-      return;
-    }
     router.push(route as never);
   }
 
@@ -281,28 +313,6 @@ export default function ProfileScreen() {
       return;
     }
     if (savingProfile) return;
-
-    if (sellerPreview) {
-      setProfile((current) => ({
-        brandName,
-        displayName: current?.displayName ?? null,
-        bio,
-        subscriptionStatus: current?.subscriptionStatus ?? null,
-        subscriptionPlanId: current?.subscriptionPlanId ?? null,
-        totalLikes: current?.totalLikes ?? 0,
-        profileImageUrl: current?.profileImageUrl ?? null,
-        verified: current?.verified ?? false,
-        metrics: current?.metrics ?? {
-          revenueCents: 0,
-          visitors: 0,
-          orders: 0,
-          conversionRate: 0,
-        },
-      }));
-      setProfileEditorVisible(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      return;
-    }
 
     setSavingProfile(true);
     try {
@@ -334,7 +344,7 @@ export default function ProfileScreen() {
     }
   }
 
-  const brandTitle = profile?.brandName || profile?.displayName || (sellerPreview ? 'Your Brand' : 'My Brand');
+  const brandTitle = profile?.brandName || profile?.displayName || 'My Brand';
   const avatarInitials = brandTitle
     .split(/\s+/)
     .map((part) => part[0])
@@ -344,14 +354,12 @@ export default function ProfileScreen() {
     .toUpperCase();
 
   const filteredPosts = sellerPosts.filter(p => {
-    if (activeTab === 0) return !p.isDraft && !p.isArchived;
-    if (activeTab === 1) return p.isDraft && !p.isArchived;
-    if (activeTab === 2) return !p.isDraft && !p.isArchived && !!p.scheduledAt;
+    if (postFilter === 'Published') return !p.isDraft && !p.isArchived;
+    if (postFilter === 'Drafts') return p.isDraft && !p.isArchived;
+    if (postFilter === 'Scheduled') return !p.isDraft && !p.isArchived && !!p.scheduledAt;
     return false;
   });
   const publishedCount = sellerPosts.filter(p => !p.isDraft && !p.isArchived).length;
-  const latestVideo = sellerPosts.find(p => !p.isDraft && !p.isArchived && p.contentType === 'video' && p.mediaUris?.[0]);
-  const latestPoster = sellerPosts.find(p => !p.isDraft && !p.isArchived && (p.thumbnailUri || (p.contentType !== 'video' && p.mediaUris?.[0])));
 
   const handleTilePress = useCallback((item: ProfileGridItem) => {
     const post = sellerPosts.find(candidate => candidate.id === item.id);
@@ -366,14 +374,26 @@ export default function ProfileScreen() {
     }
   }, [brandTitle, router, sellerPosts, userId]);
 
-  const renderTile = useCallback(({ item, index }: { item: ProfileGridItem; index: number }) => (
-    <ProfileVideoTile item={item} index={index} width={layout.tileWidth} height={layout.tileHeight} onPress={handleTilePress} />
-  ), [handleTilePress, layout.tileHeight, layout.tileWidth]);
+  const handleShopTilePress = useCallback((item: ProfileGridItem) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(productDetailHref(item.id, { isOwner: true }) as never);
+  }, [router]);
 
+  const renderTile = useCallback(({ item, index }: { item: ProfileGridItem; index: number }) => (
+    <ProfileVideoTile
+      item={item}
+      index={index}
+      width={layout.tileWidth}
+      height={layout.tileHeight}
+      onPress={activeTab === 'Shop' ? handleShopTilePress : handleTilePress}
+    />
+  ), [activeTab, handleShopTilePress, handleTilePress, layout.tileHeight, layout.tileWidth]);
+
+  // Instagram order: Posts · Followers · Following (Likes kept as the seller's fourth stat).
   const stats: ProfileStat[] = [
-    { key: 'videos', label: 'Videos', value: formatProfileCount(publishedCount) },
-    { key: 'following', label: 'Following', value: formatProfileCount(socialCounts.following), onPress: () => nav(connectionsHref('following')) },
+    { key: 'videos', label: 'Posts', value: formatProfileCount(publishedCount) },
     { key: 'followers', label: 'Followers', value: formatProfileCount(socialCounts.followers), onPress: () => nav(connectionsHref('followers')) },
+    { key: 'following', label: 'Following', value: formatProfileCount(socialCounts.following), onPress: () => nav(connectionsHref('following')) },
     { key: 'likes', label: 'Likes', value: formatProfileCount(socialCounts.likes) },
   ];
 
@@ -401,14 +421,31 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  // Post / Draft / Schedule empty states: one table, each CTA opens the real flow.
-  const empty = profileEmptyState((['seller:post', 'seller:draft', 'seller:schedule'] as const)[activeTab] ?? 'seller:post', true);
+  // One table decides every tab's empty copy; each CTA opens the real flow.
+  const emptyKey = activeTab === 'Shop'
+    ? 'shop' as const
+    : activeTab === 'Tagged'
+      ? 'seller:tagged' as const
+      : ({ Published: 'seller:post', Drafts: 'seller:draft', Scheduled: 'seller:schedule' } as const)[postFilter];
+  const empty = profileEmptyState(emptyKey, true);
+  const gridData = activeTab === 'Posts'
+    ? (postsLoading ? [] : filteredPosts.map(gridItemFromThreadPost))
+    : activeTab === 'Shop'
+      ? (shopLoading ? [] : shopProducts.map(shopTile))
+      : [];
+  const gridLoading = activeTab === 'Posts' ? postsLoading : activeTab === 'Shop' ? shopLoading && shopProducts.length === 0 : false;
+  const gridError = activeTab === 'Posts' ? postsError : activeTab === 'Shop' ? shopError : false;
+  const shopLabel = productsCount && productsCount > 0
+    ? `Shop ${productsCount} product${productsCount === 1 ? '' : 's'}`
+    : 'Set up your shop';
 
   return (
     <>
       <ProfileShell
         testID="profile-hero"
         isOwnProfile
+        headerVariant="video"
+        tabsVariant="iconOnly"
         identity={{
           name: brandTitle,
           handle: profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName
@@ -420,7 +457,9 @@ export default function ProfileScreen() {
           roleLabel: 'Seller',
         }}
         avatar={{
-          ring: myStoryIds.length > 0 || !!profile?.verified,
+          // Accent ring = an unexpired story (verified shows as the check by the name).
+          ring: myStoryIds.length > 0,
+          onPressStoryBadge: () => nav('/create-post'),
           onPress: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             if (myStoryIds.length > 0) {
@@ -432,15 +471,12 @@ export default function ProfileScreen() {
               router.push('/create-post' as any);
             }
           },
-          accessibilityLabel: myStoryIds.length > 0 ? 'View your active story' : sellerPreview ? 'Seller preview avatar' : 'Create your first story',
+          accessibilityLabel: myStoryIds.length > 0 ? 'View your active story' : 'Create your first story',
         }}
-        // A cover video, when set, leads the hero; otherwise the latest post.
-        hero={coverFlow.hasCover ? { videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl } : {
-          videoUri: latestVideo?.mediaUris?.[0] ?? null,
-          posterUri: latestVideo?.thumbnailUri ?? latestPoster?.thumbnailUri ?? latestPoster?.mediaUris?.[0] ?? null,
-        }}
+        // The profile video plays behind the header; none set → plain background.
+        hero={{ videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }}
         coverAffordance={(
-          <CoverHeroAffordance hasCover={coverFlow.hasCover} busy={coverFlow.busy} onAdd={coverFlow.startAdd} onManage={coverFlow.openManage} />
+          <ProfileVideoAffordance hasVideo={coverFlow.hasCover} busy={coverFlow.busy} onAdd={coverFlow.startAdd} onManage={coverFlow.openManage} />
         )}
         topLeft={accountSwitcher}
         topRight={(
@@ -460,8 +496,8 @@ export default function ProfileScreen() {
           </>
         )}
         meta={(
-          <ProfileMeta bio={profile?.bio}>
-            <ProfileChip label={sellerPreview ? 'Seller preview' : planLabel} icon={hasPaidPlan ? 'award' : 'layers'} tone={hasPaidPlan && !sellerPreview ? 'accent' : 'muted'} />
+          <ProfileMeta bio={profile?.bio} overMedia={coverFlow.hasCover}>
+            <ProfileChip label={planLabel} icon={hasPaidPlan ? 'award' : 'layers'} tone={hasPaidPlan ? 'accent' : 'muted'} />
           </ProfileMeta>
         )}
         stats={stats}
@@ -492,15 +528,7 @@ export default function ProfileScreen() {
         )}
         extras={(
           <View style={s.extrasStack}>
-            {/* In-flow here: a floating pill above the seller tab bar would sit
-                on top of the action rows at 375pt. */}
-            {userId ? (
-              <ShopPill
-                label={productsCount && productsCount > 0 ? `Shop ${productsCount} product${productsCount === 1 ? '' : 's'}` : 'Set up your shop'}
-                sublabel={productsCount && productsCount > 0 ? 'Your live listings' : 'Add a product'}
-                onPress={() => nav(profileProductsHref({ sellerId: userId, sellerName: brandTitle, isOwner: true }))}
-              />
-            ) : null}
+            {/* The shop now lives in the Shop tab (tiles + "Shop N products"). */}
             <View style={s.quickRow}>
               {QUICK_ACTIONS.map((qa) => (
                 <ProfileButton key={qa.label} label={qa.label} icon={qa.icon} onPress={() => nav(qa.route)} accessibilityLabel={qa.label} />
@@ -510,28 +538,64 @@ export default function ProfileScreen() {
         )}
         tabs={{
           items: CONTENT_TAB_ITEMS,
-          active: CONTENT_TABS[activeTab],
+          active: activeTab,
           onChange: (key) => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setActiveTab(Math.max(0, CONTENT_TABS.indexOf(key)));
+            setActiveTab((CONTENT_TABS as readonly string[]).includes(key) ? key as ContentTab : 'Posts');
           },
         }}
-        data={postsLoading ? [] : filteredPosts.map(gridItemFromThreadPost)}
+        belowTabs={activeTab === 'Posts' ? (
+          <View style={s.filterRow} accessibilityRole="tablist" testID="seller-post-filters">
+            {POST_FILTERS.map((filter) => {
+              const selected = filter === postFilter;
+              return (
+                <Pressable
+                  key={filter}
+                  onPress={() => { Haptics.selectionAsync(); setPostFilter(filter); }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${filter} posts`}
+                  testID={`seller-post-filter-${filter.toLowerCase()}`}
+                  style={({ pressed }) => [
+                    s.filterChip,
+                    { borderColor: selected ? theme.text : theme.border, backgroundColor: selected ? theme.text : 'transparent' },
+                    pressed && s.filterChipPressed,
+                  ]}
+                >
+                  <Text style={[s.filterText, { color: selected ? theme.background : theme.muted }]}>{filter}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : activeTab === 'Shop' && userId && shopProducts.length > 0 ? (
+          <View style={s.shopPillWrap}>
+            <ShopPill
+              label={shopLabel}
+              sublabel="Your live listings"
+              onPress={() => nav(profileProductsHref({ sellerId: userId, sellerName: brandTitle, isOwner: true }))}
+            />
+          </View>
+        ) : null}
+        data={gridData}
         renderItem={renderTile}
         keyExtractor={(item) => item.id}
         numColumns={layout.gridColumns}
         listKey={`seller-own-${layout.gridColumns}`}
         ListEmptyComponent={(
           <ProfileGridPlaceholder
-            loading={postsLoading}
-            error={postsError}
-            onRetry={() => { setPostsLoading(true); void loadPosts(); }}
+            loading={gridLoading}
+            error={gridError}
+            onRetry={() => {
+              if (activeTab === 'Shop') { void loadShopProducts(); return; }
+              setPostsLoading(true); void loadPosts();
+            }}
             layout={layout}
             icon={empty.icon as keyof typeof Feather.glyphMap}
             title={empty.title}
             description={empty.message}
             action={empty.cta ? { label: empty.cta.label, onPress: () => nav(empty.cta!.route) } : undefined}
-            testID={`seller-own-empty-${CONTENT_TABS[activeTab]?.toLowerCase() ?? 'post'}`}
+            testID={`seller-own-empty-${activeTab === 'Posts' ? postFilter.toLowerCase() : activeTab.toLowerCase()}`}
+            actionStyle="text"
           />
         )}
         refreshing={refreshing}
@@ -561,11 +625,7 @@ export default function ProfileScreen() {
             <View style={s.sheetHeader}>
               <View>
                 <Text style={s.sheetTitle}>Edit brand</Text>
-                <Text style={s.sheetSubtitle}>
-                  {sellerPreview
-                    ? 'Preview only · changes stay local to this session.'
-                    : 'Keep your Profile details up to date.'}
-                </Text>
+                <Text style={s.sheetSubtitle}>Keep your Profile details up to date.</Text>
               </View>
               <TouchableOpacity
                 style={s.sheetClose}
@@ -618,7 +678,7 @@ export default function ProfileScreen() {
                 disabled={savingProfile}
               />
               <Button
-                label={sellerPreview ? 'Save locally' : 'Save changes'}
+                label="Save changes"
                 variant="primary"
                 loading={savingProfile}
                 style={s.saveButton}
@@ -663,6 +723,11 @@ const s = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: SP.sm },
   extrasStack: { gap: SP.md },
   quickRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md },
+  filterRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xs },
+  filterChip: { height: 30, borderRadius: 15, borderWidth: 1, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+  filterChipPressed: { opacity: 0.7 },
+  filterText: { fontFamily: FONT.semibold, fontSize: FS.xs },
+  shopPillWrap: { paddingTop: SP.sm, paddingBottom: SP.sm },
 
   // Profile editor sheet
   sheetModal:       { flex: 1, justifyContent: 'flex-end' },

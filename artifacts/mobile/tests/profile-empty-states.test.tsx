@@ -66,7 +66,7 @@ function barOccupied(bar: Case['bar']): number {
 
 describe('profile empty states — copy and CTAs', () => {
   it('gives your own tabs a CTA into the real flow and other people’s profiles none', () => {
-    expect(profileEmptyState('buyer:posts', true).cta).toEqual({ label: 'Post your first video', route: '/create-post?accountType=buyer' });
+    expect(profileEmptyState('buyer:posts', true).cta).toEqual({ label: 'Share your first thread', route: '/create-post?accountType=buyer' });
     expect(profileEmptyState('seller:post', true).cta).toEqual({ label: 'Create your first post', route: '/create-post' });
     expect(profileEmptyState('seller:draft', true).cta?.route).toBe('/create-post');
     expect(profileEmptyState('seller:schedule', true).cta).toEqual({ label: 'Schedule a post', route: '/create-post?mode=schedule' });

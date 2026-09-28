@@ -256,16 +256,24 @@ export interface ProfileTab {
  * 375pt phone without icons colliding into their labels. The active tab is
  * marked by an animated pill indicator that slides to whichever tab is
  * pressed, instead of each tab drawing its own static mark.
+ *
+ * `variant="iconOnly"` is Instagram's own-profile treatment: icons only (the
+ * label stays as the accessibility label) with a full-cell-width underline
+ * under the active tab. The default `labeled` look is unchanged for every
+ * other caller.
  */
 export function ProfileTabs({
   tabs,
   active,
   onChange,
+  variant = 'labeled',
 }: {
   tabs: ProfileTab[];
   active: string;
   onChange: (key: string) => void;
+  variant?: 'labeled' | 'iconOnly';
 }) {
+  const iconOnly = variant === 'iconOnly';
   const { theme } = useAppTheme();
   const [rowWidth, setRowWidth] = useState(0);
   const activeIndex = Math.max(tabs.findIndex((tab) => tab.key === active), 0);
@@ -276,11 +284,11 @@ export function ProfileTabs({
   }, [activeIndex, indicatorX]);
 
   const cellWidth = tabs.length > 0 ? rowWidth / tabs.length : 0;
-  const indicatorWidth = Math.max(0, Math.min(cellWidth - SP.md * 2, 64));
+  const indicatorWidth = iconOnly ? cellWidth : Math.max(0, Math.min(cellWidth - SP.md * 2, 64));
 
   return (
     <View
-      style={[styles.tabs, { borderColor: theme.border, backgroundColor: theme.background }]}
+      style={[styles.tabs, iconOnly && styles.tabsFlush, { borderColor: theme.border, backgroundColor: theme.background }]}
       accessibilityRole="tablist"
       onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
     >
@@ -290,7 +298,7 @@ export function ProfileTabs({
         return (
           <View key={tab.key} style={styles.flexCell}>
             <PressableScale
-              style={styles.tab}
+              style={iconOnly ? styles.tabIconOnly : styles.tab}
               onPress={() => { hapticSelection(); onChange(tab.key); }}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
@@ -300,10 +308,12 @@ export function ProfileTabs({
               {(state) => (
                 <>
                   <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
-                  <Feather name={tab.icon} size={22} color={color} />
-                  <Text style={[styles.tabLabel, { color }, selected && styles.tabLabelActive]} numberOfLines={1}>
-                    {tab.label}{typeof tab.count === 'number' && tab.count > 0 ? ` ${tab.count}` : ''}
-                  </Text>
+                  <Feather name={tab.icon} size={iconOnly ? 24 : 22} color={color} />
+                  {iconOnly ? null : (
+                    <Text style={[styles.tabLabel, { color }, selected && styles.tabLabelActive]} numberOfLines={1}>
+                      {tab.label}{typeof tab.count === 'number' && tab.count > 0 ? ` ${tab.count}` : ''}
+                    </Text>
+                  )}
                 </>
               )}
             </PressableScale>
@@ -315,9 +325,10 @@ export function ProfileTabs({
           pointerEvents="none"
           style={[
             styles.tabIndicator,
+            iconOnly && styles.tabIndicatorFlat,
             {
               width: indicatorWidth,
-              backgroundColor: theme.accent,
+              backgroundColor: iconOnly ? theme.text : theme.accent,
               transform: [
                 {
                   translateX: indicatorX.interpolate({
@@ -487,6 +498,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.xs, position: 'relative',
   },
   tab: { minHeight: 60, alignItems: 'center', justifyContent: 'flex-end', gap: 5, paddingTop: SP.sm, paddingBottom: SP.sm, paddingHorizontal: 2 },
+  tabsFlush: { paddingHorizontal: 0 },
+  tabIconOnly: { height: 44, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  tabIndicatorFlat: { height: 1.5, borderRadius: 0 },
   tabLabel: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },
   tabLabelActive: { fontFamily: FONT.bold },
   tabIndicator: { position: 'absolute', bottom: -StyleSheet.hairlineWidth, left: 0, height: 2, borderRadius: 1 },

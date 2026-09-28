@@ -3,7 +3,7 @@
  *
  * POST   /api/social/follow              — follow a buyer   { userId }
  * DELETE /api/social/follow/:userId      — unfollow
- * GET    /api/social/following           — users I follow
+ * GET    /api/social/following           — users I follow (?sort=default|latest|earliest)
  * GET    /api/social/followers           — users who follow me (isFollowingBack flag)
  * GET    /api/social/status/:userId      — { isFollowing, isFollowedBy, isMutual }
  * GET    /api/social/profile/:userId     — public buyer profile + follow counts
@@ -32,6 +32,7 @@ import {
 import { actorFieldsFromProfile, notifyStoryLike } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+import { followingSortDirection } from "../lib/followingSort";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -614,9 +615,22 @@ async function viewerFollowsSet(myId: string, ids: string[]): Promise<Set<string
   return new Set(rows.map(r => r.followingId));
 }
 
+/** Which of `ids` follow `userId` — used for the "Follows you" mutual tag. */
+async function followersOfSet(userId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await db
+    .select({ followerId: follows.followerId })
+    .from(follows)
+    .where(and(eq(follows.followingId, userId), inArray(follows.followerId, ids)));
+  return new Set(rows.map(r => r.followerId));
+}
+
 // ─── GET /api/social/following ────────────────────────────────────────────────
 // Query params: ?userId=&limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
 // Without userId the list is the viewer's own.
+// ?sort= "default" (recently-followed first, same as before) | "latest"
+// (alias of default) | "earliest" (oldest follow first) — the Following
+// list's "Sort by" bottom sheet (Mobbin: Instagram's own Following list).
 router.get("/following", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const page = parsePagination(req.query, { limit: 100 });
@@ -624,10 +638,12 @@ router.get("/following", async (req, res) => {
   const ownerId = await resolveListOwner(req, res, myId);
   if (!ownerId) return;
   const { limit, offset } = page.data;
+  const direction = followingSortDirection(req.query.sort);
+  const orderClause = direction === "asc" ? asc(follows.createdAt) : desc(follows.createdAt);
   const rows = await db
     .select({ followingId: follows.followingId, createdAt: follows.createdAt })
     .from(follows).where(eq(follows.followerId, ownerId))
-    .orderBy(desc(follows.createdAt))
+    .orderBy(orderClause)
     .limit(limit).offset(offset);
   setPaginationHeaders(res, page.data, rows.length);
   if (!rows.length) { res.json([]); return; }
@@ -636,6 +652,9 @@ router.get("/following", async (req, res) => {
   const userRows = await db.select().from(users).where(inArray(users.clerkId, ids));
   const byId     = Object.fromEntries(userRows.map(u => [u.clerkId, u]));
   const iFollow  = ownerId === myId ? new Set(ids) : await viewerFollowsSet(myId, ids);
+  // Mutuals ("Follows you" tag): only meaningful on the viewer's own
+  // Following list — who among the people I follow also follows me back.
+  const followsMeSet = ownerId === myId ? await followersOfSet(myId, ids) : new Set<string>();
 
   res.json(rows.map(r => ({
     ...(byId[r.followingId] ? formatUser(byId[r.followingId]) : {
@@ -645,6 +664,7 @@ router.get("/following", async (req, res) => {
     }),
     followedAt: r.createdAt,
     isFollowing: iFollow.has(r.followingId),
+    followsMe: followsMeSet.has(r.followingId),
   })));
 });
 

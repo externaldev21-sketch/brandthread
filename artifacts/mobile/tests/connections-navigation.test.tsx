@@ -67,8 +67,24 @@ vi.mock('@/components/BrandthreadUI', () => {
       'Pressable', rest, typeof children === 'function' ? children({ pressed: false }) : children,
     ),
     EmptyState: ({ title }: { title: string }) => ReactActual.createElement('Text', null, title),
+    SearchBar: (props: any) => React.createElement('TextInput', props),
   };
 });
+vi.mock('@/components/ui/ActionSheet', () => ({ showActionSheet: vi.fn() }));
+vi.mock('@/components/ui/OptionSheet', () => ({
+  OptionSheet: () => React.createElement('View', { testID: 'sort-sheet' }),
+}));
+vi.mock('@/components/social/RemoveFollowerSheet', () => ({
+  RemoveFollowerSheet: () => React.createElement('View', { testID: 'remove-follower-sheet' }),
+}));
+vi.mock('@/components/social/CenteredToast', () => ({
+  CenteredToast: () => null,
+}));
+vi.mock('@/services/socialService', () => ({
+  setSellerFollowing: vi.fn().mockResolvedValue(undefined),
+  removeFollower: vi.fn().mockResolvedValue({ followersCount: 0 }),
+}));
+vi.mock('@/lib/haptics', () => ({ hapticDestructiveConfirm: vi.fn() }));
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
@@ -114,6 +130,7 @@ describe('connections list', () => {
   it("loads the viewed profile's followers, not the viewer's", async () => {
     renderer = await renderScreen();
     expect(apiMock.social.followers).toHaveBeenCalledWith('user_seller');
+    expect(apiMock.social.following).toHaveBeenCalledWith('user_seller', 'default');
   });
 
   it('opens a buyer row on the buyer profile (with the userId param) and a seller row on the brand profile', async () => {
@@ -127,7 +144,8 @@ describe('connections list', () => {
   it("loads the viewer's own list when no userId is given", async () => {
     paramsMock.mockReturnValue({ type: 'following', userId: undefined });
     renderer = await renderScreen();
-    expect(apiMock.social.following).toHaveBeenCalledWith(undefined);
+    expect(apiMock.social.following).toHaveBeenCalledWith(undefined, 'default');
+    expect(apiMock.social.followers).toHaveBeenCalledWith(undefined);
   });
 
   it('shows ErrorState with Retry instead of an endless spinner when the list fails', async () => {
