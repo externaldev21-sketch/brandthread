@@ -1912,12 +1912,16 @@ export default function FeedScreen({
   // 24pt) never crowd the absolutely-centered tabs — see the PR description
   // for the exact per-width math this was sized against.
   const topRowIconGap = windowWidth < 380 ? 12 : 14;
-  const buyerBarInset = useBuyerTabBarInset();
+  // The feed is the buyer Home tab, always shown with the tab bar's compact
+  // (Instagram iOS 26-style) sizing — see BuyerTabBar/buyerTabBarMetrics —
+  // so its own layout math uses the compact inset, not the regular one every
+  // other buyer screen still gets.
+  const buyerBarInset = useBuyerTabBarInset('compact');
   // Distinct from `buyerBarInset` above (which pads ordinary chrome with
   // extra breathing room) — this is the tab bar's own top pixel, the exact
   // "line" the immersive video frame stops at. See videoFrameInset's doc
   // comment on SpotlightPageImpl for why the two must stay separate.
-  const buyerBarTopInset = useBuyerTabBarTopInset();
+  const buyerBarTopInset = useBuyerTabBarTopInset('compact');
   const router = useRouter();
   const { userId } = useAuth();
   const { push } = useThreadPull();

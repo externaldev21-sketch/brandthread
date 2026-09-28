@@ -90,6 +90,15 @@ export function Button({
   const { scale, pressed, onPressIn, onPressOut } = usePressScale();
   const isDisabled = disabled || loading;
   const height = size === 'compact' ? 36 : size === 'small' ? COMP.buttonHSm : COMP.buttonH;
+  // Label size scales with the button size — it used to stay fixed at
+  // TYPE_SCALE.headline (17px) for every size, which read oversized on a
+  // 36pt 'compact' button (Instagram's own-profile buttons are ~13-14pt
+  // semibold on ~32-34pt buttons).
+  const labelType = size === 'compact'
+    ? { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold }
+    : size === 'small'
+      ? { fontSize: 15, lineHeight: 20, fontFamily: FONT.semibold }
+      : TYPE_SCALE.headline;
 
   const handlePress = (event: GestureResponderEvent) => {
     if (isDisabled) return;
@@ -156,11 +165,11 @@ export function Button({
           <ActivityIndicator color={variantStyle.fg} size="small" />
         ) : (
           <>
-            {icon && <Feather name={icon} size={18} color={variantStyle.fg} />}
+            {icon && <Feather name={icon} size={size === 'compact' ? 16 : 18} color={variantStyle.fg} />}
             {/* An icon-only button passes label="" (with an accessibilityLabel)
                 — no empty Text, so the icon sits dead centre. */}
             {label ? (
-              <Text style={[styles.label, TYPE_SCALE.headline, { color: variantStyle.fg }]} numberOfLines={1}>
+              <Text style={[styles.label, labelType, { color: variantStyle.fg }]} numberOfLines={1}>
                 {label}
               </Text>
             ) : null}

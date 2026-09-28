@@ -9,9 +9,10 @@
  * list rows: Theme, Nicknames, Disappearing messages, Privacy & safety,
  * Create a group chat, Something isn't working.
  *
- * Theme and Disappearing messages are intentionally UI stubs here — PR 3
- * implements their real behavior (theme picker/apply, real
- * disappear-after-seen logic). Every other row is fully functional.
+ * Theme and Disappearing messages: Theme is fully wired (bottom-sheet grid →
+ * full-screen preview → apply, PR 3); Disappearing messages toggles a real
+ * server-persisted flag with a minimal "opportunistic sweep" auto-delete
+ * (see docs/dm-flows.md) rather than a real-time push-based one.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Switch, Alert, Modal, Platform } from 'react-native';
@@ -23,11 +24,17 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { SheetRise } from '@/components/motion/SheetRise';
-import { hapticPrimaryAction, hapticSelection, hapticToggle } from '@/lib/haptics';
+import { ThemePickerSheet } from '@/components/chat/ThemePickerSheet';
+import { ThemePreviewScreen } from '@/components/chat/ThemePreviewScreen';
+import { CONVERSATION_THEMES, getConversationTheme } from '@/lib/conversationThemes';
+import { hapticPrimaryAction, hapticSelection, hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { reportHref, confirmBlock, confirmUnblock, apiErrorMessage } from '@/lib/safety';
 import { useApi } from '@/lib/api';
-import { isPreviewConversationId, getPreviewConversation } from '@/lib/previewInbox';
-import { muteConversation } from '@/services/socialService';
+import {
+  isPreviewConversationId, getPreviewConversation,
+  setPreviewConversationTheme, setPreviewConversationDisappearing, appendPreviewMessage,
+} from '@/lib/previewInbox';
+import { muteConversation, setConversationTheme, setConversationDisappearing } from '@/services/socialService';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type MuteOption = { label: string; minutes: number | null };
@@ -46,7 +53,7 @@ export default function ConversationDetailsScreen() {
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{
-    id: string; role?: string; isBlocked?: string;
+    id: string; role?: string; isBlocked?: string; openTheme?: string;
     participantUserId?: string; participantName?: string; participantHandle?: string;
     participantInitials?: string; participantColor?: string; participantAvatarUri?: string;
     participantNickname?: string;
@@ -54,6 +61,10 @@ export default function ConversationDetailsScreen() {
 
   const [muteVisible, setMuteVisible] = useState(false);
   const [mutedUntil, setMutedUntil] = useState<string | null>(null);
+  const [themeId, setThemeId] = useState<string | null>(null);
+  const [themePickerVisible, setThemePickerVisible] = useState(params.openTheme === '1');
+  const [previewThemeId, setPreviewThemeId] = useState<string | null>(null);
+  const [applyingTheme, setApplyingTheme] = useState(false);
   const [disappearing, setDisappearing] = useState(false);
   const [isBlocked, setIsBlocked] = useState(params.isBlocked === '1');
   const [busy, setBusy] = useState(false);
@@ -66,13 +77,23 @@ export default function ConversationDetailsScreen() {
     (async () => {
       if (isPreview) {
         const conv = getPreviewConversation(params.id);
-        if (!cancelled) setMutedUntil(conv?.mutedUntil ?? null);
+        if (!cancelled) {
+          setMutedUntil(conv?.mutedUntil ?? null);
+          setThemeId(conv?.themeId ?? null);
+          setDisappearing(!!conv?.disappearingEnabled);
+        }
         return;
       }
       try {
-        const conv = await api.conversations.get(params.id);
-        if (!cancelled) setMutedUntil((conv as { mutedUntil?: string })?.mutedUntil ?? null);
-      } catch { /* best-effort — mute row just reads as "Off" */ }
+        const conv = await api.conversations.get(params.id) as {
+          mutedUntil?: string; themeId?: string | null; disappearingEnabled?: boolean;
+        };
+        if (!cancelled) {
+          setMutedUntil(conv?.mutedUntil ?? null);
+          setThemeId(conv?.themeId ?? null);
+          setDisappearing(!!conv?.disappearingEnabled);
+        }
+      } catch { /* best-effort — rows just read as "Off"/Default */ }
     })();
     return () => { cancelled = true; };
   }, [params.id, isPreview, api]);
@@ -115,6 +136,52 @@ export default function ConversationDetailsScreen() {
       Alert.alert('Couldn’t update mute', apiErrorMessage(e, 'Please try again.'));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function commitTheme(nextThemeId: string | null) {
+    setApplyingTheme(true);
+    try {
+      if (isPreview) {
+        setPreviewConversationTheme(params.id, nextThemeId);
+        appendPreviewMessage(params.id, {
+          id: `local-theme-${Date.now()}`, conversationId: params.id,
+          fromId: 'me', fromName: 'You', fromInitials: 'Y', fromColor: theme.accent,
+          text: '', attachment: { type: 'system', title: 'theme_changed', meta: { themeId: nextThemeId ?? '' } },
+          reactions: [], status: 'sent', ts: Date.now(), deletedForMe: false,
+        });
+      } else {
+        await setConversationTheme(params.id, nextThemeId);
+      }
+      setThemeId(nextThemeId);
+      hapticSuccessAction();
+      setPreviewThemeId(null);
+      setThemePickerVisible(false);
+    } catch (e) {
+      Alert.alert('Couldn’t apply theme', apiErrorMessage(e, 'Please try again.'));
+    } finally {
+      setApplyingTheme(false);
+    }
+  }
+
+  async function toggleDisappearing(next: boolean) {
+    hapticToggle();
+    setDisappearing(next);
+    try {
+      if (isPreview) {
+        setPreviewConversationDisappearing(params.id, next);
+        appendPreviewMessage(params.id, {
+          id: `local-disappearing-${Date.now()}`, conversationId: params.id,
+          fromId: 'me', fromName: 'You', fromInitials: 'Y', fromColor: theme.accent,
+          text: '', attachment: { type: 'system', title: next ? 'disappearing_on' : 'disappearing_off', meta: {} },
+          reactions: [], status: 'sent', ts: Date.now(), deletedForMe: false,
+        });
+      } else {
+        await setConversationDisappearing(params.id, next);
+      }
+    } catch (e) {
+      setDisappearing(!next);
+      Alert.alert('Couldn’t update disappearing messages', apiErrorMessage(e, 'Please try again.'));
     }
   }
 
@@ -223,9 +290,9 @@ export default function ConversationDetailsScreen() {
           <ListRow
             icon="droplet" theme={theme}
             title="Theme"
-            subtitle="Default"
+            subtitle={getConversationTheme(themeId)?.name ?? 'Default'}
             pill="New"
-            onPress={() => { hapticSelection(); Alert.alert('Themes', 'Chat themes are coming in the next update.'); }}
+            onPress={() => { hapticSelection(); setThemePickerVisible(true); }}
             testID="chat-details-row-theme"
           />
           <ListRow
@@ -241,7 +308,7 @@ export default function ConversationDetailsScreen() {
             right={(
               <Switch
                 value={disappearing}
-                onValueChange={(v) => { hapticToggle(); setDisappearing(v); }}
+                onValueChange={toggleDisappearing}
                 trackColor={{ false: theme.border, true: theme.accent }}
                 thumbColor={theme.onAccent}
                 testID="chat-details-disappearing-switch"
@@ -288,6 +355,24 @@ export default function ConversationDetailsScreen() {
           ))}
         </SheetRise>
       </Modal>
+
+      <ThemePickerSheet
+        visible={themePickerVisible}
+        theme={theme}
+        currentThemeId={themeId}
+        bottomInset={insets.bottom}
+        onClose={() => setThemePickerVisible(false)}
+        onPickDefault={() => commitTheme(null)}
+        onPickTheme={(id) => setPreviewThemeId(id)}
+      />
+      <ThemePreviewScreen
+        visible={!!previewThemeId}
+        theme={theme}
+        candidate={CONVERSATION_THEMES.find((t) => t.id === previewThemeId) ?? null}
+        applying={applyingTheme}
+        onCancel={() => setPreviewThemeId(null)}
+        onApply={() => previewThemeId && commitTheme(previewThemeId)}
+      />
     </View>
   );
 }

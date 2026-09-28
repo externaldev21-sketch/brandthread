@@ -1301,13 +1301,13 @@ export default function InboxScreen() {
               )}
             </View>
             <PressableScale
+              style={s.searchCancelPressable}
               onPress={cancelMessagesSearch}
               rippleEnabled={NO_RIPPLE}
               accessibilityRole="button"
               accessibilityLabel="Cancel search"
               testID="inbox-search-cancel"
               hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-              style={s.searchCancelBtn}
             >
               <Text style={[s.searchCancelText, { color: theme.text }]}>Cancel</Text>
             </PressableScale>
@@ -1802,13 +1802,12 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     flex: 1,
     marginBottom: 0,
   },
-  // Explicit height matching searchRow's own 44 + justifyContent: 'center'
-  // rather than relying on the parent row's alignItems: 'center' alone —
-  // that centers this Pressable's own box against the search field's box,
-  // but doesn't reliably center the Text node's line-height box inside a
-  // sibling View's box the same way, which left "Cancel" sitting a few px
-  // above the field's true vertical center.
-  searchCancelBtn: {
+  // Explicit height + centered content, matching searchRowInHeader's own
+  // 44pt box, rather than leaning on the parent row's alignItems: 'center'
+  // — a Text node's line-height/font-metric box doesn't always center the
+  // same way a sibling View's cross-axis size does, which read as Cancel
+  // sitting a few px above the field's true vertical center.
+  searchCancelPressable: {
     height: 44,
     justifyContent: 'center',
   },
@@ -1822,6 +1821,11 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     fontFamily: FONT.regular,
     height: 40,
   },
+  // The web <input> underneath RNW's TextInput otherwise keeps the browser's
+  // own default focus ring (a thick amber/orange outline) on top of our
+  // themed border — suppressed here the same way buyer-search.tsx does for
+  // its own web text fields.
+  searchInputWebNoOutline: { outlineStyle: 'none', outlineWidth: 0 } as any,
   // minWidth: 0 is required for a flex:1 row to actually truncate its text
   // instead of growing past its share and pushing convTrailing off-row —
   // React Native (like web flexbox) defaults a flex item's min-width to its

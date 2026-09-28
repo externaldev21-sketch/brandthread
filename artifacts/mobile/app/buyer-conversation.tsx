@@ -13,13 +13,14 @@ import { CachedImage } from '@/components/CachedImage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { Chip } from '@/components/ui/Chip';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm } from '@/lib/haptics';
+import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm, hapticToggle } from '@/lib/haptics';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   getConversation, createOrGetConversation, getMessages,
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
   markConversationRead, subscribeSocial,
+  setConversationTheme, setConversationDisappearing,
   MY_USER_ID, MY_NAME, MY_INITIALS,
 } from '@/services/socialService';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
@@ -58,8 +59,12 @@ import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 import {
   ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
 } from '@/components/chat/ReactionBar';
+import { SystemLine } from '@/components/chat/SystemLine';
+import { getConversationTheme } from '@/lib/conversationThemes';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   isPreviewConversationId, getPreviewConversation, getPreviewMessages,
+  setPreviewConversationDisappearing, appendPreviewMessage,
 } from '@/lib/previewInbox';
 import {
   parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed,
@@ -537,6 +542,14 @@ export default function BuyerConversationScreen() {
   // everywhere this screen shows the counterpart — header, request-mode
   // profile header, media-sheet copy, etc.
   const displayName = participant?.nickname || participant?.name || params.participantName || 'Unknown';
+  // Chat details > Theme: a conversation-level property — same background
+  // and bubble colors for both participants. Null = Brandthread's existing
+  // default monochrome look, completely unchanged.
+  const convTheme = getConversationTheme(conv?.themeId);
+  const sentBubbleColor = convTheme?.sentBubble ?? theme.accent;
+  const sentTextColor = convTheme?.sentText ?? theme.onAccent;
+  const receivedBubbleColor = convTheme?.receivedBubble ?? theme.cardElevated;
+  const receivedTextColor = convTheme?.receivedText ?? theme.text;
   const isDisabled = conv?.isFriendshipActive === false;
   // Request mode (Instagram-style): the composer is hidden and replaced with
   // the accept/block/delete bottom panel below until the recipient accepts.
@@ -668,6 +681,23 @@ export default function BuyerConversationScreen() {
 
   // ── Other-participant profile ─────────────────────────────────────────────────
 
+  // Still referenced elsewhere (e.g. avatar taps) as a direct link straight
+  // to their profile, distinct from openChatDetails() below (chat details,
+  // reached via the header tap once a conversation is no longer a pending
+  // request). #220 moved the request-mode "View profile" pill itself to a
+  // direct router.push to /seller-profile — see the pill's onPress below.
+  function openParticipantProfile() {
+    if (!participant) return;
+    const qs = new URLSearchParams({
+      userId: participant.userId,
+      name: participant.name,
+      handle: participant.handle,
+      initials: participant.initials,
+      color: participant.color,
+    });
+    router.push(('/buyer-other-profile?' + qs.toString()) as never);
+  }
+
   // ── Chat details ───────────────────────────────────────────────────────────────
 
   function openChatDetails() {
@@ -684,6 +714,50 @@ export default function BuyerConversationScreen() {
       participantNickname: participant.nickname ?? '',
     });
     router.push(('/conversation-details?' + qs.toString()) as never);
+  }
+
+  // Theme system line's "Change" — reopens the picker directly (Instagram's
+  // own behavior), rather than just returning to chat details.
+  function openThemePicker() {
+    if (!conv || !participant) return;
+    const qs = new URLSearchParams({
+      id: conv.id, role: 'buyer', openTheme: '1',
+      participantUserId: participant.userId,
+      participantName: participant.name,
+      participantInitials: participant.initials ?? '',
+      participantColor: participant.color ?? '#8B5CF6',
+      participantAvatarUri: participant.avatarUri ?? '',
+    });
+    router.push(('/conversation-details?' + qs.toString()) as never);
+  }
+
+  // Disappearing-messages system line's "Change"/"Turn on" — a direct
+  // quick-toggle (per the task's own brief), not a navigation.
+  async function handleQuickToggleDisappearing() {
+    if (!conv) return;
+    const next = !conv.disappearingEnabled;
+    hapticToggle();
+    try {
+      if (isPreviewConversationId(conv.id)) {
+        const localMsg: Message = {
+          id: `local-disappearing-${Date.now()}`, conversationId: conv.id,
+          fromId: myId, fromName: 'You', fromInitials: 'Y', fromColor: theme.accent,
+          text: '', attachment: { type: 'system', title: next ? 'disappearing_on' : 'disappearing_off', meta: { actorId: myId } },
+          reactions: [], status: 'sent', ts: Date.now(), deletedForMe: false,
+        };
+        setPreviewConversationDisappearing(conv.id, next);
+        appendPreviewMessage(conv.id, localMsg);
+        setConv({ ...conv, disappearingEnabled: next });
+        setMessages((prev) => [...prev, localMsg]);
+      } else {
+        const { message } = await setConversationDisappearing(conv.id, next);
+        setConv({ ...conv, disappearingEnabled: next });
+        setMessages((prev) => [...prev, message]);
+      }
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch (e) {
+      Alert.alert('Couldn’t update disappearing messages', apiErrorMessage(e, 'Please try again.'));
+    }
   }
 
   // ── Request mode: accept / delete / block ───────────────────────────────────
@@ -1311,6 +1385,21 @@ export default function BuyerConversationScreen() {
     const { msg, isFirstInGroup, isLastInGroup } = item;
     const isOwn = msg.fromId === myId || msg.fromId === MY_USER_ID;
 
+    // Chat details > Theme / Disappearing messages: a centered system line,
+    // not a bubble — "You changed the theme to [Name]. Change" / "You turned
+    // on/off disappearing messages. Change"/"Turn on".
+    if (msg.attachment?.type === 'system') {
+      return (
+        <SystemLine
+          msg={msg}
+          isOwn={isOwn}
+          theme={theme}
+          onOpenThemePicker={openThemePicker}
+          onQuickToggleDisappearing={handleQuickToggleDisappearing}
+        />
+      );
+    }
+
     // Group reactions by kind for the chip summary under the bubble.
     const grouped = new Map<ReactionType, number>();
     for (const r of msg.reactions) {
@@ -1387,8 +1476,8 @@ export default function BuyerConversationScreen() {
           {msg.text ? (
             <View style={{ flexDirection: 'row', justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: 4 }}>
               <View style={{ maxWidth: BUBBLE_MAX }}>
-                <View style={[s.bubble, { backgroundColor: isOwn ? theme.accent : theme.cardElevated, alignSelf: isOwn ? 'flex-end' : 'flex-start' }]}>
-                  <Text style={[s.msgText, { color: isOwn ? theme.onAccent : theme.text }]}>{msg.text}</Text>
+                <View style={[s.bubble, { backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor, alignSelf: isOwn ? 'flex-end' : 'flex-start' }]}>
+                  <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
                 </View>
               </View>
             </View>
@@ -1435,8 +1524,8 @@ export default function BuyerConversationScreen() {
           {msg.text ? (
             <View style={{ flexDirection: 'row', justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: 4 }}>
               <View style={{ maxWidth: BUBBLE_MAX }}>
-                <View style={[s.bubble, { backgroundColor: isOwn ? theme.accent : theme.cardElevated, alignSelf: isOwn ? 'flex-end' : 'flex-start' }]}>
-                  <Text style={[s.msgText, { color: isOwn ? theme.onAccent : theme.text }]}>{msg.text}</Text>
+                <View style={[s.bubble, { backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor, alignSelf: isOwn ? 'flex-end' : 'flex-start' }]}>
+                  <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
                 </View>
               </View>
             </View>
@@ -1485,7 +1574,7 @@ export default function BuyerConversationScreen() {
             style={[
               s.bubble,
               {
-                backgroundColor: isOwn ? theme.accent : theme.cardElevated,
+                backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor,
                 // IG-style grouping: the corner touching an adjacent bubble
                 // in the same group (same side as the avatar column) is
                 // reduced to 6pt; every outer corner stays the full 18pt.
@@ -1516,7 +1605,7 @@ export default function BuyerConversationScreen() {
 
             {/* Text */}
             {msg.text ? (
-              <Text style={[s.msgText, { color: isOwn ? theme.onAccent : theme.text }]}>{msg.text}</Text>
+              <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
             ) : null}
 
             {/* Inline bottom-right timestamp + read receipt (last bubble of a run) */}
@@ -1620,6 +1709,17 @@ export default function BuyerConversationScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
+      {/* Chat details > Theme: the conversation's background, behind
+          everything else, only when a theme is actually applied — an
+          un-themed chat's background is untouched (s.root's own theme.background). */}
+      {convTheme && (
+        <LinearGradient
+          colors={convTheme.gradient}
+          style={StyleSheet.absoluteFill}
+          testID="conversation-theme-background"
+        />
+      )}
+
       {/* Plain flat header — no card, no pill, no background decoration.
           Sits directly on the theme background with a hairline border
           underneath instead of a floating "glass" card. */}
@@ -1736,7 +1836,10 @@ export default function BuyerConversationScreen() {
           <PressableScale
             rippleEnabled={false}
             style={s.requestProfilePill}
-            onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
+            onPress={() => {
+              hapticPrimaryAction();
+              if (participant) router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
+            }}
             accessibilityRole="button"
             accessibilityLabel={`View ${participant.name}'s profile`}
             testID="conversation-request-view-profile"

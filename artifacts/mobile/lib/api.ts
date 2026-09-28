@@ -1465,6 +1465,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Chat details > Nicknames. An empty nickname clears it. */
       setNickname: (id: string, targetUserId: string, nickname: string) =>
         patch<{ ok: boolean; nickname: string | null }>(`/api/conversations/${encodeURIComponent(id)}/nickname`, { targetUserId, nickname }),
+      /** Chat details > Theme. null resets to the default monochrome look. */
+      setTheme: (id: string, themeId: string | null) =>
+        patch<{ ok: boolean; themeId: string | null; message: any }>(`/api/conversations/${encodeURIComponent(id)}/theme`, { themeId }),
+      /** Chat details > Disappearing messages. */
+      setDisappearing: (id: string, enabled: boolean) =>
+        patch<{ ok: boolean; disappearingEnabled: boolean; message: any }>(`/api/conversations/${encodeURIComponent(id)}/disappearing`, { enabled }),
       send:       (id: string, body: { text: string; attachment?: any; replyToId?: string }) =>
         post<any>(`/api/conversations/${encodeURIComponent(id)}/messages`, body),
       markRead:   (id: string) =>
@@ -1609,6 +1615,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/public/search/recent?limit=${encodeURIComponent(String(limit))}`
         ),
       clearRecent: () => del<{ ok: boolean }>('/api/public/search/recent'),
+      /** Remove a single term from this buyer's recent searches. */
+      removeRecent: (term: string) => del<{ ok: boolean }>(`/api/public/search/recent/${encodeURIComponent(term)}`),
+      /** Record an explicitly-submitted search — NOT called for the
+       *  live-as-you-type suggestion fetches (see the route's own comment on
+       *  why: this is what keeps /search/recent free of keystroke junk). */
+      log: (query: string) => post<{ ok: boolean }>('/api/public/search/log', { query }),
       /** Suggested brands + products for the search empty state. */
       suggested: (limit = 6) =>
         get<{

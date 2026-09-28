@@ -25,6 +25,34 @@ export const TAB_SLOT_COUNT = BUYER_TAB_SLOT_COUNT;
 
 export type BuyerTabBarSizeClass = 'mini' | 'compact' | 'regular' | 'large' | 'tablet';
 
+/**
+ * Bar display mode — separate from `BuyerTabBarSizeClass` above (which
+ * classifies the *device's* width). `regular` is the bar exactly as shipped
+ * in #210/#212 on every screen. `compact` is the Instagram iOS 26-style
+ * condensed capsule shown only over the buyer feed's full-bleed video (see
+ * BuyerTabBar): both the capsule and the separate Profile circle shrink and
+ * are pulled closer together, matching the spirit of Instagram's single
+ * compact capsule within this app's two-piece (capsule + circle) layout.
+ */
+export type BuyerTabBarMode = 'regular' | 'compact';
+
+// Instagram iOS 26's own reels-tab capsule measures ~42pt tall vs. ~51pt tall
+// on every other tab, and ~75% vs ~90% of screen width — a ~0.82-0.83 scale
+// in both height and width. This app's layout differs (a capsule *plus* a
+// separate side circle, not one merged shape), so rather than copying exact
+// point values these ratios are applied to whatever this device's own
+// regular-mode numbers already are, and the gap between the capsule and the
+// circle is pulled in further so the pair still reads as one compact unit.
+const COMPACT_HEIGHT_SCALE = 42 / 51;
+const COMPACT_WIDTH_SCALE = 75 / 90;
+const COMPACT_GAP_SCALE = 0.5;
+/** Icons shrink less than the capsule itself ("slightly smaller", not tiny). */
+export const COMPACT_ICON_SCALE = 0.88;
+/** Stroke-width compensation so a smaller icon keeps the same visual weight
+ *  instead of reading thin — applied to the icon's authored stroke width,
+ *  independent of the animated size-scale transform above. */
+export const COMPACT_ICON_STROKE_SCALE = 1 / COMPACT_ICON_SCALE;
+
 export type BuyerTabBarMetrics = {
   sizeClass: BuyerTabBarSizeClass;
   isTablet: boolean;
@@ -76,6 +104,9 @@ type MetricsInput = {
   bottomInset: number;
   /** Circles beside the capsule: buyer has Profile (1), seller has Studio + AI (2). */
   sideCircleCount?: number;
+  /** 'regular' (default) — pixel-identical to #210/#212. 'compact' condenses
+   *  the capsule + circle for a full-bleed video tab (see BuyerTabBarMode). */
+  mode?: BuyerTabBarMode;
 };
 
 const CONTENT_CLEARANCE = 12;
@@ -84,7 +115,7 @@ const PHONE_SIDE_MARGIN = 16;
 /** iPad keeps a comfortable, centred bar instead of stretching across a huge screen. */
 const TABLET_MAX_BAR_WIDTH = 560;
 
-export function getBuyerTabBarMetrics({ width, height, bottomInset, sideCircleCount = 1 }: MetricsInput): BuyerTabBarMetrics {
+export function getBuyerTabBarMetrics({ width, height, bottomInset, sideCircleCount = 1, mode = 'regular' }: MetricsInput): BuyerTabBarMetrics {
   const shortestSide = Math.min(width, height);
   // Split-view iPads narrower than a phone keep phone proportions.
   const isTablet = shortestSide >= 600 && width >= 600;
@@ -124,7 +155,7 @@ export function getBuyerTabBarMetrics({ width, height, bottomInset, sideCircleCo
     ? Math.max(bottomInset, 20)
     : Math.max(bottomInset - 10, 12);
 
-  return {
+  const regular: BuyerTabBarMetrics = {
     sizeClass,
     isTablet,
     itemWidth,
@@ -145,14 +176,46 @@ export function getBuyerTabBarMetrics({ width, height, bottomInset, sideCircleCo
     occupiedHeight: bottomOffset + capsuleHeight + CONTENT_CLEARANCE,
     barTopInset: bottomOffset + capsuleHeight,
   };
+
+  return mode === 'compact' ? applyCompactMode(regular) : regular;
+}
+
+/**
+ * Condenses a regular-mode metrics object into the compact, Instagram
+ * iOS 26-style capsule shown over the buyer feed's full-bleed video. Derived
+ * from the regular metrics (not recomputed from scratch) so it can never
+ * drift from whatever this device's own regular sizing already is.
+ */
+function applyCompactMode(regular: BuyerTabBarMetrics): BuyerTabBarMetrics {
+  const capsuleHeight = regular.capsuleHeight * COMPACT_HEIGHT_SCALE;
+  const circleSize = capsuleHeight;
+  const gap = regular.gap * COMPACT_GAP_SCALE;
+  const capsuleWidth = regular.capsuleWidth * COMPACT_WIDTH_SCALE;
+  const itemWidth = (capsuleWidth - regular.capsulePadding * 2) / BUYER_TAB_SLOT_COUNT;
+  const indicatorHeight = capsuleHeight - regular.capsulePadding * 2;
+  const indicatorWidth = Math.min(itemWidth - 8, 64 * COMPACT_HEIGHT_SCALE);
+  const barTopInset = regular.bottomOffset + capsuleHeight;
+
+  return {
+    ...regular,
+    capsuleHeight,
+    capsuleWidth,
+    circleSize,
+    gap,
+    itemWidth,
+    indicatorWidth,
+    indicatorHeight,
+    barTopInset,
+    occupiedHeight: regular.bottomOffset + capsuleHeight + CONTENT_CLEARANCE,
+  };
 }
 
 export const getTabBarMetrics = getBuyerTabBarMetrics;
 
-export function useBuyerTabBarMetrics(sideCircleCount = 1): BuyerTabBarMetrics {
+export function useBuyerTabBarMetrics(sideCircleCount = 1, mode: BuyerTabBarMode = 'regular'): BuyerTabBarMetrics {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  return getBuyerTabBarMetrics({ width, height, bottomInset: insets.bottom, sideCircleCount });
+  return getBuyerTabBarMetrics({ width, height, bottomInset: insets.bottom, sideCircleCount, mode });
 }
 
 export const useTabBarMetrics = useBuyerTabBarMetrics;
@@ -160,10 +223,12 @@ export const useTabBarMetrics = useBuyerTabBarMetrics;
 /**
  * Bottom padding for any buyer screen that renders behind the floating bar.
  * Use it for scroll content `paddingBottom` and for bottom-anchored overlays so
- * nothing is hidden under the bar or the home indicator.
+ * nothing is hidden under the bar or the home indicator. Defaults to
+ * 'regular' — every existing call site keeps its exact pre-compact-mode
+ * value; only the feed screen (always shown in compact mode) passes 'compact'.
  */
-export function useBuyerTabBarInset(): number {
-  return useBuyerTabBarMetrics().occupiedHeight;
+export function useBuyerTabBarInset(mode: BuyerTabBarMode = 'regular'): number {
+  return useBuyerTabBarMetrics(1, mode).occupiedHeight;
 }
 
 /**
@@ -171,8 +236,9 @@ export function useBuyerTabBarInset(): number {
  * "the line" a Reels/TikTok-style immersive video frame stops at. See
  * `barTopInset` above for why this is smaller than `useBuyerTabBarInset()`
  * (which adds breathing room for ordinary scrolling content, not for a
- * video frame that must end exactly where the bar begins).
+ * video frame that must end exactly where the bar begins). Defaults to
+ * 'regular' for the same reason as `useBuyerTabBarInset` above.
  */
-export function useBuyerTabBarTopInset(): number {
-  return useBuyerTabBarMetrics().barTopInset;
+export function useBuyerTabBarTopInset(mode: BuyerTabBarMode = 'regular'): number {
+  return useBuyerTabBarMetrics(1, mode).barTopInset;
 }
