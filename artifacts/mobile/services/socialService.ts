@@ -1315,6 +1315,36 @@ export async function unblockUser(userId: string): Promise<void> {
   const blocks = await getBlockedUsers(k);
   await save(k.blocks, blocks.filter(b => b.blockedUserId !== userId)); notify();
 }
+
+/**
+ * Remove a follower — Instagram's "Remove follower" from the Activity "..."
+ * menu. Distinct from unfollowing: this removes *them* from following *me*,
+ * server-side, without notifying them (mirrors Instagram's own "We won't
+ * tell them" copy). Throws if the server request fails.
+ */
+export async function removeFollower(userId: string): Promise<{ followersCount: number }> {
+  const result = await serviceRequest<{ ok: boolean; removed: boolean; followersCount: number }>(
+    `/api/social/followers/${encodeURIComponent(userId)}`,
+    { method: 'DELETE' },
+  );
+  notify();
+  return { followersCount: result?.followersCount ?? 0 };
+}
+
+/**
+ * "See less" from the Activity "..." menu — mutes a whole notification type
+ * (e.g. all future "new_follower" rows) or one specific actor, persisted
+ * server-side so it applies to future events and other devices, not just
+ * client-side hiding of what's already loaded.
+ */
+export async function seeLessNotificationType(type: string): Promise<void> {
+  await serviceRequest('/api/social/see-less', { method: 'POST', body: JSON.stringify({ type }) });
+  notify();
+}
+export async function seeLessActor(actorId: string): Promise<void> {
+  await serviceRequest('/api/social/see-less', { method: 'POST', body: JSON.stringify({ actorId }) });
+  notify();
+}
 export async function getMutedUsers(k: SocialKeys = K()): Promise<MuteRecord[]> {
   return load<MuteRecord[]>(k.mutes, []);
 }

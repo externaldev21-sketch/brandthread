@@ -94,7 +94,7 @@ const TAB_BAR_SELECTOR = {
 
 const SCREENS = [
   { id: 'buyer-feed', title: 'Buyer feed', role: 'buyer', path: '/(buyer)', ready: 'Drop 04 is live', hasTabBar: true },
-  { id: 'discover', title: 'Discover', role: 'buyer', path: '/discover', ready: 'Heavyweight Hoodie — Ember', hasTabBar: true },
+  { id: 'discover', title: 'Discover', role: 'buyer', path: '/discover', ready: 'For You', hasTabBar: true },
   { id: 'buyer-cart', title: 'Cart', role: 'buyer', path: '/cart', ready: 'Order summary', hasTabBar: false },
   { id: 'buyer-checkout', title: 'Checkout', role: 'buyer', path: '/buyer-checkout?source=cart', ready: '1120 NW Everett Street', hasTabBar: false },
   { id: 'buyer-product-detail', title: 'Product detail', role: 'buyer', path: '/buyer-product-detail?productId=prod_nl_jacket_rust', ready: 'Field Shell Jacket — Rust', hasTabBar: false },

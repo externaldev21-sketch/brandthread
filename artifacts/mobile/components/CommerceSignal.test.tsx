@@ -566,11 +566,13 @@ describe('Blocker 1 — API call signatures are correct', () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
 
-    // Check discover.tsx
-    const discoverSrc = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // Should call get(20) — not get({ limit: 20 })
-    expect(discoverSrc).toMatch(/publicTrending\.get\s*\(\s*\d+\s*\)/);
-    expect(discoverSrc).not.toMatch(/publicTrending\.get\s*\(\s*\{/);
+    // Discover was rebuilt into an Explore-style grid (app/(buyer)/discover.tsx);
+    // its trending fetch now lives in lib/discoverFeed.ts's composeDiscoverPosts
+    // / composeDiscoverBrands.
+    const src = readFileSync(resolve(__dirname, '../lib/discoverFeed.ts'), 'utf8');
+    // Should call get(limit) — not get({ limit })
+    expect(src).toMatch(/publicTrending\.get\s*\(\s*(limit|\d+)\s*\)/);
+    expect(src).not.toMatch(/publicTrending\.get\s*\(\s*\{/);
   });
 
   it('publicProducts.list result is treated as a direct array (no .items wrapper)', async () => {
@@ -654,112 +656,35 @@ describe('Blocker 2 — FlatList pager integrity (measured scene per item)', () 
 });
 
 // ─── Discover section-level errors ───────────────────────────────────────────
+//
+// Discover was rebuilt from a commerce-first editorial page into an
+// Instagram Explore / TikTok Discover-style grid (see app/(buyer)/discover.tsx's
+// own top-of-file doc comment). The old per-section error/retry UI, the
+// full-bleed DiscoverHero and the swipeable ProductShowcase carousel no
+// longer exist — a rail (Just Dropped / High Demand) that fails to load
+// simply doesn't get inserted into the grid, since the grid's own posts are
+// the primary content. The still-relevant invariants below are re-anchored
+// to their new locations.
 
-describe('Discover — section-level error states and retry', () => {
-  it('discover.tsx has per-section error state for all sections (Drops was removed — see item 12)', async () => {
+describe('Discover — rail fetches stay on their real endpoints', () => {
+  it('Just Dropped still comes from publicProducts.list, High Demand from publicProducts.highDemand — never cross-mixed', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // High Demand section has its own error state
-    expect(source).toContain('highDemandError');
-    expect(source).toContain('setHighDemandError');
-    // For You, Trending each have their own
-    expect(source).toContain('forYouError');
-    expect(source).toContain('trendingError');
-    expect(source).toContain('setForYouError');
-    expect(source).toContain('setTrendingError');
-    // Drops was removed entirely from the buyer surface — no Drops state left.
-    expect(source).not.toContain('dropsError');
-    expect(source).not.toContain('setDropsError');
-    expect(source).not.toContain('fetchDrops');
-  });
-
-  it('each section renders a retry button on error', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // SectionError component used for each section
-    expect(source).toMatch(/highDemandError.*SectionError|SectionError.*highDemandError/s);
-    expect(source).toMatch(/forYouError.*SectionError|SectionError.*forYouError/s);
-    expect(source).toMatch(/trendingError.*SectionError|SectionError.*trendingError/s);
-    // Retry callbacks wired
-    expect(source).toContain('onRetry={fetchHighDemand}');
-    expect(source).toContain('onRetry={fetchProducts}');
-    expect(source).toContain('onRetry={fetchTrending}');
-  });
-
-  it('error catch blocks do not reset data arrays (previous data preserved)', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // On error, only set the error string — don't clear items
-    expect(source).toContain('setHighDemandError(');
-    expect(source).toContain('setForYouError(');
-    expect(source).toContain('setTrendingError(');
-  });
-
-  it('empty states are distinct from error states', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // SectionError component is used for error states
-    expect(source).toContain('SectionError');
-    // High Demand empty state (no qualifying products)
-    expect(source).toContain('No high-demand products right now');
-    // For You empty state
-    expect(source).toContain('No products available right now');
-    // Error messages use "Could not load"
-    expect(source).toMatch(/Could not load high demand products|Couldn't load high demand products/i);
-    expect(source).toMatch(/Could not load products|Couldn't load products/);
-  });
-
-  it('discover fetchTrending uses get(number) not get({limit})', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // Correct: api.publicTrending.get(20)
-    expect(source).toMatch(/publicTrending\.get\s*\(\s*20\s*\)/);
-    // No object argument
-    expect(source).not.toMatch(/publicTrending\.get\s*\(\s*\{/);
+    expect(source).toMatch(/publicProducts\.list\s*\(\s*\{\s*limit:\s*8\s*\}\s*\)/);
+    expect(source).toMatch(/publicProducts\.highDemand\s*\(\s*6\s*\)/);
+    // Neither rail is ever derived from the other, or from post/trending data.
+    expect(source).not.toMatch(/highDemandItems\s*=\s*justDroppedItems/);
+    expect(source).not.toMatch(/justDroppedItems\s*=\s*highDemandItems/);
   });
 
   it('discover does not fake demandCount from finalScore or organicScore', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // finalScore must NOT be assigned to demandCount
-    expect(source).not.toMatch(/demandCount\s*:\s*(t|p|item)\s*\.\s*finalScore/);
-    expect(source).not.toMatch(/demandCount\s*=\s*(t|p|item)\s*\.\s*finalScore/);
-    // organicScore must NOT be assigned to demandCount
-    expect(source).not.toMatch(/demandCount\s*:\s*(t|p|item)\s*\.\s*organicScore/);
-  });
-});
-
-describe('Discover — swipeable product showcase', () => {
-  it('keeps the For You products in a centered snapping carousel', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-
-    expect(source).toContain('function ProductShowcase');
-    expect(source).toContain('<Animated.FlatList');
-    expect(source).toContain('snapToOffsets={snapOffsets}');
-    expect(source).toContain('decelerationRate="fast"');
-    expect(source).toContain('disableIntervalMomentum');
-    expect(source).toContain('onMomentumScrollEnd=');
-    expect(source).toContain('setActiveIndex(');
-    expect(source).toContain('<ProductShowcase items={forYouItems} />');
-  });
-
-  it('shows the real product price and preserves product-detail navigation', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-
-    expect(source).toContain('formatCents(item.commerce.currentPriceCents)');
-    expect(source).toContain('item.productId ?? item.id');
-    expect(source).toContain('/thread-product-detail?productId=');
-    expect(source).toContain('accessibilityLabel={`Product ${activeIndex + 1} of ${items.length}`}');
+    expect(source).not.toMatch(/demandCount\s*:\s*(t|p|item|row)\s*\.\s*finalScore/);
+    expect(source).not.toMatch(/demandCount\s*=\s*(t|p|item|row)\s*\.\s*finalScore/);
+    expect(source).not.toMatch(/demandCount\s*:\s*(t|p|item|row)\s*\.\s*organicScore/);
   });
 });
 
@@ -799,40 +724,31 @@ describe('highDemand API — correct endpoint, no ordinary-product fallback', ()
     expect(source).toContain('fetchHighDemand');
   });
 
-  it('Discover High Demand section uses EditorialTile with real productId navigation', async () => {
+  it('EditorialTile (the High Demand / Just Dropped rail card) navigates via real productId, not brandId', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // EditorialTile navigates via productId (not brandId)
-    expect(source).toContain('EditorialTile');
+    const source = readFileSync(resolve(__dirname, '../components/discover/EditorialTile.tsx'), 'utf8');
     expect(source).toContain('productId:');
     expect(source).toMatch(/thread-product-detail.*productId/);
   });
 
-  it('Trending section is separately titled and uses TrendingRow (no demand signals)', async () => {
+  it('Discover no longer has a separate Trending rail — trending posts are grid tiles now', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // Trending section exists with its own heading
-    expect(source).toContain('"Trending"');
-    // TrendingRow is a separate component from EditorialTile
-    expect(source).toContain('TrendingRow');
-    // Trending section navigates to seller profile (brandId), not product detail
-    expect(source).toMatch(/seller-profile.*brandId|brandId.*seller-profile/);
+    // The old dedicated "Trending" list section / TrendingRow component is
+    // gone: trending posts are mapped into DiscoverPost tiles (mapTrendingToPost
+    // in lib/discoverFeed.ts) and rendered inside the unified Explore grid.
+    expect(source).not.toContain('TrendingRow');
+    expect(source).not.toContain('function DiscoverHero');
   });
 
-  it('High Demand section never uses trending post data', async () => {
+  it('High Demand rail items are only ever mapToEditorialTile(\'hd\', ...) — never derived from trending/post data', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // highDemandItems is never derived from trendingItems by filtering
-    expect(source).not.toMatch(/highDemandItems\s*=\s*trendingItems\.filter/);
-    // The EditorialTile component is only rendered from highDemandItems (not trendingItems)
-    // Verify: the map that calls EditorialTile iterates over highDemandItems
-    expect(source).toMatch(/highDemandItems\.slice.*map.*EditorialTile|highDemandItems\.map.*EditorialTile/s);
-    // TrendingRow is used only in the Trending section (not the High Demand section)
-    // Confirm TrendingRow exists and is distinct
-    expect(source).toContain('TrendingRow');
+    expect(source).not.toMatch(/highDemandItems\s*=\s*(forYouPosts|fitsPosts|trendingItems)/);
+    expect(source).toMatch(/setHighDemandItems\(safe\.map\(\(row, i\) => mapToEditorialTile\('hd', row, i\)\)\)/);
   });
 });
 
@@ -860,23 +776,15 @@ describe('Discover screen — no hardcoded mock data, accent-based urgency', () 
     expect(source).toContain('demandCount');
   });
 
-  it('urgency signals use theme.accent, not RED constants', async () => {
+  it('the rail card\'s urgency dot uses theme.accent, not RED constants', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
+    // The urgency dot moved with EditorialTile into its own shared file when
+    // Discover was rebuilt (components/discover/EditorialTile.tsx).
+    const source = readFileSync(resolve(__dirname, '../components/discover/EditorialTile.tsx'), 'utf8');
     expect(source).toMatch(/theme\.accent/);
     expect(source).not.toContain("RED,");
     expect(source).not.toContain("RED_DIM");
-  });
-
-  it('uses CommerceSignal components with accent prop', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    expect(source).toContain('ClaimedRemainingLabel');
-    expect(source).toContain('TimeRemainingLabel');
-    expect(source).toContain('EditorialSectionHead');
-    expect(source).toMatch(/accent=\{theme\.accent\}/);
   });
 });
 

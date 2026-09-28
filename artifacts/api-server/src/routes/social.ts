@@ -13,7 +13,7 @@
  */
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions, notificationsFeed, suggestionDismissals } from "@workspace/db";
+import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -322,6 +322,74 @@ router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
     return countRow?.n ?? 0;
   });
   res.json({ ok: true, isFollowing: false, followersCount });
+});
+
+// ─── DELETE /api/social/followers/:userId — remove a follower ───────────────
+// Instagram's "Remove follower": distinct from unfollow (DELETE /follow/:id,
+// which removes *me* following someone) — this removes *them* from following
+// *me*. The target is never notified (mirrors Instagram: "We won't tell them
+// they were removed from your followers"), so unlike unfollow this never
+// touches the target's own notification feed, only the acting user's.
+router.delete("/followers/:userId", rateLimit("follow"), async (req, res) => {
+  const myId   = (req as any).clerkUserId as string;
+  const target = req.params.userId as string;
+  if (target === myId) { res.status(400).json({ error: "Cannot remove yourself" }); return; }
+
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${relationshipLockKey(myId, target)}, 0)
+      )
+    `);
+    const deleted = await tx.delete(follows)
+      .where(and(eq(follows.followerId, target), eq(follows.followingId, myId)))
+      .returning();
+    // Clear any "started following you" row in MY OWN feed for this actor —
+    // it's no longer true and would let me follow-back a removed follower
+    // from a stale row. Never touches the target's feed.
+    if (deleted.length > 0) {
+      await tx.delete(notificationsFeed)
+        .where(and(
+          eq(notificationsFeed.userId, myId),
+          eq(notificationsFeed.type, "new_follower"),
+          eq(notificationsFeed.actorId, target),
+        ));
+    }
+    const [countRow] = await tx
+      .select({ n: sql<number>`cast(count(*) as int)` })
+      .from(follows)
+      .where(eq(follows.followingId, myId));
+    return { removed: deleted.length > 0, followersCount: countRow?.n ?? 0 };
+  });
+
+  res.json({ ok: true, removed: result.removed, followersCount: result.followersCount });
+});
+
+// ─── POST /api/social/see-less — mute a notification type or actor ─────────
+// Instagram's "See less" from the Activity "..." menu. Persists a per-user
+// preference (activity_mutes) that both future publishNotification() calls
+// and the feed's own read query respect, so it survives refresh and other
+// devices — not just client-side row hiding. Body: exactly one of
+// { type: string } (mute a whole notification type, e.g. "new_follower") or
+// { actorId: string } (mute everything from one person).
+router.post("/see-less", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const { type, actorId } = req.body as { type?: string; actorId?: string };
+  if ((!type && !actorId) || (type && actorId)) {
+    res.status(400).json({ error: "Provide exactly one of type or actorId" }); return;
+  }
+  const muteKey = type ? `type:${type}` : `actor:${actorId}`;
+
+  await db.insert(activityMutes).values({ userId: myId, muteKey }).onConflictDoNothing();
+
+  // Also hide whatever already-published rows this matches so it takes
+  // effect immediately, not just on the next event.
+  const rowFilter = type
+    ? and(eq(notificationsFeed.userId, myId), eq(notificationsFeed.type, type))
+    : and(eq(notificationsFeed.userId, myId), eq(notificationsFeed.actorId, actorId as string));
+  await db.update(notificationsFeed).set({ isMuted: true }).where(rowFilter);
+
+  res.json({ ok: true, muteKey });
 });
 
 // ─── GET /api/social/status/:userId ──────────────────────────────────────────

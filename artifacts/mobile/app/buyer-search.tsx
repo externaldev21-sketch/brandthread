@@ -28,6 +28,7 @@ import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
 import { SegmentedTabs, type SearchTabKey } from '@/components/search/SegmentedTabs';
 import { VideoTile } from '@/components/search/VideoTile';
 import { FASHION_PREVIEW_POSTS } from '@/app/(tabs)/feed';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
@@ -562,7 +563,7 @@ export default function BuyerSearchScreen() {
     <View style={{ flex: 1, backgroundColor: bg }}>
       <View style={[styles.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router)}
           accessibilityRole="button"
           accessibilityLabel="Back"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
