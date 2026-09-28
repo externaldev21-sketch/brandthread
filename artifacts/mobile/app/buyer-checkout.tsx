@@ -40,7 +40,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
-import { isPreviewCheckoutGroup, placePreviewOrder } from '@/lib/previewCheckout';
+import { isPreviewCheckoutGroup, placePreviewOrder, withPreviewCheckoutDetails } from '@/lib/previewCheckout';
 import {
   applyDiscount, createCheckoutSession,
   getCart, getCheckoutSession, removeCartItems, removeDiscount, saveCheckoutProgress, validateCart,
@@ -169,8 +169,15 @@ export default function BuyerCheckoutScreen() {
       // The generic terms checkbox is now the plain line under Place order —
       // drop it from sessions saved before that change (pre-order acks stay).
       next.acknowledgments = withoutImplicitTermsAck(next.acknowledgments ?? []);
-      const restoredContact: Partial<CheckoutContact> = next.contact ?? { orderUpdates: 'email', marketingConsent: false };
-      const restoredAddress: CheckoutAddressDraft = next.shippingAddress ?? { country: 'US', saveAddress: true };
+      let restoredContact: Partial<CheckoutContact> = next.contact ?? { orderUpdates: 'email', marketingConsent: false };
+      let restoredAddress: CheckoutAddressDraft = next.shippingAddress ?? { country: 'US', saveAddress: true };
+      // Dev-web preview only: an all-preview order gets the preview buyer's
+      // demo contact and address, so Place order is one tap on the live
+      // preview. isPreviewCheckoutGroup is false for any real product or
+      // seller and in production builds, so real checkouts are unchanged.
+      if (next.deliveryGroups.length > 0 && next.deliveryGroups.every(isPreviewCheckoutGroup)) {
+        ({ contact: restoredContact, address: restoredAddress } = withPreviewCheckoutDetails(restoredContact, restoredAddress));
+      }
       const firstIncomplete = getFirstIncompleteCheckoutSection(restoredContact, restoredAddress, next);
       if (next.step !== 'confirmation') next.step = firstIncomplete;
 
