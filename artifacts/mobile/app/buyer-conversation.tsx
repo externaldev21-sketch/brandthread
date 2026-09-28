@@ -668,6 +668,20 @@ export default function BuyerConversationScreen() {
 
   // ── Other-participant profile ─────────────────────────────────────────────────
 
+  // Still used by the message-request "View profile" pill; #211 removed it
+  // along with the header's old profile tap, which broke typecheck on dev.
+  function openParticipantProfile() {
+    if (!participant) return;
+    const qs = new URLSearchParams({
+      userId: participant.userId,
+      name: participant.name,
+      handle: participant.handle,
+      initials: participant.initials,
+      color: participant.color,
+    });
+    router.push(('/buyer-other-profile?' + qs.toString()) as never);
+  }
+
   // ── Chat details ───────────────────────────────────────────────────────────────
 
   function openChatDetails() {
