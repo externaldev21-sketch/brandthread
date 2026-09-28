@@ -28,6 +28,12 @@ vi.mock("@workspace/db", () => {
   };
 });
 
+vi.mock("../productImageResize", () => ({
+  getChatCardImagePath: vi.fn(async (path: string) =>
+    (path.startsWith("/objects/") ? `${path}-w720` : path)),
+}));
+
+import { getChatCardImagePath } from "../productImageResize";
 import {
   applyProductAttachmentInfo,
   enrichProductAttachments,
@@ -40,6 +46,14 @@ describe("fetchProductAttachmentInfo", () => {
     state.variantRows = [{ productId: "p1", priceCents: 41000 }, { productId: "p1", priceCents: 38000 }];
     const map = await fetchProductAttachmentInfo(["p1"]);
     expect(map.get("p1")).toEqual({ available: true, name: "Ivory Column Set", image: "https://x/p1.jpg", priceCents: 38000 });
+  });
+
+  it("resolves an own-storage image through the chat-card resize helper", async () => {
+    state.productRows = [{ id: "p4", name: "Resized Piece", images: ["/objects/uploads/p4"], status: "active", deletedAt: null }];
+    state.variantRows = [];
+    const map = await fetchProductAttachmentInfo(["p4"]);
+    expect(map.get("p4")?.image).toBe("/objects/uploads/p4-w720");
+    expect(getChatCardImagePath).toHaveBeenCalledWith("/objects/uploads/p4");
   });
 
   it("marks an archived product unavailable even though the row still exists", async () => {

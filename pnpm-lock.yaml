@@ -235,6 +235,9 @@ importers:
       resend:
         specifier: ^6.30.0
         version: 6.30.0
+      sharp:
+        specifier: ^0.35.4
+        version: 0.35.4(@types/node@25.9.4)
       stripe:
         specifier: ^22.5.0
         version: 22.5.0(@types/node@25.9.4)

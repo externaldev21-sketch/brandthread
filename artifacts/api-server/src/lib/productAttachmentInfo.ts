@@ -14,6 +14,7 @@
  */
 import { inArray } from "drizzle-orm";
 import { db, products, productVariants } from "@workspace/db";
+import { getChatCardImagePath } from "./productImageResize";
 
 export interface ProductAttachmentInfo {
   available: boolean;
@@ -52,16 +53,21 @@ export async function fetchProductAttachmentInfo(productIds: string[]): Promise<
     pricesByProduct.set(v.productId, list);
   }
 
-  for (const p of productRows) {
+  await Promise.all(productRows.map(async (p) => {
     const prices = pricesByProduct.get(p.id) ?? [];
     const images = Array.isArray(p.images) ? p.images.filter((i): i is string => typeof i === "string") : [];
+    const originalImage = images[0] ?? null;
+    // Chat product cards render at a ~240pt-wide slot — request a
+    // width-capped copy instead of the full original upload (see
+    // lib/productImageResize.ts). Fails open to the original on any error.
+    const image = originalImage ? await getChatCardImagePath(originalImage) : null;
     result.set(p.id, {
       available: p.status === "active" && !p.deletedAt,
       name: p.name,
-      image: images[0] ?? null,
+      image,
       priceCents: prices.length ? Math.min(...prices) : null,
     });
-  }
+  }));
   // Products missing from productRows entirely (hard-deleted / bad id) are
   // simply absent from the map — callers treat "not in map" the same as
   // available: false.

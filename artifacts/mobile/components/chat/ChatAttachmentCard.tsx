@@ -73,13 +73,16 @@ export function ChatAttachmentCard({
 }: ChatAttachmentCardProps) {
   const hasImage = !!imageUri;
   // expo-image decodes remote images at their RENDERED size (see
-  // components/CachedImage.tsx's own doc comment) — so requesting a crisp
-  // image is a matter of rendering it big enough, not a separate "size"
-  // param on the URL. The source itself is the product's original upload
-  // (see api-server's productAttachmentInfo.ts — images[0], never a
-  // pre-shrunk thumbnail), so at this card's ~240×300 display size,
-  // expo-image's own device-pixel-ratio-aware decode already requests
-  // comfortably more than 3x that in source pixels on any modern phone.
+  // components/CachedImage.tsx's own doc comment), which keeps memory
+  // bounded — but that's a decode-time optimization only. The full
+  // original bytes are still downloaded over the network before any of
+  // that happens, so a multi-MB original was exactly as slow to *load* at
+  // this ~240pt card as anywhere else (Dev's live Orison thread check: a
+  // ~10s load with the blur placeholder visible the whole time). The
+  // server now serves a width-capped (~720px) copy of the product's cover
+  // image for chat cards specifically, generated and cached on first
+  // request — see api-server's lib/productImageResize.ts, wired in via
+  // productAttachmentInfo.ts.
   const grayscaleStyle: ImageStyle | null = unavailable
     ? (Platform.OS === 'web'
         ? ({ filter: 'grayscale(1)' } as unknown as ImageStyle)
