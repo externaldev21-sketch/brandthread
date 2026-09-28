@@ -5,6 +5,7 @@
  *                         With neither param the legacy single page of 100 is
  *                         returned so existing callers keep their behaviour.
  *        ?filter=orders|social  Activity Center filter chips.
+ * GET    /api/buyer/notifications/actors?ids=   — the people behind one merged Activity row
  * GET    /api/buyer/notifications/unread-count  — { count } for bell badges
  * PATCH  /api/buyer/notifications/read-all      — mark all as read
  * PATCH  /api/buyer/notifications/:id/read      — mark one as read
@@ -12,7 +13,7 @@
  * POST   /api/internal/notifications            — publish a notification (server-to-user)
  */
 import { Router } from "express";
-import { db, notificationsFeed, users, blocks, activityMutes } from "@workspace/db";
+import { db, notificationsFeed, users, blocks, activityMutes, follows } from "@workspace/db";
 import { eq, and, desc, inArray, notInArray, or, isNull, sql, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -176,6 +177,71 @@ buyerRouter.get("/", async (req, res) => {
     resolveActorAvatars(rows.map((row) => row.actorId).filter((id): id is string => !!id)),
   ]);
   return res.json(rows.map((row, index) => adapt(row, images[index], row.actorId ? avatars.get(row.actorId) ?? null : null)));
+});
+
+/** Most feed ids one grouped-row lookup accepts ("Jay and 99 others"). */
+export const GROUP_ACTORS_MAX_IDS = 100;
+
+/**
+ * GET /api/buyer/notifications/actors?ids=a,b,c
+ *
+ * The individual people behind one merged Activity row ("Jay and 12 others
+ * liked your post"), for the pushed people list the row opens — Instagram's
+ * "View likes" pattern (Mobbin: https://mobbin.com/flows/c575ad7c-8644-4b26-a3d0-ae737f855c13).
+ * `ids` are the row's own feed item ids (ActivityRow.ids on the client), so
+ * the list always matches the row's count exactly and works for every merged
+ * type (likes, comments, reposts, story likes, follows) and for buyers and
+ * sellers alike — it's the same per-user feed. Read-only; only the caller's
+ * own feed rows are ever read, blocked people are dropped, and each actor
+ * carries whether the caller already follows them for the Follow pill.
+ */
+buyerRouter.get("/actors", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const ids = [...new Set(String(req.query.ids ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean))]
+    .slice(0, GROUP_ACTORS_MAX_IDS);
+  if (ids.length === 0) return res.status(400).json({ error: "ids required" });
+
+  const blockedIds = await blockedCounterpartIds(userId);
+  const conditions = [eq(notificationsFeed.userId, userId), inArray(notificationsFeed.id, ids)];
+  if (blockedIds.length > 0) {
+    conditions.push(or(isNull(notificationsFeed.actorId), notInArray(notificationsFeed.actorId, blockedIds))!);
+  }
+  const rows = await db.select().from(notificationsFeed)
+    .where(and(...conditions))
+    .orderBy(desc(notificationsFeed.createdAt), desc(notificationsFeed.id));
+
+  // Distinct actors, newest first — the same order the row's avatars use.
+  const seen = new Set<string>();
+  const actorRows = rows.filter((row) => {
+    if (!row.actorId || seen.has(row.actorId)) return false;
+    seen.add(row.actorId);
+    return true;
+  });
+  const actorIds = actorRows.map((row) => row.actorId!);
+  const [avatars, followingRows] = await Promise.all([
+    resolveActorAvatars(actorIds),
+    actorIds.length > 0
+      ? db.select({ followingId: follows.followingId }).from(follows)
+        .where(and(eq(follows.followerId, userId), inArray(follows.followingId, actorIds)))
+      : Promise.resolve([] as { followingId: string }[]),
+  ]);
+  const followingSet = new Set(followingRows.map((row) => row.followingId));
+
+  return res.json({
+    actors: actorRows.map((row) => ({
+      id: row.actorId!,
+      name: row.actorName ?? "Someone",
+      handle: row.actorHandle ?? undefined,
+      initials: row.actorInitials ?? (row.actorName ?? "?").slice(0, 2).toUpperCase(),
+      color: row.actorColor ?? undefined,
+      avatarUrl: avatars.get(row.actorId!) ?? undefined,
+      isFollowing: followingSet.has(row.actorId!),
+      createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
+    })),
+  });
 });
 
 /**

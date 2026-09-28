@@ -9,6 +9,10 @@ import {
   buildActivitySections,
   createReadTracker,
   groupByRecency,
+  groupedPeopleHref,
+  groupedPeopleTitle,
+  GROUPED_PEOPLE_MAX_IDS,
+  isGroupedRow,
   isFollowBackRow,
   newFollowersSummary,
   relativeTime,
@@ -328,5 +332,39 @@ describe('newFollowersSummary', () => {
     expect(summary!.count).toBe(2);
     expect(summary!.actors.map((a) => a.name)).toEqual(['Jay', 'Mina']);
     expect(summary!.hasUnread).toBe(true);
+  });
+});
+
+describe('grouped rows → people list', () => {
+  it('treats a merged row of 2+ people as grouped, never a single-actor or order row', () => {
+    const [merged] = aggregateActivity([like('Jay', 'post1'), like('Mina', 'post1'), like('Ola', 'post1')]);
+    expect(merged.actorCount).toBe(3);
+    expect(isGroupedRow(merged)).toBe(true);
+    const [single] = aggregateActivity([like('Jay', 'post2')]);
+    expect(isGroupedRow(single)).toBe(false);
+    expect(isGroupedRow({ type: 'order_shipped', actorCount: 2 })).toBe(false);
+  });
+
+  it("links to the people list with the row's own feed ids and type", () => {
+    const [merged] = aggregateActivity([like('Jay', 'post1'), like('Mina', 'post1')]);
+    const href = groupedPeopleHref(merged);
+    expect(href.startsWith('/activity-people?')).toBe(true);
+    const params = new URLSearchParams(href.split('?')[1]);
+    expect(params.get('type')).toBe('post_like');
+    expect(params.get('ids')!.split(',')).toEqual(merged.ids);
+  });
+
+  it('caps the ids a link carries', () => {
+    const ids = Array.from({ length: GROUPED_PEOPLE_MAX_IDS + 20 }, (_, i) => `n${i}`);
+    const params = new URLSearchParams(groupedPeopleHref({ type: 'post_like', ids }).split('?')[1]);
+    expect(params.get('ids')!.split(',')).toHaveLength(GROUPED_PEOPLE_MAX_IDS);
+  });
+
+  it('titles the list by what the people did', () => {
+    expect(groupedPeopleTitle('post_like')).toBe('Likes');
+    expect(groupedPeopleTitle('story_like')).toBe('Likes');
+    expect(groupedPeopleTitle('post_comment')).toBe('Comments');
+    expect(groupedPeopleTitle('repost')).toBe('Reposts');
+    expect(groupedPeopleTitle('new_follower')).toBe('New followers');
   });
 });
