@@ -58,6 +58,11 @@ import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuIt
 import { ReactionGlyph } from '@/components/chat/ReactionBar';
 import { applyOptimisticReaction, myReactionIn, groupReactionCounts } from '@/lib/reactionMutations';
 import type { MessageReaction, ReactionType } from '@/services/socialTypes';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashBillMark } from '@/components/thread-cash/ChatAttachThreadCash';
+import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
+import { Snackbar } from '@/components/ui/Snackbar';
+import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,7 +80,7 @@ interface ConvView {
   themeId?: string; disappearingEnabled?: boolean;
 }
 interface MsgAttachment {
-  type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice' | 'system';
+  type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice' | 'system' | 'thread_cash';
   uri?: string;
   title?: string;
   subtitle?: string;
@@ -338,6 +343,36 @@ export default function SellerConversationScreen() {
   // ── Derived ─────────────────────────────────────────────────────────────────
 
   const other = conv?.participants.find((p) => p.userId !== myId) ?? null;
+  // Item 72 (Thread Cash send in chat): the entry point always renders once
+  // the feature flag is on, disabled with an explanation rather than
+  // hidden — same affordance-check-only pattern as
+  // app/buyer-conversation.tsx, including a mirrored mutual-follow check;
+  // the server independently re-validates mutual follow at send AND claim.
+  const threadCashSendEnabled = useFeatureFlag('threadCashSend');
+  const [threadCashOverrides, setThreadCashOverrides] = useState<Record<string, ThreadCashTransferStatus>>({});
+  const [threadCashMutual, setThreadCashMutual] = useState<boolean | null>(null);
+  const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
+  const celebrateThreadCash = useCelebrateThreadCash();
+  const threadCashDisabledReason = 'You can send Thread Cash to people who follow you back';
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!threadCashSendEnabled || !other?.userId) {
+      setThreadCashMutual(null);
+      return;
+    }
+    // Preview conversations have no real backend to check against — the
+    // whole flow must be clickable end-to-end there, so treat them as an
+    // already-confirmed mutual follow, same as the buyer screen.
+    if (isSellerPreviewConversationId(id ?? '')) {
+      setThreadCashMutual(true);
+      return;
+    }
+    api.social.status(other.userId)
+      .then((status) => { if (!cancelled) setThreadCashMutual(status.isMutual); })
+      .catch(() => { if (!cancelled) setThreadCashMutual(false); });
+    return () => { cancelled = true; };
+  }, [threadCashSendEnabled, other?.userId, id, api]);
   // Chat details > Nicknames: once set, the nickname replaces the real name
   // in the header, matching buyer-conversation.tsx.
   const displayName = other?.nickname || other?.name || 'Buyer';
@@ -887,6 +922,7 @@ export default function SellerConversationScreen() {
       case 'product': return msg.attachment.title ?? 'Product';
       case 'order': return msg.attachment.title ?? 'Order';
       case 'post': return msg.attachment.title ?? 'Post';
+      case 'thread_cash': return 'Thread Cash';
       default: return '';
     }
   }
@@ -927,6 +963,65 @@ export default function SellerConversationScreen() {
         />
       );
     }
+    // A Thread Cash send is its own standalone row — not chat text, so it
+    // never gets the colored bubble treatment, and it owns its own
+    // Accept/Cancel controls, so it must never end up nested inside the
+    // PressableScale bubble below (no nested pressables). Same early-return
+    // pattern as app/buyer-conversation.tsx's identical case.
+    if (msg.attachment?.type === 'thread_cash') {
+      const transferId = msg.attachment.meta?.transferId ?? '';
+      const senderId = msg.attachment.meta?.senderId ?? '';
+      const amountCents = Number(msg.attachment.meta?.amountCents ?? 0);
+      const status = threadCashOverrides[transferId] ?? ((msg.attachment.meta?.status as ThreadCashTransferStatus) ?? 'pending');
+      return (
+        <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? SP.sm : 2 }]}>
+          {!isOwn && (
+            isLastInGroup ? (
+              <View style={[s.msgAvatar, { backgroundColor: msg.fromColor || PURPLE }]}>
+                <Text style={s.msgAvatarInitials}>{msg.fromInitials || (msg.fromName?.[0] ?? '?')}</Text>
+              </View>
+            ) : <View style={s.msgAvatarSpacer} />
+          )}
+          <View style={{ maxWidth: BUBBLE_MAX }}>
+            <ThreadCashMessageCard
+              amountCents={amountCents}
+              note={msg.attachment.meta?.note || null}
+              status={status}
+              isRecipient={senderId !== effectiveMyId}
+              isSender={senderId === effectiveMyId}
+              onClaim={async () => {
+                try {
+                  if (isSellerPreviewConversationId(id ?? '')) {
+                    setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
+                  } else {
+                    await api.threadCash.claim({ transferId });
+                    setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'claimed' }));
+                  }
+                  celebrateThreadCash({ amount: amountCents, from: msg.fromName || displayName });
+                } catch (e: any) {
+                  Alert.alert('Could not claim', e?.message ?? 'Please try again.');
+                  throw e;
+                }
+              }}
+              onCancel={senderId === effectiveMyId ? async () => {
+                try {
+                  if (isSellerPreviewConversationId(id ?? '')) {
+                    setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
+                  } else {
+                    await api.threadCash.cancel({ transferId });
+                    setThreadCashOverrides((prev) => ({ ...prev, [transferId]: 'cancelled' }));
+                  }
+                } catch (e: any) {
+                  Alert.alert('Could not cancel', e?.message ?? 'Please try again.');
+                  throw e;
+                }
+              } : undefined}
+            />
+          </View>
+        </View>
+      );
+    }
+
     const removed = (msg as { removedByModeration?: boolean }).removedByModeration === true;
     const isRead = msg.status === 'read' || !!msg.readAt;
     return (
@@ -1294,6 +1389,86 @@ export default function SellerConversationScreen() {
           <Feather name="mic" size={ICON.md} color={MUTED} />
         </PressableScale>
 
+        {/* Item 72 — same Thread Cash entry point as
+            app/buyer-conversation.tsx, works identically from the seller
+            side of a thread. Always rendered once the feature flag is on;
+            disabled with an explanation rather than hidden until mutual
+            follow is confirmed. */}
+        {threadCashSendEnabled && other?.userId ? (
+          <ThreadCashAttachButton
+            recipientId={other.userId}
+            recipientName={other.name}
+            recipientHandle={other.handle}
+            conversationId={id ?? ''}
+            disabled={threadCashMutual !== true}
+            disabledReason={threadCashDisabledReason}
+            renderTrigger={(open) => (
+              <PressableScale
+                style={s.attachBtn}
+                onPress={() => {
+                  // Still checking mutual-follow status — silent no-op,
+                  // never a "checking…" string (see the disabled state's
+                  // own comment above).
+                  if (threadCashMutual === null) return;
+                  if (threadCashMutual === false) {
+                    setThreadCashNotice(threadCashDisabledReason);
+                    return;
+                  }
+                  open();
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="seller-conversation-thread-cash"
+                accessibilityRole="button"
+                accessibilityLabel={threadCashMutual !== true ? `Thread Cash — ${threadCashDisabledReason}` : 'Send Thread Cash'}
+                accessibilityState={{ disabled: threadCashMutual !== true }}
+              >
+                <ThreadCashBillMark size={ICON.md} color={FG} accent={PURPLE} disabled={threadCashMutual !== true} />
+              </PressableScale>
+            )}
+            onSent={async ({ transferId, amountCents, note }) => {
+              if (!id) return;
+              const attachment: MsgAttachment = {
+                type: 'thread_cash',
+                title: 'Thread Cash',
+                meta: {
+                  transferId,
+                  senderId: myId || 'me',
+                  amountCents: String(amountCents),
+                  status: 'pending',
+                  ...(note ? { note } : {}),
+                },
+              };
+              // Preview conversations have no real backend to post to —
+              // append a local mock message, same as the media/voice
+              // handlers above.
+              if (isSellerPreviewConversationId(id)) {
+                setMessages((prev) => [...prev, {
+                  id: `local-thread-cash-${transferId}`,
+                  conversationId: id,
+                  fromId: effectiveMyId,
+                  fromName: 'You',
+                  fromInitials: 'Y',
+                  fromColor: PURPLE,
+                  text: '',
+                  attachment,
+                  reactions: [],
+                  status: 'sent',
+                  ts: Date.now(),
+                }]);
+                setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+                return;
+              }
+              try {
+                const msg = await api.conversations.send(id, { text: '', attachment });
+                setMessages((prev) => [...prev, msg as Msg]);
+                setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+              } catch (e: any) {
+                Alert.alert('Sent, but the chat message failed', e?.message ?? 'The Thread Cash send went through — refresh to see it in chat.');
+              }
+            }}
+          />
+        ) : null}
+
         <TextInput
           style={s.textInput}
           value={text}
@@ -1494,6 +1669,24 @@ export default function SellerConversationScreen() {
           ].filter(Boolean) as ReactionOverlayMenuItem[]
         ) : []}
         onClose={closeMessageSheet}
+      />
+
+      <Snackbar
+        visible={threadCashNotice != null}
+        message={threadCashNotice ?? ''}
+        actionLabel="Follow"
+        onAction={async () => {
+          setThreadCashNotice(null);
+          if (!other?.userId) return;
+          try {
+            await api.social.follow(other.userId);
+            hapticSuccessAction();
+          } catch {
+            // Best-effort — the composer button stays disabled until the
+            // next mutual-follow check confirms it either way.
+          }
+        }}
+        onDismiss={() => setThreadCashNotice(null)}
       />
     </KeyboardAvoidingView>
   );

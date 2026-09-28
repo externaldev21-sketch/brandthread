@@ -411,6 +411,34 @@ export const PREVIEW_FOLLOWER_SEEDS: Array<{
 // `orders` row backing both sides of a real DM would.
 export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
   {
+    // Item 72 (Thread Cash send in chat): a real-looking seeded example on
+    // the seller side, matching preview-conversation-06 on the buyer side —
+    // same attachment shape, opposite direction (a buyer sent the seller
+    // Thread Cash here), so both ?bt_preview= routes render an actual
+    // pending send bubble instead of only the buyer side having content.
+    id: 'preview-seller-conversation-02',
+    participantUserId: 'preview-buyer-02',
+    participantName: 'Maya Torres',
+    participantHandle: '@mayatorres',
+    participantInitials: 'MT',
+    participantColor: '#0EA5E9',
+    posterIndex: 2,
+    lastMessage: 'Sent you Thread Cash',
+    lastMessageFromMe: false,
+    lastMessageType: 'thread_cash',
+    minutesAgo: 40,
+    unreadCount: 1,
+    isRequest: false,
+    messages: [
+      { id: 'preview-seller-msg-02-1', fromOfficialOrParticipant: 'them', text: 'Thanks for holding that for me — here you go!', minutesAgo: 41 },
+      {
+        id: 'preview-seller-msg-02-2', fromOfficialOrParticipant: 'them', text: '',
+        attachment: { type: 'thread_cash', meta: { transferId: 'preview-seller-transfer-02', senderId: 'preview-buyer-02', amountCents: '1000', status: 'pending', note: 'Thanks for holding it!' } },
+        minutesAgo: 40,
+      },
+    ],
+  },
+  {
     id: 'preview-seller-conversation-01',
     participantUserId: 'preview-buyer-01',
     participantName: 'Ava Chen',
