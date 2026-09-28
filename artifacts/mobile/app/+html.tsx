@@ -17,12 +17,18 @@ const firstFeedPosterUri = Asset.fromModule(
  * this only runs on web, and only wraps the very first server-rendered
  * paint; it has no effect on native).
  *
- * This is the one place to put truly global, framework-level web polish that
- * can't live in a themed React component: font-loading behavior before the
- * app's JS has hydrated, and small, universal CSS rules (hover/focus/active
- * feedback and cursor for every interactive element, scrollbar styling,
- * keyboard focus rings) that would otherwise mean touching dozens of
- * individual shared components one at a time.
+ * WARNING — this file is NOT applied by this project's actual web build.
+ * `web.output: "single"` (see app.json) does not run Expo Router's
+ * +html.tsx templating; Expo's generic default `index.html` is used as-is
+ * (confirmed by inspecting a real `expo export --platform web` output — no
+ * text from this file, not even the `<meta viewport-fit=cover>`, appears in
+ * it). Any global web CSS/head content needs to be injected at runtime
+ * instead — see lib/webTextRendering.ts's injectWebTextRenderingStyles /
+ * injectWebFocusOutlineStyles, called from lib/bootstrap.ts before any
+ * screen loads, which is the one place proven to actually land in <head>.
+ * This file is kept as documentation of intent / a starting point if the
+ * project ever switches to `web.output: "static"`, but treat every rule
+ * below as dead code until then.
  */
 export default function Root({ children }: { children: React.ReactNode }) {
   return (
