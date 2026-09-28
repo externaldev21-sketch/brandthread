@@ -25,6 +25,7 @@ import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
+import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
 import {
@@ -83,7 +84,7 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
-import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
+import { getVideoFeedPage, loadExactCreatorVideoReplay, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
@@ -104,6 +105,8 @@ export interface CreatorFeedConfig {
   id: string;
   startPostId?: string;
   title?: string;
+  /** Explicit history replay: fetch the exact post even if the creator grid omits it. */
+  exactPost?: boolean;
 }
 
 const THREAD_PAGE_SIZE = 30;
@@ -1010,6 +1013,7 @@ type VideoVisualProps = {
   source: VideoSource;
   isActive: boolean;
   paused: boolean;
+  onWatched?: () => void;
   muted?: boolean;
   posterUri?: string;
   posterSource?: ImageSourcePropType;
@@ -1156,6 +1160,7 @@ function LiveVideoVisual({
   source,
   isActive,
   paused,
+  onWatched,
   muted = false,
   posterUri,
   posterSource,
@@ -1246,6 +1251,7 @@ function LiveVideoVisual({
     return () => subscription.remove();
   }, [isActive, player, progressBottom]);
   const isScreenFocused = useIsFocused();
+  useMeaningfulVideoWatch(player, isActive && !paused && isScreenFocused, onWatched);
   React.useEffect(() => {
     // isFocused is required (not just isActive) so navigating to a modal on
     // top of the feed (e.g. the comments sheet) pauses this clip, and — the
@@ -1393,7 +1399,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange, onFirstImagePa
 // presentational components to them below.
 
 function SpotlightPageImpl({
-  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
+  item, isActive, preload = false, isFirstItem = false, pageWidth, pageHeight, bottomClearance, videoFrameInset, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, onVideoWatched, soundOn, onToggleSound, onFirstFramePainted, reduceMotion = false,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1436,6 +1442,7 @@ function SpotlightPageImpl({
   onOpenComments: (id: string) => void;
   onShopTag: (item: SpotlightItem, tag: SpotlightProductTag) => void;
   onNotInterested: (id: string) => void;
+  onVideoWatched: (id: string) => void;
   /** Whether the app-wide feed sound preference is on. */
   soundOn: boolean;
   onToggleSound: () => void;
@@ -1647,6 +1654,7 @@ function SpotlightPageImpl({
                 isActive={isActive}
                 preload={preload}
                 paused={paused || holdPaused}
+                onWatched={() => onVideoWatched(item.id)}
                 rate={speedActive ? 2 : 1}
                 muted={!soundOn}
                 posterUri={item.videoPosterUri}
@@ -1853,6 +1861,7 @@ const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
   && prev.onShopTag === next.onShopTag
   && prev.onOpenCreator === next.onOpenCreator
   && prev.onNotInterested === next.onNotInterested
+  && prev.onVideoWatched === next.onVideoWatched
   && prev.onToggleSound === next.onToggleSound
   && prev.reduceMotion === next.reduceMotion
 ));
@@ -2018,6 +2027,7 @@ export default function FeedScreen({
   const creatorSource = creatorFeed?.source;
   const creatorId = creatorFeed?.id;
   const creatorStartPostId = creatorFeed?.startPostId;
+  const creatorExactPost = creatorFeed?.exactPost;
   // Search collapsed from its own bar row into a plain icon inside
   // buyerTopRow (TikTok-style), so the floating top overlay is now just
   // topBar's own paddingTop plus that one row's height — single source of
@@ -2182,9 +2192,13 @@ export default function FeedScreen({
       else setFeedRefreshing(true);
       setFeedError(false);
       try {
-        const result = await loadVideoFeedThrough(creatorSource, creatorId, initial ? creatorStartPostId : null);
+        const result = creatorExactPost && creatorSource === 'creator' && creatorStartPostId
+          ? await loadExactCreatorVideoReplay(creatorId, creatorStartPostId)
+          : await loadVideoFeedThrough(creatorSource, creatorId, initial ? creatorStartPostId : null);
         if (feedGenerationRef.current !== generation) return;
-        setSellerFeedPosts(result.posts.map(mapSellerPost).filter((p): p is SpotlightItem => p !== null));
+        const playablePosts = result.posts.map(mapSellerPost).filter((p): p is SpotlightItem => p !== null);
+        if (creatorExactPost && playablePosts[0]?.id !== creatorStartPostId) throw new Error('Video unavailable');
+        setSellerFeedPosts(playablePosts);
         creatorOffsetRef.current = result.nextOffset;
         feedHasMoreRef.current = result.hasMore;
         setFeedHasMore(result.hasMore);
@@ -2251,7 +2265,7 @@ export default function FeedScreen({
         else setFeedRefreshing(false);
       }
     }
-  }, [feedTab, creatorSource, creatorId, creatorStartPostId]);
+  }, [feedTab, creatorSource, creatorId, creatorStartPostId, creatorExactPost, api]);
 
   const loadMoreFeed = useCallback(async () => {
     if (feedLoadingMoreRef.current || !feedHasMoreRef.current || feedLoading || feedRefreshing) return;
@@ -2604,6 +2618,11 @@ export default function FeedScreen({
     viewedPostIdsRef.current.add(id);
     api.posts.interact(id, { type: 'view' }).catch(() => {});
   }, [activeIndex, api, displayItems, userId]);
+
+  const handleVideoWatched = useCallback((id: string) => {
+    if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
+    void api.posts.recordWatchedVideo(id).catch(() => {});
+  }, [api, userId]);
 
   function update(id: string, patch: Partial<EngagementState> | ((e: EngagementState) => Partial<EngagementState>)) {
     setEngagements(prev => {
@@ -3100,6 +3119,7 @@ export default function FeedScreen({
               onOpenComments={handleOpenComments}
               onShopTag={handleShopTag}
               onNotInterested={handleNotInterested}
+              onVideoWatched={handleVideoWatched}
               soundOn={soundOn}
               onToggleSound={toggleSound}
               onFirstFramePainted={contentIndex === 0 ? handleFirstCellPainted : undefined}

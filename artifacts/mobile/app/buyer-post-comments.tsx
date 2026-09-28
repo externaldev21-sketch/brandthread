@@ -29,7 +29,7 @@ import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect, useIsFocused } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import {
   SURFACE, CARD, BORDER,
@@ -44,6 +44,7 @@ import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useApi } from '@/lib/api';
+import { useMeaningfulVideoWatch } from '@/hooks/useMeaningfulVideoWatch';
 import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
 import type { ThreadComment } from '@/lib/safetyTypes';
 import { hapticSelection, hapticLight, hapticSuccess, hapticError, hapticDestructiveConfirm } from '@/lib/haptics';
@@ -544,6 +545,7 @@ export default function BuyerPostCommentsScreen() {
   const router = useRouter();
   const api = useApi();
   const { user } = useUser();
+  const isFocused = useIsFocused();
 
   /**
    * Sheet grows with the keyboard instead of the keyboard eating into a
@@ -669,6 +671,11 @@ export default function BuyerPostCommentsScreen() {
     if (mediaUri && postType === 'video') mediaPlayer.play();
     return () => mediaPlayer.pause();
   }, [mediaPlayer, mediaUri, postType]));
+  useMeaningfulVideoWatch(
+    mediaPlayer,
+    isFocused && !!user?.id && UUID_RE.test(postId) && postType === 'video' && !!mediaUri,
+    () => { void api.posts.recordWatchedVideo(postId).catch(() => {}); },
+  );
 
   const myName = user?.fullName || user?.firstName || user?.username || 'You';
   const myInitials = myName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';

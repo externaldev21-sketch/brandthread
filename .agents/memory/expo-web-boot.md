@@ -37,6 +37,8 @@ Authenticated seller tools cannot treat this navigation bypass as a real Clerk s
 ## Debugging gotcha
 The Screenshot tool captures web pages before async boot completes (sub-second), so it shows the loading state even when the app works — it cannot observe anything time-based. Use the Playwright testing subagent to watch a page over tens of seconds (console timeline, network failures, final render). Verifying signed-in flows: Clerk programmatic login + seeding localStorage (`onboarding_complete`, `user_role`, `splash_seen`) reproduces any auth/role state.
 
+Protected buyer screens have the same boundary as seller tools: selecting a synthetic preview role does not create a Clerk token. A direct Notifications deep-link may show only a loader while its request returns 401, and unauthenticated client-side navigation may redirect to the feed. **Why:** visual checks of a filter row repeatedly captured authentication/loading rather than the rendered screen. **How to apply:** use an authenticated or properly seeded browser session for visual interaction checks; a direct preview screenshot is not proof that the controls are broken or usable.
+
 If Playwright is installed but its downloaded Chromium binary is missing, use the available system Chromium (`/repl/tools/bin/chromium`) as `executablePath` for read-only browser-console inspection instead of installing another browser.
 
 **Why:** The normal Playwright launch failed despite the package being present; the system binary opened the running Expo web preview and captured browser console messages.

@@ -605,6 +605,8 @@ export default function SellerProfileScreen() {
           visible={shareSheetVisible}
           onClose={() => setShareSheetVisible(false)}
           avatarUrl={seller?.avatarUrl ?? null}
+          profileUsername={seller?.username}
+          profileBrandName={seller?.brandName}
           sellerExtra={{
             rating,
             products: videos.posts.slice(0, 3).map((post) => ({ id: post.id, uri: post.thumbnailUri ?? post.mediaUris[0] })),

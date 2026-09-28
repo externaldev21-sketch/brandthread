@@ -90,3 +90,5 @@
 - [Concurrent Git rebase](concurrent-git-rebase.md) — a shared checkout can be rebased by another session; protect the original branch and conflict worktree before aborting.
 - [GitHub design merge priority](github-design-merge-priority.md) — reviewed origin/dev UI files take precedence in sync conflicts; retain nonconflicting local runtime fixes.
 - [Swipe action color bleed](swipe-action-color-bleed.md) — colored actions behind Activity rows can appear as thin lines on device even when web looks clean; closed rows must not mount them.
+- [Recently watched semantics](recently-watched-semantics.md) — watch history means actual video playback, not a feed impression; show only the last 36 hours and currently accessible posts.
+- [Expo DevTools on Nix](expo-devtools-nix.md) — the optional RN DevTools binary can lack libglib while Metro and the web preview still work.

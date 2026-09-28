@@ -9,6 +9,8 @@ Brandthread web is the existing Expo Router product exported for browser hosting
 
 **How to apply:** Build browser releases with Expo's web static export and serve deep links through an HTML-only SPA fallback. Published builds, metadata, API-generated links, and hosted-flow callbacks use `https://brandthread.app`; local previews keep their active development origin. In production, launch the Node static server directly (not through a package-manager wrapper) and use `/status` as the explicit startup probe. Keep preview auth bypasses explicit and development-only. Camera capture, native push, biometrics, Agora live video, and calls must show a clear mobile-only state on web; never report success or silently no-op.
 
+Until the browser static export is actually the published root service, the deployed host can report a successful build yet return 404 for `/` and `/u/...` while still answering API requests. **Why:** metadata alone did not prove shared profile links could open outside the app. **How to apply:** test the real public URL with an existing public username after publishing; keep the API host's signed-out `/u/:username` landing available so shared links do not depend on a mobile web bundle being deployed. Never share a fabricated preview username as a public profile.
+
 React Native `Alert.alert` is not a visible validation surface in Expo web. Forms shared with web must show blocking validation and request failures inline as well; a native alert may supplement, but not replace, that feedback.
 
 **Why:** A product form could reject an incomplete publish while appearing to do nothing in the browser preview, even though its native alert path worked.
