@@ -35,6 +35,10 @@ import {
   type DmMessagingState,
 } from '@/components/safety/DmSafety';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
+import { CallLogBubble } from '@/components/calls/CallLogBubble';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import type { CallLogEntry } from '@/lib/calls/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,15 +107,27 @@ function attachmentIcon(type: MsgAttachment['type']): keyof typeof Feather.glyph
   }
 }
 
-type ListRow = { type: 'date'; date: string } | { type: 'message'; msg: Msg };
+type ListRow =
+  | { type: 'date'; date: string }
+  | { type: 'message'; msg: Msg }
+  | { type: 'call_log'; entry: CallLogEntry };
 
-function groupByDate(msgs: Msg[]): ListRow[] {
+/** Merges the (client-only, PR1) call log into the message timeline by
+ *  timestamp, alongside the real messages — see CallSessionContext's own doc
+ *  comment on why this log isn't backend-persisted yet. */
+function groupByDate(msgs: Msg[], callLog: CallLogEntry[] = []): ListRow[] {
+  type Item = { ts: number; row: ListRow };
+  const items: Item[] = [
+    ...msgs.map((msg) => ({ ts: msg.ts, row: { type: 'message' as const, msg } })),
+    ...callLog.map((entry) => ({ ts: entry.startedAt, row: { type: 'call_log' as const, entry } })),
+  ].sort((a, b) => a.ts - b.ts);
+
   const rows: ListRow[] = [];
   let last = '';
-  for (const msg of msgs) {
-    const d = formatDate(msg.ts);
+  for (const item of items) {
+    const d = formatDate(item.ts);
     if (d !== last) { rows.push({ type: 'date', date: d }); last = d; }
-    rows.push({ type: 'message', msg });
+    rows.push(item.row);
   }
   return rows;
 }
@@ -247,6 +263,38 @@ export default function SellerConversationScreen() {
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
 
+  const { startCall, simulateIncomingCall } = useCallSession();
+  const callLog = useCallLog(id ?? '');
+  const myName = user?.fullName || user?.username || 'You';
+  const myInitials = (myName[0] ?? '?').toUpperCase();
+
+  // Preview/QA only: ?bt_call=incoming|incoming_video rings a simulated
+  // incoming call ~500ms after mount, so the incoming-call screen can be
+  // screenshotted without a second device. Latches on boot, same pattern as
+  // BOOT_PREVIEW/BOOT_EMPTY in lib/live/liveProvider.ts — a no-op outside dev
+  // preview mode.
+  const bootCallPreviewRef = useRef<string | null>(
+    isSellerDevPreview() && typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('bt_call')
+      : null,
+  );
+  useEffect(() => {
+    const bootCallPreview = bootCallPreviewRef.current;
+    if (!bootCallPreview || !id || !other) return;
+    const mode: 'voice' | 'video' = bootCallPreview === 'incoming_video' ? 'video' : 'voice';
+    const timer = setTimeout(() => {
+      simulateIncomingCall({
+        conversationId: id,
+        surface: 'seller',
+        mode,
+        peer: { id: other.userId, name: other.name, initials: other.initials, color: other.color, avatarUri: null },
+        me: { id: myId, name: myName, initials: myInitials, color: PURPLE },
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, other?.userId]);
+
   // ── Attach helpers ──────────────────────────────────────────────────────────
 
   async function openAttachPicker() {
@@ -264,14 +312,19 @@ export default function SellerConversationScreen() {
 
   function handleStartCall(mode: 'voice' | 'video') {
     if (!id) return;
-    const qs = new URLSearchParams({
+    void startCall({
       conversationId: id,
-      participantName: other?.name ?? 'User',
-      participantInitials: other?.initials ?? '?',
-      participantColor: other?.color ?? PURPLE,
+      surface: 'seller',
       mode,
+      peer: {
+        id: other?.userId ?? '',
+        name: other?.name ?? 'User',
+        initials: other?.initials ?? '?',
+        color: other?.color ?? PURPLE,
+        avatarUri: null,
+      },
+      me: { id: myId, name: myName, initials: myInitials, color: PURPLE },
     });
-    router.push(('/call-screen?' + qs.toString()) as never);
   }
 
   // ── Photo / video picker ──────────────────────────────────────────────────────
@@ -555,6 +608,16 @@ export default function SellerConversationScreen() {
         </View>
       );
     }
+    if (item.type === 'call_log') {
+      return (
+        <View style={[s.msgOuter, { justifyContent: 'flex-start' }]}>
+          <CallLogBubble
+            entry={item.entry}
+            onCallBack={() => handleStartCall(item.entry.mode)}
+          />
+        </View>
+      );
+    }
     const { msg } = item;
     const isOwn = msg.fromId === myId;
     const removed = (msg as { removedByModeration?: boolean }).removedByModeration === true;
@@ -718,8 +781,12 @@ export default function SellerConversationScreen() {
       ) : (
         <FlatList
           ref={flatListRef}
-          data={groupByDate(messages)}
-          keyExtractor={(item, i) => (item.type === 'date' ? `date-${item.date}-${i}` : item.msg.id)}
+          data={groupByDate(messages, callLog)}
+          keyExtractor={(item, i) => (
+            item.type === 'date' ? `date-${item.date}-${i}`
+              : item.type === 'call_log' ? `call-${item.entry.id}`
+              : item.msg.id
+          )}
           renderItem={renderItem}
           contentContainerStyle={s.listContent}
           showsVerticalScrollIndicator={false}

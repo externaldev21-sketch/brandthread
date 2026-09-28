@@ -29,31 +29,39 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   SectionList,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type ViewToken,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, GRAD_DARK_FADE, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/components/layout';
+import { TabBarGlassZone } from '@/components/buyer-nav/TabBarGlassZone';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, SheetHandle } from '@/components/BrandthreadUI';
 import { ThemedRefreshControl } from '@/components/ui';
+import { showActionSheet } from '@/components/ui/ActionSheet';
+import SwipeableActions from '@/components/SwipeableActions';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
-import { hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { isPreviewActivityEnabled, getPreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri } from '@/lib/previewActivity';
 import {
   ACTIVITY_PAGE_SIZE,
@@ -83,7 +91,7 @@ import {
   watchActivityRealtime,
   type SuggestedPerson,
 } from '@/services/activityService';
-import { setSellerFollowing } from '@/services/socialService';
+import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
 import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-cash/ThreadCashBill';
 
 const EMPTY_ICON = 'activity' as const;
@@ -91,7 +99,16 @@ const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and 
 const AVATAR_SIZE = 40;
 
 type Styles = ReturnType<typeof makeStyles>;
-type ListSection = ActivitySection<ActivityRow> & { data: ActivityRow[] };
+// Instagram's own Activity taxonomy (Highlights pinned, then Today /
+// Yesterday / Last 7 days / Last 30 days) — see docs/activity-flows.md §1
+// for why this is derived here rather than in lib/activity.ts's own
+// (already-tested) New/Today/This week/This month/Earlier bucket keys.
+type DisplaySectionKey = 'highlights' | 'today' | 'yesterday' | 'last_7_days' | 'last_30_days';
+type ListSection = { key: DisplaySectionKey; title: string; items: ActivityRow[]; data: ActivityRow[] };
+const DISPLAY_TITLES: Record<DisplaySectionKey, string> = {
+  highlights: 'Highlights', today: 'Today', yesterday: 'Yesterday',
+  last_7_days: 'Last 7 days', last_30_days: 'Last 30 days',
+};
 
 // ─── Filter chips ───────────────────────────────────────────────────────────
 // A horizontally scrolling row of pill chips below the header, mirroring
@@ -289,6 +306,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
   onPress,
   onDismiss,
   onFollowBack,
+  onOpenMenu,
 }: {
   row: ActivityRow;
   unread: boolean;
@@ -298,6 +316,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
   onPress: (row: ActivityRow) => void;
   onDismiss: (row: ActivityRow) => void;
   onFollowBack: (row: ActivityRow) => void;
+  onOpenMenu: (row: ActivityRow) => void;
 }) {
   const { theme } = useAppTheme();
   const parts = activityMessage(row);
@@ -316,12 +335,11 @@ const ActivityRowView = React.memo(function ActivityRowView({
   // like an ordinary detail caption.
   const cashAmount = row.type === 'thread_cash_received' ? row.body?.match(/\$[\d,.]+/)?.[0] : null;
 
-  const longPress = () => {
-    Alert.alert('Options', undefined, [
-      { text: 'Dismiss', style: 'destructive', onPress: () => onDismiss(row) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
+  // Long-press opens the same "..." menu the swipe reveal does — Instagram
+  // has no long-press affordance of its own on this row, but this app's
+  // rows have historically supported long-press-for-options, and there's no
+  // reason to drop that just because swipe now also reaches the menu.
+  const longPress = () => onOpenMenu(row);
 
   // Trailing thumbnail (post/story image) vs the Follow control are mutually
   // exclusive, but both must render through the SAME sibling slot at the
@@ -342,7 +360,32 @@ const ActivityRowView = React.memo(function ActivityRowView({
       </View>
     ) : null;
 
+  // Swipe left reveals "..." (open the menu) then a red trash icon (delete
+  // this notification) — Mobbin: "Instagram iOS Removing a follower" flow,
+  // screen 1 (https://mobbin.com/screens/c404cbe7-e8c0-4b09-904c-62ba9d1b0a71).
+  // Monochrome swap: Instagram's own row background for "...", theme.error
+  // (not Instagram's red-on-red, but the same destructive semantic) for trash.
+  const swipeActions = useMemo(() => [
+    {
+      key: 'more',
+      icon: 'more-horizontal' as const,
+      color: theme.cardElevated,
+      iconColor: theme.text,
+      accessibilityLabel: 'More options',
+      onPress: () => onOpenMenu(row),
+    },
+    {
+      key: 'delete',
+      icon: 'trash-2' as const,
+      color: theme.error,
+      iconColor: '#FFFFFF',
+      accessibilityLabel: 'Delete this notification',
+      onPress: () => onDismiss(row),
+    },
+  ], [onDismiss, onOpenMenu, row, theme.cardElevated, theme.error, theme.text]);
+
   return (
+    <SwipeableActions actions={swipeActions}>
     <View style={styles.row}>
       {/*
         The Follow back / Following control is a real interactive element,
@@ -423,6 +466,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
         </PressableScale>
       ) : trailingThumb}
     </View>
+    </SwipeableActions>
   );
 });
 
@@ -531,7 +575,13 @@ export default function ActivityCenterScreen() {
   // geometry calculation (window size + safe-area insets), not dependent on
   // actually being mounted inside the Tabs navigator, so this is safe to
   // call here.
-  const screenPadding = useScreenPadding();
+  // withTabBarInset: false — the list itself only reserves a small clearance
+  // (not the full tab-bar height) so its rows now scroll IN UNDER the glass
+  // zone, like iOS, and are visible (softly, through blur) right up to the
+  // bar instead of stopping in the empty reserved gap above it.
+  const screenPadding = useScreenPadding({ withTabBarInset: false });
+  const glassZoneHeight = useBuyerTabBarInset() + SP.xl;
+  const { width: windowWidth } = useWindowDimensions();
   const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>();
   const router = useRouter();
   const { role } = useRole();
@@ -549,6 +599,10 @@ export default function ActivityCenterScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [followStates, setFollowStates] = useState<Record<string, 'pending' | 'done'>>({});
+  const [removeFollowerTarget, setRemoveFollowerTarget] = useState<ActivityRow | null>(null);
+  const [removingFollower, setRemovingFollower] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [suggested, setSuggested] = useState<SuggestedPerson[]>([]);
   const [suggestedFollowState, setSuggestedFollowState] = useState<Record<string, 'pending' | 'done'>>({});
@@ -685,23 +739,54 @@ export default function ActivityCenterScreen() {
       filteredItems.map((item) => (sessionNew.has(item.id) ? { ...item, isRead: false } : item)),
       new Date(now),
     );
-    // Threads only has Today / This week / Earlier — fold the age-agnostic
-    // "New" (unread) bucket into Today, and "This month" into Earlier,
-    // rather than the underlying 5-bucket recency model's own labels.
-    const merged = new Map<'today' | 'this_week' | 'earlier', ActivityRow[]>();
-    const titles: Record<'today' | 'this_week' | 'earlier', string> = {
-      today: 'Today', this_week: 'This week', earlier: 'Earlier',
-    };
-    const targetOf: Record<ActivitySectionKey, 'today' | 'this_week' | 'earlier'> = {
-      new: 'today', today: 'today', this_week: 'this_week', this_month: 'earlier', earlier: 'earlier',
+
+    // Highlights: unread, single-actor, still-actionable follow-back rows —
+    // pinned above everything else (Mobbin's Activity tab reference), pulled
+    // out of whatever recency bucket they'd otherwise land in so they don't
+    // also render a second time down in Today.
+    const highlightIds = new Set<string>();
+    const highlights: ActivityRow[] = [];
+    for (const section of raw) {
+      for (const row of section.items) {
+        if (isFollowBackRow(row) && !highlights.some((h) => h.key === row.key)) {
+          highlights.push(row);
+          highlightIds.add(row.key);
+        }
+      }
+    }
+
+    // Today / Yesterday / Last 7 days / Last 30 days: New+Today fold into
+    // Today; the "this week" bucket (1-6 days old) splits by calendar day
+    // into Yesterday vs the rest of Last 7 days; This month + Earlier both
+    // fold into Last 30 days (see docs/activity-flows.md §1).
+    const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const yesterdayStart = dayStart(new Date(now - 24 * 60 * 60 * 1000));
+    const todayStart = dayStart(new Date(now));
+
+    const buckets: Record<Exclude<DisplaySectionKey, 'highlights'>, ActivityRow[]> = {
+      today: [], yesterday: [], last_7_days: [], last_30_days: [],
     };
     for (const section of raw) {
-      const target = targetOf[section.key];
-      merged.set(target, [...(merged.get(target) ?? []), ...section.items]);
+      for (const row of section.items) {
+        if (highlightIds.has(row.key)) continue;
+        if (section.key === 'new' || section.key === 'today') {
+          buckets.today.push(row);
+        } else if (section.key === 'this_week') {
+          const createdDay = dayStart(new Date(row.createdAt));
+          if (createdDay >= yesterdayStart && createdDay < todayStart) buckets.yesterday.push(row);
+          else buckets.last_7_days.push(row);
+        } else {
+          buckets.last_30_days.push(row);
+        }
+      }
     }
-    return (['today', 'this_week', 'earlier'] as const)
-      .filter((key) => (merged.get(key)?.length ?? 0) > 0)
-      .map((key) => ({ key, title: titles[key], items: merged.get(key)!, data: merged.get(key)! }));
+
+    const result: ListSection[] = [];
+    if (highlights.length > 0) result.push({ key: 'highlights', title: DISPLAY_TITLES.highlights, items: highlights, data: highlights });
+    (['today', 'yesterday', 'last_7_days', 'last_30_days'] as const).forEach((key) => {
+      if (buckets[key].length > 0) result.push({ key, title: DISPLAY_TITLES[key], items: buckets[key], data: buckets[key] });
+    });
+    return result;
   }, [filteredItems, sessionNew, now]);
 
   const hasUnread = items.some((item) => !item.isRead);
@@ -771,6 +856,85 @@ export default function ActivityCenterScreen() {
     }
   }, [tracker]);
 
+  const showToast = useCallback((message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(message);
+    toastTimer.current = setTimeout(() => setToast(null), 1600);
+  }, []);
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
+  // "See less" — mutes this row's notification type going forward (server-
+  // persisted, see POST /api/social/see-less) and hides everything of that
+  // type already on screen so the effect is visible immediately.
+  const handleSeeLess = useCallback(async (row: ActivityRow) => {
+    setItems((prev) => prev.filter((item) => item.type !== row.type));
+    try {
+      await seeLessNotificationType(row.type);
+    } catch {
+      // The row stays hidden locally even if the persisted preference failed
+      // to save — not worth restoring noise the person just asked to lose.
+    }
+  }, []);
+
+  // "Block" from the Activity "..." menu — reuses the same server endpoint
+  // profile-level blocking uses. After blocking, that actor's activity must
+  // also stop showing here (the server now filters it too, see
+  // notifications-feed.ts), so every row from them is dropped immediately.
+  const handleBlockFromMenu = useCallback(async (row: ActivityRow) => {
+    const actor = row.actors[0];
+    if (!actor?.id) return;
+    hapticDestructiveConfirm();
+    try {
+      await blockUser({ userId: actor.id, name: actor.name, handle: '', initials: actor.initials, color: actor.color ?? '#3F3F46' });
+      setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
+      showToast('Blocked');
+    } catch {
+      Alert.alert('Could not block', 'Please try again in a moment.');
+    }
+  }, [showToast]);
+
+  // Instagram's "..." menu: See less always, Remove follower only on a
+  // single-actor new-follower row, Block always (Mobbin: "Instagram iOS
+  // Removing a follower" flow, screen 2 —
+  // https://mobbin.com/screens/6b700e40-644a-4340-a924-613392e33b04).
+  const handleOpenMenu = useCallback((row: ActivityRow) => {
+    const actor = row.actors[0];
+    const canRemoveFollower = row.type === 'new_follower' && row.actorCount === 1 && !!actor?.id;
+    const buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [
+      { text: 'See less', onPress: () => { void handleSeeLess(row); } },
+    ];
+    if (canRemoveFollower) {
+      buttons.push({ text: 'Remove follower', style: 'destructive', onPress: () => setRemoveFollowerTarget(row) });
+    }
+    if (actor?.id) {
+      buttons.push({ text: 'Block', style: 'destructive', onPress: () => { void handleBlockFromMenu(row); } });
+    }
+    buttons.push({ text: 'Cancel', style: 'cancel' });
+    showActionSheet(undefined, undefined, buttons);
+  }, [handleBlockFromMenu, handleSeeLess]);
+
+  // Remove-follower confirm sheet's destructive "Remove" — Mobbin screens
+  // 3/4 (confirm sheet) and 5 (the "Removed" toast + row state update):
+  // https://mobbin.com/screens/11397cf3-a65b-41d1-9e13-9518ed5cc830
+  // https://mobbin.com/screens/674b1826-5513-4f83-ad23-89b4454e2129
+  const handleConfirmRemoveFollower = useCallback(async () => {
+    const row = removeFollowerTarget;
+    const actor = row?.actors[0];
+    if (!row || !actor?.id) return;
+    hapticDestructiveConfirm();
+    setRemovingFollower(true);
+    try {
+      await removeFollower(actor.id);
+      setItems((prev) => prev.filter((item) => item.actorId !== actor.id));
+      setRemoveFollowerTarget(null);
+      showToast('Removed');
+    } catch {
+      Alert.alert('Could not remove follower', 'Please try again in a moment.');
+    } finally {
+      setRemovingFollower(false);
+    }
+  }, [removeFollowerTarget, showToast]);
+
   const handleMarkAll = useCallback(async () => {
     hapticPrimaryAction();
     const previous = itemsRef.current;
@@ -819,8 +983,9 @@ export default function ActivityCenterScreen() {
       onPress={handlePress}
       onDismiss={handleDismiss}
       onFollowBack={handleFollowBack}
+      onOpenMenu={handleOpenMenu}
     />
-  ), [followStates, handleDismiss, handleFollowBack, handlePress, now, readIds, styles]);
+  ), [followStates, handleDismiss, handleFollowBack, handleOpenMenu, handlePress, now, readIds, styles]);
 
   const renderSectionHeader = useCallback(({ section }: { section: ListSection }) => (
     <View style={styles.sectionHeader}>
@@ -912,20 +1077,153 @@ export default function ActivityCenterScreen() {
         />
       )}
 
-      {/* Same bottom fade treatment as Messages: blends the last row into
-          the floating tab bar instead of an abrupt hard edge. */}
+      {/* Frosted glass over the live list behind the floating tab bar —
+          replaces the old opaque-black `GRAD_DARK_FADE` scrim, which read as
+          a solid black bar swallowing the last row ("Vale Studio reposted
+          your post" fading into black) instead of a soft, legible-through
+          blur like iOS. */}
       {status === 'ready' && sections.length > 0 && (
-        <LinearGradient
-          pointerEvents="none"
-          colors={GRAD_DARK_FADE}
-          start={{ x: 0, y: 1 }}
-          end={{ x: 0, y: 0 }}
-          style={[styles.bottomFade, { height: screenPadding.bottom + SP.xl }]}
-        />
+        <TabBarGlassZone height={glassZoneHeight} width={windowWidth} tint="dark" />
       )}
+
+      <RemoveFollowerSheet
+        row={removeFollowerTarget}
+        busy={removingFollower}
+        styles={styles}
+        onCancel={() => setRemoveFollowerTarget(null)}
+        onConfirm={() => { void handleConfirmRemoveFollower(); }}
+      />
+      <CenteredToast message={toast} />
     </View>
   );
 }
+
+// ─── Remove-follower confirm sheet ─────────────────────────────────────────
+// Mobbin: "Instagram iOS Removing a follower" flow, screens 3/4 —
+// https://mobbin.com/screens/11397cf3-a65b-41d1-9e13-9518ed5cc830
+// Avatar, "Remove follower?", "We won't tell {name} they were removed from
+// your followers.", a destructive "Remove" and a "Cancel" — copy kept as
+// close to Instagram's own wording as the app's terms allow.
+
+function RemoveFollowerSheet({ row, busy, styles, onCancel, onConfirm }: {
+  row: ActivityRow | null;
+  busy: boolean;
+  styles: Styles;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const actor = row?.actors[0];
+  return (
+    <Modal visible={!!row} transparent animationType="fade" onRequestClose={onCancel}>
+      <Pressable style={sheetStyles.backdrop} onPress={busy ? undefined : onCancel} accessibilityLabel="Close">
+        <Pressable
+          style={[sheetStyles.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.lg }]}
+          onPress={() => {}}
+        >
+          <SheetHandle />
+          {actor ? (
+            <View style={sheetStyles.content}>
+              <Avatar actor={actor} size={64} styles={styles} />
+              <Text style={[sheetStyles.title, { color: theme.text }]}>Remove follower?</Text>
+              <Text style={[sheetStyles.body, { color: theme.muted }]}>
+                We won&apos;t tell {actor.name} they were removed from your followers.
+              </Text>
+            </View>
+          ) : null}
+          {/* Text-row buttons (not filled pills) — matches the native
+              iOS action-sheet structure Instagram's own confirm sheet uses:
+              a hairline divider above each full-width row. */}
+          <PressableScale
+            style={sheetStyles.removeBtn}
+            onPress={onConfirm}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel="Remove follower"
+          >
+            {busy ? <ActivityIndicator size="small" color={theme.error} /> : (
+              <Text style={[sheetStyles.removeText, { color: theme.error }]}>Remove</Text>
+            )}
+          </PressableScale>
+          <PressableScale
+            style={sheetStyles.cancelBtn}
+            onPress={onCancel}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+          >
+            <Text style={[sheetStyles.cancelText, { color: theme.text }]}>Cancel</Text>
+          </PressableScale>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ─── Centered "Removed" toast ───────────────────────────────────────────────
+// Small, brief, centered — not the app's usual bottom-anchored wide Snackbar.
+// Mobbin: "Instagram iOS Removing a follower" flow, screen 5 —
+// https://mobbin.com/screens/674b1826-5513-4f83-ad23-89b4454e2129
+
+function CenteredToast({ message }: { message: string | null }) {
+  const { theme } = useAppTheme();
+  if (!message) return null;
+  return (
+    <Animated.View
+      entering={FadeIn.duration(150)}
+      exiting={FadeOut.duration(150)}
+      pointerEvents="none"
+      style={sheetStyles.toastWrap}
+    >
+      <View style={[sheetStyles.toastPill, { backgroundColor: theme.cardElevated }]}>
+        <Text style={[sheetStyles.toastText, { color: theme.text }]}>{message}</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+const sheetStyles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  sheet: {
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    paddingTop: SP.sm,
+    paddingHorizontal: SP.lg,
+  },
+  content: { alignItems: 'center', paddingVertical: SP.lg, gap: SP.sm },
+  title: { fontFamily: FONT.bold, fontSize: FS.lg },
+  body: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingHorizontal: SP.lg, lineHeight: 20 },
+  removeBtn: {
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128,128,128,0.2)',
+  },
+  removeText: { fontFamily: FONT.semibold, fontSize: FS.md },
+  cancelBtn: {
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128,128,128,0.2)',
+  },
+  cancelText: { fontFamily: FONT.semibold, fontSize: FS.md },
+  toastWrap: {
+    position: 'absolute',
+    top: '42%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  toastPill: {
+    paddingHorizontal: SP.lg,
+    paddingVertical: SP.sm + 2,
+    borderRadius: RADIUS.pill,
+  },
+  toastText: { fontFamily: FONT.semibold, fontSize: FS.base },
+});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -1019,6 +1317,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     minHeight: 68,
     width: '100%',
     overflow: 'hidden',
+    // Opaque — a transparent row let SwipeableActions' revealed "..."/trash
+    // buttons (always rendered behind it, just off-screen at rest) show
+    // through at the trailing edge on web, where CSS paints a `position:
+    // absolute` sibling above a plain static one regardless of DOM order.
+    backgroundColor: theme.background,
   },
   // The Follow back / Following control (or the trailing thumbnail — see
   // `trailingThumb` at the call site) renders as a sibling of this

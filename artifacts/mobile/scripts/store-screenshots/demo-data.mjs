@@ -146,13 +146,27 @@ function publicDrop(drop) {
 }
 
 const TRENDING = [
-  { brand: 'northline', caption: 'Drop 04 is live. Ember hoodies restocked in every size.' },
-  { brand: 'field', caption: 'Trail Runner 02 — built for city miles and weekend trails.' },
-  { brand: 'quiet', caption: 'Moss, midnight and bone. The loopback capsule lands Friday.' },
-  { brand: 'ember', caption: 'Behind the seams: how we cut the Onyx anorak.' },
-  { brand: 'northline', caption: 'Studio day. Sampling the FW26 cargo in rust.' },
-  { brand: 'field', caption: 'Clay or stone? Vote for the next colourway.' },
-].map((row, i) => ({ id: `post_trending_${i + 1}`, rank: i + 1, brand: BRANDS[row.brand].name, brandId: BRANDS[row.brand].id, caption: row.caption }));
+  // No `imageUri` here on purpose — the real /api/public/trending contract
+  // has no image field today (metadata only), so this fixture matches that
+  // real gap rather than papering over it; Discover's grid falls back to a
+  // monochrome initials+caption tile for these. The first row does carry a
+  // productTags array so the Discover viewer's "Shop the look" pill (which
+  // only ever shows for a post with a real seller product tag) has one real
+  // example to open in a screenshot — a forward-compatible field our own
+  // client mapping (lib/discoverFeed.ts) reads defensively, not something
+  // the real endpoint sends yet.
+  { brand: 'northline', caption: 'Drop 04 is live. Ember hoodies restocked in every size.', mediaType: 'photo', likesCount: 4210, commentsCount: 96, verified: true, productTags: [{ productId: 'prod_nl_hoodie_ember', productName: 'Heavyweight Hoodie — Ember', priceCents: 9800 }] },
+  { brand: 'field', caption: 'Trail Runner 02 — built for city miles and weekend trails.', mediaType: 'photo', likesCount: 3180, commentsCount: 54, verified: true },
+  { brand: 'quiet', caption: 'Moss, midnight and bone. The loopback capsule lands Friday.', mediaType: 'video', likesCount: 2870, commentsCount: 41 },
+  { brand: 'ember', caption: 'Behind the seams: how we cut the Onyx anorak.', mediaType: 'video', likesCount: 2340, commentsCount: 38, verified: true },
+  { brand: 'northline', caption: 'Studio day. Sampling the FW26 cargo in rust.', mediaType: 'photo', likesCount: 1920, commentsCount: 22 },
+  { brand: 'field', caption: 'Clay or stone? Vote for the next colourway.', mediaType: 'photo', likesCount: 1440, commentsCount: 65 },
+].map((row, i) => ({
+  id: `post_trending_${i + 1}`, rank: i + 1, brand: BRANDS[row.brand].name, brandId: BRANDS[row.brand].id,
+  caption: row.caption, mediaType: row.mediaType,
+  likesCount: row.likesCount, commentsCount: row.commentsCount, verified: !!row.verified,
+  productTags: row.productTags,
+}));
 
 // ─── Buyer Search screen (search / suggested / categories / people) ───────────
 
@@ -562,7 +576,38 @@ export function respond({ method, path, query, role, options = {} }) {
     };
   }
   if (p === '/buyer/cart') return options.emptyCart ? { items: [], savedItems: [] } : CART;
-  if (p === '/buyer/notifications') return [];
+  // Seeded so the Activity redesign (swipe/menu/remove-follower/block, see
+  // docs/activity-flows.md) has real rows to screenshot: two single-actor
+  // new-follower rows (one unread → Highlights, one read → Today) and one
+  // like row with a thumbnail.
+  if (p === '/buyer/notifications') {
+    return [
+      {
+        id: 'n-follow-1', category: 'social', type: 'new_follower',
+        title: 'Priya Shah started following you', body: '', isRead: false, isMuted: false,
+        actorId: 'demo-follower-1', actorName: 'Priya Shah', actorHandle: '@priyashah',
+        actorInitials: 'PS', actorColor: '#8B5CF6',
+        targetId: 'demo-follower-1', targetType: 'user', cta: 'Follow back',
+        createdAt: iso(6 * HOUR),
+      },
+      {
+        id: 'n-follow-2', category: 'social', type: 'new_follower',
+        title: 'Marcus Webb started following you', body: '', isRead: true, isMuted: false,
+        actorId: 'demo-follower-2', actorName: 'Marcus Webb', actorHandle: '@marcusw',
+        actorInitials: 'MW', actorColor: '#EC4899',
+        targetId: 'demo-follower-2', targetType: 'user', cta: 'Follow back',
+        createdAt: iso(1 * DAY + 2 * HOUR),
+      },
+      {
+        id: 'n-like-1', category: 'social', type: 'post_like',
+        title: 'Jordan Lee liked your post', body: '', isRead: true, isMuted: false,
+        actorId: 'demo-liker-1', actorName: 'Jordan Lee', actorHandle: '@jordanlee',
+        actorInitials: 'JL', actorColor: '#3B82F6',
+        targetId: 'post-1', targetType: 'post', targetImageUrl: PUBLIC_PRODUCTS[0]?.images?.[0] ?? null,
+        createdAt: iso(3 * DAY),
+      },
+    ];
+  }
   if (p === '/shipping-rates/calculate') return { shippingCents: 1200, rateName: 'Express courier (2–3 days)', isFree: false };
 
   // Seller
