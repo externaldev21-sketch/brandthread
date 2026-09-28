@@ -29,6 +29,7 @@ import {
   MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
 } from '@/services/socialService';
 import type { BuyerPost, Comment } from '@/services/socialTypes';
+import { getPreviewActivityPost } from '@/lib/previewActivity';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
@@ -79,6 +80,25 @@ function PostMedia({
   );
 }
 
+/**
+ * Preview only: the viewer's seeded post an Activity row points at, after the
+ * real lookups come back empty (item 82) — its real photo and counts rather
+ * than a blank placeholder. `null` for every id outside the preview seed.
+ */
+function previewPost(postId: string | undefined): BuyerPost | null {
+  const seed = postId ? getPreviewActivityPost(postId) : undefined;
+  if (!seed) return null;
+  return {
+    id: seed.id, authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE,
+    authorInitials: MY_INITIALS, authorColor: MY_COLOR, authorAccountType: 'buyer',
+    feedEligibility: 'profile_only', profileVisibility: 'public', type: 'photo',
+    caption: '', hashtags: [], mediaColors: [], mediaUrl: seed.mediaUrl,
+    likesCount: seed.likesCount, commentsCount: seed.commentsCount, repostsCount: seed.repostsCount,
+    likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
+    createdAt: seed.createdAt, updatedAt: seed.createdAt,
+  };
+}
+
 export default function BuyerPostViewer() {
   const { userId } = useAuth();
   const api = useApi();
@@ -118,8 +138,15 @@ export default function BuyerPostViewer() {
   const isOwner = post !== null && post.authorId === MY_USER_ID;
 
   const loadPost = useCallback(async () => {
-    const all = await getMyPosts();
-    const found = all.find(p => p.id === params.postId) ?? await getPostById(params.postId);
+    let found: BuyerPost | null = null;
+    try {
+      const all = await getMyPosts();
+      found = all.find(p => p.id === params.postId) ?? await getPostById(params.postId);
+    } catch {
+      // A failed lookup leaves the placeholder, as before — or, in the
+      // preview, falls through to the seeded post below.
+    }
+    found = found ?? previewPost(params.postId);
     if (found) {
       setPost(found);
       setLiked(found.likedByMe ?? false);

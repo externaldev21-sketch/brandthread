@@ -29,6 +29,7 @@ vi.mock('react-native', () => {
     View: nativeComponent('View'),
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
+    AccessibilityInfo: { isReduceMotionEnabled: () => Promise.resolve(false) },
     Animated: {
       Value: AnimatedValue,
       View: nativeComponent('AnimatedView'),
@@ -56,7 +57,7 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   }),
 }));
 
-import { OrderProgressTimeline } from '@/components/orders/OrderProgressTimeline';
+import { OrderProgressTimeline, fmtEstimate, stepIndex } from '@/components/orders/OrderProgressTimeline';
 
 function findAllText(root: ReactTestInstance): string[] {
   return root.findAllByType('Text' as never).map((n) => {
@@ -80,7 +81,7 @@ describe('OrderProgressTimeline', () => {
       );
     });
     const texts = findAllText(renderer!.root);
-    expect(texts).toEqual(expect.arrayContaining(['Order placed', 'Processing', 'Shipped', 'Out for delivery', 'Delivered']));
+    expect(texts).toEqual(expect.arrayContaining(['Order placed', 'Confirmed', 'Shipped', 'Out for delivery', 'Delivered']));
   });
 
   it('marks the shipped step done and surfaces a tap-to-track chip with carrier + tracking number', () => {
@@ -123,6 +124,56 @@ describe('OrderProgressTimeline', () => {
     const texts = findAllText(renderer!.root);
     expect(texts).toContain('Order cancelled');
     expect(texts).not.toContain('Out for delivery');
+  });
+
+  it('item 107: placed → confirmed → shipped → out for delivery → delivered, current step selected', () => {
+    expect(stepIndex('new', undefined)).toBe(0);
+    expect(stepIndex('new', undefined, '2026-01-01T10:02:00Z')).toBe(1);
+    expect(stepIndex('processing', undefined)).toBe(1);
+    expect(stepIndex('shipped', 'in_transit')).toBe(2);
+    expect(stepIndex('shipped', 'out_for_delivery')).toBe(3);
+    expect(stepIndex('delivered', 'delivered')).toBe(4);
+
+    act(() => {
+      renderer = create(
+        <OrderProgressTimeline
+          status="shipped" createdAt="2026-01-01T10:00:00Z" paidAt="2026-01-01T10:02:00Z"
+          shippedAt="2026-01-02T14:30:00Z" trackingStatus="in_transit" estimatedDelivery="2026-01-06"
+        />,
+      );
+    });
+    const selected = renderer!.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityState?.selected === true);
+    expect(selected.map((n) => n.props.testID)).toEqual(['order-step-shipped']);
+    const texts = findAllText(renderer!.root);
+    // Confirmed carries the real payment time; Delivered carries the carrier estimate.
+    expect(texts.filter((t) => /, \d{1,2}:\d{2}/.test(t))).toHaveLength(3);
+    expect(texts).toContain('Est. Jan 6');
+  });
+
+  it('item 107: a delivered order shows no estimate and marks Delivered as the current step', () => {
+    act(() => {
+      renderer = create(
+        <OrderProgressTimeline status="delivered" createdAt="2026-01-01T10:00:00Z" trackingStatus="delivered" estimatedDelivery="2026-01-06" />,
+      );
+    });
+    const selected = renderer!.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityState?.selected === true);
+    expect(selected.map((n) => n.props.testID)).toEqual(['order-step-delivered']);
+    expect(findAllText(renderer!.root)).not.toContain('Est. Jan 6');
+  });
+
+  it('item 107: done steps use the text colour, never the (theme-tinted) accent', () => {
+    act(() => {
+      renderer = create(<OrderProgressTimeline status="shipped" createdAt="2026-01-01T10:00:00Z" trackingStatus="in_transit" />);
+    });
+    const colors = JSON.stringify(renderer!.toJSON());
+    expect(colors).toContain('#FAFAFA');
+    expect(colors).not.toContain('#F7F7FA');
+  });
+
+  it('fmtEstimate reads a YYYY-MM-DD as a calendar date (no timezone shift)', () => {
+    expect(fmtEstimate('2026-08-20')).toBe('Est. Aug 20');
+    expect(fmtEstimate(undefined)).toBe('');
+    expect(fmtEstimate('not a date')).toBe('');
   });
 
   it('collapses to an exception pill when the carrier reports a delivery exception, even if order.status is still "shipped"', () => {

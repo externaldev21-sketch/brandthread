@@ -331,6 +331,8 @@ export async function notifyCommentActivity(input: {
       targetId: post.id,
       targetType: "post",
       targetImageUrl: thumbnail,
+      // So a tap opens the comments scrolled to this exact comment.
+      commentId: input.commentId,
     } as const;
 
     const deliveries: Array<Parameters<typeof publishNotification>[0]> = [];

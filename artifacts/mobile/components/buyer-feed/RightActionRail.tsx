@@ -132,8 +132,22 @@ export function RightActionRail({
           {/* ringGap 1.5 (was the component's own default, 3) — that
               default was the "dark gap between the photo and the ring"
               the owner flagged; the ring now hugs the avatar with only a
-              1.5pt gap, plus ringWidth 2. */}
-          <LiveHostRing hostId={hostId} size={38} showTag={!!engagement?.following} ringGap={1.5} ringWidth={2}>
+              1.5pt gap, plus ringWidth 2.
+
+              showTag intentionally left at its default (true): the red
+              ring only ever renders when this host is genuinely live
+              (LiveHostRing checks the live directory itself), so the
+              "LIVE" tag must always accompany it. This previously read
+              `showTag={!!engagement?.following}`, which tied the tag to
+              whether the viewer follows the creator — wiring left over
+              from the follow badge above and unrelated to live status.
+              That produced a real, undiagnosed bug: a genuinely-live
+              creator the viewer doesn't follow got the red ring with no
+              LIVE tag, which reads as an unexplained red ring on a
+              non-live post. Every other LiveHostRing/LiveAvatarRing call
+              site in the app (profile, inbox row, story tray) already
+              uses the default. */}
+          <LiveHostRing hostId={hostId} size={38} ringGap={1.5} ringWidth={2}>
             {avatarUri ? (
               <Image source={{ uri: avatarUri }} style={styles.avatar} />
             ) : (

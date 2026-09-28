@@ -30,6 +30,8 @@ export interface ActivityItem {
   targetType?: string;
   targetImageUrl?: string;
   cta?: string;
+  /** Comment / reply / mention rows: the exact comment (targetId is the post). */
+  commentId?: string;
   /**
    * New-follower rows only: whether the viewer follows this person right
    * now (live, from the feed endpoint). Absent from older servers/rows, in
@@ -493,6 +495,17 @@ export function isGroupedRow(row: Pick<ActivityRow, 'type' | 'actorCount'>): boo
   return row.actorCount > 1 && AGGREGATED_TYPES.has(row.type);
 }
 
+/**
+ * Where tapping a row goes. A merged like / repost / follow row opens the
+ * people list; a merged comment row ("Jay and 2 others commented") opens the
+ * post's comments at the newest one instead — a list of names alone never
+ * shows what they said (item 82).
+ */
+export function activityRowHref(row: ActivityRow, role: 'buyer' | 'seller' | null = 'buyer'): string | null {
+  if (isGroupedRow(row) && row.type !== 'post_comment') return groupedPeopleHref(row);
+  return activityHref(row, role);
+}
+
 /** Header for the people list a grouped row opens. */
 export function groupedPeopleTitle(type: string): string {
   switch (type) {
@@ -540,8 +553,10 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return id ? `/manufacturer-messages?threadId=${q(id)}` : null;
     case 'post':
       if (!id) return null;
+      // Comment rows land on that exact comment (scrolled to + highlighted,
+      // its reply thread opened) when the row carries one.
       return row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention'
-        ? `/buyer-post-comments?postId=${q(id)}`
+        ? `/buyer-post-comments?postId=${q(id)}${row.commentId ? `&commentId=${q(row.commentId)}` : ''}`
         : `/buyer-post-viewer?postId=${q(id)}`;
     case 'story':
       return id ? `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}` : null;
