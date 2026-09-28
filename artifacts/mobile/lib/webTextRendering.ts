@@ -49,3 +49,43 @@ export function injectWebTextRenderingStyles() {
   `;
   document.head.appendChild(style);
 }
+
+/**
+ * Kills the browser's default focus ring on every text input/textarea on
+ * web — react-native-web renders `<TextInput>` as a real `<input>`/
+ * `<textarea>`, which Chromium outlines with its native focus ring
+ * (`-webkit-focus-ring-color`, an amber/orange rectangle on this sandbox's
+ * and most Linux/Chrome-OS-themed Chromium builds) on focus unless that's
+ * explicitly suppressed — seen live on the story-reply field and the chat
+ * composer, and reproduced locally on any `<TextInput>` that doesn't set
+ * its own `outlineStyle: 'none'` (see lib/inputReset.ts's WEB_INPUT_RESET,
+ * which a number of screens already apply per-field).
+ *
+ * `app/+html.tsx` looks like the natural place for this (and already
+ * carries a near-identical, never-applied rule) but is NOT the template
+ * this app's web build actually uses — see injectWebTextRenderingStyles's
+ * doc comment above and WEB_DEPLOYMENT.md; Expo's default `index.html` is
+ * used as-is for this project's `web.output: "single"` config, so anything
+ * written only in +html.tsx never reaches a real page. This function, run
+ * from lib/bootstrap.ts before any screen loads (the one place proven to
+ * actually land in <head>), is the real fix — monochrome-only per Dev's
+ * rule, dead code on native (Platform.OS guard below).
+ */
+export function injectWebFocusOutlineStyles() {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  if (document.getElementById('bt-focus-outline')) return; // idempotent (fast refresh, re-imports)
+
+  const style = document.createElement('style');
+  style.id = 'bt-focus-outline';
+  style.textContent = `
+    input, textarea {
+      outline: none;
+    }
+    input:focus, input:focus-visible,
+    textarea:focus, textarea:focus-visible {
+      outline: none;
+      box-shadow: none;
+    }
+  `;
+  document.head.appendChild(style);
+}
