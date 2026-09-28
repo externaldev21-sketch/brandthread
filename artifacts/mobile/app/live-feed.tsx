@@ -18,7 +18,7 @@ import {
   View, Text, StyleSheet, FlatList, TextInput, Platform, useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import type { ViewToken } from 'react-native';
+import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -32,7 +32,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { hapticLight } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS } from '@/lib/theme';
-import { ThreadCashBill } from '@/components/thread-cash/ThreadCashBill';
+import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { SHEET_TIMING } from '@/constants/motion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
@@ -48,6 +48,10 @@ const SAMPLE_ROOMS_SOURCE = [
     viewerCount: 1204,
     video: require('../assets/videos/fashion_runway_02.mp4'),
     poster: require('../assets/videos/fashion_runway_02.jpg'),
+    // Stand-in profile photo, same convention as lib/previewActivity.ts (no
+    // real headshots in this seed set) — a different frame than the room's
+    // own video/poster so the avatar doesn't just repeat it.
+    avatar: require('../assets/videos/fashion_runway_05.jpg'),
     productName: 'Liquid Silver Dress',
     priceCents: 32500,
   },
@@ -58,6 +62,7 @@ const SAMPLE_ROOMS_SOURCE = [
     viewerCount: 862,
     video: require('../assets/videos/fashion_runway_01.mp4'),
     poster: require('../assets/videos/fashion_runway_01.jpg'),
+    avatar: require('../assets/videos/fashion_runway_06.jpg'),
     productName: 'Sculpted Blazer',
     priceCents: 28500,
   },
@@ -80,6 +85,9 @@ interface LiveRoom {
   viewerCount: number;
   videoSource?: VideoSource;
   posterSource?: number;
+  /** Sample rooms' stand-in avatar (bundled asset); real rooms use `avatarUri`. */
+  avatarSource?: number;
+  avatarUri?: string | null;
   thumbnailUrl?: string | null;
   productName?: string;
   priceCents?: number;
@@ -106,6 +114,7 @@ export default function LiveFeedScreen() {
       viewerCount: sample.viewerCount,
       videoSource: sample.video,
       posterSource: sample.poster,
+      avatarSource: sample.avatar,
       productName: sample.productName,
       priceCents: sample.priceCents,
     })),
@@ -125,6 +134,7 @@ export default function LiveFeedScreen() {
           brandName: s.brand_name ?? s.seller_name ?? 'Live',
           title: s.title ?? '',
           viewerCount: s.viewer_count ?? 0,
+          avatarUri: s.avatar_url ?? null,
           thumbnailUrl: s.thumbnail_url ?? null,
           productName: s.product_tags?.[0]?.productName,
           priceCents: s.product_tags?.[0]?.priceCents,
@@ -176,6 +186,22 @@ export default function LiveFeedScreen() {
       />
     </View>
   );
+}
+
+/**
+ * Lazily requires expo-blur (same pattern as IconButton.tsx's GlassBlur) so
+ * screens that never render the pinned product card don't pull the native
+ * blur module into their bundle. Skipped on Android at the call site, where
+ * the flat productCardTint below stands in.
+ */
+function ProductCardBlur({ style }: { style?: StyleProp<ViewStyle> }) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { BlurView } = require('expo-blur') as { BlurView: typeof import('expo-blur').BlurView };
+    return <BlurView intensity={35} tint="dark" style={style} />;
+  } catch {
+    return null;
+  }
 }
 
 function LiveRoomPage({
@@ -273,53 +299,69 @@ function LiveRoomPage({
       />
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.62)']}
+        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']}
         locations={[0, 1]}
         style={[styles.bottomScrim, { height: 320 }]}
       />
 
-      {/* Top: host pill + Follow, close X */}
-      <View style={[styles.topRow, { top: insetTop + 10 }]}>
-        <View style={styles.hostPill}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarLetter}>{room.brandName.slice(0, 1).toUpperCase()}</Text>
-          </View>
-          <View style={styles.hostText}>
-            <View style={styles.hostNameRow}>
-              <Text style={styles.hostName} numberOfLines={1}>{room.brandName}</Text>
+      {/* Top: host pill + Follow, close X. A single column flow — the
+          capsule's own height is driven entirely by its content (never a
+          fixed height), and the subtitle below it is a normal flow sibling
+          with its own 6pt top margin, so it can never straddle the
+          capsule's bottom edge no matter how tall the capsule renders.
+          `insetTop + 8` keeps this at least 8pt clear of the Dynamic Island
+          (native: insets.top + 8; web: the 54pt fallback + 8 = 62). */}
+      <View style={[styles.topArea, { top: insetTop + 8 }]}>
+        <View style={styles.topRow}>
+          <View style={styles.hostPill}>
+            <View style={styles.avatarCircle}>
+              {(room.avatarSource || room.avatarUri) ? (
+                <ExpoImage
+                  source={room.avatarSource ?? { uri: room.avatarUri! }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                />
+              ) : (
+                <Text style={styles.avatarLetter}>{room.brandName.slice(0, 1).toUpperCase()}</Text>
+              )}
             </View>
-            <View style={styles.liveRow}>
-              <View style={styles.liveBadge}>
-                <Text style={styles.liveBadgeText}>LIVE</Text>
+            <View style={styles.hostText}>
+              <View style={styles.hostNameRow}>
+                <Text style={styles.hostName} numberOfLines={1}>{room.brandName}</Text>
               </View>
-              <Feather name="eye" size={11} color="rgba(255,255,255,0.85)" />
-              <Text style={styles.viewerText}>
-                {room.viewerCount >= 1000 ? `${(room.viewerCount / 1000).toFixed(1)}K` : room.viewerCount}
-              </Text>
+              <View style={styles.liveRow}>
+                <View style={styles.liveBadge}>
+                  <Text style={styles.liveBadgeText}>LIVE</Text>
+                </View>
+                <Feather name="eye" size={11} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.viewerText}>
+                  {room.viewerCount >= 1000 ? `${(room.viewerCount / 1000).toFixed(1)}K` : room.viewerCount}
+                </Text>
+              </View>
             </View>
+            <PressableScale
+              onPress={() => { hapticLight(); setFollowing(v => !v); }}
+              style={[styles.followBtn, following && styles.followBtnActive]}
+              accessibilityRole="button"
+              accessibilityLabel={following ? `Following ${room.brandName}` : `Follow ${room.brandName}`}
+            >
+              <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>{following ? 'Following' : 'Follow'}</Text>
+            </PressableScale>
           </View>
           <PressableScale
-            onPress={() => { hapticLight(); setFollowing(v => !v); }}
-            style={[styles.followBtn, following && styles.followBtnActive]}
+            onPress={onClose}
+            style={styles.closeBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel={following ? `Following ${room.brandName}` : `Follow ${room.brandName}`}
+            accessibilityLabel="Close live"
           >
-            <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>{following ? 'Following' : 'Follow'}</Text>
+            <Feather name="x" size={22} color="#fff" />
           </PressableScale>
         </View>
-        <PressableScale
-          onPress={onClose}
-          style={styles.closeBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Close live"
-        >
-          <Feather name="x" size={22} color="#fff" />
-        </PressableScale>
+        {room.title.length > 0 && (
+          <Text style={styles.roomTitle} numberOfLines={1}>{room.title}</Text>
+        )}
       </View>
-      {room.title.length > 0 && (
-        <Text style={[styles.roomTitle, { top: insetTop + 56 }]} numberOfLines={1}>{room.title}</Text>
-      )}
 
       {/* Right action rail — same slim sizing/gap/shadow/right-inset as the
           feed's own rail (components/buyer-feed/RightActionRail.tsx), and
@@ -330,7 +372,10 @@ function LiveRoomPage({
           <Feather name="share" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
         <PressableScale style={styles.railBtn} onPress={() => hapticLight()} accessibilityRole="button" accessibilityLabel="Send Thread Cash">
-          <ThreadCashBill width={28} />
+          {/* ThreadCashBillIcon, not the full <ThreadCashBill/> — below its
+              ~32pt threshold the full bill's art just turns to mush, which is
+              why the gift icon effectively vanished from the rail before. */}
+          <ThreadCashBillIcon size={26} />
         </PressableScale>
         <PressableScale style={styles.railBtn} onPress={() => hapticLight()} accessibilityRole="button" accessibilityLabel="More options">
           <Feather name="more-vertical" size={26} color="#fff" style={styles.railIconShadow} />
@@ -343,8 +388,17 @@ function LiveRoomPage({
         style={[styles.bottom, { paddingBottom: insetBottom + 12 }]}
       >
         {(room.productName != null) && (
-          <ReanimatedAnimated.View style={cardStyle}>
+          // The rail-clearance margin lives on this wrapper, not on
+          // PressableScale's own `style` prop: PressableScale only applies
+          // `style` to its inner visual box, so a margin passed there
+          // narrows what's drawn but leaves the outer Pressable's actual
+          // tap target full-width — silently stealing taps from the rail
+          // buttons it visually stopped short of. Putting it on the
+          // wrapper narrows the real tap target too.
+          <ReanimatedAnimated.View style={[styles.productCardWrap, cardStyle]}>
             <PressableScale onPress={handleBuy} style={styles.productCard} accessibilityRole="button" accessibilityLabel={`Buy ${room.productName}`}>
+              {Platform.OS !== 'android' && <ProductCardBlur style={StyleSheet.absoluteFill} />}
+              <View style={[StyleSheet.absoluteFill, styles.productCardTint]} pointerEvents="none" />
               {room.posterSource ? (
                 <ExpoImage source={room.posterSource} style={styles.productThumb} contentFit="cover" />
               ) : (
@@ -367,7 +421,7 @@ function LiveRoomPage({
           <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']} style={styles.chatTopFade} />
           <View style={styles.chatList}>
             {chat.slice(-4).map((line, i) => (
-              <Text key={i} style={styles.chatLine} numberOfLines={1}>
+              <Text key={i} style={styles.chatLine} numberOfLines={2}>
                 <Text style={styles.chatUser}>{line.user} </Text>
                 {line.text}
               </Text>
@@ -381,7 +435,7 @@ function LiveRoomPage({
             onChangeText={setMessage}
             onSubmitEditing={sendMessage}
             placeholder="Say something…"
-            placeholderTextColor="rgba(255,255,255,0.55)"
+            placeholderTextColor="rgba(255,255,255,0.7)"
             returnKeyType="send"
             style={styles.input}
           />
@@ -399,17 +453,22 @@ const styles = StyleSheet.create({
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
 
+  // Wraps topRow + roomTitle so the subtitle is a normal flow sibling below
+  // the capsule instead of a second absolutely-positioned element guessing
+  // the capsule's height.
+  topArea: { position: 'absolute', left: 12, right: 12 },
   topRow: {
-    position: 'absolute', left: 12, right: 12,
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8,
   },
   hostPill: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(0,0,0,0.38)', borderRadius: RADIUS.pill,
-    paddingHorizontal: 6, paddingVertical: 6,
+    // 8pt of capsule padding all round — the capsule's height is driven by
+    // its tallest child (the Follow button), never a fixed height.
+    padding: 8,
   },
   avatarCircle: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: '#3D2B56',
+    width: 32, height: 32, borderRadius: 16, backgroundColor: '#3D2B56', overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
   },
   avatarLetter: { color: '#fff', fontFamily: FONT.bold, fontSize: 14 },
@@ -422,20 +481,25 @@ const styles = StyleSheet.create({
   viewerText: { color: 'rgba(255,255,255,0.85)', fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
   // Monochrome brand: red is reserved for the LIVE badge only, so Follow is
   // a plain white pill with black text (the "following" state drops to a
-  // translucent white outline pill instead of a second color).
+  // translucent white outline pill instead of a second color). Fixed
+  // height (not padding-driven) so it reliably lands in the 28-30pt range
+  // and centers against the avatar/name block via hostPill's alignItems.
   followBtn: {
-    backgroundColor: '#fff', borderRadius: RADIUS.pill,
-    paddingHorizontal: 12, paddingVertical: 7,
+    height: 30, minWidth: 60, backgroundColor: '#fff', borderRadius: RADIUS.pill,
+    paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center',
   },
   followBtnActive: { backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
-  followBtnText: { color: '#000', fontFamily: FONT.bold, fontSize: 12 },
+  followBtnText: { color: '#000', fontFamily: FONT.semibold, fontSize: 13 },
   followBtnTextActive: { color: '#fff' },
   closeBtn: {
     width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.38)',
   },
+  // Normal flow now (a topArea sibling below topRow), not absolutely
+  // positioned against a guessed capsule height — 6pt clear of the capsule,
+  // never straddling its edge, whatever the capsule's actual height is.
   roomTitle: {
-    position: 'absolute', left: 20, right: 60,
+    marginTop: 6,
     color: 'rgba(255,255,255,0.82)', fontFamily: FONT.medium, fontSize: 12,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
@@ -447,14 +511,24 @@ const styles = StyleSheet.create({
   },
 
   bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 12, gap: 8 },
+  // The rail sits at right:10, width:38 (occupying the rightmost 48pt of
+  // the screen) — this keeps the card's right edge a clear 12pt further
+  // in, so it never runs under the rail regardless of viewport width. See
+  // the comment at this wrapper's call site for why it's here and not on
+  // productCard's own style.
+  productCardWrap: { marginRight: 48 },
   productCard: {
     height: 64, flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: 'rgba(20,20,22,0.82)', borderRadius: RADIUS.md,
+    // Solid fallback color: the blur (ProductCardBlur) and the translucent
+    // productCardTint layer above it are what actually reads as "subtle
+    // dark blur" on iOS/web; on Android (no blur) this alone stands in.
+    backgroundColor: '#17171A', borderRadius: RADIUS.md, overflow: 'hidden',
     paddingHorizontal: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
+  productCardTint: { backgroundColor: 'rgba(20,20,22,0.45)' },
   productThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#33303a', overflow: 'hidden' },
   productInfo: { flex: 1 },
-  productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 14 },
+  productName: { color: '#fff', fontFamily: FONT.semibold, fontSize: 15 },
   productPrice: { color: 'rgba(255,255,255,0.75)', fontFamily: FONT.medium, fontSize: 13, marginTop: 2 },
   buyBtn: { height: 32, backgroundColor: '#fff', borderRadius: RADIUS.pill, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   buyBtnText: { color: '#151517', fontFamily: FONT.bold, fontSize: FS.xs },
@@ -471,10 +545,11 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 
-  inputRow: { height: 44 },
+  // 16pt insets (the shared `bottom` container already gives 12pt; +4pt here).
+  inputRow: { height: 44, marginHorizontal: 4 },
   input: {
     flex: 1, height: 44, borderRadius: 22, paddingHorizontal: 16,
-    backgroundColor: 'rgba(255,255,255,0.14)', color: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.12)', color: '#fff',
     fontFamily: FONT.regular, fontSize: FS.sm,
   },
 });
