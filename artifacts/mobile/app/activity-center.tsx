@@ -35,6 +35,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type ViewToken,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -46,6 +47,8 @@ import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, GRAD_DARK_FADE, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/components/layout';
+import { TabBarGlassZone } from '@/components/buyer-nav/TabBarGlassZone';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -531,7 +534,13 @@ export default function ActivityCenterScreen() {
   // geometry calculation (window size + safe-area insets), not dependent on
   // actually being mounted inside the Tabs navigator, so this is safe to
   // call here.
-  const screenPadding = useScreenPadding();
+  // withTabBarInset: false — the list itself only reserves a small clearance
+  // (not the full tab-bar height) so its rows now scroll IN UNDER the glass
+  // zone, like iOS, and are visible (softly, through blur) right up to the
+  // bar instead of stopping in the empty reserved gap above it.
+  const screenPadding = useScreenPadding({ withTabBarInset: false });
+  const glassZoneHeight = useBuyerTabBarInset() + SP.xl;
+  const { width: windowWidth } = useWindowDimensions();
   const listRef = useScrollReset<SectionList<ActivityRow, ListSection>>();
   const router = useRouter();
   const { role } = useRole();
@@ -912,16 +921,13 @@ export default function ActivityCenterScreen() {
         />
       )}
 
-      {/* Same bottom fade treatment as Messages: blends the last row into
-          the floating tab bar instead of an abrupt hard edge. */}
+      {/* Frosted glass over the live list behind the floating tab bar —
+          replaces the old opaque-black `GRAD_DARK_FADE` scrim, which read as
+          a solid black bar swallowing the last row ("Vale Studio reposted
+          your post" fading into black) instead of a soft, legible-through
+          blur like iOS. */}
       {status === 'ready' && sections.length > 0 && (
-        <LinearGradient
-          pointerEvents="none"
-          colors={GRAD_DARK_FADE}
-          start={{ x: 0, y: 1 }}
-          end={{ x: 0, y: 0 }}
-          style={[styles.bottomFade, { height: screenPadding.bottom + SP.xl }]}
-        />
+        <TabBarGlassZone height={glassZoneHeight} width={windowWidth} tint="dark" />
       )}
     </View>
   );
