@@ -1475,6 +1475,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>(`/api/conversations/${encodeURIComponent(id)}/messages`, body),
       markRead:   (id: string) =>
         patch<{ ok: boolean }>(`/api/conversations/${encodeURIComponent(id)}/read`, {}),
+      /** Real-time "X is typing…" (no websocket layer — the other side picks
+       *  this up on its own light poll of the conversation). Fire-and-forget
+       *  from the caller's side; see Conversation.otherTyping. */
+      setTyping:  (id: string, typing: boolean) =>
+        patch<{ ok: boolean }>(`/api/conversations/${encodeURIComponent(id)}/typing`, { typing }),
       /** Accept a message request — moves it from Requests to main inbox */
       accept:  (id: string) =>
         patch<any>(`/api/conversations/${encodeURIComponent(id)}/accept`, {}),

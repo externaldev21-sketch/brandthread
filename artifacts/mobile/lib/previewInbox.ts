@@ -498,3 +498,36 @@ export function subscribePreviewTyping(cb: (typingConversationId: string | null)
   }, TYPING_INTERVAL_MS);
   return () => clearInterval(interval);
 }
+
+// ─── Auto-reply (preview-only, keeps a demo thread feeling live) ──────────
+//
+// A seeded preview conversation has no real counterpart to write back — the
+// person previewing the app is the only participant actually there. Without
+// this, sending a message in `?bt_preview=buyer`/`?bt_preview=seller` is a
+// one-way shout into an empty thread. This makes the OTHER (simulated) side
+// send back exactly one short, generic reply a beat after each message the
+// preview user sends — never fake commerce claims, never a loop of replies
+// replying to replies (only a user-originated send schedules one). Purely
+// cosmetic for the demo: it never touches real data, and both call sites
+// (app/buyer-conversation.tsx, app/seller-conversation.tsx) gate it behind
+// their existing isPreviewConversationId/isSellerPreviewConversationId check.
+const PREVIEW_AUTO_REPLY_TEXTS = [
+  'Got it, thanks!',
+  'Sounds good — thanks for letting me know.',
+  'Okay, noted. Thank you!',
+  'Thanks for the message — got it.',
+  'Appreciate you reaching out, thanks!',
+];
+
+/** One short, generic acknowledgement — randomized so a demo with several
+ *  sends doesn't repeat the exact same line back to back. */
+export function previewAutoReplyText(): string {
+  return PREVIEW_AUTO_REPLY_TEXTS[Math.floor(Math.random() * PREVIEW_AUTO_REPLY_TEXTS.length)];
+}
+
+/** How long to wait before the simulated reply lands — long enough to read
+ *  as a real person typing back, short enough that a demo doesn't stall. */
+export const PREVIEW_AUTO_REPLY_DELAY_MS = 1100;
+export function previewAutoReplyDelayMs(): number {
+  return PREVIEW_AUTO_REPLY_DELAY_MS + Math.random() * 900;
+}

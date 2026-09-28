@@ -7,7 +7,7 @@
  * a non-friend sees a clear locked state instead of an empty grid.
  */
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { View, Text, Alert, StyleSheet, Modal } from 'react-native';
+import { View, Text, Alert, StyleSheet, Modal, Pressable } from 'react-native';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -403,7 +403,12 @@ export default function BuyerOtherProfileScreen() {
       {/* ── More options sheet ── */}
       <Modal visible={moreSheetOpen} transparent animationType="slide" onRequestClose={() => setMoreSheetOpen(false)}>
         <View style={styles.moreBackdrop}>
-          <PressableScale style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setMoreSheetOpen(false)} accessibilityLabel="Close options" />
+          {/* Plain Pressable, not PressableScale: PressableScale only
+              forwards a plain-object `style` prop to its *inner*
+              Animated.View, never the outer Pressable that actually
+              receives touches — so this backdrop had no real hit area and
+              tapping it did nothing. */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setMoreSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close options" />
           <View style={[styles.moreSheet, { paddingBottom: insets.bottom + SP.md }]}>
             <View style={styles.moreHandle} />
             <Text style={styles.moreTitle}>{displayName}</Text>
