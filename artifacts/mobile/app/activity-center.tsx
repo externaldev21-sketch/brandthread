@@ -60,6 +60,7 @@ import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { isPreviewActivityEnabled, getPreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri } from '@/lib/previewActivity';
+import { applyPreviewFollowState, getPreviewFollowing } from '@/lib/previewFollowStore';
 import { Chip } from '@/components/ui/Chip';
 import {
   ACTIVITY_PAGE_SIZE,
@@ -69,7 +70,7 @@ import {
   matchesActivityChip,
   type ActivityChip,
   activityDetail,
-  activityHref,
+  activityRowHref,
   activityIcon,
   followControlState,
   activityKind,
@@ -77,9 +78,7 @@ import {
   applyRead,
   buildActivitySections,
   createReadTracker,
-  groupedPeopleHref,
   isFollowBackRow,
-  isGroupedRow,
   relativeTime,
   type ActivityActor,
   type ActivityItem,
@@ -98,7 +97,6 @@ import {
   type SuggestedPerson,
 } from '@/services/activityService';
 import { setSellerFollowing, removeFollower, seeLessNotificationType, blockUser } from '@/services/socialService';
-import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-cash/ThreadCashBill';
 
 const EMPTY_ICON = 'activity' as const;
 const EMPTY_MESSAGE = "Activity will show up here. Likes, follows, comments and drops from brands you follow will land here.";
@@ -183,10 +181,12 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
 
 function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }) {
   const { theme } = useAppTheme();
+  // Monochrome like every other type badge — the green bill artwork was one
+  // of the Activity screen's only non-LIVE colour accents.
   if (row.type === 'thread_cash_received') {
     return (
-      <View style={styles.typeBadgeBill}>
-        <ThreadCashBillIcon size={20} />
+      <View style={styles.typeBadge}>
+        <Feather name="dollar-sign" size={10} color={theme.accentLight} />
       </View>
     );
   }
@@ -194,7 +194,7 @@ function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }
   let color = theme.accentLight;
   const category = activityCategory(row);
   if (category === 'follows') icon = 'user-plus';
-  else if (category === 'likes') { icon = 'heart'; color = theme.error; }
+  else if (category === 'likes') icon = 'heart';
   else if (category === 'comments') icon = 'message-circle';
   if (!icon) return null;
   return (
@@ -319,7 +319,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
   );
   const sentence = parts.map((p) => p.text).join('');
   // "$5.00 · tap to view" → "+$5.00": the amount is the whole point of a
-  // Thread Cash row, so it gets its own bold green line instead of reading
+  // Thread Cash row, so it gets its own bold line (monochrome, theme text) instead of reading
   // like an ordinary detail caption.
   const cashAmount = row.type === 'thread_cash_received' ? row.body?.match(/\$[\d,.]+/)?.[0] : null;
 
@@ -394,6 +394,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
         style={({ pressed }) => [styles.tapArea, pressed && styles.tapAreaPressed]}
         onPress={() => onPress(row)}
         onLongPress={longPress}
+        testID={`activity-row-${row.key}`}
         accessibilityRole="button"
         accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
       >
@@ -402,11 +403,9 @@ const ActivityRowView = React.memo(function ActivityRowView({
         ) : (
           <View style={styles.leading}>
             <View style={styles.iconCircle}>
-              {row.type === 'thread_cash_received' ? (
-                <ThreadCashBillIcon size={ICON.md} />
-              ) : (
-                <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
-              )}
+              {/* Thread Cash included — activityIcon gives it a monochrome
+                  dollar-sign, not the green bill artwork. */}
+              <Feather name={activityIcon(row) as any} size={ICON.md} color={theme.accentLight} />
             </View>
           </View>
         )}
@@ -419,7 +418,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
             <Text style={styles.time}>{'  '}{relativeTime(row.createdAt, now, { compact: true })}</Text>
           </Text>
           {cashAmount ? (
-            <Text style={[styles.detail, { color: THREAD_CASH_GREEN_MID, fontFamily: FONT.bold }]}>{`+${cashAmount}`}</Text>
+            <Text style={[styles.detail, styles.cashAmount]}>{`+${cashAmount}`}</Text>
           ) : detail ? (
             <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
           ) : null}
@@ -596,15 +595,30 @@ export default function ActivityCenterScreen() {
   }), []);
   useEffect(() => () => tracker.dispose(), [tracker]);
 
+  // Seeded suggestions, with anyone already followed this preview session
+  // (lib/previewFollowStore) shown as "Following" instead of "Follow" again.
+  const showPreviewSuggestions = useCallback(() => {
+    const people = getPreviewSuggestedPeople();
+    setSuggested(people);
+    setSuggestedFollowState((prev) => {
+      const next = { ...prev };
+      for (const person of people) {
+        if (getPreviewFollowing(person.userId)) next[person.userId] = 'done';
+      }
+      return next;
+    });
+  }, []);
+
   const loadSuggested = useCallback(async () => {
     try {
       const people = await getSuggestedPeople();
       if (people.length > 0 || !isPreviewActivityEnabled()) { setSuggested(people); return; }
-      setSuggested(getPreviewSuggestedPeople());
+      showPreviewSuggestions();
     } catch {
-      setSuggested(isPreviewActivityEnabled() ? getPreviewSuggestedPeople() : []);
+      if (isPreviewActivityEnabled()) showPreviewSuggestions();
+      else setSuggested([]);
     }
-  }, []);
+  }, [showPreviewSuggestions]);
 
   const loadFirstPage = useCallback(async (mode: 'initial' | 'refresh' | 'focus') => {
     const id = ++requestId.current;
@@ -617,7 +631,7 @@ export default function ActivityCenterScreen() {
       // The dev-web preview has no live backend to seed a real feed from —
       // show the same rich seeded world every other preview screen uses
       // instead of an empty "Activity will show up here".
-      const resolved = page.length === 0 && isPreviewActivityEnabled() ? getPreviewActivity() : page;
+      const resolved = page.length === 0 && isPreviewActivityEnabled() ? applyPreviewFollowState(getPreviewActivity()) : page;
       setItems(resolved);
       setSessionNew(new Set(resolved.filter((item) => !item.isRead).map((item) => item.id)));
       setHasMore(page.length === ACTIVITY_PAGE_SIZE);
@@ -629,7 +643,7 @@ export default function ActivityCenterScreen() {
         // Never show a false error in the dev-web preview — there is no
         // backend to reach at all, so a fetch failure here is expected.
         retriedRef.current = false;
-        const seeded = getPreviewActivity();
+        const seeded = applyPreviewFollowState(getPreviewActivity());
         setItems(seeded);
         setSessionNew(new Set(seeded.filter((item) => !item.isRead).map((item) => item.id)));
         setHasMore(false);
@@ -787,7 +801,8 @@ export default function ActivityCenterScreen() {
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
     // A merged row ("Jay and 12 others liked your post") opens the list of
     // those people — Instagram's "View likes" pattern, see app/activity-people.tsx.
-    const href = isGroupedRow(row) ? groupedPeopleHref(row) : activityHref(row, role);
+    // Merged comment rows open the comments themselves (activityRowHref).
+    const href = activityRowHref(row, role);
     if (href) router.push(href as never);
   }, [api, role, router, tracker, user?.id]);
 
@@ -1234,19 +1249,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  typeBadgeBill: {
-    position: 'absolute',
-    right: -8,
-    bottom: -5,
-    paddingHorizontal: 2,
-    paddingVertical: 2,
-    borderRadius: RADIUS.xs,
-    backgroundColor: theme.cardElevated,
-    borderWidth: 2,
-    borderColor: theme.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   avatar: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1296,6 +1298,12 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontFamily: FONT.regular,
     fontSize: FS.sm,
     lineHeight: 18,
+  },
+  // Thread Cash "+$5.00": bold, theme text colour — never green (the only
+  // colour accents allowed are LIVE red and end-call red).
+  cashAmount: {
+    color: theme.text,
+    fontFamily: FONT.bold,
   },
 
   // Same right edge for every row whether the trailing item is this

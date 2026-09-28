@@ -219,6 +219,9 @@ export interface Message {
   attachment?: MessageAttachment;
   replyToId?: string;
   replyPreview?: string;
+  /** The quoted message's own sender name, resolved server-side alongside
+   *  replyPreview — see api-server's adaptMessage/loadReplyPreviews. */
+  replyToAuthorName?: string;
   reactions: MessageReaction[];
   status: MessageStatus;   // delivered/read only shown with backend confirmation
   /** ISO timestamp the recipient's device received the message, when known. */
@@ -390,6 +393,22 @@ export interface Story {
   repliesDisabled: boolean;
   createdAt: number;         // Unix ms
   expiresAt: number;         // createdAt + 24h
+}
+
+// ─── Notes (bubble above story-tray avatars, IG-style) ───────────────────────
+// Short-lived (24h TTL, same pattern as Story.expiresAt), one active note per
+// author — posting a new one replaces the old.
+export const NOTE_MAX_CHARS = 60;
+
+export interface Note {
+  authorId: string;
+  authorName: string;
+  authorHandle: string;
+  authorInitials: string;
+  authorColor: string;
+  text: string;
+  createdAt: number;   // Unix ms
+  expiresAt: number;   // createdAt + 24h
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

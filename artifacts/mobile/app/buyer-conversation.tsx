@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimensions,
-  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard,
+  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated, Keyboard, Linking,
 } from 'react-native';
 import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard-controller';
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
+import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { Chip } from '@/components/ui/Chip';
@@ -21,8 +22,9 @@ import {
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
   markConversationRead, subscribeSocial,
   setConversationTheme, setConversationDisappearing,
-  MY_USER_ID, MY_NAME, MY_INITIALS,
+  MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
+import { pickAvatarColor } from '@/lib/avatarColors';
 import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import type { CallLogEntry } from '@/lib/calls/types';
@@ -56,15 +58,17 @@ import MediaViewer from '@/components/chat/MediaViewer';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { ThreadCashAttachButton, ThreadCashMessageCard, ThreadCashBillMark } from '@/components/thread-cash/ChatAttachThreadCash';
 import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
-import {
-  ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
-} from '@/components/chat/ReactionBar';
+import { ReactionGlyph, reactionAuthorName } from '@/components/chat/ReactionBar';
+import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuItem } from '@/components/chat/ReactionOverlay';
+import { applyOptimisticReaction, myReactionIn, groupReactionCounts } from '@/lib/reactionMutations';
 import { SystemLine } from '@/components/chat/SystemLine';
+import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
+import { ReplyBanner } from '@/components/chat/ReplyBanner';
 import { getConversationTheme } from '@/lib/conversationThemes';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   isPreviewConversationId, getPreviewConversation, getPreviewMessages,
-  setPreviewConversationDisappearing, appendPreviewMessage,
+  setPreviewConversationDisappearing, appendPreviewMessage, reactToPreviewMessage,
 } from '@/lib/previewInbox';
 import {
   parseQuickReplies, cannedAgentReply, hasWelcomePlayed, markWelcomePlayed,
@@ -73,7 +77,7 @@ import {
 import { EMOJI_FONT_STACK } from '@/lib/appleEmoji';
 import {
   formatDate as sharedFormatDate, formatTime as sharedFormatTime,
-  sameSenderClose, groupCornerRadii, lastOwnMessageId,
+  sameSenderClose, groupCornerRadii, lastOwnMessageId, messagePreviewText,
 } from '@/lib/chatGrouping';
 
 /** Well-known clerkId of the official Brandthread Agent account — matches
@@ -292,6 +296,12 @@ export default function BuyerConversationScreen() {
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
   const [activeSheetMsg, setActiveSheetMsg]   = useState<Message | null>(null);
+  // The long-pressed bubble's on-screen position, measured right before the
+  // Glass reaction overlay opens (components/chat/ReactionOverlay.tsx) — one
+  // ref per message id so a recycled FlatList row always measures the right
+  // node. Cleared alongside activeSheetMsg.
+  const bubbleAnchorRefs = useRef<Record<string, View | null>>({});
+  const [reactionAnchor, setReactionAnchor] = useState<ReactionOverlayAnchor | null>(null);
   const [viewerUri, setViewerUri]             = useState<string | null>(null);
   const [likeBurst, setLikeBurst] = useState<{ key: number; x: number; y: number } | null>(null);
   const voicePlayer = useAudioPlayer(null);
@@ -695,7 +705,7 @@ export default function BuyerConversationScreen() {
       participantName: participant.name,
       participantHandle: participant.handle ?? '',
       participantInitials: participant.initials ?? '',
-      participantColor: participant.color ?? '#8B5CF6',
+      participantColor: participant.color ?? pickAvatarColor(participant.userId ?? participant.name),
       participantAvatarUri: participant.avatarUri ?? '',
       participantNickname: participant.nickname ?? '',
     });
@@ -711,7 +721,7 @@ export default function BuyerConversationScreen() {
       participantUserId: participant.userId,
       participantName: participant.name,
       participantInitials: participant.initials ?? '',
-      participantColor: participant.color ?? '#8B5CF6',
+      participantColor: participant.color ?? pickAvatarColor(participant.userId ?? participant.name),
       participantAvatarUri: participant.avatarUri ?? '',
     });
     router.push(('/conversation-details?' + qs.toString()) as never);
@@ -944,19 +954,27 @@ export default function BuyerConversationScreen() {
   // ── Reactions ──────────────────────────────────────────────────────────────────
 
   function myReaction(msg: Message): ReactionType | null {
-    const mine = msg.reactions.find(r => reactionAuthorId(r) === myId || reactionAuthorId(r) === MY_USER_ID);
-    return mine ? reactionKind(mine) : null;
+    return myReactionIn(msg.reactions, myId) ?? myReactionIn(msg.reactions, MY_USER_ID);
   }
 
+  // Optimistic add/remove: the tapped emoji shows immediately (and the row's
+  // own selection state updates), then the real network call runs in the
+  // background — rolled back to the pre-tap message list if it fails, so a
+  // reaction never silently "sticks" client-side when the server rejected it.
   async function handleReact(msg: Message, type: ReactionType) {
     if (!conv) return;
     hapticSelection();
+    const prevMessages = messages;
+    const { next } = applyOptimisticReaction(msg.reactions, myId, MY_NAME, type);
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, reactions: next } : m)));
     try {
+      if (isPreviewConversationId(conv.id)) {
+        reactToPreviewMessage(conv.id, msg.id, type, myId, MY_NAME);
+        return;
+      }
       await addReaction(conv.id, msg.id, type);
-      const msgs = await getMessages(conv.id);
-      setMessages(msgs);
     } catch {
-      // Best-effort — the reaction bar/summary simply won't reflect it.
+      setMessages(prevMessages);
     }
   }
 
@@ -1033,22 +1051,111 @@ export default function BuyerConversationScreen() {
         />
       );
     }
+    // Product share card (item 70): image, name, price/"No longer available"
+    // (kept live server-side — see lib/productAttachmentInfo.ts on the API),
+    // and an explicit "View" button. It's a single tap target, same as the
+    // other structured cards below — a second, nested Pressable for "View"
+    // would both violate the no-nested-pressables rule and get swallowed by
+    // the bubble's own long-press/swipe handlers, so "View" is a plain
+    // View+Text chip inside the one PressableScale that owns the whole card.
+    if (att.type === 'product') {
+      const unavailable = att.meta?.unavailable === 'true';
+      return (
+        <PressableScale rippleEnabled={false}
+          style={s.productCard}
+          activeOpacity={0.7}
+          accessibilityLabel={`${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`}
+          testID="product-card-attachment"
+          onPress={() => {
+            const pid = att.meta?.productId;
+            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
+          }}
+        >
+          <View style={[s.productCardImage, unavailable && s.productCardImageDim]}>
+            {att.uri ? (
+              <CachedImage source={{ uri: att.uri }} style={s.productCardImageFill} recyclingKey={att.uri} />
+            ) : (
+              <Feather name="shopping-bag" size={ICON.md} color={theme.muted} />
+            )}
+          </View>
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Product'}</Text>
+            <Text style={[s.attachSubtitle, unavailable && s.productUnavailableText]} numberOfLines={1}>
+              {unavailable ? 'No longer available' : (att.subtitle ?? 'Product')}
+            </Text>
+          </View>
+          <View style={s.productViewChip}>
+            <Text style={s.productViewChipText}>View</Text>
+            <Feather name="chevron-right" size={ICON.xs} color={theme.text} />
+          </View>
+        </PressableScale>
+      );
+    }
+
+    // Order status card (item 71) — Mobbin: Whatnot's order-status screen
+    // (status label + "Track your purchase" row with an external-link icon)
+    // adapted from a standalone screen into this inline card, the same way
+    // item 70 adapted Depop's persistent product header. Status/tracking are
+    // kept live server-side (see api-server's lib/orderAttachmentInfo.ts) —
+    // never the value cached on the message at send time, so a seller
+    // marking an order shipped shows up here immediately, not just on the
+    // order detail screen. Single tap target, same "no nested Pressable"
+    // technique as the product card above: the whole card is one
+    // PressableScale, and the Track/View chip is a plain View+Text.
+    if (att.type === 'order') {
+      const orderId = att.meta?.orderId;
+      const rawStatus = att.meta?.status;
+      const uiStatus = rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
+      const trackingNumber = att.meta?.trackingNumber;
+      const trackingUrl = trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
+      const chipLabel = trackingUrl ? 'Track' : 'View';
+      return (
+        <PressableScale rippleEnabled={false}
+          style={s.orderMsgCard}
+          activeOpacity={0.7}
+          accessibilityLabel={`${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${chipLabel}`}
+          testID="order-card-attachment"
+          onPress={() => {
+            if (trackingUrl) {
+              Linking.openURL(trackingUrl).catch(() => {});
+            } else if (orderId) {
+              router.push(('/buyer-order-detail?id=' + orderId) as never);
+            } else {
+              router.push('/(buyer)/orders' as never);
+            }
+          }}
+        >
+          <View style={s.orderMsgCardIconCircle}>
+            <Feather name="package" size={ICON.md} color={theme.accent} />
+          </View>
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Order'}</Text>
+            {uiStatus ? (
+              <View style={s.orderMsgCardBadgeRow}>
+                <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+              </View>
+            ) : (
+              <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle ?? 'Order'}</Text>
+            )}
+          </View>
+          <View style={s.productViewChip}>
+            <Text style={s.productViewChipText}>{chipLabel}</Text>
+            <Feather name={trackingUrl ? 'external-link' : 'chevron-right'} size={ICON.xs} color={theme.text} />
+          </View>
+        </PressableScale>
+      );
+    }
+
     // 'thread_cash', 'quick_replies' and 'agent_card' are handled in
     // renderItem() before this function is ever called for them — they're
     // standalone rows, not content that belongs inside a chat bubble.
-    // Default: product / order / post / profile card
+    // Default: post / profile card (order is handled above)
     return (
       <PressableScale rippleEnabled={false}
         style={s.attachCard}
-        activeOpacity={att.type === 'product' || att.type === 'order' || att.type === 'post' ? 0.7 : 1}
+        activeOpacity={att.type === 'post' ? 0.7 : 1}
         onPress={() => {
-          if (att.type === 'product') {
-            const pid = att.meta?.productId;
-            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
-            else if (participant) router.push(('/seller-profile?id=' + participant.userId) as never);
-          } else if (att.type === 'order') {
-            router.push('/(buyer)/orders' as never);
-          } else if (att.type === 'post') {
+          if (att.type === 'post') {
             const postId = att.meta?.postId;
             if (postId) {
               const postAuthorName = att.meta?.authorName ?? participant?.name ?? 'Seller';
@@ -1072,7 +1179,7 @@ export default function BuyerConversationScreen() {
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
-        {(att.type === 'product' || att.type === 'order' || att.type === 'post') && (
+        {att.type === 'post' && (
           <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
         )}
       </PressableScale>
@@ -1127,7 +1234,7 @@ export default function BuyerConversationScreen() {
       fromId: MY_USER_ID,
       fromName: 'You',
       fromInitials: 'Y',
-      fromColor: '#8B5CF6',
+      fromColor: MY_COLOR,
       text: messageText,
       reactions: [],
       status: 'sent',
@@ -1215,6 +1322,37 @@ export default function BuyerConversationScreen() {
       return;
     }
 
+    // Preview conversations have no real backend to post to (see the other
+    // isPreviewConversationId(conv.id) branches throughout this file, e.g.
+    // handleVoiceRecorded/handleQuickToggleDisappearing) — this covers the
+    // remaining case those didn't: a plain text/attachment send that also
+    // carries a reply (or an attachment, so it skipped the agent branch
+    // above). Appends locally, with the same replyToId/replyPreview shape
+    // the real API returns, so swipe-to-reply is fully demoable in preview.
+    if (isPreviewConversationId(conv.id)) {
+      const localMsg: Message = {
+        id: `local-${Date.now()}`,
+        conversationId: conv.id,
+        fromId: myId,
+        fromName: 'You',
+        fromInitials: MY_INITIALS,
+        fromColor: theme.accent,
+        text: t,
+        attachment: att ?? undefined,
+        replyToId: replyingTo?.id,
+        replyPreview: replyingTo?.text,
+        replyToAuthorName: replyingTo?.fromName,
+        reactions: [],
+        status: 'sent',
+        ts: Date.now(),
+        deletedForMe: false,
+      };
+      appendPreviewMessage(conv.id, localMsg);
+      setMessages((prev) => [...prev, localMsg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      return;
+    }
+
     setIsSending(true);
     try {
       await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
@@ -1290,8 +1428,37 @@ export default function BuyerConversationScreen() {
 
   // ── Message long press → reaction bar + actions sheet ───────────────────────
 
+  /** A short label for the elevated bubble clone when a long-pressed message
+   *  has no plain text (an image/voice/product card etc.) — the overlay only
+   *  needs to read recognizably as "the same bubble", not fully re-render
+   *  every attachment type. */
+  function sheetAttachmentLabel(msg: Message): string {
+    switch (msg.attachment?.type) {
+      case 'image': return 'Photo';
+      case 'video': return 'Video';
+      case 'voice': return 'Voice message';
+      case 'product': return msg.attachment.title ?? 'Product';
+      case 'order': return msg.attachment.title ?? 'Order';
+      case 'post': return msg.attachment.title ?? 'Post';
+      default: return '';
+    }
+  }
+
   function closeMessageSheet() {
     setActiveSheetMsg(null);
+    setReactionAnchor(null);
+  }
+
+  /** Measures the long-pressed bubble's window position, then opens the
+   *  Glass reaction overlay anchored to it. */
+  function openReactionOverlay(msg: Message) {
+    hapticSelection();
+    const node = bubbleAnchorRefs.current[msg.id];
+    if (!node) { setActiveSheetMsg(msg); return; }
+    node.measureInWindow((x, y, width, height) => {
+      setReactionAnchor({ x, y, width, height });
+      setActiveSheetMsg(msg);
+    });
   }
 
   function sheetReply() {
@@ -1387,13 +1554,7 @@ export default function BuyerConversationScreen() {
     }
 
     // Group reactions by kind for the chip summary under the bubble.
-    const grouped = new Map<ReactionType, number>();
-    for (const r of msg.reactions) {
-      const kind = reactionKind(r);
-      if (!kind) continue;
-      grouped.set(kind, (grouped.get(kind) ?? 0) + 1);
-    }
-    const reactionEntries = Array.from(grouped.entries());
+    const reactionEntries = groupReactionCounts(msg.reactions);
     const mine = myReaction(msg);
     const topReactor = msg.reactions[msg.reactions.length - 1];
 
@@ -1538,23 +1699,46 @@ export default function BuyerConversationScreen() {
           ) : <View style={s.msgAvatarSpacer} />
         )}
 
-        <View style={{ maxWidth: BUBBLE_MAX }}>
-          {/* Bubble */}
+        <View
+          style={{ maxWidth: BUBBLE_MAX }}
+          collapsable={false}
+          ref={(r) => { bubbleAnchorRefs.current[msg.id] = r; }}
+        >
+          {/* Bubble — wrapped in a short swipe-right-to-reply gesture (see
+              SwipeToReplyBubble's own doc comment for the tap/long-press
+              disambiguation, borrowed from components/inbox/InboxSwipeRow.tsx). */}
+          <SwipeToReplyBubble
+            testID={`conversation-bubble-swipe-${msg.id}`}
+            disabled={isDisabled || isRequestMode || messaging.blockedByMe || messaging.unavailable}
+            iconColor={theme.muted}
+            iconBg={theme.cardElevated}
+            onReply={() => { setReplyTo(msg); }}
+          >
           <PressableScale rippleEnabled={false}
             bounce={false}
             testID={`conversation-bubble-${msg.id}`}
             activeOpacity={0.88}
             onPress={(e) => handleBubblePress(msg, e)}
-            onLongPress={() => { hapticSelection(); setActiveSheetMsg(msg); }}
+            onLongPress={() => openReactionOverlay(msg)}
             delayLongPress={280}
-            // Voice messages render their own play/scrub/speed/transcription
-            // buttons inside this bubble (see VoiceMessageBubble) — on web,
+            // Voice, product and order attachments each render their own
+            // interactive control inside this bubble (VoiceMessageBubble's
+            // play/scrub/speed buttons; the product/order cards' own single
+            // PressableScale for View/Track — see items 70/71's "no nested
+            // Pressable" comments on those cards). On web,
             // accessibilityRole="button" makes react-native-web render an
             // actual <button>, and a <button> cannot legally contain other
-            // interactive controls (the HTML nested-button rule). Drop the
-            // role only for voice bubbles so it renders as a plain, still
+            // interactive controls (the HTML nested-button rule) — so those
+            // controls silently break the DOM tree even though there's only
+            // ever one logical tap target per row. Drop the role for all
+            // three attachment kinds so the bubble renders as a plain, still
             // fully tappable/long-pressable <div> instead.
-            accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : 'button'}
+            accessibilityRole={
+              msg.attachment?.type === 'voice'
+              || msg.attachment?.type === 'product'
+              || msg.attachment?.type === 'order'
+                ? 'none' : 'button'
+            }
             accessibilityLabel={isOwn ? 'Your message' : `Message from ${msg.fromName}`}
             accessibilityHint="Double tap to like, or touch and hold for more actions"
             style={[
@@ -1581,7 +1765,7 @@ export default function BuyerConversationScreen() {
             {msg.replyToId ? (
               <View style={[s.replyQuote, { borderLeftColor: isOwn ? theme.onAccent : theme.accent }]}>
                 <Text style={[s.replyQuoteText, { color: isOwn ? `${theme.onAccent}CC` : theme.muted }]} numberOfLines={1}>
-                  {msg.replyPreview ?? messages.find(m => m.id === msg.replyToId)?.text ?? 'Message'}
+                  {msg.replyPreview ?? messagePreviewText(messages.find(m => m.id === msg.replyToId) ?? {})}
                 </Text>
               </View>
             ) : null}
@@ -1625,6 +1809,7 @@ export default function BuyerConversationScreen() {
               </PressableScale>
             )}
           </PressableScale>
+          </SwipeToReplyBubble>
 
           {/* Reaction chip summary */}
           {reactionEntries.length > 0 && (
@@ -1942,21 +2127,18 @@ export default function BuyerConversationScreen() {
         <LikeBurst key={likeBurst.key} x={likeBurst.x} y={likeBurst.y} color={theme.accent} onDone={() => setLikeBurst(null)} />
       )}
 
-      {/* Reply preview */}
-      {replyTo && (
-        <View style={s.replyBar}>
-          <Feather name="corner-up-left" size={ICON.sm} color={theme.accent} />
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.replyFromName}>{replyTo.fromName}</Text>
-            <Text style={s.replyPreviewText} numberOfLines={1}>{replyTo.text}</Text>
-          </View>
-          <PressableScale rippleEnabled={false}
-            onPress={() => setReplyTo(null)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={s.replyClose}>×</Text>
-          </PressableScale>
-        </View>
+      {/* Reply preview — Mobbin: Instagram "Replying to a message"
+          (mobbin.com/flows/c973fada-0946-4bf2-b821-8a2b37958685). Fades/
+          slides in (ReplyBanner), never bounces — this is UI chrome, not
+          the swipe gesture that (usually) triggers it. */}
+      {replyTo && !isRequestMode && !messaging.blockedByMe && !messaging.unavailable && (
+        <ReplyBanner
+          testID="conversation-reply-banner"
+          theme={theme}
+          fromName={replyTo.fromName}
+          previewText={messagePreviewText(replyTo)}
+          onCancel={() => setReplyTo(null)}
+        />
       )}
 
       {/* Input row — request mode replaces the composer entirely with the
@@ -2419,47 +2601,40 @@ export default function BuyerConversationScreen() {
         </View>
       </Modal>
 
-      {/* Long-press reactions + actions sheet */}
-      <Modal
+      {/* Long-press reactions — Glass overlay. Mobbin: Instagram DM "Tap and
+          hold to super react" (mobbin.com/screens/5d13fdd9-75ad-43d6-9089-
+          7b236e362b73) — dims/blurs the thread, floats 6 emoji above the
+          elevated bubble with a hint label, and shows this same context
+          menu below the bubble at the same time. */}
+      <ReactionOverlay
         visible={activeSheetMsg != null}
-        transparent
-        animationType="fade"
-        onRequestClose={closeMessageSheet}
-      >
-        <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={closeMessageSheet} />
-        <SheetRise style={s.reactionSheet}>
-          <View style={s.mediaSheetHandle} />
-          <ReactionChipsRow
-            selected={myReactionOnSheet}
-            testIDPrefix="reaction-bar"
-            onSelect={(type) => {
-              if (activeSheetMsg) void handleReact(activeSheetMsg, type);
-              closeMessageSheet();
-            }}
-          />
-          <View style={s.sheetDivider} />
-          <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetReply}>
-            <Feather name="corner-up-left" size={ICON.sm} color={theme.text} />
-            <Text style={s.sheetActionText}>Reply</Text>
-          </PressableScale>
-          <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetCopy}>
-            <Feather name="copy" size={ICON.sm} color={theme.text} />
-            <Text style={s.sheetActionText}>Copy</Text>
-          </PressableScale>
-          {isOwnSheetMsg ? (
-            <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetDelete}>
-              <Feather name="trash-2" size={ICON.sm} color={theme.error} />
-              <Text style={[s.sheetActionText, { color: theme.error }]}>Delete for me</Text>
-            </PressableScale>
-          ) : (
-            <PressableScale rippleEnabled={false} style={s.sheetAction} onPress={sheetReport}>
-              <Feather name="flag" size={ICON.sm} color={theme.error} />
-              <Text style={[s.sheetActionText, { color: theme.error }]}>Report message</Text>
-            </PressableScale>
-          )}
-          <View style={{ height: 12 }} />
-        </SheetRise>
-      </Modal>
+        anchor={reactionAnchor}
+        isOwn={isOwnSheetMsg}
+        bubbleStyle={activeSheetMsg ? [
+          s.bubble,
+          { backgroundColor: isOwnSheetMsg ? sentBubbleColor : receivedBubbleColor, borderRadius: RADIUS.lg },
+        ] : undefined}
+        bubbleContent={activeSheetMsg ? (
+          <Text style={[s.msgText, { color: isOwnSheetMsg ? sentTextColor : receivedTextColor }]}>
+            {activeSheetMsg.text || sheetAttachmentLabel(activeSheetMsg)}
+          </Text>
+        ) : null}
+        selected={myReactionOnSheet}
+        onSelectReaction={(type) => {
+          if (activeSheetMsg) void handleReact(activeSheetMsg, type);
+          closeMessageSheet();
+        }}
+        menuItems={activeSheetMsg ? (
+          [
+            { key: 'reply', label: 'Reply', icon: 'corner-up-left', onPress: sheetReply },
+            { key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy },
+            isOwnSheetMsg
+              ? { key: 'delete', label: 'Delete for me', icon: 'trash-2', destructive: true, onPress: sheetDelete }
+              : { key: 'report', label: 'Report message', icon: 'flag', destructive: true, onPress: sheetReport },
+          ] as ReactionOverlayMenuItem[]
+        ) : []}
+        onClose={closeMessageSheet}
+      />
 
       <MediaViewer visible={viewerUri != null} uri={viewerUri} onClose={() => setViewerUri(null)} />
 
@@ -2905,6 +3080,83 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderColor: theme.border,
     padding: SP.sm,
     marginBottom: SP.xs,
+  },
+  // Product share card (item 70) — same row shape as attachCard but with a
+  // real image thumbnail instead of a leading glyph, and an explicit "View"
+  // chip in place of the bare chevron.
+  productCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 240,
+    backgroundColor: theme.card,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: SP.sm,
+    marginBottom: SP.xs,
+  },
+  productCardImage: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.sm,
+    backgroundColor: theme.cardElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  productCardImageDim: {
+    opacity: 0.5,
+  },
+  productCardImageFill: {
+    width: '100%',
+    height: '100%',
+  },
+  productUnavailableText: {
+    fontFamily: FONT.medium,
+  },
+  productViewChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: RADIUS.pill,
+    paddingVertical: 4,
+    paddingHorizontal: SP.xs,
+    marginLeft: SP.xs,
+  },
+  productViewChipText: {
+    fontFamily: FONT.semibold,
+    fontSize: FS.xs,
+    color: theme.text,
+  },
+  // Order status card (item 71) — same row shape as productCard, with a
+  // package-glyph-in-a-circle in place of an image thumbnail (an order has
+  // no single photo the way a product listing does) and a status badge
+  // under the title instead of a plain subtitle line.
+  orderMsgCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 240,
+    backgroundColor: theme.card,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: SP.sm,
+    marginBottom: SP.xs,
+  },
+  orderMsgCardIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.cardElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  orderMsgCardBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
   },
   // A standalone agent info/deep-link card — full width, coin/icon-in-a-
   // circle, bold title, subtitle, chevron. Same row shape as the Thread Cash

@@ -1012,6 +1012,10 @@ export const notificationsFeed = pgTable('notifications_feed', {
   // Thumbnail of the related post/product/order. Either an absolute URL or a
   // private `/objects/…` path that the feed route signs at read time.
   targetImageUrl: text('target_image_url'),
+  // The specific comment a post_comment / comment_reply / mention row is
+  // about (target_id is the post), so a tap lands on that comment
+  // (migration 101). Null for every other type and for older rows.
+  commentId:     text('comment_id'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   userCreatedIdx: index('notifications_feed_user_created_idx')
@@ -1149,6 +1153,26 @@ export const storyViews = pgTable('story_views', {
 }, (t) => ({
   pk:      primaryKey({ columns: [t.storyId, t.userId] }),
   userIdx: index('story_views_user_idx').on(t.userId),
+}));
+
+// ─── Notes bubble above story avatars (IG "Notes", 24 h TTL) ─────────────────
+// Structurally parallel to `stories` above, but one row per author at most —
+// a new note replaces the old one (enforced by the unique index on
+// authorId), matching Instagram's real "only one active note" behavior.
+
+export const notes = pgTable('notes', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  authorId:       text('author_id').notNull(),
+  authorName:     text('author_name').notNull(),
+  authorHandle:   text('author_handle'),
+  authorInitials: text('author_initials'),
+  authorColor:    text('author_color'),
+  text:           text('text').notNull(),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+  expiresAt:      timestamp('expires_at').notNull(),
+}, (t) => ({
+  authorUniqueIdx: uniqueIndex('notes_author_unique_idx').on(t.authorId),
+  expiresAtIdx:    index('notes_expires_idx').on(t.expiresAt),
 }));
 
 // ─── Buyer-to-buyer follows (social graph) ────────────────────────────────────

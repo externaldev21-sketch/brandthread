@@ -30,6 +30,8 @@ export interface ActivityItem {
   targetType?: string;
   targetImageUrl?: string;
   cta?: string;
+  /** Comment / reply / mention rows: the exact comment (targetId is the post). */
+  commentId?: string;
   /**
    * New-follower rows only: whether the viewer follows this person right
    * now (live, from the feed endpoint). Absent from older servers/rows, in
@@ -280,7 +282,23 @@ export function activityMessage(row: ActivityRow): MessagePart[] {
   if (first && row.actorCount > 1) {
     return [...actorNames(row), { text: ` · ${row.title}` }];
   }
-  return [{ text: row.title, bold: true }];
+  return [{ text: stripEmoji(row.title), bold: true }];
+}
+
+// Explicit ranges rather than \p{Extended_Pictographic}, which Hermes
+// doesn't reliably support. Pictographs, symbols & dingbats (minus the plain
+// ✓/✔ check glyphs, which are monochrome text), flags, VS16 and ZWJ.
+const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{2712}\u{2715}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu;
+
+/**
+ * System titles without emoji. Older order rows were stored as "Your order
+ * has shipped! 🚚" / "…delivered! 📦" / "New order! 🛍️" (the server copy no
+ * longer has them); colour emoji break the monochrome brand, and each row
+ * already carries its own monochrome icon (activityIcon). Only system rows
+ * are cleaned — never a person's name.
+ */
+export function stripEmoji(text: string): string {
+  return text.replace(EMOJI, '').replace(/\s{2,}/g, ' ').trim();
 }
 
 /** Secondary line under the sentence (comment excerpt, amount, etc.). */
@@ -299,8 +317,23 @@ export function activityDetail(row: ActivityRow): string | null {
 // ─── Classification ───────────────────────────────────────────────────────────
 
 /** Mirrors the server's `filter=orders` definition in notifications-feed.ts. */
-const ORDER_CATEGORIES = new Set(['orders', 'order', 'payout', 'payouts', 'payment', 'production']);
+const ORDER_CATEGORIES = new Set(['orders', 'order', 'payout', 'payouts', 'payment', 'production', 'returns']);
 const ORDER_TYPES = new Set(['low_stock', 'out_of_stock']);
+
+/**
+ * Order updates published to the BUYER (routes/orders.ts, webhooks-shippo,
+ * webhooks-shopify, dropLifecycle, lib/orderNotifications.ts). Seller-side
+ * order types (new_order_received, order_cancelled_by_buyer,
+ * shopify_order_cancelled) are deliberately absent.
+ */
+const BUYER_ORDER_TYPES = new Set([
+  'order_confirmed', 'order_shipped', 'order_out_for_delivery', 'order_delivered',
+  'order_cancelled', 'order_exception', 'order_returned_to_sender',
+]);
+
+export function isBuyerOrderNotification(type: string | undefined | null): boolean {
+  return !!type && BUYER_ORDER_TYPES.has(type);
+}
 // price_drop/back_in_stock/new_product are published under category "stock"
 // (seller alerts) or "social" (buyer alerts) depending on the publisher, but
 // they're always a buyer-facing "things you follow/saved" event for the
@@ -396,7 +429,9 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'order_shipped':
     case 'order_out_for_delivery': return 'truck';
     case 'order_delivered': return 'package';
-    case 'order_cancelled': return 'x-circle';
+    case 'order_cancelled':
+    case 'order_cancelled_by_buyer': return 'x-circle';
+    case 'order_confirmed': return 'check-circle';
     case 'order_exception': return 'alert-triangle';
     default:
       break;
@@ -410,6 +445,7 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'payout':
     case 'payment': return 'dollar-sign';
     case 'production': return 'tool';
+    case 'returns': return 'rotate-ccw';
     case 'subscription': return 'credit-card';
     case 'social': return 'users';
     default: return 'bell';
@@ -459,6 +495,17 @@ export function isGroupedRow(row: Pick<ActivityRow, 'type' | 'actorCount'>): boo
   return row.actorCount > 1 && AGGREGATED_TYPES.has(row.type);
 }
 
+/**
+ * Where tapping a row goes. A merged like / repost / follow row opens the
+ * people list; a merged comment row ("Jay and 2 others commented") opens the
+ * post's comments at the newest one instead — a list of names alone never
+ * shows what they said (item 82).
+ */
+export function activityRowHref(row: ActivityRow, role: 'buyer' | 'seller' | null = 'buyer'): string | null {
+  if (isGroupedRow(row) && row.type !== 'post_comment') return groupedPeopleHref(row);
+  return activityHref(row, role);
+}
+
 /** Header for the people list a grouped row opens. */
 export function groupedPeopleTitle(type: string): string {
   switch (type) {
@@ -486,7 +533,16 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
   const id = row.targetId;
   switch (row.targetType) {
     case 'order':
+      // Older buyer rows (shipped/delivered/cancelled…) were published with
+      // targetType "order" too — send those to the buyer's own order screen,
+      // not the seller's /order-detail.
+      if (isBuyerOrderNotification(row.type)) {
+        return id ? `/buyer-order-detail?id=${q(id)}` : '/(buyer)/orders';
+      }
       return id ? `/order-detail?id=${q(id)}` : '/(tabs)/orders';
+    case 'return':
+      // Same screen the return-status push opens (lib/notificationNavigation.ts).
+      return id ? `/return-detail?returnId=${q(id)}` : null;
     case 'buyer_order':
       return id ? `/buyer-order-detail?id=${q(id)}` : '/(buyer)/orders';
     case 'sample_order':
@@ -497,8 +553,10 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return id ? `/manufacturer-messages?threadId=${q(id)}` : null;
     case 'post':
       if (!id) return null;
+      // Comment rows land on that exact comment (scrolled to + highlighted,
+      // its reply thread opened) when the row carries one.
       return row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention'
-        ? `/buyer-post-comments?postId=${q(id)}`
+        ? `/buyer-post-comments?postId=${q(id)}${row.commentId ? `&commentId=${q(row.commentId)}` : ''}`
         : `/buyer-post-viewer?postId=${q(id)}`;
     case 'story':
       return id ? `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}` : null;

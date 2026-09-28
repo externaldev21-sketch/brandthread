@@ -59,6 +59,7 @@ export function adapt(
     targetType:    n.targetType   ?? undefined,
     targetImageUrl: targetImageUrl ?? undefined,
     cta:           n.cta          ?? undefined,
+    commentId:     n.commentId    ?? undefined,
     createdAt:     n.createdAt?.toISOString() ?? new Date().toISOString(),
   };
 }
@@ -103,7 +104,7 @@ async function resolveTargetImage(value: string | null): Promise<string | null> 
 }
 
 /** Feed categories the Activity Center shows under "Orders". */
-export const ORDER_ACTIVITY_CATEGORIES = ["orders", "order", "payout", "payouts", "payment", "production"] as const;
+export const ORDER_ACTIVITY_CATEGORIES = ["orders", "order", "payout", "payouts", "payment", "production", "returns"] as const;
 /** Inventory alerts are inserted without an orders category but belong there. */
 export const ORDER_ACTIVITY_TYPES = ["low_stock", "out_of_stock"] as const;
 /**
@@ -333,6 +334,8 @@ export async function publishNotification(n: {
   targetId?:    string;
   targetType?:  string;
   cta?:         string;
+  /** The specific comment (post_comment / comment_reply / mention). */
+  commentId?:   string;
   actorId?:     string;
   targetImageUrl?: string | null;
   analyticsOwnerId?: string;
@@ -368,6 +371,7 @@ export async function publishNotification(n: {
       cta:          n.cta          ?? null,
       actorId:      n.actorId      ?? null,
       targetImageUrl: n.targetImageUrl ?? null,
+      commentId:    n.commentId    ?? null,
     })
     // Order alerts are unique by seller, type, and order target. The
     // database partial unique index is the concurrency-safe idempotency
@@ -391,6 +395,7 @@ export async function publishNotification(n: {
         targetId: n.targetId,
         targetType: n.targetType,
         cta: n.cta,
+        commentId: n.commentId,
       },
       sound: n.pushSound,
       channelId: n.pushChannelId,

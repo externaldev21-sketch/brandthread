@@ -32,6 +32,7 @@ import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
 import { ApiError } from '@/lib/networkNotice';
 import { activityHref, groupedPeopleTitle, GROUPED_PEOPLE_MAX_IDS } from '@/lib/activity';
 import { getPreviewActivity, isPreviewActivityEnabled, previewActorAvatarUri } from '@/lib/previewActivity';
+import { getPreviewFollowing } from '@/lib/previewFollowStore';
 import { getGroupedActivityActors, type GroupedActivityActor } from '@/services/activityService';
 import { setSellerFollowing } from '@/services/socialService';
 
@@ -61,7 +62,7 @@ function previewActors(ids: readonly string[]): GroupedActivityActor[] {
       id: item.actorId, name, handle: item.actorHandle,
       initials: item.actorInitials || name.slice(0, 2).toUpperCase(),
       color: item.actorColor, avatarUrl: item.actorAvatarUrl,
-      isFollowing: false, createdAt: item.createdAt,
+      isFollowing: getPreviewFollowing(item.actorId) ?? false, createdAt: item.createdAt,
     });
   }
   return actors;

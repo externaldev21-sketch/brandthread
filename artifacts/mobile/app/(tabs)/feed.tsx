@@ -21,7 +21,7 @@ import {
 } from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
@@ -75,7 +75,7 @@ import {
 } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
-import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
+import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { SheetRise } from '@/components/motion/SheetRise';
@@ -85,6 +85,7 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
@@ -421,11 +422,11 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$480',
     productOriginalPrice: null,
     accentColor: '#232323',
-    likes: 0,
+    likes: 12400,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 842,
+    shares: 2045,
+    saves: 3100,
     location: 'Paris, France',
     productId: 'preview-product-01',
     sellerId: 'preview-seller-01',
@@ -439,7 +440,7 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
       { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000 },
       { productId: 'preview-product-01b', productName: 'Leather Ankle Boots', priceCents: 21000 },
     ],
-    commentsCount: 0,
+    commentsCount: 980,
   },
   {
     id: 'preview-fashion-02',
@@ -459,16 +460,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$325',
     productOriginalPrice: '$390',
     accentColor: '#474747',
-    likes: 0,
+    likes: 9800,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 567,
+    shares: 1780,
+    saves: 2200,
     location: 'Milan, Italy',
     productId: 'preview-product-02',
     sellerId: 'preview-seller-02',
     productTags: [{ productId: 'preview-product-02', productName: 'Liquid Silver Dress', priceCents: 32500 }],
-    commentsCount: 0,
+    commentsCount: 1240,
   },
   {
     id: 'preview-fashion-03',
@@ -488,16 +489,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$560',
     productOriginalPrice: null,
     accentColor: '#171717',
-    likes: 0,
+    likes: 15600,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 910,
+    shares: 2600,
+    saves: 4300,
     location: 'New York, NY',
     productId: 'preview-product-03',
     sellerId: 'preview-seller-03',
     productTags: [{ productId: 'preview-product-03', productName: 'Oversized Tuxedo', priceCents: 56000 }],
-    commentsCount: 0,
+    commentsCount: 2100,
   },
   {
     id: 'preview-fashion-04',
@@ -517,16 +518,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$410',
     productOriginalPrice: null,
     accentColor: '#626262',
-    likes: 0,
+    likes: 8300,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 320,
+    shares: 990,
+    saves: 1500,
     location: 'London, UK',
     productId: 'preview-product-04',
     sellerId: 'preview-seller-04',
     productTags: [{ productId: 'preview-product-04', productName: 'Ivory Column Set', priceCents: 41000 }],
-    commentsCount: 0,
+    commentsCount: 640,
   },
   {
     id: 'preview-fashion-05',
@@ -546,16 +547,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$295',
     productOriginalPrice: '$350',
     accentColor: '#0F0F0F',
-    likes: 0,
+    likes: 22100,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 1200,
+    shares: 3200,
+    saves: 5800,
     location: 'Tokyo, Japan',
     productId: 'preview-product-05',
     sellerId: 'preview-seller-05',
     productTags: [{ productId: 'preview-product-05', productName: 'Asymmetric Layer Jacket', priceCents: 29500 }],
-    commentsCount: 0,
+    commentsCount: 3400,
   },
   {
     id: 'preview-fashion-06',
@@ -575,16 +576,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$375',
     productOriginalPrice: null,
     accentColor: '#353535',
-    likes: 0,
+    likes: 6700,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 210,
+    shares: 720,
+    saves: 1100,
     location: 'Berlin, Germany',
     productId: 'preview-product-06',
     sellerId: 'preview-seller-06',
     productTags: [{ productId: 'preview-product-06', productName: 'Draped Hardware Gown', priceCents: 37500 }],
-    commentsCount: 0,
+    commentsCount: 480,
   },
   {
     id: 'preview-fashion-07',
@@ -604,16 +605,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$245',
     productOriginalPrice: null,
     accentColor: '#555555',
-    likes: 0,
+    likes: 18900,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 1050,
+    shares: 2850,
+    saves: 4900,
     location: 'Los Angeles, CA',
     productId: 'preview-product-07',
     sellerId: 'preview-seller-07',
     productTags: [{ productId: 'preview-product-07', productName: 'Crystal Mesh Top', priceCents: 24500 }],
-    commentsCount: 0,
+    commentsCount: 2700,
   },
   {
     id: 'preview-fashion-08',
@@ -633,16 +634,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$520',
     productOriginalPrice: null,
     accentColor: '#292929',
-    likes: 0,
+    likes: 11200,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 610,
+    shares: 1650,
+    saves: 2600,
     location: 'Copenhagen, Denmark',
     productId: 'preview-product-08',
     sellerId: 'preview-seller-08',
     productTags: [{ productId: 'preview-product-08', productName: 'Reconstructed Trench', priceCents: 52000 }],
-    commentsCount: 0,
+    commentsCount: 890,
   },
   {
     id: 'preview-fashion-09',
@@ -662,16 +663,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$445',
     productOriginalPrice: '$510',
     accentColor: '#404040',
-    likes: 0,
+    likes: 27500,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 1600,
+    shares: 3900,
+    saves: 6700,
     location: 'Seoul, South Korea',
     productId: 'preview-product-09',
     sellerId: 'preview-seller-09',
     productTags: [{ productId: 'preview-product-09', productName: 'Satin Power Suit', priceCents: 44500 }],
-    commentsCount: 0,
+    commentsCount: 4100,
   },
   {
     id: 'preview-fashion-10',
@@ -691,16 +692,16 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$690',
     productOriginalPrice: null,
     accentColor: '#1E1E1E',
-    likes: 0,
+    likes: 5400,
     comments: [],
-    reposts: 0,
-    shares: 0,
-    saves: 0,
+    reposts: 180,
+    shares: 610,
+    saves: 950,
     location: 'Paris, France',
     productId: 'preview-product-10',
     sellerId: 'preview-seller-10',
     productTags: [{ productId: 'preview-product-10', productName: 'Sculpted Silk Gown', priceCents: 69000 }],
-    commentsCount: 0,
+    commentsCount: 390,
   },
 ];
 
@@ -801,7 +802,9 @@ function initialEngagement(item: SpotlightItem): EngagementState {
     saved: item.savedByMe === true, saves: item.saves,
     reposted: item.repostedByMe === true, reposts: item.reposts,
     following: false,
-    comments: item.comments,
+    // Some feed items arrive without a comments array (e.g. posts restored
+    // from the feed cache); never let that reach the memo comparator below.
+    comments: item.comments ?? [],
   };
 }
 
@@ -1442,6 +1445,11 @@ function SpotlightPageImpl({
   // scale pop needs its own 0.8 -> 1.1 -> 1 sequence, not a value
   // interpolated off the fade's own progress.
   const heartBurstScale = useRef(new Animated.Value(0.8)).current;
+  // Counter, not boolean: bumping it on every double-tap (even in rapid
+  // succession) gives HeartBurstParticles a fresh value to key its
+  // Reanimated replay off, the same way a changing `key` would remount it
+  // but without paying for an unmount/remount each time.
+  const [heartBurstTrigger, setHeartBurstTrigger] = useState(0);
   const heartScale = useRef(new Animated.Value(1)).current;
   /** Ring that flashes out from behind the rail heart on like — a second,
    * smaller echo of the double-tap burst so a single tap on the rail icon
@@ -1490,6 +1498,7 @@ function SpotlightPageImpl({
       Animated.spring(heartBurstScale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 0 }),
     ]).start();
     Animated.timing(heartBurst, { toValue: 0, duration: 550, delay: 350, useNativeDriver: true }).start();
+    setHeartBurstTrigger(t => t + 1);
   }
 
   // 1 -> 1.15 -> 1 over 180ms total (was a 1.35 spring — stronger overshoot
@@ -1532,7 +1541,11 @@ function SpotlightPageImpl({
       onDoubleTapLike(item.id);
       bumpHeart();
       burstHeart();
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // Medium tier, not the "light" tier the rail's own like tap uses
+      // (hapticLight/hapticToggle, lib/haptics.ts) — double-tap-to-like is a
+      // bigger, more deliberate gesture with a full-screen burst to match,
+      // so it earns the stronger of the two impact tiers.
+      hapticMedium();
     } else {
       lastTap.current = now;
       pauseTimer.current = setTimeout(() => {
@@ -1642,6 +1655,7 @@ function SpotlightPageImpl({
           >
             <Feather name="heart" size={110} color={ON_DARK} />
           </Animated.View>
+          <HeartBurstParticles trigger={heartBurstTrigger} />
           {item.contentType === 'video' && (
             <Animated.View
               pointerEvents="none"
@@ -1775,7 +1789,7 @@ function engagementEqual(a: EngagementState | undefined, b: EngagementState | un
   return a.liked === b.liked && a.likes === b.likes
     && a.saved === b.saved && a.saves === b.saves
     && a.reposted === b.reposted && a.reposts === b.reposts
-    && a.following === b.following && a.comments.length === b.comments.length;
+    && a.following === b.following && (a.comments?.length ?? 0) === (b.comments?.length ?? 0);
 }
 
 const SpotlightPage = React.memo(SpotlightPageImpl, (prev, next) => (
@@ -1844,7 +1858,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     reposts: post.repostsCount,
     repostedByMe: post.repostedByMe,
     friendReposts: post.friendReposts,
-    shares: 0,
+    shares: Number((post as any).sharesCount ?? 0),
     saves: Number((post as any).savedCount ?? (post as any).savesCount ?? 0),
     savedByMe: post.savedByMe === true,
     location: (post as any).location ?? (post as any).locationName ?? undefined,
@@ -2057,7 +2071,8 @@ export default function FeedScreen({
   const feedHasMoreRef = useRef(true);
   const repostPendingRef = useRef(new Set<string>());
   const openLive = useOpenLive();
-  const cartPulse = useRef(new Animated.Value(1)).current;
+  // Shared with the Discover pager's cart badge (hooks/useCartBadgeBump.ts).
+  const { scale: cartPulse, bump: bumpCart } = useCartBadgeBump(reduceMotion);
   const cartTargetRef = useRef<View>(null);
   const feedListRef = useRef<FlatList<FeedItem>>(null);
 
@@ -2225,26 +2240,54 @@ export default function FeedScreen({
     return unsub;
   }, [loadFeed]);
 
+  // Last cart count this screen knows about — lets a refocus tell "the buyer
+  // added something elsewhere" (product page Add to bag, Saved → Add to
+  // cart, …) apart from a plain reload.
+  const knownCartCountRef = useRef<number | null>(null);
   useEffect(() => {
     let active = true;
     setCartCount(0);
+    knownCartCountRef.current = null;
     void getCart()
       .then(cart => {
-        if (active) setCartCount(cart.items.reduce((total, item) => total + item.quantity, 0));
+        if (!active) return;
+        const count = cart.items.reduce((total, item) => total + item.quantity, 0);
+        knownCartCountRef.current = count;
+        setCartCount(count);
       })
       .catch(() => {});
     return () => { active = false; };
   }, [userId]);
 
+  // The feed stays mounted under pushed screens, so without this the badge
+  // kept its old count after adding from a product page. On return, pick up
+  // the real count and bump only if it went up (an add happened) — never on
+  // first load, a plain refocus, or a removal.
+  const screenFocused = useIsFocused();
+  const wasScreenFocusedRef = useRef(screenFocused);
+  useEffect(() => {
+    const refocused = screenFocused && !wasScreenFocusedRef.current;
+    wasScreenFocusedRef.current = screenFocused;
+    if (!refocused) return undefined;
+    let active = true;
+    void getCart()
+      .then(cart => {
+        if (!active) return;
+        const count = cart.items.reduce((total, item) => total + item.quantity, 0);
+        const known = knownCartCountRef.current;
+        knownCartCountRef.current = count;
+        setCartCount(count);
+        if (known != null && count > known) bumpCart();
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [screenFocused, bumpCart]);
+
   const handleCartUpdated = useCallback((newCount: number) => {
+    knownCartCountRef.current = newCount;
     setCartCount(newCount);
-    if (!shouldAnimateCartSuccess(reduceMotion)) return;
-    cartPulse.setValue(0.78);
-    Animated.sequence([
-      Animated.spring(cartPulse, { toValue: 1.18, speed: 28, bounciness: 8, useNativeDriver: true }),
-      Animated.spring(cartPulse, { toValue: 1, speed: 24, bounciness: 4, useNativeDriver: true }),
-    ]).start();
-  }, [cartPulse, reduceMotion]);
+    bumpCart();
+  }, [bumpCart]);
 
   const handleRefresh = useCallback(() => {
     if (feedRefreshing) return;
@@ -3066,7 +3109,7 @@ export default function FeedScreen({
             <Text style={styles.creatorTitle} numberOfLines={1} accessibilityRole="header">
               {creatorFeed?.title || (creatorFeed?.source === 'product' ? 'Featured in' : 'Videos')}
             </Text>
-            <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
+            <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
                 style={styles.buyerTopBtn}
                 activeOpacity={0.7}
@@ -3194,7 +3237,7 @@ export default function FeedScreen({
               >
                 <Feather name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
               </TouchableOpacity>
-              <Animated.View ref={cartTargetRef} style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
+              <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
                 style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
@@ -3267,7 +3310,7 @@ export default function FeedScreen({
 
             <ActivityBellButton color={ON_DARK} size={20} badgeBorderColor={BG} />
 
-            <Animated.View ref={cartTargetRef} style={{ transform: [{ scale: cartPulse }] }}>
+            <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={{ transform: [{ scale: cartPulse }] }}>
             <TouchableOpacity
               style={styles.cartHeaderBtn}
               activeOpacity={0.7}

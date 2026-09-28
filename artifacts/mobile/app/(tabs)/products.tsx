@@ -14,7 +14,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, WEB_SAFE_AREA_TOP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, SearchBar, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
@@ -627,7 +627,9 @@ export default function ProductsScreen() {
   return (
     <View style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
       {/* ── Fixed header ── */}
-      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? 67 : insets.top) + 12, backgroundColor: palette.surface ?? BG }]}>
+      {/* Overnight batch item 40: shared WEB_SAFE_AREA_TOP (lib/theme.ts),
+          not a hardcoded 67 — see its own comment. */}
+      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top) + 12, backgroundColor: palette.surface ?? BG }]}>
         {/* Title row */}
         <View style={s.titleRow}>
           <PressableScale
@@ -672,14 +674,18 @@ export default function ProductsScreen() {
 
         {/* Persistent search row */}
         <View style={s.searchRow}>
-          <View style={s.searchBox}>
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search products…"
-              style={s.searchInput}
-            />
-          </View>
+          {/* Overnight batch item 37: SearchBar is the box now (no border, at
+              rest or focus) — the outer `searchBox` wrapper used to draw a
+              second bordered card around it, and this file's own
+              `searchInput` style forced SearchBar's own fill to transparent
+              to compensate, which is exactly the doubled-up "rectangle bar"
+              the owner flagged. */}
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search products…"
+            style={s.searchBarFlex}
+          />
           <PressableScale
             style={[s.controlBtn, hasActiveFilter && s.controlBtnActive]}
             onPress={() => { hapticPrimaryAction(); setFilterModalVisible(true); }}
@@ -843,24 +849,7 @@ const createStyles = (theme: any) => {
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
   },
-  searchBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CARD,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: SP.sm,
-    height: 36,
-  },
-  searchInput: {
-    flex: 1,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    height: 36,
-  },
+  searchBarFlex: { flex: 1, height: 36 },
   controlBtn: {
     width: 36,
     height: 36,

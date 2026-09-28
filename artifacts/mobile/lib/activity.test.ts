@@ -5,6 +5,7 @@ import {
   activityChipEmpty,
   matchesActivityChip,
   activityHref,
+  activityRowHref,
   activityIcon,
   activityKind,
   activityMessage,
@@ -19,8 +20,10 @@ import {
   GROUPED_PEOPLE_MAX_IDS,
   isGroupedRow,
   isFollowBackRow,
+  isBuyerOrderNotification,
   newFollowersSummary,
   relativeTime,
+  stripEmoji,
   type ActivityItem,
 } from './activity';
 
@@ -53,7 +56,7 @@ function like(actor: string, postId: string, overrides: Partial<ActivityItem> = 
     actorId: `user_${actor}`,
     actorName: actor,
     actorInitials: actor.slice(0, 2).toUpperCase(),
-    actorColor: '#8B5CF6',
+    actorColor: '#3D3D42',
     targetId: postId,
     targetType: 'post',
     targetImageUrl: `https://cdn.test/${postId}.jpg`,
@@ -245,6 +248,28 @@ describe('read state', () => {
   });
 });
 
+describe('monochrome system titles', () => {
+  it('drops colour emoji from stored order titles', () => {
+    expect(stripEmoji('Your order has shipped! 🚚')).toBe('Your order has shipped!');
+    expect(stripEmoji('Your order was delivered! 📦')).toBe('Your order was delivered!');
+    expect(stripEmoji('New order! 🛍️')).toBe('New order!');
+    expect(stripEmoji('Your package is arriving today 🚚')).toBe('Your package is arriving today');
+    expect(stripEmoji('Big 🎉 news')).toBe('Big news');
+  });
+
+  it('keeps plain text and monochrome check glyphs', () => {
+    expect(stripEmoji('✓ Trial started')).toBe('✓ Trial started');
+    expect(stripEmoji('Order #BT-00042 — 2 items')).toBe('Order #BT-00042 — 2 items');
+  });
+
+  it('is applied to system rows only, never to a person-led sentence', () => {
+    const [system] = aggregateActivity([item({ type: 'order_shipped', category: 'orders', title: 'Your order has shipped! 🚚' })]);
+    expect(activityMessage(system)).toEqual([{ text: 'Your order has shipped!', bold: true }]);
+    const [person] = aggregateActivity([like('Mia 🌸', 'post1')]);
+    expect(activityMessage(person).map((p) => p.text).join('')).toBe('Mia 🌸 liked your post');
+  });
+});
+
 describe('relativeTime', () => {
   const now = new Date(2026, 8, 24, 15, 0).getTime();
   it('formats the notification style', () => {
@@ -272,6 +297,19 @@ describe('classification and routing', () => {
     expect(activityKind({ category: 'messages', type: 'new_friend_message' })).toBe('other');
   });
 
+  it('deep-links comment, reply and mention rows to the exact comment', () => {
+    for (const type of ['post_comment', 'comment_reply', 'mention']) {
+      expect(activityHref(item({ type, targetType: 'post', targetId: 'p1', commentId: 'c 9' })))
+        .toBe('/buyer-post-comments?postId=p1&commentId=c%209');
+      // Older rows without a comment id still open that post's comments.
+      expect(activityHref(item({ type, targetType: 'post', targetId: 'p1' })))
+        .toBe('/buyer-post-comments?postId=p1');
+    }
+    // A like never carries a comment: it opens the post itself.
+    expect(activityHref(item({ type: 'post_like', targetType: 'post', targetId: 'p1', commentId: 'c9' })))
+      .toBe('/buyer-post-viewer?postId=p1');
+  });
+
   it('routes rows to existing screens', () => {
     expect(activityHref(item({ type: 'new_order_received', targetType: 'order', targetId: 'o 1' }), 'seller'))
       .toBe('/order-detail?id=o%201');
@@ -292,6 +330,26 @@ describe('classification and routing', () => {
       .toBe('/thread-cash');
     expect(activityHref(item({ type: 'repost', targetType: 'post', targetId: 'p1' })))
       .toBe('/buyer-post-viewer?postId=p1');
+  });
+
+  it("routes buyer order updates to the buyer's order screen, whatever targetType they were stored with", () => {
+    for (const type of ['order_confirmed', 'order_shipped', 'order_out_for_delivery', 'order_delivered', 'order_cancelled', 'order_exception', 'order_returned_to_sender']) {
+      expect(activityHref(item({ type, category: 'orders', targetType: 'order', targetId: 'o1' }))).toBe('/buyer-order-detail?id=o1');
+      expect(activityHref(item({ type, category: 'orders', targetType: 'buyer_order', targetId: 'o1' }))).toBe('/buyer-order-detail?id=o1');
+      expect(isBuyerOrderNotification(type)).toBe(true);
+    }
+    // Seller-side order events keep the seller screen.
+    for (const type of ['new_order_received', 'order_cancelled_by_buyer', 'shopify_order_cancelled']) {
+      expect(activityHref(item({ type, category: 'orders', targetType: 'order', targetId: 'o2' }), 'seller')).toBe('/order-detail?id=o2');
+      expect(isBuyerOrderNotification(type)).toBe(false);
+    }
+    // Return status rows: Orders filter, and the same screen the push opens.
+    expect(activityKind({ category: 'returns', type: 'return_refunded' })).toBe('orders');
+    expect(activityHref(item({ type: 'return_approved', category: 'returns', targetType: 'return', targetId: 'r1' })))
+      .toBe('/return-detail?returnId=r1');
+    expect(activityIcon({ type: 'order_confirmed', category: 'orders' })).toBe('check-circle');
+    expect(activityIcon({ type: 'order_cancelled_by_buyer', category: 'orders' })).toBe('x-circle');
+    expect(activityIcon({ type: 'return_refunded', category: 'returns' })).toBe('rotate-ccw');
   });
 
   it('icons the new event types', () => {
@@ -429,6 +487,19 @@ describe('grouped rows → people list', () => {
     const params = new URLSearchParams(href.split('?')[1]);
     expect(params.get('type')).toBe('post_like');
     expect(params.get('ids')!.split(',')).toEqual(merged.ids);
+  });
+
+  it('opens a merged comment row at the newest comment, other merged rows at the people list', () => {
+    const comment = (actor: string, commentId: string) => like(actor, 'post1', {
+      type: 'post_comment', title: `${actor} commented on your post`, commentId,
+    });
+    const [comments] = aggregateActivity([comment('Jay', 'c2'), comment('Mina', 'c1')]);
+    expect(isGroupedRow(comments)).toBe(true);
+    expect(activityRowHref(comments)).toBe('/buyer-post-comments?postId=post1&commentId=c2');
+    const [likes] = aggregateActivity([like('Jay', 'post1'), like('Mina', 'post1')]);
+    expect(activityRowHref(likes)).toBe(groupedPeopleHref(likes));
+    const [single] = aggregateActivity([like('Jay', 'post1')]);
+    expect(activityRowHref(single, 'seller')).toBe('/buyer-post-viewer?postId=post1');
   });
 
   it('caps the ids a link carries', () => {

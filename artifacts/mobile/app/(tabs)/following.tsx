@@ -24,6 +24,7 @@ import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { useScrollReset } from '@/hooks/useScrollReset';
+import { pickAvatarColor } from '@/lib/avatarColors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,11 +72,10 @@ function useCountdown(releaseAt?: string | null): CountdownParts {
 
 // ─── Drop card ────────────────────────────────────────────────────────────────
 
-// Per-seller identity color, generated the same way as elsewhere in the app
-// (e.g. buyer-friend-requests.tsx). This is data-driven brand identity, not UI
-// chrome, so it is intentionally kept outside the theme token system.
-const SELLER_COLORS = ['#0EA5E9', '#0F766E', '#B45309', '#BE185D', '#1D4ED8', '#059669', '#DC2626', '#0891B2'];
-function colorForId(id: string) { return SELLER_COLORS[id.charCodeAt(0) % SELLER_COLORS.length]; }
+// Per-seller identity color — monochrome sweep (part 2): was its own
+// colorful SELLER_COLORS array, now the shared neutral avatar palette
+// (lib/avatarColors.ts) like every other avatar-color pick in the app.
+function colorForId(id: string) { return pickAvatarColor(id); }
 
 function DropCard({ drop, onPress }: { drop: DropItem; onPress: () => void }) {
   const palette = useColors();

@@ -20,12 +20,15 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
+import { Glass } from '@/components/ui/Glass';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui';
 import {
   getStories, trackStoryView, subscribeSocial, muteUser, createOrGetConversation, sendMessage,
+  MY_USER_ID, MY_NAME, MY_HANDLE, MY_INITIALS, MY_COLOR,
 } from '@/services/socialService';
+import { getPreviewActivityStory } from '@/lib/previewActivity';
 import { useAuth } from '@clerk/expo';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import type { Story, StoryMedia } from '@/services/socialTypes';
@@ -35,6 +38,12 @@ import { shouldShowStoryGestureGuide } from '@/lib/storyGestureGuideStorage';
 import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
 
 const { width: W, height: H } = Dimensions.get('window');
+
+// Mirrors Instagram's default quick-reaction row shown above the reply
+// pill before the viewer starts typing (Mobbin: Instagram iOS story
+// viewer reply screen). Emoji glyphs carry their own inherent color —
+// not a themed accent — so they're exempt from the monochrome rule.
+const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '👏', '🔥'];
 
 function timeAgo(ms: number): string {
   const diff = Date.now() - ms;
@@ -63,6 +72,25 @@ function StorySlideVideo({ uri, paused }: { uri: string; paused: boolean }) {
   );
 }
 
+/**
+ * Preview only: the viewer's own seeded story or highlight an Activity row
+ * points at (item 82), used when the real lookup finds nothing. Kept open
+ * (highlights don't expire). `null` for every id outside the preview seed.
+ */
+function previewStory(id: string): Story | null {
+  const seed = getPreviewActivityStory(id);
+  if (!seed) return null;
+  return {
+    id: seed.id, authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE,
+    authorInitials: MY_INITIALS, authorColor: MY_COLOR, authorAccountType: 'buyer',
+    media: [{ id: `${seed.id}-slide`, type: 'photo', backgroundColor: '#000000', duration: 5, imageUri: seed.imageUri }],
+    privacy: { visibility: 'public', replyPermission: 'everyone', hiddenFromUserIds: [], closeFriendsOnly: false },
+    viewers: [], repliesDisabled: false,
+    createdAt: seed.createdAt, expiresAt: Date.now() + 24 * 60 * 60_000,
+    likesCount: seed.likesCount,
+  } as Story;
+}
+
 export default function BuyerStoryViewer() {
   const colors = useColors();
   const { theme } = useAppTheme();
@@ -81,6 +109,7 @@ export default function BuyerStoryViewer() {
   const [isPaused, setIsPaused] = useState(false);
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [replyFocused, setReplyFocused] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
   const [viewerModalVisible, setViewerModalVisible] = useState(false);
   // Like state keyed by storyId
@@ -102,12 +131,16 @@ export default function BuyerStoryViewer() {
   const loadStories = useCallback(async () => {
     const generation = ++loadGeneration.current;
     try {
-      const all = await getStories();
+      const all = await getStories().catch(() => [] as Story[]);
       if (loadGeneration.current !== generation) return;
       const now = Date.now();
-      const filtered = ids
+      const found = ids
         .map(id => all.find(s => s.id === id))
         .filter((s): s is Story => !!s && s.expiresAt > now);
+      // Preview only: seeded stories the Activity rows point at (item 82).
+      const filtered = found.length > 0
+        ? found
+        : ids.map(previewStory).filter((s): s is Story => !!s);
       setStories(filtered);
       if (storyId) {
         const idx = filtered.findIndex(s => s.id === storyId);
@@ -171,8 +204,8 @@ export default function BuyerStoryViewer() {
     return unsub;
   }, []);
 
-  const handleSendReply = async () => {
-    const text = inputText.trim();
+  const handleSendReply = async (override?: string) => {
+    const text = (override ?? inputText).trim();
     if (!text || sendingReply || !currentStory) return;
     setSendingReply(true);
     try {
@@ -188,13 +221,18 @@ export default function BuyerStoryViewer() {
         },
       });
       await sendMessage(conv.id, text);
-      setInputText('');
+      if (!override) setInputText('');
       hapticSuccessAction();
     } catch {
       Alert.alert('Couldn’t send reply', 'Try again.');
     } finally {
       setSendingReply(false);
     }
+  };
+
+  const sendQuickReaction = (emoji: string) => {
+    hapticLight();
+    void handleSendReply(emoji);
   };
 
   const slideCounts = stories.map(s => s.media.length);
@@ -557,24 +595,41 @@ export default function BuyerStoryViewer() {
         style={styles.bottomBarWrap}
         keyboardVerticalOffset={0}
       >
+        {!currentStory.repliesDisabled && !replyFocused && (
+          <View style={styles.quickReactionRow}>
+            {QUICK_REACTIONS.map(emoji => (
+              <PressableScale
+                key={emoji}
+                onPress={() => sendQuickReaction(emoji)}
+                disabled={sendingReply}
+                accessibilityRole="button"
+                accessibilityLabel={`React with ${emoji}`}
+              >
+                <Text style={styles.quickReactionEmoji}>{emoji}</Text>
+              </PressableScale>
+            ))}
+          </View>
+        )}
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
           {!currentStory.repliesDisabled ? (
             <>
-              <TextInput
-                style={styles.replyInput}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder={`Reply to ${currentStory.authorName}…`}
-                placeholderTextColor="rgba(255,255,255,0.4)"
-                onFocus={() => setIsPaused(true)}
-                onBlur={() => setIsPaused(false)}
-                onSubmitEditing={handleSendReply}
-                returnKeyType="send"
-                editable={!sendingReply}
-              />
+              <Glass variant="clear" radius={RADII.pill} style={styles.replyInputGlass}>
+                <TextInput
+                  style={styles.replyInput}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder={`Reply to ${currentStory.authorName}…`}
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  onFocus={() => { setIsPaused(true); setReplyFocused(true); }}
+                  onBlur={() => { setIsPaused(false); setReplyFocused(false); }}
+                  onSubmitEditing={() => handleSendReply()}
+                  returnKeyType="send"
+                  editable={!sendingReply}
+                />
+              </Glass>
               {inputText.trim().length > 0 && (
                 <PressableScale
-                  onPress={handleSendReply}
+                  onPress={() => handleSendReply()}
                   style={styles.likeBtn}
                   disabled={sendingReply}
                   accessibilityRole="button"
@@ -822,14 +877,23 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     gap: SP.sm,
   },
-  replyInput: {
+  quickReactionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SP.md,
+    paddingBottom: SP.sm,
+  },
+  quickReactionEmoji: {
+    fontSize: 26,
+  },
+  replyInputGlass: {
     flex: 1,
     height: 44,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.pill,
+    justifyContent: 'center',
+  },
+  replyInput: {
+    height: 44,
     paddingHorizontal: SP.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     color: ON_DARK,
