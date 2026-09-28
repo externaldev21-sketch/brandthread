@@ -21,7 +21,7 @@ import {
 } from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
@@ -75,7 +75,7 @@ import {
 } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
-import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
+import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { SheetRise } from '@/components/motion/SheetRise';
@@ -85,6 +85,7 @@ import { TABULAR_NUMS } from '@/constants/typography';
 import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
 import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
+import { HeartBurstParticles } from '@/components/buyer-feed/HeartBurstParticles';
 import { CaptionBlock, CAPTION_BLOCK_HEIGHT_WITH_REPOST } from '@/components/buyer-feed/CaptionBlock';
 import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
@@ -1444,6 +1445,11 @@ function SpotlightPageImpl({
   // scale pop needs its own 0.8 -> 1.1 -> 1 sequence, not a value
   // interpolated off the fade's own progress.
   const heartBurstScale = useRef(new Animated.Value(0.8)).current;
+  // Counter, not boolean: bumping it on every double-tap (even in rapid
+  // succession) gives HeartBurstParticles a fresh value to key its
+  // Reanimated replay off, the same way a changing `key` would remount it
+  // but without paying for an unmount/remount each time.
+  const [heartBurstTrigger, setHeartBurstTrigger] = useState(0);
   const heartScale = useRef(new Animated.Value(1)).current;
   /** Ring that flashes out from behind the rail heart on like — a second,
    * smaller echo of the double-tap burst so a single tap on the rail icon
@@ -1492,6 +1498,7 @@ function SpotlightPageImpl({
       Animated.spring(heartBurstScale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 0 }),
     ]).start();
     Animated.timing(heartBurst, { toValue: 0, duration: 550, delay: 350, useNativeDriver: true }).start();
+    setHeartBurstTrigger(t => t + 1);
   }
 
   // 1 -> 1.15 -> 1 over 180ms total (was a 1.35 spring — stronger overshoot
@@ -1534,7 +1541,11 @@ function SpotlightPageImpl({
       onDoubleTapLike(item.id);
       bumpHeart();
       burstHeart();
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // Medium tier, not the "light" tier the rail's own like tap uses
+      // (hapticLight/hapticToggle, lib/haptics.ts) — double-tap-to-like is a
+      // bigger, more deliberate gesture with a full-screen burst to match,
+      // so it earns the stronger of the two impact tiers.
+      hapticMedium();
     } else {
       lastTap.current = now;
       pauseTimer.current = setTimeout(() => {
@@ -1644,6 +1655,7 @@ function SpotlightPageImpl({
           >
             <Feather name="heart" size={110} color={ON_DARK} />
           </Animated.View>
+          <HeartBurstParticles trigger={heartBurstTrigger} />
           {item.contentType === 'video' && (
             <Animated.View
               pointerEvents="none"
@@ -2059,7 +2071,8 @@ export default function FeedScreen({
   const feedHasMoreRef = useRef(true);
   const repostPendingRef = useRef(new Set<string>());
   const openLive = useOpenLive();
-  const cartPulse = useRef(new Animated.Value(1)).current;
+  // Shared with the Discover pager's cart badge (hooks/useCartBadgeBump.ts).
+  const { scale: cartPulse, bump: bumpCart } = useCartBadgeBump(reduceMotion);
   const cartTargetRef = useRef<View>(null);
   const feedListRef = useRef<FlatList<FeedItem>>(null);
 
@@ -2227,26 +2240,54 @@ export default function FeedScreen({
     return unsub;
   }, [loadFeed]);
 
+  // Last cart count this screen knows about — lets a refocus tell "the buyer
+  // added something elsewhere" (product page Add to bag, Saved → Add to
+  // cart, …) apart from a plain reload.
+  const knownCartCountRef = useRef<number | null>(null);
   useEffect(() => {
     let active = true;
     setCartCount(0);
+    knownCartCountRef.current = null;
     void getCart()
       .then(cart => {
-        if (active) setCartCount(cart.items.reduce((total, item) => total + item.quantity, 0));
+        if (!active) return;
+        const count = cart.items.reduce((total, item) => total + item.quantity, 0);
+        knownCartCountRef.current = count;
+        setCartCount(count);
       })
       .catch(() => {});
     return () => { active = false; };
   }, [userId]);
 
+  // The feed stays mounted under pushed screens, so without this the badge
+  // kept its old count after adding from a product page. On return, pick up
+  // the real count and bump only if it went up (an add happened) — never on
+  // first load, a plain refocus, or a removal.
+  const screenFocused = useIsFocused();
+  const wasScreenFocusedRef = useRef(screenFocused);
+  useEffect(() => {
+    const refocused = screenFocused && !wasScreenFocusedRef.current;
+    wasScreenFocusedRef.current = screenFocused;
+    if (!refocused) return undefined;
+    let active = true;
+    void getCart()
+      .then(cart => {
+        if (!active) return;
+        const count = cart.items.reduce((total, item) => total + item.quantity, 0);
+        const known = knownCartCountRef.current;
+        knownCartCountRef.current = count;
+        setCartCount(count);
+        if (known != null && count > known) bumpCart();
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [screenFocused, bumpCart]);
+
   const handleCartUpdated = useCallback((newCount: number) => {
+    knownCartCountRef.current = newCount;
     setCartCount(newCount);
-    if (!shouldAnimateCartSuccess(reduceMotion)) return;
-    cartPulse.setValue(0.78);
-    Animated.sequence([
-      Animated.spring(cartPulse, { toValue: 1.18, speed: 28, bounciness: 8, useNativeDriver: true }),
-      Animated.spring(cartPulse, { toValue: 1, speed: 24, bounciness: 4, useNativeDriver: true }),
-    ]).start();
-  }, [cartPulse, reduceMotion]);
+    bumpCart();
+  }, [bumpCart]);
 
   const handleRefresh = useCallback(() => {
     if (feedRefreshing) return;
@@ -3068,7 +3109,7 @@ export default function FeedScreen({
             <Text style={styles.creatorTitle} numberOfLines={1} accessibilityRole="header">
               {creatorFeed?.title || (creatorFeed?.source === 'product' ? 'Featured in' : 'Videos')}
             </Text>
-            <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
+            <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
                 style={styles.buyerTopBtn}
                 activeOpacity={0.7}
@@ -3196,7 +3237,7 @@ export default function FeedScreen({
               >
                 <Feather name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
               </TouchableOpacity>
-              <Animated.View ref={cartTargetRef} style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
+              <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
                 style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
@@ -3269,7 +3310,7 @@ export default function FeedScreen({
 
             <ActivityBellButton color={ON_DARK} size={20} badgeBorderColor={BG} />
 
-            <Animated.View ref={cartTargetRef} style={{ transform: [{ scale: cartPulse }] }}>
+            <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={{ transform: [{ scale: cartPulse }] }}>
             <TouchableOpacity
               style={styles.cartHeaderBtn}
               activeOpacity={0.7}
