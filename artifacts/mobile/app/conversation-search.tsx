@@ -17,6 +17,7 @@ import { isPreviewConversationId, getPreviewMessages } from '@/lib/previewInbox'
 import { searchConversationMessages } from '@/services/socialService';
 import type { Message } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 export default function ConversationSearchScreen() {
   const { theme } = useAppTheme();
@@ -69,7 +70,7 @@ export default function ConversationSearchScreen() {
         <View style={[s.searchPill, { backgroundColor: theme.cardElevated }]}>
           <Feather name="search" size={ICON.sm} color={theme.muted} />
           <TextInput
-            style={[s.searchInput, { color: theme.text }]}
+            style={[s.searchInput, { color: theme.text }, WEB_INPUT_RESET]}
             value={query}
             onChangeText={runSearch}
             placeholder="Search in this chat"

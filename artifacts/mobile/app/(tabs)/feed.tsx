@@ -89,6 +89,7 @@ import { CaptionBlock } from '@/components/buyer-feed/CaptionBlock';
 import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 /**
  * Scopes the feed player to one creator's videos (profile grid tap) or to the
@@ -3160,7 +3161,7 @@ export default function FeedScreen({
         {showSearch ? (
           <View style={styles.searchRow}>
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, WEB_INPUT_RESET]}
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search creators, products..."

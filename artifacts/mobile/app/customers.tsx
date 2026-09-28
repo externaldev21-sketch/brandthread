@@ -10,6 +10,7 @@ import { serviceRequest } from '@/lib/serviceConfig';
 import { FS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { ErrorState } from '@/components/ui/ErrorState';
 
 type ApiCustomer = {
@@ -140,7 +141,7 @@ export default function CustomersScreen() {
       <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Feather name="search" size={16} color={colors.mutedForeground} />
         <TextInput
-          style={[styles.searchInput, { color: colors.foreground }]}
+          style={[styles.searchInput, { color: colors.foreground }, WEB_INPUT_RESET]}
           placeholder="Search customers..."
           placeholderTextColor={colors.mutedForeground}
           value={search}

@@ -24,6 +24,7 @@ import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { PressableScale, SheetHandle, HapticSwitch } from '@/components/BrandthreadUI';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -88,14 +89,14 @@ export function SettingsSearchBar({
   const s = React.useMemo(() => makeCardStyles(colors), [colors]);
   const [focused, setFocused] = React.useState(false);
   return (
-    <View style={[s.searchWrap, focused && { borderColor: colors.primary }]}>
+    <View style={[s.searchWrap, focused && s.searchWrapFocused]}>
       <Feather name="search" size={16} color={colors.mutedForeground} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.mutedForeground}
-        style={s.searchInput}
+        style={[s.searchInput, WEB_INPUT_RESET]}
         autoCorrect={false}
         returnKeyType="search"
         onFocus={() => setFocused(true)}
@@ -334,6 +335,9 @@ function makeCardStyles(colors: Colors) {
 
     // Search
     searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.secondary, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 20, borderWidth: 1, borderColor: 'transparent' },
+    // Focused state stays the same pill as unfocused — no border/box
+    // appears, only a very subtle fill change.
+    searchWrapFocused: { backgroundColor: 'rgba(255,255,255,0.12)' },
     searchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: colors.foreground },
 
     // Section

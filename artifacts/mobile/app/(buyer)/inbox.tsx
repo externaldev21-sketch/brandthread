@@ -10,6 +10,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth, useUser } from '@clerk/expo';
@@ -1263,15 +1264,18 @@ export default function InboxScreen() {
                 s.searchRow,
                 s.searchRowInHeader,
                 {
-                  backgroundColor: theme.cardElevated,
-                  borderColor: messagesSearchFocused ? theme.border : 'transparent',
+                  // Focused state stays the same pill as unfocused — no
+                  // border/box appears on focus, only a very subtle fill
+                  // change (never anything boxy).
+                  backgroundColor: messagesSearchFocused ? 'rgba(255,255,255,0.12)' : theme.cardElevated,
+                  borderColor: 'transparent',
                 },
               ]}
             >
               <Feather name="search" size={16} color={theme.muted} />
               <TextInput
                 ref={messagesSearchInputRef}
-                style={[s.searchInput, { color: theme.text }]}
+                style={[s.searchInput, { color: theme.text }, WEB_INPUT_RESET]}
                 value={messagesSearchQuery}
                 onChangeText={setMessagesSearchQuery}
                 placeholder="Search"
@@ -1303,6 +1307,7 @@ export default function InboxScreen() {
               accessibilityLabel="Cancel search"
               testID="inbox-search-cancel"
               hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+              style={s.searchCancelBtn}
             >
               <Text style={[s.searchCancelText, { color: theme.text }]}>Cancel</Text>
             </PressableScale>
@@ -1796,6 +1801,16 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   searchRowInHeader: {
     flex: 1,
     marginBottom: 0,
+  },
+  // Explicit height matching searchRow's own 44 + justifyContent: 'center'
+  // rather than relying on the parent row's alignItems: 'center' alone —
+  // that centers this Pressable's own box against the search field's box,
+  // but doesn't reliably center the Text node's line-height box inside a
+  // sibling View's box the same way, which left "Cancel" sitting a few px
+  // above the field's true vertical center.
+  searchCancelBtn: {
+    height: 44,
+    justifyContent: 'center',
   },
   searchCancelText: {
     fontSize: FS.sm,

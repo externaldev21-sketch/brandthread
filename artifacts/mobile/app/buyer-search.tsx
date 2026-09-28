@@ -29,6 +29,7 @@ import { SegmentedTabs, type SearchTabKey } from '@/components/search/SegmentedT
 import { VideoTile } from '@/components/search/VideoTile';
 import { FASHION_PREVIEW_POSTS } from '@/app/(tabs)/feed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
@@ -581,7 +582,7 @@ export default function BuyerSearchScreen() {
             onChangeText={handleChangeText}
             placeholder="Search"
             placeholderTextColor="#9A9AA0"
-            style={[styles.fieldInput, { color: '#FFFFFF' }, Platform.OS === 'web' && styles.fieldInputWebNoOutline]}
+            style={[styles.fieldInput, { color: '#FFFFFF' }, WEB_INPUT_RESET]}
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
@@ -717,13 +718,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     backgroundColor: '#1f1f1f',
     borderWidth: 1, borderColor: 'transparent',
   },
-  // A subtle 1px light border on focus instead of the browser's default
-  // thick yellow/orange outline (removed via fieldInputWebNoOutline below).
-  fieldFocused: { borderColor: 'rgba(255,255,255,0.2)' },
+  // Focused state stays the same pill as unfocused — no border/box appears.
+  // Only a very subtle fill change signals focus (the browser's own default
+  // outline is separately suppressed via WEB_INPUT_RESET on the TextInput).
+  fieldFocused: { backgroundColor: 'rgba(255,255,255,0.12)' },
   fieldInput: { flex: 1, ...TYPE_SCALE.body, padding: 0 },
-  // react-native-web renders a default focus ring on <input>; the field's
-  // own border above is the only focus affordance we want.
-  fieldInputWebNoOutline: { outlineStyle: 'none', outlineWidth: 0 } as any,
   // Explicit 8pt gap to the field, on top of the header row's own `gap` —
   // guarantees a fixed gap even if a web flexbox `gap` renders inconsistently,
   // so the "Search" button never crowds the field's trailing clear button.

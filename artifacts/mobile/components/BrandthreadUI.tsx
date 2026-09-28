@@ -35,6 +35,7 @@ import { undoExpiresAt } from '@/lib/undoRecovery';
 import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
 import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
 // Mutations remain responsible for their own server/local rollback. This provider
@@ -575,10 +576,10 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
   const { theme } = useAppTheme();
   const palette = useColors();
   return (
-    <View style={[srS.root, { backgroundColor: palette.card, borderColor: palette.border }, focused && [srS.focused, { borderColor: theme.accent }], style]}>
+    <View style={[srS.root, { backgroundColor: palette.card, borderColor: palette.border }, focused && srS.focused, style]}>
       <Feather name="search" size={ICON.sm} color={focused ? theme.accentLight : palette.mutedForeground} />
       <TextInput
-        style={[srS.input, { color: palette.foreground }]}
+        style={[srS.input, { color: palette.foreground }, WEB_INPUT_RESET]}
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
@@ -605,9 +606,11 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
 
 const srS = StyleSheet.create({
   root:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD,
-             borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+             borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'transparent',
              paddingHorizontal: SP.md, height: COMP.inputH - 4 },
-  focused: { borderColor: BORDER_FOCUS },
+  // Focused state stays the same pill as unfocused — no border/box appears.
+  // Only a very subtle fill change signals focus (no boxy outline of any kind).
+  focused: { backgroundColor: 'rgba(255,255,255,0.12)' },
   input:   { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: FG },
 });
 
@@ -982,7 +985,7 @@ export function FormInput({
       {label && <Text style={fiS.label}>{label}</Text>}
       <View style={[fiS.inputRow, focused && [fiS.focusedRow, { borderColor: theme.accent }], multiline && fiS.multilineRow]}>
         <TextInput
-          style={[fiS.input, multiline && fiS.multilineInput]}
+          style={[fiS.input, multiline && fiS.multilineInput, WEB_INPUT_RESET]}
           value={value}
           onChangeText={onChange}
           placeholder={placeholder}
