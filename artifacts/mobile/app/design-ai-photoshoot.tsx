@@ -31,6 +31,7 @@ import {
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product, ProductMedia } from '@/services/productTypes';
 import { useApi } from '@/hooks/useApi';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { File, Paths } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 
@@ -487,7 +488,7 @@ export default function AIPhotoshootScreen() {
             <View style={s.inputWrap}>
               <Feather name="search" size={ICON.sm} color={SUBTLE} style={s.inputIcon} />
               <TextInput
-                style={[s.input, { paddingLeft: ICON.sm + SP.md + SP.sm }]}
+                style={[s.input, { paddingLeft: ICON.sm + SP.md + SP.sm }, WEB_INPUT_RESET]}
                 value={productSearch}
                 onChangeText={setProductSearch}
                 placeholder="Search products…"

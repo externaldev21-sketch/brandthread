@@ -49,6 +49,7 @@ import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/compo
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { FollowPill } from '@/components/search/PersonRow';
 import { ThemedRefreshControl } from '@/components/ui';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import SwipeableActions from '@/components/SwipeableActions';
@@ -59,17 +60,26 @@ import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { hapticPrimaryAction, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { isPreviewActivityEnabled, getPreviewActivity, getPreviewSuggestedPeople, previewActorAvatarUri } from '@/lib/previewActivity';
+import { Chip } from '@/components/ui/Chip';
 import {
   ACTIVITY_PAGE_SIZE,
+  ACTIVITY_CHIPS,
+  activityCategory,
+  activityChipEmpty,
+  matchesActivityChip,
+  type ActivityChip,
   activityDetail,
   activityHref,
   activityIcon,
+  followControlState,
   activityKind,
   activityMessage,
   applyRead,
   buildActivitySections,
   createReadTracker,
+  groupedPeopleHref,
   isFollowBackRow,
+  isGroupedRow,
   relativeTime,
   type ActivityActor,
   type ActivityItem,
@@ -107,78 +117,51 @@ const DISPLAY_TITLES: Record<DisplaySectionKey, string> = {
 };
 
 // ─── Filter chips ───────────────────────────────────────────────────────────
-// A horizontally scrolling row of pill chips below the header, mirroring
-// Threads' Activity tab. Selection is component state only (not persisted).
+// A horizontally scrolling row of pill chips below the header — Threads'
+// Activity tab (All / Replies / Mentions… over one feed:
+// https://mobbin.com/screens/cb296e3d-df9e-4c48-a030-0f08248197d5,
+// filtered: https://mobbin.com/screens/f19ed0eb-9ad1-4579-aa5f-dd9779fce52c).
+// The chip set and what each one matches live in lib/activity.ts
+// (ACTIVITY_CHIPS / matchesActivityChip). Selection is component state only.
 
-type ActivityChipKey = 'all' | 'follows' | 'likes' | 'comments' | 'thread_cash' | 'orders';
-
-const ACTIVITY_CHIPS: { key: ActivityChipKey; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'follows', label: 'Follows' },
-  { key: 'likes', label: 'Likes' },
-  { key: 'comments', label: 'Comments' },
-  { key: 'thread_cash', label: 'Thread Cash' },
-  { key: 'orders', label: 'Orders' },
-];
-
-const FOLLOW_ROW_TYPES = new Set(['new_follower']);
-const LIKE_ROW_TYPES = new Set(['post_like', 'story_like']);
-const COMMENT_ROW_TYPES = new Set(['post_comment', 'comment_reply', 'mention']);
-const THREAD_CASH_ROW_TYPES = new Set(['thread_cash_received']);
-
-/** Which social item types belong to a given chip; `null` = no type filter (All). */
-function chipTypeFilter(chip: ActivityChipKey): ReadonlySet<string> | null {
-  switch (chip) {
-    case 'follows': return FOLLOW_ROW_TYPES;
-    case 'likes': return LIKE_ROW_TYPES;
-    case 'comments': return COMMENT_ROW_TYPES;
-    case 'thread_cash': return THREAD_CASH_ROW_TYPES;
-    default: return null;
-  }
-}
+/** One shared design-system Chip with a stable per-chip handler. */
+const ActivityFilterChip = React.memo(function ActivityFilterChip({ chip, label, selected, onSelect }: {
+  chip: ActivityChip;
+  label: string;
+  selected: boolean;
+  onSelect: (key: ActivityChip) => void;
+}) {
+  const handlePress = useCallback(() => onSelect(chip), [chip, onSelect]);
+  return <Chip label={label} selected={selected} onPress={handlePress} testID={`activity-chip-${chip}`} />;
+});
 
 function ActivityFilterChips({ selected, onSelect, styles }: {
-  selected: ActivityChipKey;
-  onSelect: (key: ActivityChipKey) => void;
+  selected: ActivityChip;
+  onSelect: (key: ActivityChip) => void;
   styles: Styles;
 }) {
-  const { theme } = useAppTheme();
   return (
     // A plain View wrapper with an explicit height, not just the ScrollView's
     // own style — a horizontal ScrollView with no non-zero cross-axis height
     // of its own can collapse to nothing in this screen's flex column,
-    // letting the SectionList below render through/over it. Plain `Pressable`
-    // (not `PressableScale`) here too, so there's no ambiguity about which
-    // element in the tree actually carries the chip's visible style.
+    // letting the SectionList below render through/over it.
     <View style={styles.chipRow}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
         contentContainerStyle={styles.chipScrollContent}
       >
-        {ACTIVITY_CHIPS.map((chip) => {
-          const isSelected = chip.key === selected;
-          return (
-            <Pressable
-              key={chip.key}
-              style={({ pressed }) => [
-                styles.chip,
-                isSelected
-                  ? { backgroundColor: theme.cardElevated, borderColor: theme.border }
-                  : { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.15)' },
-                pressed && styles.chipPressed,
-              ]}
-              onPress={() => onSelect(chip.key)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={chip.label}
-            >
-              <Text style={[styles.chipText, { color: isSelected ? theme.text : theme.muted }]} numberOfLines={1}>
-                {chip.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {ACTIVITY_CHIPS.map((chip) => (
+          <ActivityFilterChip
+            key={chip.key}
+            chip={chip.key}
+            label={chip.label}
+            selected={chip.key === selected}
+            onSelect={onSelect}
+          />
+        ))}
       </ScrollView>
       {/* Hints that the row scrolls further — same right-edge fade pattern
           used on the seller Orders filter pills — instead of the last chip
@@ -209,9 +192,10 @@ function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }
   }
   let icon: string | null = null;
   let color = theme.accentLight;
-  if (FOLLOW_ROW_TYPES.has(row.type)) icon = 'user-plus';
-  else if (LIKE_ROW_TYPES.has(row.type)) { icon = 'heart'; color = theme.error; }
-  else if (COMMENT_ROW_TYPES.has(row.type)) icon = 'message-circle';
+  const category = activityCategory(row);
+  if (category === 'follows') icon = 'user-plus';
+  else if (category === 'likes') { icon = 'heart'; color = theme.error; }
+  else if (category === 'comments') icon = 'message-circle';
   if (!icon) return null;
   return (
     <View style={styles.typeBadge}>
@@ -298,33 +282,41 @@ const ActivityRowView = React.memo(function ActivityRowView({
   unread,
   now,
   styles,
-  followState,
+  followOverride,
+  followPending,
   onPress,
   onDismiss,
-  onFollowBack,
+  onToggleFollow,
   onOpenMenu,
 }: {
   row: ActivityRow;
   unread: boolean;
   now: number;
   styles: Styles;
-  followState: 'idle' | 'pending' | 'done';
+  /** This session's follow/unfollow of the row's person, over the feed's state. */
+  followOverride: boolean | undefined;
+  followPending: boolean;
   onPress: (row: ActivityRow) => void;
   onDismiss: (row: ActivityRow) => void;
-  onFollowBack: (row: ActivityRow) => void;
+  onToggleFollow: (row: ActivityRow, currentlyFollowing: boolean) => void;
   onOpenMenu: (row: ActivityRow) => void;
 }) {
   const { theme } = useAppTheme();
   const parts = activityMessage(row);
   const detail = activityDetail(row);
-  const followBack = isFollowBackRow(row);
   // A follow row for a single person always shows a real Follow back /
-  // Following control instead of a generic icon — even once it's mutual
-  // (cta cleared), "Following" reads better than a bare person icon. (PR
-  // #118, re-applied on top of PR #123/#130's Threads-style row.)
-  const isSingleFollowRow = row.type === 'new_follower' && row.actorCount === 1 && !!row.targetId;
-  const alreadyFollowing = isSingleFollowRow && !followBack;
-  const showFollowControl = followBack || isSingleFollowRow;
+  // Following pill instead of a generic icon (Instagram iOS Activity:
+  // "bear.2123374 started following you. 6h [Follow back]",
+  // https://mobbin.com/screens/1f627db9-fb0f-4870-b58d-35bec67239c7). Its
+  // state is the server's live follow state (`isFollowingActor`), then this
+  // session's own taps on top.
+  const followControl = followControlState(row);
+  const following = followControl ? (followOverride ?? followControl.following) : false;
+  const showFollowControl = !!followControl;
+  const handleFollowPress = useCallback(
+    () => onToggleFollow(row, following),
+    [following, onToggleFollow, row],
+  );
   const sentence = parts.map((p) => p.text).join('');
   // "$5.00 · tap to view" → "+$5.00": the amount is the whole point of a
   // Thread Cash row, so it gets its own bold green line instead of reading
@@ -435,31 +427,19 @@ const ActivityRowView = React.memo(function ActivityRowView({
       </Pressable>
 
       {showFollowControl ? (
-        <PressableScale
-          style={[
-            styles.followBtn,
-            alreadyFollowing || followState === 'done' ? styles.followBtnFollowing : styles.followBtnNotFollowing,
-          ]}
-          disabled={alreadyFollowing || followState !== 'idle'}
-          onPress={() => onFollowBack(row)}
-          accessibilityRole="button"
-          accessibilityLabel={alreadyFollowing || followState === 'done' ? 'Following' : `Follow back ${row.actors[0]?.name ?? ''}`}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-        >
-          {followState === 'pending' ? (
-            <ActivityIndicator size="small" color={alreadyFollowing ? '#FFFFFF' : '#000000'} />
-          ) : (
-            <Text
-              style={[
-                styles.followText,
-                alreadyFollowing || followState === 'done' ? styles.followTextFollowing : styles.followTextNotFollowing,
-              ]}
-              numberOfLines={1}
-            >
-              {alreadyFollowing || followState === 'done' ? 'Following' : 'Follow back'}
-            </Text>
-          )}
-        </PressableScale>
+        // The shared Follow pill (components/search/PersonRow) — same one the
+        // grouped "New followers" list uses — as a sibling of `tapArea`, so
+        // tapping it never also opens the profile.
+        <FollowPill
+          following={following}
+          followBack={!following}
+          loading={followPending}
+          onPress={handleFollowPress}
+          accessibilityLabel={following
+            ? `Following ${row.actors[0]?.name ?? ''}, tap to unfollow`
+            : `Follow back ${row.actors[0]?.name ?? ''}`}
+          testID={`activity-follow-${row.targetId}`}
+        />
       ) : trailingThumb}
     </View>
     </SwipeableActions>
@@ -590,7 +570,10 @@ export default function ActivityCenterScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [followStates, setFollowStates] = useState<Record<string, 'pending' | 'done'>>({});
+  // Follow pill state on single-person follow rows, keyed by the person (not
+  // the row), so every row for the same person agrees.
+  const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
+  const [followPending, setFollowPending] = useState<ReadonlySet<string>>(() => new Set());
   const [removeFollowerTarget, setRemoveFollowerTarget] = useState<ActivityRow | null>(null);
   const [removingFollower, setRemovingFollower] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -599,7 +582,7 @@ export default function ActivityCenterScreen() {
   const [suggested, setSuggested] = useState<SuggestedPerson[]>([]);
   const [suggestedFollowState, setSuggestedFollowState] = useState<Record<string, 'pending' | 'done'>>({});
   // Chip filter — component state only, not persisted across app restarts.
-  const [chip, setChip] = useState<ActivityChipKey>('all');
+  const [chip, setChip] = useState<ActivityChip>('all');
 
   const requestId = useRef(0);
   const itemsRef = useRef<ActivityItem[]>([]);
@@ -710,21 +693,16 @@ export default function ActivityCenterScreen() {
 
   const readIds = useMemo(() => new Set(items.filter((item) => item.isRead).map((item) => item.id)), [items]);
 
-  // Order/payout updates stay out of the default "All" feed (shopping noise
-  // doesn't belong next to likes/follows), but the "Orders" chip shows them
-  // as ordinary rows in the same list — no separate summary card.
-  const orderItems = useMemo(() => items.filter((item) => activityKind(item) === 'orders'), [items]);
-  const socialItems = useMemo(() => items.filter((item) => activityKind(item) !== 'orders'), [items]);
-
   // Client-side filtering of the already-loaded page — pagination
   // (loadMore/hasMore) keeps working against the unfiltered `items`, this
-  // only narrows what's displayed.
-  const filteredItems = useMemo(() => {
-    if (chip === 'orders') return orderItems;
-    const typeFilter = chipTypeFilter(chip);
-    if (!typeFilter) return socialItems;
-    return socialItems.filter((item) => typeFilter.has(item.type));
-  }, [socialItems, orderItems, chip]);
+  // only narrows what's displayed. Order/payout updates stay out of "All"
+  // (shopping noise doesn't belong next to likes/follows); the "Orders" chip
+  // shows them as ordinary rows in the same list — see matchesActivityChip.
+  const filteredItems = useMemo(
+    () => items.filter((item) => matchesActivityChip(item, chip)),
+    [items, chip],
+  );
+  const chipEmpty = activityChipEmpty(chip);
 
   const sections: ListSection[] = useMemo(() => {
     const raw = buildActivitySections(
@@ -807,7 +785,9 @@ export default function ActivityCenterScreen() {
       // Navigation must not depend on analytics.
     });
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
-    const href = activityHref(row, role);
+    // A merged row ("Jay and 12 others liked your post") opens the list of
+    // those people — Instagram's "View likes" pattern, see app/activity-people.tsx.
+    const href = isGroupedRow(row) ? groupedPeopleHref(row) : activityHref(row, role);
     if (href) router.push(href as never);
   }, [api, role, router, tracker, user?.id]);
 
@@ -828,25 +808,46 @@ export default function ActivityCenterScreen() {
     }
   }, []);
 
-  const handleFollowBack = useCallback(async (row: ActivityRow) => {
+  // Follow back / unfollow from a follow row's inline pill — the same
+  // POST/DELETE /api/social/follow every other Follow pill uses. Optimistic,
+  // one request per person at a time, rolled back on failure.
+  const followPendingRef = useRef(followPending);
+  followPendingRef.current = followPending;
+  const setFollowingPerson = useCallback(async (userId: string, next: boolean) => {
+    if (followPendingRef.current.has(userId)) return;
+    setFollowPending((prev) => new Set(prev).add(userId));
+    setFollowOverrides((prev) => ({ ...prev, [userId]: next }));
+    try {
+      await setSellerFollowing(userId, next);
+      if (next) hapticSuccessAction();
+    } catch {
+      setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
+      Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
+    } finally {
+      setFollowPending((prev) => {
+        const copy = new Set(prev);
+        copy.delete(userId);
+        return copy;
+      });
+    }
+  }, []);
+
+  const handleToggleFollow = useCallback((row: ActivityRow, currentlyFollowing: boolean) => {
     const userId = row.targetId;
     if (!userId) return;
-    hapticPrimaryAction();
-    setFollowStates((prev) => ({ ...prev, [row.key]: 'pending' }));
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
-    try {
-      await setSellerFollowing(userId, true);
-      hapticSuccessAction();
-      setFollowStates((prev) => ({ ...prev, [row.key]: 'done' }));
-    } catch {
-      setFollowStates((prev) => {
-        const next = { ...prev };
-        delete next[row.key];
-        return next;
-      });
-      Alert.alert('Could not follow', 'Please try again in a moment.');
+    if (!currentlyFollowing) {
+      hapticPrimaryAction();
+      void setFollowingPerson(userId, true);
+      return;
     }
-  }, [tracker]);
+    // "Following" → Instagram's two-option unfollow confirm, same as the
+    // Following list (app/connections.tsx).
+    showActionSheet(undefined, undefined, [
+      { text: 'Unfollow', style: 'destructive', onPress: () => { void setFollowingPerson(userId, false); } },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [setFollowingPerson, tracker]);
 
   const showToast = useCallback((message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -971,13 +972,14 @@ export default function ActivityCenterScreen() {
       unread={row.ids.some((id) => !readIds.has(id))}
       now={now}
       styles={styles}
-      followState={followStates[row.key] ?? 'idle'}
+      followOverride={row.targetId ? followOverrides[row.targetId] : undefined}
+      followPending={!!row.targetId && followPending.has(row.targetId)}
       onPress={handlePress}
       onDismiss={handleDismiss}
-      onFollowBack={handleFollowBack}
+      onToggleFollow={handleToggleFollow}
       onOpenMenu={handleOpenMenu}
     />
-  ), [followStates, handleDismiss, handleFollowBack, handleOpenMenu, handlePress, now, readIds, styles]);
+  ), [followOverrides, followPending, handleDismiss, handleToggleFollow, handleOpenMenu, handlePress, now, readIds, styles]);
 
   const renderSectionHeader = useCallback(({ section }: { section: ListSection }) => (
     <View style={styles.sectionHeader}>
@@ -1054,7 +1056,13 @@ export default function ActivityCenterScreen() {
           )}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
-              <EmptyState icon={EMPTY_ICON} illustration="bell" message={EMPTY_MESSAGE} />
+              {/* A filter with nothing in it says so specifically (minimal
+                  per-chip copy — full empty-state polish is item 85). */}
+              {chip === 'all' ? (
+                <EmptyState icon={EMPTY_ICON} illustration="bell" message={EMPTY_MESSAGE} />
+              ) : (
+                <EmptyState icon={chipEmpty.icon as any} message={chipEmpty.message} testID={`activity-empty-${chip}`} />
+              )}
             </View>
           )}
           ListFooterComponent={listFooter}
@@ -1131,23 +1139,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingBottom: SP.sm,
     gap: SP.sm,
     alignItems: 'center',
-  },
-  chip: {
-    height: 36,
-    paddingHorizontal: SP.md,
-    borderRadius: RADIUS.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // A plain `Pressable` here (not `PressableScale`) has no built-in press
-  // feedback of its own — this restores a subtle dim on tap.
-  chipPressed: {
-    opacity: 0.6,
-  },
-  chipText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
   },
   // 16pt trailing inset (matches `chipScrollContent`'s own paddingHorizontal)
   // so the fade sits fully inside the last chip's own padding, not overlapping it.

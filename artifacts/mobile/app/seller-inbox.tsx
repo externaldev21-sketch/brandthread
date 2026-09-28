@@ -207,7 +207,7 @@ export default function SellerInboxScreen() {
         </View>
         <View style={s.rowCenter}>
           <View style={s.rowTop}>
-            <Text style={[s.name, hasUnread && { fontFamily: FONT.bold }]} numberOfLines={1}>
+            <Text style={[s.name, { fontFamily: hasUnread ? FONT.bold : FONT.regular }]} numberOfLines={1}>
               {other.name || other.handle || 'Buyer'}
             </Text>
             <Text style={s.time}>{timeAgo(item.lastMessageTs)}</Text>
@@ -219,15 +219,13 @@ export default function SellerInboxScreen() {
           ) : null}
           <View style={s.rowBottom}>
             <Text
-              style={[s.preview, hasUnread && { color: theme.text, fontFamily: FONT.medium }]}
+              style={[s.preview, hasUnread && { color: theme.text, fontFamily: FONT.bold }]}
               numberOfLines={1}
             >
               {previewText(item.lastMessage)}
             </Text>
             {hasUnread && (
-              <View testID={`seller-unread-badge-${item.id}`} style={s.unreadBadge}>
-                <Text style={s.unreadText}>{item.unreadCount > 9 ? '9+' : item.unreadCount}</Text>
-              </View>
+              <View testID={`seller-unread-badge-${item.id}`} style={[s.unreadDot, { backgroundColor: theme.accent }]} />
             )}
           </View>
         </View>
@@ -298,15 +296,16 @@ const createStyles = (theme: AppThemePreset) => {
   avatarInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
   rowCenter: { flex: 1 },
   rowTop: { flexDirection: 'row', alignItems: 'center' },
-  name: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  name: { flex: 1, fontSize: FS.base, fontFamily: FONT.regular, color: theme.text },
   time: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginLeft: SP.sm },
   context: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.accent, marginTop: 1 },
   rowBottom: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   preview: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
-  unreadBadge: {
-    minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5,
-    backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', marginLeft: SP.sm,
+  // Threads/buyer-inbox-style trailing dot (matches
+  // app/(buyer)/inbox.tsx's unreadDotTrailing) — was previously a numeric
+  // count badge, a different visual convention from the buyer side's dot.
+  unreadDot: {
+    width: 8, height: 8, borderRadius: 4, marginLeft: SP.sm,
   },
-  unreadText: { fontSize: 11, fontFamily: FONT.bold, color: theme.onAccent },
   });
 };

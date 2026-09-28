@@ -1562,7 +1562,7 @@ router.get("/posts", async (req, res) => {
     const postIds = rows.map((r) => r.id);
 
     // Fetch tagged products and interaction counts in parallel
-    const [tagRows, likeRows, repostRows, commentRows] = await Promise.all([
+    const [tagRows, likeRows, repostRows, shareRows, saveRows, commentRows] = await Promise.all([
       db
         .select({
           postId:    postTaggedProducts.postId,
@@ -1588,6 +1588,18 @@ router.get("/posts", async (req, res) => {
         .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
         .groupBy(interactions.postId),
 
+      db
+        .select({ postId: interactions.postId, cnt: count() })
+        .from(interactions)
+        .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "share")))
+        .groupBy(interactions.postId),
+
+      db
+        .select({ postId: savedItems.targetId, cnt: count() })
+        .from(savedItems)
+        .where(and(inArray(savedItems.targetId, postIds), eq(savedItems.itemType, "post")))
+        .groupBy(savedItems.targetId),
+
       visibleCommentCounts(postIds),
     ]);
 
@@ -1601,6 +1613,10 @@ router.get("/posts", async (req, res) => {
     for (const r of likeRows) if (r.postId) likesByPost[r.postId] = Number(r.cnt);
     const repostsByPost: Record<string, number> = {};
     for (const r of repostRows) if (r.postId) repostsByPost[r.postId] = Number(r.cnt);
+    const sharesByPost: Record<string, number> = {};
+    for (const r of shareRows) if (r.postId) sharesByPost[r.postId] = Number(r.cnt);
+    const savesByPost: Record<string, number> = {};
+    for (const r of saveRows) if (r.postId) savesByPost[r.postId] = Number(r.cnt);
     const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
 
     const result = rows.map((p) => ({
@@ -1630,6 +1646,8 @@ router.get("/posts", async (req, res) => {
       })),
       likesCount:    p.visibility?.showLikeCount === false ? null : likesByPost[p.id] ?? 0,
       repostsCount:  repostsByPost[p.id]  ?? 0,
+      sharesCount:   sharesByPost[p.id]   ?? 0,
+      savesCount:    savesByPost[p.id]    ?? 0,
       commentsCount: commentsByPost[p.id] ?? 0,
     }));
 
