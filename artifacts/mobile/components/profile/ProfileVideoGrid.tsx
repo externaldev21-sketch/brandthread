@@ -114,10 +114,14 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
         {(state) => (
           <>
             {item.posterUri ? (
+              // Video keeps its full-bleed cover poster (9:16 rule, unchanged
+              // grid-cell shape). Photo/slideshow tiles show the creator's
+              // chosen crop uncropped inside the same cell — no more
+              // center-cropping a 3:4 photo into this 9:16/4:5 box.
               <CachedImage
                 source={{ uri: item.posterUri }}
                 style={StyleSheet.absoluteFill}
-                contentFit="cover"
+                contentFit={item.kind === 'video' ? 'cover' : 'contain'}
                 cachePolicy="memory-disk"
                 transition={150}
               />

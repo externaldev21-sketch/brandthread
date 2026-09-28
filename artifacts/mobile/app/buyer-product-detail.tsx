@@ -159,7 +159,10 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 
 const fmtPrice = formatCents;
 const GALLERY_WIDTH = Dimensions.get('window').width;
-const GALLERY_HEIGHT = Math.min(520, Math.max(430, GALLERY_WIDTH * 1.22));
+// 3:4 — matches how product photos are now saved (cropped by the seller to
+// 3:4 at upload time; see ShopProductSheet's ProductImageCarousel, fixed the
+// same way in an earlier photo-audit pass).
+const GALLERY_HEIGHT = GALLERY_WIDTH * 4 / 3;
 
 function renderStars(rating: number): string {
   const full = Math.round(Math.max(0, Math.min(5, rating)));
@@ -239,7 +242,7 @@ function ZoomableGalleryImage({ uri }: { uri: string }) {
       <Animated.Image
         source={{ uri }}
         style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
-        resizeMode="cover"
+        resizeMode="contain"
         accessibilityLabel="Product photo. Pinch with two fingers to zoom."
       />
       {zoomed && (

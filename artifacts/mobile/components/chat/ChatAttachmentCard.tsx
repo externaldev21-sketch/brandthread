@@ -109,6 +109,7 @@ export function ChatAttachmentCard({
           <CachedImage
             source={{ uri: imageUri! }}
             style={[StyleSheet.absoluteFill, grayscaleStyle]}
+            contentFit="contain"
             recyclingKey={imageUri!}
           />
         ) : (
@@ -158,9 +159,10 @@ const s = StyleSheet.create({
   },
   media: {
     width: '100%',
-    // 4:5 — Mobbin's Etsy/eBay standalone chat cards, and clearly bigger
-    // than the old 44×44 inline thumbnail this replaces.
-    aspectRatio: 4 / 5,
+    // 3:4 — matches how product/post photos are now saved (cropped by the
+    // creator to 3:4 at upload time), and still clearly bigger than the old
+    // 44×44 inline thumbnail this replaces.
+    aspectRatio: 3 / 4,
   },
   iconCircle: {
     width: 56,

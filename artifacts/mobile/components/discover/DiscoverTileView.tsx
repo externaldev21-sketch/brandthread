@@ -31,16 +31,14 @@ export function DiscoverTileView({
       style={{ width, height }}
     >
       {post.imageUri ? (
-        // Tiles are portrait (3:4) so a full-length look fits; a "cover" fit
-        // still has to crop *some* height off a taller source photo — anchor
-        // it to the top so a chopped edge lands at the feet, not the head
-        // (item 46 fix: heads were getting cropped with the default center
-        // anchor).
+        // Tiles are 3:4, matching how photos are now saved (cropped by the
+        // creator to 3:4 at post time) — "contain" so a tile never crops
+        // beyond the creator's own chosen crop, even for older content that
+        // predates this system and isn't exactly 3:4.
         <CachedImage
           source={{ uri: post.imageUri }}
           style={styles.image}
-          contentFit="cover"
-          contentPosition="top center"
+          contentFit={post.media === 'video' ? 'cover' : 'contain'}
           cachePolicy="memory-disk"
         />
       ) : (

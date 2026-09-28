@@ -2029,7 +2029,7 @@ const makeSheetStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
   productImageWrap: { position: 'relative' },
   productImage: {
     width: 88,
-    height: 108,
+    height: 88 * 4 / 3, // 3:4 — matches how product photos are now saved
     borderRadius: RADIUS.md,
     backgroundColor: theme.cardElevated,
   },
