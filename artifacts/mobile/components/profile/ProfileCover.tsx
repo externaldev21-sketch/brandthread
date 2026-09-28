@@ -5,7 +5,7 @@
  *    only), runs pick → (trim) → upload / remove, and surfaces the server's
  *    24h-limit message ("You can change your cover again in X hours").
  *  - `CoverCoachmarkSheet` — the one-time "add a cover video" pop-up.
- *  - `CoverTrimSheet` — shown for clips over 30s; suggests the first 20s.
+ *  - `CoverTrimSheet` — shown for clips over 25s; suggests the first 20s.
  *  - `CoverManageSheet` — change / remove an existing cover.
  *
  * Avatar editing is untouched — the cover is a separate thing.
@@ -116,7 +116,7 @@ export function useProfileCover({ own, cover, userId }: { own: boolean; cover: C
   const startAdd = useCallback(() => {
     hapticLight();
     if (Platform.OS === 'web') { void pickFrom('library'); return; }
-    Alert.alert('Add cover video', 'Up to 30 seconds. It plays muted on a loop.', [
+    Alert.alert('Add cover video', 'Up to 25 seconds. It plays muted on a loop.', [
       { text: 'Choose from library', onPress: () => { void pickFrom('library'); } },
       { text: 'Record video', onPress: () => { void pickFrom('camera'); } },
       { text: 'Cancel', style: 'cancel' },
@@ -203,7 +203,7 @@ export function CoverCoachmarkSheet({ visible, onAdd, onLater }: { visible: bool
       </View>
       <Text style={s.coachTitle} accessibilityRole="header">Make your profile move</Text>
       <Text style={s.coachBody}>
-        Add a short video as your profile cover. It plays on a silent loop for everyone who visits — up to 30 seconds.
+        Add a short video as your profile cover. It plays on a silent loop for everyone who visits — up to 25 seconds.
       </Text>
       <View style={s.coachActions}>
         <ProfileButton label="Add cover video" icon="film" variant="primary" onPress={onAdd} testID="cover-coachmark-add" />
@@ -278,7 +278,7 @@ export function CoverTrimSheet({
   return (
     <Sheet visible={!!source} onClose={onCancel} testID="cover-trim">
       <Text style={s.coachTitle} accessibilityRole="header">Trim your cover</Text>
-      <Text style={s.coachBody}>Covers are up to 30 seconds. Drag the window to pick the part that loops.</Text>
+      <Text style={s.coachBody}>Covers are up to 25 seconds. Drag the window to pick the part that loops.</Text>
       <View style={[s.trimPreview, { borderColor: theme.border }]}>
         {source ? <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} /> : null}
       </View>
