@@ -43,13 +43,18 @@ import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { TEXT_FONTS, storyFontFamily, loadStoryFontsAsync, type StoryFontKey } from '@/lib/storyFonts';
 import { startUploadActivity, updateUploadActivity, endUploadActivity } from '@/lib/uploadLiveActivity';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { MediaCropper } from '@/components/media/MediaCropper';
+import { applyCropRect, type NormalizedCropRect } from '@/lib/mediaCrop';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
 
 type Step = 'camera' | 'create' | 'edit';
 type CaptureMode = 'story' | 'post' | 'live';
-type CapturedMedia = { kind: 'photo' | 'video'; uri: string };
+type CapturedMedia = {
+  kind: 'photo' | 'video'; uri: string;
+  originalUri?: string; cropRect?: NormalizedCropRect;
+};
 type SharePayload = { type: 'photo' | 'video' | 'text'; uri?: string; bg?: string; text?: string; textColor?: string; ovs: StoryOverlay[] };
 
 // ─── Layout capture grids — Instagram's 6-option "Changing grid" popover ───
@@ -492,6 +497,12 @@ export default function StoryComposer() {
 
   // ── Media (captured or picked) ──
   const [media, setMedia] = useState<CapturedMedia | null>(null);
+  // Stories are always 9:16 (photo or video). A freshly captured/picked photo
+  // needs a crop pass before the edit step composes it; video capture is
+  // already full-bleed at the device's own aspect (effectively 9:16 on
+  // virtually every phone) via the camera preview and playback view, so it
+  // doesn't route through the interactive cropper here — see PR notes.
+  const [cropPending, setCropPending] = useState(false);
 
   // ── Create-mode (text-only story) state ──
   const swatches = useMemo(() => buildSwatches(theme.accent), [theme.accent]);
@@ -627,7 +638,8 @@ export default function StoryComposer() {
     setCompositing(true);
     try {
       const uri = await captureRef(gridCompositeRef, { format: 'png', quality: 0.92, result: 'tmpfile' });
-      setMedia({ kind: 'photo', uri });
+      setMedia({ kind: 'photo', uri, originalUri: uri });
+      setCropPending(true);
       setStep('edit');
     } catch {
       Alert.alert('Could not combine those photos', 'Please try the layout again.');
@@ -655,7 +667,8 @@ export default function StoryComposer() {
         });
         return;
       }
-      setMedia({ kind: 'photo', uri: result.uri });
+      setMedia({ kind: 'photo', uri: result.uri, originalUri: result.uri });
+      setCropPending(true);
       setStep('edit');
     } catch {
       Alert.alert('Could not capture that photo', 'Please try again.');
@@ -688,10 +701,27 @@ export default function StoryComposer() {
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       setLastGalleryUri(asset.uri);
-      setMedia({ kind: asset.type === 'video' ? 'video' : 'photo', uri: asset.uri });
+      const isPhoto = asset.type !== 'video';
+      setMedia({ kind: isPhoto ? 'photo' : 'video', uri: asset.uri, originalUri: isPhoto ? asset.uri : undefined });
+      setCropPending(isPhoto);
       setStep('edit');
     }
   }, []);
+
+  const handleStoryCropSave = useCallback(async (result: { rect: NormalizedCropRect }) => {
+    if (!media) { setCropPending(false); return; }
+    const sourceUri = media.originalUri ?? media.uri;
+    try {
+      const croppedUri = await applyCropRect(sourceUri, result.rect);
+      setMedia({ kind: 'photo', uri: croppedUri, originalUri: sourceUri, cropRect: result.rect });
+    } catch {
+      Alert.alert('Crop failed', 'Could not crop this photo. Please try again.');
+    } finally {
+      setCropPending(false);
+    }
+  }, [media]);
+
+  const handleStoryCropCancel = useCallback(() => setCropPending(false), []);
 
   // ── Overlay helpers ──────────────────────────────────────────────────────
 
@@ -1778,6 +1808,18 @@ export default function StoryComposer() {
         </View>
       </Modal>
       {renderShareSheets()}
+
+      {cropPending && media?.kind === 'photo' && (
+        <MediaCropper
+          visible
+          uri={media.originalUri ?? media.uri}
+          targetRatio={9 / 16}
+          initialRect={media.cropRect ?? null}
+          title="Crop photo"
+          onCancel={handleStoryCropCancel}
+          onSave={(result) => void handleStoryCropSave(result)}
+        />
+      )}
     </View>
   );
 }
