@@ -165,6 +165,10 @@ export interface ConversationParticipant {
 export type MessageAttachmentType =
   | 'image' | 'video' | 'voice'
   | 'product' | 'post' | 'order' | 'profile' | 'thread_cash'
+  // A reply sent from the story viewer (text or a tapped quick-reaction
+  // emoji) — `uri` is the replied-to slide's image, `meta.storyId` names the
+  // story. Renders as a small thumbnail + "Replied to your story", IG style.
+  | 'story_reply'
   // Brandthread Agent only. `agent_card` is a generic deep-linking card
   // (Thread Cash explainer, product, brand/profile, "Go to Discover" — see
   // meta.cardKind / meta.deepLink); `quick_replies` renders a row of tappable
