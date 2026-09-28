@@ -3,9 +3,9 @@
  * limits, these only shape the UI).
  */
 
-export const COVER_MAX_SECONDS = 30;
+export const COVER_MAX_SECONDS = 25;
 export const COVER_SUGGESTED_TRIM_SECONDS = 20;
-export const COVER_TRIM_LENGTHS = [10, 15, 20, 30] as const;
+export const COVER_TRIM_LENGTHS = [10, 15, 20, 25] as const;
 
 /** The coach mark shows once: own profile, server says unseen, no cover yet. */
 export function shouldShowCoverCoachmark({
@@ -21,7 +21,7 @@ export function shouldShowCoverCoachmark({
   return !status.seen && !status.hasCover;
 }
 
-/** A clip over 30s needs trimming; the suggested window is the first 20s. */
+/** A clip over 25s needs trimming; the suggested window is the first 20s. */
 export function needsTrim(durationSeconds: number | null | undefined): boolean {
   return typeof durationSeconds === 'number' && durationSeconds > COVER_MAX_SECONDS + 0.25;
 }

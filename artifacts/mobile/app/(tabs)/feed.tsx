@@ -1005,90 +1005,37 @@ export function VideoVisual(props: VideoVisualProps) {
   return <PosterOnlyVisual {...props} />;
 }
 
-// Cover-vs-contain crop tolerance. Callers that pass a `bottomStripHeight`
-// (Buyer Home's immersive frame, which stops at the tab bar) use the
-// tighter Reels/TikTok tolerance from the framing spec: a clip within ~15%
-// of the FRAME's aspect (not the full page) is center-cover-cropped on its
-// sides only; anything further off (a landscape or square clip) is
-// letterboxed instead. Callers with no bottom strip (the LIVE viewer's
-// full-bleed page, which has no tab bar to frame against) keep the original,
-// looser 30% tolerance unchanged so this file's other consumers of
-// `VideoVisual`/`LiveVideoVisual` (app/live.tsx) are unaffected.
-const IMMERSIVE_FRAME_COVER_CROP_THRESHOLD = 0.15;
+// Cover-vs-contain crop tolerance: a clip within ~30% of the FRAME's own
+// aspect (the full page — the frame is always full-bleed, see
+// immersiveFrameHeight below) is center-cover-cropped on its sides only;
+// anything further off (a landscape or square clip) is letterboxed instead
+// so it's never cropped through the top/head. One threshold for every
+// caller now that the frame is always the full page — a typical 9:16 clip
+// against a taller phone screen's own aspect (e.g. 390x844) already differs
+// by ~15-18%, so the tighter Reels-style 15% tolerance this used when the
+// frame was shrunk by the tab-bar strip (pre-full-bleed) would wrongly
+// letterbox perfectly ordinary vertical clips.
 const FULL_PAGE_COVER_CROP_THRESHOLD = 0.3;
 
 /**
- * Height of the sharp video frame once the floating tab-bar zone is
- * subtracted — the Reels/TikTok "stops at the line" frame. Falls back to
- * the full page height when there is no strip to carve out (e.g. the LIVE
- * viewer, or a non-immersive page), so this is a pure no-op for every other
- * caller of VideoVisual.
- */
-function immersiveFrameHeight(pageHeight: number | undefined, bottomStripHeight: number): number | undefined {
-  if (pageHeight == null) return undefined;
-  return Math.max(0, pageHeight - bottomStripHeight);
-}
-
-/**
- * Reels/TikTok-style continuation behind the floating tab bar: not sharp
- * video, but a blurred, darkened copy of the same clip's poster, cover-
- * scaled against the FULL frame (sharp area + strip) and windowed to just
- * this strip so it reads as more of the same shot continuing under the bar,
- * not a mirrored or misaligned copy. Purely decorative — nothing sharp ever
- * plays here, and it never receives touches.
+ * Height of the sharp video frame. Full-bleed: the video always fills the
+ * WHOLE page, all the way to the bottom edge — there is no shorter "stops at
+ * the line" frame any more (that was PR #196's approach, rejected for
+ * reading as an instant dead-stop). The floating tab-bar zone is instead a
+ * frosted-glass overlay drawn on TOP of this same full-bleed frame, sampling
+ * the live video/list actually behind it, rather than a separate shorter
+ * frame plus a blurred copy of a poster image. That overlay (TabBarGlassZone)
+ * is now rendered once, centrally, by BuyerTabBar itself (the one shared tab-
+ * bar container mounted for the whole buyer navigator) rather than per video
+ * page here — a fixed strip at the bottom of the viewport blurs whichever
+ * page is currently in view exactly the same way a per-page copy would,
+ * since only one page is ever visible at a time.
  *
- * Blur follows the same lazy `expo-blur` require GlassPanel/IconButton's
- * glass variant already use elsewhere in this app, including their flat
- * dark-tint fallback where `BlurView` isn't reliable (Android) — see
- * components/ui/GlassPanel.tsx and components/ui/IconButton.tsx.
+ * `bottomStripHeight` is accepted purely so existing callers don't need to
+ * change, but it no longer shrinks the frame itself or renders anything.
  */
-function BottomStripBlur({
-  posterImage, fallbackColor, pageWidth, frameHeight, stripHeight,
-}: {
-  posterImage?: ImageSourcePropType;
-  fallbackColor?: string;
-  pageWidth: number;
-  frameHeight: number;
-  stripHeight: number;
-}) {
-  if (stripHeight <= 0) return null;
-  return (
-    <View
-      style={{
-        position: 'absolute', top: frameHeight, left: 0, width: pageWidth, height: stripHeight,
-        overflow: 'hidden', backgroundColor: fallbackColor ?? '#0a0a0a',
-      }}
-      pointerEvents="none"
-      {...a11yHidden(true, 'no')}
-    >
-      {posterImage && (
-        <CachedImage
-          source={posterImage}
-          style={{ position: 'absolute', top: -frameHeight, left: 0, width: pageWidth, height: frameHeight + stripHeight }}
-          contentFit="cover"
-          blurRadius={40}
-        />
-      )}
-      {Platform.OS !== 'android' && <TabBarStripBlur />}
-      <View style={[StyleSheet.absoluteFill, styles.bottomStripTint]} />
-    </View>
-  );
-}
-
-/**
- * Requires expo-blur lazily, at first render of the strip, rather than at
- * module load — matches GlassPanel's/IconButton's own `GlassBlur` helpers so
- * a page that never scrolls the immersive feed doesn't pull the native blur
- * module into its bundle.
- */
-function TabBarStripBlur() {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { BlurView } = require('expo-blur') as { BlurView: typeof import('expo-blur').BlurView };
-    return <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />;
-  } catch {
-    return null;
-  }
+function immersiveFrameHeight(pageHeight: number | undefined, _bottomStripHeight: number): number | undefined {
+  return pageHeight;
 }
 
 function PosterOnlyVisual({
@@ -1103,15 +1050,13 @@ function PosterOnlyVisual({
   posterPriority,
 }: VideoVisualProps) {
   const videoAspect = 9 / 16;
-  // The sharp frame stops at the tab bar's top edge — fit/crop math runs
-  // against that shorter frame's own aspect, not the full page's, or a
-  // frame that's shorter than the page (immersive + a tab bar) would
-  // misjudge cover vs contain and could crop the wrong axis.
+  // Full-bleed frame (the whole page); `bottomStripHeight` only narrows the
+  // cover/contain crop tolerance below, so a clip still only ever crops its
+  // sides, never its top/head.
   const frameHeight = immersiveFrameHeight(pageHeight, bottomStripHeight);
   const frameAspect = pageWidth != null && frameHeight ? pageWidth / frameHeight : pageAspect;
   const cropFraction = 1 - Math.min(videoAspect, frameAspect) / Math.max(videoAspect, frameAspect);
-  const coverThreshold = bottomStripHeight > 0 ? IMMERSIVE_FRAME_COVER_CROP_THRESHOLD : FULL_PAGE_COVER_CROP_THRESHOLD;
-  const fit = immersive && cropFraction <= coverThreshold ? 'cover' : 'contain';
+  const fit = immersive && cropFraction <= FULL_PAGE_COVER_CROP_THRESHOLD ? 'cover' : 'contain';
   const posterImage = posterSource ?? (posterUri ? { uri: posterUri } : undefined);
   const frameStyle = pageWidth != null && frameHeight != null
     ? { position: 'absolute' as const, top: 0, left: 0, width: pageWidth, height: frameHeight }
@@ -1134,15 +1079,6 @@ function PosterOnlyVisual({
           <View style={[StyleSheet.absoluteFill, { backgroundColor: fallbackColor ?? '#0a0a0a' }]} pointerEvents="none" />
         )}
       </View>
-      {immersive && bottomStripHeight > 0 && pageWidth != null && frameHeight != null && (
-        <BottomStripBlur
-          posterImage={posterImage}
-          fallbackColor={fallbackColor}
-          pageWidth={pageWidth}
-          frameHeight={frameHeight}
-          stripHeight={bottomStripHeight}
-        />
-      )}
     </>
   );
 }
@@ -1199,13 +1135,14 @@ function LiveVideoVisual({
   const [progress, setProgress] = useState(0);
   const showPoster = Boolean(posterSource || posterUri) && !(hasStarted && readyToPlay);
   const showFallbackCover = !showPoster && !(hasStarted && readyToPlay);
-  // Fit/crop math runs against the sharp FRAME's own aspect (the page minus
-  // the tab-bar strip), not the full page's — see immersiveFrameHeight.
+  // Fit/crop math runs against the full-bleed frame's aspect (the whole
+  // page — see immersiveFrameHeight) against FULL_PAGE_COVER_CROP_THRESHOLD,
+  // so a clip only ever crops its sides, never its top/head, exactly as PR
+  // #196 fixed.
   const frameHeight = immersiveFrameHeight(pageHeight, bottomStripHeight);
   const frameAspect = pageWidth != null && frameHeight ? pageWidth / frameHeight : pageAspect;
   const cropFraction = 1 - Math.min(videoAspect, frameAspect) / Math.max(videoAspect, frameAspect);
-  const coverThreshold = bottomStripHeight > 0 ? IMMERSIVE_FRAME_COVER_CROP_THRESHOLD : FULL_PAGE_COVER_CROP_THRESHOLD;
-  const fit = immersive && cropFraction <= coverThreshold ? 'cover' : 'contain';
+  const fit = immersive && cropFraction <= FULL_PAGE_COVER_CROP_THRESHOLD ? 'cover' : 'contain';
   const posterImage = posterSource ?? (posterUri ? { uri: posterUri } : undefined);
   React.useEffect(() => {
     const subscription = player.addListener('playingChange', ({ isPlaying }) => {
@@ -1263,16 +1200,16 @@ function LiveVideoVisual({
     player.playbackRate = rate;
   }, [player, rate]);
 
-  // The sharp video stops exactly at the tab bar's top edge (Reels/TikTok
-  // "the line") instead of playing full-bleed behind it — a fixed-size
-  // frame keyed off `frameHeight`, not the full page. A separate blurred,
-  // darkened copy of this same clip's poster (BottomStripBlur, below) fills
-  // the strip behind the bar instead: the live <video> element itself isn't
-  // used as that blur's source (an earlier attempt sampling it directly
-  // couldn't do so reliably on web and the mirror's offset math drifted out
-  // of alignment with the real frame there), so this reuses the already-
-  // decoded poster image instead — same visual continuation, no per-frame
-  // sampling, no alignment drift.
+  // Full-bleed: the sharp video plays all the way to the bottom of the page
+  // again (frameHeight === pageHeight, see immersiveFrameHeight above). The
+  // frosted glass over the tab-bar zone is a real backdrop blur (CSS
+  // `backdrop-filter` on web, a native blur material on iOS/Android) of the
+  // live video actually behind it, not a separate shorter frame plus a
+  // blurred copy of a poster image — but it's rendered once by BuyerTabBar
+  // (see the shared TabBarGlassZone usage there), not per page here, since a
+  // fixed strip at the bottom of the viewport already blurs whichever page
+  // is currently visible. As the video plays, the blur updates in real time
+  // because it's sampling the live layer, not a frozen mirror.
   //
   // Explicit size on the sharp-clip wrapper itself rather than trusting it
   // to inherit height from an ancestor: on web, absoluteFill inside a
@@ -1326,15 +1263,6 @@ function LiveVideoVisual({
           </View>
         </Animated.View>
       </View>
-      {immersive && bottomStripHeight > 0 && pageWidth != null && frameHeight != null && (
-        <BottomStripBlur
-          posterImage={posterImage}
-          fallbackColor={fallbackColor}
-          pageWidth={pageWidth}
-          frameHeight={frameHeight}
-          stripHeight={bottomStripHeight}
-        />
-      )}
       {progressBottom != null && isActive && (
         <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} externallyPaused={paused} />
       )}
@@ -1983,12 +1911,16 @@ export default function FeedScreen({
   // 24pt) never crowd the absolutely-centered tabs — see the PR description
   // for the exact per-width math this was sized against.
   const topRowIconGap = windowWidth < 380 ? 12 : 14;
-  const buyerBarInset = useBuyerTabBarInset();
+  // The feed is the buyer Home tab, always shown with the tab bar's compact
+  // (Instagram iOS 26-style) sizing — see BuyerTabBar/buyerTabBarMetrics —
+  // so its own layout math uses the compact inset, not the regular one every
+  // other buyer screen still gets.
+  const buyerBarInset = useBuyerTabBarInset('compact');
   // Distinct from `buyerBarInset` above (which pads ordinary chrome with
   // extra breathing room) — this is the tab bar's own top pixel, the exact
   // "line" the immersive video frame stops at. See videoFrameInset's doc
   // comment on SpotlightPageImpl for why the two must stay separate.
-  const buyerBarTopInset = useBuyerTabBarTopInset();
+  const buyerBarTopInset = useBuyerTabBarTopInset('compact');
   const router = useRouter();
   const { userId } = useAuth();
   const { push } = useThreadPull();
@@ -3426,12 +3358,6 @@ const styles = StyleSheet.create({
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   videoFill: { width: '100%', height: '100%' },
   letterboxBackdrop: { opacity: 0.55 },
-  // Darkens the blurred bottom-strip continuation behind the tab bar, on top
-  // of both the blurred poster image and (where available) BlurView's own
-  // frost — matches GlassPanel's/IconButton's glass-variant tint so this
-  // reads as the same "frosted dark glass" language, and doubles as the
-  // whole strip's look on Android, where BlurView is skipped.
-  bottomStripTint: { backgroundColor: 'rgba(10,10,11,0.45)' },
   feedContentFade: { flex: 1 },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },

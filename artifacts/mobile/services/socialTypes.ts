@@ -156,6 +156,10 @@ export interface ConversationParticipant {
    *  bundled preview poster images as stand-in avatars. UI reading this
    *  field must fall back to the initials circle when it's absent. */
   avatarUri?: string;
+  /** Chat details > Nicknames: the CURRENT viewer's nickname for this
+   *  participant in this conversation, if they've set one. Renders in place
+   *  of/alongside `name` in the thread once set. */
+  nickname?: string;
 }
 
 export type MessageAttachmentType =
@@ -165,7 +169,13 @@ export type MessageAttachmentType =
   // (Thread Cash explainer, product, brand/profile, "Go to Discover" — see
   // meta.cardKind / meta.deepLink); `quick_replies` renders a row of tappable
   // reply chips (meta.optionsJson: JSON-encoded {label,value}[]).
-  | 'agent_card' | 'quick_replies';
+  | 'agent_card' | 'quick_replies'
+  // Chat details (DM flows PR 3): a centered system line in the thread, not
+  // a bubble — "You changed the theme to [Name]. Change" / "You turned
+  // on/off disappearing messages. Change"/"Turn on". `title` is one of
+  // 'theme_changed' | 'disappearing_on' | 'disappearing_off'; `meta.actorId`
+  // and (for theme_changed) `meta.themeId` drive the exact copy client-side.
+  | 'system';
 
 export interface MessageAttachment {
   type: MessageAttachmentType;
@@ -255,6 +265,16 @@ export interface Conversation {
    *  conversation — polled via GET /api/conversations/:id (no websocket
    *  layer exists for DMs yet). Only ever set for the agent's conversation. */
   agentTyping?: boolean;
+  /** Chat details > Mute: ISO timestamp this conversation is muted until, for
+   *  the current viewer. Absent/undefined means not muted. */
+  mutedUntil?: string;
+  /** Chat details > Theme — a conversation-level property (both participants
+   *  see the same background/bubble colors). Undefined/null = default
+   *  monochrome look. One of lib/conversationThemes.ts's CONVERSATION_THEMES ids. */
+  themeId?: string;
+  /** Chat details > Disappearing messages — conversation-level, identical
+   *  for every participant. */
+  disappearingEnabled?: boolean;
 }
 
 // ─── Story ────────────────────────────────────────────────────────────────────
@@ -294,6 +314,19 @@ export interface StoryOverlay {
   color?: string;
   size?: number;
   align?: 'left' | 'center' | 'right';
+  /** Named story-text font (see TEXT_FONTS in buyer-story-create.tsx). Undefined = the default system font. */
+  fontKey?: string;
+  /** Text background box style — matches Instagram's "A" toggle. */
+  bgStyle?: 'none' | 'solid' | 'translucent';
+  /** Text render style — outline/glow are drawn with extra text-shadow layers. */
+  textEffect?: 'plain' | 'outline' | 'glow';
+  /**
+   * Selected story-text entrance animation (Instagram: Emphasize/Drift Up/
+   * Loud/Speedy/Fall/Headline/Slide Up). Persisted so a future story-viewer
+   * pass can play it back — this repo's viewer does not yet animate text on
+   * playback, so today it only affects a light preview in the composer.
+   */
+  textAnimation?: string;
   // mention sticker
   mentionHandle?: string;
   // location sticker

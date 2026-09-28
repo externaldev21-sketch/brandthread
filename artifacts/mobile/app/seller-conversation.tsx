@@ -17,17 +17,16 @@ import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
-import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
+import { hapticPrimaryAction, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
   useAudioPlayer,
   useAudioPlayerStatus,
-  useAudioRecorder,
 } from 'expo-audio';
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
+import { VoiceMessageBubble } from '@/components/chat/VoiceMessageBubble';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
 import { confirmUnblock } from '@/lib/safety';
@@ -40,20 +39,27 @@ import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
 import { CallLogBubble } from '@/components/calls/CallLogBubble';
 import { isSellerDevPreview } from '@/lib/devPreview';
 import type { CallLogEntry } from '@/lib/calls/types';
+import { SystemLine } from '@/components/chat/SystemLine';
+import { getConversationTheme } from '@/lib/conversationThemes';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Participant {
   userId: string; name: string; handle: string;
   initials: string; color: string; accountType: string;
+  /** Chat details > Nicknames: the current viewer's nickname for them, if set. */
+  nickname?: string;
 }
 interface ConvView {
   id: string; type: string; participants: Participant[];
   contextOrderId?: string; contextOrderNumber?: string; contextOrderStatus?: string;
   contextProductId?: string; contextProductName?: string;
+  /** Chat details > Theme / Disappearing messages (conversation-level). */
+  themeId?: string; disappearingEnabled?: boolean;
 }
 interface MsgAttachment {
-  type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice';
+  type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice' | 'system';
   uri?: string;
   title?: string;
   subtitle?: string;
@@ -167,13 +173,13 @@ export default function SellerConversationScreen() {
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [isRecording, setIsRecording]         = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
+  const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
+  const voiceRecorder = useVoiceRecorder(uploadMedia, handleVoiceRecorded);
 
   // Attachment state
   const [pendingAttachment, setPendingAttachment] = useState<MsgAttachment | null>(null);
@@ -261,6 +267,17 @@ export default function SellerConversationScreen() {
   // ── Derived ─────────────────────────────────────────────────────────────────
 
   const other = conv?.participants.find((p) => p.userId !== myId) ?? null;
+  // Chat details > Nicknames: once set, the nickname replaces the real name
+  // in the header, matching buyer-conversation.tsx.
+  const displayName = other?.nickname || other?.name || 'Buyer';
+  // Chat details > Theme: a conversation-level property — same background
+  // and bubble colors for both participants. Null = the app's existing
+  // default monochrome look, completely unchanged.
+  const convTheme = getConversationTheme(conv?.themeId);
+  const sentBubbleColor = convTheme?.sentBubble ?? PURPLE;
+  const sentTextColor = convTheme?.sentText ?? ON_DARK;
+  const receivedBubbleColor = convTheme?.receivedBubble ?? CARD;
+  const receivedTextColor = convTheme?.receivedText ?? FG;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
 
@@ -328,6 +345,52 @@ export default function SellerConversationScreen() {
     });
   }
 
+  // ── Chat details ───────────────────────────────────────────────────────────────
+
+  function openChatDetails() {
+    if (!id || !other) return;
+    const qs = new URLSearchParams({
+      id, role: 'seller',
+      isBlocked: messaging.blockedByMe ? '1' : '0',
+      participantUserId: other.userId,
+      participantName: other.name,
+      participantHandle: other.handle ?? '',
+      participantInitials: other.initials ?? '',
+      participantColor: other.color ?? PURPLE,
+      participantNickname: other.nickname ?? '',
+    });
+    router.push(('/conversation-details?' + qs.toString()) as never);
+  }
+
+  // Theme system line's "Change" — reopens the picker directly.
+  function openThemePicker() {
+    if (!id || !other) return;
+    const qs = new URLSearchParams({
+      id, role: 'seller', openTheme: '1',
+      participantUserId: other.userId,
+      participantName: other.name,
+      participantInitials: other.initials ?? '',
+      participantColor: other.color ?? PURPLE,
+    });
+    router.push(('/conversation-details?' + qs.toString()) as never);
+  }
+
+  // Disappearing-messages system line's "Change"/"Turn on" — a direct
+  // quick-toggle, not a navigation.
+  async function handleQuickToggleDisappearing() {
+    if (!id || !conv) return;
+    const next = !conv.disappearingEnabled;
+    hapticSelection();
+    try {
+      const result = await api.conversations.setDisappearing(id, next);
+      setConv((prev) => prev ? { ...prev, disappearingEnabled: next } : prev);
+      setMessages((prev) => [...prev, result.message]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch {
+      Alert.alert('Couldn’t update disappearing messages', 'Please try again.');
+    }
+  }
+
   // ── Photo / video picker ──────────────────────────────────────────────────────
 
   async function handlePickPhoto() {
@@ -383,47 +446,37 @@ export default function SellerConversationScreen() {
   }
 
   // ── Voice recording ───────────────────────────────────────────────────────────
-
-  async function handleToggleRecording() {
-    if (isRecording) {
-      setIsRecording(false);
-      try {
-        await recorder.stop();
-        const status = recorder.getStatus();
-        const uri = recorder.uri ?? status.url;
-        if (!uri) return;
-        setIsUploading(true);
-        const response = await fetch(uri);
-        const buf = await response.arrayBuffer();
-        const bytes = new Uint8Array(buf);
-        let binary = '';
-        const CHUNK = 8192;
-        for (let i = 0; i < bytes.byteLength; i += CHUNK) {
-          binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.byteLength)));
-        }
-        const url = await uploadMedia(btoa(binary), 'audio/m4a', 'm4a');
-        const dur = Math.round(status.durationMillis / 1000);
-        setPendingAttachment({ type: 'voice', uri: url, title: 'Voice message', meta: { duration: String(dur) } });
-      } catch { Alert.alert('Recording error', 'Could not save voice message. Please try again.'); }
-      finally {
-        setIsUploading(false);
-        void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-      }
-    } else {
-      try {
-        const permission = await requestRecordingPermissionsAsync();
-        if (!permission.granted) throw new Error('Microphone permission denied');
-        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-        await recorder.prepareToRecordAsync();
-        recorder.record();
-        setIsRecording(true);
-      } catch { Alert.alert('Mic unavailable', 'Check microphone permissions in Settings.'); }
+  // Mirrors buyer-conversation.tsx (see docs/dm-flows.md and Instagram DM's
+  // "Sending an audio message" flow) — sends the moment recording finishes,
+  // rather than staging into pendingAttachment. The seller composer already
+  // used a tap-to-toggle mic (no press-and-hold) before this PR, so it keeps
+  // that same tap-to-toggle interaction on every platform for consistency,
+  // instead of introducing a native-only hold gesture asymmetry with the
+  // buyer screen's identical-looking mic button.
+  async function handleVoiceRecorded(result: { uri: string; durationSec: number; waveform: number[] }) {
+    if (!id) return;
+    hapticSuccessAction();
+    const attachment: MsgAttachment = {
+      type: 'voice',
+      uri: result.uri,
+      title: 'Voice message',
+      meta: { duration: String(result.durationSec), waveform: JSON.stringify(result.waveform) },
+    };
+    setIsSending(true);
+    try {
+      const msg = await api.conversations.send(id, { text: '', attachment });
+      setMessages((prev) => [...prev, msg as Msg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch {
+      Alert.alert('Voice message not sent', 'Please check your connection and try again.');
+    } finally {
+      setIsSending(false);
     }
   }
 
   // ── Voice playback ────────────────────────────────────────────────────────────
 
-  async function handlePlayVoice(uri: string) {
+  async function handlePlayVoice(uri: string, rate: number) {
     if (playingVoiceUri === uri) {
       voicePlayer.pause();
       await voicePlayer.seekTo(0).catch(() => {});
@@ -434,13 +487,26 @@ export default function SellerConversationScreen() {
     try {
       setPlayingVoiceUri(uri);
       voicePlayer.replace({ uri });
+      voicePlayer.playbackRate = rate;
       voicePlayer.play();
     } catch { setPlayingVoiceUri(null); }
   }
 
+  function handleSeekVoice(uri: string, fraction: number, durationSec: number) {
+    if (playingVoiceUri !== uri || !durationSec) return;
+    void voicePlayer.seekTo(fraction * durationSec).catch(() => {});
+  }
+
+  function handleVoiceSpeedChange(uri: string, rate: number) {
+    setVoiceSpeed(rate);
+    if (playingVoiceUri === uri) {
+      try { voicePlayer.playbackRate = rate; } catch { /* best-effort */ }
+    }
+  }
+
   // ── Attachment renderer (media-aware) ─────────────────────────────────────────
 
-  function renderMsgAttachment(att: MsgAttachment) {
+  function renderMsgAttachment(att: MsgAttachment, isOwn: boolean) {
     if (att.type === 'image') {
       let uris: string[] = [];
       try { uris = JSON.parse(att.meta?.photoUris ?? '[]'); } catch {}
@@ -469,19 +535,25 @@ export default function SellerConversationScreen() {
       );
     }
     if (att.type === 'voice') {
+      const durationSec = Number(att.meta?.duration ?? 0);
+      let waveform: number[] = [];
+      try { waveform = JSON.parse(att.meta?.waveform ?? '[]'); } catch {}
+      const isPlaying = !!att.uri && playingVoiceUri === att.uri;
+      const progress = isPlaying && voicePlayerStatus.duration
+        ? Math.max(0, Math.min(1, voicePlayerStatus.currentTime / voicePlayerStatus.duration))
+        : 0;
       return (
-        <PressableScale style={s.voiceRow} activeOpacity={0.8}
-          onPress={() => att.uri && handlePlayVoice(att.uri)}>
-          <View style={[s.voicePlayBtn, playingVoiceUri === att.uri && s.voicePlayBtnActive]}>
-            <Feather name={playingVoiceUri === att.uri ? 'square' : 'play'} size={14} color="#fff" />
-          </View>
-          <View style={s.voiceWave}>
-            {[...Array(12)].map((_, i) => (
-              <View key={i} style={[s.voiceBar, { height: 4 + Math.abs(Math.sin(i * 0.8)) * 14 }]} />
-            ))}
-          </View>
-          <Text style={s.voiceDur}>{att.meta?.duration ? `${att.meta.duration}s` : '…'}</Text>
-        </PressableScale>
+        <VoiceMessageBubble
+          theme={theme}
+          waveform={waveform}
+          durationSec={durationSec}
+          isPlaying={isPlaying}
+          progress={progress}
+          isOwn={isOwn}
+          onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
+          onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
+          onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+        />
       );
     }
     return (
@@ -612,6 +684,17 @@ export default function SellerConversationScreen() {
     }
     const { msg } = item;
     const isOwn = msg.fromId === myId;
+    if (msg.attachment?.type === 'system') {
+      return (
+        <SystemLine
+          msg={msg}
+          isOwn={isOwn}
+          theme={theme}
+          onOpenThemePicker={openThemePicker}
+          onQuickToggleDisappearing={handleQuickToggleDisappearing}
+        />
+      );
+    }
     const removed = (msg as { removedByModeration?: boolean }).removedByModeration === true;
     return (
       <PressableScale
@@ -630,6 +713,12 @@ export default function SellerConversationScreen() {
         delayLongPress={350}
         style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start' }]}
         accessibilityHint={isOwn ? undefined : 'Long press to report this message'}
+        // Voice messages render their own play/scrub/speed/transcription
+        // buttons inside this bubble — PressableScale defaults to rendering
+        // an actual <button> on web, which cannot legally contain other
+        // interactive controls. Drop the role only here so it's a plain,
+        // still fully long-pressable <div> instead. See buyer-conversation.tsx.
+        accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : undefined}
       >
         {!isOwn && (
           <View style={[s.msgAvatar, { backgroundColor: msg.fromColor || PURPLE }]}>
@@ -640,8 +729,8 @@ export default function SellerConversationScreen() {
           style={[
             s.bubble,
             {
-              backgroundColor: isOwn ? PURPLE : CARD,
-              borderColor: isOwn ? PURPLE : BORDER,
+              backgroundColor: isOwn ? sentBubbleColor : receivedBubbleColor,
+              borderColor: isOwn ? sentBubbleColor : BORDER,
               borderBottomRightRadius: isOwn ? 4 : RADIUS.lg,
               borderBottomLeftRadius: isOwn ? RADIUS.lg : 4,
               maxWidth: BUBBLE_MAX,
@@ -649,12 +738,12 @@ export default function SellerConversationScreen() {
           ]}
         >
           {/* Attachment */}
-          {msg.attachment && renderMsgAttachment(msg.attachment)}
+          {msg.attachment && renderMsgAttachment(msg.attachment, isOwn)}
           {/* Text — hide the single-space placeholder */}
           {removed ? (
-            <Text style={[s.msgText, { color: isOwn ? ON_DARK : MUTED, fontStyle: 'italic' }]}>{REMOVED_MESSAGE_TEXT}</Text>
+            <Text style={[s.msgText, { color: isOwn ? sentTextColor : MUTED, fontStyle: 'italic' }]}>{REMOVED_MESSAGE_TEXT}</Text>
           ) : msg.text && msg.text.trim().length > 0 && (
-            <Text style={[s.msgText, isOwn && { color: ON_DARK }]}>{msg.text}</Text>
+            <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
           )}
         </View>
       </PressableScale>
@@ -669,6 +758,12 @@ export default function SellerConversationScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
+      {/* Chat details > Theme: only rendered when a theme is actually
+          applied — an un-themed chat's background is untouched. */}
+      {convTheme && (
+        <LinearGradient colors={convTheme.gradient} style={StyleSheet.absoluteFill} testID="conversation-theme-background" />
+      )}
+
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <PressableScale
@@ -680,17 +775,26 @@ export default function SellerConversationScreen() {
         >
           <Feather name="arrow-left" size={ICON.lg} color={FG} />
         </PressableScale>
-        {other && (
-          <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
-            <Text style={s.headerAvatarInitials}>
-              {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
-            </Text>
+        <PressableScale
+          style={s.headerCenterRow}
+          disabled={!other || !id}
+          onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+          testID="seller-conversation-header-name"
+          accessibilityRole="button"
+          accessibilityLabel={`${displayName} — chat details`}
+        >
+          {other && (
+            <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
+              <Text style={s.headerAvatarInitials}>
+                {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View style={s.headerCenter}>
+            <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+            {other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null}
           </View>
-        )}
-        <View style={s.headerCenter}>
-          <Text style={s.headerName} numberOfLines={1}>{other?.name ?? 'Buyer'}</Text>
-          {other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null}
-        </View>
+        </PressableScale>
         {id && (
           <>
             <PressableScale
@@ -814,6 +918,24 @@ export default function SellerConversationScreen() {
         />
       ) : (
       <View style={[s.inputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
+        {voiceRecorder.phase !== 'idle' ? (
+          <VoiceRecordingBar
+            theme={theme}
+            phase={voiceRecorder.phase}
+            elapsedMs={voiceRecorder.elapsedMs}
+            waveform={voiceRecorder.waveform}
+            dragX={voiceRecorder.dragX}
+            dragY={voiceRecorder.dragY}
+            // The seller composer's mic was already tap-to-toggle (no
+            // press-and-hold) before this PR — keep that consistent
+            // interaction on every platform rather than adding a native-only
+            // hold gesture here. See docs/dm-flows.md.
+            isWeb
+            onCancel={voiceRecorder.cancel}
+            onLock={voiceRecorder.lock}
+            onSend={() => { void voiceRecorder.finish(); }}
+          />
+        ) : (<>
         {/* Attach button */}
         <PressableScale
           style={s.attachBtn}
@@ -842,14 +964,15 @@ export default function SellerConversationScreen() {
 
         {/* Voice */}
         <PressableScale
-          style={[s.attachBtn, isRecording && s.recordingBtn]}
-          onPress={handleToggleRecording}
+          style={s.attachBtn}
+          onPress={() => { void voiceRecorder.startWeb(); }}
           disabled={isUploading || isSending}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          testID="seller-conversation-mic"
           accessibilityRole="button"
           accessibilityLabel="Record voice message"
         >
-          <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.md} color={isRecording ? RED : MUTED} />
+          <Feather name="mic" size={ICON.md} color={MUTED} />
         </PressableScale>
 
         <TextInput
@@ -876,6 +999,7 @@ export default function SellerConversationScreen() {
         >
           <Feather name="send" size={ICON.sm} color={canSend ? ON_DARK : MUTED} />
         </PressableScale>
+        </>)}
       </View>
       )}
 
@@ -1043,6 +1167,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   header: {
     flexDirection: 'row', alignItems: 'center',
+    backgroundColor: BG,
     paddingHorizontal: SP.md, paddingBottom: SP.sm,
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
@@ -1052,6 +1177,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center', marginRight: SP.sm,
   },
   headerAvatarInitials: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
+  headerCenterRow: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   headerCenter: { flex: 1 },
   headerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   headerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },

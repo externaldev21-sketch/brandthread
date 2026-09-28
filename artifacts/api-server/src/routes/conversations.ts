@@ -21,7 +21,7 @@ import {
   db, conversations, conversationParticipants, messages, messageReactions, blocks, follows, users,
   products, orders, posts,
 } from "@workspace/db";
-import { eq, and, desc, inArray, sql, or } from "drizzle-orm";
+import { eq, and, desc, inArray, sql, or, ilike } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
@@ -33,6 +33,13 @@ import { isAgentUserId } from "../lib/brandthreadAgent";
 
 const router = Router();
 router.use(requireAuth);
+
+// Attachment types a message may carry. "product"/"order" get extra
+// cross-reference checks below; the rest (plain media + structured cards) are
+// stored as-is once their shape passes the lighter checks further down.
+const MESSAGE_ATTACHMENT_TYPES = [
+  "product", "order", "post", "profile", "image", "video", "voice",
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +77,8 @@ function buildConversationView(
   // isPinned/isOfficial comment on Conversation in mobile's socialTypes.ts.
   const isAgentThread = parts.some((p) => isAgentUserId(p.userId));
   const agentTypingUntil = (conv as { agentTypingUntil?: Date | null }).agentTypingUntil;
+  const nicknameMap = (conv as { nicknames?: Record<string, string> | null }).nicknames ?? {};
+  const myMutedUntil = me?.mutedUntil ?? null;
   return {
     id:   conv.id,
     type: conv.type,
@@ -80,7 +89,17 @@ function buildConversationView(
       initials:    p.initials,
       color:       p.color,
       accountType: p.accountType,
+      // Chat details > Nicknames: the CURRENT viewer's nickname for this
+      // participant, if they've set one — never another viewer's.
+      nickname:    nicknameMap[`${myUserId}:${p.userId}`] || undefined,
     })),
+    // Chat details > Mute. Present only when actively muted (a past
+    // mutedUntil behaves as unmuted on the client).
+    mutedUntil: myMutedUntil && myMutedUntil.getTime() > Date.now() ? myMutedUntil.toISOString() : undefined,
+    // Chat details > Theme / Disappearing messages (both conversation-level,
+    // identical for every participant — never per-viewer).
+    themeId: (conv as { themeId?: string | null }).themeId ?? undefined,
+    disappearingEnabled: !!(conv as { disappearingEnabled?: boolean }).disappearingEnabled,
     lastMessage:        lastMessagePreview ?? conv.lastMessage ?? undefined,
     lastMessageTs:      conv.lastMessageAt
       ? new Date(conv.lastMessageAt).getTime()
@@ -229,18 +248,28 @@ router.get("/", async (req, res) => {
   )));
 });
 
+type ParticipantInput = { userId: string; name: string; handle: string; initials: string; color: string; accountType: string };
+
 // ─── POST /api/conversations ──────────────────────────────────────────────────
 router.post("/", rateLimit("messaging"), async (req, res) => {
   const myUserId = (req as any).clerkUserId as string;
   const {
     type,
     participant,
+    participants,
     myInfo,
     contextOrderId, contextOrderNumber, contextOrderStatus,
     contextProductId, contextProductName, contextSellerName,
   } = req.body as {
     type: string;
-    participant: { userId: string; name: string; handle: string; initials: string; color: string; accountType: string };
+    participant?: ParticipantInput;
+    // Chat details > Create a group chat: 2+ participants instead of one.
+    // A deliberately minimal path (see docs/dm-flows.md) — no dedupe against
+    // an existing group with the exact same members, no per-member DM-privacy
+    // or seller-vacation checks (those are 1:1-specific concepts), just a
+    // straightforward create. Block enforcement between the creator and each
+    // invitee still applies below.
+    participants?: ParticipantInput[];
     myInfo?: { name: string; handle: string; initials: string; color: string; accountType: string };
     contextOrderId?: string;
     contextOrderNumber?: string;
@@ -249,6 +278,32 @@ router.post("/", rateLimit("messaging"), async (req, res) => {
     contextProductName?: string;
     contextSellerName?: string;
   };
+
+  if (Array.isArray(participants) && participants.length >= 2) {
+    if (participants.length > 20) return res.status(400).json({ error: "A group chat can have at most 20 other members." });
+    for (const p of participants) {
+      if (!p?.userId) return res.status(400).json({ error: "Every participant needs a userId." });
+      const relation = await blockRelation(myUserId, p.userId);
+      if (relation !== "none") {
+        return res.status(403).json({ error: `Unable to add ${p.name || "that person"} to the group.`, code: "BLOCKED" });
+      }
+    }
+    const [conv] = await db.insert(conversations).values({ type: "group" }).returning();
+    await db.insert(conversationParticipants).values([
+      {
+        conversationId: conv.id, userId: myUserId,
+        name: myInfo?.name ?? "", handle: myInfo?.handle ?? "",
+        initials: myInfo?.initials ?? "", color: myInfo?.color ?? "#8B5CF6",
+        accountType: myInfo?.accountType ?? "buyer",
+      },
+      ...participants.map((p) => ({
+        conversationId: conv.id, userId: p.userId, name: p.name, handle: p.handle,
+        initials: p.initials, color: p.color, accountType: p.accountType,
+      })),
+    ]);
+    const parts = await db.select().from(conversationParticipants).where(eq(conversationParticipants.conversationId, conv.id));
+    return res.status(201).json(buildConversationView(conv, parts, myUserId));
+  }
 
   if (!participant?.userId) return res.status(400).json({ error: "participant.userId required" });
 
@@ -408,6 +463,11 @@ router.get("/:id/messages", async (req, res) => {
   const { id } = req.params;
   const limit = Math.min(parseInt(String(req.query.limit ?? 50), 10), 100);
   const before = req.query.before as string | undefined;
+  // Search-in-chat (chat details > Search): when `q` is present this becomes
+  // a search over this conversation's own message history only, not global
+  // search — newest-first like the normal timeline, `before`/pagination
+  // don't apply to a search result set.
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
 
   const [isMember] = await db.select({ userId: conversationParticipants.userId })
     .from(conversationParticipants)
@@ -416,14 +476,22 @@ router.get("/:id/messages", async (req, res) => {
 
   if (!isMember) return res.status(403).json({ error: "Not a participant" });
 
-  const whereClause = before
-    ? and(eq(messages.conversationId, id), sql`${messages.createdAt} < ${new Date(before)}`)
-    : eq(messages.conversationId, id);
+  // Disappearing messages: an opportunistic sweep in place of a cron job —
+  // hard-delete anything in this conversation whose disappear_at has passed
+  // before returning the list. See docs/dm-flows.md.
+  await db.delete(messages)
+    .where(and(eq(messages.conversationId, id), sql`${messages.disappearAt} IS NOT NULL AND ${messages.disappearAt} < now()`));
+
+  const whereClause = q
+    ? and(eq(messages.conversationId, id), ilike(messages.body, `%${q}%`))
+    : before
+      ? and(eq(messages.conversationId, id), sql`${messages.createdAt} < ${new Date(before)}`)
+      : eq(messages.conversationId, id);
 
   const msgs = await db.select().from(messages)
     .where(whereClause)
     .orderBy(desc(messages.createdAt))
-    .limit(limit);
+    .limit(q ? Math.min(limit, 50) : limit);
 
   const parts = await db.select().from(conversationParticipants)
     .where(eq(conversationParticipants.conversationId, id));
@@ -523,9 +591,15 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
   }
 
   // ── Attachment validation ────────────────────────────────────────────────
+  // "image"/"video"/"voice" are plain media attachments (uri + meta only —
+  // no cross-referenced record to check, unlike product/order below). They
+  // were missing from this allowlist entirely, which meant every photo,
+  // video and voice message sent through this route 400'd against a real
+  // (non-preview) backend; fixed here as part of adding audio messages,
+  // since the same gap blocked those too. See docs/dm-flows.md.
   for (const item of attachmentItems) {
     const type = (item as { type?: unknown } | null)?.type;
-    if (typeof type !== "string" || !["product", "order", "post", "profile"].includes(type)) {
+    if (typeof type !== "string" || !MESSAGE_ATTACHMENT_TYPES.includes(type)) {
       return res.status(400).json({ error: "Invalid attachment type." });
     }
   }
@@ -537,7 +611,7 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
       subtitle?: string;
       meta?: { productId?: string; orderId?: string; postId?: string };
     };
-    const allowedTypes = ["product", "order", "post", "profile"];
+    const allowedTypes = MESSAGE_ATTACHMENT_TYPES;
     if (!att.type || !allowedTypes.includes(att.type)) {
       return res.status(400).json({ error: "Invalid attachment type." });
     }
@@ -646,15 +720,28 @@ router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
       .where(and(eq(conversationParticipants.conversationId, id), sql`user_id != ${userId}`)),
   ]);
 
-  // Notify each recipient of the new message (non-critical, fire-and-forget)
+  // Notify each recipient of the new message (non-critical, fire-and-forget).
+  // Chat details > Mute: a recipient who muted this conversation gets no
+  // notification for it — this is the actual notification-suppression half
+  // of "Mute", not just a cosmetic toggle.
   if (otherIds.length > 0) {
     (async () => {
       try {
         const [conv] = await db.select({ type: conversations.type })
           .from(conversations).where(eq(conversations.id, id)).limit(1);
+        const recipientRows = await db.select({ userId: conversationParticipants.userId, mutedUntil: conversationParticipants.mutedUntil })
+          .from(conversationParticipants)
+          .where(and(eq(conversationParticipants.conversationId, id), inArray(conversationParticipants.userId, otherIds)));
+        const now = Date.now();
+        const mutedIds = new Set(
+          recipientRows
+            .filter((r: { userId: string; mutedUntil: Date | null }) => r.mutedUntil && r.mutedUntil.getTime() > now)
+            .map((r: { userId: string; mutedUntil: Date | null }) => r.userId),
+        );
         // Map conversation type to the notification type the mobile client expects
         const notifType = conv?.type === "buyer_to_buyer" ? "new_friend_message" : "new_order_message";
         for (const recipientId of otherIds) {
+          if (mutedIds.has(recipientId)) continue;
           await publishNotification({
             userId:        recipientId,
             category:      "messages",
@@ -768,17 +855,163 @@ router.patch("/:id/read", async (req, res) => {
     .limit(1);
   if (!isMember) return res.status(404).json({ error: "Conversation not found" });
 
+  const [conv] = await db.select({ disappearingEnabled: conversations.disappearingEnabled })
+    .from(conversations).where(eq(conversations.id, id)).limit(1);
+
   const readAt = new Date();
+  // Disappearing messages: once a message has been seen (read), it disappears
+  // 24h later — matching Instagram's own copy — set here rather than waited
+  // on a cron job; see the sweep in GET /:id/messages.
+  const disappearAt = conv?.disappearingEnabled ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
   await Promise.all([
     db.update(conversationParticipants)
       .set({ unreadCount: 0, lastReadAt: readAt })
       .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId))),
     db.update(messages)
-      .set({ status: "read", readAt })
+      .set({ status: "read", readAt, ...(disappearAt ? { disappearAt } : {}) })
       .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`)),
   ]);
 
   return res.json({ ok: true });
+});
+
+// A far-future sentinel for "Until I turn it back on" (never auto-expires in
+// practice) — avoids a second boolean column for one extra mute option.
+const MUTE_FOREVER = new Date("9999-12-31T00:00:00.000Z");
+
+// ─── PATCH /api/conversations/:id/mute ───────────────────────────────────────
+// Chat details > Mute. Body: { durationMinutes?: number | null }.
+//   - a positive number  → muted for that many minutes from now
+//   - -1                 → muted "Until I turn it back on"
+//   - null / 0 / omitted → unmuted
+router.patch("/:id/mute", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const { durationMinutes } = req.body as { durationMinutes?: number | null };
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  const mutedUntil = durationMinutes == null || durationMinutes <= 0
+    ? null
+    : durationMinutes === -1
+      ? MUTE_FOREVER
+      : new Date(Date.now() + durationMinutes * 60_000);
+
+  await db.update(conversationParticipants)
+    .set({ mutedUntil })
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
+
+  return res.json({ ok: true, mutedUntil: mutedUntil?.toISOString() ?? null });
+});
+
+// ─── PATCH /api/conversations/:id/nickname ───────────────────────────────────
+// Chat details > Nicknames. Body: { targetUserId: string, nickname: string }.
+// An empty/whitespace-only nickname clears it back to the real name.
+router.patch("/:id/nickname", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const { targetUserId, nickname } = req.body as { targetUserId?: string; nickname?: string };
+  if (!targetUserId || typeof targetUserId !== "string") {
+    return res.status(400).json({ error: "targetUserId is required" });
+  }
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  const targetIsMember = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, targetUserId)))
+    .limit(1);
+  if (!targetIsMember.length) return res.status(400).json({ error: "Not a participant in this conversation" });
+
+  const [conv] = await db.select({ nicknames: conversations.nicknames })
+    .from(conversations)
+    .where(eq(conversations.id, id))
+    .limit(1);
+  if (!conv) return res.status(404).json({ error: "Conversation not found" });
+
+  const key = `${userId}:${targetUserId}`;
+  const nicknames: Record<string, string> = { ...(conv.nicknames as Record<string, string> | null ?? {}) };
+  const trimmed = (nickname ?? "").trim();
+  if (trimmed) nicknames[key] = trimmed.slice(0, 60);
+  else delete nicknames[key];
+
+  await db.update(conversations).set({ nicknames }).where(eq(conversations.id, id));
+
+  return res.json({ ok: true, nickname: nicknames[key] ?? null });
+});
+
+// Kept in sync with mobile's lib/conversationThemes.ts CONVERSATION_THEMES ids.
+const THEME_IDS = ["runway", "denim", "satin", "noir", "chrome", "linen", "street", "archive"] as const;
+
+async function insertSystemMessage(conversationId: string, actorId: string, title: string, meta: Record<string, string>) {
+  const [msg] = await db.insert(messages).values({
+    conversationId,
+    senderId: actorId,
+    senderName: "",
+    senderInitials: "",
+    senderColor: "#000000",
+    body: "",
+    attachment: { type: "system", title, meta: { actorId, ...meta } },
+    status: "sent",
+    deliveredAt: new Date(),
+  }).returning();
+  await db.update(conversations)
+    .set({ lastMessage: "Chat settings changed", lastMessageAt: new Date(), updatedAt: new Date() })
+    .where(eq(conversations.id, conversationId));
+  return msg;
+}
+
+// ─── PATCH /api/conversations/:id/theme ──────────────────────────────────────
+// Chat details > Theme. Body: { themeId: string | null }. null resets to the
+// app's default monochrome look. Posts a system line into the thread —
+// "You changed the theme to [Name]. Change" — visible to both participants,
+// since the theme itself is a conversation-level property, not per-user.
+router.patch("/:id/theme", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const { themeId } = req.body as { themeId?: string | null };
+  if (themeId != null && !THEME_IDS.includes(themeId as any)) {
+    return res.status(400).json({ error: `themeId must be one of: ${THEME_IDS.join(", ")}, or null.` });
+  }
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  await db.update(conversations).set({ themeId: themeId ?? null }).where(eq(conversations.id, id));
+  const msg = await insertSystemMessage(id, userId, "theme_changed", { themeId: themeId ?? "" });
+
+  return res.json({ ok: true, themeId: themeId ?? null, message: adaptMessage(msg) });
+});
+
+// ─── PATCH /api/conversations/:id/disappearing ───────────────────────────────
+// Chat details > Disappearing messages. Body: { enabled: boolean }. Posts the
+// matching system line ("You turned on/off disappearing messages. Change").
+router.patch("/:id/disappearing", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const { enabled } = req.body as { enabled?: boolean };
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  await db.update(conversations).set({ disappearingEnabled: !!enabled }).where(eq(conversations.id, id));
+  const msg = await insertSystemMessage(id, userId, enabled ? "disappearing_on" : "disappearing_off", {});
+
+  return res.json({ ok: true, disappearingEnabled: !!enabled, message: adaptMessage(msg) });
 });
 
 // ─── PATCH /api/conversations/:id/accept — accept a message request ───────────
@@ -832,6 +1065,10 @@ const UPLOAD_MEDIA_MIME_EXTENSIONS: Record<string, string> = {
   "audio/mpeg": "mp3",
   "audio/mp4": "m4a",
   "audio/x-m4a": "m4a",
+  // Some recorders (including this app's voice-message recorder) report the
+  // informal "audio/m4a" mime type rather than the registered "audio/mp4" —
+  // accept it as the same alias so voice message uploads aren't rejected.
+  "audio/m4a": "m4a",
   "audio/wav": "wav",
 };
 const UPLOAD_MEDIA_BASE64_RE = /^[A-Za-z0-9+/]+=*$/;

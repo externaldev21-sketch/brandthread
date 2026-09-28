@@ -673,12 +673,11 @@ export async function createCheckoutSession(
       acknowledged: false,
     });
   }
-  acks.push({
-    key: 'terms',
-    label: 'I agree to the Brandthread Terms of Service and Refund Policy.',
-    required: true,
-    acknowledged: false,
-  });
+  // No generic "I agree to the Terms" checkbox: it was client-only (never
+  // sent to or enforced by the server), and checkout now shows a plain
+  // "By placing your order you agree to…" line under the button instead —
+  // see IMPLICIT_TERMS_ACK_KEY in lib/checkoutReadiness.ts. Pre-order
+  // acknowledgments above stay required checkboxes.
 
   const session: CheckoutSession = {
     id: uid(),

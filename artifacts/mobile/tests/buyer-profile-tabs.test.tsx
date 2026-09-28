@@ -22,9 +22,13 @@ const {
   subscribeSocialMock: vi.fn(),
   loadBuyerProfileMock: vi.fn(),
   routerMock: { push: vi.fn(), replace: vi.fn() },
-  apiMock: { social: { myStories: vi.fn() }, threadCash: { get: vi.fn() } },
+  apiMock: { social: { myStories: vi.fn(), profile: vi.fn() }, threadCash: { get: vi.fn() } },
   getBuyerOrdersWithStatusMock: vi.fn(),
 }));
+
+const { loadHighlightsMock } = vi.hoisted(() => ({ loadHighlightsMock: vi.fn() }));
+vi.mock('@/lib/highlightsService', () => ({ loadHighlights: loadHighlightsMock }));
+vi.mock('@/lib/buyerSettings', () => ({ loadBuyerSettings: () => Promise.resolve({ dataSaver: false }) }));
 
 vi.mock('@/components/profile/ProfileCover', async () =>
   (await import('./helpers/profileCoverMock')).profileCoverMockModule);
@@ -111,6 +115,10 @@ vi.mock('react-native', () => {
       loop: () => ({ start: () => {}, stop: () => {} }),
     },
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
     useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
@@ -403,6 +411,8 @@ describe('buyer profile tabs', () => {
     subscribeSocialMock.mockReset().mockReturnValue(vi.fn());
     loadBuyerProfileMock.mockReset().mockResolvedValue({ avatarUri: null });
     apiMock.social.myStories.mockReset().mockResolvedValue([]);
+    apiMock.social.profile.mockReset().mockResolvedValue({ followersCount: 7, followingCount: 3, coverVideoUrl: null, coverPosterUrl: null });
+    loadHighlightsMock.mockReset().mockResolvedValue([]);
     apiMock.threadCash.get.mockReset().mockResolvedValue({ balanceCents: 0 });
     getBuyerOrdersWithStatusMock.mockReset().mockResolvedValue({ orders: [], fromCache: false });
     routerMock.push.mockReset();
@@ -583,12 +593,139 @@ describe('buyer profile tabs', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/connections?type=followers');
   });
 
-  it('offers "Post your first video" when the buyer has no posts', async () => {
+  it('offers "Share your first thread" when the buyer has no posts', async () => {
     getMyPostsMock.mockResolvedValue([]);
     renderer = await renderScreen();
     const cta = renderer.root.findByProps({ testID: 'empty-state-action' });
-    expect(textContent(cta.props.children)).toContain('Post your first video');
+    expect(textContent(cta.props.children)).toContain('Share your first thread');
     await act(async () => { cta.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/create-post?accountType=buyer');
+  });
+});
+
+describe('buyer profile — Instagram layout', () => {
+  let renderer: ReactTestRenderer | undefined;
+  const flat = (style: unknown): Record<string, any> => (Array.isArray(style)
+    ? Object.assign({}, ...style.flat(Infinity).filter(Boolean))
+    : (style as Record<string, any>) ?? {});
+
+  beforeEach(() => {
+    getMyProfileMock.mockReset().mockResolvedValue(baseProfile);
+    getMyPostsMock.mockReset().mockResolvedValue([]);
+    getSavedItemsMock.mockReset().mockResolvedValue([]);
+    getPrivacySettingsMock.mockReset().mockResolvedValue({});
+    subscribeSocialMock.mockReset().mockReturnValue(vi.fn());
+    loadBuyerProfileMock.mockReset().mockResolvedValue({ avatarUri: null });
+    apiMock.social.myStories.mockReset().mockResolvedValue([]);
+    apiMock.social.profile.mockReset().mockResolvedValue({ followersCount: 7, followingCount: 3, coverVideoUrl: null, coverPosterUrl: null });
+    apiMock.threadCash.get.mockReset().mockResolvedValue({ balanceCents: 0 });
+    loadHighlightsMock.mockReset().mockResolvedValue([]);
+    getBuyerOrdersWithStatusMock.mockReset().mockResolvedValue({ orders: [], fromCache: false });
+    routerMock.push.mockReset();
+    signedInUser.current = { id: 'buyer-1' };
+  });
+
+  afterEach(async () => {
+    if (renderer) {
+      await act(async () => { renderer?.unmount(); });
+      renderer = undefined;
+    }
+  });
+
+  it('draws the avatar as three concentric circles: each box’s content box equals the next circle (72pt avatar)', async () => {
+    renderer = await renderScreen();
+    const outer = flat(renderer.root.findByProps({ testID: 'profile-avatar-story-ring' }).props.style);
+    const ring = flat(renderer.root.findByProps({ testID: 'profile-avatar-ring' }).props.style);
+    const inner = flat(renderer.root.findByProps({ testID: 'profile-avatar-inner' }).props.style);
+    expect(inner.width).toBe(72);
+    // border-box: content = size − 2 × (border + padding)
+    expect(ring.width - 2 * (ring.borderWidth + (ring.padding ?? 0))).toBe(inner.width);
+    expect(outer.width - 2 * (outer.borderWidth + (outer.padding ?? 0))).toBe(ring.width);
+    // No story → the outermost stroke is transparent (layout never shifts).
+    expect(outer.borderColor).toBe('transparent');
+  });
+
+  it('shows the accent story ring only while the buyer has an unexpired story, and the avatar then opens it', async () => {
+    apiMock.social.myStories.mockResolvedValue([
+      { id: 'old', expiresAt: Date.now() - 1000 },
+      { id: 'live', expiresAt: Date.now() + 60_000 },
+    ]);
+    renderer = await renderScreen();
+    expect(flat(renderer.root.findByProps({ testID: 'profile-avatar-story-ring' }).props.style).borderColor).toBe('#C7CDD5');
+    await act(async () => { renderer!.root.findByProps({ testID: 'profile-avatar' }).props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith({ pathname: '/buyer-story-viewer', params: { storyId: 'live', allStoryIds: 'live' } });
+    routerMock.push.mockReset();
+    await act(async () => { renderer!.root.findByProps({ testID: 'profile-avatar-badge' }).props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-story-create');
+  });
+
+  it('orders the stats Posts · Followers · Following', async () => {
+    renderer = await renderScreen();
+    const row = renderer.root.findByProps({ testID: 'profile-stats-row' });
+    const keys = row.findAll((node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('profile-stat-') && typeof node.type === 'string')
+      .map((node) => node.props.testID);
+    expect([...new Set(keys)]).toEqual(['profile-stat-posts', 'profile-stat-followers', 'profile-stat-following']);
+  });
+
+  it('puts the avatar and stats on the same row (Instagram order), with name/@handle/bio below it', async () => {
+    renderer = await renderScreen();
+    const identityStack = renderer.root.findByProps({ testID: 'profile-identity-stack' });
+    // The mocked Pressable exposes the same testID on both its composite and
+    // host instances, so count only host ('string' type) nodes — same
+    // pattern as the "orders the stats" test above.
+    const hostNodesWithTestID = (root: typeof identityStack, testID: string) => root.findAll(
+      (node) => node.props.testID === testID && typeof node.type === 'string',
+    );
+    // The avatar and the stats row are both inside the measured
+    // identity-stack (what the video hero sizes itself to) — i.e. the same
+    // row, not stats on their own line further down the screen.
+    expect(hostNodesWithTestID(identityStack, 'profile-avatar')).toHaveLength(1);
+    expect(hostNodesWithTestID(identityStack, 'profile-stats-row')).toHaveLength(1);
+    // Name/@handle/bio render in a separate block AFTER the identity-stack,
+    // on the solid background below the fade — not beside the avatar.
+    const meta = renderer.root.findByProps({ testID: 'profile-identity-meta' });
+    expect(hostNodesWithTestID(meta, 'profile-avatar')).toHaveLength(0);
+    expect(hostNodesWithTestID(meta, 'profile-stats-row')).toHaveLength(0);
+  });
+
+  it('renders no video layer (and no empty band) without a profile video', async () => {
+    renderer = await renderScreen();
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'profile-identity-stack' }).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
+    });
+    expect(renderer.root.findAll((node) => node.props.testID === 'profile-video-hero')).toHaveLength(0);
+    const affordance = renderer.root.findByProps({ testID: 'profile-cover-affordance' });
+    expect(affordance.props.accessibilityLabel).toBe('Add profile video');
+  });
+
+  it('plays the profile video behind the identity and fades to the exact page background at the stats row', async () => {
+    apiMock.social.profile.mockResolvedValue({ followersCount: 7, followingCount: 3, coverVideoUrl: 'https://x/cover.mp4', coverPosterUrl: 'https://x/poster.jpg' });
+    renderer = await renderScreen();
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'profile-identity-stack' }).props.onLayout({ nativeEvent: { layout: { height: 320 } } });
+    });
+    const hero = renderer.root.findByProps({ testID: 'profile-video-hero' });
+    expect(flat(hero.props.style)).toMatchObject({ position: 'absolute', top: 0, height: 320 });
+    const fade = renderer.root.findAll((node) => node.props.testID === 'profile-video-fade')[0];
+    const colors = fade.props.colors as string[];
+    expect(colors[0]).toBe('#07070F00');
+    expect(colors[colors.length - 1]).toBe('#07070F');
+    expect(flat(fade.props.style)).toMatchObject({ bottom: 0, height: 128 });
+  });
+
+  it('wires the highlights row: "New" opens the create form, a highlight opens itself in the manager', async () => {
+    loadHighlightsMock.mockResolvedValue([{ id: 'hl_1', emoji: '🔥', label: 'Fits', coverColor: '#222222', createdAt: '2026-01-01' }]);
+    renderer = await renderScreen();
+    await act(async () => { renderer!.root.findByProps({ testID: 'profile-story-new' }).props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-highlights-manager?create=1');
+    const item = renderer.root.findAll((node) => node.props.accessibilityLabel === 'Fits highlight' && typeof node.props.onPress === 'function')[0];
+    await act(async () => { item.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-highlights-manager?edit=hl_1');
+  });
+
+  it('uses icon-only tabs with the label kept for accessibility', async () => {
+    renderer = await renderScreen();
+    const postsTab = renderer.root.findAll((node) => node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === 'Posts tab')[0];
+    expect(postsTab.findAll((node) => (node.type as unknown) === 'Text' && textContent(node.props.children) === 'Posts')).toHaveLength(0);
   });
 });

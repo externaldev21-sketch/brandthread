@@ -1,16 +1,25 @@
 /**
- * Buyer's own profile — TikTok/Instagram/Threads-style layout (see the
- * Mobbin references cited in this change's PR description): a compact top
- * bar clear of the notch/Dynamic Island, a short cover strip, an overlapping
- * avatar, inline TikTok-style stats, one row of small actions, the Thread
- * Cash streak, and a content tab bar (Posts / Saved / Liked / Orders).
+ * Buyer's own profile — Instagram's own-profile layout in Brandthread
+ * branding (Mobbin references in the PR description):
+ *
+ *  - the profile video plays full-bleed from the very top of the screen
+ *    behind the top bar, avatar, name/@handle/chip and bio, fading into the
+ *    solid page background exactly where the stats row begins
+ *    (`ProfileVideoHeader`); with no video the same layout sits on the plain
+ *    background;
+ *  - Posts · Followers · Following as number-over-label columns;
+ *  - Edit profile · Share profile · discover-people (shared `Button`);
+ *  - Story Highlights row (circles + "New");
+ *  - the Thread Cash streak card;
+ *  - icon-only tabs with an underline (Posts / Saved / Liked / Orders) over a
+ *    3-column, 1pt-gutter, 4:5 grid.
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, Modal, Animated, Share, Linking, Alert, ScrollView, Platform, Pressable,
+  useWindowDimensions, type LayoutChangeEvent,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -42,26 +51,24 @@ import { formatProfileCount } from '@/services/profileService';
 import { ProfileMeta } from '@/components/profile/ProfileShell';
 import { InteractionLayer, ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
+import { ProfileVideoAffordance, ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
+import { ProfileStoryAvatar } from '@/components/profile/ProfileStoryAvatar';
+import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
+import { ProfileStoriesRow, type ProfileStoryItem } from '@/components/profile/ProfileStoriesRow';
+import { loadHighlights, type Highlight } from '@/lib/highlightsService';
+import { Button } from '@/components/ui/Button';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
+import { ProfileEmptyAreaContext } from '@/components/profile/ProfileEmptyAreaContext';
 import {
   CoverCoachmarkSheet, CoverManageSheet, CoverTrimSheet, useProfileCover, type CoverMedia,
 } from '@/components/profile/ProfileCover';
-import { profileEmptyState, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
-import { useProfileLayout } from '@/components/profile/profileLayout';
+import { profileEmptyState, computeEmptyArea, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
+import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
 import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRow';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
-
-const AVATAR = 88;
-const AVATAR_OVERLAP = 36;
-// Tall enough that "+ Add cover video" (anchored to this box's bottom-right)
-// clears the top bar's balance chip/icons with real room to spare — a
-// shorter cover left only a few pixels between them, which measured as a
-// real overlap on a live device.
-const COVER_HEIGHT = 160;
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -211,105 +218,6 @@ function TopBarIcon({ name, onPress, accessibilityLabel, theme, badge }: {
   );
 }
 
-// ─── Actions row ──────────────────────────────────────────────────────────────
-function DarkActionButton({ label, onPress, testID, accessibilityHint }: {
-  label: string;
-  onPress: () => void;
-  testID?: string;
-  accessibilityHint?: string;
-}) {
-  return (
-    <View style={actionStyles.wrap}>
-      <PressableScale
-        onPress={() => { hapticLight(); onPress(); }}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityHint={accessibilityHint}
-        testID={testID}
-        style={actionStyles.button}
-      >
-        {(state) => (
-          <>
-            <InteractionLayer state={state as { pressed: boolean }} radius={8} theme={{ text: '#FFFFFF', accent: '#FFFFFF' } as AppThemePreset} />
-            <Text style={actionStyles.buttonText} numberOfLines={1}>{label}</Text>
-          </>
-        )}
-      </PressableScale>
-    </View>
-  );
-}
-
-function SquareIconButton({ icon, onPress, accessibilityLabel }: {
-  icon: keyof typeof Feather.glyphMap;
-  onPress: () => void;
-  accessibilityLabel: string;
-}) {
-  return (
-    <PressableScale
-      onPress={() => { hapticLight(); onPress(); }}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      style={actionStyles.square}
-    >
-      {(state) => (
-        <>
-          <InteractionLayer state={state as { pressed: boolean }} radius={8} theme={{ text: '#FFFFFF', accent: '#FFFFFF' } as AppThemePreset} />
-          <Feather name={icon} size={16} color="#FFFFFF" /* theme-exempt: fixed dark chip */ />
-        </>
-      )}
-    </PressableScale>
-  );
-}
-
-// ─── Stats ────────────────────────────────────────────────────────────────────
-// Plain `Pressable`/`View` for every cell (not `PressableScale`, which
-// forwards a plain `style` prop onto its *inner* wrapper and leaves the
-// outer element — the actual flex child of `statsStyles.row` — unstyled).
-// With two of the three cells losing their row-item styling that way, the
-// row's flex layout became inconsistent enough that the third cell wrapped
-// onto its own line. Every cell is now the same plain, directly-styled
-// element, and cells are spaced with explicit margins rather than the flex
-// `gap` shorthand, which has been unreliable across RN Web versions.
-function TikTokStatsRow({ stats, loading, theme }: { stats: ProfileStat[]; loading?: boolean; theme: AppThemePreset }) {
-  return (
-    <View style={statsStyles.row}>
-      {stats.map((stat, index) => {
-        const cellStyle = [statsStyles.cell, index > 0 && statsStyles.cellSpacing];
-        const content = (
-          <>
-            <Text style={[statsStyles.value, { color: loading ? theme.subtle : theme.text }]} numberOfLines={1}>
-              {loading ? '–' : stat.value}
-            </Text>
-            <Text style={[statsStyles.label, { color: theme.muted }]} numberOfLines={1}>{stat.label}</Text>
-          </>
-        );
-        return stat.onPress ? (
-          <Pressable
-            key={stat.key}
-            style={cellStyle}
-            onPress={() => { hapticSelection(); stat.onPress?.(); }}
-            accessibilityRole="button"
-            accessibilityLabel={stat.accessibilityLabel ?? `${stat.value} ${stat.label}`}
-            testID={`profile-stat-${stat.key}`}
-          >
-            {content}
-          </Pressable>
-        ) : (
-          <View
-            key={stat.key}
-            style={cellStyle}
-            accessible
-            accessibilityLabel={stat.accessibilityLabel ?? `${stat.value} ${stat.label}`}
-            testID={`profile-stat-${stat.key}`}
-          >
-            {content}
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 // ─── Memoized non-grid cells ─────────────────────────────────────────────────
 const SavedCell = React.memo(function SavedCell({
   item, size, theme, onPress,
@@ -376,14 +284,38 @@ export default function ProfileScreen() {
   const api     = useApi();
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const layout = useProfileLayout();
+  // Instagram's own-profile grid: 3 columns, 1pt gutters, 4:5 tiles.
+  const layout = useProfileLayout({ tileAspect: TILE_ASPECT_4_5 });
+  const heroPosterOnly = useHeroPosterOnly();
   const threadCashEnabled = useFeatureFlag('threadCash');
   const celebrateThreadCash = useCelebrateThreadCash();
+  const { height: winHeight } = useWindowDimensions();
   // Clears the floating buyer tab bar.
   const listPadding = { paddingBottom: barInset + SP.lg };
   const savedColumns = layout.gridColumns >= 4 ? 3 : 2;
   const savedCellSize = Math.floor((layout.columnWidth - SP.md * 2) / savedColumns);
   const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+
+  // The whole header (video hero, identity, buttons, highlights, streak,
+  // tabs) scrolls away with the list — nothing stays pinned above the empty
+  // state — so `computeEmptyArea` (the same helper ProfileShell already uses
+  // for this exact bug class) is given the header's own measured height as
+  // its "tabsHeight" input. This sizes the empty state to fill the rest of
+  // the viewport, guaranteeing its CTA clears the floating tab bar by
+  // `EMPTY_AREA_BREATHING_ROOM` at the end of the scroll, on any header
+  // height (the video hero makes this header much taller than a fixed
+  // constant could safely assume).
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const handleHeaderLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.height);
+    setHeaderHeight((prev) => (prev === next ? prev : next));
+  }, []);
+  const emptyArea = computeEmptyArea({
+    viewportHeight: winHeight,
+    topChrome: 0,
+    tabsHeight: headerHeight,
+    bottomInset: barInset,
+  });
 
   const accountRef = useRef(user?.id);
   accountRef.current = user?.id;
@@ -404,6 +336,13 @@ export default function ProfileScreen() {
   // profile counts went stale after every follow).
   const [socialCounts, setSocialCounts] = useState<{ followers: number; following: number } | null>(null);
   const [serverCover, setServerCover] = useState<CoverMedia>({ videoUrl: null, posterUrl: null });
+  const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  // The profile video only decodes while this tab is focused AND the video
+  // layer is still on screen (paused once it scrolls away).
+  const [focused, setFocused] = useState(true);
+  const [heroHeight, setHeroHeight] = useState(0);
+  const [heroOnScreen, setHeroOnScreen] = useState(true);
   const coverFlow = useProfileCover({ own: true, cover: serverCover, userId: user?.id });
 
   // Sheets
@@ -464,6 +403,29 @@ export default function ProfileScreen() {
   }, [loadData]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+
+  useFocusEffect(useCallback(() => {
+    setFocused(true);
+    return () => setFocused(false);
+  }, []));
+
+  // Accent story ring: the same "unexpired story" rule the seller profile
+  // uses (api.social.myStories() filtered by expiresAt > now).
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    if (user?.id) {
+      api.social.myStories()
+        .then((rows) => { if (alive) setMyStoryIds(activeStoryIds(rows)); })
+        .catch(() => { /* no ring rather than a wrong one */ });
+    }
+    loadHighlights().then((items) => { if (alive) setHighlights(items); }).catch(() => {});
+    return () => { alive = false; };
+  }, [api, user?.id]));
+
+  const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
+    const next = event.nativeEvent.contentOffset.y < Math.max(heroHeight, 1);
+    setHeroOnScreen((prev) => (prev === next ? prev : next));
+  }, [heroHeight]);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -693,185 +655,167 @@ export default function ProfileScreen() {
     );
   }
 
-  const latestVideo = posts.find((post) => post.type === 'video' && post.mediaUrl);
-  const latestPhoto = posts.find((post) => post.type !== 'video' && post.mediaUrl);
   const hasCover = coverFlow.hasCover;
-  const coverAddLabel = coverFlow.busy === 'uploading'
-    ? 'Uploading cover…'
-    : coverFlow.busy === 'removing'
-      ? 'Removing cover…'
-      : hasCover ? 'Edit cover' : 'Add cover video';
-  const showCoverPlusIcon = !hasCover && !coverFlow.busy;
+  const hasActiveStory = myStoryIds.length > 0;
+  const heroActive = focused && heroOnScreen && !heroPosterOnly;
 
+  // Instagram order: Posts · Followers · Following.
   const stats: ProfileStat[] = [
-    {
-      key: 'following', label: 'Following',
-      value: formatProfileCount(socialCounts?.following ?? profile?.followingBrandsCount ?? 0),
-      onPress: () => router.push(connectionsHref('following') as any),
-    },
+    { key: 'posts', label: 'Posts', value: formatProfileCount(posts.length) },
     {
       key: 'followers', label: 'Followers',
       value: formatProfileCount(socialCounts?.followers ?? profile?.friendsCount ?? 0),
       onPress: () => router.push(connectionsHref('followers') as any),
     },
-    { key: 'posts', label: 'Posts', value: formatProfileCount(posts.length) },
+    {
+      key: 'following', label: 'Following',
+      value: formatProfileCount(socialCounts?.following ?? profile?.followingBrandsCount ?? 0),
+      onPress: () => router.push(connectionsHref('following') as any),
+    },
   ];
 
+  const highlightItems: ProfileStoryItem[] = highlights.map((h) => ({
+    id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor,
+  }));
+
+  const topBar = (
+    <>
+      <PressableScale
+        style={styles.topBarLeft}
+        onPress={() => {
+          hapticLight();
+          router.push('/account-switcher' as never);
+        }}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel="Switch account"
+        testID="buyer-profile-account-switcher"
+      >
+        {(state) => (
+          <>
+            <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.sm} theme={theme} />
+            <Text style={[styles.topBarUsername, { color: theme.text }, hasCover && styles.overMedia]} numberOfLines={1}>{displayHandle || displayName}</Text>
+            <Feather name="chevron-down" size={16} color={theme.text} />
+          </>
+        )}
+      </PressableScale>
+      <View style={styles.topBarRight}>
+        {threadCashEnabled ? (
+          <CompactWalletChip
+            balanceLabel={formatCents(threadCashBalanceCents)}
+            onPress={() => router.push('/thread-cash' as never)}
+            onLongPress={__DEV__ ? () => celebrateThreadCash({ amount: 500, from: 'Daily reward' }) : undefined}
+            theme={theme}
+          />
+        ) : null}
+        <TopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" theme={theme} />
+        <TopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" theme={theme} />
+      </View>
+    </>
+  );
+
   const header = (
-    <View>
-      {/* ── Cover — runs all the way to the top, behind the transparent top
-          bar, so there's no hard seam between them. A subtle dark gradient
-          when empty, never a placeholder squiggle. ── */}
-      <View style={styles.cover}>
-        {hasCover ? (
-          <ProfileHeroMedia videoUri={coverFlow.cover.videoUrl} posterUri={coverFlow.cover.posterUrl} active height={COVER_HEIGHT} />
-        ) : (latestVideo?.mediaUrl || latestPhoto?.mediaUrl) ? (
-          <ProfileHeroMedia videoUri={latestVideo?.mediaUrl ?? null} posterUri={latestPhoto?.mediaUrl ?? null} active={false} height={COVER_HEIGHT} posterOnly />
-        ) : (
-          // One clean diagonal gradient, clearly a step up from the
-          // near-black page background (#0A0A0B) — a top-left highlight
-          // layer plus a scattered grain overlay were stacked on top of
-          // this in an earlier pass and, combined, read as a muddy smudge
-          // rather than a clean surface. Just the gradient, full stop.
-          <LinearGradient
-            colors={['#34343a', '#16161a']} // theme-exempt: fixed monochrome empty-cover gradient
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
+    <View onLayout={handleHeaderLayout}>
+      {/* ── Video hero + identity: the profile video (when set) runs from the
+          very top of the screen, behind the top bar, avatar, name/@handle/
+          chip and bio, and fades into the solid background exactly where the
+          stats row begins. No video → the same layout on the plain page. ── */}
+      <ProfileVideoHeader
+        hero={{ videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }}
+        heroActive={heroActive}
+        posterOnly={heroPosterOnly}
+        topPad={topPad}
+        onHeroHeight={setHeroHeight}
+        topBar={topBar}
+        avatar={(
+          <ProfileStoryAvatar
+            uri={avatarUri}
+            initials={avatarInitials}
+            hasActiveStory={hasActiveStory}
+            accessibilityLabel={hasActiveStory ? 'View your story' : 'Create a story'}
+            onPress={() => {
+              hapticSelection();
+              if (hasActiveStory) {
+                router.push({ pathname: '/buyer-story-viewer' as any, params: { storyId: myStoryIds[0], allStoryIds: myStoryIds.join(',') } });
+              } else {
+                router.push('/buyer-story-create' as any);
+              }
+            }}
+            onPressBadge={() => { hapticSelection(); router.push('/buyer-story-create' as any); }}
           />
         )}
-        {/* Legibility scrim for the transparent top bar's icons/text — only
-            needed over real cover media (a video/photo can be bright); the
-            flat dark empty-cover gradient is already dark enough on its own,
-            and stacking a black scrim on top of it was what made the empty
-            cover read as solid black instead of a visible gradient. */}
-        {(hasCover || latestVideo?.mediaUrl || latestPhoto?.mediaUrl) ? (
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0)']} // theme-exempt: legibility scrim over cover media
-            style={[styles.coverTopFade, { height: topPad + 60 }]}
-          />
-        ) : null}
-        {/* Soft fade into the page background at the cover's bottom edge. */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={['rgba(0,0,0,0)', theme.background]}
-          style={styles.coverBottomFade}
-        />
-        {/* Plain `Pressable` (not `PressableScale`, whose forced 44pt
-            minimum touch target — appropriate for a real button — inflated
-            this small text button's box upward until it collided with the
-            top bar's icons). `hitSlop` gives it a comfortable tap area
-            without growing the visible/measured box itself. */}
-        <Pressable
-          onPress={hasCover ? coverFlow.openManage : coverFlow.startAdd}
-          disabled={!!coverFlow.busy}
-          accessibilityRole="button"
-          accessibilityLabel={coverAddLabel}
-          accessibilityHint={hasCover ? 'Change or remove your profile cover video' : 'Pick or record a short video to play behind your profile'}
-          testID="profile-cover-affordance"
-          hitSlop={10}
-          style={({ pressed }) => [styles.coverAdd, pressed && styles.coverAddPressed]}
-        >
-          {showCoverPlusIcon ? <Feather name="plus" size={13} color="#FFFFFF" style={styles.coverAddIcon} /* theme-exempt: legible over cover media */ /> : null}
-          <Text style={styles.coverAddText} numberOfLines={1}>{coverAddLabel}</Text>
-        </Pressable>
-      </View>
-
-      {/* ── Top bar — transparent over the cover, always clear of the
-          notch/Dynamic Island ── */}
-      <View style={[styles.topBar, { paddingTop: topPad + 6 }]}>
-        <PressableScale
-          style={styles.topBarLeft}
-          onPress={() => {
-            hapticLight();
-            router.push('/account-switcher' as never);
-          }}
-          activeOpacity={0.75}
-          accessibilityRole="button"
-          accessibilityLabel="Switch account"
-          testID="buyer-profile-account-switcher"
-        >
-          {(state) => (
-            <>
-              <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.sm} theme={theme} />
-              <Text style={[styles.topBarUsername, { color: theme.text }]} numberOfLines={1}>{displayHandle || displayName}</Text>
-              <Feather name="chevron-down" size={16} color={theme.text} />
-            </>
-          )}
-        </PressableScale>
-        <View style={styles.topBarRight}>
-          {threadCashEnabled ? (
-            <CompactWalletChip
-              balanceLabel={formatCents(threadCashBalanceCents)}
-              onPress={() => router.push('/thread-cash' as never)}
-              onLongPress={__DEV__ ? () => celebrateThreadCash({ amount: 500, from: 'Daily reward' }) : undefined}
-              theme={theme}
-            />
-          ) : null}
-          <TopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" theme={theme} />
-          <TopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" theme={theme} />
-        </View>
-      </View>
-
-      {/* ── Identity — avatar overlapping the cover, real name, handle, tag, bio ── */}
-      <View style={styles.identity}>
-        <PressableScale
-          onPress={() => { hapticSelection(); router.push('/buyer-story-create' as any); }}
-          accessibilityRole="button"
-          accessibilityLabel="Create a story"
-          testID="profile-avatar"
-          style={styles.avatarPress}
-        >
-          <View style={styles.avatarRing}>
-            <View style={styles.avatar}>
-              {avatarUri ? (
-                <CachedImage source={{ uri: avatarUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-              ) : (
-                <>
-                  <LinearGradient
-                    colors={['#2a2a2a', '#1a1a1a']} // theme-exempt: fixed monochrome avatar placeholder per spec
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <Text style={[styles.avatarInitials, { color: theme.text }]}>{avatarInitials}</Text>
-                </>
-              )}
-            </View>
-            <View style={styles.avatarBadge}>
-              <Feather name="plus" size={12} color="#000000" /* theme-exempt: fixed black glyph on the white badge per spec */ />
-            </View>
-          </View>
-        </PressableScale>
-
-        <Text style={[styles.displayName, { color: theme.text }]} numberOfLines={2} accessibilityRole="header">{displayName}</Text>
-        {displayHandle && displayHandle !== displayName ? (
-          <Text style={[styles.handle, { color: theme.muted }]} numberOfLines={1}>{displayHandle}</Text>
-        ) : null}
-        <View style={styles.chipWrap}>
-          <ProfileChip label="Buyer" icon="user" />
-        </View>
-
-        <View style={styles.meta}>
+        name={displayName}
+        handle={displayHandle && displayHandle !== displayName ? displayHandle : null}
+        chip={<ProfileChip label="Buyer" icon="user" />}
+        meta={(profile?.bio || profile?.website || profile?.location) ? (
           <ProfileMeta
             bio={profile?.bio}
             website={profile?.website}
             location={profile?.location}
             onOpenWebsite={(url) => { void Linking.openURL(url); }}
           />
+        ) : null}
+        coverAffordance={(
+          <ProfileVideoAffordance
+            hasVideo={hasCover}
+            busy={coverFlow.busy}
+            onAdd={coverFlow.startAdd}
+            onManage={coverFlow.openManage}
+          />
+        )}
+        stats={stats}
+        statsLoading={loading}
+      />
+
+      {/* ── Edit profile · Share profile · discover people (shared Button) ── */}
+      <View style={styles.actionsRow}>
+        <View style={styles.actionFlex}>
+          <Button
+            label="Edit profile"
+            variant="secondary"
+            size="compact"
+            fullWidth
+            onPress={() => router.push('/(buyer)/edit-profile')}
+            style={[styles.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
+            testID="profile-edit-button"
+          />
         </View>
+        <View style={styles.actionFlex}>
+          <Button
+            label="Share profile"
+            variant="secondary"
+            size="compact"
+            fullWidth
+            onPress={handleShareProfile}
+            accessibilityHint="Opens your shareable profile link and QR code"
+            style={[styles.actionButton, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
+            testID="profile-share-button"
+          />
+        </View>
+        <Button
+          label=""
+          icon="user-plus"
+          variant="secondary"
+          size="compact"
+          accessibilityLabel="Discover people"
+          onPress={() => router.push('/(buyer)/friends' as any)}
+          style={[styles.actionButton, styles.actionSquare, { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }]}
+          testID="profile-discover-people"
+        />
       </View>
 
-      <TikTokStatsRow stats={stats} loading={loading} theme={theme} />
-
-      {/* ── One action row: Edit profile / Share profile / Add friends ── */}
-      <View style={styles.actionsRow}>
-        <DarkActionButton label="Edit profile" onPress={() => router.push('/(buyer)/edit-profile')} />
-        <DarkActionButton
-          label="Share profile"
-          onPress={handleShareProfile}
-          accessibilityHint="Opens your shareable profile link and QR code"
+      {/* ── Story Highlights: circles + "New" ── */}
+      <View style={styles.highlightsWrap} testID="profile-highlights">
+        <ProfileStoriesRow
+          items={highlightItems}
+          onNew={() => { hapticSelection(); router.push('/buyer-highlights-manager?create=1' as any); }}
+          onPressItem={(item) => {
+            hapticSelection();
+            // Highlights are local label/emoji/colour records with no story
+            // media yet, so a tap opens that highlight in the manager.
+            router.push(`/buyer-highlights-manager?edit=${encodeURIComponent(item.id)}` as any);
+          }}
         />
-        <SquareIconButton icon="user-plus" onPress={() => router.push('/(buyer)/friends' as any)} accessibilityLabel="Add friends" />
       </View>
 
       {threadCashEnabled ? (
@@ -881,13 +825,14 @@ export default function ProfileScreen() {
       ) : null}
 
       <View style={styles.tabsBlock}>
-        <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} />
+        <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} variant="iconOnly" />
       </View>
     </View>
   );
 
   return (
     <View style={styles.root} testID="buyer-profile">
+      <ProfileEmptyAreaContext.Provider value={emptyArea.minHeight}>
       <Animated.FlatList
         key={`buyer-${numColumns}`}
         data={loading ? [] : rows}
@@ -897,17 +842,12 @@ export default function ProfileScreen() {
         columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
         ListHeaderComponent={header}
         ListEmptyComponent={(
-          // A floating overlay independent of scroll (tried here first) can
-          // only ever guarantee tab-bar clearance if the header + this state
-          // both fit above the tab bar with room to spare — on a short
-          // viewport (this screen's header alone can approach 650pt) that's
-          // not always possible, and an absolutely-positioned overlay that
-          // doesn't fit just renders off-screen with no way to scroll to it,
-          // which is worse than the bug it was meant to fix. In-flow content
-          // plus a `paddingBottom` sized to the tab bar's own footprint (see
-          // `listPadding` below) instead guarantees the CTA scrolls fully
-          // clear of the bar by at least 16pt on every screen size, and sits
-          // clear of it with no scrolling at all whenever there's room.
+          // `emptyArea` (computeEmptyArea, shared with ProfileShell) sizes
+          // this to fill the rest of the viewport below the (measured, video
+          // hero included) header, and `emptyArea.paddingBottom` below
+          // reserves the floating tab bar's own footprint — so at the end of
+          // the scroll the CTA sits fully clear of the bar, on any header
+          // height, not just a fixed constant.
           <ProfileGridPlaceholder
             loading={loading}
             error={false}
@@ -918,14 +858,17 @@ export default function ProfileScreen() {
             title={emptyTitle}
             description={emptyDescription}
             action={emptyAction}
-            compact
+            actionStyle="text"
           />
         )}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: listPadding.paddingBottom }}
+        onScroll={handleScroll}
+        scrollEventThrottle={32}
+        contentContainerStyle={{ paddingBottom: emptyArea.paddingBottom }}
         refreshing={refreshing}
         onRefresh={onRefresh}
       />
+      </ProfileEmptyAreaContext.Provider>
 
       {/* ── Profile Menu Sheet ── */}
       <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>
@@ -984,89 +927,31 @@ function makeStyles(theme: AppThemePreset) {
     errorRoot: { flex: 1, backgroundColor: theme.background, justifyContent: 'center' },
     gridRow: { gap: 1 },
 
-    topBar: {
-      position: 'absolute', top: 0, left: 0, right: 0,
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: SP.md, paddingBottom: SP.sm, backgroundColor: 'transparent',
-    },
     topBarLeft: {
       flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32,
       borderRadius: RADIUS.sm, overflow: 'hidden',
     },
     topBarUsername: { fontFamily: FONT.semibold, fontSize: 18, flexShrink: 1, minWidth: 0 },
+    overMedia: {
+      textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, // theme-exempt: legibility over cover media
+    },
     topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 16, flexShrink: 0 },
 
-    cover: { height: COVER_HEIGHT, overflow: 'hidden', backgroundColor: theme.card },
-    coverTopFade: { position: 'absolute', top: 0, left: 0, right: 0 },
-    // Blends the cover's bottom edge into the page background instead of
-    // cutting off hard — the last quarter of the cover's own height.
-    coverBottomFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: COVER_HEIGHT / 4 },
-    coverAdd: {
-      position: 'absolute', right: 16, bottom: 12,
-      flexDirection: 'row', alignItems: 'center', gap: 4,
-      backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, // theme-exempt: fixed translucent pill per spec
-      paddingHorizontal: 10, paddingVertical: 6,
-    },
-    coverAddPressed: { opacity: 0.6 },
-    coverAddIcon: { opacity: 0.85 },
-    coverAddText: {
-      fontFamily: FONT.semibold, fontSize: 13, lineHeight: 16, color: '#FFFFFF', opacity: 0.85, // theme-exempt: legible over cover media
-      textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
-    },
-
-    identity: { paddingHorizontal: SP.md },
-    // Avatar bottom → display name: 12pt.
-    avatarPress: { marginTop: -AVATAR_OVERLAP, alignSelf: 'flex-start', marginBottom: 12 },
-    avatarRing: {
-      width: AVATAR + 6, height: AVATAR + 6, borderRadius: (AVATAR + 6) / 2,
-      borderWidth: 3, borderColor: theme.background,
-      padding: 3, backgroundColor: theme.background,
-    },
-    avatar: {
-      width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden',
-      alignItems: 'center', justifyContent: 'center',
-    },
-    avatarInitials: { fontFamily: FONT.semibold, fontSize: 30 },
-    avatarBadge: {
-      position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11,
-      backgroundColor: '#FFFFFF', borderColor: theme.background, // theme-exempt: fixed white badge per spec
-      borderWidth: 2, alignItems: 'center', justifyContent: 'center',
-    },
-    // Name → @handle: 2pt.
-    displayName: { fontFamily: FONT.bold, fontSize: 22, letterSpacing: -0.4 },
-    handle: { fontFamily: FONT.medium, fontSize: 14, marginTop: 2 },
-    // @handle (or name, if no handle) → Buyer tag: 8pt.
-    chipWrap: { marginTop: 8, alignItems: 'flex-start' },
-    // Buyer tag (or bio) → stats row: 8pt here, plus the stats row's own
-    // 16pt top padding below — see statsStyles.row.
-    meta: { marginTop: 8 },
-
-    // Stats row → Edit/Share buttons: 16pt (statsStyles.row's own bottom
-    // padding is 0 — this is the single source of truth for that gap).
-    actionsRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: 16, alignItems: 'center' },
-    // Buttons → streak card (or tabs, when Thread Cash is off): 20pt.
-    streakWrap: { marginTop: 20 },
-    // Streak card (or buttons) → tabs: 20pt above; tabs → content/empty
-    // state: 24pt below.
-    tabsBlock: { paddingTop: 20, paddingBottom: 24 },
+    // Stats row → buttons: 16pt. Instagram proportions: two equal buttons
+    // plus a square discover-people button, 6pt apart, 8pt corners.
+    actionsRow: { flexDirection: 'row', gap: 6, paddingHorizontal: SP.md, paddingTop: 16, alignItems: 'center' },
+    actionFlex: { flex: 1, minWidth: 0 },
+    actionButton: { borderRadius: 8, paddingHorizontal: SP.sm },
+    actionSquare: { width: 36, paddingHorizontal: 0 },
+    // Buttons → highlights: 16pt.
+    highlightsWrap: { paddingTop: 16 },
+    // Highlights → streak card (or tabs, when Thread Cash is off): 16pt.
+    streakWrap: { marginTop: 16 },
+    // Streak card (or highlights) → tabs: 16pt above; tabs → grid: 1pt
+    // (Instagram's grid starts right under the underline).
+    tabsBlock: { paddingTop: 16, paddingBottom: 1 },
   });
 }
-
-const statsStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'flex-end', justifyContent: 'flex-start',
-    // Buyer tag/bio → stats row: 16pt (the row's own top padding); the
-    // bottom gap to the action row is owned entirely by actionsRow's own
-    // top padding, so it isn't double-counted here.
-    paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: 0,
-  },
-  cell: { flexDirection: 'row', alignItems: 'baseline', flexShrink: 0 },
-  // Explicit margin instead of the row's `gap` — spaces every cell but the
-  // first, so the total gap stays 24pt regardless of `gap` support.
-  cellSpacing: { marginLeft: 20 },
-  value: { fontFamily: FONT.bold, fontSize: 16, fontVariant: ['tabular-nums'] },
-  label: { fontFamily: FONT.medium, fontSize: 14, marginLeft: 4 },
-});
 
 const topBarStyles = StyleSheet.create({
   walletChip: {
@@ -1076,19 +961,6 @@ const topBarStyles = StyleSheet.create({
   walletText: { fontFamily: FONT.bold, fontSize: FS.xs, fontVariant: ['tabular-nums'] },
   iconButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   iconBadge: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
-});
-
-const actionStyles = StyleSheet.create({
-  wrap: { flex: 1 },
-  button: {
-    height: 40, borderRadius: 10, backgroundColor: '#1f1f1f', // theme-exempt: fixed dark action per spec
-    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-  },
-  buttonText: { fontFamily: FONT.semibold, fontSize: 14, color: '#FFFFFF' /* theme-exempt: fixed dark action */ },
-  square: {
-    width: 40, height: 40, borderRadius: 10, backgroundColor: '#1f1f1f', // theme-exempt: fixed dark action per spec
-    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-  },
 });
 
 const cellStyles = StyleSheet.create({
