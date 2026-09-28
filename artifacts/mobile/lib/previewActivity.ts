@@ -97,7 +97,7 @@ const previewReadIds = new Set<string>();
 let previewSeedServed = false;
 
 export function isPreviewActivityId(id: string): boolean {
-  return id.startsWith('preview-act-');
+  return isPreviewActivityEnabled() && id.startsWith('preview-act-');
 }
 
 /** Mark seeded preview rows read (ids that aren't preview rows are ignored). */
@@ -262,11 +262,6 @@ function seedPreviewActivity(): ActivityItem[] {
 // stays gone when Activity is reopened — the same "survives a reload of the
 // screen" behaviour the real DELETE gives a signed-in account.
 const dismissedPreviewIds = new Set<string>();
-
-/** True for a seeded preview row id (never a real notification's id). */
-export function isPreviewActivityId(id: string): boolean {
-  return isPreviewActivityEnabled() && id.startsWith('preview-');
-}
 
 export function markPreviewActivityDismissed(id: string): void {
   dismissedPreviewIds.add(id);
