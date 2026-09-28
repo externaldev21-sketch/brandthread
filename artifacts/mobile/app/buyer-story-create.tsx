@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  Alert, Animated, Dimensions, Image, Modal, PanResponder, Platform,
+  Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Modal, PanResponder, Platform,
   Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -23,7 +23,8 @@ import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useUser } from '@clerk/expo';
-import Svg, { Path } from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Circle, Path } from 'react-native-svg';
 import {
   CARD, BORDER, FG, MUTED, ON_DARK, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -33,7 +34,8 @@ import type { StoryMedia, StoryOverlay, StoryOverlayType, StoryPrivacySettings }
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import { getTaggableProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
-import { PressableScale, HapticSwitch } from '@/components/BrandthreadUI';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { Button } from '@/components/ui/Button';
 import { hapticLight, hapticToggle, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 const { width: W, height: H } = Dimensions.get('window');
@@ -43,6 +45,7 @@ const MAX_VIDEO_SECONDS = 15;
 type Step = 'camera' | 'create' | 'edit';
 type CaptureMode = 'story' | 'post' | 'live';
 type CapturedMedia = { kind: 'photo' | 'video'; uri: string };
+type SharePayload = { type: 'photo' | 'video' | 'text'; uri?: string; bg?: string; text?: string; textColor?: string; ovs: StoryOverlay[] };
 
 // ─── Monochrome-leaning "Create" backgrounds ───────────────────────────────
 // Pure black / off-white / charcoal / graphite / a couple of subtle
@@ -168,6 +171,64 @@ function OverlayChip({
     </Animated.View>
   );
 }
+
+// ─── Posting-progress toast ─────────────────────────────────────────────────
+// Matches Instagram's own "Your story is uploading… NN%" pill: a thumbnail,
+// the label, and a ring that fills as `percent` climbs to 100.
+const RING_SIZE = 22;
+const RING_STROKE = 2.5;
+const RING_R = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRC = 2 * Math.PI * RING_R;
+
+function PostingToast({ percent, topInset }: { percent: number; topInset: number }) {
+  return (
+    <View pointerEvents="none" style={[postingStyles.wrap, { top: topInset + SP.sm }]}>
+      <View style={postingStyles.pill}>
+        <Text style={postingStyles.label}>Your story is uploading…</Text>
+        <View style={{ width: RING_SIZE, height: RING_SIZE }}>
+          <Svg width={RING_SIZE} height={RING_SIZE}>
+            <Circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RING_R}
+              stroke="rgba(255,255,255,0.25)"
+              strokeWidth={RING_STROKE}
+              fill="none"
+            />
+            <Circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RING_R}
+              stroke="#FFFFFF"
+              strokeWidth={RING_STROKE}
+              fill="none"
+              strokeDasharray={`${RING_CIRC}, ${RING_CIRC}`}
+              strokeDashoffset={RING_CIRC * (1 - percent / 100)}
+              strokeLinecap="round"
+              transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+            />
+          </Svg>
+          <Text style={postingStyles.percent}>{percent}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const postingStyles = StyleSheet.create({
+  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 50 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+    backgroundColor: 'rgba(0,0,0,0.85)', borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.md, paddingVertical: SP.sm,
+  },
+  label: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
+  percent: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    textAlign: 'center', textAlignVertical: 'center',
+    color: ON_DARK, fontSize: 9, fontFamily: FONT.semibold,
+  },
+});
 
 // ─── Freehand draw canvas ───────────────────────────────────────────────────
 type DrawStroke = { color: string; width: number; d: string };
@@ -310,7 +371,12 @@ export default function StoryComposer() {
   const [shopModalOpen, setShopModalOpen] = useState(false);
   const [shopUrlDraft, setShopUrlDraft] = useState('');
   const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
+  const [captionDraft, setCaptionDraft] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  // Drives the "Your story is uploading… NN%" pill (see doShare) — always
+  // completes to 100%, same as Instagram's own composer.
+  const postingProgress = useRef(new Animated.Value(0)).current;
+  const [postingPercent, setPostingPercent] = useState(0);
 
   const canvasSize = { width: W, height: H };
 
@@ -438,9 +504,33 @@ export default function StoryComposer() {
   };
 
   // ── Post ──────────────────────────────────────────────────────────────────
+  // Mirrors Instagram's "Your story is uploading… NN%" pill: an animated ring
+  // that always reaches 100% (driven independently of the real network call,
+  // same as IG's own composer UI), then the "Stories archive" info alert the
+  // first time this account ever posts a story.
 
-  const doShare = useCallback(async (payload: { type: 'photo' | 'video' | 'text'; uri?: string; bg?: string; text?: string; textColor?: string; ovs: StoryOverlay[] }) => {
+  const showArchiveNoticeOnce = useCallback(async () => {
+    try {
+      const key = `bt:story:archiveNoticeShown:${user?.id ?? 'guest'}`;
+      const seen = await AsyncStorage.getItem(key);
+      if (seen) return;
+      await AsyncStorage.setItem(key, '1');
+      Alert.alert(
+        'Stories archive',
+        'Stories are saved to your archive after 24 hours. Archived stories aren’t visible unless you share them.',
+        [{ text: 'Manage settings', onPress: () => router.push('/buyer-privacy-settings' as never) }, { text: 'OK' }],
+      );
+    } catch {
+      // Non-critical: skip the one-time notice rather than block posting.
+    }
+  }, [router, user?.id]);
+
+  const doShare = useCallback(async (payload: SharePayload) => {
     setIsPosting(true);
+    setPostingPercent(0);
+    postingProgress.setValue(0);
+    const progressListener = postingProgress.addListener(({ value }) => setPostingPercent(Math.round(value)));
+    Animated.timing(postingProgress, { toValue: 96, duration: 1100, useNativeDriver: false }).start();
     try {
       const media: StoryMedia[] = [{
         id: `sm_${Date.now()}`,
@@ -473,20 +563,30 @@ export default function StoryComposer() {
       }).catch(() => {});
 
       hapticSuccessAction();
+      // Let the ring visibly complete (matches IG's own pill, which always
+      // finishes at 100% rather than snapping away mid-count) before leaving.
+      await new Promise<void>((resolve) => {
+        Animated.timing(postingProgress, { toValue: 100, duration: 180, useNativeDriver: false }).start(() => resolve());
+      });
+      postingProgress.removeListener(progressListener);
+      await showArchiveNoticeOnce();
       goBackOr(router);
     } catch {
+      postingProgress.removeListener(progressListener);
       Alert.alert("Couldn't share your story", 'Try again.');
       setIsPosting(false);
     }
-  }, [api, myName, myHandle, myInitials, params.accountType, router, closeFriendsOnly]);
+  }, [api, myName, myHandle, myInitials, params.accountType, router, closeFriendsOnly, postingProgress, showArchiveNoticeOnce]);
 
   const shareFromEdit = () => {
-    if (!media) return;
-    void doShare({ type: media.kind, uri: media.uri, ovs: overlays });
+    if (!media || isPosting) return;
+    hapticPrimaryAction();
+    void doShare({ type: media.kind, uri: media.uri, text: captionDraft.trim() || undefined, ovs: overlays });
   };
 
   const shareFromCreate = () => {
-    if (!createText.trim()) return;
+    if (!createText.trim() || isPosting) return;
+    hapticPrimaryAction();
     void doShare({ type: 'text', bg: swatches[bgIdx].colors[0], text: createText.trim(), textColor: createColor, ovs: [] });
   };
 
@@ -556,7 +656,7 @@ export default function StoryComposer() {
         <View style={[styles.camBottom, { paddingBottom: insets.bottom + SP.md }]}>
           {/* Mode carousel: STORY / POST / LIVE */}
           <View style={styles.modeRow}>
-            {(['story', 'post', 'live'] as CaptureMode[]).map((m) => {
+            {(['post', 'story', 'live'] as CaptureMode[]).map((m) => {
               const active = mode === m;
               return (
                 <TouchableOpacity
@@ -654,18 +754,14 @@ export default function StoryComposer() {
             <Feather name="arrow-left" size={22} color={swatch.id === 'off-white' ? '#000' : ON_DARK} />
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
-          <PressableScale
-            onPress={() => { hapticPrimaryAction(); shareFromCreate(); }}
+          <Button
+            label="Share"
+            size="compact"
+            onPress={shareFromCreate}
             disabled={!createText.trim() || isPosting}
-            style={{ opacity: !createText.trim() || isPosting ? 0.4 : 1 }}
-            accessibilityRole="button"
-            accessibilityLabel="Share story"
-          >
-            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.shareBtn}>
-              <Text style={[styles.shareBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{isPosting ? 'Posting…' : 'Share'}</Text>
-            </LinearGradient>
-          </PressableScale>
+          />
         </View>
+        {isPosting && <PostingToast percent={postingPercent} topInset={topInset} />}
 
         <Pressable style={styles.createCenter} onPress={() => {}} accessibilityRole="none">
           <TextInput
@@ -797,6 +893,7 @@ export default function StoryComposer() {
           </TouchableOpacity>
         </View>
       </View>
+      {isPosting && <PostingToast percent={postingPercent} topInset={topInset} />}
 
       {/* Draw sub-toolbar */}
       {drawOpen ? (
@@ -818,19 +915,32 @@ export default function StoryComposer() {
 
       {/* Bottom bar */}
       <View style={[styles.editBottom, { paddingBottom: insets.bottom + SP.md }]}>
+        <TextInput
+          style={styles.captionInput}
+          value={captionDraft}
+          onChangeText={setCaptionDraft}
+          placeholder="Add a caption…"
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          maxLength={200}
+        />
         <View style={styles.audienceRow}>
           <View style={styles.myStoryChip}>
             <View style={styles.myAvatar}><Text style={styles.myAvatarText}>{myInitials}</Text></View>
             <Text style={styles.myStoryLabel}>Your story</Text>
           </View>
-          <View style={styles.closeFriendsChip}>
-            <Feather name="star" size={13} color={closeFriendsOnly ? '#34D399' : 'rgba(255,255,255,0.6)'} />
-            <Text style={[styles.closeFriendsLabel, closeFriendsOnly && { color: '#34D399' }]}>Close Friends</Text>
-            <HapticSwitch value={closeFriendsOnly} onValueChange={setCloseFriendsOnly} trackColor={{ false: BORDER, true: '#34D399' }} thumbColor={ON_DARK} />
-          </View>
+          <TouchableOpacity
+            style={[styles.closeFriendsChip, closeFriendsOnly && { backgroundColor: ON_DARK }]}
+            onPress={() => { hapticToggle(); setCloseFriendsOnly((v) => !v); }}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle Close Friends only"
+            accessibilityState={{ selected: closeFriendsOnly }}
+          >
+            <Feather name="star" size={13} color={closeFriendsOnly ? '#000' : 'rgba(255,255,255,0.6)'} />
+            <Text style={[styles.closeFriendsLabel, closeFriendsOnly && { color: '#000' }]}>Close Friends</Text>
+          </TouchableOpacity>
           <PressableScale
             style={[styles.sendBtn, isPosting && { opacity: 0.6 }]}
-            onPress={() => { hapticPrimaryAction(); shareFromEdit(); }}
+            onPress={shareFromEdit}
             disabled={isPosting}
             accessibilityRole="button"
             accessibilityLabel={isPosting ? 'Posting story' : 'Send story'}
@@ -842,7 +952,11 @@ export default function StoryComposer() {
 
       {/* ── Text tool overlay ── */}
       <Modal visible={textToolOpen} transparent animationType="fade" onRequestClose={() => setTextToolOpen(false)}>
-        <View style={styles.textToolBackdrop}>
+        <KeyboardAvoidingView
+          style={styles.textToolBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? topInset : 0}
+        >
           <View style={[styles.textToolTop, { paddingTop: topInset + SP.sm }]}>
             <TouchableOpacity onPress={() => setTextToolOpen(false)} accessibilityLabel="Cancel" accessibilityRole="button">
               <Text style={styles.textToolCancel}>Cancel</Text>
@@ -901,7 +1015,7 @@ export default function StoryComposer() {
               ))}
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Sticker sheet ── */}
@@ -1145,8 +1259,6 @@ const styles = StyleSheet.create({
   bgSwatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
   bgSwatchActive: { borderWidth: 2.5, borderColor: ON_DARK },
 
-  shareBtn: { borderRadius: RADIUS.pill, paddingHorizontal: SP.lg, paddingVertical: SP.sm },
-  shareBtnText: { fontFamily: FONT.semibold, fontSize: FS.base },
 
   overlayChip: { position: 'absolute', top: 0, left: 0, zIndex: 15 },
   aaIcon: { color: ON_DARK, fontSize: FS.md, fontFamily: FONT.bold },
@@ -1163,6 +1275,7 @@ const styles = StyleSheet.create({
   drawUndo: { marginLeft: 'auto', width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 
   editBottom: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, paddingHorizontal: SP.md },
+  captionInput: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.medium, paddingVertical: SP.sm, marginBottom: SP.xs },
   audienceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   myStoryChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6 },
   myAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#444', alignItems: 'center', justifyContent: 'center' },
