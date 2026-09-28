@@ -545,11 +545,52 @@ export function respond({ method, path, query, role, options = {} }) {
   // Discover's "From Brands You Follow" rail: the buyer follows Ember & Ash
   // and Field Office; each seller's public storefront lists their catalogue.
   if (p === '/social/following') {
-    return ['ember', 'field'].map((key) => ({
-      userId: BRANDS[key].clerkId, name: BRANDS[key].name, username: BRANDS[key].handle,
-      handle: BRANDS[key].handle, initials: BRANDS[key].name.slice(0, 2).toUpperCase(),
-      color: '#7A7A7A', followedAt: iso(90 * DAY),
-    }));
+    // Followers/Following lists PR: a mix of brands (seller accountType) and
+    // buyers, with distinct followedAt timestamps so the "Sort by" bottom
+    // sheet (Default / latest / earliest) visibly reorders the list, plus a
+    // couple of "Follows me" mutuals for the tag.
+    const rows = [
+      { key: 'ember', ago: 90 * DAY, followsMe: false, accountType: 'seller' },
+      { key: 'field', ago: 45 * DAY, followsMe: true, accountType: 'seller' },
+      { userId: 'user_priya', name: 'Priya Nandan', username: 'priyan', handle: '@priyan', initials: 'PN', color: '#B45309', ago: 20 * DAY, followsMe: true, accountType: 'buyer' },
+      { userId: 'user_theo', name: 'Theo Marsh', username: 'theomarsh', handle: '@theomarsh', initials: 'TM', color: '#0F766E', ago: 2 * DAY, followsMe: false, accountType: 'buyer' },
+    ];
+    const list = rows.map((r) => {
+      const brand = r.key ? BRANDS[r.key] : null;
+      return {
+        userId: brand ? brand.clerkId : r.userId,
+        name: brand ? brand.name : r.name,
+        username: brand ? brand.handle : r.username,
+        handle: brand ? brand.handle : r.handle,
+        initials: brand ? brand.name.slice(0, 2).toUpperCase() : r.initials,
+        color: r.color ?? '#7A7A7A',
+        accountType: r.accountType,
+        followedAt: iso(r.ago),
+        isFollowing: true,
+        followsMe: r.followsMe,
+      };
+    });
+    const sort = query.get('sort');
+    if (sort === 'earliest') list.sort((a, b) => new Date(a.followedAt) - new Date(b.followedAt));
+    else list.sort((a, b) => new Date(b.followedAt) - new Date(a.followedAt));
+    return list;
+  }
+  // Followers list PR: two buyers who follow the demo account — the
+  // viewer's own Followers list gets a "Remove" button per row (see
+  // components/social/RemoveFollowerSheet.tsx).
+  if (p === '/social/followers') {
+    return [
+      {
+        userId: 'demo-follower-1', name: 'Priya Shah', username: 'priyashah', handle: '@priyashah',
+        initials: 'PS', color: '#8B5CF6', accountType: 'buyer', followedAt: iso(6 * HOUR),
+        isFollowingBack: false, isFollowing: false,
+      },
+      {
+        userId: 'demo-follower-2', name: 'Marcus Webb', username: 'marcusw', handle: '@marcusw',
+        initials: 'MW', color: '#EC4899', accountType: 'buyer', followedAt: iso(1 * DAY + 2 * HOUR),
+        isFollowingBack: true, isFollowing: true,
+      },
+    ];
   }
   if ((match = p.match(/^\/public\/sellers\/([^/]+)$/))) {
     const brandKey = Object.keys(BRANDS).find((key) => BRANDS[key].clerkId === decodeURIComponent(match[1]));

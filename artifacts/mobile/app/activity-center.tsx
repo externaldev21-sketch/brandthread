@@ -29,7 +29,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   SectionList,
@@ -42,8 +41,6 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
@@ -51,10 +48,12 @@ import { FONT, FS, GRAD_DARK_FADE, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/components/layout';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
-import { PressableScale, SheetHandle } from '@/components/BrandthreadUI';
+import { PressableScale } from '@/components/BrandthreadUI';
 import { ThemedRefreshControl } from '@/components/ui';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import SwipeableActions from '@/components/SwipeableActions';
+import { RemoveFollowerSheet } from '@/components/social/RemoveFollowerSheet';
+import { CenteredToast } from '@/components/social/CenteredToast';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
@@ -1081,9 +1080,14 @@ export default function ActivityCenterScreen() {
       )}
 
       <RemoveFollowerSheet
-        row={removeFollowerTarget}
+        person={removeFollowerTarget ? {
+          id: removeFollowerTarget.actors[0]?.id ?? '',
+          name: removeFollowerTarget.actors[0]?.name ?? '',
+          initials: removeFollowerTarget.actors[0]?.initials ?? '?',
+          avatarUrl: removeFollowerTarget.actors[0]?.avatarUrl || previewActorAvatarUri(removeFollowerTarget.actors[0]?.id ?? '', removeFollowerTarget.actors[0]?.name ?? ''),
+          color: removeFollowerTarget.actors[0]?.color,
+        } : null}
         busy={removingFollower}
-        styles={styles}
         onCancel={() => setRemoveFollowerTarget(null)}
         onConfirm={() => { void handleConfirmRemoveFollower(); }}
       />
@@ -1091,133 +1095,6 @@ export default function ActivityCenterScreen() {
     </View>
   );
 }
-
-// ─── Remove-follower confirm sheet ─────────────────────────────────────────
-// Mobbin: "Instagram iOS Removing a follower" flow, screens 3/4 —
-// https://mobbin.com/screens/11397cf3-a65b-41d1-9e13-9518ed5cc830
-// Avatar, "Remove follower?", "We won't tell {name} they were removed from
-// your followers.", a destructive "Remove" and a "Cancel" — copy kept as
-// close to Instagram's own wording as the app's terms allow.
-
-function RemoveFollowerSheet({ row, busy, styles, onCancel, onConfirm }: {
-  row: ActivityRow | null;
-  busy: boolean;
-  styles: Styles;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
-  const actor = row?.actors[0];
-  return (
-    <Modal visible={!!row} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={sheetStyles.backdrop} onPress={busy ? undefined : onCancel} accessibilityLabel="Close">
-        <Pressable
-          style={[sheetStyles.sheet, { backgroundColor: theme.card, paddingBottom: insets.bottom + SP.lg }]}
-          onPress={() => {}}
-        >
-          <SheetHandle />
-          {actor ? (
-            <View style={sheetStyles.content}>
-              <Avatar actor={actor} size={64} styles={styles} />
-              <Text style={[sheetStyles.title, { color: theme.text }]}>Remove follower?</Text>
-              <Text style={[sheetStyles.body, { color: theme.muted }]}>
-                We won&apos;t tell {actor.name} they were removed from your followers.
-              </Text>
-            </View>
-          ) : null}
-          {/* Text-row buttons (not filled pills) — matches the native
-              iOS action-sheet structure Instagram's own confirm sheet uses:
-              a hairline divider above each full-width row. */}
-          <PressableScale
-            style={sheetStyles.removeBtn}
-            onPress={onConfirm}
-            disabled={busy}
-            accessibilityRole="button"
-            accessibilityLabel="Remove follower"
-          >
-            {busy ? <ActivityIndicator size="small" color={theme.error} /> : (
-              <Text style={[sheetStyles.removeText, { color: theme.error }]}>Remove</Text>
-            )}
-          </PressableScale>
-          <PressableScale
-            style={sheetStyles.cancelBtn}
-            onPress={onCancel}
-            disabled={busy}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel"
-          >
-            <Text style={[sheetStyles.cancelText, { color: theme.text }]}>Cancel</Text>
-          </PressableScale>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-// ─── Centered "Removed" toast ───────────────────────────────────────────────
-// Small, brief, centered — not the app's usual bottom-anchored wide Snackbar.
-// Mobbin: "Instagram iOS Removing a follower" flow, screen 5 —
-// https://mobbin.com/screens/674b1826-5513-4f83-ad23-89b4454e2129
-
-function CenteredToast({ message }: { message: string | null }) {
-  const { theme } = useAppTheme();
-  if (!message) return null;
-  return (
-    <Animated.View
-      entering={FadeIn.duration(150)}
-      exiting={FadeOut.duration(150)}
-      pointerEvents="none"
-      style={sheetStyles.toastWrap}
-    >
-      <View style={[sheetStyles.toastPill, { backgroundColor: theme.cardElevated }]}>
-        <Text style={[sheetStyles.toastText, { color: theme.text }]}>{message}</Text>
-      </View>
-    </Animated.View>
-  );
-}
-
-const sheetStyles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  sheet: {
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    paddingTop: SP.sm,
-    paddingHorizontal: SP.lg,
-  },
-  content: { alignItems: 'center', paddingVertical: SP.lg, gap: SP.sm },
-  title: { fontFamily: FONT.bold, fontSize: FS.lg },
-  body: { fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingHorizontal: SP.lg, lineHeight: 20 },
-  removeBtn: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.2)',
-  },
-  removeText: { fontFamily: FONT.semibold, fontSize: FS.md },
-  cancelBtn: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.2)',
-  },
-  cancelText: { fontFamily: FONT.semibold, fontSize: FS.md },
-  toastWrap: {
-    position: 'absolute',
-    top: '42%',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  toastPill: {
-    paddingHorizontal: SP.lg,
-    paddingVertical: SP.sm + 2,
-    borderRadius: RADIUS.pill,
-  },
-  toastText: { fontFamily: FONT.semibold, fontSize: FS.base },
-});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
