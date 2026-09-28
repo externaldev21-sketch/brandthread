@@ -147,7 +147,7 @@ vi.mock('@/lib/theme', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/theme')>();
   return {
     ...actual,
-    FONT: { regular: 'System', semibold: 'System', bold: 'System', medium: 'System' },
+    FONT: { regular: 'Test-Regular', semibold: 'Test-Semibold', bold: 'Test-Bold', medium: 'Test-Medium' },
     FS: { xs: 12, sm: 14, base: 16, md: 18 },
     SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
     RADIUS: { xs: 6, sm: 8, md: 14, lg: 16, xl: 24, pill: 999 },
@@ -192,6 +192,12 @@ function conversation(id: string, unreadCount: number): Conversation {
 
 function flushPromises() {
   return Promise.resolve().then(() => Promise.resolve()).then(() => Promise.resolve());
+}
+
+function fontFamilyOf(node: ReturnType<ReactTestRenderer['root']['findAllByType']>[number]): string[] {
+  const style = node.props.style;
+  const flat = Array.isArray(style) ? style : [style];
+  return flat.filter(Boolean).map((entry: Record<string, unknown>) => entry.fontFamily).filter(Boolean) as string[];
 }
 
 function textContent(renderer: ReactTestRenderer): string {
@@ -245,7 +251,8 @@ describe('seller inbox unread state', () => {
     renderer = await renderScreen();
 
     expect(textContent(renderer)).toContain('3 unread');
-    expect(textContent(renderer)).toContain('2');
+    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }))
+      .toHaveLength(1);
 
     const row = renderer.root.findByProps({ testID: 'seller-conversation-unread-thread' });
     await act(async () => {
@@ -254,9 +261,35 @@ describe('seller inbox unread state', () => {
     });
 
     expect(textContent(renderer)).not.toContain('3 unread');
-    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }))
+    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }))
       .toHaveLength(0);
     expect(routerMock.push).toHaveBeenCalledWith('/seller-conversation?id=unread-thread');
+  });
+
+  it('renders unread rows bold with a dot and read rows regular with no dot (matches buyer inbox)', async () => {
+    apiMock.conversations.list.mockResolvedValue([
+      conversation('unread-thread', 2),
+      conversation('read-thread', 0),
+    ]);
+    renderer = await renderScreen();
+
+    const unreadRow = renderer.root.findByProps({ testID: 'seller-conversation-unread-thread' });
+    const readRow = renderer.root.findByProps({ testID: 'seller-conversation-read-thread' });
+
+    const unreadName = unreadRow.findAllByType('Text' as never).find((n) => n.props.children === 'Buyer');
+    const readName = readRow.findAllByType('Text' as never).find((n) => n.props.children === 'Buyer');
+    expect(unreadName).toBeTruthy();
+    expect(readName).toBeTruthy();
+    expect(fontFamilyOf(unreadName!)).toContain('Test-Bold');
+    expect(fontFamilyOf(readName!)).toContain('Test-Regular');
+
+    const unreadPreview = unreadRow.findAllByType('Text' as never).find((n) => n.props.children === 'Can you help with sizing?');
+    const readPreview = readRow.findAllByType('Text' as never).find((n) => n.props.children === 'Can you help with sizing?');
+    expect(fontFamilyOf(unreadPreview!)).toContain('Test-Bold');
+    expect(fontFamilyOf(readPreview!)).not.toContain('Test-Bold');
+
+    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-read-thread' }, { deep: false })).toHaveLength(0);
   });
 
   it('does not restore a stale badge when a later inbox load is delayed or fails', async () => {
@@ -318,7 +351,7 @@ describe('seller inbox unread state', () => {
     await refocusScreen();
 
     expect(textContent(renderer)).toContain('3 unread');
-    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }).length)
+    expect(renderer.root.findAllByProps({ testID: 'seller-unread-badge-unread-thread' }, { deep: false }).length)
       .toBeGreaterThan(0);
   });
 });

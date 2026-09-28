@@ -86,10 +86,16 @@ router.get("/", async (req, res) => {
       cancellationReason: orders.cancellationReason,
       createdAt: orders.createdAt,
       updatedAt: orders.updatedAt,
+      // Set by the checkout webhook when Stripe confirms payment. A paid
+      // checkout order is stored as status "pending" (= new, not yet
+      // processed), so the app needs this to show it as Paid — not Unpaid.
+      paidAt: orders.paidAt,
       // Prefer the explicit customers record; fall back to the buyer's user row
-      // (covers Stripe-originated orders where customerId is null but buyerId is set)
-      customerName: sql<string>`COALESCE(${customers.name}, NULLIF(${users.displayName}, ''), ${users.name})`,
-      customerEmail: sql<string>`COALESCE(${customers.email}, ${users.email})`,
+      // (covers Stripe-originated orders where customerId is null but buyerId is set),
+      // then — for guest checkout, which has neither — the shipping name and
+      // the checkout email the guest paid with.
+      customerName: sql<string>`COALESCE(${customers.name}, NULLIF(${users.displayName}, ''), ${users.name}, NULLIF(${orders.shippingAddress}->>'name', ''))`,
+      customerEmail: sql<string>`COALESCE(${customers.email}, ${users.email}, ${orders.guestEmail})`,
       dropName: drops.name,
       dropType: drops.type,
       itemCount: sql<number>`count(${orderItems.id})::int`,

@@ -69,6 +69,29 @@ export async function getActivity(params: {
   return Array.isArray(rows) ? rows : [];
 }
 
+/** One person behind a merged Activity row, with the viewer's follow state. */
+export interface GroupedActivityActor {
+  id: string;
+  name: string;
+  handle?: string;
+  initials: string;
+  color?: string;
+  avatarUrl?: string;
+  isFollowing: boolean;
+  createdAt: string;
+}
+
+/**
+ * The people behind a merged row ("Jay and 12 others…"), newest first, from
+ * the row's own feed ids — GET /api/buyer/notifications/actors. Throws on
+ * failure so the people list can show its error state.
+ */
+export async function getGroupedActivityActors(ids: readonly string[]): Promise<GroupedActivityActor[]> {
+  const query = new URLSearchParams({ ids: ids.join(',') });
+  const result = await serviceRequest<{ actors?: GroupedActivityActor[] }>(`${BASE}/actors?${query.toString()}`);
+  return Array.isArray(result?.actors) ? result.actors : [];
+}
+
 /** Unread, unmuted activity count for the bell badge. Never throws. */
 export async function getUnreadActivityCount(): Promise<number> {
   try {

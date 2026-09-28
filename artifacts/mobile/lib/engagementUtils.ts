@@ -26,6 +26,34 @@ export function formatCount(n: number): string {
   return `${formatted}${suffix}`;
 }
 
+/**
+ * Diffs a count's formatted display strings for TickingCount's odometer
+ * roll (components/ui/TickingCount.tsx) — split out here, alongside
+ * formatCount, so it's unit-testable without a react-native import.
+ *
+ * - 'none': the formatted string didn't change — no animation.
+ * - 'chars': same length before/after — a per-character diff, so only the
+ *   characters that actually differ roll (the ordinary "+1/-1 on a
+ *   small-to-medium number" case — "1,203" -> "1,204", "12.3K" -> "12.4K").
+ * - 'whole': length changed (a threshold crossed, e.g. "999" -> "1,000",
+ *   or the blank/non-blank edge at 0) — the whole label rolls as one unit,
+ *   since there's no shared column to diff per character against.
+ */
+export type CountDiff =
+  | { kind: 'none'; text: string }
+  | { kind: 'chars'; text: string; prevText: string; direction: 1 | -1; diffs: boolean[] }
+  | { kind: 'whole'; text: string; prevText: string; direction: 1 | -1 };
+
+export function diffCount(value: number, prevValue: number): CountDiff {
+  const text = formatCount(value);
+  const prevText = formatCount(prevValue);
+  if (text === prevText) return { kind: 'none', text };
+  const direction: 1 | -1 = value >= prevValue ? 1 : -1;
+  if (text.length !== prevText.length) return { kind: 'whole', text, prevText, direction };
+  const diffs = text.split('').map((c, i) => c !== prevText[i]);
+  return { kind: 'chars', text, prevText, direction, diffs };
+}
+
 /** UUID v4 detector used to guard API calls against non-UUID local IDs. */
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function isUUID(id: string): boolean {

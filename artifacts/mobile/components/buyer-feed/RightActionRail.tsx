@@ -198,6 +198,7 @@ export function RightActionRail({
           solidIcon="heart"
           iconSize={26}
           count={formatCount(engagement?.likes ?? 0)}
+          value={engagement?.likes ?? 0}
           active={engagement?.liked ?? false}
           activeColor="#EF4444"
           inactiveColor={ON_DARK}
@@ -246,6 +247,7 @@ export function RightActionRail({
         solidIcon="bookmark"
         iconSize={26}
         count={formatCount(engagement?.saves ?? saves)}
+        value={engagement?.saves ?? saves}
         active={engagement?.saved ?? false}
         activeColor={GOLD}
         inactiveColor={ON_DARK}

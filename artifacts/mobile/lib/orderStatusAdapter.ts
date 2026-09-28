@@ -39,6 +39,15 @@ export const DB_PAYMENT_STATUS_MAP: Record<string, DbPaymentStatus> = {
   disputed:       'partially_refunded',
 };
 
-export function dbStatusToPaymentStatus(dbStatus: string): DbPaymentStatus {
+/**
+ * `paidAt` is the order's own payment timestamp (set by the checkout webhook
+ * once Stripe confirms payment). A buyer's paid checkout order is stored as
+ * status "pending" — meaning new / not yet processed, not "unpaid" — so when
+ * the row says it was paid, the seller must see Paid, not a Pending payment
+ * pill or the order under the Unpaid filter. Rows without `paidAt` (older API
+ * responses, seller-created orders) keep the status-only mapping.
+ */
+export function dbStatusToPaymentStatus(dbStatus: string, paidAt?: string | Date | null): DbPaymentStatus {
+  if (dbStatus === 'pending' && paidAt) return 'paid';
   return DB_PAYMENT_STATUS_MAP[dbStatus] ?? 'pending';
 }

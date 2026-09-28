@@ -80,7 +80,7 @@ export function adaptApiOrder(raw: any): Order {
 
   // Derive payment status from DB order status (shared with app/(tabs)/orders.tsx)
   type PaymentStatus = DbPaymentStatus;
-  const uiPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(raw.status);
+  const uiPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(raw.status, raw.paidAt);
   const isRefundPending = raw.status === 'refund_pending';
 
   // Parse shipping address (stored as JSON in DB)

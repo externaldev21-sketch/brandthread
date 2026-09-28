@@ -200,7 +200,7 @@ const FULFILLMENT_MAP: Partial<Record<OrderStatus, FulfillmentStatus>> = {
 
 export function apiRowToOrder(row: any): OrderListOrder {
   const ordStatus: OrderStatus = dbStatusToOrderStatus(row.status as string);
-  const rowPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(row.status as string) as PaymentStatus;
+  const rowPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(row.status as string, row.paidAt) as PaymentStatus;
   const fStatus: FulfillmentStatus = FULFILLMENT_MAP[ordStatus] ?? 'unfulfilled';
   const initials = ((row.customerName as string | undefined) ?? 'C')
     .split(/\s+/).map((w: string) => w[0] ?? '').slice(0, 2).join('').toUpperCase();

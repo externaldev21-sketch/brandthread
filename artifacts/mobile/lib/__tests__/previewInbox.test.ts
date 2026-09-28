@@ -81,9 +81,14 @@ describe('previewInboxData — seed matches the real Conversation/Message shapes
     expect(PREVIEW_CONVERSATION_SEEDS.some(s => s.minutesAgo === 0)).toBe(true);
   });
 
-  it('has exactly one seed flagged for the simulated typing indicator', () => {
+  it('flags exactly the Brandthread Agent thread for the simulated typing indicator, and no ordinary thread', () => {
+    // The real backend only ever sets `agentTyping` for the Agent's
+    // conversation (see its comment on Conversation in socialTypes.ts) — the
+    // preview simulation must mirror that exactly, not fake it on an
+    // ordinary buyer<->seller/buyer thread that has no real typing signal.
+    expect(BRANDTHREAD_AGENT_SEED.simulateTyping).toBe(true);
     const typingSeeds = PREVIEW_CONVERSATION_SEEDS.filter(s => s.simulateTyping);
-    expect(typingSeeds).toHaveLength(1);
+    expect(typingSeeds).toHaveLength(0);
   });
 
   it('every message in every thread has the fields a real Message needs', () => {
