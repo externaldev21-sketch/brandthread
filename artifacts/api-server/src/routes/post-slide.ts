@@ -42,6 +42,19 @@ const SLIDE_W = 720;
 const SLIDE_H = 1280;
 
 const OBJECT_PATH_RE = /^\/objects\/uploads\/[A-Za-z0-9._/-]+$/;
+// Mirrors compose-video's per-clip filter set exactly (post-video.ts) so a
+// slideshow's "Effects" tool applies the same real colour transform photos
+// get as videos, instead of being a UI-only toggle.
+const FILTERS = new Set(["none", "warm", "cool", "mono"]);
+
+/** Same eq/colorbalance/hue chain compose-video applies per clip (post-video.ts),
+ *  expressed as a standalone ffmpeg -vf fragment (leading comma, empty for "none"). */
+function filterFragment(filter: string | undefined): string {
+  if (filter === "warm") return ",eq=saturation=1.12:contrast=1.04:brightness=0.02";
+  if (filter === "cool") return ",colorbalance=bs=.08";
+  if (filter === "mono") return ",hue=s=0";
+  return "";
+}
 
 const FALLBACK_FONT      = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 const FALLBACK_FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
@@ -50,6 +63,7 @@ const FALLBACK_FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
 interface SlideInput {
   objectPath: string;
   overlays?: unknown;
+  filter?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -192,7 +206,7 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
   }
 
   // Validate each slide entry
-  const slideInputs: Array<{ objectPath: string; overlays: ValidatedOverlay[] }> = [];
+  const slideInputs: Array<{ objectPath: string; overlays: ValidatedOverlay[]; filter: string }> = [];
   for (let si = 0; si < rawSlides.length; si++) {
     const slide = rawSlides[si] as SlideInput;
     if (!slide || typeof slide !== "object") {
@@ -201,11 +215,14 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
     if (!validObjectPath(slide.objectPath)) {
       return res.status(400).json({ error: `Slide ${si} has an invalid objectPath` });
     }
+    if (slide.filter !== undefined && !FILTERS.has(slide.filter)) {
+      return res.status(400).json({ error: `Slide ${si} has an invalid filter` });
+    }
     const ovResult = validateOverlaysArray(slide.overlays, `slide[${si}]`);
     if (!ovResult.ok) {
       return res.status(400).json({ error: ovResult.error });
     }
-    slideInputs.push({ objectPath: slide.objectPath, overlays: ovResult.overlays });
+    slideInputs.push({ objectPath: slide.objectPath, overlays: ovResult.overlays, filter: slide.filter ?? "none" });
   }
 
   const dir = await fs.mkdtemp(join(tmpdir(), "bt-slideshow-"));
@@ -251,15 +268,16 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
 
     // Phase 2: render each slide with FFmpeg
     for (let si = 0; si < slideInputs.length; si++) {
-      const { overlays } = slideInputs[si];
+      const { overlays, filter } = slideInputs[si];
+      const colorFilter = filterFragment(filter);
       const inputPath  = inputPaths[si];
       const outputPath = join(dir, `rendered_${si}.jpg`);
 
       if (overlays.length === 0) {
-        // No overlays — just resize/pad to portrait canvas
+        // No overlays — resize/pad to portrait canvas, plus the chosen colour filter
         await exec("ffmpeg", [
           "-y", "-i", inputPath,
-          "-vf", `scale=${SLIDE_W}:${SLIDE_H}:force_original_aspect_ratio=decrease,pad=${SLIDE_W}:${SLIDE_H}:(ow-iw)/2:(oh-ih)/2,setsar=1`,
+          "-vf", `scale=${SLIDE_W}:${SLIDE_H}:force_original_aspect_ratio=decrease,pad=${SLIDE_W}:${SLIDE_H}:(ow-iw)/2:(oh-ih)/2,setsar=1${colorFilter}`,
           "-frames:v", "1", "-q:v", "3", outputPath,
         ], { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
       } else {
@@ -274,7 +292,8 @@ router.post("/compose-slideshow", requireAuth, async (req, res) => {
           drawtextParts.push(`drawtext=${buildImageDrawtext(ov, textFile, fontPath)}`);
         }
         const overlayFilter = drawtextParts.join(",");
-        const baseFilter = `scale=${SLIDE_W}:${SLIDE_H}:force_original_aspect_ratio=decrease,pad=${SLIDE_W}:${SLIDE_H}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+        // Colour filter runs before drawtext so overlay text itself isn't tinted.
+        const baseFilter = `scale=${SLIDE_W}:${SLIDE_H}:force_original_aspect_ratio=decrease,pad=${SLIDE_W}:${SLIDE_H}:(ow-iw)/2:(oh-ih)/2,setsar=1${colorFilter}`;
 
         await exec("ffmpeg", [
           "-y", "-i", inputPath,

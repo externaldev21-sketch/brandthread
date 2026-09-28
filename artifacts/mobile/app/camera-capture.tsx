@@ -15,6 +15,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
+import { Glass } from '@/components/ui/Glass';
 import {
   clampVideoZoom,
   effectiveClipDuration,
@@ -40,8 +41,6 @@ import {
 
 const FG      = ON_DARK;           // '#FFFFFF'
 const CHROME  = '#000000';         // true-black camera chrome
-const GLASS   = 'rgba(0,0,0,0.62)';
-const GLASS_LT = 'rgba(0,0,0,0.44)';
 const ERROR   = RED;               // '#F87171'
 
 type DurationMode = 15 | 30 | 60 | 600;
@@ -246,13 +245,18 @@ export default function CameraCapture() {
     try {
       const result = await cameraRef.current.takePictureAsync({ quality: 0.9 });
       if (result?.uri) {
-        (global as any).__cameraCaptureResult = { uri: result.uri, type: 'photo' };
+        // The chosen filter is applied for real later — compose-slideshow
+        // (server-side ffmpeg) renders it into the final slide, same as a
+        // video clip's filter is applied by compose-video. Carrying it here
+        // means a camera photo doesn't silently lose the filter the user
+        // picked, matching what a library-picked photo now supports too.
+        (global as any).__cameraCaptureResult = { uri: result.uri, type: 'photo', filter };
         goBackOr(router);
       }
     } catch {
       setCaptureError('Could not capture that photo. Please try again.');
     }
-  }, []);
+  }, [filter]);
 
   const cycleSpeed = useCallback(() => {
     const idx = SPEEDS.indexOf(speed);
@@ -364,17 +368,22 @@ export default function CameraCapture() {
             }}
             accessibilityLabel="Close camera"
           >
+            <Glass variant="regular" tint="dark" radius={20} style={StyleSheet.absoluteFill} />
             <Feather name="x" size={20} color={FG} />
           </TouchableOpacity>
 
           {/* Flash · speed · timer mini row */}
           <View style={s.miniRow}>
+            <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
             <TouchableOpacity
               style={s.miniRowItem}
               onPress={() => setFlash((v) => v === 'off' ? 'on' : 'off')}
               accessibilityLabel={flash === 'off' ? 'Turn flash on' : 'Turn flash off'}
             >
-              <Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={16} color={flash === 'on' ? '#FBBF24' : FG} />
+              {/* Monochrome: the on-state is a white icon on a filled glass
+                  circle, never a color (was amber '#FBBF24'). */}
+              {flash === 'on' && <Glass variant="pressed" tint="dark" radius={14} style={s.miniRowItemGlass} />}
+              <Feather name={flash === 'off' ? 'zap-off' : 'zap'} size={16} color={FG} />
             </TouchableOpacity>
 
             {captureMode === 'video' ? (
@@ -388,7 +397,8 @@ export default function CameraCapture() {
               onPress={() => setActivePanel((v) => v === 'length' ? null : 'length')}
               accessibilityLabel="Open length and timer options"
             >
-              <Feather name="clock" size={16} color={activePanel === 'length' ? ACCENT : FG} />
+              {activePanel === 'length' && <Glass variant="pressed" tint="dark" radius={14} style={s.miniRowItemGlass} />}
+              <Feather name="clock" size={16} color={FG} />
             </TouchableOpacity>
           </View>
 
@@ -398,12 +408,14 @@ export default function CameraCapture() {
             onPress={() => void Haptics.selectionAsync()}
             accessibilityLabel="Camera settings"
           >
+            <Glass variant="regular" tint="dark" radius={20} style={StyleSheet.absoluteFill} />
             <Feather name="settings" size={19} color={FG} />
           </TouchableOpacity>
         </View>
 
         {/* Elapsed / remaining readout */}
-        <View style={[s.timerPill, isRecording && s.timerPillActive]}>
+        <View style={s.timerPill}>
+          <Glass variant={isRecording ? 'pressed' : 'regular'} tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
           {isRecording ? <View style={s.timerDot} /> : null}
           <Text style={s.timerText}>{formatTime(displayedDuration)}</Text>
           {showRemaining ? <Text style={s.timerRemaining}> / {formatTime(durationMode)}</Text> : null}
@@ -415,6 +427,7 @@ export default function CameraCapture() {
           onPress={() => void Haptics.selectionAsync()}
           accessibilityLabel="Add audio"
         >
+          <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
           <Feather name="music" size={13} color={FG} />
           <Text style={s.addAudioText}>Add audio</Text>
         </TouchableOpacity>
@@ -422,6 +435,7 @@ export default function CameraCapture() {
         {/* Zoom readout — only while pinched away from 0 */}
         {zoom > 0.01 ? (
           <View style={s.zoomBadge}>
+            <Glass variant="clear" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
             <Text style={s.zoomBadgeText}>{(zoom * 9 + 1).toFixed(1)}x</Text>
           </View>
         ) : null}
@@ -434,6 +448,7 @@ export default function CameraCapture() {
           onPress={() => setRailExpanded((v) => !v)}
           accessibilityLabel={railExpanded ? 'Collapse tools' : 'Expand tools'}
         >
+          <Glass variant="regular" tint="dark" radius={14} style={StyleSheet.absoluteFill} />
           <Feather name={railExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={FG} />
         </TouchableOpacity>
 
@@ -488,6 +503,7 @@ export default function CameraCapture() {
       {/* ── Effects / Length flyout panel (from left rail) ────────────────── */}
       {activePanel === 'effects' && !isRecording ? (
         <View style={[s.panel, { top: insets.top + 150 }]}>
+          <Glass variant="regular" tint="dark" radius={RADIUS.md} style={StyleSheet.absoluteFill} />
           <View style={s.filterStrip}>
             {FILTERS.map((item) => (
               <TouchableOpacity
@@ -517,6 +533,7 @@ export default function CameraCapture() {
 
       {activePanel === 'length' && !isRecording ? (
         <View style={[s.panel, { top: insets.top + 150 }]}>
+          <Glass variant="regular" tint="dark" radius={RADIUS.md} style={StyleSheet.absoluteFill} />
           {clips.length === 0 ? (
             <View style={s.durationRow}>
               {([15, 30, 60, 600] as DurationMode[]).map((value) => (
@@ -585,6 +602,7 @@ export default function CameraCapture() {
             }}
             accessibilityLabel="Tag product listing"
           >
+            <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
             <Feather name="tag" size={14} color={ACCENT} />
             <Text style={s.tagProductText}>Tag Product Listing</Text>
             <Feather name="chevron-right" size={14} color={ACCENT} />
@@ -599,6 +617,7 @@ export default function CameraCapture() {
             onPress={() => setCaptureMode((v) => v === 'video' ? 'picture' : 'video')}
             accessibilityLabel={captureMode === 'video' ? 'Switch to photo' : 'Switch to video'}
           >
+            <Glass variant="regular" tint="dark" radius={RADIUS.pill} style={StyleSheet.absoluteFill} />
             <Feather
               name={captureMode === 'video' ? 'camera' : 'video'}
               size={14}
@@ -617,6 +636,7 @@ export default function CameraCapture() {
             onPress={() => goBackOr(router)}
             accessibilityLabel="Back to gallery"
           >
+            <Glass variant="regular" tint="dark" radius={RADIUS.sm} style={StyleSheet.absoluteFill} />
             <Feather name="image" size={18} color={FG} />
           </TouchableOpacity>
 
@@ -645,6 +665,7 @@ export default function CameraCapture() {
             onPress={() => setFacing((v) => v === 'back' ? 'front' : 'back')}
             accessibilityLabel="Flip camera"
           >
+            <Glass variant="regular" tint="dark" radius={22} style={StyleSheet.absoluteFill} />
             <Feather name="refresh-cw" size={22} color={isRecording ? MUTED : FG} />
           </TouchableOpacity>
         </View>
@@ -699,37 +720,36 @@ const s = StyleSheet.create({
     justifyContent: 'space-between', alignItems: 'center',
   },
   iconBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: GLASS,
+    width: 40, height: 40, borderRadius: 20, overflow: 'hidden',
     justifyContent: 'center', alignItems: 'center',
   },
   miniRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4,
-    backgroundColor: GLASS_LT,
-    borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.pill, overflow: 'hidden',
     paddingHorizontal: SP.sm + 2, paddingVertical: 6,
   },
   miniRowItem: { alignItems: 'center', justifyContent: 'center', minWidth: 20 },
+  // The small glass circle behind an active flash/length toggle — sized by
+  // negative margin around the icon rather than a fixed width/height, since
+  // miniRowItem itself has no fixed circular size.
+  miniRowItemGlass: { position: 'absolute', top: -6, bottom: -6, left: -6, right: -6 },
   miniRowSpeedText: { color: FG, fontSize: FS.xs, fontFamily: FONT.bold },
   timerPill: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: GLASS,
-    borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.pill, overflow: 'hidden',
     paddingHorizontal: SP.sm + 4, paddingVertical: 6,
   },
-  timerPillActive: { backgroundColor: 'rgba(0,0,0,0.78)' },
   timerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: ERROR, marginRight: 5 },
   timerText: { color: FG, fontSize: FS.sm, fontFamily: FONT.bold },
   timerRemaining: { color: MUTED, fontSize: FS.xs },
   addAudioPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: GLASS,
-    borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.pill, overflow: 'hidden',
     paddingHorizontal: SP.md, paddingVertical: 7,
   },
   addAudioText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
   zoomBadge: {
-    backgroundColor: GLASS_LT, borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.pill, overflow: 'hidden',
     paddingHorizontal: SP.sm, paddingVertical: 3,
   },
   zoomBadgeText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
@@ -740,8 +760,7 @@ const s = StyleSheet.create({
     alignItems: 'center', gap: SP.md,
   },
   railChevron: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: GLASS_LT,
+    width: 28, height: 28, borderRadius: 14, overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',
     marginBottom: SP.xs,
   },
@@ -752,8 +771,7 @@ const s = StyleSheet.create({
   // ── Effects / Length flyout panel ──
   panel: {
     position: 'absolute', left: SP.md + 56, right: SP.md, zIndex: 19,
-    backgroundColor: GLASS,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.md, overflow: 'hidden',
     padding: SP.sm,
   },
   panelHint: { color: MUTED, fontSize: FS.xs, textAlign: 'center' },
@@ -786,8 +804,7 @@ const s = StyleSheet.create({
   durationRow: { flexDirection: 'row', gap: 6 },
   durationBtn: {
     paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: RADIUS.pill,
-    backgroundColor: GLASS,
+    borderRadius: RADIUS.pill, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
   durationBtnActive: { backgroundColor: ACCENT, borderColor: ACCENT },
@@ -801,8 +818,7 @@ const s = StyleSheet.create({
   },
   filterChip: {
     paddingHorizontal: 11, paddingVertical: 6,
-    borderRadius: RADIUS.pill,
-    backgroundColor: GLASS_LT,
+    borderRadius: RADIUS.pill, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
   filterChipActive: { borderColor: ACCENT, backgroundColor: `${ACCENT}22` },
@@ -827,8 +843,7 @@ const s = StyleSheet.create({
   captureModeToggle: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: SP.sm + 2, paddingVertical: 6,
-    borderRadius: RADIUS.pill,
-    backgroundColor: GLASS_LT,
+    borderRadius: RADIUS.pill, overflow: 'hidden',
   },
   captureModeToggleDisabled: { opacity: 0.4 },
   captureModeToggleText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
@@ -839,14 +854,12 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'space-around',
   },
   galleryThumb: {
-    width: 44, height: 44, borderRadius: RADIUS.sm,
-    backgroundColor: GLASS_LT,
+    width: 44, height: 44, borderRadius: RADIUS.sm, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center', justifyContent: 'center',
   },
   flipBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: GLASS_LT,
+    width: 44, height: 44, borderRadius: 22, overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -870,8 +883,7 @@ const s = StyleSheet.create({
   tagProductBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
     paddingHorizontal: SP.md, paddingVertical: SP.xs + 2,
-    borderRadius: RADIUS.pill,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    borderRadius: RADIUS.pill, overflow: 'hidden',
     borderWidth: 1, borderColor: `${ACCENT}55`,
   },
   tagProductText: {

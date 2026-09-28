@@ -165,6 +165,48 @@ export async function notifyPostLike(input: { postId: string; likerId: string })
   }
 }
 
+// ─── Tag people ───────────────────────────────────────────────────────────────
+
+/**
+ * Tell a tagged user someone tagged them in a post. Idempotent per
+ * (tagged user, tagger, post) — re-saving the same tag set doesn't re-notify.
+ */
+export async function notifyPostTag(input: { postId: string; taggerId: string; taggedUserId: string }): Promise<void> {
+  try {
+    if (input.taggedUserId === input.taggerId) return;
+    const post = await loadPost(input.postId);
+    if (!post) return;
+
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, input.taggedUserId),
+        eq(notificationsFeed.type, "post_tag"),
+        eq(notificationsFeed.targetId, post.id),
+        eq(notificationsFeed.actorId, input.taggerId),
+      ))
+      .limit(1);
+    if (existing) return;
+
+    const actor = await actorFields(input.taggerId);
+    if (!actor) return;
+
+    await publishNotification({
+      userId: input.taggedUserId,
+      category: "social",
+      type: "post_tag",
+      title: `${actor.actorName} tagged you in a post`,
+      ...actor,
+      targetId: post.id,
+      targetType: "post",
+      targetImageUrl: postThumbnail(post),
+    });
+  } catch (err) {
+    logger.warn({ err, postId: input.postId, taggedUserId: input.taggedUserId }, "Post tag notification failed");
+  }
+}
+
 // ─── Reposts ──────────────────────────────────────────────────────────────────
 
 /** Tell a post's owner someone reposted it. Idempotent per (owner, reposter, post). */

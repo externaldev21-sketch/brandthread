@@ -7,7 +7,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Animated, Dimensions, Platform,
-  ActivityIndicator, Alert, Image, Pressable,
+  ActivityIndicator, Alert, Image, Pressable, PanResponder,
   StatusBar,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -27,7 +27,7 @@ import {
 } from '@/services/socialService';
 import type { Product } from '@/services/productTypes';
 import type {
-  Sound, PostProductTag, PostHashtag, PostVisibility,
+  Sound, PostProductTag, PostPersonTag, PostHashtag, PostVisibility,
   MaxVideoDuration, ContentType,
 } from '@/services/types';
 import { useColors } from '@/hooks/useColors';
@@ -36,7 +36,7 @@ import { formatCents } from '@/lib/money';
 import { useApi } from '@/lib/api';
 import {
   markVideoClipUploaded, normalizeTrimBounds,
-  createPhotoSlide, updateSlideUploadState, updateSlideOverlays, removePhotoSlide, moveSlide,
+  createPhotoSlide, updateSlideUploadState, updateSlideOverlays, updateSlideFilter, removePhotoSlide, moveSlide,
   slidesToComposePayload,
   type EditablePhotoSlide, type ComposedSlideshowResult,
 } from '@/lib/videoEditing';
@@ -51,6 +51,12 @@ import { MediaGrid, type MediaGridAsset } from '@/components/create-post/MediaGr
 import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
 import { FADE_MS } from '@/constants/motion';
+import { Glass } from '@/components/ui/Glass';
+import { PressableScale } from '@/components/BrandthreadUI';
+import {
+  type CropAspect, type CropTransform, DEFAULT_CROP_TRANSFORM,
+  clampCropTransform, applyPhotoCrop,
+} from '@/lib/photoCrop';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -58,8 +64,66 @@ let ts: any = {};
 let ms: any = {};
 let dps: any = {};
 
+// ─── Caption screen + tag-people sheet styles (colors applied inline) ────────
+const cps = StyleSheet.create({
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: FS.md, fontFamily: FONT.bold },
+  // Both inputs below drop the browser's default focus outline on web (it
+  // renders as a colored ring, breaking monochrome) — same pattern as
+  // components/checkout/CheckoutPrimitives.tsx's `input` style; the field's
+  // own border already shows focus.
+  input: {
+    fontSize: FS.base, fontFamily: FONT.regular, minHeight: 140,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
+  },
+  tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  tagChip: {
+    flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 14,
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  tagChipText: { fontSize: FS.xs, fontFamily: FONT.semibold },
+  chipRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10 },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 16,
+    paddingHorizontal: 12, height: 34,
+  },
+  chipText: { fontSize: FS.xs, fontFamily: FONT.semibold },
+  hashtagInput: {
+    fontSize: FS.sm, fontFamily: FONT.regular, borderWidth: 1, borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 8,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
+  },
+});
+
+const tps = StyleSheet.create({
+  title: { fontSize: FS.md, fontFamily: FONT.bold, marginBottom: 12 },
+  mediaBox: { width: '100%', aspectRatio: 1, borderRadius: RADII.card, overflow: 'hidden', backgroundColor: '#111', marginBottom: 12 },
+  pin: { position: 'absolute', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, overflow: 'hidden', maxWidth: 140 },
+  pinText: { color: '#fff', fontSize: FS.xs, fontFamily: FONT.semibold },
+  pinDot: { position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: '#fff', marginLeft: -6, marginTop: -6 },
+  searchInput: {
+    fontSize: FS.sm, fontFamily: FONT.regular, borderWidth: 1, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
+  },
+  resultRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, minHeight: 44,
+  },
+  resultName: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  taggedList: { marginTop: 12, gap: 6 },
+  taggedRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+  },
+});
+
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Step = 'media-pick' | 'video-edit' | 'slide-edit' | 'post-details' | 'publishing' | 'done';
+type Step = 'media-pick' | 'photo-crop' | 'video-edit' | 'slide-edit' | 'post-details' | 'publishing' | 'done';
 
 interface VideoClipLocal {
   uri: string; duration: number; id: string;
@@ -70,7 +134,7 @@ interface ComposedVideoLocal {
   mediaUrl: string; mediaPath: string;
   thumbnailUrl: string; thumbnailPath: string; duration: number;
 }
-interface SlidePhotoLocal { uri: string; id: string; }
+interface SlidePhotoLocal { uri: string; id: string; filter?: 'none' | 'warm' | 'cool' | 'mono'; }
 interface SoundSelection {
   soundId: string; soundTitle: string; artist: string; startTime: number; volume: number;
 }
@@ -469,6 +533,12 @@ export default function CreatePostScreen() {
   // ── Media ──
   const [videoClips,    setVideoClips]   = useState<VideoClipLocal[]>([]);
   const [slidePhotos,   setSlidePhotos]  = useState<SlidePhotoLocal[]>([]);
+  // ── Photo crop step (between media-pick and slide-edit for photos) ──
+  const [cropAspect, setCropAspect] = useState<CropAspect>('original');
+  const [cropIndex, setCropIndex] = useState(0);
+  const [cropTransforms, setCropTransforms] = useState<Record<string, CropTransform>>({});
+  const [croppingPhotos, setCroppingPhotos] = useState(false);
+
   // ── Slide edit: editable slides with per-slide overlays ──
   const [editableSlides,    setEditableSlides]    = useState<EditablePhotoSlide[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -495,6 +565,7 @@ export default function CreatePostScreen() {
   const [videoPaused, setVideoPaused] = useState(false);
   const [showTrimSheet, setShowTrimSheet] = useState(false);
   const [showEffectsSheet, setShowEffectsSheet] = useState(false);
+  const [showSlideEffectsSheet, setShowSlideEffectsSheet] = useState(false);
   const pauseGlyphAnim = useRef(new Animated.Value(0)).current;
   const [showPauseGlyph, setShowPauseGlyph] = useState(false);
   const pauseGlyphTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -511,6 +582,9 @@ export default function CreatePostScreen() {
   const [pickerState,        setPickerState]        = useState<PickerState>(makeDefaultPickerState);
   const [showDatePicker,     setShowDatePicker]     = useState(false);
   const [productTags,        setProductTags]        = useState<PostProductTag[]>([]);
+  const [taggedPeople,       setTaggedPeople]        = useState<PostPersonTag[]>([]);
+  const [showCaptionScreen,  setShowCaptionScreen]   = useState(false);
+  const [showTagPeopleSheet, setShowTagPeopleSheet]  = useState(false);
   const [taggableProducts,   setTaggableProducts]   = useState<Product[]>([]);
   const [loadingTaggable,    setLoadingTaggable]    = useState(false);
   const [styleTags,          setStyleTags]          = useState<string[]>([]);
@@ -569,6 +643,9 @@ export default function CreatePostScreen() {
         setProductTags(post.productTags.map(tag => ({
           productId: tag.productId, productName: tag.productName, priceCents: tag.priceCents,
         })));
+        setTaggedPeople((post.taggedPeople ?? []).map(tag => ({
+          userId: tag.userId, displayName: tag.displayName, avatarUrl: tag.avatarUrl, x: tag.x, y: tag.y, slideIndex: tag.slideIndex,
+        })));
         setSelectedSound(post.sound ?? null);
         setVisibility({ isPublic: true, ...post.visibility });
         if (post.scheduledAt) {
@@ -595,6 +672,7 @@ export default function CreatePostScreen() {
             uri,
             overlays: savedOverlayMap.get(idx) ?? [],
             uploadState: 'idle' as const,
+            filter: 'none' as const,
           }));
           setSlidePhotos(post.mediaUris.map((uri, idx) => ({ uri, id: `edit-slide-${post.id}-${idx}` })));
           setEditableSlides(restoredSlides);
@@ -627,7 +705,7 @@ export default function CreatePostScreen() {
     useCallback(() => {
       const result = (global as any).__cameraCaptureResult as
         | { type: 'video'; clips?: Array<{ id: string; uri: string; duration: number; speed: 0.5|1|2|3; filter: 'none'|'warm'|'cool'|'mono' }>; uri?: string; duration: number; }
-        | { type: 'photo'; uri: string }
+        | { type: 'photo'; uri: string; filter?: 'none'|'warm'|'cool'|'mono' }
         | null | undefined;
       if (!result) return;
       (global as any).__cameraCaptureResult = null;
@@ -642,7 +720,7 @@ export default function CreatePostScreen() {
         setPreviewSeekTime(0); setPreviewClipIndex(0); setComposedVideo(null);
         setProcessingPhase('idle'); setProcessingError(null); setSlidePhotos([]);
       } else {
-        setSlidePhotos(prev => [...prev, { uri: result.uri, id: `cam_${Date.now()}` }]);
+        setSlidePhotos(prev => [...prev, { uri: result.uri, id: `cam_${Date.now()}`, filter: result.filter ?? 'none' }]);
       }
     }, [])
   );
@@ -796,6 +874,7 @@ export default function CreatePostScreen() {
     setCaption(''); setHashtags([]); setHashtagInput(''); setStyleTags([]);
     setLocation(''); setVisibility(DEFAULT_VISIBILITY); setScheduleMode('now');
     setScheduledAt(null); setPickerState(makeDefaultPickerState()); setProductTags([]);
+    setTaggedPeople([]);
     setSelectedSound(null); setTextOverlays([]);
   }
 
@@ -836,6 +915,9 @@ export default function CreatePostScreen() {
       slideOverlays,
       productTags: productTags.map(pt => ({
         productId: pt.productId, productName: pt.productName, priceCents: pt.priceCents,
+      })),
+      taggedPeople: taggedPeople.map(pt => ({
+        userId: pt.userId, displayName: pt.displayName, avatarUrl: pt.avatarUrl, x: pt.x, y: pt.y, slideIndex: pt.slideIndex,
       })),
       sound: selectedSound ?? undefined,
       visibility, isDraft,
@@ -987,13 +1069,10 @@ export default function CreatePostScreen() {
         if (videoClips.length > 0) {
           setStep('video-edit');
         } else {
-          const slides = slidePhotos.map(p => createPhotoSlide(p.id, p.uri));
-          setEditableSlides(slides);
-          setCurrentSlideIndex(0);
-          setComposedSlideshow(null);
-          setSlideProcessingPhase('idle');
-          setSlideProcessingError(null);
-          setStep('slide-edit');
+          setCropAspect('original');
+          setCropIndex(0);
+          setCropTransforms({});
+          setStep('photo-crop');
         }
       });
     }
@@ -1100,13 +1179,130 @@ export default function CreatePostScreen() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // SCREEN A2: PHOTO CROP — Instagram's post-creation crop screen (ref:
+  // 01b-picker-new-post's follow-on crop step). Aspect toggle (Original /
+  // Square / 4:5) shared across every selected photo, pinch-to-zoom-and-pan
+  // crop box per photo. Crop is applied for real via expo-image-manipulator
+  // on "Next" (lib/photoCrop.ts) — a no-op crop (Original, no zoom/pan) skips
+  // re-encoding untouched photos.
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (step === 'photo-crop') {
+    const photo = slidePhotos[Math.min(cropIndex, Math.max(0, slidePhotos.length - 1))];
+    const transform = (photo && cropTransforms[photo.id]) ?? DEFAULT_CROP_TRANSFORM;
+
+    async function confirmCrop() {
+      if (croppingPhotos) return;
+      setCroppingPhotos(true);
+      try {
+        const cropped = await Promise.all(slidePhotos.map(async (p) => {
+          const t = cropTransforms[p.id] ?? DEFAULT_CROP_TRANSFORM;
+          const uri = await applyPhotoCrop(p.uri, cropAspect, t);
+          return { ...p, uri };
+        }));
+        setSlidePhotos(cropped);
+        const slides = cropped.map(p => ({ ...createPhotoSlide(p.id, p.uri), filter: p.filter ?? 'none' as const }));
+        setEditableSlides(slides);
+        setCurrentSlideIndex(0);
+        setComposedSlideshow(null);
+        setSlideProcessingPhase('idle');
+        setSlideProcessingError(null);
+        haptic(() => setStep('slide-edit'));
+      } finally {
+        setCroppingPhotos(false);
+      }
+    }
+
+    return (
+      <View style={[ts.root, { backgroundColor: BG }]}>
+        <StatusBar barStyle="light-content" backgroundColor={BG} />
+
+        <View style={[ts.pkHeader, { paddingTop: topPad + 4 }]}>
+          <TouchableOpacity
+            onPress={() => haptic(() => setStep('media-pick'))}
+            style={ts.pkHeaderBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Back"
+            accessibilityRole="button"
+          >
+            <Feather name="arrow-left" size={22} color={FG} />
+          </TouchableOpacity>
+          <Text style={ts.pkHeaderTitle}>Edit</Text>
+          <View style={ts.pkHeaderRight}>
+            <Button
+              label="Next" variant="primary" size="compact"
+              loading={croppingPhotos}
+              onPress={confirmCrop}
+              testID="crop-next-btn"
+            />
+          </View>
+        </View>
+
+        {photo && (
+          <PhotoCropBox
+            key={photo.id}
+            uri={photo.uri}
+            aspect={cropAspect}
+            transform={transform}
+            onChange={(next) => setCropTransforms(prev => ({ ...prev, [photo.id]: next }))}
+          />
+        )}
+
+        {slidePhotos.length > 1 && (
+          <View style={ts.cropPagerRow} pointerEvents="box-none">
+            <PressableScale
+              onPress={() => setCropIndex(i => Math.max(0, i - 1))}
+              disabled={cropIndex === 0}
+              style={[ts.cropPagerBtn, { opacity: cropIndex === 0 ? 0.3 : 1 }]}
+              accessibilityLabel="Previous photo"
+            >
+              <Glass variant="regular" tint="dark" radius={18} style={StyleSheet.absoluteFill} />
+              <Feather name="chevron-left" size={18} color={FG} />
+            </PressableScale>
+            <View style={ts.cropDotsRow}>
+              {slidePhotos.map((p, i) => (
+                <View key={p.id} style={[ts.slideDot, i === cropIndex && ts.slideDotActive]} />
+              ))}
+            </View>
+            <PressableScale
+              onPress={() => setCropIndex(i => Math.min(slidePhotos.length - 1, i + 1))}
+              disabled={cropIndex === slidePhotos.length - 1}
+              style={[ts.cropPagerBtn, { opacity: cropIndex === slidePhotos.length - 1 ? 0.3 : 1 }]}
+              accessibilityLabel="Next photo"
+            >
+              <Glass variant="regular" tint="dark" radius={18} style={StyleSheet.absoluteFill} />
+              <Feather name="chevron-right" size={18} color={FG} />
+            </PressableScale>
+          </View>
+        )}
+
+        <View style={[ts.cropAspectRow, { paddingBottom: botPad + 16 }]}>
+          {(['original', 'square', '4:5'] as CropAspect[]).map(a => (
+            <PressableScale
+              key={a}
+              onPress={() => { void Haptics.selectionAsync(); setCropAspect(a); }}
+              style={ts.cropAspectChip}
+              accessibilityLabel={a === 'original' ? 'Original aspect' : a === 'square' ? 'Square aspect' : '4 by 5 aspect'}
+              testID={`crop-aspect-${a}`}
+            >
+              <Glass variant={cropAspect === a ? 'pressed' : 'regular'} tint="dark" radius={18} style={StyleSheet.absoluteFill} />
+              <Text style={[ts.cropAspectText, { color: cropAspect === a ? FG : MUTED }]}>
+                {a === 'original' ? 'Original' : a === 'square' ? 'Square' : '4:5'}
+              </Text>
+            </PressableScale>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // SCREEN B2: SLIDE EDIT — same rounded-card editor chrome as video-edit, for
   // a photo/slideshow. Tap the card to view it large; tool row covers what
   // applies to a photo (Text/Sticker/Overlay share the text-overlay system;
-  // Trim doesn't apply to a still photo so it's dropped; Effects has no
-  // filter/speed field on EditablePhotoSlide so it's dropped too — see the
-  // PR notes for the reasoning). Next uploads + composes then goes on to
-  // post-details.
+  // Trim doesn't apply to a still photo so it's dropped). Effects now carries
+  // the slide's own colour filter (see the Effects tool chip below), applied
+  // for real by compose-slideshow's ffmpeg render — same mechanism as a video
+  // clip's filter. Next uploads + composes then goes on to post-details.
   // ─────────────────────────────────────────────────────────────────────────────
   if (step === 'slide-edit') {
     const currentSlide = editableSlides[Math.min(currentSlideIndex, Math.max(0, editableSlides.length - 1))];
@@ -1307,6 +1503,7 @@ export default function CreatePostScreen() {
             onPress={() => { setSlideEditingOverlayId(undefined); setSlideShowTextEditor(true); }}
             testID="slide-tool-overlay"
           />
+          <EditorToolChip icon="sliders" label="Effects" onPress={() => setShowSlideEffectsSheet(true)} testID="slide-tool-effects" />
           <EditorToolChip icon="music" label="Audio" onPress={() => setShowSoundModal(true)} testID="slide-tool-audio" />
           {editableSlides.length > 1 && (
             <EditorToolChip
@@ -1349,6 +1546,34 @@ export default function CreatePostScreen() {
             testID="slide-editor-next-btn"
           />
         </View>
+
+        {/* Effects bottom sheet — the current slide's own filter, applied for
+            real by compose-slideshow's ffmpeg render, same as a video clip. */}
+        <BottomSheet visible={showSlideEffectsSheet} onClose={() => setShowSlideEffectsSheet(false)}>
+          <View style={{ paddingHorizontal: SPACING.md, paddingBottom: SPACING.md }}>
+            <Text style={[ts.sheetTitle, { color: FG }]}>Filter</Text>
+            <View style={ts.effectsRow}>
+              {EDITOR_FILTERS.map(f => {
+                const active = (currentSlide?.filter ?? 'none') === f.id;
+                return (
+                  <TouchableOpacity
+                    key={f.id}
+                    style={[ts.effectsChip, active && { borderColor: FG }]}
+                    onPress={() => {
+                      if (!currentSlide) return;
+                      setEditableSlides(prev => updateSlideFilter(prev, currentSlide.id, f.id));
+                      setComposedSlideshow(null);
+                      setSlideProcessingPhase('idle');
+                    }}
+                    accessibilityLabel={f.label}
+                  >
+                    <Text style={[ts.effectsChipText, { color: active ? FG : MUTED }]}>{f.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </BottomSheet>
 
         {/* Text overlay editor modal */}
         <TextOverlayEditor
@@ -1734,18 +1959,29 @@ export default function CreatePostScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Caption + thumbnail row */}
+            {/* Caption + thumbnail row — tapping opens the full-screen caption
+                editor (Instagram's caption screen), rather than editing
+                inline here; the TextInput below is display-only. */}
             <View style={ts.captionRow}>
-              <TextInput
-                style={ts.captionInput}
-                value={caption}
-                onChangeText={setCaption}
-                multiline
-                maxLength={2200}
-                placeholder="Write a caption..."
-                placeholderTextColor={MUTED}
-                textAlignVertical="top"
-              />
+              <Pressable
+                style={{ flex: 1 }}
+                onPress={() => haptic(() => setShowCaptionScreen(true))}
+                accessibilityLabel="Edit caption"
+                accessibilityRole="button"
+                testID="post-details-caption-row"
+              >
+                <TextInput
+                  style={ts.captionInput}
+                  value={caption}
+                  editable={false}
+                  pointerEvents="none"
+                  multiline
+                  maxLength={2200}
+                  placeholder="Write a caption..."
+                  placeholderTextColor={MUTED}
+                  textAlignVertical="top"
+                />
+              </Pressable>
               {/* Thumbnail */}
               <View style={ts.thumbContainer}>
                 {hasVideo && videoClips[0]?.uri ? (
@@ -1784,6 +2020,14 @@ export default function CreatePostScreen() {
                 <Feather name="hash" size={14} color={FG} style={{ marginRight: 6 }} />
                 <Text style={ts.pillText}>Hashtags</Text>
               </TouchableOpacity>
+              {/* Tag people — both buyer and seller posts can carry these
+                  (only product tagging below is seller-only). */}
+              <TouchableOpacity style={ts.pill} onPress={() => setShowTagPeopleSheet(true)} testID="post-details-tag-people-pill">
+                <Feather name="user" size={14} color={FG} style={{ marginRight: 6 }} />
+                <Text style={ts.pillText}>
+                  {taggedPeople.length > 0 ? `${taggedPeople.length} tagged` : 'Tag people'}
+                </Text>
+              </TouchableOpacity>
               {!isBuyer && (
                 <TouchableOpacity style={ts.pill} onPress={() => setShowProductModal(true)}>
                   <Feather name="tag" size={14} color={FG} style={{ marginRight: 6 }} />
@@ -1820,6 +2064,23 @@ export default function CreatePostScreen() {
                     ))}
                   </View>
                 )}
+              </View>
+            )}
+
+            {/* Tagged people — monochrome chip, unlike the product-tag chip
+                below (which predates this feature and isn't in scope here). */}
+            {taggedPeople.length > 0 && (
+              <View style={[ts.hashtagSection, { paddingTop: 0 }]}>
+                <View style={ts.tagWrap}>
+                  {taggedPeople.map((pt) => (
+                    <View key={pt.userId} style={[ts.tagChip, { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: BORDER }]}>
+                      <Text style={[ts.tagChipText, { color: FG }]}>@{pt.displayName}</Text>
+                      <TouchableOpacity onPress={() => setTaggedPeople(prev => prev.filter(t => t.userId !== pt.userId))}>
+                        <Feather name="x" size={10} color={MUTED} style={{ marginLeft: 4 }} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
               </View>
             )}
 
@@ -2032,6 +2293,29 @@ export default function CreatePostScreen() {
             taggableProducts={taggableProducts}
             insets={insets}
           />
+          <CaptionScreen
+            visible={showCaptionScreen}
+            onClose={() => setShowCaptionScreen(false)}
+            caption={caption} setCaption={setCaption}
+            hashtagInput={hashtagInput} setHashtagInput={setHashtagInput}
+            hashtags={hashtags} addHashtag={addHashtag}
+            removeHashtag={(tag) => setHashtags(prev => prev.filter(h => h.tag !== tag))}
+            isBuyer={isBuyer}
+            taggedPeopleCount={taggedPeople.length}
+            productTagsCount={productTags.length}
+            onOpenTagPeople={() => setShowTagPeopleSheet(true)}
+            onOpenTagProducts={() => setShowProductModal(true)}
+            insets={insets}
+          />
+          <TagPeopleSheet
+            visible={showTagPeopleSheet}
+            onClose={() => setShowTagPeopleSheet(false)}
+            taggedPeople={taggedPeople}
+            onAdd={(person) => setTaggedPeople(prev => [...prev, person])}
+            onRemove={(userId) => setTaggedPeople(prev => prev.filter(p => p.userId !== userId))}
+            mediaUri={thumbUri}
+            insets={insets}
+          />
           <SoundModal
             visible={showSoundModal} onClose={() => setShowSoundModal(false)}
             soundTab={soundTab} setSoundTab={setSoundTab}
@@ -2120,6 +2404,373 @@ export default function CreatePostScreen() {
 }
 
 // ─── Sound Modal ──────────────────────────────────────────────────────────────
+// ─── Photo crop box — pinch-to-zoom-and-pan crop window (SCREEN A2) ───────────
+interface PhotoCropBoxProps {
+  uri: string;
+  aspect: CropAspect;
+  transform: CropTransform;
+  onChange: (next: CropTransform) => void;
+}
+function PhotoCropBox({ uri, aspect, transform, onChange }: PhotoCropBoxProps) {
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [sourceSize, setSourceSize] = useState<{ width: number; height: number } | null>(null);
+  const transformRef = useRef(transform);
+  transformRef.current = transform;
+  const gestureStartRef = useRef<{ scale: number; tx: number; ty: number } | null>(null);
+  const pinchDistanceRef = useRef<number | null>(null);
+  const panStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    Image.getSize(uri, (width, height) => { if (active) setSourceSize({ width, height }); }, () => {});
+    return () => { active = false; };
+  }, [uri]);
+
+  const sourceW = sourceSize?.width ?? 1;
+  const sourceH = sourceSize?.height ?? 1;
+  const ratio = aspect === 'square' ? 1 : aspect === '4:5' ? 4 / 5 : (sourceW / Math.max(1, sourceH));
+  // The crop box itself: the largest box of `ratio` that fits the measured container.
+  let boxW = containerSize.width;
+  let boxH = boxW / ratio;
+  if (boxH > containerSize.height && containerSize.height > 0) {
+    boxH = containerSize.height;
+    boxW = boxH * ratio;
+  }
+  const baseScale = sourceSize && boxW > 0 ? Math.max(boxW / sourceW, boxH / sourceH) : 1;
+  const displayScale = baseScale * transform.scale;
+  const imageW = sourceW * displayScale;
+  const imageH = sourceH * displayScale;
+  const translateX = -transform.tx * displayScale;
+  const translateY = -transform.ty * displayScale;
+
+  // PanResponder is created once (useRef) but its handlers read gesture math
+  // from these refs rather than render-time closures, since baseScale/aspect
+  // change after the responder is created (source image loads async, aspect
+  // toggle changes after mount).
+  const baseScaleRef = useRef(baseScale);
+  baseScaleRef.current = baseScale;
+  const sourceSizeRef = useRef(sourceSize);
+  sourceSizeRef.current = sourceSize;
+  const aspectRef = useRef(aspect);
+  aspectRef.current = aspect;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (event) => {
+        gestureStartRef.current = { ...transformRef.current };
+        const touches = event.nativeEvent.touches;
+        if (touches.length >= 2) {
+          const [a, b] = touches;
+          pinchDistanceRef.current = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+          panStartRef.current = null;
+        } else if (touches.length === 1) {
+          panStartRef.current = { x: touches[0].pageX, y: touches[0].pageY };
+          pinchDistanceRef.current = null;
+        }
+      },
+      onPanResponderMove: (event) => {
+        const touches = event.nativeEvent.touches;
+        const start = gestureStartRef.current;
+        const size = sourceSizeRef.current;
+        if (!start || !size) return;
+        if (touches.length >= 2) {
+          const [a, b] = touches;
+          const distance = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+          if (pinchDistanceRef.current == null) { pinchDistanceRef.current = distance; return; }
+          const nextScale = start.scale + (distance - pinchDistanceRef.current) / 200;
+          onChange(clampCropTransform({ ...start, scale: nextScale }, size.width, size.height, aspectRef.current));
+        } else if (touches.length === 1 && panStartRef.current) {
+          const dx = touches[0].pageX - panStartRef.current.x;
+          const dy = touches[0].pageY - panStartRef.current.y;
+          const s = baseScaleRef.current * start.scale;
+          const screenToSource = s > 0 ? 1 / s : 1;
+          onChange(clampCropTransform({
+            ...start, tx: start.tx - dx * screenToSource, ty: start.ty - dy * screenToSource,
+          }, size.width, size.height, aspectRef.current));
+        }
+      },
+      onPanResponderRelease: () => { gestureStartRef.current = null; pinchDistanceRef.current = null; panStartRef.current = null; },
+      onPanResponderTerminate: () => { gestureStartRef.current = null; pinchDistanceRef.current = null; panStartRef.current = null; },
+    }),
+  ).current;
+
+  return (
+    <View
+      style={ts.cropBoxWrap}
+      onLayout={(e) => setContainerSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+      {...panResponder.panHandlers}
+    >
+      {containerSize.width > 0 && (
+        <View style={{ width: boxW, height: boxH, overflow: 'hidden' }}>
+          {sourceSize && (
+            <Image
+              source={{ uri }}
+              style={{
+                width: imageW, height: imageH,
+                marginLeft: (boxW - imageW) / 2 + translateX,
+                marginTop: (boxH - imageH) / 2 + translateY,
+              }}
+              resizeMode="cover"
+            />
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─── Caption — full-screen entry (SCREEN 5, ref: 05-caption) ──────────────────
+interface CaptionScreenProps {
+  visible: boolean; onClose: () => void;
+  caption: string; setCaption: (c: string) => void;
+  hashtagInput: string; setHashtagInput: (s: string) => void;
+  hashtags: PostHashtag[]; addHashtag: (raw: string) => void;
+  removeHashtag: (tag: string) => void;
+  isBuyer: boolean;
+  taggedPeopleCount: number;
+  productTagsCount: number;
+  onOpenTagPeople: () => void;
+  onOpenTagProducts: () => void;
+  insets: { top: number; bottom: number };
+}
+function CaptionScreen({
+  visible, onClose, caption, setCaption, hashtagInput, setHashtagInput,
+  hashtags, addHashtag, removeHashtag, isBuyer, taggedPeopleCount, productTagsCount,
+  onOpenTagPeople, onOpenTagProducts, insets,
+}: CaptionScreenProps) {
+  const { theme } = useAppTheme();
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const BORDER = theme.border;
+  const BG = theme.background;
+  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: BG }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <StatusBar barStyle="light-content" backgroundColor={BG} />
+        <View style={[cps.header, { paddingTop: topPad + 4, borderBottomColor: BORDER }]}>
+          <TouchableOpacity onPress={onClose} style={cps.headerBtn} accessibilityLabel="Back" accessibilityRole="button">
+            <Feather name="arrow-left" size={22} color={FG} />
+          </TouchableOpacity>
+          <Text style={[cps.headerTitle, { color: FG }]}>Caption</Text>
+          <TouchableOpacity onPress={onClose} style={cps.headerBtn} accessibilityLabel="Done" accessibilityRole="button" testID="caption-done-btn">
+            {/* Success/confirm checkmark — always white, never a colored accent. */}
+            <Feather name="check" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16 }}>
+          <TextInput
+            style={[cps.input, { color: FG }]}
+            value={caption}
+            onChangeText={setCaption}
+            placeholder="Write a caption..."
+            placeholderTextColor={MUTED}
+            multiline
+            maxLength={2200}
+            autoFocus={visible}
+            textAlignVertical="top"
+          />
+          {hashtags.length > 0 && (
+            <View style={cps.tagWrap}>
+              {hashtags.map((h) => (
+                <TouchableOpacity key={h.tag} style={[cps.tagChip, { borderColor: BORDER }]} onPress={() => removeHashtag(h.tag)}>
+                  <Text style={[cps.tagChipText, { color: FG }]}>{h.tag}</Text>
+                  <Feather name="x" size={10} color={MUTED} style={{ marginLeft: 4 }} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Chip row above the keyboard: Tag people / Tag products (seller
+            only) / Add hashtag. */}
+        <View style={[cps.chipRow, { borderTopColor: BORDER, paddingBottom: Math.max(insets.bottom, 10) }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 12 }}>
+            <TouchableOpacity style={[cps.chip, { borderColor: BORDER }]} onPress={onOpenTagPeople} testID="caption-chip-tag-people">
+              <Feather name="user" size={13} color={FG} style={{ marginRight: 6 }} />
+              <Text style={[cps.chipText, { color: FG }]}>
+                {taggedPeopleCount > 0 ? `${taggedPeopleCount} tagged` : 'Tag people'}
+              </Text>
+            </TouchableOpacity>
+            {!isBuyer && (
+              <TouchableOpacity style={[cps.chip, { borderColor: BORDER }]} onPress={onOpenTagProducts} testID="caption-chip-tag-products">
+                <Feather name="tag" size={13} color={FG} style={{ marginRight: 6 }} />
+                <Text style={[cps.chipText, { color: FG }]}>
+                  {productTagsCount > 0 ? `${productTagsCount} products` : 'Tag products'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[cps.chip, { borderColor: BORDER }]}
+              onPress={() => { if (hashtagInput.length === 0) setHashtagInput('#'); }}
+              testID="caption-chip-hashtag"
+            >
+              <Feather name="hash" size={13} color={FG} style={{ marginRight: 6 }} />
+              <Text style={[cps.chipText, { color: FG }]}>Add hashtag</Text>
+            </TouchableOpacity>
+          </ScrollView>
+          {hashtagInput.length > 0 && (
+            <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+              <TextInput
+                style={[cps.hashtagInput, { color: FG, borderColor: BORDER }]}
+                value={hashtagInput}
+                onChangeText={setHashtagInput}
+                placeholder="#add tag..."
+                placeholderTextColor={MUTED}
+                returnKeyType="done"
+                onSubmitEditing={() => { if (hashtagInput.trim().length > 1) addHashtag(hashtagInput); }}
+                autoCapitalize="none"
+              />
+            </View>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ─── Tag people — sheet reused for both the caption chip and post-details ────
+const PEOPLE_SEARCH_DEBOUNCE_MS = 150;
+const MAX_TAGGED_PEOPLE = 10;
+interface TagPeopleSheetProps {
+  visible: boolean; onClose: () => void;
+  taggedPeople: PostPersonTag[];
+  onAdd: (person: PostPersonTag) => void;
+  onRemove: (userId: string) => void;
+  mediaUri: string | null;
+  insets: { top: number; bottom: number };
+}
+function TagPeopleSheet({ visible, onClose, taggedPeople, onAdd, onRemove, mediaUri, insets }: TagPeopleSheetProps) {
+  const { theme } = useAppTheme();
+  const api = useApi();
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const BORDER = theme.border;
+  const BG = theme.background;
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Array<{ userId: string; name: string; avatarUrl: string | null }>>([]);
+  const [searching, setSearching] = useState(false);
+  const [pendingSpot, setPendingSpot] = useState<{ x: number; y: number } | null>(null);
+  const [mediaBoxSize, setMediaBoxSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setResults([]); setSearching(false); return; }
+    let cancelled = false;
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const rows = await api.social.search(q, 20);
+        if (!cancelled) setResults(rows.map(r => ({ userId: r.userId, name: r.name, avatarUrl: r.avatarUrl })));
+      } catch {
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, PEOPLE_SEARCH_DEBOUNCE_MS);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [query, api]);
+
+  function placeTag(person: { userId: string; name: string; avatarUrl: string | null }) {
+    if (taggedPeople.some(p => p.userId === person.userId)) return;
+    if (taggedPeople.length >= MAX_TAGGED_PEOPLE) return;
+    const spot = pendingSpot ?? { x: 0.5, y: 0.5 };
+    onAdd({ userId: person.userId, displayName: person.name, avatarUrl: person.avatarUrl ?? undefined, x: spot.x, y: spot.y, slideIndex: 0 });
+    setQuery('');
+    setResults([]);
+    setPendingSpot(null);
+    void Haptics.selectionAsync();
+  }
+
+  return (
+    <BottomSheet visible={visible} onClose={onClose}>
+      <View style={{ paddingHorizontal: SPACING.md, paddingBottom: Math.max(insets.bottom, SPACING.md) }}>
+        <Text style={[tps.title, { color: FG }]}>Tag people</Text>
+
+        {mediaUri && (
+          <Pressable
+            style={tps.mediaBox}
+            onLayout={(e) => setMediaBoxSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+            onPress={(e) => {
+              if (mediaBoxSize.width <= 0 || mediaBoxSize.height <= 0) return;
+              const { locationX, locationY } = e.nativeEvent;
+              setPendingSpot({
+                x: Math.max(0, Math.min(1, locationX / mediaBoxSize.width)),
+                y: Math.max(0, Math.min(1, locationY / mediaBoxSize.height)),
+              });
+            }}
+            accessibilityLabel="Tap a spot to place the next tag"
+          >
+            <Image source={{ uri: mediaUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            {taggedPeople.map((p) => (
+              <View key={p.userId} style={[tps.pin, { left: `${p.x * 100}%`, top: `${p.y * 100}%` }]}>
+                <Glass variant="regular" tint="dark" radius={10} style={StyleSheet.absoluteFill} />
+                <Text style={tps.pinText} numberOfLines={1}>@{p.displayName}</Text>
+              </View>
+            ))}
+            {pendingSpot && (
+              <View style={[tps.pinDot, { left: `${pendingSpot.x * 100}%`, top: `${pendingSpot.y * 100}%` }]} />
+            )}
+          </Pressable>
+        )}
+
+        <TextInput
+          style={[tps.searchInput, { color: FG, borderColor: BORDER }]}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search people"
+          placeholderTextColor={MUTED}
+          autoCapitalize="none"
+          testID="tag-people-search"
+        />
+
+        {searching && <ActivityIndicator color={FG} style={{ marginTop: 12 }} />}
+
+        {!searching && results.length > 0 && (
+          <View style={{ maxHeight: 220, marginTop: 8 }}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {results.map((r) => {
+                const already = taggedPeople.some(p => p.userId === r.userId);
+                return (
+                  <PressableScale
+                    key={r.userId}
+                    onPress={() => placeTag(r)}
+                    disabled={already}
+                    style={[tps.resultRow, { opacity: already ? 0.4 : 1 }]}
+                    testID={`tag-people-result-${r.userId}`}
+                  >
+                    <Text style={[tps.resultName, { color: FG }]}>{r.name}</Text>
+                    {already && <Feather name="check" size={16} color="#fff" />}
+                  </PressableScale>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {taggedPeople.length > 0 && (
+          <View style={tps.taggedList}>
+            {taggedPeople.map((p) => (
+              <View key={p.userId} style={[tps.taggedRow, { borderColor: BORDER }]}>
+                <Text style={[tps.resultName, { color: FG }]}>@{p.displayName}</Text>
+                <TouchableOpacity onPress={() => onRemove(p.userId)} accessibilityLabel={`Remove ${p.displayName}`}>
+                  <Feather name="x" size={16} color={MUTED} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <Button label="Done" variant="primary" onPress={onClose} style={{ marginTop: 16 }} testID="tag-people-done-btn" />
+      </View>
+    </BottomSheet>
+  );
+}
+
 interface SoundModalProps {
   visible: boolean; onClose: () => void;
   soundTab: 'trending'|'saved'|'recent'|'original'|'royalty_free';
@@ -2517,6 +3168,18 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   slideDotActive: { backgroundColor: '#fff', width: 14 },
   slideZoomBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
   slideZoomImage: { width: '100%', height: '80%' },
+
+  // ── SCREEN A2 — Photo crop step ──
+  cropBoxWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#000' },
+  cropPagerRow: {
+    position: 'absolute', left: 0, right: 0, bottom: 96,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14,
+  },
+  cropPagerBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  cropDotsRow: { flexDirection: 'row', gap: 4 },
+  cropAspectRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, paddingTop: 14 },
+  cropAspectChip: { minWidth: 84, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', paddingHorizontal: 14 },
+  cropAspectText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   });
 };
 

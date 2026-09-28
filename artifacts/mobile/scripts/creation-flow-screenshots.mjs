@@ -85,13 +85,43 @@ async function runViewport(browser, { origin, images, viewport }) {
     await waitForImages(page);
     await shot(page, outDir, ++index, 'picker-selected');
 
-    // ── 04: Editor (slide-edit — a single photo builds a one-slide Thread) ─
+    // ── 04: Photo crop — Instagram's post-creation crop step (item 115) ──
     const nextBtn = page.getByTestId('picker-next-btn');
     if (await nextBtn.count()) await nextBtn.click();
     else await page.getByText('Next', { exact: true }).click();
     await waitForQuietNetwork(activity, 500, 5_000);
+    await page.waitForSelector('text=Edit', { timeout: 15_000 });
+    await waitForImages(page);
+    await shot(page, outDir, ++index, 'photo-crop');
+
+    // ── 05: Editor (slide-edit — a single photo builds a one-slide Thread) ─
+    await page.getByTestId('crop-next-btn').click();
+    await waitForQuietNetwork(activity, 500, 5_000);
     await waitForImages(page);
     await shot(page, outDir, ++index, 'editor-slide-edit');
+
+    // ── 06: Details step (caption row + Tag people pill) ─────────────────
+    const slideNextBtn = page.getByTestId('slide-editor-next-btn');
+    if (await slideNextBtn.count()) await slideNextBtn.click();
+    await waitForQuietNetwork(activity, 500, 5_000);
+    await page.waitForSelector('[data-testid="post-details-caption-row"]', { timeout: 15_000 }).catch(() => {});
+    await waitForImages(page);
+    await shot(page, outDir, ++index, 'post-details');
+
+    // ── 07: Caption screen — full-screen entry, chip row above keyboard ───
+    const captionRow = page.getByTestId('post-details-caption-row');
+    if (await captionRow.count()) {
+      await captionRow.click();
+      await page.waitForSelector('text=Caption', { timeout: 15_000 });
+      await shot(page, outDir, ++index, 'caption-screen');
+
+      // ── 08: Tag people sheet, reached from the caption chip row ─────────
+      await page.getByTestId('caption-chip-tag-people').click();
+      await page.waitForSelector('[data-testid="tag-people-search"]', { timeout: 15_000 });
+      await shot(page, outDir, ++index, 'tag-people-sheet');
+      await page.getByTestId('tag-people-done-btn').click().catch(() => {});
+      await page.getByTestId('caption-done-btn').click().catch(() => {});
+    }
   } catch (error) {
     console.error(`  ✗ ${viewport.id}: ${String(error?.message ?? error).split('\n')[0]}`);
     await shot(page, outDir, ++index, 'FAILED-state').catch(() => {});

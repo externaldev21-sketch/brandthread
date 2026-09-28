@@ -385,6 +385,18 @@ export interface PostProductTag {
   slideIndex?: number;
 }
 
+/** A person tagged on a Thread — available to both buyer and seller posts
+ *  (unlike PostProductTag, which is seller-only). Mirrors PostProductTag's
+ *  shape: a normalized x/y position on the tagged slide/frame. */
+export interface PostPersonTag {
+  userId:      string;
+  displayName: string;
+  avatarUrl?:  string;
+  x:           number;
+  y:           number;
+  slideIndex?: number;
+}
+
 export interface PostHashtag {
   tag:       string;
   trending?: boolean;
@@ -465,6 +477,7 @@ export interface SellerPost {
   slideshowEdit?:  SlideshowEdit;
   overlays:        PostOverlay[];
   productTags:     PostProductTag[];
+  taggedPeople:    PostPersonTag[];
   visibility:      PostVisibility;
   schedule?:       PostSchedule;
   isPinned:        boolean;
