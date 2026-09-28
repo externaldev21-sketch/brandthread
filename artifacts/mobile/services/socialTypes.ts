@@ -156,6 +156,10 @@ export interface ConversationParticipant {
    *  bundled preview poster images as stand-in avatars. UI reading this
    *  field must fall back to the initials circle when it's absent. */
   avatarUri?: string;
+  /** Chat details > Nicknames: the CURRENT viewer's nickname for this
+   *  participant in this conversation, if they've set one. Renders in place
+   *  of/alongside `name` in the thread once set. */
+  nickname?: string;
 }
 
 export type MessageAttachmentType =
@@ -255,6 +259,9 @@ export interface Conversation {
    *  conversation — polled via GET /api/conversations/:id (no websocket
    *  layer exists for DMs yet). Only ever set for the agent's conversation. */
   agentTyping?: boolean;
+  /** Chat details > Mute: ISO timestamp this conversation is muted until, for
+   *  the current viewer. Absent/undefined means not muted. */
+  mutedUntil?: string;
 }
 
 // ─── Story ────────────────────────────────────────────────────────────────────

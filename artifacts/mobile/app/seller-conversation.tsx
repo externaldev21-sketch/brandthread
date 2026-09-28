@@ -42,6 +42,8 @@ import { SheetRise } from '@/components/motion/SheetRise';
 interface Participant {
   userId: string; name: string; handle: string;
   initials: string; color: string; accountType: string;
+  /** Chat details > Nicknames: the current viewer's nickname for them, if set. */
+  nickname?: string;
 }
 interface ConvView {
   id: string; type: string; participants: Participant[];
@@ -245,6 +247,9 @@ export default function SellerConversationScreen() {
   // ── Derived ─────────────────────────────────────────────────────────────────
 
   const other = conv?.participants.find((p) => p.userId !== myId) ?? null;
+  // Chat details > Nicknames: once set, the nickname replaces the real name
+  // in the header, matching buyer-conversation.tsx.
+  const displayName = other?.nickname || other?.name || 'Buyer';
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
 
@@ -273,6 +278,23 @@ export default function SellerConversationScreen() {
       mode,
     });
     router.push(('/call-screen?' + qs.toString()) as never);
+  }
+
+  // ── Chat details ───────────────────────────────────────────────────────────────
+
+  function openChatDetails() {
+    if (!id || !other) return;
+    const qs = new URLSearchParams({
+      id, role: 'seller',
+      isBlocked: messaging.blockedByMe ? '1' : '0',
+      participantUserId: other.userId,
+      participantName: other.name,
+      participantHandle: other.handle ?? '',
+      participantInitials: other.initials ?? '',
+      participantColor: other.color ?? PURPLE,
+      participantNickname: other.nickname ?? '',
+    });
+    router.push(('/conversation-details?' + qs.toString()) as never);
   }
 
   // ── Photo / video picker ──────────────────────────────────────────────────────
@@ -617,17 +639,26 @@ export default function SellerConversationScreen() {
         >
           <Feather name="arrow-left" size={ICON.lg} color={FG} />
         </PressableScale>
-        {other && (
-          <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
-            <Text style={s.headerAvatarInitials}>
-              {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
-            </Text>
+        <PressableScale
+          style={s.headerCenterRow}
+          disabled={!other || !id}
+          onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+          testID="seller-conversation-header-name"
+          accessibilityRole="button"
+          accessibilityLabel={`${displayName} — chat details`}
+        >
+          {other && (
+            <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
+              <Text style={s.headerAvatarInitials}>
+                {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View style={s.headerCenter}>
+            <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+            {other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null}
           </View>
-        )}
-        <View style={s.headerCenter}>
-          <Text style={s.headerName} numberOfLines={1}>{other?.name ?? 'Buyer'}</Text>
-          {other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null}
-        </View>
+        </PressableScale>
         {id && (
           <>
             <PressableScale
@@ -985,6 +1016,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center', marginRight: SP.sm,
   },
   headerAvatarInitials: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
+  headerCenterRow: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   headerCenter: { flex: 1 },
   headerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   headerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },

@@ -1162,6 +1162,50 @@ export async function archiveConversation(conversationId: string): Promise<void>
   await save(k.conversations, convs.map(c => c.id === conversationId ? { ...c, isArchived: true } : c)); notify();
 }
 
+/** Search-in-chat (chat details > Search): this conversation's own message
+ *  history only, never global search. Not cached — search results aren't
+ *  the thread's own message list. */
+export async function searchConversationMessages(conversationId: string, query: string): Promise<Message[]> {
+  const q = query.trim();
+  if (!q) return [];
+  const remote = await serviceRequest<Message[]>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/messages?q=${encodeURIComponent(q)}`,
+  );
+  return Array.isArray(remote) ? remote : [];
+}
+
+/** Chat details > Mute. durationMinutes: -1 = "Until I turn it back on",
+ *  null/0 = unmute. Updates the cached conversation's mutedUntil so the
+ *  chat-details row reflects the new state without a refetch. */
+export async function muteConversation(conversationId: string, durationMinutes: number | null): Promise<string | null> {
+  const k = K();
+  const result = await serviceRequest<{ ok: boolean; mutedUntil: string | null }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/mute`,
+    { method: 'PATCH', body: JSON.stringify({ durationMinutes }) },
+  );
+  const convs = await load<Conversation[]>(k.conversations, []);
+  await save(k.conversations, convs.map(c => c.id === conversationId ? { ...c, mutedUntil: result.mutedUntil ?? undefined } : c));
+  notify();
+  return result.mutedUntil ?? null;
+}
+
+/** Chat details > Nicknames. An empty nickname clears it back to the real
+ *  name. Updates the cached conversation's participant so it renders
+ *  immediately in the thread without a refetch. */
+export async function setConversationNickname(conversationId: string, targetUserId: string, nickname: string): Promise<string | null> {
+  const k = K();
+  const result = await serviceRequest<{ ok: boolean; nickname: string | null }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/nickname`,
+    { method: 'PATCH', body: JSON.stringify({ targetUserId, nickname }) },
+  );
+  const convs = await load<Conversation[]>(k.conversations, []);
+  await save(k.conversations, convs.map(c => c.id === conversationId
+    ? { ...c, participants: c.participants.map(p => p.userId === targetUserId ? { ...p, nickname: result.nickname ?? undefined } : p) }
+    : c));
+  notify();
+  return result.nickname ?? null;
+}
+
 // ─── Stories ─────────────────────────────────────────────────────────────────
 
 async function loadStories(k: SocialKeys = K()): Promise<Story[]> {
