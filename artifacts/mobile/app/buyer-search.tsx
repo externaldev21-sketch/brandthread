@@ -39,6 +39,7 @@ import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import { isBuyerDevPreview } from '@/lib/devPreview';
+import { pickAvatarColor } from '@/lib/avatarColors';
 import { ProductTile } from '@/components/search/ProductTile';
 import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
 import { BrandRow, type SearchBrandRow } from '@/components/search/BrandRow';
@@ -66,9 +67,9 @@ const VIDEO_GRID_GAP = 8;
  * under ?bt_preview=buyer with no live backend. Only shown when the real
  * `api.social.search` call fails or returns nothing while in preview mode. */
 const PREVIEW_ACCOUNTS: SearchPerson[] = [
-  { userId: 'preview-buyer-1', name: 'Casey Rivera', username: 'caseyrivera', handle: '@caseyrivera', initials: 'CR', color: '#5B5CFF', bio: 'Thrifted fits daily', isFollowing: false, accountType: 'buyer', verified: false, roleTag: 'Buyer' },
-  { userId: 'preview-buyer-2', name: 'Priya Nandan', username: 'priyan', handle: '@priyan', initials: 'PN', color: '#EC4899', bio: null, isFollowing: false, accountType: 'buyer', verified: true, roleTag: 'Buyer' },
-  { userId: 'preview-seller-1', name: 'Atelier Noire', username: 'ateliernoire', handle: '@ateliernoire', initials: 'AN', color: '#232323', bio: 'Midnight tailoring', isFollowing: false, accountType: 'seller', verified: true, roleTag: 'Atelier Noire' },
+  { userId: 'preview-buyer-1', name: 'Casey Rivera', username: 'caseyrivera', handle: '@caseyrivera', initials: 'CR', color: pickAvatarColor('preview-buyer-1'), bio: 'Thrifted fits daily', isFollowing: false, accountType: 'buyer', verified: false, roleTag: 'Buyer' },
+  { userId: 'preview-buyer-2', name: 'Priya Nandan', username: 'priyan', handle: '@priyan', initials: 'PN', color: pickAvatarColor('preview-buyer-2'), bio: null, isFollowing: false, accountType: 'buyer', verified: true, roleTag: 'Buyer' },
+  { userId: 'preview-seller-1', name: 'Atelier Noire', username: 'ateliernoire', handle: '@ateliernoire', initials: 'AN', color: pickAvatarColor('preview-seller-1'), bio: 'Midnight tailoring', isFollowing: false, accountType: 'seller', verified: true, roleTag: 'Atelier Noire' },
 ];
 
 function mapPreviewPostToVideo(post: (typeof FASHION_PREVIEW_POSTS)[number]): VideoResult {
