@@ -27,6 +27,7 @@ import {
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
 import { VoiceMessageBubble } from '@/components/chat/VoiceMessageBubble';
+import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
 import { confirmUnblock } from '@/lib/safety';
@@ -46,6 +47,10 @@ import {
   formatDate as sharedFormatDate, formatTime, groupFlags,
   groupCornerRadii, lastOwnMessageId,
 } from '@/lib/chatGrouping';
+import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuItem } from '@/components/chat/ReactionOverlay';
+import { ReactionGlyph } from '@/components/chat/ReactionBar';
+import { applyOptimisticReaction, myReactionIn, groupReactionCounts } from '@/lib/reactionMutations';
+import type { MessageReaction, ReactionType } from '@/services/socialTypes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +83,12 @@ interface Msg {
    *  message. Same field the API returns on app/buyer-conversation.tsx's
    *  Message type; see lib/chatGrouping.ts. */
   readAt?: string;
+  /** Item 68 (chat reactions glass) — the API already returns this for
+   *  every message regardless of caller role (see loadReactionsByMessage in
+   *  artifacts/api-server/src/routes/conversations.ts); previously just
+   *  unread here. Same MessageReaction shape app/buyer-conversation.tsx
+   *  renders, so both sides of a thread share one reaction data model. */
+  reactions?: MessageReaction[];
 }
 interface SellerProduct {
   id: string; name: string; priceCents?: number; status?: string;
@@ -196,6 +207,12 @@ export default function SellerConversationScreen() {
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
+  // Item 68 (chat reactions glass) — long-pressed message + its measured
+  // on-screen position, feeding the shared ReactionOverlay (see
+  // app/buyer-conversation.tsx's identical pattern).
+  const [activeSheetMsg, setActiveSheetMsg] = useState<Msg | null>(null);
+  const [reactionAnchor, setReactionAnchor] = useState<ReactionOverlayAnchor | null>(null);
+  const bubbleAnchorRefs = useRef<Record<string, View | null>>({});
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
   const voiceRecorder = useVoiceRecorder(uploadMedia, handleVoiceRecorded);
@@ -686,6 +703,75 @@ export default function SellerConversationScreen() {
     }
   }
 
+  // ── Reactions (item 68: chat reactions glass) ───────────────────────────────
+  // Same data model/endpoint app/buyer-conversation.tsx uses (the reaction
+  // rows/route are conversation-scoped, not buyer- or seller-specific — see
+  // loadReactionsByMessage in artifacts/api-server/src/routes/conversations.ts)
+  // — a seller reacting here shows up on the buyer's own thread view and
+  // vice versa, with no separate implementation.
+
+  function closeMessageSheet() {
+    setActiveSheetMsg(null);
+    setReactionAnchor(null);
+  }
+
+  function openReactionOverlay(msg: Msg) {
+    hapticSelection();
+    const node = bubbleAnchorRefs.current[msg.id];
+    if (!node) { setActiveSheetMsg(msg); return; }
+    node.measureInWindow((x, y, width, height) => {
+      setReactionAnchor({ x, y, width, height });
+      setActiveSheetMsg(msg);
+    });
+  }
+
+  /** Optimistic add/remove with rollback — same reducer + call shape as
+   *  app/buyer-conversation.tsx's handleReact, just against api.conversations
+   *  directly (this screen doesn't go through services/socialService). */
+  async function handleReact(msg: Msg, type: ReactionType) {
+    if (!id) return;
+    hapticSelection();
+    const prevMessages = messages;
+    const { next, isToggleOff } = applyOptimisticReaction(msg.reactions ?? [], myId, user?.fullName || user?.username || 'You', type);
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, reactions: next } : m)));
+    try {
+      if (isToggleOff) await api.conversations.removeReaction(id, msg.id);
+      else await api.conversations.addReaction(id, msg.id, type);
+    } catch {
+      setMessages(prevMessages);
+    }
+  }
+
+  function sheetCopy() {
+    if (activeSheetMsg?.text) {
+      Clipboard.setStringAsync(activeSheetMsg.text);
+      hapticSuccessAction();
+    }
+    closeMessageSheet();
+  }
+
+  function sheetReport() {
+    const msg = activeSheetMsg;
+    closeMessageSheet();
+    if (!msg || !other) return;
+    openMessageOptions({ router, messageId: msg.id, text: msg.text, counterpart: { userId: other.userId, name: other.name } });
+  }
+
+  function sheetAttachmentLabel(msg: Msg): string {
+    switch (msg.attachment?.type) {
+      case 'image': return 'Photo';
+      case 'video': return 'Video';
+      case 'voice': return 'Voice message';
+      case 'product': return msg.attachment.title ?? 'Product';
+      case 'order': return msg.attachment.title ?? 'Order';
+      case 'post': return msg.attachment.title ?? 'Post';
+      default: return '';
+    }
+  }
+
+  const myReactionOnSheet = activeSheetMsg ? myReactionIn(activeSheetMsg.reactions ?? [], myId) : null;
+  const isOwnSheetMsg = activeSheetMsg ? activeSheetMsg.fromId === myId : false;
+
   // ── Render helpers ──────────────────────────────────────────────────────────
 
   function renderItem({ item }: ListRenderItemInfo<ListRow>) {
@@ -732,20 +818,15 @@ export default function SellerConversationScreen() {
             </View>
           ) : <View style={s.msgAvatarSpacer} />
         )}
-        <View style={{ maxWidth: BUBBLE_MAX }}>
+        <View style={{ maxWidth: BUBBLE_MAX }} collapsable={false} ref={(r) => { bubbleAnchorRefs.current[msg.id] = r; }}>
           <PressableScale
             activeOpacity={0.9}
-            disabled={isOwn || removed || !other}
-            onLongPress={() => {
-              if (!other) return;
-              hapticSelection();
-              openMessageOptions({
-                router,
-                messageId: msg.id,
-                text: msg.text,
-                counterpart: { userId: other.userId, name: other.name },
-              });
-            }}
+            disabled={removed}
+            // Long-press always opens the reactions overlay (own or
+            // incoming message); Report stays incoming-only inside that
+            // overlay's own menu (see sheetReport below) — same one gesture
+            // now covers both, instead of a second competing long-press.
+            onLongPress={() => openReactionOverlay(msg)}
             delayLongPress={350}
             style={[
               s.bubble,
@@ -759,7 +840,7 @@ export default function SellerConversationScreen() {
                 ...groupCornerRadii(isOwn, isFirstInGroup, isLastInGroup, RADIUS.lg, 4),
               },
             ]}
-            accessibilityHint={isOwn ? undefined : 'Long press to report this message'}
+            accessibilityHint="Touch and hold to react or see more options"
             // Voice messages render their own play/scrub/speed/transcription
             // buttons inside this bubble — PressableScale defaults to rendering
             // an actual <button> on web, which cannot legally contain other
@@ -794,6 +875,33 @@ export default function SellerConversationScreen() {
               </View>
             )}
           </PressableScale>
+
+          {/* Reaction pill row — same summary treatment as
+              app/buyer-conversation.tsx (emoji + count, mine highlighted). */}
+          {(() => {
+            const reactionEntries = groupReactionCounts(msg.reactions ?? []);
+            const mine = myReactionIn(msg.reactions ?? [], myId);
+            if (reactionEntries.length === 0) return null;
+            return (
+              <View style={[s.reactionsRow, isOwn ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }]}>
+                {reactionEntries.map(([kind, count]) => (
+                  <PressableScale rippleEnabled={false}
+                    key={kind}
+                    style={[
+                      s.reactionChip,
+                      { backgroundColor: mine === kind ? PURPLE_DIM : CARD, borderColor: mine === kind ? PURPLE : BORDER },
+                    ]}
+                    onPress={() => handleReact(msg, kind)}
+                    activeOpacity={0.7}
+                    testID={`reaction-chip-${msg.id}-${kind}`}
+                  >
+                    <ReactionGlyph type={kind} size={12} />
+                    <Text style={[s.reactionCount, { color: mine === kind ? PURPLE : MUTED }]}>{count}</Text>
+                  </PressableScale>
+                ))}
+              </View>
+            );
+          })()}
 
           {/* Seen receipt — real backend readAt, same as
               app/buyer-conversation.tsx; see lib/chatGrouping.ts. */}
@@ -1200,6 +1308,39 @@ export default function SellerConversationScreen() {
           )}
         </SheetRise>
       </Modal>
+
+      {/* Long-press reactions — Glass overlay, same component/behavior as
+          app/buyer-conversation.tsx (Mobbin: Instagram DM "Tap and hold to
+          super react" — mobbin.com/screens/5d13fdd9-75ad-43d6-9089-
+          7b236e362b73). */}
+      <ReactionOverlay
+        visible={activeSheetMsg != null}
+        anchor={reactionAnchor}
+        isOwn={isOwnSheetMsg}
+        bubbleStyle={activeSheetMsg ? [
+          s.bubble,
+          { backgroundColor: isOwnSheetMsg ? sentBubbleColor : receivedBubbleColor, borderRadius: RADIUS.lg },
+        ] : undefined}
+        bubbleContent={activeSheetMsg ? (
+          <Text style={[s.msgText, { color: isOwnSheetMsg ? sentTextColor : receivedTextColor }]}>
+            {activeSheetMsg.text || sheetAttachmentLabel(activeSheetMsg)}
+          </Text>
+        ) : null}
+        selected={myReactionOnSheet}
+        onSelectReaction={(type) => {
+          if (activeSheetMsg) void handleReact(activeSheetMsg, type);
+          closeMessageSheet();
+        }}
+        menuItems={activeSheetMsg ? (
+          [
+            { key: 'copy', label: 'Copy', icon: 'copy', onPress: sheetCopy },
+            !isOwnSheetMsg && other
+              ? { key: 'report', label: 'Report message', icon: 'flag', destructive: true, onPress: sheetReport }
+              : null,
+          ].filter(Boolean) as ReactionOverlayMenuItem[]
+        ) : []}
+        onClose={closeMessageSheet}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -1287,6 +1428,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   bubbleTime: { fontSize: 10, fontFamily: FONT.regular },
   receiptChecks: { flexDirection: 'row', marginLeft: 2 },
+  // Reaction pill row (item 68) — same treatment as buyer-conversation.tsx.
+  reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  reactionChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: 1,
+  },
+  reactionCount: { fontSize: 11, fontFamily: FONT.semibold },
   // Seen receipt (Instagram DM "Seen just now" reference) — small muted
   // text under the sender's own last message.
   seenReceipt: {
