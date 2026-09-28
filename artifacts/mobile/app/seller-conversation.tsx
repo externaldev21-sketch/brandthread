@@ -43,7 +43,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   isSellerPreviewConversationId,
   getSellerPreviewConversation, getSellerPreviewMessages,
-  isPreviewInboxEnabled, posterUri,
+  isPreviewInboxEnabled, posterUri, previewAutoReplyText, previewAutoReplyDelayMs,
 } from '@/lib/previewInbox';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaUploadThumb from '@/components/chat/MediaUploadThumb';
@@ -81,6 +81,10 @@ interface ConvView {
   contextProductId?: string; contextProductName?: string;
   /** Chat details > Theme / Disappearing messages (conversation-level). */
   themeId?: string; disappearingEnabled?: boolean;
+  /** Real-time "X is typing…" — the buyer's own typing signal, polled via
+   *  GET /api/conversations/:id (see PATCH .../typing). Undefined for a
+   *  seeded preview thread (no real backend to poll). */
+  otherTyping?: boolean;
 }
 interface MsgAttachment {
   type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice' | 'system' | 'thread_cash';
@@ -255,6 +259,10 @@ export default function SellerConversationScreen() {
   // Item 74 (photo/video upload progress ring) — see the identical comment
   // in app/buyer-conversation.tsx.
   const mediaUploadTokenRef = useRef(0);
+  // Real-time "X is typing…" — same pattern as app/buyer-conversation.tsx's
+  // identical refs.
+  const isTypingSentRef = useRef(false);
+  const typingClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Item 74 verification aid — NOT a real feature. See the identical comment
   // on this same effect in app/buyer-conversation.tsx: the real upload is too
@@ -353,6 +361,53 @@ export default function SellerConversationScreen() {
       }
     };
   }, [api, id, loadAll, loadMessages]));
+
+  // "X is typing…" needs a tighter cadence than the 15s message poll above
+  // to read as live — same 3s cadence app/buyer-conversation.tsx's identical
+  // poll uses. Merges just otherTyping into conv rather than replacing it
+  // wholesale, so it never clobbers an in-flight local update elsewhere on
+  // this screen. Skipped for a seeded preview thread (no real backend/
+  // counterpart to poll).
+  useFocusEffect(useCallback(() => {
+    if (!id || isSellerPreviewConversationId(id)) return;
+    const interval = setInterval(() => {
+      api.conversations.get(id).then((fresh: { otherTyping?: boolean }) => {
+        setConv((prev) => (prev ? { ...prev, otherTyping: fresh?.otherTyping } : prev));
+      }).catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [api, id]));
+
+  useEffect(() => () => {
+    if (typingClearTimerRef.current) clearTimeout(typingClearTimerRef.current);
+  }, []);
+
+  /** Real-time "X is typing…": tells the server I'm composing (once per
+   *  burst of keystrokes) and schedules clearing it after a short pause —
+   *  see app/buyer-conversation.tsx's identical helper. No-ops for a seeded
+   *  preview thread (no real backend/counterpart). */
+  function sendTypingSignal(hasText: boolean) {
+    if (!id || isSellerPreviewConversationId(id)) return;
+    if (typingClearTimerRef.current) { clearTimeout(typingClearTimerRef.current); typingClearTimerRef.current = null; }
+    if (hasText) {
+      if (!isTypingSentRef.current) {
+        isTypingSentRef.current = true;
+        api.conversations.setTyping(id, true).catch(() => {});
+      }
+      typingClearTimerRef.current = setTimeout(() => {
+        isTypingSentRef.current = false;
+        api.conversations.setTyping(id, false).catch(() => {});
+      }, 3000);
+    } else if (isTypingSentRef.current) {
+      isTypingSentRef.current = false;
+      api.conversations.setTyping(id, false).catch(() => {});
+    }
+  }
+
+  function handleChangeText(next: string) {
+    setText(next);
+    sendTypingSignal(next.trim().length > 0);
+  }
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -884,6 +939,53 @@ export default function SellerConversationScreen() {
     setText('');
     setPendingAttachment(null);
     setReplyTo(null);
+    sendTypingSignal(false);
+
+    // Preview conversations have no real backend to post to — this branch
+    // was previously missing here (unlike every other send path on this
+    // screen, e.g. the Thread Cash onSent handler above), so sending a
+    // message under ?bt_preview=seller hit the real API with a fake
+    // conversation id and failed. Appends locally instead, same pattern as
+    // app/buyer-conversation.tsx's identical branch, and has the simulated
+    // buyer send back exactly one short auto-reply so the thread feels live.
+    if (isSellerPreviewConversationId(id)) {
+      const localMsg: Msg = {
+        id: `local-${Date.now()}`,
+        conversationId: id,
+        fromId: effectiveMyId,
+        fromName: 'You',
+        fromInitials: 'Y',
+        fromColor: PURPLE,
+        text: t,
+        attachment: att ?? undefined,
+        replyToId: replyingTo?.id,
+        replyPreview: replyingTo?.text,
+        replyToAuthorName: replyingTo?.fromName,
+        reactions: [],
+        status: 'sent',
+        ts: Date.now(),
+      };
+      setMessages((prev) => [...prev, localMsg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      setTimeout(() => {
+        const reply: Msg = {
+          id: `local-reply-${Date.now()}`,
+          conversationId: id,
+          fromId: other?.userId ?? 'preview-buyer',
+          fromName: other?.name ?? 'Buyer',
+          fromInitials: other?.initials ?? 'B',
+          fromColor: other?.color ?? PURPLE,
+          text: previewAutoReplyText(),
+          reactions: [],
+          status: 'sent',
+          ts: Date.now(),
+        };
+        setMessages((prev) => [...prev, reply]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      }, previewAutoReplyDelayMs());
+      return;
+    }
+
     setIsSending(true);
     try {
       const msg = await api.conversations.send(id, {
@@ -1257,7 +1359,13 @@ export default function SellerConversationScreen() {
           )}
           <View style={s.headerCenter}>
             <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
-            {other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null}
+            {/* Real-time "X is typing…" (conv.otherTyping) takes priority
+                over the static handle line when present — same field/poll
+                app/buyer-conversation.tsx's statusLine reads, just no
+                existing subtitle slot there to reuse before now. */}
+            {conv?.otherTyping
+              ? <Text style={s.headerHandle} numberOfLines={1}>typing…</Text>
+              : (other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null)}
           </View>
         </PressableScale>
         {id && (
@@ -1559,7 +1667,7 @@ export default function SellerConversationScreen() {
         <TextInput
           style={s.textInput}
           value={text}
-          onChangeText={setText}
+          onChangeText={handleChangeText}
           placeholder="Message…"
           placeholderTextColor={SUBTLE}
           multiline
