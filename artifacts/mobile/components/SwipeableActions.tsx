@@ -1,0 +1,97 @@
+/**
+ * Swipe-left-to-reveal actions, generalizing `SwipeActionRow` (single action)
+ * to any number of stacked action buttons — Instagram's Activity row is the
+ * first caller: swiping a row left reveals a "..." button and a red trash
+ * icon side by side (Mobbin: "Instagram iOS Removing a follower" flow,
+ * screen 1 — https://mobbin.com/screens/c404cbe7-e8c0-4b09-904c-62ba9d1b0a71).
+ *
+ * `SwipeActionRow` is left as-is for its existing single-action callers;
+ * this is the shared, general version for anything (now or later) that needs
+ * more than one revealed button.
+ */
+import React, { useMemo, useRef } from 'react';
+import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { hapticLight } from '@/lib/haptics';
+
+export interface SwipeAction {
+  key: string;
+  icon: keyof typeof Feather.glyphMap;
+  color: string;
+  iconColor: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+}
+
+const ACTION_WIDTH = 56;
+
+export default function SwipeableActions({
+  children,
+  actions,
+  disabled = false,
+}: {
+  children: React.ReactNode;
+  actions: SwipeAction[];
+  disabled?: boolean;
+}) {
+  const revealWidth = actions.length * ACTION_WIDTH;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const openRef = useRef(false);
+
+  const animateTo = (toValue: number) => {
+    Animated.spring(translateX, { toValue, useNativeDriver: true, damping: 22, stiffness: 240 }).start();
+    openRef.current = toValue !== 0;
+  };
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) =>
+      !disabled && (
+        (gesture.dx < -8 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.25) ||
+        (openRef.current && gesture.dx > 8)
+      ),
+    onPanResponderMove: (_, gesture) => {
+      const base = openRef.current ? -revealWidth : 0;
+      translateX.setValue(Math.max(-revealWidth, Math.min(0, base + gesture.dx)));
+    },
+    onPanResponderRelease: (_, gesture) => {
+      const base = openRef.current ? -revealWidth : 0;
+      const projected = base + gesture.dx;
+      if (projected <= -revealWidth / 2) {
+        if (!openRef.current) hapticLight();
+        animateTo(-revealWidth);
+      } else {
+        animateTo(0);
+      }
+    },
+    onPanResponderTerminate: () => animateTo(openRef.current ? -revealWidth : 0),
+  }), [disabled, revealWidth]);
+
+  const close = () => animateTo(0);
+
+  return (
+    <View style={styles.clip}>
+      <View style={[styles.actionsRow, { width: revealWidth }]}>
+        {actions.map((action) => (
+          <Pressable
+            key={action.key}
+            style={[styles.action, { backgroundColor: action.color, width: ACTION_WIDTH }]}
+            onPress={() => { close(); action.onPress(); }}
+            accessibilityRole="button"
+            accessibilityLabel={action.accessibilityLabel}
+          >
+            <Feather name={action.icon} size={18} color={action.iconColor} />
+          </Pressable>
+        ))}
+      </View>
+      <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  clip: { overflow: 'hidden', position: 'relative' },
+  actionsRow: { position: 'absolute', top: 0, right: 0, bottom: 0, flexDirection: 'row' },
+  action: { alignItems: 'center', justifyContent: 'center' },
+});
