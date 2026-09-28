@@ -47,6 +47,12 @@ const FILES_TO_CHECK = [
   'app/(tabs)/profile.tsx',
   'components/profile/ProfileStoryAvatar.tsx',
   'components/profile/ProfileVideoHeader.tsx',
+  // Feed SHOP pill (see tests/feed-shop-pill.test.ts and the tap-target fix
+  // in components/buyer-feed/ShopSideTab.tsx): the whole expanded strip
+  // (thumbnail + name/price text + chevron) must stay ONE shared
+  // TouchableOpacity, never a per-element handler nested inside it.
+  'components/buyer-feed/ShopSideTab.tsx',
+  'components/buyer-feed/CaptionBlock.tsx',
 ];
 
 /**

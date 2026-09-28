@@ -1,3 +1,5 @@
+import type { NormalizedCropRect } from '@/lib/mediaCrop';
+
 export type VideoCaptureSpeed = 0.5 | 1 | 2 | 3;
 export type VideoCaptureFilter = 'none' | 'warm' | 'cool' | 'mono';
 
@@ -123,7 +125,7 @@ export function createTextOverlay(partial: Partial<TextOverlay> & { id: string; 
 export interface EditablePhotoSlide {
   /** Stable client-side identifier (never changes for the lifetime of this slide) */
   id: string;
-  /** Local image URI (from media library / camera) */
+  /** Local image URI (from media library / camera), already cropped to 3:4 */
   uri: string;
   /** Detected MIME type of the local file */
   mimeType?: string;
@@ -135,6 +137,10 @@ export interface EditablePhotoSlide {
   uploadState: 'idle' | 'uploading' | 'uploaded' | 'error';
   /** Error message if uploadState === 'error' */
   uploadError?: string;
+  /** The uncropped source, kept so "Edit crop" always re-crops from it. */
+  originalUri?: string;
+  /** The saved 3:4 crop, normalized against `originalUri`'s pixel dimensions. */
+  cropRect?: NormalizedCropRect;
 }
 
 /** Per-slide overlay entry as persisted in the DB / sent to the API */
@@ -152,9 +158,11 @@ export interface ComposedSlideshowResult {
   slideCount: number;
 }
 
-/** Create a new editable photo slide from a local URI */
-export function createPhotoSlide(id: string, uri: string, mimeType?: string): EditablePhotoSlide {
-  return { id, uri, mimeType, overlays: [], uploadState: 'idle' };
+/** Create a new editable photo slide from a local URI, already cropped to 3:4. */
+export function createPhotoSlide(
+  id: string, uri: string, mimeType?: string, originalUri?: string, cropRect?: NormalizedCropRect,
+): EditablePhotoSlide {
+  return { id, uri, mimeType, overlays: [], uploadState: 'idle', originalUri: originalUri ?? uri, cropRect };
 }
 
 /** Set the upload state for a specific slide */
