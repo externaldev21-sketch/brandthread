@@ -8,6 +8,7 @@
  */
 import React, { forwardRef, useMemo } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -50,6 +51,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   onTileLongPress: (post: DiscoverPost) => void;
   contentContainerStyle?: object;
   ListHeaderComponent?: React.ComponentType<any> | React.ReactElement;
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  scrollEventThrottle?: number;
 }>(function DiscoverGrid({
   posts,
   loading,
@@ -66,6 +69,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   onTileLongPress,
   contentContainerStyle,
   ListHeaderComponent,
+  onScroll,
+  scrollEventThrottle,
 }, ref) {
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
@@ -111,6 +116,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
       ListHeaderComponent={ListHeaderComponent}
+      onScroll={onScroll}
+      scrollEventThrottle={scrollEventThrottle}
       ListEmptyComponent={!loading ? (
         <EmptyState
           icon="activity"

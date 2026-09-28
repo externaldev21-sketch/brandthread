@@ -7,6 +7,7 @@ import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
+import { Glass } from '@/components/ui/Glass';
 
 export type DiscoverFilterKey = 'forYou' | 'fits' | 'brands' | 'people' | 'drops';
 
@@ -21,20 +22,30 @@ export const DISCOVER_FILTERS: Array<{ key: DiscoverFilterKey; label: string }> 
 /**
  * Discover's filter row — same scrolling-pill pattern as search's
  * SegmentedTabs (16pt gutter, right fade, white-fill/black-text active
- * state), specialized for the five Discover filters.
+ * state), specialized for the five Discover filters. Pinned as a sticky
+ * sibling above the grid (see app/(buyer)/discover.tsx) rather than
+ * scrolling away with content — Mobbin reference: Instagram's own
+ * search-results pill row, pinned directly under the search bar
+ * (https://mobbin.com/screens/f85f7bca-4c5c-4535-8c91-dc966ab36d6a).
+ * `elevated` fades in a <Glass/> backdrop once the grid below has scrolled,
+ * signalling the row is now floating over content rather than sitting flush
+ * against the plain background at the top.
  */
 export function DiscoverFilterRow({
   active,
   onChange,
+  elevated = false,
 }: {
   active: DiscoverFilterKey;
   onChange: (key: DiscoverFilterKey) => void;
+  elevated?: boolean;
 }) {
   const { theme } = useAppTheme();
   const styles = makeStyles(theme);
 
   return (
     <View style={styles.wrap}>
+      {elevated && <Glass variant="regular" tint="dark" radius={0} style={StyleSheet.absoluteFill} testID="discover-filter-row-glass" />}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
