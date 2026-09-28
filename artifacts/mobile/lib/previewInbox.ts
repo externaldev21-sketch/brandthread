@@ -151,6 +151,31 @@ export function deletePreviewConversationRequest(id: string): void {
   cachedConversations = removeConversationFromList(getPreviewConversations(), id);
 }
 
+/**
+ * Chat details > Theme, in preview mode: sets the seeded conversation's
+ * themeId in place, the same module-level-cache trick as accept/delete above
+ * — there's no real backend to persist to, but the mutation is visible to
+ * every screen reading getPreviewConversation() in this session.
+ */
+export function setPreviewConversationTheme(id: string, themeId: string | null): void {
+  const list = getPreviewConversations();
+  const idx = list.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  const next = list.slice();
+  next[idx] = { ...next[idx], themeId: themeId ?? undefined };
+  cachedConversations = next;
+}
+
+/** Chat details > Disappearing messages, in preview mode: same pattern. */
+export function setPreviewConversationDisappearing(id: string, enabled: boolean): void {
+  const list = getPreviewConversations();
+  const idx = list.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  const next = list.slice();
+  next[idx] = { ...next[idx], disappearingEnabled: enabled };
+  cachedConversations = next;
+}
+
 let cachedNotifications: Notification[] | null = null;
 
 /** Seeded "new follower" notifications for the redesigned inbox's Follows
@@ -187,10 +212,23 @@ function toAttachment(seed: PreviewMessageSeed['attachment']): MessageAttachment
 /** Seeded messages for one seeded conversation id, in the exact `Message`
  *  shape `app/buyer-conversation.tsx` already renders (bubbles, reactions,
  *  attachments). Returns `[]` for an id this module doesn't know about. */
+// Messages appended after the seed data at runtime (e.g. a "You changed the
+// theme..." system line posted from chat details) — a conversation-scoped,
+// module-level list, same lifetime/sharing model as cachedConversations
+// above. Cleared on reload, same as every other preview mutation.
+const previewExtraMessages = new Map<string, Message[]>();
+
+/** Chat details > Theme / Disappearing messages, in preview mode: appends a
+ *  system-line message after the seeded thread, visible to every screen
+ *  reading getPreviewMessages() for this conversation in this session. */
+export function appendPreviewMessage(conversationId: string, message: Message): void {
+  const list = previewExtraMessages.get(conversationId) ?? [];
+  previewExtraMessages.set(conversationId, [...list, message]);
+}
+
 export function getPreviewMessages(conversationId: string): Message[] {
   const seed = seedById(conversationId);
-  if (!seed?.messages) return [];
-  return seed.messages.map((m): Message => {
+  const base: Message[] = !seed?.messages ? [] : seed.messages.map((m): Message => {
     const isMe = m.fromOfficialOrParticipant === 'me';
     return {
       id: m.id,
@@ -207,6 +245,7 @@ export function getPreviewMessages(conversationId: string): Message[] {
       deletedForMe: false,
     };
   });
+  return [...base, ...(previewExtraMessages.get(conversationId) ?? [])];
 }
 
 // ─── Transient "typing…" simulation (preview-only, not a real feature) ────────

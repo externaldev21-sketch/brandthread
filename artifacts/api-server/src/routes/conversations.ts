@@ -96,6 +96,10 @@ function buildConversationView(
     // Chat details > Mute. Present only when actively muted (a past
     // mutedUntil behaves as unmuted on the client).
     mutedUntil: myMutedUntil && myMutedUntil.getTime() > Date.now() ? myMutedUntil.toISOString() : undefined,
+    // Chat details > Theme / Disappearing messages (both conversation-level,
+    // identical for every participant — never per-viewer).
+    themeId: (conv as { themeId?: string | null }).themeId ?? undefined,
+    disappearingEnabled: !!(conv as { disappearingEnabled?: boolean }).disappearingEnabled,
     lastMessage:        lastMessagePreview ?? conv.lastMessage ?? undefined,
     lastMessageTs:      conv.lastMessageAt
       ? new Date(conv.lastMessageAt).getTime()
@@ -472,6 +476,12 @@ router.get("/:id/messages", async (req, res) => {
 
   if (!isMember) return res.status(403).json({ error: "Not a participant" });
 
+  // Disappearing messages: an opportunistic sweep in place of a cron job —
+  // hard-delete anything in this conversation whose disappear_at has passed
+  // before returning the list. See docs/dm-flows.md.
+  await db.delete(messages)
+    .where(and(eq(messages.conversationId, id), sql`${messages.disappearAt} IS NOT NULL AND ${messages.disappearAt} < now()`));
+
   const whereClause = q
     ? and(eq(messages.conversationId, id), ilike(messages.body, `%${q}%`))
     : before
@@ -845,13 +855,20 @@ router.patch("/:id/read", async (req, res) => {
     .limit(1);
   if (!isMember) return res.status(404).json({ error: "Conversation not found" });
 
+  const [conv] = await db.select({ disappearingEnabled: conversations.disappearingEnabled })
+    .from(conversations).where(eq(conversations.id, id)).limit(1);
+
   const readAt = new Date();
+  // Disappearing messages: once a message has been seen (read), it disappears
+  // 24h later — matching Instagram's own copy — set here rather than waited
+  // on a cron job; see the sweep in GET /:id/messages.
+  const disappearAt = conv?.disappearingEnabled ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
   await Promise.all([
     db.update(conversationParticipants)
       .set({ unreadCount: 0, lastReadAt: readAt })
       .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId))),
     db.update(messages)
-      .set({ status: "read", readAt })
+      .set({ status: "read", readAt, ...(disappearAt ? { disappearAt } : {}) })
       .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`)),
   ]);
 
@@ -929,6 +946,72 @@ router.patch("/:id/nickname", async (req, res) => {
   await db.update(conversations).set({ nicknames }).where(eq(conversations.id, id));
 
   return res.json({ ok: true, nickname: nicknames[key] ?? null });
+});
+
+// Kept in sync with mobile's lib/conversationThemes.ts CONVERSATION_THEMES ids.
+const THEME_IDS = ["runway", "denim", "satin", "noir", "chrome", "linen", "street", "archive"] as const;
+
+async function insertSystemMessage(conversationId: string, actorId: string, title: string, meta: Record<string, string>) {
+  const [msg] = await db.insert(messages).values({
+    conversationId,
+    senderId: actorId,
+    senderName: "",
+    senderInitials: "",
+    senderColor: "#000000",
+    body: "",
+    attachment: { type: "system", title, meta: { actorId, ...meta } },
+    status: "sent",
+    deliveredAt: new Date(),
+  }).returning();
+  await db.update(conversations)
+    .set({ lastMessage: "Chat settings changed", lastMessageAt: new Date(), updatedAt: new Date() })
+    .where(eq(conversations.id, conversationId));
+  return msg;
+}
+
+// ─── PATCH /api/conversations/:id/theme ──────────────────────────────────────
+// Chat details > Theme. Body: { themeId: string | null }. null resets to the
+// app's default monochrome look. Posts a system line into the thread —
+// "You changed the theme to [Name]. Change" — visible to both participants,
+// since the theme itself is a conversation-level property, not per-user.
+router.patch("/:id/theme", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const { themeId } = req.body as { themeId?: string | null };
+  if (themeId != null && !THEME_IDS.includes(themeId as any)) {
+    return res.status(400).json({ error: `themeId must be one of: ${THEME_IDS.join(", ")}, or null.` });
+  }
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  await db.update(conversations).set({ themeId: themeId ?? null }).where(eq(conversations.id, id));
+  const msg = await insertSystemMessage(id, userId, "theme_changed", { themeId: themeId ?? "" });
+
+  return res.json({ ok: true, themeId: themeId ?? null, message: adaptMessage(msg) });
+});
+
+// ─── PATCH /api/conversations/:id/disappearing ───────────────────────────────
+// Chat details > Disappearing messages. Body: { enabled: boolean }. Posts the
+// matching system line ("You turned on/off disappearing messages. Change").
+router.patch("/:id/disappearing", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  const { enabled } = req.body as { enabled?: boolean };
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  await db.update(conversations).set({ disappearingEnabled: !!enabled }).where(eq(conversations.id, id));
+  const msg = await insertSystemMessage(id, userId, enabled ? "disappearing_on" : "disappearing_off", {});
+
+  return res.json({ ok: true, disappearingEnabled: !!enabled, message: adaptMessage(msg) });
 });
 
 // ─── PATCH /api/conversations/:id/accept — accept a message request ───────────

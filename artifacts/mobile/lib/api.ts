@@ -1465,6 +1465,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Chat details > Nicknames. An empty nickname clears it. */
       setNickname: (id: string, targetUserId: string, nickname: string) =>
         patch<{ ok: boolean; nickname: string | null }>(`/api/conversations/${encodeURIComponent(id)}/nickname`, { targetUserId, nickname }),
+      /** Chat details > Theme. null resets to the default monochrome look. */
+      setTheme: (id: string, themeId: string | null) =>
+        patch<{ ok: boolean; themeId: string | null; message: any }>(`/api/conversations/${encodeURIComponent(id)}/theme`, { themeId }),
+      /** Chat details > Disappearing messages. */
+      setDisappearing: (id: string, enabled: boolean) =>
+        patch<{ ok: boolean; disappearingEnabled: boolean; message: any }>(`/api/conversations/${encodeURIComponent(id)}/disappearing`, { enabled }),
       send:       (id: string, body: { text: string; attachment?: any; replyToId?: string }) =>
         post<any>(`/api/conversations/${encodeURIComponent(id)}/messages`, body),
       markRead:   (id: string) =>

@@ -69,7 +69,7 @@ export default function ConversationSearchScreen() {
         <View style={[s.searchPill, { backgroundColor: theme.cardElevated }]}>
           <Feather name="search" size={ICON.sm} color={theme.muted} />
           <TextInput
-            style={[s.searchInput, { color: theme.text }]}
+            style={[s.searchInput, { color: theme.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
             value={query}
             onChangeText={runSearch}
             placeholder="Search in this chat"
