@@ -1311,6 +1311,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     minHeight: 68,
     width: '100%',
     overflow: 'hidden',
+    // Opaque — a transparent row let SwipeableActions' revealed "..."/trash
+    // buttons (always rendered behind it, just off-screen at rest) show
+    // through at the trailing edge on web, where CSS paints a `position:
+    // absolute` sibling above a plain static one regardless of DOM order.
+    backgroundColor: theme.background,
   },
   // The Follow back / Following control (or the trailing thumbnail — see
   // `trailingThumb` at the call site) renders as a sibling of this

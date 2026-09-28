@@ -83,7 +83,7 @@ export default function SwipeableActions({
           </Pressable>
         ))}
       </View>
-      <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
+      <Animated.View style={[styles.front, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
         {children}
       </Animated.View>
     </View>
@@ -91,7 +91,13 @@ export default function SwipeableActions({
 }
 
 const styles = StyleSheet.create({
-  clip: { overflow: 'hidden', position: 'relative' },
+  // Explicit width on both the clip and the front content: without it, an
+  // unconstrained `<Animated.View>` shrinks to its content's own width
+  // rather than stretching to the row's full width, leaving a gap at the
+  // trailing edge that let the absolutely-positioned action buttons behind
+  // it show through even at rest (translateX: 0).
+  clip: { overflow: 'hidden', position: 'relative', width: '100%' },
+  front: { width: '100%' },
   actionsRow: { position: 'absolute', top: 0, right: 0, bottom: 0, flexDirection: 'row' },
   action: { alignItems: 'center', justifyContent: 'center' },
 });
