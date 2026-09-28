@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/BrandthreadUI';
 import { EditorialTile, TileRailSkeleton, type EditorialTileItem } from './EditorialTile';
 import { DiscoverTileView, DiscoverTileSkeleton } from './DiscoverTileView';
 import { DiscoverPeopleRow } from './DiscoverPeopleRow';
+import { DiscoverShopTheLookRail } from './DiscoverShopTheLookRail';
 import type { DiscoverPost, DiscoverPersonSuggestion } from '@/lib/discoverFeed';
 import { buildGridRows, type GridRow } from '@/lib/discoverGridPacking';
 
@@ -38,6 +39,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   loadingMore?: boolean;
   justDroppedItems?: EditorialTileItem[];
   highDemandItems?: EditorialTileItem[];
+  shopTheLookPosts?: DiscoverPost[];
+  onOpenShopTheLook?: (post: DiscoverPost) => void;
   people?: DiscoverPersonSuggestion[];
   showRails?: boolean;
   onEndReached?: () => void;
@@ -51,6 +54,8 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
   loadingMore,
   justDroppedItems = [],
   highDemandItems = [],
+  shopTheLookPosts = [],
+  onOpenShopTheLook,
   people = [],
   showRails = true,
   onEndReached,
@@ -78,9 +83,10 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
       showRails,
       hasJustDropped: justDroppedItems.length > 0,
       hasHighDemand: highDemandItems.length > 0,
+      hasShopTheLook: shopTheLookPosts.length > 0,
       hasPeople: people.length > 0,
     });
-  }, [posts, loading, showRails, justDroppedItems.length, highDemandItems.length, people.length]);
+  }, [posts, loading, showRails, justDroppedItems.length, highDemandItems.length, shopTheLookPosts.length, people.length]);
 
   return (
     <FlatList
@@ -151,6 +157,9 @@ export const DiscoverGrid = forwardRef<FlatList<GridRow>, {
         }
         if (row.type === 'people') {
           return <DiscoverPeopleRow people={people} />;
+        }
+        if (row.kind === 'shopTheLook') {
+          return <DiscoverShopTheLookRail posts={shopTheLookPosts} onPress={onOpenShopTheLook ?? (() => {})} />;
         }
         // Rail row (Just Dropped / High Demand)
         const items = row.kind === 'justDropped' ? justDroppedItems : highDemandItems;

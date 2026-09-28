@@ -26,7 +26,7 @@
  * (owner correction) — "Shop the look" only appears on posts that carry a
  * seller product tag.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useRouter } from 'expo-router';
@@ -291,6 +291,11 @@ export default function DiscoverScreen() {
     });
   }
 
+  const shopTheLookPosts = useMemo(
+    () => forYouPosts.filter((p) => (p.productTags?.length ?? 0) > 0).slice(0, 12),
+    [forYouPosts],
+  );
+
   function removePostFromLists(authorId: string, onlyPostId?: string) {
     const filterFn = (p: DiscoverPost) => (onlyPostId ? p.id !== onlyPostId : p.authorId !== authorId);
     setForYouPosts((prev) => prev.filter(filterFn));
@@ -318,6 +323,8 @@ export default function DiscoverScreen() {
           loadingMore={forYouLoadingMore}
           justDroppedItems={justDroppedItems}
           highDemandItems={highDemandItems}
+          shopTheLookPosts={shopTheLookPosts}
+          onOpenShopTheLook={openShopTheLook}
           people={people}
           onEndReached={() => {
             if (forYouLoadingMore || forYouLoading || forYouLimit.current >= 120) return;
