@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Glass } from '@/components/ui/Glass';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FONT, FS } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { RADII } from '@/constants/radii';
 import { FADE_MS } from '@/constants/motion';
 import { REACTION_CONFIG, ReactionGlyph } from './ReactionBar';
@@ -60,6 +61,7 @@ const SCREEN_MARGIN = 16;
 export function ReactionOverlay({
   visible, anchor, isOwn, bubbleStyle, bubbleContent, selected, onSelectReaction, menuItems, onClose,
 }: ReactionOverlayProps) {
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const anim = useRef(new Animated.Value(0)).current;
   const [rowH, setRowH] = useState(0);
@@ -159,8 +161,8 @@ export function ReactionOverlay({
                   onPress={item.onPress}
                   testID={`reaction-menu-${item.key}`}
                 >
-                  <Text style={[s.menuLabel, item.destructive && s.menuLabelDestructive]}>{item.label}</Text>
-                  <Feather name={item.icon} size={16} color={item.destructive ? '#FF6B6B' : '#fff'} />
+                  <Text style={[s.menuLabel, item.destructive && { color: theme.error }]}>{item.label}</Text>
+                  <Feather name={item.icon} size={16} color={item.destructive ? theme.error : '#fff'} />
                 </PressableScale>
               ))}
             </Glass>
@@ -181,7 +183,6 @@ const s = StyleSheet.create({
   menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 },
   menuItemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.18)' },
   menuLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: '#fff' },
-  menuLabelDestructive: { color: '#FF6B6B' },
   elevatedShadow: {
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
   },
