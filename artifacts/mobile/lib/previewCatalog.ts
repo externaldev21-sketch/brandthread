@@ -64,6 +64,12 @@ export interface PreviewCatalogProduct {
 // Same brand/product names + prices as the FASHION_PREVIEW_POSTS feed demo
 // data, so a buyer sees one consistent set of preview brands across the
 // feed, Discover, Search and Shop rather than two different fake catalogs.
+//
+// fashion_runway_07.jpg (posterIndex 6) is deliberately never used here — a
+// bright sunset/city-skyline shot, the one photo in this bundle that breaks
+// the muted, monochrome-leaning editorial look the rest of the catalog
+// keeps (item 45). "Crystal Mesh Top" reuses index 1's photo (also an
+// evening/going-out look) instead of a 7th distinct image.
 const SEED: Array<Omit<PreviewCatalogProduct, 'images' | 'cutoutUri' | 'id' | 'productId' | 'sellerId'> & { posterIndex: number }> = [
   { posterIndex: 0, name: 'Sculpted Wool Coat', sellerDisplayName: 'Atelier Noire', category: 'Outerwear', currentPriceCents: 48000, compareAtPriceCents: null, priceCents: 48000, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 18, remainingUnits: 6, demandCount: 142, tags: ['coat', 'wool', 'tailoring'] },
   { posterIndex: 1, name: 'Liquid Silver Dress', sellerDisplayName: 'Maison Vela', category: 'Dresses', currentPriceCents: 32500, compareAtPriceCents: 39000, priceCents: 32500, sizes: ['XS', 'S', 'M'], claimedUnits: 24, remainingUnits: 4, demandCount: 210, tags: ['dress', 'evening'] },
@@ -71,7 +77,7 @@ const SEED: Array<Omit<PreviewCatalogProduct, 'images' | 'cutoutUri' | 'id' | 'p
   { posterIndex: 3, name: 'Ivory Column Set', sellerDisplayName: 'Orison', category: 'Sets', currentPriceCents: 41000, compareAtPriceCents: null, priceCents: 41000, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 12, remainingUnits: 8, demandCount: 96, tags: ['set', 'bridal'] },
   { posterIndex: 4, name: 'Asymmetric Layer Jacket', sellerDisplayName: 'Kuro Line', category: 'Outerwear', currentPriceCents: 29500, compareAtPriceCents: 35000, priceCents: 29500, sizes: ['S', 'M', 'L'], claimedUnits: 31, remainingUnits: 3, demandCount: 260, tags: ['jacket'] },
   { posterIndex: 5, name: 'Draped Hardware Gown', sellerDisplayName: 'Forme 22', category: 'Dresses', currentPriceCents: 37500, compareAtPriceCents: null, priceCents: 37500, sizes: ['XS', 'S', 'M'], claimedUnits: 15, remainingUnits: 9, demandCount: 121, tags: ['gown', 'evening'] },
-  { posterIndex: 6, name: 'Crystal Mesh Top', sellerDisplayName: 'Astrae', category: 'Tops', currentPriceCents: 24500, compareAtPriceCents: null, priceCents: 24500, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 22, remainingUnits: 14, demandCount: 175, tags: ['top', 'going-out'] },
+  { posterIndex: 1, name: 'Crystal Mesh Top', sellerDisplayName: 'Astrae', category: 'Tops', currentPriceCents: 24500, compareAtPriceCents: null, priceCents: 24500, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 22, remainingUnits: 14, demandCount: 175, tags: ['top', 'going-out'] },
   { posterIndex: 7, name: 'Reconstructed Trench', sellerDisplayName: 'Noma Archive', category: 'Outerwear', currentPriceCents: 52000, compareAtPriceCents: null, priceCents: 52000, sizes: ['S', 'M', 'L', 'XL'], claimedUnits: 7, remainingUnits: 13, demandCount: 64, tags: ['trench', 'coat'] },
   { posterIndex: 8, name: 'Satin Power Suit', sellerDisplayName: 'Echelon', category: 'Suiting', currentPriceCents: 44500, compareAtPriceCents: 51000, priceCents: 44500, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 19, remainingUnits: 5, demandCount: 188, tags: ['suit'] },
   { posterIndex: 9, name: 'Sculpted Silk Gown', sellerDisplayName: 'Vale Studio', category: 'Dresses', currentPriceCents: 69000, compareAtPriceCents: null, priceCents: 69000, sizes: ['XS', 'S', 'M'], claimedUnits: 5, remainingUnits: 7, demandCount: 71, tags: ['gown', 'evening'] },

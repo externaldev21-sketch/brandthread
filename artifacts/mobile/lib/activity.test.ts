@@ -5,6 +5,7 @@ import {
   activityChipEmpty,
   matchesActivityChip,
   activityHref,
+  activityRowHref,
   activityIcon,
   activityKind,
   activityMessage,
@@ -13,6 +14,8 @@ import {
   applyRead,
   buildActivitySections,
   createReadTracker,
+  createDeferredDelete,
+  ACTIVITY_UNDO_MS,
   groupByRecency,
   groupedPeopleHref,
   groupedPeopleTitle,
@@ -296,6 +299,19 @@ describe('classification and routing', () => {
     expect(activityKind({ category: 'messages', type: 'new_friend_message' })).toBe('other');
   });
 
+  it('deep-links comment, reply and mention rows to the exact comment', () => {
+    for (const type of ['post_comment', 'comment_reply', 'mention']) {
+      expect(activityHref(item({ type, targetType: 'post', targetId: 'p1', commentId: 'c 9' })))
+        .toBe('/buyer-post-comments?postId=p1&commentId=c%209');
+      // Older rows without a comment id still open that post's comments.
+      expect(activityHref(item({ type, targetType: 'post', targetId: 'p1' })))
+        .toBe('/buyer-post-comments?postId=p1');
+    }
+    // A like never carries a comment: it opens the post itself.
+    expect(activityHref(item({ type: 'post_like', targetType: 'post', targetId: 'p1', commentId: 'c9' })))
+      .toBe('/buyer-post-viewer?postId=p1');
+  });
+
   it('routes rows to existing screens', () => {
     expect(activityHref(item({ type: 'new_order_received', targetType: 'order', targetId: 'o 1' }), 'seller'))
       .toBe('/order-detail?id=o%201');
@@ -475,6 +491,19 @@ describe('grouped rows → people list', () => {
     expect(params.get('ids')!.split(',')).toEqual(merged.ids);
   });
 
+  it('opens a merged comment row at the newest comment, other merged rows at the people list', () => {
+    const comment = (actor: string, commentId: string) => like(actor, 'post1', {
+      type: 'post_comment', title: `${actor} commented on your post`, commentId,
+    });
+    const [comments] = aggregateActivity([comment('Jay', 'c2'), comment('Mina', 'c1')]);
+    expect(isGroupedRow(comments)).toBe(true);
+    expect(activityRowHref(comments)).toBe('/buyer-post-comments?postId=post1&commentId=c2');
+    const [likes] = aggregateActivity([like('Jay', 'post1'), like('Mina', 'post1')]);
+    expect(activityRowHref(likes)).toBe(groupedPeopleHref(likes));
+    const [single] = aggregateActivity([like('Jay', 'post1')]);
+    expect(activityRowHref(single, 'seller')).toBe('/buyer-post-viewer?postId=post1');
+  });
+
   it('caps the ids a link carries', () => {
     const ids = Array.from({ length: GROUPED_PEOPLE_MAX_IDS + 20 }, (_, i) => `n${i}`);
     const params = new URLSearchParams(groupedPeopleHref({ type: 'post_like', ids }).split('?')[1]);
@@ -487,5 +516,67 @@ describe('grouped rows → people list', () => {
     expect(groupedPeopleTitle('post_comment')).toBe('Comments');
     expect(groupedPeopleTitle('repost')).toBe('Reposts');
     expect(groupedPeopleTitle('new_follower')).toBe('New followers');
+  });
+});
+
+describe('delete with undo', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('only deletes on the server once the undo window has passed', async () => {
+    const commit = vi.fn(async () => [] as string[]);
+    const d = createDeferredDelete({ delayMs: ACTIVITY_UNDO_MS, commit });
+    d.schedule(['n1', 'n2']);
+    expect(d.isPending('n1')).toBe(true);
+    await vi.advanceTimersByTimeAsync(ACTIVITY_UNDO_MS - 1);
+    expect(commit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(commit).toHaveBeenCalledWith(['n1', 'n2']);
+    expect(d.isPending('n1')).toBe(false);
+  });
+
+  it('Undo cancels the delete entirely; too late once it has been sent', async () => {
+    const commit = vi.fn(async () => [] as string[]);
+    const d = createDeferredDelete({ delayMs: ACTIVITY_UNDO_MS, commit });
+    const first = d.schedule(['n1']);
+    expect(d.undo(first)).toBe(true);
+    expect(d.isPending('n1')).toBe(false);
+    await vi.advanceTimersByTimeAsync(ACTIVITY_UNDO_MS * 2);
+    expect(commit).not.toHaveBeenCalled();
+
+    const second = d.schedule(['n2']);
+    await vi.advanceTimersByTimeAsync(ACTIVITY_UNDO_MS);
+    expect(d.undo(second)).toBe(false);
+    expect(commit).toHaveBeenCalledWith(['n2']);
+  });
+
+  it('a newer delete, or leaving the screen, sends the waiting one straight away', async () => {
+    const commit = vi.fn(async () => [] as string[]);
+    const d = createDeferredDelete({ delayMs: ACTIVITY_UNDO_MS, commit });
+    const first = d.schedule(['n1']);
+    d.schedule(['n2']);
+    expect(commit).toHaveBeenCalledWith(['n1']);
+    expect(d.undo(first)).toBe(false);
+    d.flush();
+    expect(commit).toHaveBeenCalledWith(['n2']);
+    await vi.advanceTimersByTimeAsync(ACTIVITY_UNDO_MS);
+    expect(commit).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an id off screen while its delete is in flight, and hands back failures', async () => {
+    let resolve!: (failed: string[]) => void;
+    const onFailed = vi.fn();
+    const d = createDeferredDelete({
+      delayMs: ACTIVITY_UNDO_MS,
+      commit: () => new Promise<string[]>((r) => { resolve = r; }),
+      onFailed,
+    });
+    d.schedule(['n1', 'n2']);
+    await vi.advanceTimersByTimeAsync(ACTIVITY_UNDO_MS);
+    expect(d.isPending('n1')).toBe(true);
+    resolve(['n2']);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(d.isPending('n1')).toBe(false);
+    expect(onFailed).toHaveBeenCalledWith(['n2']);
   });
 });

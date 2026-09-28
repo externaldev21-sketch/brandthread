@@ -17,6 +17,7 @@ export type StoryTrayEntry = {
   isMe: boolean;
   storyIds: string[];
   seen: boolean;
+  closeFriendsOnly: boolean;
 };
 
 const RING_SIZE = 64;
@@ -34,6 +35,7 @@ export function StoryRing({
   initials,
   onPress,
   showPlusBadge,
+  closeFriendsOnly,
   testID,
 }: {
   size?: number;
@@ -43,6 +45,10 @@ export function StoryRing({
   initials: string;
   onPress?: () => void;
   showPlusBadge?: boolean;
+  /** Instagram marks this with a green ring; Brandthread stays monochrome,
+   *  so this renders a white star badge (matching the composer's Close
+   *  Friends toggle) instead of recoloring the ring itself. */
+  closeFriendsOnly?: boolean;
   testID?: string;
 }) {
   const { theme } = useAppTheme();
@@ -82,6 +88,11 @@ export function StoryRing({
       {showPlusBadge && (
         <View style={[styles.plusBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
           <Feather name="plus" size={11} color={theme.onAccent} />
+        </View>
+      )}
+      {closeFriendsOnly && !showPlusBadge && (
+        <View style={[styles.closeFriendsBadge, { borderColor: theme.background }]} pointerEvents="none">
+          <Feather name="star" size={9} color="#000000" />
         </View>
       )}
     </TouchableOpacity>
@@ -146,6 +157,7 @@ export default function StoryTray({ myAvatarUrl, myInitials, onCreateStory, onOp
             seen={entry.seen}
             color={entry.authorColor}
             initials={entry.authorInitials}
+            closeFriendsOnly={entry.closeFriendsOnly}
             onPress={() => onOpenAuthor(entry)}
           />
           <Text style={styles2.label} numberOfLines={1}>{entry.authorName.split(' ')[0]}</Text>
@@ -169,6 +181,18 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  closeFriendsBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
   },
 });
 

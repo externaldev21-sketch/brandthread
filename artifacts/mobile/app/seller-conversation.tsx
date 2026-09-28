@@ -27,7 +27,7 @@ import {
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
-import { VoiceMessageBubble } from '@/components/chat/VoiceMessageBubble';
+import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
 import * as Clipboard from 'expo-clipboard';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
@@ -43,7 +43,10 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   isSellerPreviewConversationId,
   getSellerPreviewConversation, getSellerPreviewMessages,
+  isPreviewInboxEnabled, posterUri,
 } from '@/lib/previewInbox';
+import UploadRing from '@/components/chat/UploadRing';
+import MediaUploadThumb from '@/components/chat/MediaUploadThumb';
 import type { CallLogEntry } from '@/lib/calls/types';
 import { SystemLine } from '@/components/chat/SystemLine';
 import { getConversationTheme } from '@/lib/conversationThemes';
@@ -54,6 +57,7 @@ import {
 } from '@/lib/chatGrouping';
 import { SwipeToReplyBubble } from '@/components/chat/SwipeToReplyBubble';
 import { ReplyBanner } from '@/components/chat/ReplyBanner';
+import { ChatAttachmentCard } from '@/components/chat/ChatAttachmentCard';
 import { ReactionOverlay, type ReactionOverlayAnchor, type ReactionOverlayMenuItem } from '@/components/chat/ReactionOverlay';
 import { ReactionGlyph } from '@/components/chat/ReactionBar';
 import { applyOptimisticReaction, myReactionIn, groupReactionCounts } from '@/lib/reactionMutations';
@@ -207,7 +211,8 @@ export default function SellerConversationScreen() {
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
   const { user } = useUser();
   const myId = user?.id ?? '';
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // bt_force_upload: item 74 verification aid only — see the effect below.
+  const { id, bt_force_upload } = useLocalSearchParams<{ id?: string; bt_force_upload?: string }>();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   // The dev-web ?bt_preview=seller bypass never signs in through Clerk (see
   // lib/devPreview.ts), so `myId` is '' in that mode — getSellerPreviewMessages
@@ -230,6 +235,7 @@ export default function SellerConversationScreen() {
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [voiceSpeed, setVoiceSpeed]           = useState(1);
+  const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
   // Item 68 (chat reactions glass) — long-pressed message + its measured
@@ -248,6 +254,26 @@ export default function SellerConversationScreen() {
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [products, setProducts] = useState<SellerProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  // Item 74 (photo/video upload progress ring) — see the identical comment
+  // in app/buyer-conversation.tsx.
+  const mediaUploadTokenRef = useRef(0);
+
+  // Item 74 verification aid — NOT a real feature. See the identical comment
+  // on this same effect in app/buyer-conversation.tsx: the real upload is too
+  // transient (and this sandbox has no reachable backend) to reliably
+  // screenshot mid-flight, so ?bt_preview=seller&bt_force_upload=1
+  // force-stages a real bundled photo as "uploading". Inert unless
+  // isPreviewInboxEnabled() is also true.
+  useEffect(() => {
+    if (bt_force_upload !== '1' || !isPreviewInboxEnabled()) return;
+    setPendingAttachment({
+      type: 'image', uri: posterUri(4),
+      title: 'Photo',
+      meta: { photoUris: JSON.stringify([posterUri(4)]), uploading: 'true' },
+    } as MsgAttachment);
+    setIsUploading(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bt_force_upload]);
 
   // ── Data loading ────────────────────────────────────────────────────────────
 
@@ -386,6 +412,11 @@ export default function SellerConversationScreen() {
   const receivedTextColor = convTheme?.receivedText ?? FG;
   const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
+  // Whether the composer actually has something to send — drives whether
+  // the send button shows at all (see the input row below), independent of
+  // `canSend`'s isSending/id gating so the button doesn't flicker away
+  // mid-send.
+  const hasComposerContent = text.trim().length > 0 || pendingAttachment != null;
   // Seen receipt: id of MY (the seller's) most recent message in this
   // thread — "Seen" only ever renders under that one message. See
   // lib/chatGrouping.ts's doc comment on the real, honest granularity this
@@ -516,6 +547,16 @@ export default function SellerConversationScreen() {
     });
     if (result.canceled || !result.assets.length) return;
     setShowMediaSheet(false);
+    const token = ++mediaUploadTokenRef.current;
+    // Stage the REAL picked photo(s) immediately via their local URIs, same
+    // as app/buyer-conversation.tsx — meta.uploading drives MediaUploadThumb's
+    // ring overlay until the real upload resolves below.
+    const localUris = result.assets.map((a) => a.uri);
+    setPendingAttachment({
+      type: 'image', uri: localUris[0],
+      title: localUris.length > 1 ? `${localUris.length} photos` : 'Photo',
+      meta: { photoUris: JSON.stringify(localUris), uploading: 'true' },
+    });
     setIsUploading(true);
     try {
       const urls: string[] = [];
@@ -523,14 +564,20 @@ export default function SellerConversationScreen() {
         if (!asset.base64) continue;
         urls.push(await uploadMedia(asset.base64, 'image/jpeg', 'jpg'));
       }
-      if (!urls.length) return;
+      if (mediaUploadTokenRef.current !== token) return;
+      if (!urls.length) { setPendingAttachment(null); return; }
       setPendingAttachment({
         type: 'image', uri: urls[0],
         title: urls.length > 1 ? `${urls.length} photos` : 'Photo',
         meta: { photoUris: JSON.stringify(urls) },
       });
-    } catch { Alert.alert('Upload failed', 'Could not upload. Please try again.'); }
-    finally { setIsUploading(false); }
+    } catch {
+      if (mediaUploadTokenRef.current === token) {
+        setPendingAttachment(null);
+        Alert.alert('Upload failed', 'Could not upload. Please try again.');
+      }
+    }
+    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
   }
 
   async function handlePickVideo() {
@@ -547,13 +594,22 @@ export default function SellerConversationScreen() {
     if ((asset.duration ?? 0) > 60000) { Alert.alert('Video too long', 'Choose a video under 1 minute.'); return; }
     if (!asset.base64) { Alert.alert('Couldn’t read that video', 'Please try a different file.'); return; }
     setShowMediaSheet(false);
+    const token = ++mediaUploadTokenRef.current;
+    const durationLabel = String(Math.round((asset.duration ?? 0) / 1000));
+    setPendingAttachment({ type: 'video', title: 'Video clip', meta: { duration: durationLabel, uploading: 'true' } });
     setIsUploading(true);
     try {
       const ext = (asset.uri.split('.').pop() ?? 'mp4').replace(/\?.*/, '');
       const url = await uploadMedia(asset.base64, 'video/mp4', ext);
-      setPendingAttachment({ type: 'video', uri: url, title: 'Video clip', meta: { duration: String(Math.round((asset.duration ?? 0) / 1000)) } });
-    } catch { Alert.alert('Upload failed', 'Could not upload video. Please try again.'); }
-    finally { setIsUploading(false); }
+      if (mediaUploadTokenRef.current !== token) return;
+      setPendingAttachment({ type: 'video', uri: url, title: 'Video clip', meta: { duration: durationLabel } });
+    } catch {
+      if (mediaUploadTokenRef.current === token) {
+        setPendingAttachment(null);
+        Alert.alert('Upload failed', 'Could not upload video. Please try again.');
+      }
+    }
+    finally { if (mediaUploadTokenRef.current === token) setIsUploading(false); }
   }
 
   // ── Voice recording ───────────────────────────────────────────────────────────
@@ -664,98 +720,18 @@ export default function SellerConversationScreen() {
           onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
           onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
           onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+          onViewTranscription={() => {
+            setTranscriptionToast(true);
+            setTimeout(() => setTranscriptionToast(false), 2600);
+          }}
         />
       );
     }
-    // Product share card (item 70) — same treatment as buyer-conversation.tsx
-    // so a shared product card looks identical from both sides of the DM: a
-    // real image thumbnail, live name/price (or "No longer available" — kept
-    // fresh server-side, see api-server's lib/productAttachmentInfo.ts), and
-    // an explicit "View" chip. It's a single tap target — no nested
-    // pressable inside the bubble's own long-press/swipe handlers.
-    if (att.type === 'product') {
-      const unavailable = att.meta?.unavailable === 'true';
-      return (
-        <PressableScale
-          style={s.productCard}
-          activeOpacity={0.7}
-          accessibilityLabel={`${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`}
-          testID="product-card-attachment"
-          onPress={() => {
-            const pid = att.meta?.productId;
-            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
-          }}
-        >
-          <View style={[s.productCardImage, unavailable && s.productCardImageDim]}>
-            {att.uri ? (
-              <CachedImage source={{ uri: att.uri }} style={s.productCardImageFill} recyclingKey={att.uri} />
-            ) : (
-              <Feather name="shopping-bag" size={ICON.md} color={MUTED} />
-            )}
-          </View>
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Product'}</Text>
-            <Text style={[s.attachSubtitle, unavailable && s.productUnavailableText]} numberOfLines={1}>
-              {unavailable ? 'No longer available' : (att.subtitle ?? 'Product')}
-            </Text>
-          </View>
-          <View style={s.productViewChip}>
-            <Text style={s.productViewChipText}>View</Text>
-            <Feather name="chevron-right" size={ICON.xs} color={FG} />
-          </View>
-        </PressableScale>
-      );
-    }
-    // Order status card (item 71) — same treatment as buyer-conversation.tsx
-    // so the order card the seller sent looks identical from both sides of
-    // the DM: a status badge (matching the order detail screen's own badge
-    // colors/labels, see lib/orderStatusAdapter.ts) and a real Track/View
-    // action, both kept live server-side (see api-server's
-    // lib/orderAttachmentInfo.ts) rather than the value cached at send time
-    // — the seller's own "order shipped" update must show up here right
-    // away, not just on order-detail. Single tap target — see the product
-    // card above for why the chip isn't a second Pressable.
-    if (att.type === 'order') {
-      const orderId = att.meta?.orderId;
-      const rawStatus = att.meta?.status;
-      const uiStatus = rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
-      const trackingNumber = att.meta?.trackingNumber;
-      const trackingUrl = trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
-      const chipLabel = trackingUrl ? 'Track' : 'View';
-      return (
-        <PressableScale
-          style={s.orderMsgCard}
-          activeOpacity={0.7}
-          accessibilityLabel={`${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${chipLabel}`}
-          testID="order-card-attachment"
-          onPress={() => {
-            if (trackingUrl) {
-              Linking.openURL(trackingUrl).catch(() => {});
-            } else {
-              router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
-            }
-          }}
-        >
-          <View style={s.orderMsgCardIconCircle}>
-            <Feather name="package" size={ICON.md} color={PURPLE} />
-          </View>
-          <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.attachTitle} numberOfLines={1}>{att.title || 'Order'}</Text>
-            {uiStatus ? (
-              <View style={s.orderMsgCardBadgeRow}>
-                <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
-              </View>
-            ) : (
-              <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle ?? 'Order'}</Text>
-            )}
-          </View>
-          <View style={s.productViewChip}>
-            <Text style={s.productViewChipText}>{chipLabel}</Text>
-            <Feather name={trackingUrl ? 'external-link' : 'chevron-right'} size={ICON.xs} color={FG} />
-          </View>
-        </PressableScale>
-      );
-    }
+    // 'product', 'order' and 'thread_cash' are handled standalone in
+    // renderItem() before this function is ever called for them — see its
+    // product/order branch (matches app/buyer-conversation.tsx's identical
+    // standalone treatment, so a card looks identical from both sides of
+    // the DM).
     return (
       <PressableScale
         style={s.attachCard}
@@ -1022,6 +998,66 @@ export default function SellerConversationScreen() {
       );
     }
 
+    // Standalone product/order card (Dev's chat-card-redesign feedback) —
+    // NEVER rendered inside the text-message bubble, same standalone
+    // treatment as app/buyer-conversation.tsx so the card looks identical
+    // from both sides of the DM. See components/chat/ChatAttachmentCard.tsx.
+    if (msg.attachment?.type === 'product' || msg.attachment?.type === 'order') {
+      const att = msg.attachment;
+      const isProduct = att.type === 'product';
+      const unavailable = isProduct && att.meta?.unavailable === 'true';
+      const orderId = att.meta?.orderId;
+      const rawStatus = att.meta?.status;
+      const uiStatus = !isProduct && rawStatus ? dbStatusToOrderStatus(rawStatus) : null;
+      const trackingNumber = att.meta?.trackingNumber;
+      const trackingUrl = !isProduct && trackingNumber ? carrierTrackingUrl(att.meta?.carrier, trackingNumber) : null;
+      const footerLabel = isProduct ? 'View' : (trackingUrl ? 'Track' : 'View');
+      const footerIcon = !isProduct && trackingUrl ? 'external-link' : 'chevron-right';
+      const accessibilityLabel = isProduct
+        ? `${att.title ?? 'Product'}, ${unavailable ? 'no longer available' : att.subtitle ?? ''}, View`
+        : `${att.title ?? 'Order'}${uiStatus ? `, ${orderStatusBadgeLabel(uiStatus)}` : ''}, ${footerLabel}`;
+      return (
+        <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? SP.sm : 2 }]}>
+          {!isOwn && (
+            isLastInGroup ? (
+              <View style={[s.msgAvatar, { backgroundColor: msg.fromColor || PURPLE }]}>
+                <Text style={s.msgAvatarInitials}>{msg.fromInitials || (msg.fromName?.[0] ?? '?')}</Text>
+              </View>
+            ) : <View style={s.msgAvatarSpacer} />
+          )}
+          <ChatAttachmentCard
+            theme={theme}
+            isMe={isOwn}
+            imageUri={isProduct ? att.uri : undefined}
+            icon={isProduct ? 'shopping-bag' : 'package'}
+            iconColor={PURPLE}
+            title={att.title || (isProduct ? 'Product' : 'Order')}
+            priceLabel={isProduct ? att.subtitle : undefined}
+            statusBadge={!isProduct && uiStatus ? (
+              <StatusBadge label={orderStatusBadgeLabel(uiStatus)} variant={orderStatusBadgeVariant(uiStatus)} small />
+            ) : (!isProduct && !uiStatus && att.subtitle ? (
+              <Text style={[s.attachSubtitle, { marginTop: 0 }]} numberOfLines={1}>{att.subtitle}</Text>
+            ) : undefined)}
+            unavailable={unavailable}
+            footerLabel={footerLabel}
+            footerIcon={footerIcon}
+            testID={isProduct ? 'product-card-attachment' : 'order-card-attachment'}
+            accessibilityLabel={accessibilityLabel}
+            onPress={() => {
+              if (isProduct) {
+                const pid = att.meta?.productId;
+                if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
+              } else if (trackingUrl) {
+                Linking.openURL(trackingUrl).catch(() => {});
+              } else {
+                router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
+              }
+            }}
+          />
+        </View>
+      );
+    }
+
     const removed = (msg as { removedByModeration?: boolean }).removedByModeration === true;
     const isRead = msg.status === 'read' || !!msg.readAt;
     return (
@@ -1065,12 +1101,17 @@ export default function SellerConversationScreen() {
               },
             ]}
             accessibilityHint="Touch and hold to react or see more options"
-            // Voice messages render their own play/scrub/speed/transcription
-            // buttons inside this bubble — PressableScale defaults to rendering
-            // an actual <button> on web, which cannot legally contain other
-            // interactive controls. Drop the role only here so it's a plain,
-            // still fully long-pressable <div> instead. See buyer-conversation.tsx.
-            accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : undefined}
+            // Voice attachments render their own interactive control inside
+            // this bubble — PressableScale defaults to rendering an actual
+            // <button> on web, which cannot legally contain other
+            // interactive controls. Drop the role so it's a plain, still
+            // fully long-pressable <div> instead. Product/order cards no
+            // longer render inside this bubble at all — see renderItem's
+            // standalone product/order branch. See buyer-conversation.tsx.
+            accessibilityRole={
+              msg.attachment?.type === 'voice'
+                ? 'none' : undefined
+            }
           >
             {/* Quoted reply — same inline-quote-strip treatment as
                 app/buyer-conversation.tsx, so a thread reads identically from
@@ -1085,12 +1126,21 @@ export default function SellerConversationScreen() {
 
             {/* Attachment */}
             {msg.attachment && renderMsgAttachment(msg.attachment, isOwn)}
-            {/* Text — hide the single-space placeholder */}
+            {/* Text — hide the single-space placeholder. Item 74 found and
+                fixed a real bug here: `msg.text && msg.text.trim().length >
+                0 && (...)` renders the literal empty string as a stray text
+                node (a direct child of this bubble's View) whenever
+                msg.text is exactly '' — the short-circuit stops at the
+                falsy '' itself rather than reaching a boolean, which is
+                exactly what every attachment-only message (voice, image,
+                video, product, etc.) sends as its text. A ternary, like
+                app/buyer-conversation.tsx already uses for this same spot,
+                always resolves to either the Text element or null. */}
             {removed ? (
               <Text style={[s.msgText, { color: isOwn ? sentTextColor : MUTED, fontStyle: 'italic' }]}>{REMOVED_MESSAGE_TEXT}</Text>
-            ) : msg.text && msg.text.trim().length > 0 && (
+            ) : (msg.text?.trim().length ?? 0) > 0 ? (
               <Text style={[s.msgText, { color: isOwn ? sentTextColor : receivedTextColor }]}>{msg.text}</Text>
-            )}
+            ) : null}
 
             {/* Inline bottom-right timestamp + read receipt (last bubble of
                 a run) — same automatic, group-boundary timestamp behavior as
@@ -1166,7 +1216,7 @@ export default function SellerConversationScreen() {
       )}
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
+      <View style={[s.header, { paddingTop: insets.top + SP.sm, paddingRight: SP.md + insets.right }]}>
         <PressableScale
           onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
           style={s.headerBack}
@@ -1287,23 +1337,46 @@ export default function SellerConversationScreen() {
       )}
 
       {/* Pending attachment preview */}
-      {pendingAttachment && (
-        <View style={s.pendingAttachRow}>
-          <Feather name={attachmentIcon(pendingAttachment.type)} size={ICON.sm} color={PURPLE} />
+      {pendingAttachment && (() => {
+        const uploadingMedia = pendingAttachment.meta?.uploading === 'true';
+        const isMedia = pendingAttachment.type === 'image' || pendingAttachment.type === 'video';
+        return (
+        <View style={s.pendingAttachRow} testID="seller-conversation-selected-attachment">
+          {isMedia ? (
+            <MediaUploadThumb
+              type={pendingAttachment.type as 'image' | 'video'}
+              uri={pendingAttachment.type === 'image' ? pendingAttachment.uri : undefined}
+              uploading={uploadingMedia}
+              size={40}
+              ringColor={PURPLE}
+              iconColor={MUTED}
+              trackColor={BORDER}
+            />
+          ) : isUploading ? (
+            <UploadRing size={22} color={PURPLE} trackColor={BORDER} />
+          ) : (
+            <Feather name={attachmentIcon(pendingAttachment.type)} size={ICON.sm} color={PURPLE} />
+          )}
           <View style={{ flex: 1, marginLeft: SP.sm }}>
-            <Text style={s.pendingAttachTitle} numberOfLines={1}>{pendingAttachment.title}</Text>
+            <Text style={s.pendingAttachTitle} numberOfLines={1}>
+              {uploadingMedia ? 'Uploading…' : pendingAttachment.title}
+            </Text>
             {pendingAttachment.subtitle ? (
               <Text style={s.pendingAttachSub} numberOfLines={1}>{pendingAttachment.subtitle}</Text>
             ) : null}
           </View>
           <PressableScale
-            onPress={() => setPendingAttachment(null)}
+            onPress={() => { mediaUploadTokenRef.current++; setPendingAttachment(null); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={uploadingMedia ? 'Cancel upload' : 'Remove attachment'}
+            testID="seller-conversation-selected-attachment-remove"
           >
             <Feather name="x" size={ICON.sm} color={MUTED} />
           </PressableScale>
         </View>
-      )}
+        );
+      })()}
 
       {/* Reply preview — mirrors app/buyer-conversation.tsx's own
           ReplyBanner (Mobbin: Instagram "Replying to a message",
@@ -1478,21 +1551,27 @@ export default function SellerConversationScreen() {
           multiline
           returnKeyType="default"
         />
-        <PressableScale
-          style={[
-            s.sendBtn,
-            canSend
-              ? { backgroundColor: PURPLE, borderColor: PURPLE }
-              : { backgroundColor: CARD, borderColor: BORDER },
-          ]}
-          onPress={() => { hapticPrimaryAction(); handleSend(); }}
-          disabled={!canSend}
-          accessibilityRole="button"
-          accessibilityLabel="Send message"
-          activeOpacity={0.8}
-        >
-          <Feather name="send" size={ICON.sm} color={canSend ? ON_DARK : MUTED} />
-        </PressableScale>
+        {/* Send only appears once there's actually something to send —
+            matches app/buyer-conversation.tsx's mic⇄send morph condition
+            (showSendButton), instead of always showing a disabled send
+            button next to an empty input. */}
+        {hasComposerContent ? (
+          <PressableScale
+            style={[
+              s.sendBtn,
+              canSend
+                ? { backgroundColor: PURPLE, borderColor: PURPLE }
+                : { backgroundColor: CARD, borderColor: BORDER },
+            ]}
+            onPress={() => { hapticPrimaryAction(); handleSend(); }}
+            disabled={!canSend}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            activeOpacity={0.8}
+          >
+            <Feather name="send" size={ICON.sm} color={canSend ? ON_DARK : MUTED} />
+          </PressableScale>
+        ) : null}
         </>)}
       </View>
       )}
@@ -1672,6 +1751,12 @@ export default function SellerConversationScreen() {
       />
 
       <Snackbar
+        visible={transcriptionToast}
+        message={TRANSCRIPTION_STUB}
+        onDismiss={() => setTranscriptionToast(false)}
+      />
+
+      <Snackbar
         visible={threadCashNotice != null}
         message={threadCashNotice ?? ''}
         actionLabel="Follow"
@@ -1713,7 +1798,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   header: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: BG,
-    paddingHorizontal: SP.md, paddingBottom: SP.sm,
+    // Right edge padding is set inline (needs insets.right) — see the
+    // header's own JSX. Mobbin: Instagram DM header
+    // (mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7) — the call/
+    // video/overflow icons sit inset from the screen edge, evenly spaced,
+    // never flush against it.
+    paddingLeft: SP.md, paddingBottom: SP.sm,
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   headerBack: { marginRight: SP.sm },
@@ -1812,39 +1902,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   attachTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   attachSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
 
-  // Product share card (item 70) — see buyer-conversation.tsx's matching styles.
-  productCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: BG, borderRadius: RADIUS.md,
-    padding: SP.sm, marginBottom: 2,
-    borderWidth: 1, borderColor: BORDER,
-  },
-  productCardImage: {
-    width: 44, height: 44, borderRadius: RADIUS.sm,
-    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-  },
-  productCardImageDim: { opacity: 0.5 },
-  productCardImageFill: { width: '100%', height: '100%' },
-  productUnavailableText: { fontFamily: FONT.medium },
-  productViewChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 2,
-    borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill,
-    paddingVertical: 4, paddingHorizontal: SP.xs, marginLeft: SP.xs,
-  },
-  productViewChipText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG },
-
-  // Order status card (item 71) — see buyer-conversation.tsx's matching styles.
-  orderMsgCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: BG, borderRadius: RADIUS.md,
-    padding: SP.sm, marginBottom: 2,
-    borderWidth: 1, borderColor: BORDER,
-  },
-  orderMsgCardIconCircle: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: CARD, alignItems: 'center', justifyContent: 'center',
-  },
-  orderMsgCardBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
+  // Product/order chat cards (item 70/71) moved to the standalone
+  // ChatAttachmentCard component (components/chat/ChatAttachmentCard.tsx) —
+  // no bubble, no border, own the tap target. See renderItem's product/
+  // order branch.
 
   pendingAttachRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -1872,7 +1933,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flex: 1, backgroundColor: CARD, borderRadius: RADIUS.xl,
     borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    fontSize: FS.base, fontFamily: FONT.regular, color: FG, maxHeight: 120,
+    fontSize: FS.base, fontFamily: FONT.regular, color: FG,
+    // ~44pt at rest for a single line (matches buyer-conversation.tsx's
+    // pill height) — only grows past that as the user types more lines,
+    // never fixed-tall. Symmetric vertical padding keeps the placeholder
+    // centered within that height on every platform (textAlignVertical is
+    // Android-only).
+    minHeight: 44,
+    maxHeight: 120,
+    textAlignVertical: 'center',
   },
   sendBtn: {
     width: 36, height: 36, borderRadius: 18,
@@ -1935,7 +2004,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   emptyText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
 
   // ── Call + media styles ──────────────────────────────────────────────────────
-  headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: SP.xs },
+  headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: SP.sm },
   recordingBtn:  { backgroundColor: 'rgba(255,59,48,0.12)', borderRadius: RADIUS.pill },
 
   // Photo grid

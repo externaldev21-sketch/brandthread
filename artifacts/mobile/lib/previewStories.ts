@@ -35,6 +35,7 @@ export interface PreviewStoryTrayRow {
   isLive: boolean;
   /** Base "seen" state before any runtime viewing this session. */
   seen: boolean;
+  closeFriendsOnly: boolean;
   latestCreatedAt: number;
 }
 
@@ -51,8 +52,13 @@ function slide(index: number, id: string, durationSec = 5): StoryMedia {
   };
 }
 
-function privacy(): Story['privacy'] {
-  return { visibility: 'public', replyPermission: 'everyone', hiddenFromUserIds: [], closeFriendsOnly: false };
+function privacy(closeFriendsOnly = false): Story['privacy'] {
+  return {
+    visibility: closeFriendsOnly ? 'friends' : 'public',
+    replyPermission: 'everyone',
+    hiddenFromUserIds: [],
+    closeFriendsOnly,
+  };
 }
 
 // ─── "Your story" ───────────────────────────────────────────────────────────
@@ -81,29 +87,33 @@ export const PREVIEW_LIVE_TRAY_ROWS: PreviewStoryTrayRow[] = [
   {
     authorId: 'preview-seller-01', authorName: 'Atelier Noire', authorHandle: '@atelier_noire',
     authorInitials: 'AN', authorColor: '#232323', avatarUrl: posterUri(0),
-    isLive: true, seen: false, latestCreatedAt: now,
+    isLive: true, seen: false, closeFriendsOnly: false, latestCreatedAt: now,
   },
   {
     authorId: 'preview-seller-02', authorName: 'Maison Vela', authorHandle: '@maison_vela',
     authorInitials: 'MV', authorColor: '#474747', avatarUrl: posterUri(1),
-    isLive: true, seen: false, latestCreatedAt: now,
+    isLive: true, seen: false, closeFriendsOnly: false, latestCreatedAt: now,
   },
 ];
 
 // ─── Unseen stories (newest first) ─────────────────────────────────────────
 const UNSEEN_PEOPLE = [
-  { authorId: 'preview-story-rae', name: 'Rae Kim', handle: '@raekim', initials: 'RK', color: '#333338', poster: 6, hoursAgo: 1 },
-  { authorId: 'preview-story-theo', name: 'Theo Park', handle: '@theo.fits', initials: 'TP', color: '#3D3D42', poster: 7, hoursAgo: 3 },
-  { authorId: 'preview-story-nova', name: 'Nova Dane', handle: '@nova.dane', initials: 'ND', color: '#2A2A2E', poster: 8, hoursAgo: 5 },
+  // Rae Kim posts to Close Friends only — gives the tray's close-friends
+  // ring a real, always-present demo case in preview mode.
+  { authorId: 'preview-story-rae', name: 'Rae Kim', handle: '@raekim', initials: 'RK', color: '#333338', poster: 6, hoursAgo: 1, closeFriendsOnly: true },
+  { authorId: 'preview-story-theo', name: 'Theo Park', handle: '@theo.fits', initials: 'TP', color: '#3D3D42', poster: 7, hoursAgo: 3, closeFriendsOnly: false },
+  { authorId: 'preview-story-nova', name: 'Nova Dane', handle: '@nova.dane', initials: 'ND', color: '#2A2A2E', poster: 8, hoursAgo: 5, closeFriendsOnly: false },
 ];
 
 // ─── Seen stories ───────────────────────────────────────────────────────────
 const SEEN_PEOPLE = [
-  { authorId: 'preview-story-sasha', name: 'Sasha Cole', handle: '@sasha.cole', initials: 'SC', color: '#3A3A3E', poster: 4, hoursAgo: 10 },
-  { authorId: 'preview-story-wyn', name: 'Wyn Ives', handle: '@wynives', initials: 'WI', color: '#292929', poster: 9, hoursAgo: 18 },
+  { authorId: 'preview-story-sasha', name: 'Sasha Cole', handle: '@sasha.cole', initials: 'SC', color: '#3A3A3E', poster: 4, hoursAgo: 10, closeFriendsOnly: false },
+  { authorId: 'preview-story-wyn', name: 'Wyn Ives', handle: '@wynives', initials: 'WI', color: '#292929', poster: 9, hoursAgo: 18, closeFriendsOnly: false },
 ];
 
-function storyFor(person: { authorId: string; name: string; handle: string; initials: string; color: string; poster: number; hoursAgo: number }): Story {
+type PreviewPerson = { authorId: string; name: string; handle: string; initials: string; color: string; poster: number; hoursAgo: number; closeFriendsOnly: boolean };
+
+function storyFor(person: PreviewPerson): Story {
   return {
     id: `preview-story-${person.authorId}-1`,
     authorId: person.authorId,
@@ -113,7 +123,7 @@ function storyFor(person: { authorId: string; name: string; handle: string; init
     authorColor: person.color,
     authorAccountType: 'buyer',
     media: [slide(person.poster, `preview-story-${person.authorId}-1-a`)],
-    privacy: privacy(),
+    privacy: privacy(person.closeFriendsOnly),
     viewers: [],
     repliesDisabled: false,
     createdAt: now - person.hoursAgo * HOUR,
@@ -124,7 +134,7 @@ function storyFor(person: { authorId: string; name: string; handle: string; init
 export const PREVIEW_UNSEEN_STORIES: Story[] = UNSEEN_PEOPLE.map(storyFor);
 export const PREVIEW_SEEN_STORIES: Story[] = SEEN_PEOPLE.map(storyFor);
 
-function rowFor(person: { authorId: string; name: string; handle: string; initials: string; color: string; poster: number; hoursAgo: number }, seen: boolean): PreviewStoryTrayRow {
+function rowFor(person: PreviewPerson, seen: boolean): PreviewStoryTrayRow {
   return {
     authorId: person.authorId,
     authorName: person.name,
@@ -134,6 +144,7 @@ function rowFor(person: { authorId: string; name: string; handle: string; initia
     avatarUrl: posterUri(person.poster),
     isLive: false,
     seen,
+    closeFriendsOnly: person.closeFriendsOnly,
     latestCreatedAt: now - person.hoursAgo * HOUR,
   };
 }

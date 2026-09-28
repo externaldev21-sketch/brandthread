@@ -13,8 +13,28 @@
  *    they're on file; Stripe Checkout lists them for one-tap reuse.
  * The wallet button's black/white chrome and logo are the one place a
  * platform mark appears — everything else stays monochrome.
+ *
+ * Wallet button spec (Apple Pay HIG + Google Pay brand guidelines, and
+ * Mobbin: Revolut / Posh dark checkouts — white pill, black " Pay"):
+ *  - On this always-dark UI it is the platforms' WHITE style: pure #FFFFFF
+ *    fill, pure #000000 mark and text — never theme-derived (a colored theme
+ *    used to tint the Apple mark purple/olive/navy, which neither brand allows).
+ *  - "Buy with" + mark in the platform's own system typeface (SF on iOS /
+ *    Safari, Roboto on Android) — not the app's Inter, which isn't part of
+ *    either lockup.
+ *  - Height 50pt (above Apple's 30pt / Google's 40dp minimums); pill corner
+ *    radius, which both platforms allow (PKPaymentButton.cornerRadius /
+ *    Google Pay buttonRadius).
+ *  - Web: real Apple Pay availability is detectable (Safari's
+ *    ApplePaySession.canMakePayments()), so Safari with Apple Pay gets the
+ *    Apple Pay button; every other browser gets a neutral, unbranded
+ *    "Express checkout" button — brand marks are never combined in one
+ *    custom button. Stripe Checkout then offers whichever wallet that
+ *    browser really supports.
+ *  - Google's official mark uses the multicolor "G"; the app's monochrome
+ *    rule keeps it single-color here (flagged in the PR for a decision).
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -38,30 +58,61 @@ function brandLabel(brand: string) {
   return brand.charAt(0).toUpperCase() + brand.slice(1);
 }
 
-function WalletMark({ color }: { color: string }) {
-  if (Platform.OS === 'android') {
+const WALLET_BG = '#FFFFFF';
+const WALLET_FG = '#000000';
+
+export type WalletKind = 'apple' | 'google' | 'express';
+
+/** Safari exposes ApplePaySession; canMakePayments() is true when Apple Pay is usable here. */
+export function detectWebApplePay(win: unknown = typeof window !== 'undefined' ? window : undefined): boolean {
+  try {
+    const session = (win as { ApplePaySession?: { canMakePayments?: () => boolean } } | undefined)?.ApplePaySession;
+    return !!session?.canMakePayments?.();
+  } catch {
+    return false;
+  }
+}
+
+export function useWalletKind(): WalletKind {
+  const [webApplePay, setWebApplePay] = useState(false);
+  useEffect(() => {
+    if (Platform.OS === 'web') setWebApplePay(detectWebApplePay());
+  }, []);
+  if (Platform.OS === 'ios') return 'apple';
+  if (Platform.OS === 'android') return 'google';
+  return webApplePay ? 'apple' : 'express';
+}
+
+export const WALLET_NAMES: Record<WalletKind, string> = {
+  apple: 'Apple Pay',
+  google: 'Google Pay',
+  express: 'express checkout',
+};
+
+function WalletMark({ kind }: { kind: WalletKind }) {
+  if (kind === 'google') {
     return (
       <View style={styles.walletMark}>
-        <Ionicons name="logo-google" size={18} color={color} />
-        <Text style={[styles.walletText, { color }]}>Pay</Text>
+        <Text style={styles.walletLead}>Buy with</Text>
+        <Ionicons name="logo-google" size={18} color={WALLET_FG} />
+        <Text style={styles.walletText}>Pay</Text>
       </View>
     );
   }
-  if (Platform.OS === 'ios') {
+  if (kind === 'apple') {
     return (
       <View style={styles.walletMark}>
-        <Text style={[styles.walletLead, { color }]}>Buy with</Text>
-        <Ionicons name="logo-apple" size={20} color={color} style={{ marginTop: -3 }} />
-        <Text style={[styles.walletText, { color }]}>Pay</Text>
+        <Text style={styles.walletLead}>Buy with</Text>
+        <Ionicons name="logo-apple" size={20} color={WALLET_FG} style={{ marginTop: -3 }} />
+        <Text style={styles.walletText}>Pay</Text>
       </View>
     );
   }
-  // Web: Stripe Checkout offers whichever wallet this browser supports.
+  // No wallet mark we can vouch for (non-Safari web): plain, unbranded.
   return (
     <View style={styles.walletMark}>
-      <Text style={[styles.walletLead, { color }]}>Express checkout</Text>
-      <Ionicons name="logo-apple" size={17} color={color} style={{ marginTop: -2 }} />
-      <Ionicons name="logo-google" size={15} color={color} />
+      <Feather name="zap" size={16} color={WALLET_FG} />
+      <Text style={styles.walletLead}>Express checkout</Text>
     </View>
   );
 }
@@ -78,7 +129,7 @@ export function PaymentCard({
   const { theme } = useAppTheme();
   const defaultCard = savedCards.find(card => card.isDefault) ?? savedCards[0];
   const otherCards = savedCards.filter(card => card.id !== defaultCard?.id);
-  const walletName = Platform.OS === 'android' ? 'Google Pay' : Platform.OS === 'ios' ? 'Apple Pay' : 'Apple Pay or Google Pay';
+  const walletKind = useWalletKind();
 
   return (
     <CheckoutCard title="Payment" testID="checkout-payment">
@@ -87,15 +138,17 @@ export function PaymentCard({
       <PressableScale
         onPress={onExpressPay}
         disabled={disabled || loading}
-        style={[styles.wallet, { backgroundColor: theme.text }]}
+        style={styles.wallet}
         accessibilityRole="button"
-        accessibilityLabel={`Pay with ${walletName}`}
-        accessibilityHint="Opens Stripe's secure checkout with your wallet"
+        accessibilityLabel={walletKind === 'express' ? 'Express checkout' : `Buy with ${WALLET_NAMES[walletKind]}`}
+        accessibilityHint={walletKind === 'express'
+          ? "Opens Stripe's secure checkout, which offers Apple Pay or Google Pay when your browser supports it"
+          : "Opens Stripe's secure checkout with your wallet"}
         accessibilityState={{ disabled: disabled || loading, busy: loading }}
         rippleEnabled={false}
         testID="checkout-express-pay"
       >
-        {loading ? <ActivityIndicator color={theme.background} /> : <WalletMark color={theme.background} />}
+        {loading ? <ActivityIndicator color={WALLET_FG} /> : <WalletMark kind={walletKind} />}
       </PressableScale>
       </View>
 
@@ -143,11 +196,18 @@ export function PaymentCard({
   );
 }
 
+const SYSTEM_FONT = Platform.select({
+  ios: 'System',
+  android: 'sans-serif',
+  default: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Roboto, system-ui, sans-serif',
+});
+
 const styles = StyleSheet.create({
-  wallet: { height: 50, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center' },
+  wallet: { height: 50, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: WALLET_BG },
   walletMark: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  walletLead: { fontFamily: FONT.medium, fontSize: FS.base + 1 },
-  walletText: { fontFamily: FONT.semibold, fontSize: FS.md + 1, letterSpacing: -0.2 },
+  // The platform's own typeface, not Inter (see the module comment).
+  walletLead: { fontFamily: SYSTEM_FONT, fontWeight: '500', fontSize: FS.base + 1, color: WALLET_FG },
+  walletText: { fontFamily: SYSTEM_FONT, fontWeight: '600', fontSize: FS.md + 1, letterSpacing: -0.2, color: WALLET_FG },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginVertical: SP.md - 2 },
   orLine: { flex: 1, marginVertical: 0 },
   orText: { fontFamily: FONT.medium, fontSize: FS.xs + 1 },

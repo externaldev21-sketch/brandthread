@@ -10,6 +10,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
@@ -42,7 +43,7 @@ import {
 import {
   scheduleDeleteConversationRequest, undoDeleteConversationRequest, blockConversationRequestUser,
 } from '@/lib/requestActions';
-import { subscribePendingConversationDeletes } from '@/lib/pendingRequestDeletes';
+import { subscribePendingConversationDeletes, DELETE_GRACE_MS } from '@/lib/pendingRequestDeletes';
 import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import { BLOCK_EXPLAINER } from '@/lib/safety';
 import {
@@ -240,6 +241,7 @@ type StoryTrayRow = {
    *  the story viewer, so no story needs to be resolved). */
   storyId: string | null;
   seen: boolean;
+  closeFriendsOnly: boolean;
   latestCreatedAt: number;
 };
 
@@ -372,7 +374,7 @@ export default function InboxScreen() {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
           authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
-          seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+          seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
         })));
         setMyStoryId(PREVIEW_MY_STORY.id);
         cacheStoriesForViewer([
@@ -394,7 +396,7 @@ export default function InboxScreen() {
       setStoryTrayRows(others.map(r => ({
         authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
         color: r.authorColor, avatarUri: r.avatarUrl ?? undefined,
-        storyId: r.storyIds[r.storyIds.length - 1] ?? null, seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+        storyId: r.storyIds[r.storyIds.length - 1] ?? null, seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
       })));
       // Resolve the real (media-bearing) Story objects so the viewer — which
       // reads its queue purely from local storage — can actually show them.
@@ -408,7 +410,7 @@ export default function InboxScreen() {
         setStoryTrayRows(getPreviewStoryTrayRows().map(r => ({
           authorId: r.authorId, name: r.authorName, handle: r.authorHandle, initials: r.authorInitials,
           color: r.authorColor, avatarUri: r.avatarUrl, storyId: r.isLive ? null : getPreviewStoryFor(r.authorId)?.id ?? null,
-          seen: r.seen, latestCreatedAt: r.latestCreatedAt,
+          seen: r.seen, closeFriendsOnly: r.closeFriendsOnly, latestCreatedAt: r.latestCreatedAt,
         })));
         setMyStoryId(PREVIEW_MY_STORY.id);
         cacheStoriesForViewer([
@@ -685,10 +687,21 @@ export default function InboxScreen() {
   function deleteRequestConversation(conv: Conversation) {
     const participant = getParticipant(conv);
     hapticDestructiveConfirm();
-    scheduleDeleteConversationRequest(conv.id, api);
+    // The undo window (`pendingDeleteIds`, subscribed above) only hides the
+    // row for ~4s — once it commits for real, `conversations` state itself
+    // has to drop the row too, or it silently reappears (see the doc comment
+    // on scheduleDeleteConversationRequest for the bug this fixes).
+    scheduleDeleteConversationRequest(conv.id, api, () => {
+      setConversations(prev => prev.filter(c => c.id !== conv.id));
+    });
     showUndo({
       message: `Deleted request from ${participant?.name ?? 'this person'}`,
       undo: () => undoDeleteConversationRequest(conv.id),
+      // Match the toast's own visible window to the real undo grace period
+      // — the default 6s toast outliving the 4s delete commit let someone
+      // tap "Undo" after the delete already went through, silently doing
+      // nothing (see the doc comment on scheduleDeleteConversationRequest).
+      durationMs: DELETE_GRACE_MS,
     });
   }
 
@@ -696,10 +709,13 @@ export default function InboxScreen() {
     if (requestConvs.length === 0) return;
     hapticDestructiveConfirm();
     const ids = requestConvs.map(c => c.id);
-    ids.forEach(id => scheduleDeleteConversationRequest(id, api));
+    ids.forEach(id => scheduleDeleteConversationRequest(id, api, () => {
+      setConversations(prev => prev.filter(c => c.id !== id));
+    }));
     showUndo({
       message: ids.length === 1 ? 'Deleted 1 request' : `Deleted ${ids.length} requests`,
       undo: () => ids.forEach(id => undoDeleteConversationRequest(id)),
+      durationMs: DELETE_GRACE_MS,
     });
   }
 
@@ -724,7 +740,10 @@ export default function InboxScreen() {
 
   function longPressConversation(conv: Conversation) {
     hapticDestructiveConfirm();
-    Alert.alert('Options', undefined, [
+    // Alert.alert() with a button array is a silent no-op on web — this left
+    // the row long-press menu completely dead in the web preview. See
+    // components/ui/ActionSheet.tsx's header comment.
+    showActionSheet('Options', undefined, [
       { text: 'Archive', onPress: () => swipeArchiveConversation(conv), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -1006,7 +1025,12 @@ export default function InboxScreen() {
   }
 
   function openFilterMenu() {
-    Alert.alert('Filter messages', 'Coming soon.');
+    // Alert.alert() is a silent no-op on web (react-native-web has no
+    // native dialog to defer to), so it left this button dead in the web
+    // preview — no dialog, no honest "not available" state, nothing. Use
+    // the screen's existing snackbar (already the pattern for every other
+    // inbox affordance above) so the tap always gives real feedback.
+    showSnackbar('Message filters — coming soon');
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -1582,7 +1606,7 @@ export default function InboxScreen() {
                     onPress={() => openStoryViewerFor(row.authorId)}
                     rippleEnabled={NO_RIPPLE}
                     accessibilityRole="button"
-                    accessibilityLabel={`${row.name}${row.seen ? '' : ', new story'}${note ? `, note: ${note.text}` : ''}`}
+                    accessibilityLabel={`${row.name}${row.seen ? '' : ', new story'}${row.closeFriendsOnly ? ', Close Friends' : ''}${note ? `, note: ${note.text}` : ''}`}
                     testID={`inbox-story-tray-${row.authorId}`}
                   >
                     {noteBubble}
@@ -1599,6 +1623,11 @@ export default function InboxScreen() {
                       ) : (
                         <View style={[s.activeRailAvatar, { backgroundColor: row.color }]}>
                           <Text style={s.activeRailInitials}>{row.initials}</Text>
+                        </View>
+                      )}
+                      {row.closeFriendsOnly && (
+                        <View style={[s.closeFriendsBadge, { borderColor: theme.background }]} pointerEvents="none">
+                          <Feather name="star" size={10} color="#000000" />
                         </View>
                       )}
                     </View>
@@ -1884,6 +1913,14 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   addStoryBadge: {
     position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10,
     borderWidth: 2, alignItems: 'center', justifyContent: 'center',
+  },
+  // Close Friends badge — Instagram marks this with a green ring; Brandthread
+  // stays monochrome, so the story ring itself doesn't change color and this
+  // white star badge (matching the same star used in the composer's Close
+  // Friends toggle) is the ring's distinct "close friends" indicator instead.
+  closeFriendsBadge: {
+    position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10,
+    borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF',
   },
   activeRailInitials: { fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
   activeRailName: { fontSize: 11, fontFamily: FONT.medium, width: 72, textAlign: 'center' },

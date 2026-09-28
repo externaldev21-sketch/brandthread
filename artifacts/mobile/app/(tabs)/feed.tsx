@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { UploadProgressPill } from '@/components/feed/UploadProgressPill';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
@@ -75,7 +76,7 @@ import {
 } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
-import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
+import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { SheetRise } from '@/components/motion/SheetRise';
@@ -436,9 +437,21 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     // same way a seller who tagged more than one product on a real post
     // would show up here — see ShopSideTab's module comment for why the
     // badge only appears once count > 1.
+    //
+    // imageUri on each tag (overnight follow-up): the sheet's multi-tag
+    // switcher (ShopProductSheet's tagListWrap) only has a real photo for
+    // whichever tag is currently hydrated (`product`/`previewProduct`) —
+    // any OTHER tag in the row falls back to a bag-icon placeholder until
+    // it's tapped. Sculpted Wool Coat (the tag opened first) always reads
+    // as hydrated, so it never showed the gap; Leather Ankle Boots, never
+    // the initially-active tag, did. Both now carry this post's own poster
+    // as their `imageUri` — the same bundled asset this preview post
+    // already uses for its own poster/gallery/seller-avatar fallbacks (see
+    // buildPreviewGalleryUris/buildPreviewShopProduct below) — so the tag
+    // card always has a real photo instead of a placeholder, active or not.
     productTags: [
-      { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000 },
-      { productId: 'preview-product-01b', productName: 'Leather Ankle Boots', priceCents: 21000 },
+      { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000, imageUri: FASHION_PREVIEW_POSTER_URIS[0] },
+      { productId: 'preview-product-01b', productName: 'Leather Ankle Boots', priceCents: 21000, imageUri: FASHION_PREVIEW_POSTER_URIS[0] },
     ],
     commentsCount: 980,
   },
@@ -2071,7 +2084,8 @@ export default function FeedScreen({
   const feedHasMoreRef = useRef(true);
   const repostPendingRef = useRef(new Set<string>());
   const openLive = useOpenLive();
-  const cartPulse = useRef(new Animated.Value(1)).current;
+  // Shared with the Discover pager's cart badge (hooks/useCartBadgeBump.ts).
+  const { scale: cartPulse, bump: bumpCart } = useCartBadgeBump(reduceMotion);
   const cartTargetRef = useRef<View>(null);
   const feedListRef = useRef<FlatList<FeedItem>>(null);
 
@@ -2239,26 +2253,54 @@ export default function FeedScreen({
     return unsub;
   }, [loadFeed]);
 
+  // Last cart count this screen knows about — lets a refocus tell "the buyer
+  // added something elsewhere" (product page Add to bag, Saved → Add to
+  // cart, …) apart from a plain reload.
+  const knownCartCountRef = useRef<number | null>(null);
   useEffect(() => {
     let active = true;
     setCartCount(0);
+    knownCartCountRef.current = null;
     void getCart()
       .then(cart => {
-        if (active) setCartCount(cart.items.reduce((total, item) => total + item.quantity, 0));
+        if (!active) return;
+        const count = cart.items.reduce((total, item) => total + item.quantity, 0);
+        knownCartCountRef.current = count;
+        setCartCount(count);
       })
       .catch(() => {});
     return () => { active = false; };
   }, [userId]);
 
+  // The feed stays mounted under pushed screens, so without this the badge
+  // kept its old count after adding from a product page. On return, pick up
+  // the real count and bump only if it went up (an add happened) — never on
+  // first load, a plain refocus, or a removal.
+  const screenFocused = useIsFocused();
+  const wasScreenFocusedRef = useRef(screenFocused);
+  useEffect(() => {
+    const refocused = screenFocused && !wasScreenFocusedRef.current;
+    wasScreenFocusedRef.current = screenFocused;
+    if (!refocused) return undefined;
+    let active = true;
+    void getCart()
+      .then(cart => {
+        if (!active) return;
+        const count = cart.items.reduce((total, item) => total + item.quantity, 0);
+        const known = knownCartCountRef.current;
+        knownCartCountRef.current = count;
+        setCartCount(count);
+        if (known != null && count > known) bumpCart();
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [screenFocused, bumpCart]);
+
   const handleCartUpdated = useCallback((newCount: number) => {
+    knownCartCountRef.current = newCount;
     setCartCount(newCount);
-    if (!shouldAnimateCartSuccess(reduceMotion)) return;
-    cartPulse.setValue(0.78);
-    Animated.sequence([
-      Animated.spring(cartPulse, { toValue: 1.18, speed: 28, bounciness: 8, useNativeDriver: true }),
-      Animated.spring(cartPulse, { toValue: 1, speed: 24, bounciness: 4, useNativeDriver: true }),
-    ]).start();
-  }, [cartPulse, reduceMotion]);
+    bumpCart();
+  }, [bumpCart]);
 
   const handleRefresh = useCallback(() => {
     if (feedRefreshing) return;
@@ -2746,7 +2788,7 @@ export default function FeedScreen({
   const handleShopTag = useCallback((item: SpotlightItem, tag: SpotlightProductTag) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const allTags = (item.productTags ?? []).length > 0
-      ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number }>)
+      ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number; imageUri?: string }>)
       : [tag];
     const tagIdx = allTags.findIndex(t => t.productId === tag.productId);
     setShopSelection({
@@ -3080,7 +3122,7 @@ export default function FeedScreen({
             <Text style={styles.creatorTitle} numberOfLines={1} accessibilityRole="header">
               {creatorFeed?.title || (creatorFeed?.source === 'product' ? 'Featured in' : 'Videos')}
             </Text>
-            <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
+            <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
                 style={styles.buyerTopBtn}
                 activeOpacity={0.7}
@@ -3208,7 +3250,7 @@ export default function FeedScreen({
               >
                 <Feather name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
               </TouchableOpacity>
-              <Animated.View ref={cartTargetRef} style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
+              <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopIconBtn, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
                 style={styles.buyerTopIconBtn}
                 activeOpacity={0.7}
@@ -3281,7 +3323,7 @@ export default function FeedScreen({
 
             <ActivityBellButton color={ON_DARK} size={20} badgeBorderColor={BG} />
 
-            <Animated.View ref={cartTargetRef} style={{ transform: [{ scale: cartPulse }] }}>
+            <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={{ transform: [{ scale: cartPulse }] }}>
             <TouchableOpacity
               style={styles.cartHeaderBtn}
               activeOpacity={0.7}
@@ -3407,6 +3449,10 @@ export default function FeedScreen({
 
       {isBuyerSurface && (
         <FeedGestureGuide visible={showGestureGuide} onDismiss={dismissGestureGuide} />
+      )}
+
+      {!isCreatorFeed && (
+        <UploadProgressPill topInset={buyerHeaderHeight} />
       )}
 
     </View>
