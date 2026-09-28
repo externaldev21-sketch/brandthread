@@ -518,6 +518,9 @@ const createEditorStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => S
     textShadowRadius: 3,
     minHeight: 48,
     textAlignVertical: 'center',
+    // Drop the browser's default colored focus outline on web — monochrome
+    // only; same pattern as components/checkout/CheckoutPrimitives.tsx.
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
   },
   bottomStrip: {
     backgroundColor: theme.card,
