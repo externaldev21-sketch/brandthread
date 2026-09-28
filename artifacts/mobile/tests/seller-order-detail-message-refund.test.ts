@@ -37,6 +37,11 @@ describe('order detail: Message Buyer action', () => {
     expect(source).toContain("label={messagingBuyer ? 'Opening…' : 'Message Buyer'}");
     expect(source).toContain('disabled={messagingBuyer || !order.customer.buyerUserId}');
   });
+
+  it('never hardcodes a brand color for the conversation participants — monochrome only', () => {
+    expect(source).not.toContain('#8B5CF6');
+    expect(source).toContain('color: theme.accent');
+  });
 });
 
 describe('order detail: Refund action', () => {

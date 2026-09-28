@@ -579,14 +579,18 @@ export default function OrderDetailScreen() {
           name: order.customer.name,
           handle: '',
           initials: order.customer.initials || getInitials(order.customer.name),
-          color: '#8B5CF6',
+          // Monochrome brand: the same theme.accent every avatar chip
+          // already falls back to when no color is stored (see
+          // `other.color || theme.accent` in seller-inbox.tsx /
+          // seller-conversation.tsx) — never a hardcoded brand color.
+          color: theme.accent,
           accountType: 'buyer',
         },
         myInfo: {
           name: sellerName,
           handle: profile.username ? `@${profile.username}` : '',
           initials: getInitials(sellerName),
-          color: '#8B5CF6',
+          color: theme.accent,
           accountType: 'seller',
         },
         contextOrderId: order.id,
