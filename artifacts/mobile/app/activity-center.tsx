@@ -215,10 +215,10 @@ function Avatar({ actor, size, styles }: {
   styles: Styles;
 }) {
   const { theme } = useAppTheme();
-  // Preview-only: a real photo from the same asset pool the rest of the
-  // buyer preview uses, keyed by the seeded seller id, instead of a flat
-  // color-and-initials placeholder. No-op (undefined) for a real account.
-  const imageUri = previewActorAvatarUri(actor.id, actor.name);
+  // Real avatar data first. Falls back to a preview-only photo from the
+  // same asset pool the rest of the buyer preview uses (no-op for a real
+  // account), then to a flat color-and-initials placeholder.
+  const imageUri = actor.avatarUrl || previewActorAvatarUri(actor.id, actor.name);
   if (imageUri) {
     return (
       <CachedImage
