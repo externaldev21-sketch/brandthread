@@ -25,10 +25,20 @@ vi.mock('react-native', () => {
     StyleSheet: {
       create: (s: unknown) => s,
       hairlineWidth: 1,
+      absoluteFill: {},
+      absoluteFillObject: {},
     },
     View: el('View'),
     Text: el('Text'),
     TouchableOpacity: el('TouchableOpacity'),
+    Platform: { OS: 'ios', select: (spec: Record<string, unknown>) => spec.ios ?? spec.default },
+    Animated: {
+      View: el('AnimatedView'),
+      Value: class { constructor(public value: number) {} },
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      spring: () => ({ start: (cb?: () => void) => cb?.() }),
+      parallel: () => ({ start: (cb?: () => void) => cb?.() }),
+    },
   };
 });
 
@@ -59,7 +69,20 @@ vi.mock('react-native-reanimated', () => {
     useAnimatedStyle: (fn: () => Record<string, unknown>) => fn(),
     useAnimatedReaction: () => {},
     runOnJS: (fn: (...args: any[]) => void) => fn,
+    withSpring: (toValue: unknown) => toValue,
+    withTiming: (toValue: unknown) => toValue,
+    Easing: { bezier: () => (t: number) => t },
   };
+});
+
+vi.mock('expo-linear-gradient', () => {
+  const React = require('react') as typeof import('react');
+  return { LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode) };
+});
+
+vi.mock('@/components/ui/Glass', () => {
+  const React = require('react') as typeof import('react');
+  return { Glass: (props: Record<string, unknown>) => React.createElement('Glass', props, props.children as React.ReactNode) };
 });
 
 vi.mock('expo-haptics', () => ({
@@ -184,5 +207,48 @@ describe('SellerDashboardChart', () => {
       monthPill.props.onPress();
     });
     expect(onRangeChange).toHaveBeenCalledWith('month');
+  });
+
+  it('renders every x-axis label, not just the first/last (item 123)', async () => {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={[10, 20, 15, 40, 30, 25, 50]}
+          labels={labels}
+          theme={theme}
+          range="week"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    expect(texts).toEqual(labels);
+  });
+
+  it('renders a sliding glass range indicator behind the tabs (item 124)', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={[10, 20]}
+          labels={['A', 'B']}
+          theme={theme}
+          range="week"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    // Flush the range row's onLayout so the indicator gets a non-zero width.
+    const rangeRow = renderer!.root.findByProps({ testID: 'seller-dashboard-range-pills' });
+    await act(async () => {
+      rangeRow.props.onLayout({ nativeEvent: { layout: { width: 350 } } });
+    });
+    const indicator = renderer!.root.findByProps({ testID: 'seller-dashboard-range-indicator' });
+    expect(indicator.findByType('Glass' as unknown as React.ElementType)).toBeTruthy();
   });
 });

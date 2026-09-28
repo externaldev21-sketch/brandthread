@@ -69,7 +69,9 @@ import {
   applyRead,
   buildActivitySections,
   createReadTracker,
+  groupedPeopleHref,
   isFollowBackRow,
+  isGroupedRow,
   relativeTime,
   type ActivityActor,
   type ActivityItem,
@@ -807,7 +809,9 @@ export default function ActivityCenterScreen() {
       // Navigation must not depend on analytics.
     });
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
-    const href = activityHref(row, role);
+    // A merged row ("Jay and 12 others liked your post") opens the list of
+    // those people — Instagram's "View likes" pattern, see app/activity-people.tsx.
+    const href = isGroupedRow(row) ? groupedPeopleHref(row) : activityHref(row, role);
     if (href) router.push(href as never);
   }, [api, role, router, tracker, user?.id]);
 

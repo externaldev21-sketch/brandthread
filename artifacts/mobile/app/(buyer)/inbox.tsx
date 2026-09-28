@@ -20,7 +20,7 @@ import {
   getConversations, markConversationRead, archiveConversation,
   subscribeSocial,
   searchProfiles, createOrGetConversation, muteUser, MY_USER_ID,
-  getFriendSuggestions, cacheStoriesForViewer,
+  getFriendSuggestions, cacheStoriesForViewer, setConversationPinned,
 } from '@/services/socialService';
 import type { Conversation, ProfileSearchResult, AccountType, Story } from '@/services/socialTypes';
 import { getSuggestedPeople, dismissSuggestedPerson, type SuggestedPerson } from '@/services/activityService';
@@ -34,7 +34,7 @@ import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import {
   isPreviewInboxEnabled, isPreviewConversationId, getPreviewConversations,
-  subscribePreviewTyping,
+  subscribePreviewTyping, setPreviewConversationPinned,
 } from '@/lib/previewInbox';
 import {
   scheduleDeleteConversationRequest, undoDeleteConversationRequest, blockConversationRequestUser,
@@ -405,8 +405,13 @@ export default function InboxScreen() {
     }
   }, [userId, api]);
 
-  // Preview-only: simulate a transient "typing…" row for one seeded thread
-  // (see lib/previewInbox.ts) — a no-op outside the dev/preview environment.
+  // Preview-only overlay for the "typing…" row treatment: real accounts get
+  // it purely from `conv.agentTyping` below (polled via GET /api/conversations
+  // — the only real "someone is typing" signal that exists today, and only
+  // ever true for the Brandthread Agent thread; there is no presence/typing
+  // mechanism for ordinary human buyer<->seller or buyer<->buyer threads).
+  // This just simulates that same field, on that same seeded Agent thread,
+  // for the seeded dev/preview inbox — a no-op outside that environment.
   useEffect(() => {
     const unsub = subscribePreviewTyping(setTypingConvId);
     return unsub;
@@ -689,6 +694,34 @@ export default function InboxScreen() {
     }
   }
 
+  // Swipe > Pin (item 62): optimistic toggle — the row's icon/label and sort
+  // position update immediately, before the request lands, then roll back +
+  // surface an alert if the request fails. The official Brandthread Agent
+  // thread is always pinned (see isPinned's comment in socialTypes.ts) and
+  // has no real per-participant row to toggle, so it's excluded here the
+  // same way it's excluded from every other swipe action on this row.
+  async function swipePinConversation(conv: Conversation) {
+    if (conv.isOfficial) return;
+    const nextPinned = !conv.isPinned;
+    setConversations(prev => prev.map(item =>
+      item.id === conv.id ? { ...item, isPinned: nextPinned } : item
+    ));
+    try {
+      if (isPreviewConversationId(conv.id)) {
+        setPreviewConversationPinned(conv.id, nextPinned);
+      } else {
+        await setConversationPinned(conv.id, nextPinned);
+      }
+      showSnackbar(nextPinned ? 'Conversation pinned' : 'Conversation unpinned');
+    } catch {
+      // Roll back to the pre-toggle state on failure.
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, isPinned: conv.isPinned } : item
+      ));
+      Alert.alert(nextPinned ? 'Couldn’t pin' : 'Couldn’t unpin', 'Please try again.');
+    }
+  }
+
   async function swipeMarkReadConversation(conv: Conversation) {
     if (conv.unreadCount <= 0) return;
     // A seeded preview conversation has no real backend record to PATCH —
@@ -898,7 +931,13 @@ export default function InboxScreen() {
     const participant = getParticipant(conv);
     if (!participant) return null;
     const isUnread = conv.unreadCount > 0;
-    const isTyping = typingConvId === conv.id;
+    // Real signal: `conv.agentTyping` (only ever true for the Brandthread
+    // Agent thread — see the field's comment on Conversation in
+    // services/socialTypes.ts). `typingConvId` is the preview-only overlay
+    // above, which flips the exact same seeded Agent thread's state so the
+    // row treatment demos the same real field rather than a fake parallel
+    // mechanism — it is never set for an ordinary buyer<->seller/buyer row.
+    const isTyping = conv.agentTyping === true || typingConvId === conv.id;
 
     const swipeActions: InboxSwipeAction[] = [
       {
@@ -910,6 +949,23 @@ export default function InboxScreen() {
         onPress: () => swipeMarkReadConversation(conv),
         accessibilityLabel: `Mark conversation with ${participant.name} as read`,
       },
+      // Instagram-inspired action (icon/naming borrowed from its DM
+      // pin/mute/delete set — see the Mobbin citation in this PR's
+      // description); kept on Brandthread's existing swipe gesture rather
+      // than switching to Instagram's long-press menu. Not shown on the
+      // always-pinned official Brandthread Agent thread, which has nothing
+      // for the viewer to toggle.
+      ...(conv.isOfficial ? [] : [{
+        key: 'pin',
+        label: conv.isPinned ? 'Unpin' : 'Pin',
+        icon: 'bookmark' as const,
+        color: theme.cardElevated,
+        textColor: theme.muted,
+        onPress: () => swipePinConversation(conv),
+        accessibilityLabel: conv.isPinned
+          ? `Unpin conversation with ${participant.name}`
+          : `Pin conversation with ${participant.name}`,
+      }]),
       {
         key: 'mute',
         label: 'Mute',

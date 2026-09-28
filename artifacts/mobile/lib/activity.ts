@@ -363,6 +363,39 @@ export function isFollowBackRow(row: ActivityRow): boolean {
 
 const q = encodeURIComponent;
 
+// ─── Grouped rows → people list ───────────────────────────────────────────────
+
+/** Most feed ids a people-list link carries (matches the server's cap). */
+export const GROUPED_PEOPLE_MAX_IDS = 100;
+
+/**
+ * True for a merged row of two or more people ("Jay and 12 others liked your
+ * post"). Tapping one opens the list of those people — Instagram's "View
+ * likes" pattern (https://mobbin.com/flows/c575ad7c-8644-4b26-a3d0-ae737f855c13)
+ * — instead of jumping straight to the post.
+ */
+export function isGroupedRow(row: Pick<ActivityRow, 'type' | 'actorCount'>): boolean {
+  return row.actorCount > 1 && AGGREGATED_TYPES.has(row.type);
+}
+
+/** Header for the people list a grouped row opens. */
+export function groupedPeopleTitle(type: string): string {
+  switch (type) {
+    case 'post_like':
+    case 'story_like': return 'Likes';
+    case 'post_comment': return 'Comments';
+    case 'repost': return 'Reposts';
+    case 'new_follower': return 'New followers';
+    default: return 'People';
+  }
+}
+
+/** Route for the people list behind a grouped row. */
+export function groupedPeopleHref(row: Pick<ActivityRow, 'type' | 'ids'>): string {
+  const ids = row.ids.slice(0, GROUPED_PEOPLE_MAX_IDS).join(',');
+  return `/activity-people?type=${q(row.type)}&ids=${q(ids)}`;
+}
+
 /**
  * Where tapping a row goes, or null when there is nowhere useful to go.
  * Routes match the push-notification handler (lib/notificationNavigation.ts)

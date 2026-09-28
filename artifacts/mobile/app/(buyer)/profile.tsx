@@ -57,6 +57,7 @@ import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { ProfileStoriesRow, type ProfileStoryItem } from '@/components/profile/ProfileStoriesRow';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import { Button } from '@/components/ui/Button';
+import { Glass } from '@/components/ui/Glass';
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { ProfileEmptyAreaContext } from '@/components/profile/ProfileEmptyAreaContext';
@@ -100,10 +101,16 @@ function BottomSheet({
   visible,
   onClose,
   children,
+  glass,
 }: {
   visible: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  /** Frosted `<Glass>` fill instead of the flat `theme.card` — for a menu
+   *  that reads as chrome over the page (the hamburger menu) rather than a
+   *  solid card. Defaults to false: the post long-press sheet on this same
+   *  screen keeps its current solid look. */
+  glass?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
@@ -130,11 +137,12 @@ function BottomSheet({
         <Animated.View
           style={[
             sheetStyles.sheet,
-            { backgroundColor: theme.card, borderColor: theme.border },
+            { backgroundColor: glass ? 'transparent' : theme.card, borderColor: theme.border },
             { paddingBottom: insets.bottom + SP.md },
             { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [120, 0] }) }] },
           ]}
         >
+          {glass ? <Glass variant="regular" tint="dark" radius={0} style={StyleSheet.absoluteFill} /> : null}
           <View style={[sheetStyles.sheetHandle, { backgroundColor: theme.border }]} />
           <ScrollView style={sheetStyles.sheetScroll} showsVerticalScrollIndicator={false}>
             {children}
@@ -859,6 +867,7 @@ export default function ProfileScreen() {
             description={emptyDescription}
             action={emptyAction}
             actionStyle="text"
+            showGridPreview={activeTab === 'Posts'}
           />
         )}
         showsVerticalScrollIndicator={false}
@@ -871,7 +880,7 @@ export default function ProfileScreen() {
       </ProfileEmptyAreaContext.Provider>
 
       {/* ── Profile Menu Sheet ── */}
-      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>
+      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} glass>
         <Text style={[sheetStyles.sheetTitle, { color: theme.muted }]}>Profile</Text>
         <SheetRow icon="edit-3" label="Edit profile" onPress={() => { setMenuOpen(false); router.push('/(buyer)/edit-profile'); }} />
         <SheetRow icon="share-2" label="Share profile" onPress={handleShareProfile} />
@@ -981,7 +990,7 @@ const cellStyles = StyleSheet.create({
 
 const sheetStyles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingTop: SP.sm, paddingHorizontal: SP.md, borderWidth: 1, borderBottomWidth: 0, maxHeight: '80%' },
+  sheet: { borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingTop: SP.sm, paddingHorizontal: SP.md, borderWidth: 1, borderBottomWidth: 0, maxHeight: '80%', overflow: 'hidden' },
   sheetScroll: { maxHeight: '100%' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
   sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, paddingVertical: SP.sm, paddingHorizontal: SP.xs, marginBottom: SP.xs },
