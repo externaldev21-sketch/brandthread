@@ -316,14 +316,24 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantInitials: 'AS',
     participantColor: pickAvatarColor('preview-seller-07'),
     posterIndex: 6,
-    lastMessage: 'Let me check on that for you',
-    lastMessageFromMe: false,
-    minutesAgo: 1,
+    lastMessage: 'Voice message',
+    lastMessageFromMe: true,
+    lastMessageType: 'voice',
+    minutesAgo: 0.5,
     unreadCount: 1,
     isRequest: false,
     messages: [
       { id: 'preview-msg-07-1', fromOfficialOrParticipant: 'me', text: 'Does the mesh top run small?', minutesAgo: 2 },
       { id: 'preview-msg-07-2', fromOfficialOrParticipant: 'them', text: 'Let me check on that for you', minutesAgo: 1 },
+      {
+        // Item 73 (voice note waveform playback progress): a real, playable
+        // seeded voice bubble — see toAttachment()'s `type === 'voice'`
+        // branch in lib/previewInbox.ts for the bundled audio URI + waveform
+        // it attaches here.
+        id: 'preview-msg-07-3', fromOfficialOrParticipant: 'me', text: '',
+        attachment: { type: 'voice' },
+        minutesAgo: 0.5,
+      },
     ],
   },
   {
@@ -457,6 +467,16 @@ export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     contextOrderNumber: 'BT-10234',
     messages: [
       { id: 'preview-seller-msg-01-1', fromOfficialOrParticipant: 'them', text: 'Hi! Just checking on my jacket order 🙂', minutesAgo: 240 },
+      {
+        // Item 73 (voice note waveform playback progress), seller-side
+        // mirror of preview-msg-03-2 on the buyer side above — same real
+        // bundled voice bubble, rendered here as an incoming message from
+        // the buyer (Ava Chen) so the seller preview also has a genuinely
+        // playable voice note to demo, not only the buyer preview.
+        id: 'preview-seller-msg-01-1b', fromOfficialOrParticipant: 'them', text: '',
+        attachment: { type: 'voice' },
+        minutesAgo: 239,
+      },
       {
         id: 'preview-seller-msg-01-2', fromOfficialOrParticipant: 'me', text: 'Your jacket just shipped!',
         attachment: {
