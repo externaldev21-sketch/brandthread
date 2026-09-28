@@ -1239,7 +1239,7 @@ function buildNoteView(row: typeof notes.$inferSelect) {
     authorName:     row.authorName,
     authorHandle:   row.authorHandle ?? "",
     authorInitials: row.authorInitials ?? "",
-    authorColor:    row.authorColor ?? "#8B5CF6",
+    authorColor:    row.authorColor ?? "#71717A",
     text:           row.text,
     createdAt:      new Date(row.createdAt).getTime(),
     expiresAt:      new Date(row.expiresAt).getTime(),
