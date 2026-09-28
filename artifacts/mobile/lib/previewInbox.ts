@@ -24,6 +24,7 @@ import {
   type PreviewConversationSeed, type PreviewMessageSeed,
 } from './previewInboxData';
 import type { Conversation, Message, MessageAttachment, Notification } from '@/services/socialTypes';
+import { acceptConversationInList, removeConversationFromList } from './conversationListMutations';
 
 export function isPreviewInboxEnabled(): boolean {
   return isPreviewCatalogEnabled();
@@ -135,14 +136,9 @@ export function getPreviewConversation(id: string): Conversation | null {
  */
 export function acceptPreviewConversationRequest(id: string): Conversation | null {
   const list = getPreviewConversations();
-  const idx = list.findIndex(c => c.id === id);
-  if (idx < 0) return null;
-  const accepted: Conversation = { ...list[idx], isRequest: false, updatedAt: new Date().toISOString() };
-  const next = list.slice();
-  next.splice(idx, 1);
-  next.unshift(accepted);
-  cachedConversations = next;
-  return accepted;
+  if (!list.some(c => c.id === id)) return null;
+  cachedConversations = acceptConversationInList(list, id);
+  return cachedConversations[0];
 }
 
 /**
@@ -152,8 +148,7 @@ export function acceptPreviewConversationRequest(id: string): Conversation | nul
  * backend block/delete record to keep in sync with.
  */
 export function deletePreviewConversationRequest(id: string): void {
-  const list = getPreviewConversations();
-  cachedConversations = list.filter(c => c.id !== id);
+  cachedConversations = removeConversationFromList(getPreviewConversations(), id);
 }
 
 /**

@@ -77,7 +77,6 @@ import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { TabBarGlassZone } from '@/components/buyer-nav/TabBarGlassZone';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
@@ -1023,12 +1022,17 @@ const FULL_PAGE_COVER_CROP_THRESHOLD = 0.3;
  * WHOLE page, all the way to the bottom edge — there is no shorter "stops at
  * the line" frame any more (that was PR #196's approach, rejected for
  * reading as an instant dead-stop). The floating tab-bar zone is instead a
- * frosted-glass OVERLAY (TabBarGlassZone) drawn on TOP of this same
- * full-bleed frame, sampling the live video/list actually behind it, rather
- * than a separate shorter frame plus a blurred copy of a poster image.
+ * frosted-glass overlay drawn on TOP of this same full-bleed frame, sampling
+ * the live video/list actually behind it, rather than a separate shorter
+ * frame plus a blurred copy of a poster image. That overlay (TabBarGlassZone)
+ * is now rendered once, centrally, by BuyerTabBar itself (the one shared tab-
+ * bar container mounted for the whole buyer navigator) rather than per video
+ * page here — a fixed strip at the bottom of the viewport blurs whichever
+ * page is currently in view exactly the same way a per-page copy would,
+ * since only one page is ever visible at a time.
  *
  * `bottomStripHeight` is accepted purely so existing callers don't need to
- * change, but it no longer shrinks the frame itself.
+ * change, but it no longer shrinks the frame itself or renders anything.
  */
 function immersiveFrameHeight(pageHeight: number | undefined, _bottomStripHeight: number): number | undefined {
   return pageHeight;
@@ -1075,9 +1079,6 @@ function PosterOnlyVisual({
           <View style={[StyleSheet.absoluteFill, { backgroundColor: fallbackColor ?? '#0a0a0a' }]} pointerEvents="none" />
         )}
       </View>
-      {immersive && bottomStripHeight > 0 && pageWidth != null && (
-        <TabBarGlassZone height={bottomStripHeight} width={pageWidth} tint="dark" />
-      )}
     </>
   );
 }
@@ -1200,13 +1201,15 @@ function LiveVideoVisual({
   }, [player, rate]);
 
   // Full-bleed: the sharp video plays all the way to the bottom of the page
-  // again (frameHeight === pageHeight, see immersiveFrameHeight above).
-  // TabBarGlassZone (below) is a thin, mostly-transparent overlay drawn on
-  // TOP of this same frame at the tab-bar zone — a real backdrop blur
-  // (CSS `backdrop-filter` on web, a native blur material on iOS/Android)
-  // of the live video actually behind it, not a separate shorter frame plus
-  // a blurred copy of a poster image. As the video plays, the blur updates
-  // in real time because it's sampling the live layer, not a frozen mirror.
+  // again (frameHeight === pageHeight, see immersiveFrameHeight above). The
+  // frosted glass over the tab-bar zone is a real backdrop blur (CSS
+  // `backdrop-filter` on web, a native blur material on iOS/Android) of the
+  // live video actually behind it, not a separate shorter frame plus a
+  // blurred copy of a poster image — but it's rendered once by BuyerTabBar
+  // (see the shared TabBarGlassZone usage there), not per page here, since a
+  // fixed strip at the bottom of the viewport already blurs whichever page
+  // is currently visible. As the video plays, the blur updates in real time
+  // because it's sampling the live layer, not a frozen mirror.
   //
   // Explicit size on the sharp-clip wrapper itself rather than trusting it
   // to inherit height from an ancestor: on web, absoluteFill inside a
@@ -1260,9 +1263,6 @@ function LiveVideoVisual({
           </View>
         </Animated.View>
       </View>
-      {immersive && bottomStripHeight > 0 && pageWidth != null && (
-        <TabBarGlassZone height={bottomStripHeight} width={pageWidth} tint="dark" />
-      )}
       {progressBottom != null && isActive && (
         <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} externallyPaused={paused} />
       )}

@@ -42,21 +42,29 @@ export function DiscoverPeopleRow({ people }: { people: DiscoverPersonSuggestion
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ gap: 12, paddingHorizontal: SP.md }}
         renderItem={({ item }) => (
-          <PressableScale
-            onPress={() => router.push(`/buyer-other-profile?userId=${encodeURIComponent(item.userId)}&name=${encodeURIComponent(item.name)}&handle=${encodeURIComponent(item.handle)}&initials=${encodeURIComponent(item.initials)}` as never)}
-            style={[styles.card, { borderColor: theme.border, backgroundColor: theme.card }]}
-          >
-            <PersonAvatar person={item} size={56} />
-            <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
-            <Text style={[styles.handle, { color: theme.muted }]} numberOfLines={1}>{item.handle}</Text>
-            <Text style={[styles.reason, { color: theme.muted }]} numberOfLines={2}>{item.reason}</Text>
+          // Two SIBLING tap targets, never nested: the card's own
+          // PressableScale opens the profile; FollowButton is a plain
+          // sibling View, not wrapped inside it — a Pressable inside a
+          // Pressable renders as a nested <button> on web (invalid HTML,
+          // and the two press handlers fight each other). See
+          // tests/discover-no-nested-pressables.test.ts.
+          <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.card }]}>
+            <PressableScale
+              onPress={() => router.push(`/buyer-other-profile?userId=${encodeURIComponent(item.userId)}&name=${encodeURIComponent(item.name)}&handle=${encodeURIComponent(item.handle)}&initials=${encodeURIComponent(item.initials)}` as never)}
+              style={styles.cardTapArea}
+            >
+              <PersonAvatar person={item} size={56} />
+              <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+              <Text style={[styles.handle, { color: theme.muted }]} numberOfLines={1}>{item.handle}</Text>
+              <Text style={[styles.reason, { color: theme.muted }]} numberOfLines={2}>{item.reason}</Text>
+            </PressableScale>
             <FollowButton
               userId={item.userId}
               initial={{ isFollowing: item.isFollowing, isFollowedBy: false, isMutual: false }}
               size="compact"
               style={{ marginTop: SP.xs, alignSelf: 'stretch' }}
             />
-          </PressableScale>
+          </View>
         )}
       />
     </View>
@@ -69,6 +77,7 @@ const styles = StyleSheet.create({
     width: 130, borderRadius: RADII.card, borderWidth: 1,
     paddingHorizontal: SP.sm, paddingVertical: SP.md, alignItems: 'center', gap: 4,
   },
+  cardTapArea: { alignItems: 'center', width: '100%' },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarInitials: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.md },
   name: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 6, textAlign: 'center' },
