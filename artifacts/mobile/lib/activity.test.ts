@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ACTIVITY_CHIPS,
+  activityCategory,
+  activityChipEmpty,
+  matchesActivityChip,
   activityHref,
   activityIcon,
   activityKind,
@@ -310,6 +314,43 @@ describe('aggregateActivity — reposts and story likes', () => {
     });
     const rows = aggregateActivity([storyLike('s1'), storyLike('s2')]);
     expect(rows).toHaveLength(2);
+  });
+});
+
+describe('filter chips', () => {
+  const of = (type: string, category = 'social') => item({ type, category });
+
+  it('offers exactly All / Follows / Likes / Comments / Orders / Thread Cash, in that order', () => {
+    expect(ACTIVITY_CHIPS.map((c) => c.label)).toEqual(['All', 'Follows', 'Likes', 'Comments', 'Orders', 'Thread Cash']);
+  });
+
+  it('puts each notification type under one chip', () => {
+    expect(activityCategory(of('new_follower'))).toBe('follows');
+    expect(activityCategory(of('post_like'))).toBe('likes');
+    expect(activityCategory(of('story_like'))).toBe('likes');
+    expect(activityCategory(of('post_comment'))).toBe('comments');
+    expect(activityCategory(of('comment_reply'))).toBe('comments');
+    expect(activityCategory(of('mention'))).toBe('comments');
+    expect(activityCategory(of('thread_cash_received'))).toBe('thread_cash');
+    expect(activityCategory(of('order_shipped', 'orders'))).toBe('orders');
+    expect(activityCategory(of('order_delivered', 'orders'))).toBe('orders');
+    expect(activityCategory(of('payout_sent', 'payout'))).toBe('orders');
+    expect(activityCategory(of('low_stock', 'stock'))).toBe('orders');
+    expect(activityCategory(of('repost'))).toBe('other');
+  });
+
+  it('keeps orders out of All but shows every social row there', () => {
+    expect(matchesActivityChip(of('order_shipped', 'orders'), 'all')).toBe(false);
+    expect(matchesActivityChip(of('repost'), 'all')).toBe(true);
+    expect(matchesActivityChip(of('thread_cash_received'), 'all')).toBe(true);
+    expect(matchesActivityChip(of('order_shipped', 'orders'), 'orders')).toBe(true);
+    expect(matchesActivityChip(of('post_like'), 'comments')).toBe(false);
+  });
+
+  it('has a specific empty message for every chip', () => {
+    const messages = ACTIVITY_CHIPS.map((c) => activityChipEmpty(c.key).message);
+    expect(new Set(messages).size).toBe(ACTIVITY_CHIPS.length);
+    expect(activityChipEmpty('thread_cash').message).toContain('Thread Cash');
   });
 });
 
