@@ -17,6 +17,7 @@ import { useActivityUnreadCount } from '@/components/ActivityBellButton';
 import { SHEET_EASING, SHEET_OPEN_MS } from '@/constants/motion';
 import {
   TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, CrossfadeNavIcon, tabIconColor,
+  useTabBarActiveIndex,
 } from '@/components/tab-bar/TabBarParts';
 import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { COMPACT_ICON_SCALE, COMPACT_ICON_STROKE_SCALE, useBuyerTabBarMetrics } from './buyerTabBarMetrics';
@@ -107,6 +108,13 @@ export function BuyerTabBar({
   // Home is the only full-bleed video tab — every other buyer screen keeps
   // the regular capsule exactly as shipped.
   const isCompact = activeSlot === 'index';
+
+  // Owns the pill's position so a tab press can kick the glide immediately,
+  // before the tabPress event and the screen swap — see the hook's doc.
+  const {
+    x: indicatorX, target: indicatorTarget, opacity: indicatorOpacity,
+    press: pressIndicator, hide: hideIndicator,
+  } = useTabBarActiveIndex(activeIndex, reducedMotion);
 
   // 0 = regular, 1 = compact. Every animated style below reads this one
   // value so width, height, icon scale and the selection pill all move as
@@ -203,10 +211,17 @@ export function BuyerTabBar({
     const event = route
       ? navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
       : null;
-    if (event?.defaultPrevented) return;
+    if (event?.defaultPrevented) {
+      // The press-in already moved the pill ahead of this tab's own
+      // navigation — a listener vetoing it means that never happens, so put
+      // the pill (and, for Profile, its hidden state) back where it was.
+      if (activeIndex >= 0) pressIndicator(activeIndex);
+      else hideIndicator();
+      return;
+    }
     hapticTabChange();
     navigation.navigate(routeName as never);
-  }, [activeRoute, navigation, state.routes]);
+  }, [activeRoute, activeIndex, navigation, state.routes, pressIndicator, hideIndicator]);
 
   const onLongPress = React.useCallback((routeName: string) => {
     const route = state.routes.find(candidate => candidate.name === routeName);
@@ -261,8 +276,9 @@ export function BuyerTabBar({
         <TabBarGlass theme={theme} radius={metrics.capsuleHeight / 2} animatedStyle={capsuleGlassStyle} />
 
         <TabBarIndicator
-          activeIndex={activeIndex}
-          visible
+          x={indicatorX}
+          target={indicatorTarget}
+          opacity={indicatorOpacity}
           metrics={regularMetrics}
           compactMetrics={compactMetrics}
           progress={progress}
@@ -273,7 +289,7 @@ export function BuyerTabBar({
           accessibilityRole="tablist"
           style={[styles.slotRow, { marginLeft: metrics.capsulePadding }]}
         >
-          {BUYER_TAB_ITEMS.map((item) => {
+          {BUYER_TAB_ITEMS.map((item, index) => {
             const focused = activeSlot === item.route;
             const badge = item.route === 'inbox' ? inboxBadgeCount : item.route === 'activity' ? activityUnread : 0;
             const hasBadge = item.route === 'inbox' || item.route === 'activity';
@@ -289,10 +305,13 @@ export function BuyerTabBar({
                 animatedStyle={slotAnimatedStyle}
                 hitSlop={isCompact ? compactHitSlop : undefined}
                 onPress={() => openRoute(item.route)}
+                onPressIn={() => pressIndicator(index)}
                 onLongPress={() => onLongPress(item.route)}
                 testID={`buyer-tab-${item.route}`}
                 accessibilityLabel={label}
                 badge={hasBadge ? <TabBarBadge count={badge} theme={theme} /> : null}
+                pillTarget={indicatorTarget}
+                pillIndex={index}
               >
                 <Animated.View style={iconScaleStyle}>
                   <CrossfadeNavIcon
@@ -320,6 +339,7 @@ export function BuyerTabBar({
         accessibilityLabel="Profile tab"
         selected={profileFocused}
         onPress={() => openRoute('profile')}
+        onPressIn={hideIndicator}
         onLongPress={() => onLongPress('profile')}
         testID="buyer-tab-profile"
       >

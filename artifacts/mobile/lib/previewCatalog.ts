@@ -85,9 +85,9 @@ export interface PreviewCatalogProduct {
 // keeps (item 45). "Crystal Mesh Top" reuses index 1's photo (also an
 // evening/going-out look) instead of a 7th distinct image.
 //
-// "Leather Ankle Boots" (posterIndex 3, shared with "Ivory Column Set" —
-// same reuse convention as Crystal Mesh Top above) was added so the Atelier
-// Noire preview post's second tagged product (feed.tsx's `productTags`,
+// "Leather Ankle Boots" (shared with "Ivory Column Set" — same reuse
+// convention as Crystal Mesh Top above) was added so the Atelier Noire
+// preview post's second tagged product (feed.tsx's `productTags`,
 // preview-fashion-01) hydrates through this same real catalog path instead
 // of falling through to nothing: it used to carry a productId
 // ('preview-product-01b') with no matching catalog row, so
@@ -96,7 +96,26 @@ export interface PreviewCatalogProduct {
 // thumbnail fell back to the post's own poster image, the same one the
 // first tagged product ("Sculpted Wool Coat") already shows. Now id
 // `preview-product-11`, matching this array's normal auto-id convention.
-const SEED: Array<Omit<PreviewCatalogProduct, 'images' | 'cutoutUri' | 'id' | 'productId' | 'sellerId' | 'sizeChartImageUrl'> & { posterIndex: number; sizeChartKey?: string }> = [
+//
+// Photo audit follow-up: this row used to reuse posterIndex 3 (the same
+// runway photo "Ivory Column Set" correctly uses — a model in a white
+// column gown), which put that white dress on a BOOTS listing — a real
+// garment-type/gender mismatch (reported live). None of this bundle's 10
+// runway posters (see POSTER_SOURCES) actually show footwear clearly
+// (couture gowns/suits with trousers or hemlines covering the shoe) — there
+// is no real boots photo to reuse from the existing set, and sourcing a new
+// one requires network access this environment's egress proxy blocks
+// (`EGRESS_BLOCKED` on every image host tried: images.unsplash.com,
+// unsplash.com, images.pexels.com, cdn.pixabay.com, i.imgur.com,
+// images.squarespace-cdn.com). `posterIndex: undefined` here means "no
+// photo asset" — `getPreviewCatalog()` below leaves `images: []` for it,
+// which every existing image-consuming surface (ProductImageCarousel,
+// ProductListRow, ProductHeader) already renders as its established
+// no-photo placeholder (a plain Feather "image" icon), never a wrong
+// photo. Follow-up: swap in a real boots product photo (as a bundled
+// asset here, same convention as the rest of POSTER_SOURCES) once network
+// access allows sourcing one.
+const SEED: Array<Omit<PreviewCatalogProduct, 'images' | 'cutoutUri' | 'id' | 'productId' | 'sellerId' | 'sizeChartImageUrl'> & { posterIndex?: number; sizeChartKey?: string }> = [
   { posterIndex: 0, name: 'Sculpted Wool Coat', sellerDisplayName: 'Atelier Noire', category: 'Outerwear', currentPriceCents: 48000, compareAtPriceCents: null, priceCents: 48000, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 18, remainingUnits: 6, demandCount: 142, tags: ['coat', 'wool', 'tailoring'], sizeChartKey: 'wool-coat' },
   { posterIndex: 1, name: 'Liquid Silver Dress', sellerDisplayName: 'Maison Vela', category: 'Dresses', currentPriceCents: 32500, compareAtPriceCents: 39000, priceCents: 32500, sizes: ['XS', 'S', 'M'], claimedUnits: 24, remainingUnits: 4, demandCount: 210, tags: ['dress', 'evening'] },
   { posterIndex: 2, name: 'Oversized Tuxedo', sellerDisplayName: 'Saint Rue', category: 'Suiting', currentPriceCents: 56000, compareAtPriceCents: null, priceCents: 56000, sizes: ['S', 'M', 'L', 'XL'], claimedUnits: 9, remainingUnits: 11, demandCount: 88, tags: ['suit', 'tuxedo'], sizeChartKey: 'tuxedo' },
@@ -107,7 +126,7 @@ const SEED: Array<Omit<PreviewCatalogProduct, 'images' | 'cutoutUri' | 'id' | 'p
   { posterIndex: 7, name: 'Reconstructed Trench', sellerDisplayName: 'Noma Archive', category: 'Outerwear', currentPriceCents: 52000, compareAtPriceCents: null, priceCents: 52000, sizes: ['S', 'M', 'L', 'XL'], claimedUnits: 7, remainingUnits: 13, demandCount: 64, tags: ['trench', 'coat'] },
   { posterIndex: 8, name: 'Satin Power Suit', sellerDisplayName: 'Echelon', category: 'Suiting', currentPriceCents: 44500, compareAtPriceCents: 51000, priceCents: 44500, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 19, remainingUnits: 5, demandCount: 188, tags: ['suit'] },
   { posterIndex: 9, name: 'Sculpted Silk Gown', sellerDisplayName: 'Vale Studio', category: 'Dresses', currentPriceCents: 69000, compareAtPriceCents: null, priceCents: 69000, sizes: ['XS', 'S', 'M'], claimedUnits: 5, remainingUnits: 7, demandCount: 71, tags: ['gown', 'evening'] },
-  { posterIndex: 3, name: 'Leather Ankle Boots', sellerDisplayName: 'Atelier Noire', category: 'Footwear', currentPriceCents: 21000, compareAtPriceCents: null, priceCents: 21000, sizes: ['37', '38', '39', '40', '41'], claimedUnits: 14, remainingUnits: 5, demandCount: 118, tags: ['boots', 'leather', 'footwear'] },
+  { name: 'Leather Ankle Boots', sellerDisplayName: 'Atelier Noire', category: 'Footwear', currentPriceCents: 21000, compareAtPriceCents: null, priceCents: 21000, sizes: ['37', '38', '39', '40', '41'], claimedUnits: 14, remainingUnits: 5, demandCount: 118, tags: ['boots', 'leather', 'footwear'] },
 ];
 
 let cached: PreviewCatalogProduct[] | null = null;
@@ -123,7 +142,7 @@ export function getPreviewCatalog(): PreviewCatalogProduct[] {
     name: row.name,
     sellerDisplayName: row.sellerDisplayName,
     category: row.category,
-    images: [posterUri(row.posterIndex)],
+    images: row.posterIndex != null ? [posterUri(row.posterIndex)] : [],
     cutoutUri: null,
     currentPriceCents: row.currentPriceCents,
     compareAtPriceCents: row.compareAtPriceCents,

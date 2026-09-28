@@ -97,7 +97,7 @@ const previewReadIds = new Set<string>();
 let previewSeedServed = false;
 
 export function isPreviewActivityId(id: string): boolean {
-  return id.startsWith('preview-act-');
+  return isPreviewActivityEnabled() && id.startsWith('preview-act-');
 }
 
 /** Mark seeded preview rows read (ids that aren't preview rows are ignored). */
@@ -132,7 +132,7 @@ export function getPreviewActivity(): ActivityItem[] {
 }
 
 function seedPreviewActivity(): ActivityItem[] {
-  if (cached) return cached;
+  if (cached) return withPreviewLiveArrivals(cached);
   const p = PEOPLE;
   cached = [
     // ── New (unread) ──────────────────────────────────────────────────────
@@ -254,7 +254,43 @@ function seedPreviewActivity(): ActivityItem[] {
       targetId: 'preview-post-07', targetType: 'post', targetImageUrl: posterUri(7), createdAt: minutesAgo(60 * 24 * 45),
     },
   ];
-  return cached;
+  return withPreviewLiveArrivals(cached);
+}
+
+// ─── Live arrival (item 84) ───────────────────────────────────────────────────
+// The preview has no backend, so nothing would ever arrive while Activity is
+// open and the live slide-in could never be seen there. Once per session, a
+// few seconds after Activity first opens, one new like "arrives" through the
+// same refresh path a real event takes (activity-center.tsx). Never outside
+// the preview.
+
+/** How long after Activity first opens the preview's one live event arrives. */
+export const PREVIEW_LIVE_ARRIVAL_DELAY_MS = 6000;
+
+const liveArrivals: ActivityItem[] = [];
+let liveArrivalDelivered = false;
+
+function withPreviewLiveArrivals(feed: ActivityItem[]): ActivityItem[] {
+  return liveArrivals.length > 0 ? [...liveArrivals, ...feed] : feed;
+}
+
+/** True until this session's one preview live event has been delivered. */
+export function hasPendingPreviewLiveArrival(): boolean {
+  return isPreviewActivityEnabled() && !liveArrivalDelivered;
+}
+
+/** Delivers this session's preview live event (a fresh, unread like). No-op after the first call. */
+export function deliverPreviewLiveArrival(): boolean {
+  if (!hasPendingPreviewLiveArrival()) return false;
+  liveArrivalDelivered = true;
+  const p = PEOPLE[6];
+  liveArrivals.unshift({
+    id: 'preview-act-live-01', category: 'social', type: 'post_like',
+    title: `${p.name} liked your post`, body: '', isRead: false,
+    actorId: p.userId, actorName: p.name, actorInitials: p.initials, actorColor: p.color, actorAvatarUrl: p.avatarUrl,
+    targetId: 'preview-post-02', targetType: 'post', targetImageUrl: posterUri(5), createdAt: new Date().toISOString(),
+  });
+  return true;
 }
 
 // Preview rows the viewer deleted (item 83). The preview has no backend to
@@ -350,9 +386,13 @@ let cachedSuggestions: PreviewSuggestedPerson[] | null = null;
 /** The seeded "Suggested for you" list. Gate on `isPreviewActivityEnabled()`. */
 export function getPreviewSuggestedPeople(): PreviewSuggestedPerson[] {
   if (cachedSuggestions) return cachedSuggestions;
+  // Never name the suggested person as their own mutual (e.g. Astrae's own
+  // reason must never read "Followed by Astrae") — each entry here lines up
+  // 1:1 with PEOPLE.slice(5) below, so double-check against that list when
+  // editing either.
   const reasons = [
     'Followed by Atelier Noire + 4 others',
-    'Followed by Astrae + 1 other',
+    'Followed by Maison Vela + 1 other',
     'New on Brandthread',
     'Followed by Orison',
     'New on Brandthread',

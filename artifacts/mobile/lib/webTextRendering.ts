@@ -89,3 +89,43 @@ export function injectWebFocusOutlineStyles() {
   `;
   document.head.appendChild(style);
 }
+
+/**
+ * Hides every scrollbar on web — Dev's rule: no visible scrollbar (the
+ * white bar on the right edge) on any screen, ever, vertical or horizontal
+ * (chip rows/carousels included). Seen live on Discover's Brands/People
+ * tabs; every ScrollView/FlatList/FlashList/SectionView renders as a plain
+ * scrollable `<div>` on web, which shows the browser's own scrollbar unless
+ * that's explicitly suppressed — this is the CSS half of that fix (see
+ * lib/scrollIndicators.ts for the native-prop half: `showsVerticalScroll
+ * Indicator`/`showsHorizontalScrollIndicator` default to `false`).
+ *
+ * `scrollbar-width`/`-ms-overflow-style` are the standard/legacy properties
+ * (Firefox, old Edge); `::-webkit-scrollbar` is what Chromium/Safari
+ * actually need. `overflow` itself is untouched — hiding the scrollbar's
+ * paint never removes the element's ability to scroll.
+ *
+ * Same reasoning as injectWebFocusOutlineStyles above: `app/+html.tsx`
+ * already carries a near-identical (but merely thin, not hidden) scrollbar
+ * rule that is proven dead code for this build — see that function's doc
+ * comment. This is the one place that actually reaches a live page.
+ */
+export function injectWebScrollbarHideStyles() {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  if (document.getElementById('bt-scrollbar-hide')) return; // idempotent (fast refresh, re-imports)
+
+  const style = document.createElement('style');
+  style.id = 'bt-scrollbar-hide';
+  style.textContent = `
+    html, body, * {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    *::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+  `;
+  document.head.appendChild(style);
+}

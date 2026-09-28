@@ -17,6 +17,8 @@ import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { showActionSheet } from '@/components/ui/ActionSheet';
+import { MediaCropper } from '@/components/media/MediaCropper';
+import { applyCropRect } from '@/lib/mediaCrop';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { File, Paths } from 'expo-file-system';
 
@@ -230,6 +232,13 @@ export default function AddProductScreen() {
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
   const [sizeChartUploadStatus, setSizeChartUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle');
+  // Media crop system: newly-picked photos queue up to be cropped one at a
+  // time (each keeps its own transform once cropped — this is "crop each
+  // photo" via a sequential flow rather than a single multi-photo session
+  // with a live thumbnail strip, which the shared MediaCropper doesn't
+  // build yet; every photo still gets its own crop either way).
+  const [cropQueue, setCropQueue] = useState<string[]>([]);
+  const [cropTargetId, setCropTargetId] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [collections, setCollections] = useState<ProductCollection[]>([]);
@@ -837,26 +846,48 @@ export default function AddProductScreen() {
     patchDraft({ media: media.map(m => m.id === id ? { ...m, useCutout: !m.useCutout } : m) });
   }
 
-  /** Center-crop a photo to a square using expo-image-manipulator. */
-  async function cropToSquare(item: ProductMedia) {
+  /** Opens the shared MediaCropper for an existing photo ("Edit crop"),
+   *  always re-cropping from its uncropped original. */
+  function openCropperFor(item: ProductMedia) {
+    hapticToggle();
+    setCropTargetId(item.id);
+  }
+
+  /** Advances the sequential crop queue after a photo's crop is applied
+   *  (or skipped) — opens the next queued photo's cropper, if any. */
+  function advanceCropQueue(justCroppedId: string) {
+    setCropQueue(prev => {
+      const rest = prev.filter(id => id !== justCroppedId);
+      setCropTargetId(rest[0] ?? null);
+      return rest;
+    });
+  }
+
+  async function handleCropSave(itemId: string, result: { rect: { x: number; y: number; width: number; height: number } }) {
+    const media = draftData.media ?? [];
+    const item = media.find(m => m.id === itemId);
+    if (!item) { advanceCropQueue(itemId); return; }
+    const sourceUri = item.originalUri ?? item.uri;
+    setMediaUpload(prev => ({ ...prev, [itemId]: { status: 'uploading' } }));
     try {
-      const manipulated = await ImageManipulator.manipulateAsync(item.uri, [], { compress: 0.95 });
-      const size = Math.min(manipulated.width, manipulated.height);
-      const originX = Math.max(0, Math.floor((manipulated.width - size) / 2));
-      const originY = Math.max(0, Math.floor((manipulated.height - size) / 2));
-      const cropped = await ImageManipulator.manipulateAsync(
-        item.uri,
-        [{ crop: { originX, originY, width: size, height: size } }],
-        { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG },
-      );
-      const media = draftData.media ?? [];
-      patchDraft({ media: media.map(m => m.id === item.id ? { ...m, uri: cropped.uri } : m) });
-      setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'uploading' } }));
-      void uploadMediaAsset({ ...item, uri: cropped.uri });
+      const croppedUri = await applyCropRect(sourceUri, result.rect);
+      patchDraft({
+        media: (draftData.media ?? []).map(m => m.id === itemId
+          ? { ...m, uri: croppedUri, originalUri: sourceUri, cropRect: result.rect }
+          : m),
+      });
       hapticSuccessAction();
+      void uploadMediaAsset({ ...item, uri: croppedUri });
     } catch {
       Alert.alert('Crop failed', 'Could not crop this photo. Please try again.');
+      setMediaUpload(prev => ({ ...prev, [itemId]: { status: 'error' } }));
+    } finally {
+      advanceCropQueue(itemId);
     }
+  }
+
+  function handleCropCancel(itemId: string) {
+    advanceCropQueue(itemId);
   }
 
   /**
@@ -922,12 +953,17 @@ export default function AddProductScreen() {
                 id: `${Date.now()}-${i}`,
                 type: 'image' as const,
                 uri: a.uri,
+                originalUri: a.uri,
                 isCover: existingMedia.length + i === 0,
                 sortOrder: existingMedia.length + i,
                 createdAt: new Date().toISOString(),
               }));
               patchDraft({ media: [...existingMedia, ...newItems] });
-              newItems.forEach(item => { void uploadMediaAsset(item); });
+              // Every new photo crops to 3:4 before it uploads — the crop
+              // queue opens the shared cropper for each one in turn.
+              const newIds = newItems.map(item => item.id);
+              setCropQueue(prev => [...prev, ...newIds]);
+              setCropTargetId(current => current ?? newIds[0] ?? null);
             }
           }}
           style={s.uploadZone}
@@ -1033,9 +1069,9 @@ export default function AddProductScreen() {
                           <Text style={s.mediaActionChipText}>Set cover</Text>
                         </TouchableOpacity>
                       )}
-                      <TouchableOpacity style={s.mediaActionChip} onPress={() => cropToSquare(m)}>
+                      <TouchableOpacity style={s.mediaActionChip} onPress={() => openCropperFor(m)} testID={`media-edit-crop-${m.id}`}>
                         <Feather name="crop" size={11} color={theme.accentLight} />
-                        <Text style={s.mediaActionChipText}>Crop square</Text>
+                        <Text style={s.mediaActionChipText}>Edit crop</Text>
                       </TouchableOpacity>
                       {bgStatus !== 'processing' && (
                         <TouchableOpacity style={s.mediaActionChip} onPress={() => removeBackgroundForMedia(m)}>
@@ -2091,6 +2127,22 @@ export default function AddProductScreen() {
         secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
         testID="add-product-success-sheet"
       />
+
+      {cropTargetId && (() => {
+        const cropItem = (draftData.media ?? []).find(m => m.id === cropTargetId);
+        if (!cropItem) return null;
+        return (
+          <MediaCropper
+            visible
+            uri={cropItem.originalUri ?? cropItem.uri}
+            targetRatio={3 / 4}
+            initialRect={cropItem.cropRect ?? null}
+            title="Crop photo"
+            onCancel={() => handleCropCancel(cropTargetId)}
+            onSave={(result) => void handleCropSave(cropTargetId, result)}
+          />
+        );
+      })()}
     </View>
   );
 }

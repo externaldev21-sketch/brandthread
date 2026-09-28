@@ -77,9 +77,11 @@ describe('LIST step rows: real per-product data, a compact sibling cart button, 
     expect(sheet).toContain('listRowThumbWrap: { width: 72, height: 96');
   });
 
-  it('opens on a half-height sheet for the list step', () => {
-    expect(sheet).toContain("sheetStep === 'list' && ss.sheetHalf");
-    expect(sheet).toContain("sheetHalf: { maxHeight: '55%' }");
+  it('opens at a real 55% height for the list step, draggable up to 90%', () => {
+    expect(sheet).toContain("sheetStep === 'list' && listSheetAnimatedStyle");
+    expect(sheet).toContain('const listSheetMinHeight = windowHeight * 0.55;');
+    expect(sheet).toContain('const listSheetMaxHeight = windowHeight * 0.90;');
+    expect(sheet).toContain('const listResizeGesture = Gesture.Pan()');
   });
 });
 
