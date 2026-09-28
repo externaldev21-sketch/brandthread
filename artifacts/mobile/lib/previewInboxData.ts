@@ -10,6 +10,8 @@
  * the app's own logo instead of a poster photo.
  */
 
+import { pickAvatarColor } from './avatarColors';
+
 export type PreviewMessageAttachmentSeed = {
   type: 'image' | 'video' | 'voice' | 'product' | 'post' | 'order' | 'profile' | 'thread_cash'
     | 'agent_card' | 'quick_replies';
@@ -74,7 +76,7 @@ export const BRANDTHREAD_AGENT_SEED: PreviewConversationSeed = {
   participantName: 'Brandthread Agent',
   participantHandle: '@brandthread',
   participantInitials: 'BT',
-  participantColor: '#0A0A0B',
+  participantColor: pickAvatarColor('brandthread-agent'),
   isBrandMark: true,
   isPinned: true,
   isOfficial: true,
@@ -141,7 +143,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Atelier Noire',
     participantHandle: '@atelier_noire',
     participantInitials: 'AN',
-    participantColor: '#2E2A26',
+    participantColor: pickAvatarColor('preview-seller-01'),
     posterIndex: 0,
     lastMessage: 'Just restocked the Sculpted Wool Coat in your size!',
     lastMessageFromMe: false,
@@ -176,7 +178,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Maison Vela',
     participantHandle: '@maison_vela',
     participantInitials: 'MV',
-    participantColor: '#8B5CF6',
+    participantColor: pickAvatarColor('preview-seller-02'),
     posterIndex: 1,
     lastMessage: 'Thank you so much — enjoy the dress!',
     lastMessageFromMe: false,
@@ -194,7 +196,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Saint Rue',
     participantHandle: '@saint_rue',
     participantInitials: 'SR',
-    participantColor: '#111827',
+    participantColor: pickAvatarColor('preview-seller-03'),
     posterIndex: 2,
     lastMessage: 'Hi! Interested in custom sizing for the tuxedo.',
     lastMessageFromMe: false,
@@ -211,7 +213,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Orison',
     participantHandle: '@orison',
     participantInitials: 'OR',
-    participantColor: '#D6D3D1',
+    participantColor: pickAvatarColor('preview-seller-04'),
     posterIndex: 3,
     lastMessage: 'Ivory Column Set',
     lastMessageFromMe: false,
@@ -247,7 +249,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Kuro Line',
     participantHandle: '@kuro_line',
     participantInitials: 'KL',
-    participantColor: '#1F2933',
+    participantColor: pickAvatarColor('preview-seller-05'),
     posterIndex: 4,
     lastMessage: 'Order #BT-10234',
     // The order card is sent BY the seller (Kuro Line) — only a seller can
@@ -289,7 +291,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Forme 22',
     participantHandle: '@forme22',
     participantInitials: 'F2',
-    participantColor: '#6D28D9',
+    participantColor: pickAvatarColor('preview-seller-06'),
     posterIndex: 5,
     lastMessage: 'Sent you Thread Cash',
     lastMessageFromMe: false,
@@ -312,7 +314,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Astrae',
     participantHandle: '@astrae',
     participantInitials: 'AS',
-    participantColor: '#0EA5E9',
+    participantColor: pickAvatarColor('preview-seller-07'),
     posterIndex: 6,
     lastMessage: 'Let me check on that for you',
     lastMessageFromMe: false,
@@ -330,7 +332,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Noma Archive',
     participantHandle: '@noma_archive',
     participantInitials: 'NA',
-    participantColor: '#78716C',
+    participantColor: pickAvatarColor('preview-seller-08'),
     posterIndex: 7,
     lastMessage: 'Would love to know more about the trench!',
     lastMessageFromMe: false,
@@ -347,7 +349,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Echelon',
     participantHandle: '@echelon',
     participantInitials: 'EC',
-    participantColor: '#0F172A',
+    participantColor: pickAvatarColor('preview-seller-09'),
     posterIndex: 8,
     lastMessage: 'It\'s on its way to you now.',
     lastMessageFromMe: false,
@@ -365,7 +367,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Vale Studio',
     participantHandle: '@vale_studio',
     participantInitials: 'VS',
-    participantColor: '#44403C',
+    participantColor: pickAvatarColor('preview-seller-10'),
     posterIndex: 9,
     lastMessage: 'Hi! Is the silk gown still available in size S?',
     lastMessageFromMe: false,
@@ -390,9 +392,9 @@ export const PREVIEW_FOLLOWER_SEEDS: Array<{
   isRead: boolean;
   minutesAgo: number;
 }> = [
-  { id: 'preview-notif-follow-01', actorUserId: 'preview-seller-01', actorName: 'Atelier Noire', actorInitials: 'AN', actorColor: '#2E2A26', isRead: false, minutesAgo: 30 },
-  { id: 'preview-notif-follow-02', actorUserId: 'preview-seller-04', actorName: 'Orison', actorInitials: 'OR', actorColor: '#D6D3D1', isRead: false, minutesAgo: 90 },
-  { id: 'preview-notif-follow-03', actorUserId: 'preview-seller-07', actorName: 'Astrae', actorInitials: 'AS', actorColor: '#0EA5E9', isRead: true, minutesAgo: 300 },
+  { id: 'preview-notif-follow-01', actorUserId: 'preview-seller-01', actorName: 'Atelier Noire', actorInitials: 'AN', actorColor: pickAvatarColor('preview-seller-01'), isRead: false, minutesAgo: 30 },
+  { id: 'preview-notif-follow-02', actorUserId: 'preview-seller-04', actorName: 'Orison', actorInitials: 'OR', actorColor: pickAvatarColor('preview-seller-04'), isRead: false, minutesAgo: 90 },
+  { id: 'preview-notif-follow-03', actorUserId: 'preview-seller-07', actorName: 'Astrae', actorInitials: 'AS', actorColor: pickAvatarColor('preview-seller-07'), isRead: true, minutesAgo: 300 },
 ];
 
 // ─── Seller preview inbox (item 71) ────────────────────────────────────────
@@ -421,7 +423,7 @@ export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Maya Torres',
     participantHandle: '@mayatorres',
     participantInitials: 'MT',
-    participantColor: '#0EA5E9',
+    participantColor: pickAvatarColor('preview-buyer-02'),
     posterIndex: 2,
     lastMessage: 'Sent you Thread Cash',
     lastMessageFromMe: false,
@@ -444,7 +446,7 @@ export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Ava Chen',
     participantHandle: '@ava.chen',
     participantInitials: 'AC',
-    participantColor: '#8B5CF6',
+    participantColor: pickAvatarColor('preview-buyer-01'),
     posterIndex: 4,
     lastMessage: 'Your jacket just shipped!',
     lastMessageFromMe: true,

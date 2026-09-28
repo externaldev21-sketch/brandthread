@@ -36,6 +36,7 @@ import {
 } from '@/lib/previewInbox';
 import { muteConversation, setConversationTheme, setConversationDisappearing } from '@/services/socialService';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { pickAvatarColor } from '@/lib/avatarColors';
 
 type MuteOption = { label: string; minutes: number | null };
 const MUTE_OPTIONS: MuteOption[] = [
@@ -108,7 +109,7 @@ export default function ConversationDetailsScreen() {
       name: params.participantName ?? '',
       handle: params.participantHandle ?? '',
       initials: params.participantInitials ?? '',
-      color: params.participantColor ?? '#8B5CF6',
+      color: params.participantColor ?? pickAvatarColor(params.participantUserId ?? params.participantName),
     });
     router.push(('/buyer-other-profile?' + qs.toString()) as never);
   }
