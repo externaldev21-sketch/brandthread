@@ -31,6 +31,7 @@ import {
 import { SheetRise } from '@/components/motion/SheetRise';
 import { Button } from '@/components/ui/Button';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
+import { ListRow } from '@/components/ui/ListRow';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, productDetailHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatProfileCount, getSellerShopPage, type ShopProduct } from '@/services/profileService';
@@ -75,11 +76,6 @@ interface SocialCounts {
   following: number;
   likes:     number;
 }
-
-const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
-  { icon: 'user',       label: 'My Profile',    route: '/edit-profile' },
-  { icon: 'message-circle', label: 'Messages',  route: '/seller-inbox' },
-];
 
 const CONTENT_TABS = ['Posts', 'Shop', 'Tagged'] as const;
 type ContentTab = typeof CONTENT_TABS[number];
@@ -131,6 +127,12 @@ export default function ProfileScreen() {
   const [bioInput, setBioInput] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Gates the stats row's "–" placeholder. Tied only to the FIRST load
+  // attempt settling (success or failure) via Promise.allSettled below —
+  // never to `!profile` — so a slow or failing seller-profile fetch can't
+  // strand Posts/Followers/Following/Likes on "–" forever even though those
+  // three come from independent, already-resolved sources.
+  const [statsInitialLoading, setStatsInitialLoading] = useState(true);
   const requestUserRef = useRef<string | null>(null);
 
   const loadPosts = useCallback(async () => {
@@ -226,13 +228,16 @@ export default function ProfileScreen() {
     } catch { /* the pill falls back to "Shop" without a count */ }
   }, [api, authLoaded, userId]);
 
-  const loadPage = useCallback(() => {
+  const loadPage = useCallback(async () => {
     if (!authLoaded || !userId) return;
-    void loadPosts();
     void loadMyStories();
-    void loadSocialCounts();
-    void loadProfile();
     void loadShopCount();
+    // The three sources behind the four visible stats — awaited together so
+    // statsInitialLoading always resolves once, whichever finish first or
+    // fail; loadPosts/loadProfile/loadSocialCounts each already swallow
+    // their own errors, but allSettled is the belt-and-braces guarantee.
+    await Promise.allSettled([loadPosts(), loadProfile(), loadSocialCounts()]);
+    setStatsInitialLoading(false);
   }, [authLoaded, userId, loadPosts, loadMyStories, loadProfile, loadSocialCounts, loadShopCount]);
 
   useEffect(() => {
@@ -242,11 +247,18 @@ export default function ProfileScreen() {
     setProfile(null);
     setPostsLoading(true);
     setSocialCounts({ followers: 0, following: 0, likes: 0 });
+    setStatsInitialLoading(true);
     if (authLoaded && userId) void loadPage();
-    if (authLoaded && !userId) setPostsLoading(false);
+    if (authLoaded && !userId) { setPostsLoading(false); setStatsInitialLoading(false); }
     // New / edited / deleted posts publish through socialService — refresh.
     const unsub = subscribeSocial(() => { loadPosts(); loadMyStories(); });
-    return unsub;
+    // Belt-and-braces: if auth itself never resolves (a slow or stuck Clerk
+    // session) statsInitialLoading would otherwise never flip, since
+    // loadPage() only runs once authLoaded && userId are both true. Never
+    // leave the stats row stuck on "–" indefinitely — fall back to showing
+    // real (zero) values after a few seconds regardless.
+    const stallGuard = setTimeout(() => setStatsInitialLoading(false), 6000);
+    return () => { unsub(); clearTimeout(stallGuard); };
   }, [authLoaded, userId, loadPage, loadPosts, loadMyStories]);
 
   // Returning from add-product / create-post / edit-profile refreshes counts.
@@ -285,7 +297,7 @@ export default function ProfileScreen() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.resolve(loadPage());
+    await loadPage();
     setRefreshing(false);
   }, [loadPage]);
 
@@ -501,16 +513,45 @@ export default function ProfileScreen() {
           </ProfileMeta>
         )}
         stats={stats}
-        statsLoading={!profile}
+        statsLoading={statsInitialLoading}
         actions={(
           <>
+            {/* Instagram's own business-profile shape (mobbin.com/screens/
+                7b7b7c39-39a7-4ba6-bf3a-45c009a4769d, same reference used for
+                the visited /seller-profile route in PR #232): a full-width
+                "Professional dashboard" row above one row of buttons —
+                Edit profile / Share profile / Contact — nothing else. Real
+                Instagram's own-profile row is only Edit profile + Share
+                profile plus an icon-only "suggest to others" control; there
+                is no labeled "Contact" text button on your OWN profile in
+                the reference (that only appears on a business profile you're
+                VISITING). Built as asked anyway, mapped to the seller inbox
+                — the nearest real destination for "how buyers reach me".
+                Go Live and Create Post move into the Studio control center's
+                Sell section (the "+" grid button in the tab bar) — Create
+                Post was already there as "Post video"; Go Live is added
+                alongside it. Settings was already duplicated in the
+                top-right gear above. My Profile pointed at the same
+                /edit-profile route as Edit Profile; Messages duplicated the
+                header's own Inbox icon. Removing all four cuts the wall from
+                six buttons to three. */}
+            <ListRow
+              icon="bar-chart-2"
+              title="Professional dashboard"
+              subtitle="Views, followers and content stats"
+              chevron
+              onPress={() => nav('/(tabs)/')}
+              style={s.dashboardRow}
+              testID="profile-dashboard-row"
+            />
             <View style={s.actionRow}>
-              {/* Opens the full seller Edit Profile screen (avatar, name,
-                  username, bio, link…). Long-press keeps the quick brand
-                  name + bio sheet one gesture away. */}
+              {/* Three buttons across a 390pt row leave no room for an icon
+                  plus "Edit profile" / "Share profile" / "Contact" without
+                  truncating (confirmed live) — real Instagram's own row is
+                  text-only here too (its icon is a separate, unlabeled
+                  fourth control). Full wording stays in accessibilityLabel. */}
               <ProfileButton
-                label="Edit Profile"
-                icon="edit-2"
+                label="Edit"
                 variant="primary"
                 onPress={() => nav('/edit-profile')}
                 onLongPress={openProfileEditor}
@@ -518,23 +559,22 @@ export default function ProfileScreen() {
                 accessibilityHint="Opens your full profile editor. Long press to quickly edit brand name and bio."
                 testID="profile-edit-details"
               />
-              <ProfileButton label="Settings" icon="settings" onPress={() => nav('/settings')} />
-            </View>
-            <View style={s.actionRow}>
-              <ProfileButton label="Go Live" icon="radio" onPress={() => nav('/seller-go-live')} accessibilityLabel="Go Live" />
-              <ProfileButton label="Create Post" icon="video" onPress={() => nav('/create-post')} accessibilityLabel="Create Post" />
+              <ProfileButton
+                label="Share"
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShareSheetVisible(true); }}
+                accessibilityLabel="Share profile"
+                accessibilityHint="Opens a shareable profile card, QR code, and link"
+                testID="profile-share-btn"
+              />
+              <ProfileButton
+                label="Contact"
+                onPress={() => nav('/seller-inbox')}
+                accessibilityLabel="Contact"
+                accessibilityHint="Opens your buyer messages"
+                testID="profile-contact-btn"
+              />
             </View>
           </>
-        )}
-        extras={(
-          <View style={s.extrasStack}>
-            {/* The shop now lives in the Shop tab (tiles + "Shop N products"). */}
-            <View style={s.quickRow}>
-              {QUICK_ACTIONS.map((qa) => (
-                <ProfileButton key={qa.label} label={qa.label} icon={qa.icon} onPress={() => nav(qa.route)} accessibilityLabel={qa.label} />
-              ))}
-            </View>
-          </View>
         )}
         tabs={{
           items: CONTENT_TAB_ITEMS,
@@ -721,9 +761,11 @@ const s = StyleSheet.create({
     minHeight: 44, borderRadius: 22, borderWidth: 1, paddingLeft: SP.md, paddingRight: SP.sm,
   },
   brandNameTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, flexShrink: 1 },
+  dashboardRow: {
+    backgroundColor: CARD, borderColor: BORDER, borderWidth: 1,
+    borderRadius: RADIUS.md, marginBottom: SP.sm,
+  },
   actionRow: { flexDirection: 'row', gap: SP.sm },
-  extrasStack: { gap: SP.md },
-  quickRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md },
   filterRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xs },
   filterChip: { height: 30, borderRadius: 15, borderWidth: 1, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   filterChipPressed: { opacity: 0.7 },
