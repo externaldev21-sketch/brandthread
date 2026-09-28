@@ -52,6 +52,7 @@ import { DiscoverPostViewer } from '@/components/discover/DiscoverPostViewer';
 import { DiscoverSafetyMenu } from '@/components/discover/DiscoverSafetyMenu';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { composeDiscoverPosts, type DiscoverPost } from '@/lib/discoverFeed';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
@@ -571,7 +572,7 @@ export default function BuyerSearchScreen() {
     <View style={{ flex: 1, backgroundColor: bg }}>
       <View style={[styles.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router)}
           accessibilityRole="button"
           accessibilityLabel="Back"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

@@ -3,7 +3,7 @@
  *
  * POST   /api/social/follow              — follow a buyer   { userId }
  * DELETE /api/social/follow/:userId      — unfollow
- * GET    /api/social/following           — users I follow
+ * GET    /api/social/following           — users I follow (?sort=default|latest|earliest)
  * GET    /api/social/followers           — users who follow me (isFollowingBack flag)
  * GET    /api/social/status/:userId      — { isFollowing, isFollowedBy, isMutual }
  * GET    /api/social/profile/:userId     — public buyer profile + follow counts
@@ -13,7 +13,7 @@
  */
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions, notificationsFeed, suggestionDismissals } from "@workspace/db";
+import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -32,6 +32,7 @@ import {
 import { actorFieldsFromProfile, notifyStoryLike } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+import { followingSortDirection } from "../lib/followingSort";
 
 // Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
 // search endpoint so people search behaves consistently with product/brand
@@ -324,6 +325,74 @@ router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
   res.json({ ok: true, isFollowing: false, followersCount });
 });
 
+// ─── DELETE /api/social/followers/:userId — remove a follower ───────────────
+// Instagram's "Remove follower": distinct from unfollow (DELETE /follow/:id,
+// which removes *me* following someone) — this removes *them* from following
+// *me*. The target is never notified (mirrors Instagram: "We won't tell them
+// they were removed from your followers"), so unlike unfollow this never
+// touches the target's own notification feed, only the acting user's.
+router.delete("/followers/:userId", rateLimit("follow"), async (req, res) => {
+  const myId   = (req as any).clerkUserId as string;
+  const target = req.params.userId as string;
+  if (target === myId) { res.status(400).json({ error: "Cannot remove yourself" }); return; }
+
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${relationshipLockKey(myId, target)}, 0)
+      )
+    `);
+    const deleted = await tx.delete(follows)
+      .where(and(eq(follows.followerId, target), eq(follows.followingId, myId)))
+      .returning();
+    // Clear any "started following you" row in MY OWN feed for this actor —
+    // it's no longer true and would let me follow-back a removed follower
+    // from a stale row. Never touches the target's feed.
+    if (deleted.length > 0) {
+      await tx.delete(notificationsFeed)
+        .where(and(
+          eq(notificationsFeed.userId, myId),
+          eq(notificationsFeed.type, "new_follower"),
+          eq(notificationsFeed.actorId, target),
+        ));
+    }
+    const [countRow] = await tx
+      .select({ n: sql<number>`cast(count(*) as int)` })
+      .from(follows)
+      .where(eq(follows.followingId, myId));
+    return { removed: deleted.length > 0, followersCount: countRow?.n ?? 0 };
+  });
+
+  res.json({ ok: true, removed: result.removed, followersCount: result.followersCount });
+});
+
+// ─── POST /api/social/see-less — mute a notification type or actor ─────────
+// Instagram's "See less" from the Activity "..." menu. Persists a per-user
+// preference (activity_mutes) that both future publishNotification() calls
+// and the feed's own read query respect, so it survives refresh and other
+// devices — not just client-side row hiding. Body: exactly one of
+// { type: string } (mute a whole notification type, e.g. "new_follower") or
+// { actorId: string } (mute everything from one person).
+router.post("/see-less", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const { type, actorId } = req.body as { type?: string; actorId?: string };
+  if ((!type && !actorId) || (type && actorId)) {
+    res.status(400).json({ error: "Provide exactly one of type or actorId" }); return;
+  }
+  const muteKey = type ? `type:${type}` : `actor:${actorId}`;
+
+  await db.insert(activityMutes).values({ userId: myId, muteKey }).onConflictDoNothing();
+
+  // Also hide whatever already-published rows this matches so it takes
+  // effect immediately, not just on the next event.
+  const rowFilter = type
+    ? and(eq(notificationsFeed.userId, myId), eq(notificationsFeed.type, type))
+    : and(eq(notificationsFeed.userId, myId), eq(notificationsFeed.actorId, actorId as string));
+  await db.update(notificationsFeed).set({ isMuted: true }).where(rowFilter);
+
+  res.json({ ok: true, muteKey });
+});
+
 // ─── GET /api/social/status/:userId ──────────────────────────────────────────
 // Accepts users.clerkId or users.id (UUID) — resolves to canonical clerkId.
 router.get("/status/:userId", async (req, res) => {
@@ -546,9 +615,22 @@ async function viewerFollowsSet(myId: string, ids: string[]): Promise<Set<string
   return new Set(rows.map(r => r.followingId));
 }
 
+/** Which of `ids` follow `userId` — used for the "Follows you" mutual tag. */
+async function followersOfSet(userId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await db
+    .select({ followerId: follows.followerId })
+    .from(follows)
+    .where(and(eq(follows.followingId, userId), inArray(follows.followerId, ids)));
+  return new Set(rows.map(r => r.followerId));
+}
+
 // ─── GET /api/social/following ────────────────────────────────────────────────
 // Query params: ?userId=&limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
 // Without userId the list is the viewer's own.
+// ?sort= "default" (recently-followed first, same as before) | "latest"
+// (alias of default) | "earliest" (oldest follow first) — the Following
+// list's "Sort by" bottom sheet (Mobbin: Instagram's own Following list).
 router.get("/following", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const page = parsePagination(req.query, { limit: 100 });
@@ -556,10 +638,12 @@ router.get("/following", async (req, res) => {
   const ownerId = await resolveListOwner(req, res, myId);
   if (!ownerId) return;
   const { limit, offset } = page.data;
+  const direction = followingSortDirection(req.query.sort);
+  const orderClause = direction === "asc" ? asc(follows.createdAt) : desc(follows.createdAt);
   const rows = await db
     .select({ followingId: follows.followingId, createdAt: follows.createdAt })
     .from(follows).where(eq(follows.followerId, ownerId))
-    .orderBy(desc(follows.createdAt))
+    .orderBy(orderClause)
     .limit(limit).offset(offset);
   setPaginationHeaders(res, page.data, rows.length);
   if (!rows.length) { res.json([]); return; }
@@ -568,6 +652,9 @@ router.get("/following", async (req, res) => {
   const userRows = await db.select().from(users).where(inArray(users.clerkId, ids));
   const byId     = Object.fromEntries(userRows.map(u => [u.clerkId, u]));
   const iFollow  = ownerId === myId ? new Set(ids) : await viewerFollowsSet(myId, ids);
+  // Mutuals ("Follows you" tag): only meaningful on the viewer's own
+  // Following list — who among the people I follow also follows me back.
+  const followsMeSet = ownerId === myId ? await followersOfSet(myId, ids) : new Set<string>();
 
   res.json(rows.map(r => ({
     ...(byId[r.followingId] ? formatUser(byId[r.followingId]) : {
@@ -577,6 +664,7 @@ router.get("/following", async (req, res) => {
     }),
     followedAt: r.createdAt,
     isFollowing: iFollow.has(r.followingId),
+    followsMe: followsMeSet.has(r.followingId),
   })));
 });
 
@@ -984,10 +1072,15 @@ router.get("/stories/following", async (req, res) => {
 
   // Real profile photos for the tray (the stories table only stores the
   // fallback initials/color captured at post time) — one extra lookup,
-  // keyed by clerkId, no new table.
-  const authorRows = await db.select({
-    clerkId: users.clerkId, profileImageUrl: users.profileImageUrl, avatarUrl: users.avatarUrl,
-  }).from(users).where(inArray(users.clerkId, Array.from(byAuthor.keys())));
+  // keyed by clerkId, no new table. Guarded against an empty author list
+  // (an empty inArray(...) is invalid SQL) even though the earlier
+  // rows.length/visibleRows.length checks should already rule it out.
+  const authorIdsForLookup = Array.from(byAuthor.keys());
+  const authorRows = authorIdsForLookup.length
+    ? await db.select({
+        clerkId: users.clerkId, profileImageUrl: users.profileImageUrl, avatarUrl: users.avatarUrl,
+      }).from(users).where(inArray(users.clerkId, authorIdsForLookup))
+    : [];
   const avatarByAuthor = new Map(authorRows.map((u) => [
     u.clerkId,
     (typeof u.profileImageUrl === "string" && u.profileImageUrl.startsWith("http") ? u.profileImageUrl : u.avatarUrl) ?? null,

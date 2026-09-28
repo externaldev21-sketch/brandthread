@@ -30,6 +30,8 @@ export function EmptyState({
   compact,
   /** One of the shared thread-motif line illustrations; falls back to `icon` when omitted. */
   illustration,
+  /** `text` = Instagram-style link action (accent text, no pill); default `button`. */
+  actionStyle = 'button',
 }: {
   icon: keyof typeof Feather.glyphMap;
   title?: string;
@@ -41,8 +43,10 @@ export function EmptyState({
   testID?: string;
   compact?: boolean;
   illustration?: ThreadMotif;
+  actionStyle?: 'button' | 'text';
 }) {
   const { theme } = useAppTheme();
+  const textAction = actionStyle === 'text';
   const iconColor = variant === 'error' ? theme.error : theme.muted;
 
   return (
@@ -67,10 +71,10 @@ export function EmptyState({
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
           onPress={onAction}
-          style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+          style={textAction ? styles.actionText : [styles.actionBtn, { backgroundColor: theme.accent }]}
           testID={testID ? `${testID}-action` : undefined}
         >
-          <Text style={[styles.actionLabel, { color: theme.onAccent }]}>{actionLabel}</Text>
+          <Text style={[styles.actionLabel, { color: textAction ? theme.accentLight : theme.onAccent }]}>{actionLabel}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -118,6 +122,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     marginTop: SP.xs,
   },
+  actionText: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SP.sm },
   actionLabel: {
     fontFamily: FONT.semibold,
     fontSize: FS.base,

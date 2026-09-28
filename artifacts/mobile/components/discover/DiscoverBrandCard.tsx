@@ -14,9 +14,9 @@ export function DiscoverBrandCard({ brand }: { brand: BrandCardData }) {
   const router = useRouter();
   const { theme } = useAppTheme();
   return (
-    // Two SIBLING tap targets, never nested — see DiscoverPeopleRow's own
-    // comment on why (a Pressable inside a Pressable is invalid on web and
-    // the press handlers fight each other). See
+    // Two SIBLING tap targets, never nested — a Pressable inside a
+    // Pressable renders as a nested <button> on web (invalid HTML, and the
+    // two press handlers fight each other). See
     // tests/discover-no-nested-pressables.test.ts.
     <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.card }]}>
       <PressableScale

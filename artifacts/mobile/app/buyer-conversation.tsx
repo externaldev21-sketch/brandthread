@@ -8,7 +8,7 @@ import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { Chip } from '@/components/ui/Chip';
@@ -20,24 +20,31 @@ import {
   getConversation, createOrGetConversation, getMessages,
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
   markConversationRead, subscribeSocial,
-  MY_USER_ID,
+  MY_USER_ID, MY_NAME, MY_INITIALS,
 } from '@/services/socialService';
+import { useCallSession, useCallLog } from '@/lib/calls/CallSessionContext';
+import { CallLogBubble } from '@/components/calls/CallLogBubble';
+import type { CallLogEntry } from '@/lib/calls/types';
 import type {
   Conversation, Message, MessageAttachment, ConversationParticipant, ReactionType,
 } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
   useAudioPlayer,
   useAudioPlayerStatus,
-  useAudioRecorder,
 } from 'expo-audio';
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
+import { VoiceMessageBubble } from '@/components/chat/VoiceMessageBubble';
 import { useAuth } from '@clerk/expo';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
+import {
+  acceptConversationRequest, scheduleDeleteConversationRequest, undoDeleteConversationRequest,
+  blockConversationRequestUser,
+} from '@/lib/requestActions';
+import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
@@ -135,7 +142,35 @@ function sameSenderClose(a: Message, b: Message): boolean {
 type DateRow = { type: 'date'; date: string; ts: number; key: string };
 type UnreadRow = { type: 'unread'; key: string };
 type MsgRow = { type: 'message'; msg: Message; isFirstInGroup: boolean; isLastInGroup: boolean };
-type ListRow = DateRow | UnreadRow | MsgRow;
+type CallLogRow = { type: 'call_log'; entry: CallLogEntry; key: string };
+type ListRow = DateRow | UnreadRow | MsgRow | CallLogRow;
+
+/** Interleaves the (client-only, PR1) call log into the already-built message
+ *  rows by timestamp, inserting a date separator when a call falls on a day
+ *  not otherwise represented — see CallSessionContext's own doc comment on
+ *  why this log isn't backend-persisted yet. */
+function mergeCallLogRows(rows: ListRow[], callLog: CallLogEntry[]): ListRow[] {
+  if (callLog.length === 0) return rows;
+  const merged = [...rows];
+  const rowTs = (r: ListRow): number => (
+    r.type === 'message' ? r.msg.ts : r.type === 'call_log' ? r.entry.startedAt : r.type === 'date' ? r.ts : -Infinity
+  );
+  for (const entry of [...callLog].sort((a, b) => a.startedAt - b.startedAt)) {
+    let insertAt = merged.length;
+    for (let i = 0; i < merged.length; i++) {
+      if (rowTs(merged[i]) > entry.startedAt) { insertAt = i; break; }
+    }
+    const d = formatDate(entry.startedAt);
+    const precedingDate = [...merged.slice(0, insertAt)].reverse().find((r): r is DateRow => r.type === 'date');
+    const toInsert: ListRow[] = [];
+    if (!precedingDate || precedingDate.date !== d) {
+      toInsert.push({ type: 'date', date: d, ts: entry.startedAt, key: `date-call-${entry.id}` });
+    }
+    toInsert.push({ type: 'call_log', entry, key: `call-${entry.id}` });
+    merged.splice(insertAt, 0, ...toInsert);
+  }
+  return merged;
+}
 
 function buildListRows(msgs: Message[], unreadDividerId: string | null): ListRow[] {
   const rows: ListRow[] = [];
@@ -237,6 +272,7 @@ export default function BuyerConversationScreen() {
   const quickReplyScrollRefs = useRef<Record<string, ScrollView | null>>({});
   const api = useApi();
   const { userId } = useAuth();
+  const { startCall } = useCallSession();
   const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   // A sent/claimed/cancelled Thread Cash bubble's status is set once, in the
   // message's own attachment meta, at send time — it never gets rewritten
@@ -257,24 +293,30 @@ export default function BuyerConversationScreen() {
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
   const [conv, setConv] = useState<Conversation | null>(null);
+  const callLog = useCallLog(conv?.id ?? params.id ?? '');
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
+  const { showUndo } = useUndoToast();
+  const textInputRef = useRef<TextInput>(null);
+  // Request-mode UI state (see the bottom RequestActionPanel below):
+  // in-flight Accept, so the Accept/Block/Delete row can't double-fire.
+  const [requestActionLoading, setRequestActionLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
-  const [isRecording, setIsRecording]         = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
+  const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
   const [activeSheetMsg, setActiveSheetMsg]   = useState<Message | null>(null);
   const [viewerUri, setViewerUri]             = useState<string | null>(null);
   const [likeBurst, setLikeBurst] = useState<{ key: number; x: number; y: number } | null>(null);
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
+  const voiceRecorder = useVoiceRecorder(uploadMedia, handleVoiceRecorded);
 
   // Unread-on-open divider: computed once from the conversation's unreadCount
   // *before* markConversationRead() clears it server-side, then held fixed for
@@ -371,7 +413,12 @@ export default function BuyerConversationScreen() {
         loadedConv = await getConversation(params.id);
         if (loadedConv) {
           unreadBeforeRead = loadedConv.unreadCount ?? 0;
-          await markConversationRead(loadedConv.id);
+          // Per the Instagram-style request flow: opening a pending request
+          // must NOT tell the sender it's been read — that only happens once
+          // the recipient actually accepts (see handleAcceptRequest below).
+          if (!loadedConv.isRequest) {
+            await markConversationRead(loadedConv.id);
+          }
         }
       } else if (params.participantId) {
         loadedConv = await createOrGetConversation({
@@ -488,7 +535,10 @@ export default function BuyerConversationScreen() {
     ?? null;
   const displayName = participant?.name ?? params.participantName ?? 'Unknown';
   const isDisabled = conv?.isFriendshipActive === false;
-  const canSend = (text.trim().length > 0 || selectedAttachment != null) && !isDisabled && !isSending;
+  // Request mode (Instagram-style): the composer is hidden and replaced with
+  // the accept/block/delete bottom panel below until the recipient accepts.
+  const isRequestMode = conv?.isRequest === true;
+  const canSend = (text.trim().length > 0 || selectedAttachment != null) && !isDisabled && !isSending && !isRequestMode;
 
   // Presence line under the header name. `isOnline`/`lastSeenAt` are the only
   // presence signals ConversationParticipant carries; the backend does not
@@ -598,14 +648,19 @@ export default function BuyerConversationScreen() {
   function handleStartCall(mode: 'voice' | 'video') {
     if (!conv) { Alert.alert('Not ready', 'Wait for the conversation to load.'); return; }
     const p = participant;
-    const qs = new URLSearchParams({
+    void startCall({
       conversationId: conv.id,
-      participantName: displayName,
-      participantInitials: p?.initials ?? '?',
-      participantColor: p?.color ?? theme.accent,
+      surface: 'buyer',
       mode,
+      peer: {
+        id: p?.userId ?? '',
+        name: displayName,
+        initials: p?.initials ?? '?',
+        color: p?.color ?? theme.accent,
+        avatarUri: p?.avatarUri ?? null,
+      },
+      me: { id: myId, name: MY_NAME, initials: MY_INITIALS, color: theme.accent },
     });
-    router.push(('/call-screen?' + qs.toString()) as never);
   }
 
   // ── Other-participant profile ─────────────────────────────────────────────────
@@ -620,6 +675,65 @@ export default function BuyerConversationScreen() {
       color: participant.color,
     });
     router.push(('/buyer-other-profile?' + qs.toString()) as never);
+  }
+
+  // ── Request mode: accept / delete / block ───────────────────────────────────
+  // Real work happens through lib/requestActions.ts, which is preview-aware —
+  // this is the single fix for the app owner's "Accept does nothing" report:
+  // the old inbox.tsx `acceptRequest` called the real API unconditionally, so
+  // every one of the 3 seeded preview requests (fake `preview-conversation-*`
+  // ids) 404'd against the real backend and silently failed.
+
+  async function handleAcceptRequest() {
+    if (!conv || requestActionLoading) return;
+    hapticPrimaryAction();
+    setRequestActionLoading(true);
+    const previousConv = conv;
+    try {
+      await acceptConversationRequest(conv.id, api);
+      hapticSuccessAction();
+      setConv({ ...previousConv, isRequest: false });
+      // Composer takes the bottom panel's place the instant isRequestMode
+      // flips false (see the render below) — hand it the keyboard right
+      // away, matching "keyboard ready" in the spec.
+      setTimeout(() => textInputRef.current?.focus(), 50);
+    } catch (e) {
+      // Roll back: the panel stays up and Accept is tappable again.
+      setConv(previousConv);
+      Alert.alert('Couldn’t accept request', apiErrorMessage(e, 'Please check your connection and try again.'));
+    } finally {
+      setRequestActionLoading(false);
+    }
+  }
+
+  function handleDeleteRequest() {
+    if (!conv) return;
+    hapticDestructiveConfirm();
+    const conversationId = conv.id;
+    const name = displayName;
+    scheduleDeleteConversationRequest(conversationId, api);
+    showUndo({
+      message: `Deleted request from ${name}`,
+      undo: () => undoDeleteConversationRequest(conversationId),
+    });
+    goBackOr(router);
+  }
+
+  async function handleBlockRequest() {
+    if (!conv || !participant) return;
+    const confirmed = await confirmDestructiveActionSheet({
+      title: `Block ${participant.name}?`,
+      message: 'They won’t be able to find your profile, see your posts, comments or stories, or message you. You won’t see theirs either. They aren’t notified.',
+      confirmLabel: 'Block',
+    });
+    if (!confirmed) return;
+    hapticDestructiveConfirm();
+    try {
+      await blockConversationRequestUser(conv.id, participant);
+      goBackOr(router);
+    } catch (e) {
+      Alert.alert('Couldn’t block', apiErrorMessage(e, 'Please check your connection and try again.'));
+    }
   }
 
   // ── Photo / video picker ──────────────────────────────────────────────────────
@@ -680,50 +794,57 @@ export default function BuyerConversationScreen() {
     finally { setIsUploading(false); }
   }
 
-  // ── Voice recording (hold-to-record) ──────────────────────────────────────────
-
-  async function startRecording() {
-    if (isRecording || isUploading || isSending) return;
+  // ── Voice recording ────────────────────────────────────────────────────────────
+  // Instagram DM "Sending an audio message" (mobbin.com/flows/125d5a4c-31d5-
+  // 4b05-8f08-2de2c6860c23): recording sends the voice note directly the
+  // instant it's released/tapped-send — it doesn't stage into the composer
+  // like a photo/video attachment does. See docs/dm-flows.md.
+  async function handleVoiceRecorded(result: { uri: string; durationSec: number; waveform: number[] }) {
+    if (!conv) return;
+    hapticSuccessAction();
+    const attachment: MessageAttachment = {
+      type: 'voice',
+      uri: result.uri,
+      title: 'Voice message',
+      meta: { duration: String(result.durationSec), waveform: JSON.stringify(result.waveform) },
+    };
+    // Preview conversations have no real backend to post to — append a
+    // local mock message directly, the same way Thread Cash / the agent
+    // reply flow above does.
+    if (isPreviewConversationId(conv.id)) {
+      setMessages((prev) => [...prev, {
+        id: `local-voice-${Date.now()}`,
+        conversationId: conv.id,
+        fromId: myId,
+        fromName: 'You',
+        fromInitials: 'Y',
+        fromColor: theme.accent,
+        text: '',
+        attachment,
+        reactions: [],
+        status: 'sent',
+        ts: Date.now(),
+        deletedForMe: false,
+      }]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      return;
+    }
+    setIsSending(true);
     try {
-      const permission = await requestRecordingPermissionsAsync();
-      if (!permission.granted) throw new Error('Microphone permission denied');
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      await recorder.prepareToRecordAsync();
-      recorder.record();
-      setIsRecording(true);
-    } catch { Alert.alert('Mic unavailable', 'Could not access microphone. Check permissions in Settings.'); }
-  }
-
-  async function stopRecording() {
-    if (!isRecording) return;
-    setIsRecording(false);
-    try {
-      await recorder.stop();
-      const status = recorder.getStatus();
-      const uri = recorder.uri ?? status.url;
-      if (!uri) return;
-      setIsUploading(true);
-      const response = await fetch(uri);
-      const buf = await response.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      let binary = '';
-      const CHUNK = 8192;
-      for (let i = 0; i < bytes.byteLength; i += CHUNK) {
-        binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.byteLength)));
-      }
-      const url = await uploadMedia(btoa(binary), 'audio/m4a', 'm4a');
-      const dur = Math.round(status.durationMillis / 1000);
-      setSelectedAttachment({ type: 'voice', uri: url, title: 'Voice message', meta: { duration: String(dur) } });
-    } catch { Alert.alert('Recording error', 'Could not save voice message. Please try again.'); }
-    finally {
-      setIsUploading(false);
-      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      await sendMessage(conv.id, '', attachment);
+      const msgs = await getMessages(conv.id);
+      setMessages(msgs);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch (e) {
+      Alert.alert('Voice message not sent', apiErrorMessage(e, 'Please check your connection and try again.'));
+    } finally {
+      setIsSending(false);
     }
   }
 
   // ── Voice playback ────────────────────────────────────────────────────────────
 
-  async function handlePlayVoice(uri: string) {
+  async function handlePlayVoice(uri: string, rate: number) {
     if (playingVoiceUri === uri) {
       voicePlayer.pause();
       await voicePlayer.seekTo(0).catch(() => {});
@@ -734,8 +855,21 @@ export default function BuyerConversationScreen() {
     try {
       setPlayingVoiceUri(uri);
       voicePlayer.replace({ uri });
+      voicePlayer.playbackRate = rate;
       voicePlayer.play();
     } catch { setPlayingVoiceUri(null); }
+  }
+
+  function handleSeekVoice(uri: string, fraction: number, durationSec: number) {
+    if (playingVoiceUri !== uri || !durationSec) return;
+    void voicePlayer.seekTo(fraction * durationSec).catch(() => {});
+  }
+
+  function handleVoiceSpeedChange(uri: string, rate: number) {
+    setVoiceSpeed(rate);
+    if (playingVoiceUri === uri) {
+      try { voicePlayer.playbackRate = rate; } catch { /* best-effort */ }
+    }
   }
 
   // ── Reactions ──────────────────────────────────────────────────────────────────
@@ -775,7 +909,7 @@ export default function BuyerConversationScreen() {
 
   // ── Attachment renderer (handles image / video / voice inline) ────────────────
 
-  function renderAttachment(att: MessageAttachment) {
+  function renderAttachment(att: MessageAttachment, isOwn: boolean) {
     if (att.type === 'image') {
       let uris: string[] = [];
       try { uris = JSON.parse(att.meta?.photoUris ?? '[]'); } catch {}
@@ -809,19 +943,25 @@ export default function BuyerConversationScreen() {
       );
     }
     if (att.type === 'voice') {
+      const durationSec = Number(att.meta?.duration ?? 0);
+      let waveform: number[] = [];
+      try { waveform = JSON.parse(att.meta?.waveform ?? '[]'); } catch {}
+      const isPlaying = !!att.uri && playingVoiceUri === att.uri;
+      const progress = isPlaying && voicePlayerStatus.duration
+        ? Math.max(0, Math.min(1, voicePlayerStatus.currentTime / voicePlayerStatus.duration))
+        : 0;
       return (
-        <PressableScale rippleEnabled={false} style={s.voiceRow} activeOpacity={0.8}
-          onPress={() => att.uri && handlePlayVoice(att.uri)}>
-          <View style={[s.voicePlayBtn, playingVoiceUri === att.uri && s.voicePlayBtnActive]}>
-            <Feather name={playingVoiceUri === att.uri ? 'square' : 'play'} size={14} color="#fff" />
-          </View>
-          <View style={s.voiceWave}>
-            {[...Array(12)].map((_, i) => (
-              <View key={i} style={[s.voiceBar, { height: 4 + Math.abs(Math.sin(i * 0.8)) * 14 }]} />
-            ))}
-          </View>
-          <Text style={s.voiceDur}>{att.meta?.duration ? `${att.meta.duration}s` : '…'}</Text>
-        </PressableScale>
+        <VoiceMessageBubble
+          theme={theme}
+          waveform={waveform}
+          durationSec={durationSec}
+          isPlaying={isPlaying}
+          progress={progress}
+          isOwn={isOwn}
+          onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
+          onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
+          onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+        />
       );
     }
     // 'thread_cash', 'quick_replies' and 'agent_card' are handled in
@@ -1151,6 +1291,14 @@ export default function BuyerConversationScreen() {
       );
     }
 
+    if (item.type === 'call_log') {
+      return (
+        <View style={[s.msgOuter, { justifyContent: 'flex-start', marginTop: 12 }]}>
+          <CallLogBubble entry={item.entry} onCallBack={() => handleStartCall(item.entry.mode)} />
+        </View>
+      );
+    }
+
     const { msg, isFirstInGroup, isLastInGroup } = item;
     const isOwn = msg.fromId === myId || msg.fromId === MY_USER_ID;
 
@@ -1315,7 +1463,14 @@ export default function BuyerConversationScreen() {
             onPress={(e) => handleBubblePress(msg, e)}
             onLongPress={() => { hapticSelection(); setActiveSheetMsg(msg); }}
             delayLongPress={280}
-            accessibilityRole="button"
+            // Voice messages render their own play/scrub/speed/transcription
+            // buttons inside this bubble (see VoiceMessageBubble) — on web,
+            // accessibilityRole="button" makes react-native-web render an
+            // actual <button>, and a <button> cannot legally contain other
+            // interactive controls (the HTML nested-button rule). Drop the
+            // role only for voice bubbles so it renders as a plain, still
+            // fully tappable/long-pressable <div> instead.
+            accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : 'button'}
             accessibilityLabel={isOwn ? 'Your message' : `Message from ${msg.fromName}`}
             accessibilityHint="Double tap to like, or touch and hold for more actions"
             style={[
@@ -1348,7 +1503,7 @@ export default function BuyerConversationScreen() {
             ) : null}
 
             {/* Attachment */}
-            {msg.attachment && renderAttachment(msg.attachment)}
+            {msg.attachment && renderAttachment(msg.attachment, isOwn)}
 
             {/* Text */}
             {msg.text ? (
@@ -1417,7 +1572,7 @@ export default function BuyerConversationScreen() {
   // ── Main render ─────────────────────────────────────────────────────────────
 
   const visibleMessages = messages.filter(m => !m.deletedForMe);
-  const listData = buildListRows(visibleMessages, unreadDividerId);
+  const listData = mergeCallLogRows(buildListRows(visibleMessages, unreadDividerId), callLog);
 
   useEffect(() => {
     if (!unreadDividerId || hasScrolledToUnreadRef.current) return;
@@ -1527,6 +1682,18 @@ export default function BuyerConversationScreen() {
             <Feather name="phone" size={ICON.sm} color={theme.muted} />
           </PressableScale>
         )}
+        {conv && !isAgentConv && (
+          <PressableScale rippleEnabled={false}
+            style={s.roundBtn}
+            onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            testID="conversation-call-video"
+            accessibilityRole="button"
+            accessibilityLabel="Video call"
+          >
+            <Feather name="video" size={ICON.sm} color={theme.muted} />
+          </PressableScale>
+        )}
         <PressableScale rippleEnabled={false}
           style={s.roundBtn}
           onPress={() => { hapticPrimaryAction(); openOptions(); }}
@@ -1538,6 +1705,36 @@ export default function BuyerConversationScreen() {
           <Feather name={isAgentConv ? 'info' : 'more-horizontal'} size={ICON.sm} color={theme.muted} />
         </PressableScale>
       </View>
+
+      {/* Request-mode profile header — Instagram's message-request chat
+          leads with a bigger avatar, name, @handle and a "View profile"
+          pill before any messages, since this is often the first real
+          context the recipient has on who's messaging them. */}
+      {isRequestMode && participant && (
+        <View style={s.requestProfileHeader} testID="conversation-request-profile-header">
+          <View style={[s.requestProfileAvatar, { backgroundColor: participant.color }]}>
+            {participant.avatarUri ? (
+              <CachedImage source={{ uri: participant.avatarUri }} style={s.requestProfileAvatarImage} />
+            ) : (
+              <Text style={s.requestProfileAvatarInitials}>{participant.initials}</Text>
+            )}
+          </View>
+          <Text style={s.requestProfileName} numberOfLines={1}>{participant.name}</Text>
+          {!!participant.handle && (
+            <Text style={s.requestProfileHandle} numberOfLines={1}>{participant.handle}</Text>
+          )}
+          <PressableScale
+            rippleEnabled={false}
+            style={s.requestProfilePill}
+            onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${participant.name}'s profile`}
+            testID="conversation-request-view-profile"
+          >
+            <Text style={s.requestProfilePillText}>View profile</Text>
+          </PressableScale>
+        </View>
+      )}
 
       {/* Order context card */}
       {conv?.type === 'buyer_to_seller_order' && (
@@ -1651,8 +1848,18 @@ export default function BuyerConversationScreen() {
         </View>
       )}
 
-      {/* Input row */}
-      {participant && (messaging.blockedByMe || messaging.unavailable) ? (
+      {/* Input row — request mode replaces the composer entirely with the
+          accept/block/delete bottom panel (see RequestActionPanel below). */}
+      {isRequestMode && participant ? (
+        <RequestActionPanel
+          name={participant.name}
+          bottomInset={insets.bottom}
+          loading={requestActionLoading}
+          onAccept={handleAcceptRequest}
+          onDelete={handleDeleteRequest}
+          onBlock={handleBlockRequest}
+        />
+      ) : participant && (messaging.blockedByMe || messaging.unavailable) ? (
         <BlockedComposer
           counterpartName={participant.name}
           messaging={messaging}
@@ -1705,6 +1912,20 @@ export default function BuyerConversationScreen() {
             </View>
           )}
           <View style={[s.inputRow, { paddingBottom: composerBottomPad }]}>
+            {voiceRecorder.phase !== 'idle' ? (
+              <VoiceRecordingBar
+                theme={theme}
+                phase={voiceRecorder.phase}
+                elapsedMs={voiceRecorder.elapsedMs}
+                waveform={voiceRecorder.waveform}
+                dragX={voiceRecorder.dragX}
+                dragY={voiceRecorder.dragY}
+                isWeb={voiceRecorder.isWeb}
+                onCancel={voiceRecorder.cancel}
+                onLock={voiceRecorder.lock}
+                onSend={() => { void voiceRecorder.finish(); }}
+              />
+            ) : (<>
             {/* Attach — photos, video, Thread Cash (Apple-Cash-style), and
                 (for seller chats) products/posts. A plain "+" inside a
                 hairline circle, aligned to the pill's own center. */}
@@ -1729,6 +1950,7 @@ export default function BuyerConversationScreen() {
                 same rounded bounds instead of floating as separate siblings. */}
             <View style={s.pill}>
               <TextInput
+                ref={textInputRef}
                 nativeID={CHAT_INPUT_NATIVE_ID}
                 style={[s.textInput, { height: composerInputHeight }]}
                 value={text}
@@ -1746,18 +1968,33 @@ export default function BuyerConversationScreen() {
                   pointerEvents={showSendButton ? 'none' : 'auto'}
                   style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
                 >
-                  <PressableScale rippleEnabled={false}
-                    bounce={false}
-                    onPressIn={startRecording}
-                    onPressOut={stopRecording}
-                    disabled={isUploading || isSending}
-                    style={s.morphFaceInner}
-                    testID="conversation-mic"
-                    accessibilityRole="button"
-                    accessibilityLabel="Record voice message"
-                  >
-                    <Feather name={isRecording ? 'stop-circle' : 'mic'} size={COMPOSER_ICON} color={isRecording ? theme.error : theme.muted} />
-                  </PressableScale>
+                  {/* Native: press-and-hold starts recording, then slide-to-
+                      cancel/lock via the same gesture (see useVoiceRecorder).
+                      Web has no press-hold-and-drag parity, so a tap toggles
+                      recording instead — see docs/dm-flows.md. */}
+                  {voiceRecorder.isWeb ? (
+                    <PressableScale rippleEnabled={false}
+                      bounce={false}
+                      onPress={() => { void voiceRecorder.startWeb(); }}
+                      disabled={isUploading || isSending}
+                      style={s.morphFaceInner}
+                      testID="conversation-mic"
+                      accessibilityRole="button"
+                      accessibilityLabel="Record voice message"
+                    >
+                      <Feather name="mic" size={COMPOSER_ICON} color={theme.muted} />
+                    </PressableScale>
+                  ) : (
+                    <View
+                      {...voiceRecorder.panHandlers}
+                      style={s.morphFaceInner}
+                      testID="conversation-mic"
+                      accessibilityRole="button"
+                      accessibilityLabel="Record voice message"
+                    >
+                      <Feather name="mic" size={COMPOSER_ICON} color={theme.muted} />
+                    </View>
+                  )}
                 </Animated.View>
                 <Animated.View
                   pointerEvents={showSendButton ? 'auto' : 'none'}
@@ -1886,6 +2123,7 @@ export default function BuyerConversationScreen() {
                 />
               ) : null}
             </View>
+            </>)}
           </View>
         </View>
       ) : (
@@ -2178,6 +2416,98 @@ function LikeBurst({ x, y, color, onDone }: { x: number; y: number; color: strin
   );
 }
 
+// ─── Request-mode bottom panel ─────────────────────────────────────────────────
+// Replaces the composer while `conv.isRequest` is true (see isRequestMode in
+// the screen above). Instagram reference: mobbin.com/screens/db4e29c8-e47e-
+// 47ce-8f01-b7a98376c6e7 (Instagram chat) — a sheet-style panel that sits
+// above the home indicator with the explainer copy and a three-way row
+// (Block / Delete / Accept), Accept as the sole filled/primary action.
+function RequestActionPanel({
+  name, bottomInset, loading, onAccept, onDelete, onBlock,
+}: {
+  name: string;
+  bottomInset: number;
+  loading: boolean;
+  onAccept: () => void;
+  onDelete: () => void;
+  onBlock: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const rs = requestPanelStyles;
+  return (
+    <View
+      style={[rs.wrap, { borderTopColor: theme.border, backgroundColor: theme.surface, paddingBottom: Math.max(bottomInset, SP.md) }]}
+      testID="conversation-request-panel"
+    >
+      <Text style={[rs.title, { color: theme.text }]}>{name} wants to send you a message</Text>
+      <Text style={[rs.subline, { color: theme.muted }]}>
+        Accepting lets them see when you’ve read their messages and message you freely.
+      </Text>
+      <View style={rs.actionsRow}>
+        <PressableScale
+          rippleEnabled={false}
+          style={rs.actionBtn}
+          onPress={onBlock}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Block ${name}`}
+          testID="conversation-request-block"
+        >
+          <Text style={[rs.actionText, { color: theme.error }]}>Block</Text>
+        </PressableScale>
+        <PressableScale
+          rippleEnabled={false}
+          style={rs.actionBtn}
+          onPress={onDelete}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete request from ${name}`}
+          testID="conversation-request-delete"
+        >
+          <Text style={[rs.actionText, { color: theme.text }]}>Delete</Text>
+        </PressableScale>
+        <PressableScale
+          rippleEnabled={false}
+          style={[rs.actionBtn, rs.acceptBtn, { backgroundColor: theme.text }]}
+          onPress={onAccept}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={`Accept message request from ${name}`}
+          testID="conversation-request-accept"
+        >
+          {loading ? (
+            <ActivityIndicator color={theme.background} size="small" />
+          ) : (
+            <Text style={[rs.actionText, rs.acceptText, { color: theme.background }]}>Accept</Text>
+          )}
+        </PressableScale>
+      </View>
+    </View>
+  );
+}
+
+const requestPanelStyles = StyleSheet.create({
+  wrap: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SP.md,
+    paddingTop: SP.md,
+    gap: SP.xs,
+  },
+  title: { fontFamily: FONT.semibold, fontSize: FS.sm, textAlign: 'center' },
+  subline: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 16, textAlign: 'center', marginBottom: SP.sm },
+  actionsRow: { flexDirection: 'row', gap: SP.sm },
+  actionBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: RADIUS.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acceptBtn: {},
+  actionText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  acceptText: {},
+});
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
@@ -2258,6 +2588,36 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.bold,
     color: '#FFFFFF',
   },
+  // Request-mode profile header (avatar / name / @handle / "View profile")
+  requestProfileHeader: {
+    alignItems: 'center',
+    paddingVertical: SP.lg,
+    paddingHorizontal: SP.lg,
+    gap: 4,
+  },
+  requestProfileAvatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: SP.sm,
+  },
+  requestProfileAvatarImage: { width: 88, height: 88 },
+  requestProfileAvatarInitials: { fontSize: FS.xl, fontFamily: FONT.bold, color: '#FFFFFF' },
+  requestProfileName: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
+  requestProfileHandle: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginBottom: SP.sm },
+  requestProfilePill: {
+    height: 34,
+    paddingHorizontal: SP.md,
+    borderRadius: RADIUS.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestProfilePillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
   headerAvatarOnlineDot: {
     position: 'absolute',
     bottom: -1,

@@ -12,8 +12,8 @@
  * POST   /api/internal/notifications            — publish a notification (server-to-user)
  */
 import { Router } from "express";
-import { db, notificationsFeed, users } from "@workspace/db";
-import { eq, and, desc, inArray, or, sql, type SQL } from "drizzle-orm";
+import { db, notificationsFeed, users, blocks, activityMutes } from "@workspace/db";
+import { eq, and, desc, inArray, notInArray, or, isNull, sql, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
@@ -143,12 +143,31 @@ function parsePage(query: Record<string, unknown>): { limit: number; offset: num
   };
 }
 
+/**
+ * Clerk IDs blocked in either direction — a blocked (or blocking-me) user's
+ * activity (follows, likes, comments) must stop showing up here the moment
+ * the block exists, per Instagram's own block behavior.
+ */
+async function blockedCounterpartIds(userId: string): Promise<string[]> {
+  const rows = await db
+    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
+    .from(blocks)
+    .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
+  return rows.map((row) => (row.blockerId === userId ? row.blockedId : row.blockerId));
+}
+
 buyerRouter.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { limit, offset } = parsePage(req.query as Record<string, unknown>);
   const filter = filterCondition(req.query.filter);
+  const blockedIds = await blockedCounterpartIds(userId);
+  const conditions = [eq(notificationsFeed.userId, userId)];
+  if (filter) conditions.push(filter);
+  if (blockedIds.length > 0) {
+    conditions.push(or(isNull(notificationsFeed.actorId), notInArray(notificationsFeed.actorId, blockedIds))!);
+  }
   const rows = await db.select().from(notificationsFeed)
-    .where(filter ? and(eq(notificationsFeed.userId, userId), filter) : eq(notificationsFeed.userId, userId))
+    .where(and(...conditions))
     .orderBy(desc(notificationsFeed.createdAt), desc(notificationsFeed.id))
     .limit(limit)
     .offset(offset);
@@ -235,6 +254,14 @@ export async function publishNotification(n: {
 }): Promise<void> {
   const pushCategory = n.pushCategory ?? normalizePushEventCategory(n.category);
 
+  // "See less" preferences (Activity "..." menu) — a muted type or a muted
+  // actor keeps future matching events out of the recipient's unread feed,
+  // without silently dropping the row entirely (still fetchable, just muted).
+  const muteKeys = [`type:${n.type}`, ...(n.actorId ? [`actor:${n.actorId}`] : [])];
+  const muted = await db.select({ muteKey: activityMutes.muteKey }).from(activityMutes)
+    .where(and(eq(activityMutes.userId, n.userId), inArray(activityMutes.muteKey, muteKeys)));
+  const isMuted = muted.length > 0;
+
   const [notification] = await db
     .insert(notificationsFeed)
     .values({
@@ -243,6 +270,7 @@ export async function publishNotification(n: {
       type:         n.type,
       title:        n.title,
       body:         n.body   ?? "",
+      isMuted,
       actorName:    n.actorName    ?? null,
       actorHandle:  n.actorHandle  ?? null,
       actorInitials: n.actorInitials ?? null,
@@ -259,8 +287,10 @@ export async function publishNotification(n: {
     .onConflictDoNothing()
     .returning({ id: notificationsFeed.id });
 
-  // Do not send a second push when the in-app notification already existed.
-  if (!notification) return;
+  // Do not send a second push when the in-app notification already existed,
+  // and don't push a muted ("see less") event either — it's still visible if
+  // the recipient goes looking, just not worth interrupting them for.
+  if (!notification || isMuted) return;
 
   if (pushCategory) {
     await sendPushToUser(n.userId, {

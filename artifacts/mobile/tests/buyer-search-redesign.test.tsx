@@ -28,6 +28,7 @@ const { apiMock, routerMock } = vi.hoisted(() => {
     replace: vi.fn(),
     navigate: vi.fn(),
     back: vi.fn(),
+    canGoBack: vi.fn(() => true),
   };
 
   return { apiMock, routerMock };
