@@ -28,19 +28,27 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 // through a minimal local replica that mirrors the exported function contract.
 
 type PreviewResult = boolean;
+type PersistedRole = 'buyer' | 'seller' | null;
 
-function sellerPreviewFromSearch(search: string, isDev: boolean, isWeb: boolean): PreviewResult {
+// `persistedRole` mirrors reading localStorage['user_role'] once the query
+// param itself is gone (tab-bar switch, router.push to a plain path) — see
+// the real module's doc comment for why this fallback exists.
+function sellerPreviewFromSearch(search: string, isDev: boolean, isWeb: boolean, persistedRole: PersistedRole = null): PreviewResult {
   if (!isDev) return false;
   if (!isWeb) return false;
   const v = new URLSearchParams(search).get('bt_preview');
-  return v === 'seller';
+  if (v === 'seller') return true;
+  if (v === 'buyer') return false;
+  return persistedRole === 'seller';
 }
 
-function buyerPreviewFromSearch(search: string, isDev: boolean, isWeb: boolean): PreviewResult {
+function buyerPreviewFromSearch(search: string, isDev: boolean, isWeb: boolean, persistedRole: PersistedRole = null): PreviewResult {
   if (!isDev) return false;
   if (!isWeb) return false;
   const v = new URLSearchParams(search).get('bt_preview');
-  return v === 'buyer';
+  if (v === 'buyer') return true;
+  if (v === 'seller') return false;
+  return persistedRole === 'buyer';
 }
 
 // ── Production guard ──────────────────────────────────────────────────────────
@@ -139,6 +147,41 @@ describe('seller + buyer preview symmetry', () => {
   });
 });
 
+// ── Persisted-role fallback (survives in-app navigation) ─────────────────────
+// The query param only has to be present on the very first load; Expo
+// Router's tab bar and a router.push() to a plain path drop it. Without a
+// fallback, every screen reached that way falls out of preview mode and
+// hangs on a real (here, unreachable) network call forever — this is what
+// broke #232/#254 on the live Replit preview.
+
+describe('preview detection falls back to the persisted role once the query param is gone', () => {
+  it('an absent param uses the role persisted from the first load', () => {
+    expect(sellerPreviewFromSearch('', true, true, 'seller')).toBe(true);
+    expect(buyerPreviewFromSearch('', true, true, 'buyer')).toBe(true);
+  });
+
+  it('an absent param with no persisted role at all is still the real flow, not fake data', () => {
+    expect(sellerPreviewFromSearch('', true, true, null)).toBe(false);
+    expect(buyerPreviewFromSearch('', true, true, null)).toBe(false);
+  });
+
+  it('an absent param never leaks the OTHER role\'s persisted flag', () => {
+    expect(sellerPreviewFromSearch('', true, true, 'buyer')).toBe(false);
+    expect(buyerPreviewFromSearch('', true, true, 'seller')).toBe(false);
+  });
+
+  it('an explicit query param always overrides a stale persisted role from a previous session', () => {
+    // e.g. navigated from ?bt_preview=seller straight to a fresh ?bt_preview=buyer link
+    expect(sellerPreviewFromSearch('?bt_preview=buyer', true, true, 'seller')).toBe(false);
+    expect(buyerPreviewFromSearch('?bt_preview=buyer', true, true, 'seller')).toBe(true);
+  });
+
+  it('the production and native guards still short-circuit before any persisted-role read', () => {
+    expect(sellerPreviewFromSearch('', false, true, 'seller')).toBe(false);
+    expect(sellerPreviewFromSearch('', true, false, 'seller')).toBe(false);
+  });
+});
+
 // ── Real module export sanity ─────────────────────────────────────────────────
 // We cannot import lib/devPreview.ts in vitest because it imports Platform from
 // react-native, which uses Flow syntax that Rollup/Vite cannot parse. The pure
@@ -179,6 +222,13 @@ describe('isSellerDevPreview real export (module path exists)', () => {
   it('seller preview requires an explicit bt_preview=seller opt-in (source check)', () => {
     const { readFileSync } = require('fs');
     const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
-    expect(src).toContain("return v === 'seller';");
+    expect(src).toContain("if (v === 'seller') return true;");
+  });
+
+  it('falls back to the persisted user_role once the query param is gone (source check)', () => {
+    const { readFileSync } = require('fs');
+    const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
+    expect(src).toContain("localStorage.getItem('user_role')");
+    expect(src).toContain('persistedPreviewRole()');
   });
 });

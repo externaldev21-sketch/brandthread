@@ -7,12 +7,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { emitProfileEvent } from '@/lib/profileEvents';
+import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
   Conversation, ConversationType, ConversationParticipant,
   Message, MessageAttachment, MessageReaction, ReactionType,
-  Story, StoryMedia, StoryPrivacySettings, StoryViewer,
+  Story, StoryMedia, StoryPrivacySettings, StoryViewer, Note,
   Notification, NotificationCategory, NotificationPreference,
   BlockRecord, MuteRecord, RestrictRecord,
   SavedItem, SavedItemType, SavedCollection, PrivacySettings, ProfileSearchResult,
@@ -100,7 +101,7 @@ export const MY_USER_ID = 'me';
 export const MY_NAME    = 'Jordan';
 export const MY_HANDLE  = '@jordan';
 export const MY_INITIALS = 'J';
-export const MY_COLOR    = '#8B5CF6';
+export const MY_COLOR    = MY_AVATAR_COLOR;
 
 // ─── Pub/Sub ─────────────────────────────────────────────────────────────────
 
@@ -504,6 +505,7 @@ export interface SellerThreadPost {
   commentsCount:     number;
   repostsCount:      number;
   savedCount:        number;
+  sharesCount:       number;
   likedByMe:         boolean;
   savedByMe:         boolean;
   repostedByMe:      boolean;
@@ -554,7 +556,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     authorName,
     authorHandle:    '@' + authorName.toLowerCase().replace(/[^a-z0-9]/g, ''),
     authorInitials:  authorName.slice(0, 2).toUpperCase(),
-    authorColor:     '#8B5CF6',
+    authorColor:     pickAvatarColor(p.userId ?? userId),
     sellerId:        p.userId ?? userId,
     brandId:         p.userId ?? userId,
     feedEligibility: 'thread_eligible',
@@ -596,6 +598,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     commentsCount:   p.commentsCount ?? 0,
     repostsCount:    p.repostsCount ?? 0,
     savedCount:      p.savedCount ?? 0,
+    sharesCount:     p.sharesCount ?? 0,
     likedByMe:       false,
     savedByMe:       false,
     repostedByMe:    false,
@@ -838,7 +841,8 @@ export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadP
     likesCount:    p.likesCount    ?? 0,
     commentsCount: p.commentsCount ?? 0,
     repostsCount:  p.repostsCount  ?? 0,
-    savedCount:    0,
+    savedCount:    typeof p.savesCount === 'number' ? p.savesCount : 0,
+    sharesCount:   typeof p.sharesCount === 'number' ? p.sharesCount : 0,
     viewsCount:    typeof p.viewsCount === 'number' ? p.viewsCount : undefined,
     likedByMe:     false,
     savedByMe:     false,
@@ -1070,7 +1074,7 @@ export async function createOrGetConversation(params: {
       participant: {
         userId: params.participant.userId, name: params.participant.name,
         handle: params.participant.handle ?? '', initials: params.participant.initials ?? '',
-        color: params.participant.color ?? '#8B5CF6', accountType: params.participant.accountType ?? 'seller',
+        color: params.participant.color ?? pickAvatarColor(params.participant.userId ?? params.participant.name), accountType: params.participant.accountType ?? 'seller',
       },
       myInfo: { name: profile.name, handle: `@${profile.username}`, initials: profile.avatarInitials, color: profile.avatarColor, accountType: 'buyer' },
       contextOrderId: params.contextOrderId, contextOrderNumber: params.contextOrderNumber,
@@ -1351,6 +1355,29 @@ export async function deleteStory(storyId: string): Promise<void> {
   const k = K();
   const stories = await loadStories(k);
   await save(k.stories, stories.filter(s => s.id !== storyId)); notify();
+}
+
+// ─── Notes (bubble above story-tray avatars) ─────────────────────────────────
+// No local cache to prune here (unlike stories) — a note tray is small and
+// short-lived enough that app/(buyer)/inbox.tsx just re-fetches it alongside
+// the story tray on every load/focus, same as it does for stories via
+// api.social.storiesFollowing().
+
+/** Post (or replace) my own active note — 60 chars max, 24h TTL, matching the
+ *  server's own validation in POST /api/social/notes. */
+export async function postNote(text: string): Promise<Note> {
+  const note = await serviceRequest<Note>('/api/social/notes', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  });
+  notify();
+  return note;
+}
+
+/** Active notes from people I follow (+ my own), for the stories tray. */
+export async function getNotesForTray(): Promise<Note[]> {
+  const remote = await serviceRequest<Note[]>('/api/social/notes/following');
+  return Array.isArray(remote) ? remote : [];
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

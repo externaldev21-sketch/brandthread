@@ -128,6 +128,16 @@ async function sellerExists(clerkId: string): Promise<boolean> {
   return seller?.accountType === "seller";
 }
 
+/** Buyer or seller — the two account types allowed to own/manage a post at all. */
+async function posterAccountType(clerkId: string): Promise<"buyer" | "seller" | null> {
+  const [row] = await db
+    .select({ accountType: users.accountType })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  return row?.accountType === "seller" || row?.accountType === "buyer" ? row.accountType : null;
+}
+
 /**
  * Lowest variant price per product — a product has no price of its own
  * (that lives only on its variants), so this is what a tagged product's
@@ -270,7 +280,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
   if (postRows.length === 0) return [];
   const postIds = postRows.map((post) => post.id);
   const sellerIds = [...new Set(postRows.map((post) => post.userId))];
-  const [sellerRows, tagRows, personTagRows, likeRows, repostRows, commentRows] = await Promise.all([
+  const [sellerRows, tagRows, personTagRows, likeRows, repostRows, shareRows, saveRows, commentRows] = await Promise.all([
     db.select({
       clerkId: users.clerkId,
       displayName: users.displayName,
@@ -307,6 +317,12 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
     db.select({ postId: interactions.postId, cnt: count() }).from(interactions)
       .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
       .groupBy(interactions.postId),
+    db.select({ postId: interactions.postId, cnt: count() }).from(interactions)
+      .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "share")))
+      .groupBy(interactions.postId),
+    db.select({ postId: savedItems.targetId, cnt: count() }).from(savedItems)
+      .where(and(inArray(savedItems.targetId, postIds), eq(savedItems.itemType, "post")))
+      .groupBy(savedItems.targetId),
     visibleCommentCounts(postIds),
   ]);
   const sellerById = new Map(sellerRows.map((seller) => [seller.clerkId, seller]));
@@ -319,6 +335,8 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
     Object.fromEntries(rows.filter((row) => row.postId).map((row) => [row.postId, Number(row.cnt)]));
   const likesByPost = countByPost(likeRows);
   const repostsByPost = countByPost(repostRows);
+  const sharesByPost = countByPost(shareRows);
+  const savesByPost = countByPost(saveRows);
   const commentsByPost = Object.fromEntries(commentRows);
 
   return postRows.map((post) => {
@@ -350,6 +368,8 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
       })),
       likesCount: post.visibility?.showLikeCount === false ? null : likesByPost[post.id] ?? 0,
       repostsCount: repostsByPost[post.id] ?? 0,
+      sharesCount: sharesByPost[post.id] ?? 0,
+      savesCount: savesByPost[post.id] ?? 0,
       commentsCount: commentsByPost[post.id] ?? 0,
     };
   });
@@ -426,7 +446,7 @@ router.get("/feed", requireAuth, async (req, res) => {
     const postIds = rows.map((r) => r.id);
 
     // 3. Fetch tagged products, tagged people and interaction counts in parallel
-    const [tagRows, personTagRows, likeRows, repostRows, commentRows] = await Promise.all([
+    const [tagRows, personTagRows, likeRows, repostRows, shareRows, saveRows, commentRows] = await Promise.all([
       db
         .select({
           postId:    postTaggedProducts.postId,
@@ -466,6 +486,18 @@ router.get("/feed", requireAuth, async (req, res) => {
         .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
         .groupBy(interactions.postId),
 
+      db
+        .select({ postId: interactions.postId, cnt: count() })
+        .from(interactions)
+        .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "share")))
+        .groupBy(interactions.postId),
+
+      db
+        .select({ postId: savedItems.targetId, cnt: count() })
+        .from(savedItems)
+        .where(and(inArray(savedItems.targetId, postIds), eq(savedItems.itemType, "post")))
+        .groupBy(savedItems.targetId),
+
       visibleCommentCounts(postIds),
     ]);
 
@@ -485,6 +517,10 @@ router.get("/feed", requireAuth, async (req, res) => {
     for (const r of likeRows) if (r.postId) likesByPost[r.postId] = Number(r.cnt);
     const repostsByPost: Record<string, number> = {};
     for (const r of repostRows) if (r.postId) repostsByPost[r.postId] = Number(r.cnt);
+    const sharesByPost: Record<string, number> = {};
+    for (const r of shareRows) if (r.postId) sharesByPost[r.postId] = Number(r.cnt);
+    const savesByPost: Record<string, number> = {};
+    for (const r of saveRows) if (r.postId) savesByPost[r.postId] = Number(r.cnt);
     const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
 
     // ─── Boost ranking: find active boosts for this page of posts ────────────
@@ -547,6 +583,8 @@ router.get("/feed", requireAuth, async (req, res) => {
       })),
       likesCount:    p.visibility?.showLikeCount === false ? null : likesByPost[p.id] ?? 0,
       repostsCount:  repostsByPost[p.id]  ?? 0,
+      sharesCount:   sharesByPost[p.id]   ?? 0,
+      savesCount:    savesByPost[p.id]    ?? 0,
       commentsCount: commentsByPost[p.id] ?? 0,
     }));
 
@@ -856,14 +894,15 @@ router.post("/", requireAuth, async (req, res) => {
 });
 
 // ─── GET /api/posts/mine ─────────────────────────────────────────────────────
-// Authenticated seller library. Unlike /api/public/posts this includes only
-// the caller's own published, draft, and scheduled posts.
+// Authenticated own-post library (buyer or seller). Unlike /api/public/posts
+// this includes only the caller's own published, draft, and scheduled posts —
+// buyers need this too, to resume their own drafts (item 117).
 // Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT) — a
 // long-lived seller's full post history was previously loaded unbounded.
 router.get("/mine", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  if (!await sellerExists(clerkId)) {
-    return res.status(403).json({ error: "Only seller accounts can manage posts.", code: "SELLER_ONLY" });
+  if (!await posterAccountType(clerkId)) {
+    return res.status(403).json({ error: "Only buyer and seller accounts can manage posts.", code: "ACCOUNT_TYPE_REQUIRED" });
   }
   const page = parsePagination(req.query, { limit: 100 });
   if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
@@ -892,14 +931,32 @@ router.patch("/:id", requireAuth, async (req, res) => {
   if (typeof id !== "string" || !UUID_RE.test(id)) {
     return res.status(404).json({ error: "Post not found" });
   }
-  if (!await sellerExists(clerkId)) {
-    return res.status(403).json({ error: "Only seller accounts can manage posts.", code: "SELLER_ONLY" });
+  const posterType = await posterAccountType(clerkId);
+  if (!posterType) {
+    return res.status(403).json({ error: "Only buyer and seller accounts can manage posts.", code: "ACCOUNT_TYPE_REQUIRED" });
   }
+  const isBuyerPoster = posterType === "buyer";
 
   const body = req.body as Record<string, unknown>;
   const [existing] = await db.select().from(posts)
     .where(and(eq(posts.id, id), eq(posts.userId, clerkId))).limit(1);
   if (!existing) return res.status(404).json({ error: "Post not found" });
+
+  // Buyer posting rules apply on update too (item 117: buyers can resume
+  // their own drafts, but the same restrictions as creation still hold —
+  // see the matching isBuyer block in POST / above).
+  if (isBuyerPoster) {
+    const nextMediaType = (body.mediaType as string | undefined) ?? existing.mediaType;
+    if (nextMediaType !== "photo" && nextMediaType !== "slideshow") {
+      return res.status(403).json({ error: "Buyer accounts can only post photos (single or carousel).", code: "BUYER_PHOTO_ONLY" });
+    }
+    if (Array.isArray(body.taggedProductIds) && body.taggedProductIds.length > 0) {
+      return res.status(403).json({ error: "Buyer accounts cannot tag products.", code: "BUYER_NO_PRODUCT_TAGS" });
+    }
+    if (body.scheduledAt) {
+      return res.status(403).json({ error: "Buyer posts cannot be scheduled.", code: "BUYER_NO_SCHEDULING" });
+    }
+  }
 
   const updates: Partial<typeof posts.$inferInsert> = {};
   if (body.mediaUrl !== undefined) {

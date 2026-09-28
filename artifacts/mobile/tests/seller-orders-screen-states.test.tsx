@@ -73,8 +73,14 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 let mockUserId: string | null = 'seller-1';
+let mockAuthLoaded = true;
 vi.mock('@clerk/expo', () => ({
-  useAuth: () => ({ userId: mockUserId, isLoaded: true, isSignedIn: !!mockUserId }),
+  useAuth: () => ({ userId: mockUserId, isLoaded: mockAuthLoaded, isSignedIn: !!mockUserId }),
+}));
+
+let mockPreviewMode = false;
+vi.mock('@/lib/devPreview', () => ({
+  isSellerDevPreview: () => mockPreviewMode,
 }));
 
 vi.mock('@/components/BrandthreadUI', () => ({
@@ -220,6 +226,8 @@ function apiOrderRow(overrides: Record<string, unknown> = {}) {
 describe('seller Orders screen states', () => {
   afterEach(() => {
     mockUserId = 'seller-1';
+    mockAuthLoaded = true;
+    mockPreviewMode = false;
   });
 
   it('shows skeleton rows while the initial request is in flight', async () => {
@@ -287,5 +295,97 @@ describe('seller Orders screen states', () => {
     const empty = renderer.root.findAll((node: any) => node.type === 'EmptyState');
     expect(empty.length).toBe(1);
     expect(empty[0].props.variant).toBe('error');
+  });
+
+  // Item 127: the Orders tab spun its loading skeleton forever when Clerk's
+  // async auth finished loading AFTER this tab was already focused (a real
+  // race on cold start / a deep link straight into Orders) — useFocusEffect
+  // only re-runs its callback on an actual focus event, not when a
+  // dependency changes while already focused, so the request never fired.
+  // This mock's useFocusEffect deliberately mirrors that real limitation
+  // (see the comment on the mock above): it only runs its callback once, on
+  // mount — exactly the failure condition — so this test only passes with
+  // the safety-net effect in place.
+  it('recovers once auth finishes loading, even though the tab was already "focused" first (item 127)', async () => {
+    mockAuthLoaded = false;
+    mockOrdersList = async () => [apiOrderRow({ orderNumber: 'BT-3003' })];
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<OrdersScreen />);
+    });
+    await flush();
+
+    // Still waiting on auth: skeleton up, nothing fetched yet.
+    expect(renderer.root.findAll((node: any) => node.type === 'SkeletonBlock').length).toBeGreaterThan(0);
+
+    // Auth finishes loading — no re-focus event follows, only a re-render.
+    mockAuthLoaded = true;
+    await act(async () => {
+      renderer.update(<OrdersScreen />);
+    });
+    await flush();
+
+    expect(renderer.root.findAll((node: any) => node.type === 'SkeletonBlock').length).toBe(0);
+    expect(textContent(renderer)).toContain('BT-3003');
+  });
+
+  // The infinite-skeleton bug reported live on the Replit design-preview
+  // deployment (?bt_preview=seller): app/_layout.tsx's PREVIEW_ROLE bypass
+  // renders straight through without ever waiting on ClerkLoaded, so real
+  // auth can legitimately stay unresolved (isLoaded false, isSignedIn
+  // false, userId null) for the entire session — not a race that later
+  // corrects itself, an intentional, permanent no-account state. #254's fix
+  // only covered auth that eventually loads; it did not cover this. Unlike
+  // the item-127 test above, auth here never becomes ready at any point.
+  it('resolves to the real empty state — never an infinite skeleton — in preview mode with no real account', async () => {
+    mockPreviewMode = true;
+    mockAuthLoaded = false;
+    mockUserId = null;
+    // If the screen ever tried a real fetch here it would be a bug (there
+    // is no token to authenticate it with) — so any call is itself a
+    // failure, not just an empty result.
+    mockOrdersList = async () => { throw new Error('should never be called with no real account'); };
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<OrdersScreen />);
+    });
+    await flush();
+
+    expect(renderer.root.findAll((node: any) => node.type === 'SkeletonBlock').length).toBe(0);
+    const empty = renderer.root.findAll((node: any) => node.type === 'EmptyState');
+    expect(empty.length).toBe(1);
+    // The real empty state, not the "couldn't load" error/retry one — a
+    // deliberate no-account preview isn't a connectivity failure.
+    expect(empty[0].props.variant).not.toBe('error');
+    expect(empty[0].props.message).toContain('Your orders will show up here');
+  });
+
+  // Backstop: even if some future edge case defeats both guards above, the
+  // skeleton must still resolve on its own within a bounded time.
+  it('never spins past ~1.5s under any circumstance, as a last-resort backstop', async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveList!: (rows: any[]) => void;
+      mockOrdersList = () => new Promise((resolve) => { resolveList = resolve; });
+
+      let renderer!: ReactTestRenderer;
+      act(() => {
+        renderer = create(<OrdersScreen />);
+      });
+      expect(renderer.root.findAll((node: any) => node.type === 'SkeletonBlock').length).toBeGreaterThan(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1600);
+      });
+
+      expect(renderer.root.findAll((node: any) => node.type === 'SkeletonBlock').length).toBe(0);
+
+      // Clean up the still-pending fetch so it can't leak into another test.
+      await act(async () => { resolveList([]); });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -171,6 +171,7 @@ vi.mock('@/lib/theme', () => ({
   COMP: { buttonH: 52, tabBarH: 64 },
   ICON: { xs: 12, sm: 16, md: 20, lg: 24, xxl: 40 },
   GUTTER: 16,
+  WEB_SAFE_AREA_TOP: 47,
   CONTENT_MAX_WIDTH: 720,
   GRID_MAX_WIDTH: 1080,
   BREAKPOINT: { tablet: 768, desktopWeb: 1024 },

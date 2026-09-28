@@ -21,6 +21,7 @@ import { ListRow, StickyBottomCTA } from '@/components/ui';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 export default function BuyerCloseFriends() {
   const colors = useColors();
@@ -108,7 +109,7 @@ export default function BuyerCloseFriends() {
       <View style={s.searchWrap}>
         <Feather name="search" size={16} color={colors.mutedForeground} />
         <TextInput
-          style={s.searchInput}
+          style={[s.searchInput, WEB_INPUT_RESET]}
           value={query}
           onChangeText={setQuery}
           placeholder="Search friends"
@@ -157,9 +158,13 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   },
   bannerText: { flex: 1, ...TYPE_SCALE.footnote, color: colors.mutedForeground, lineHeight: 17 },
   searchWrap: {
+    // Overnight batch item 37: filled, no border at rest or focus — a
+    // themed card+border read as the "rectangle bar" flagged across the
+    // app's search fields. Fixed monochrome fill + radius 12 (exact
+    // number given), same treatment as the shared SearchBar component.
     flexDirection: 'row', alignItems: 'center', gap: 10, margin: SPACING.md,
-    paddingHorizontal: SPACING.md, height: 40, backgroundColor: colors.card,
-    borderRadius: RADII.input, borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: SPACING.md, height: 40, backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 12, borderWidth: 0,
   },
   searchInput: { flex: 1, color: colors.foreground, ...TYPE_SCALE.body },
   countBadge: { ...TYPE_SCALE.caption, color: colors.primary, paddingHorizontal: SPACING.md, marginBottom: SPACING.xxs },
