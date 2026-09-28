@@ -54,6 +54,8 @@ import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
 import { FADE_MS } from '@/constants/motion';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { MediaCropper } from '@/components/media/MediaCropper';
+import { applyCropRect, type NormalizedCropRect } from '@/lib/mediaCrop';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -73,7 +75,14 @@ interface ComposedVideoLocal {
   mediaUrl: string; mediaPath: string;
   thumbnailUrl: string; thumbnailPath: string; duration: number;
 }
-interface SlidePhotoLocal { uri: string; id: string; }
+interface SlidePhotoLocal {
+  uri: string; id: string;
+  /** The uncropped source, kept so "Edit crop"/re-crop never re-crops an
+   *  already-cropped image. Set to the picked asset's own uri until cropped. */
+  originalUri?: string;
+  /** The saved 3:4 crop, normalized against `originalUri`'s pixel dimensions. */
+  cropRect?: NormalizedCropRect;
+}
 interface SoundSelection {
   soundId: string; soundTitle: string; artist: string; startTime: number; volume: number;
 }
@@ -472,8 +481,17 @@ export default function CreatePostScreen() {
   // ── Media ──
   const [videoClips,    setVideoClips]   = useState<VideoClipLocal[]>([]);
   const [slidePhotos,   setSlidePhotos]  = useState<SlidePhotoLocal[]>([]);
+  // Sequential crop queue: every picked photo crops to 3:4 before it's used,
+  // one at a time via the shared MediaCropper (same pattern as add-product's
+  // product-photo crop queue). "Edit crop" from the tool row bypasses the
+  // queue by setting cropTargetId directly.
+  const [cropQueue,    setCropQueue]    = useState<string[]>([]);
+  const [cropTargetId, setCropTargetId] = useState<string | null>(null);
   // ── Slide edit: editable slides with per-slide overlays ──
   const [editableSlides,    setEditableSlides]    = useState<EditablePhotoSlide[]>([]);
+  const cropTarget = cropTargetId
+    ? (slidePhotos.find(p => p.id === cropTargetId) ?? editableSlides.find(s => s.id === cropTargetId))
+    : null;
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [composedSlideshow, setComposedSlideshow] = useState<ComposedSlideshowResult | null>(null);
   const [slideProcessingPhase, setSlideProcessingPhase] = useState<'idle' | 'uploading' | 'composing' | 'error' | 'ready'>('idle');
@@ -739,8 +757,14 @@ export default function CreatePostScreen() {
       setPreviewClipIndex(0); setComposedVideo(null); setProcessingPhase('idle');
       setProcessingError(null); setSlidePhotos([]);
     } else {
-      setSlidePhotos(prev => [...prev, ...photos.map((a, i) => ({ uri: a.uri, id: `photo-${Date.now()}-${i}` }))]);
+      const newPhotos = photos.map((a, i) => ({ uri: a.uri, id: `photo-${Date.now()}-${i}`, originalUri: a.uri }));
+      setSlidePhotos(prev => [...prev, ...newPhotos]);
       setVideoClips([]);
+      // Same crop queue as the grid picker's handleTogglePhoto — every new
+      // photo crops to 3:4 before it's used.
+      const newIds = newPhotos.map(p => p.id);
+      setCropQueue(prev => [...prev, ...newIds]);
+      setCropTargetId(current => current ?? newIds[0] ?? null);
     }
   }
 
@@ -783,6 +807,39 @@ export default function CreatePostScreen() {
     setTextOverlays(prev => prev.filter(o => o.id !== id));
   }
 
+  /** Advances the sequential crop queue after a photo's crop is applied (or
+   *  skipped) — opens the next queued photo's cropper, if any. Also used to
+   *  close a manually-opened "Edit crop" (bypasses the queue: filtering an id
+   *  that was never in it is a no-op, and an empty queue closes the modal). */
+  function advanceCropQueue(justHandledId: string) {
+    setCropQueue(prev => {
+      const rest = prev.filter(id => id !== justHandledId);
+      setCropTargetId(rest[0] ?? null);
+      return rest;
+    });
+  }
+
+  async function handleCropSave(photoId: string, result: { rect: NormalizedCropRect }) {
+    const photo = slidePhotos.find(p => p.id === photoId) ?? editableSlides.find(s => s.id === photoId);
+    if (!photo) { advanceCropQueue(photoId); return; }
+    const sourceUri = photo.originalUri ?? photo.uri;
+    try {
+      const croppedUri = await applyCropRect(sourceUri, result.rect);
+      setSlidePhotos(prev => prev.map(p => p.id === photoId
+        ? { ...p, uri: croppedUri, originalUri: sourceUri, cropRect: result.rect } : p));
+      setEditableSlides(prev => prev.map(s => s.id === photoId
+        ? { ...s, uri: croppedUri, originalUri: sourceUri, cropRect: result.rect } : s));
+    } catch {
+      Alert.alert('Crop failed', 'Could not crop this photo. Please try again.');
+    } finally {
+      advanceCropQueue(photoId);
+    }
+  }
+
+  function handleCropCancel(photoId: string) {
+    advanceCropQueue(photoId);
+  }
+
   function tagProduct(p: Product) {
     const already = productTags.find(t => t.productId === p.id);
     if (already) setProductTags(prev => prev.filter(t => t.productId !== p.id));
@@ -792,6 +849,7 @@ export default function CreatePostScreen() {
   function resetAll() {
     setStep('media-pick');
     setVideoClips([]); setSlidePhotos([]); setMaxDuration(30);
+    setCropQueue([]); setCropTargetId(null);
     setTrimStart(0); setTrimEnd(0); setScrubTime(0); setPreviewSeekTime(0); setPreviewClipIndex(0);
     setComposedVideo(null); setProcessingPhase('idle'); setProcessingError(null);
     setEditableSlides([]); setCurrentSlideIndex(0); setComposedSlideshow(null);
@@ -834,7 +892,9 @@ export default function CreatePostScreen() {
       mediaPath: composedVideo?.mediaPath,
       thumbnailPath: composedVideo?.thumbnailPath ?? composedSlideshow?.thumbnailPath,
       thumbnailUri: composedSlideshow?.thumbnailUrl ?? composedVideo?.thumbnailUrl ?? editingPost?.thumbnailUri,
-      aspectRatio: '9:16' as const,
+      // Photos crop to 3:4 (app-wide media aspect-ratio system); video posts
+      // stay 9:16 full-screen.
+      aspectRatio: isSlideshow ? ('3:4' as const) : ('9:16' as const),
       mediaPaths: composedSlideshow?.mediaPaths ?? [],
       slideOverlays,
       productTags: productTags.map(pt => ({
@@ -990,7 +1050,7 @@ export default function CreatePostScreen() {
         if (videoClips.length > 0) {
           setStep('video-edit');
         } else {
-          const slides = slidePhotos.map(p => createPhotoSlide(p.id, p.uri));
+          const slides = slidePhotos.map(p => createPhotoSlide(p.id, p.uri, undefined, p.originalUri, p.cropRect));
           setEditableSlides(slides);
           setCurrentSlideIndex(0);
           setComposedSlideshow(null);
@@ -1002,12 +1062,17 @@ export default function CreatePostScreen() {
     }
 
     function handleTogglePhoto(asset: MediaGridAsset) {
-      setSlidePhotos(prev => {
-        const exists = prev.some(p => p.uri === asset.uri);
-        if (exists) return prev.filter(p => p.uri !== asset.uri);
-        return [...prev, { uri: asset.uri, id: asset.id }];
-      });
+      const exists = slidePhotos.some(p => p.uri === asset.uri);
+      setSlidePhotos(prev => exists
+        ? prev.filter(p => p.uri !== asset.uri)
+        : [...prev, { uri: asset.uri, id: asset.id, originalUri: asset.uri }]);
       setVideoClips([]);
+      // Every new photo crops to 3:4 before it's used — the crop queue opens
+      // the shared cropper for each newly-picked photo in turn.
+      if (!exists) {
+        setCropQueue(prev => [...prev, asset.id]);
+        setCropTargetId(current => current ?? asset.id);
+      }
     }
 
     function handleSelectVideo(asset: MediaGridAsset) {
@@ -1098,6 +1163,18 @@ export default function CreatePostScreen() {
           soundSearch={soundSearch} setSoundSearch={setSoundSearch}
           onUse={useSound} insets={insets}
         />
+
+        {cropTarget && (
+          <MediaCropper
+            visible
+            uri={cropTarget.originalUri ?? cropTarget.uri}
+            targetRatio={3 / 4}
+            initialRect={cropTarget.cropRect ?? null}
+            title="Crop photo"
+            onCancel={() => handleCropCancel(cropTargetId!)}
+            onSave={(result) => void handleCropSave(cropTargetId!, result)}
+          />
+        )}
       </View>
     );
   }
@@ -1289,12 +1366,17 @@ export default function CreatePostScreen() {
           </View>
         </ScrollView>
 
-        {/* Tool row: Text · Sticker · Overlay (share the text-overlay system) · Audio · Delete */}
+        {/* Tool row: Crop · Text · Sticker · Overlay (share the text-overlay system) · Audio · Delete */}
         <ScrollView
           horizontal showsHorizontalScrollIndicator={false}
           style={ts.edToolRow}
           contentContainerStyle={ts.edToolRowContent}
         >
+          <EditorToolChip
+            icon="crop" label="Crop"
+            onPress={() => { if (currentSlide) setCropTargetId(currentSlide.id); }}
+            testID="slide-tool-crop"
+          />
           <EditorToolChip
             icon="type" label="Text"
             onPress={() => { setSlideEditingOverlayId(undefined); setSlideShowTextEditor(true); }}
@@ -1380,6 +1462,18 @@ export default function CreatePostScreen() {
           soundSearch={soundSearch} setSoundSearch={setSoundSearch}
           onUse={useSound} insets={insets}
         />
+
+        {cropTarget && (
+          <MediaCropper
+            visible
+            uri={cropTarget.originalUri ?? cropTarget.uri}
+            targetRatio={3 / 4}
+            initialRect={cropTarget.cropRect ?? null}
+            title="Crop photo"
+            onCancel={() => handleCropCancel(cropTargetId!)}
+            onSave={(result) => void handleCropSave(cropTargetId!, result)}
+          />
+        )}
       </View>
     );
   }
