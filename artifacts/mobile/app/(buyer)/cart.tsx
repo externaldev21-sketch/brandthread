@@ -1086,7 +1086,9 @@ export default function CartScreen() {
               <Button
                 label="Remove"
                 size="compact"
-                variant="destructive"
+                // Monochrome: red is for LIVE and end-call only. Same grey
+                // secondary treatment as the row and swipe Remove actions.
+                variant="secondary"
                 onPress={handleRemoveSelected}
                 loading={removingSelected}
                 disabled={selectedItems.length === 0}
