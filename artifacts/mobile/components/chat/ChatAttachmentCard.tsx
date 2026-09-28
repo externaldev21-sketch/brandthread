@@ -181,7 +181,7 @@ const s = StyleSheet.create({
     paddingVertical: SP.xs,
   },
   unavailableBadgeText: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.bold,
     letterSpacing: 0.1,
   },
@@ -205,8 +205,8 @@ const s = StyleSheet.create({
     marginTop: 3,
   },
   sellerLine: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    fontSize: FS.meta,
+    fontFamily: FONT.medium,
     marginTop: 2,
   },
   footer: {
@@ -218,7 +218,7 @@ const s = StyleSheet.create({
     gap: 4,
   },
   footerText: {
-    fontSize: FS.xs,
+    fontSize: FS.meta,
     fontFamily: FONT.semibold,
   },
   footerIcon: {
