@@ -17,17 +17,16 @@ import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
-import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
+import { hapticPrimaryAction, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
   useAudioPlayer,
   useAudioPlayerStatus,
-  useAudioRecorder,
 } from 'expo-audio';
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
+import { VoiceMessageBubble } from '@/components/chat/VoiceMessageBubble';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
 import { confirmUnblock } from '@/lib/safety';
@@ -174,13 +173,13 @@ export default function SellerConversationScreen() {
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [isRecording, setIsRecording]         = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
+  const [voiceSpeed, setVoiceSpeed]           = useState(1);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
+  const voiceRecorder = useVoiceRecorder(uploadMedia, handleVoiceRecorded);
 
   // Attachment state
   const [pendingAttachment, setPendingAttachment] = useState<MsgAttachment | null>(null);
@@ -447,47 +446,37 @@ export default function SellerConversationScreen() {
   }
 
   // ── Voice recording ───────────────────────────────────────────────────────────
-
-  async function handleToggleRecording() {
-    if (isRecording) {
-      setIsRecording(false);
-      try {
-        await recorder.stop();
-        const status = recorder.getStatus();
-        const uri = recorder.uri ?? status.url;
-        if (!uri) return;
-        setIsUploading(true);
-        const response = await fetch(uri);
-        const buf = await response.arrayBuffer();
-        const bytes = new Uint8Array(buf);
-        let binary = '';
-        const CHUNK = 8192;
-        for (let i = 0; i < bytes.byteLength; i += CHUNK) {
-          binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.byteLength)));
-        }
-        const url = await uploadMedia(btoa(binary), 'audio/m4a', 'm4a');
-        const dur = Math.round(status.durationMillis / 1000);
-        setPendingAttachment({ type: 'voice', uri: url, title: 'Voice message', meta: { duration: String(dur) } });
-      } catch { Alert.alert('Recording error', 'Could not save voice message. Please try again.'); }
-      finally {
-        setIsUploading(false);
-        void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-      }
-    } else {
-      try {
-        const permission = await requestRecordingPermissionsAsync();
-        if (!permission.granted) throw new Error('Microphone permission denied');
-        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-        await recorder.prepareToRecordAsync();
-        recorder.record();
-        setIsRecording(true);
-      } catch { Alert.alert('Mic unavailable', 'Check microphone permissions in Settings.'); }
+  // Mirrors buyer-conversation.tsx (see docs/dm-flows.md and Instagram DM's
+  // "Sending an audio message" flow) — sends the moment recording finishes,
+  // rather than staging into pendingAttachment. The seller composer already
+  // used a tap-to-toggle mic (no press-and-hold) before this PR, so it keeps
+  // that same tap-to-toggle interaction on every platform for consistency,
+  // instead of introducing a native-only hold gesture asymmetry with the
+  // buyer screen's identical-looking mic button.
+  async function handleVoiceRecorded(result: { uri: string; durationSec: number; waveform: number[] }) {
+    if (!id) return;
+    hapticSuccessAction();
+    const attachment: MsgAttachment = {
+      type: 'voice',
+      uri: result.uri,
+      title: 'Voice message',
+      meta: { duration: String(result.durationSec), waveform: JSON.stringify(result.waveform) },
+    };
+    setIsSending(true);
+    try {
+      const msg = await api.conversations.send(id, { text: '', attachment });
+      setMessages((prev) => [...prev, msg as Msg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch {
+      Alert.alert('Voice message not sent', 'Please check your connection and try again.');
+    } finally {
+      setIsSending(false);
     }
   }
 
   // ── Voice playback ────────────────────────────────────────────────────────────
 
-  async function handlePlayVoice(uri: string) {
+  async function handlePlayVoice(uri: string, rate: number) {
     if (playingVoiceUri === uri) {
       voicePlayer.pause();
       await voicePlayer.seekTo(0).catch(() => {});
@@ -498,13 +487,26 @@ export default function SellerConversationScreen() {
     try {
       setPlayingVoiceUri(uri);
       voicePlayer.replace({ uri });
+      voicePlayer.playbackRate = rate;
       voicePlayer.play();
     } catch { setPlayingVoiceUri(null); }
   }
 
+  function handleSeekVoice(uri: string, fraction: number, durationSec: number) {
+    if (playingVoiceUri !== uri || !durationSec) return;
+    void voicePlayer.seekTo(fraction * durationSec).catch(() => {});
+  }
+
+  function handleVoiceSpeedChange(uri: string, rate: number) {
+    setVoiceSpeed(rate);
+    if (playingVoiceUri === uri) {
+      try { voicePlayer.playbackRate = rate; } catch { /* best-effort */ }
+    }
+  }
+
   // ── Attachment renderer (media-aware) ─────────────────────────────────────────
 
-  function renderMsgAttachment(att: MsgAttachment) {
+  function renderMsgAttachment(att: MsgAttachment, isOwn: boolean) {
     if (att.type === 'image') {
       let uris: string[] = [];
       try { uris = JSON.parse(att.meta?.photoUris ?? '[]'); } catch {}
@@ -533,19 +535,25 @@ export default function SellerConversationScreen() {
       );
     }
     if (att.type === 'voice') {
+      const durationSec = Number(att.meta?.duration ?? 0);
+      let waveform: number[] = [];
+      try { waveform = JSON.parse(att.meta?.waveform ?? '[]'); } catch {}
+      const isPlaying = !!att.uri && playingVoiceUri === att.uri;
+      const progress = isPlaying && voicePlayerStatus.duration
+        ? Math.max(0, Math.min(1, voicePlayerStatus.currentTime / voicePlayerStatus.duration))
+        : 0;
       return (
-        <PressableScale style={s.voiceRow} activeOpacity={0.8}
-          onPress={() => att.uri && handlePlayVoice(att.uri)}>
-          <View style={[s.voicePlayBtn, playingVoiceUri === att.uri && s.voicePlayBtnActive]}>
-            <Feather name={playingVoiceUri === att.uri ? 'square' : 'play'} size={14} color="#fff" />
-          </View>
-          <View style={s.voiceWave}>
-            {[...Array(12)].map((_, i) => (
-              <View key={i} style={[s.voiceBar, { height: 4 + Math.abs(Math.sin(i * 0.8)) * 14 }]} />
-            ))}
-          </View>
-          <Text style={s.voiceDur}>{att.meta?.duration ? `${att.meta.duration}s` : '…'}</Text>
-        </PressableScale>
+        <VoiceMessageBubble
+          theme={theme}
+          waveform={waveform}
+          durationSec={durationSec}
+          isPlaying={isPlaying}
+          progress={progress}
+          isOwn={isOwn}
+          onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
+          onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
+          onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+        />
       );
     }
     return (
@@ -705,6 +713,12 @@ export default function SellerConversationScreen() {
         delayLongPress={350}
         style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start' }]}
         accessibilityHint={isOwn ? undefined : 'Long press to report this message'}
+        // Voice messages render their own play/scrub/speed/transcription
+        // buttons inside this bubble — PressableScale defaults to rendering
+        // an actual <button> on web, which cannot legally contain other
+        // interactive controls. Drop the role only here so it's a plain,
+        // still fully long-pressable <div> instead. See buyer-conversation.tsx.
+        accessibilityRole={msg.attachment?.type === 'voice' ? 'none' : undefined}
       >
         {!isOwn && (
           <View style={[s.msgAvatar, { backgroundColor: msg.fromColor || PURPLE }]}>
@@ -724,7 +738,7 @@ export default function SellerConversationScreen() {
           ]}
         >
           {/* Attachment */}
-          {msg.attachment && renderMsgAttachment(msg.attachment)}
+          {msg.attachment && renderMsgAttachment(msg.attachment, isOwn)}
           {/* Text — hide the single-space placeholder */}
           {removed ? (
             <Text style={[s.msgText, { color: isOwn ? sentTextColor : MUTED, fontStyle: 'italic' }]}>{REMOVED_MESSAGE_TEXT}</Text>
@@ -904,6 +918,24 @@ export default function SellerConversationScreen() {
         />
       ) : (
       <View style={[s.inputRow, { paddingBottom: Math.max(insets.bottom, SP.sm) + SP.sm }]}>
+        {voiceRecorder.phase !== 'idle' ? (
+          <VoiceRecordingBar
+            theme={theme}
+            phase={voiceRecorder.phase}
+            elapsedMs={voiceRecorder.elapsedMs}
+            waveform={voiceRecorder.waveform}
+            dragX={voiceRecorder.dragX}
+            dragY={voiceRecorder.dragY}
+            // The seller composer's mic was already tap-to-toggle (no
+            // press-and-hold) before this PR — keep that consistent
+            // interaction on every platform rather than adding a native-only
+            // hold gesture here. See docs/dm-flows.md.
+            isWeb
+            onCancel={voiceRecorder.cancel}
+            onLock={voiceRecorder.lock}
+            onSend={() => { void voiceRecorder.finish(); }}
+          />
+        ) : (<>
         {/* Attach button */}
         <PressableScale
           style={s.attachBtn}
@@ -932,14 +964,15 @@ export default function SellerConversationScreen() {
 
         {/* Voice */}
         <PressableScale
-          style={[s.attachBtn, isRecording && s.recordingBtn]}
-          onPress={handleToggleRecording}
+          style={s.attachBtn}
+          onPress={() => { void voiceRecorder.startWeb(); }}
           disabled={isUploading || isSending}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          testID="seller-conversation-mic"
           accessibilityRole="button"
           accessibilityLabel="Record voice message"
         >
-          <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.md} color={isRecording ? RED : MUTED} />
+          <Feather name="mic" size={ICON.md} color={MUTED} />
         </PressableScale>
 
         <TextInput
@@ -966,6 +999,7 @@ export default function SellerConversationScreen() {
         >
           <Feather name="send" size={ICON.sm} color={canSend ? ON_DARK : MUTED} />
         </PressableScale>
+        </>)}
       </View>
       )}
 
