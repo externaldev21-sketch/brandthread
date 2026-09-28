@@ -1072,10 +1072,15 @@ router.get("/stories/following", async (req, res) => {
 
   // Real profile photos for the tray (the stories table only stores the
   // fallback initials/color captured at post time) — one extra lookup,
-  // keyed by clerkId, no new table.
-  const authorRows = await db.select({
-    clerkId: users.clerkId, profileImageUrl: users.profileImageUrl, avatarUrl: users.avatarUrl,
-  }).from(users).where(inArray(users.clerkId, Array.from(byAuthor.keys())));
+  // keyed by clerkId, no new table. Guarded against an empty author list
+  // (an empty inArray(...) is invalid SQL) even though the earlier
+  // rows.length/visibleRows.length checks should already rule it out.
+  const authorIdsForLookup = Array.from(byAuthor.keys());
+  const authorRows = authorIdsForLookup.length
+    ? await db.select({
+        clerkId: users.clerkId, profileImageUrl: users.profileImageUrl, avatarUrl: users.avatarUrl,
+      }).from(users).where(inArray(users.clerkId, authorIdsForLookup))
+    : [];
   const avatarByAuthor = new Map(authorRows.map((u) => [
     u.clerkId,
     (typeof u.profileImageUrl === "string" && u.profileImageUrl.startsWith("http") ? u.profileImageUrl : u.avatarUrl) ?? null,

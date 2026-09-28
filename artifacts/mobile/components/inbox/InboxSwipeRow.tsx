@@ -101,7 +101,7 @@ export default function InboxSwipeRow({ children, actions, rowId, disabled = fal
         ))}
       </View>
       <Animated.View
-        style={{ transform: [{ translateX }] }}
+        style={[styles.foreground, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
         {children}
@@ -115,12 +115,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  // Explicit stacking order (rather than relying on incidental DOM/paint
+  // order) so the swipe actions can never show through the closed row on
+  // web — without this, a sub-pixel layout rounding at the row's edge could
+  // let a sliver of an action's tinted background peek past the foreground.
   actionPanel: {
     position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
     flexDirection: 'row',
+    zIndex: 0,
+    elevation: 0,
+  },
+  foreground: {
+    zIndex: 1,
+    elevation: 1,
   },
   action: {
     alignItems: 'center',
