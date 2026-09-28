@@ -55,7 +55,7 @@ Legend: **PR** = which PR ships it. **Role** = buyer / seller / both.
 | 6 | Tag people — tap photo, draggable name chip, list of tags, Done | [06-tag-people](polish/screenshots/creation-flow/mobbin-reference/06-tag-people.webp) | new sheet reusing `OverlayChip`-style tag pattern | both | 2 |
 | 7 | Discard-changes sheet — "Save draft" (secondary) / "Discard" (destructive) | [08-discard-save-draft](polish/screenshots/creation-flow/mobbin-reference/08-discard-save-draft.webp) | wired into every back-out point in the composer | both | 2 |
 | 8 | Drafts — reopen an unfinished Thread | [09-drafts-list](polish/screenshots/creation-flow/mobbin-reference/09-drafts-list.webp) | existing `?editId=` reopen path in `create-post.tsx`, surfaced from a Drafts entry | both | 2 |
-| 9 | Posting progress — slim row at top of feed, thumbnail + real progress bar | [11b-posting-progress](polish/screenshots/creation-flow/mobbin-reference/11b-posting-progress.webp) | new component mounted at top of `app/(tabs)/feed.tsx`'s data layer (not the feed UI itself) | both | 2 |
+| 9 | Posting progress — slim row at top of feed, thumbnail + real progress bar (item 118) | [11b-posting-progress](polish/screenshots/creation-flow/mobbin-reference/11b-posting-progress.webp) | New `components/feed/UploadProgressPill.tsx`, reading a new module-level store (`lib/postUploadProgress.ts`) that survives the composer unmounting. Tapping "Post" on a brand-new (not edit, not scheduled) Thread now hands off to the feed immediately instead of blocking on a full-screen loader — `app/create-post.tsx`'s Post button starts the pill, calls `leaveSetupDestination()` right away, and runs the persist call in the background. The same start/update/end calls also drive the existing (previously unwired) iOS Live Activity API from PR #198 (`lib/uploadLiveActivity.ts`) — one real progress source for both surfaces. Editing an existing post or scheduling keeps the pre-existing blocking publishing/done screens unchanged. | both | own PR (item 118) |
 | 10 | Post-share prompt — "Done posting. Want to send it directly to friends?" + Send; congrats screen | [11-posting-toast-send](polish/screenshots/creation-flow/mobbin-reference/11-posting-toast-send.webp), [10-congrats](polish/screenshots/creation-flow/mobbin-reference/10-congrats.webp) | reuses existing `ThreadShareSheet` | both | 2 |
 | 11 | Tag products (seller) — search products, pin on media, up to 5, price/link | [12-tag-products-shopee](polish/screenshots/creation-flow/mobbin-reference/12-tag-products-shopee.webp), [12b-tag-products-pinterest](polish/screenshots/creation-flow/mobbin-reference/12b-tag-products-pinterest.webp) | extends existing `PostProductTag` / `tagProduct()` already in `create-post.tsx`, small pin-placement interface for PR B (buyer discover/tagging session) to wire into | seller only | 3 |
 | 12 | Upload progress in Dynamic Island + Lock Screen Live Activity — compact (thumbnail + % ring), expanded (thumbnail + "uploading…" + big ring), Lock Screen card, complete/failed states | [island-compact](polish/screenshots/upload-live-activity/mobbin-reference/01-island-compact.webp), [island-expanded](polish/screenshots/upload-live-activity/mobbin-reference/02-island-expanded-uploading.webp), [island-complete](polish/screenshots/upload-live-activity/mobbin-reference/04-island-compact-complete.webp), [lockscreen-uploading](polish/screenshots/upload-live-activity/mobbin-reference/06-lockscreen-uploading.webp), [lockscreen-complete](polish/screenshots/upload-live-activity/mobbin-reference/07-lockscreen-complete.webp) | new iOS-only Expo config plugin + ActivityKit widget extension (Swift/SwiftUI), exposing `startUploadActivity`/`updateUploadActivity`/`endUploadActivity` from `lib/uploadLiveActivity.ts` for both this flow and the stories session's upload plumbing to call; no-op on Android/web | both (and stories) | 4 |
@@ -91,6 +91,18 @@ remote updates, not for the local-only in-app progress this v1 implements).
   chosen to visually match the reference, not measured pixel-for-pixel.
 - Anything else discovered while building is appended below by the agent/PR
   that hits it, not assumed away in advance.
+- **Item 118: could not verify against the live Replit preview URL.** The
+  orchestrator asked for a screenshot of the exact live preview route
+  (`https://…expo.riker.replit.dev/?bt_preview=buyer|seller`) after this
+  point. This sandbox's outbound network policy denies that host
+  (`*.replit.dev`/`*.expo.dev` — confirmed via a 403 policy denial from the
+  egress proxy, not a bug on either side), so it genuinely cannot be reached
+  from here. Verified instead against the local Playwright harness
+  (`scripts/*.mjs`), which serves the exact same static preview export
+  (`expo export --platform web` with the same `bt_preview` bypass) the
+  Replit deployment runs — same code, same build, different host. Flagging
+  this rather than claiming a check that didn't happen; a session with
+  access to that host should confirm the same screens there.
 
 ## What's already there vs. what this changes
 
