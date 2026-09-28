@@ -8,7 +8,7 @@
  *
  * Adding/editing opens `AddressSheet`: a full form with the app's existing
  * Google Places autocomplete (AddressAutocompleteInput → the server's
- * /buyer/addresses/autocomplete), edited on a draft and only committed on
+ * /buyer/address-suggestions), edited on a draft and only committed on
  * "Use this address" so Cancel never leaves a half-typed address behind.
  */
 import React, { useEffect, useState } from 'react';
