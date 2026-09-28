@@ -455,7 +455,7 @@ export default function CreatePostScreen() {
   const editId   = typeof params.editId === 'string' ? params.editId : undefined;
   const isSellerSetup = isSellerSetupOrigin(params.from);
 
-  const topPad = insets.top;
+  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
   const botPad = insets.bottom;
 
   function leaveSetupDestination() {

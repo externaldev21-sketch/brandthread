@@ -99,8 +99,9 @@ function FramingBrackets() {
 function CameraCaptureWeb() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const topPad = Math.max(insets.top, 54);
   return (
-    <View style={[s.root, s.webFallback, { backgroundColor: colors.background, paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
+    <View style={[s.root, s.webFallback, { backgroundColor: colors.background, paddingTop: topPad + 24, paddingBottom: insets.bottom + 24 }]}>
       <View style={[s.webFallbackIcon, { backgroundColor: `${ACCENT}22` }]}>
         <Feather name="camera-off" size={34} color={ACCENT} />
       </View>
