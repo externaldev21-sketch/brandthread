@@ -382,6 +382,11 @@ const ActivityRowView = React.memo(function ActivityRowView({
   return (
     <SwipeableActions actions={swipeActions}>
     <View style={styles.row}>
+      {/* Unread dot — LinkedIn-style leading dot in the row's own 16pt
+          gutter (https://mobbin.com/screens/e455bcf1-7b85-4c0b-b4fd-76df1241fd5f),
+          white not blue: monochrome brand. Absolutely positioned, so rows
+          never shift when it appears or clears. */}
+      {unread ? <View style={styles.unreadDot} testID={`activity-unread-dot-${row.key}`} /> : null}
       {/*
         The Follow back / Following control is a real interactive element,
         so it must be a sibling of the row's own tap target rather than
@@ -571,6 +576,26 @@ export default function ActivityCenterScreen() {
   // visit even after being marked read, so rows don't jump while you look at
   // them; the next refresh moves them to their dated section.
   const [sessionNew, setSessionNew] = useState<Set<string>>(() => new Set());
+  // Unread dots. Every id that arrives unread during this visit (first page,
+  // realtime refetches, "load more") gets a dot, kept even after the row is
+  // marked read on view so dots don't blink away under your eyes — the same
+  // "new since you were last here" highlight Instagram/Threads keep for a
+  // visit. A dot clears when you open that row, on "Mark all read", or when
+  // you leave the screen. The bell/tab badge counts what is still unread
+  // server-side (GET /unread-count), so both come from the same isRead data.
+  const [dotIds, setDotIds] = useState<ReadonlySet<string>>(() => new Set());
+  const dotIdsRef = useRef(dotIds);
+  dotIdsRef.current = dotIds;
+  const addUnreadDots = useCallback((list: readonly ActivityItem[]) => {
+    const fresh = list.filter((item) => !item.isRead).map((item) => item.id);
+    if (fresh.length === 0) return;
+    setDotIds((prev) => {
+      if (fresh.every((id) => prev.has(id))) return prev;
+      const next = new Set(prev);
+      for (const id of fresh) next.add(id);
+      return next;
+    });
+  }, []);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorKind, setErrorKind] = useState<'auth' | 'offline' | 'server'>('offline');
   const [refreshing, setRefreshing] = useState(false);
@@ -692,6 +717,7 @@ export default function ActivityCenterScreen() {
       // instead of an empty "Activity will show up here".
       const resolved = withoutPendingDeletes(page.length === 0 && isPreviewActivityEnabled() ? applyPreviewFollowState(getVisiblePreviewActivity()) : page);
       setItems(resolved);
+      addUnreadDots(resolved);
       setSessionNew(new Set(resolved.filter((item) => !item.isRead).map((item) => item.id)));
       setHasMore(page.length === ACTIVITY_PAGE_SIZE);
       setNow(Date.now());
@@ -704,6 +730,7 @@ export default function ActivityCenterScreen() {
         retriedRef.current = false;
         const seeded = withoutPendingDeletes(applyPreviewFollowState(getVisiblePreviewActivity()));
         setItems(seeded);
+        addUnreadDots(seeded);
         setSessionNew(new Set(seeded.filter((item) => !item.isRead).map((item) => item.id)));
         setHasMore(false);
         setNow(Date.now());
@@ -725,7 +752,7 @@ export default function ActivityCenterScreen() {
     } finally {
       if (id === requestId.current) setRefreshing(false);
     }
-  }, []);
+  }, [addUnreadDots]);
 
   // Runs on focus, and periodically while focused (no websocket/SSE layer —
   // see watchActivityRealtime's own comment).
@@ -741,7 +768,11 @@ export default function ActivityCenterScreen() {
       // another device) — quietly refresh the first page in place.
       void loadFirstPage('focus');
     });
-    return () => realtime.stop();
+    return () => {
+      realtime.stop();
+      // Dots are per visit: next time, only what's still unread gets one.
+      setDotIds(new Set());
+    };
   }, [loadFirstPage, loadSuggested]));
 
   const loadMore = useCallback(async () => {
@@ -756,13 +787,14 @@ export default function ActivityCenterScreen() {
         const seen = new Set(prev.map((item) => item.id));
         return [...prev, ...withoutPendingDeletes(page).filter((item) => !seen.has(item.id))];
       });
+      addUnreadDots(page);
       setHasMore(page.length === ACTIVITY_PAGE_SIZE);
     } catch {
       // Leave hasMore set; scrolling again retries.
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, loadingMore, status]);
+  }, [addUnreadDots, hasMore, loadingMore, status]);
 
   const readIds = useMemo(() => new Set(items.filter((item) => item.isRead).map((item) => item.id)), [items]);
 
@@ -844,7 +876,9 @@ export default function ActivityCenterScreen() {
     return result;
   }, [filteredItems, sessionNew, now]);
 
-  const hasUnread = items.some((item) => !item.isRead);
+  // "Mark all read" shows while anything is unread server-side or still
+  // carries a dot on screen.
+  const hasUnread = dotIds.size > 0 || items.some((item) => !item.isRead);
 
   // ── Mark as read on view ───────────────────────────────────────────────────
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60, minimumViewTime: 150 }).current;
@@ -861,7 +895,18 @@ export default function ActivityCenterScreen() {
   }).current;
 
   // ── Actions ────────────────────────────────────────────────────────────────
+  const clearDots = useCallback((ids: readonly string[]) => {
+    setDotIds((prev) => {
+      if (!ids.some((id) => prev.has(id))) return prev;
+      const next = new Set(prev);
+      for (const id of ids) next.delete(id);
+      return next;
+    });
+  }, []);
+
   const handlePress = useCallback((row: ActivityRow) => {
+    // Opening a row reads it: its dot goes now, not on the next visit.
+    clearDots(row.ids);
     void captureNotificationEvent(api, user?.id, {
       notificationId: row.id,
       eventType: 'tap',
@@ -875,7 +920,7 @@ export default function ActivityCenterScreen() {
     // Merged comment rows open the comments themselves (activityRowHref).
     const href = activityRowHref(row, role);
     if (href) router.push(href as never);
-  }, [api, role, router, tracker, user?.id]);
+  }, [api, clearDots, role, router, tracker, user?.id]);
 
   // Trash: the row goes now, "Notification deleted · Undo" shows, and the
   // server delete is sent when the Undo window closes (Mobbin: LinkedIn
@@ -1023,11 +1068,17 @@ export default function ActivityCenterScreen() {
   const handleMarkAll = useCallback(async () => {
     hapticPrimaryAction();
     const previous = itemsRef.current;
+    const previousDots = dotIdsRef.current;
+    // Dots, rows and (via markAllActivityRead's change broadcast) the bell/
+    // tab badge all clear together; everything rolls back if the call fails.
     setItems((prev) => applyRead(prev, prev.map((item) => item.id)));
+    setDotIds(new Set());
     try {
       await markAllActivityRead();
     } catch {
       setItems(previous);
+      setDotIds(previousDots);
+      Alert.alert('Could not mark all as read', 'Check your connection and try again.');
     }
   }, []);
 
@@ -1061,7 +1112,9 @@ export default function ActivityCenterScreen() {
   const renderItem = useCallback(({ item: row }: { item: ActivityRow }) => (
     <ActivityRowView
       row={row}
-      unread={row.ids.some((id) => !readIds.has(id))}
+      // Read through the ref (+ the list's `extraData={dotIds}`) so a dot
+      // clears the moment dotIds changes, whatever else re-rendered.
+      unread={row.ids.some((id) => dotIdsRef.current.has(id))}
       now={now}
       styles={styles}
       followOverride={row.targetId ? followOverrides[row.targetId] : undefined}
@@ -1134,6 +1187,7 @@ export default function ActivityCenterScreen() {
           sections={sections}
           keyExtractor={(row) => row.key}
           renderItem={renderItem}
+          extraData={dotIds}
           renderSectionHeader={renderSectionHeader}
           stickySectionHeadersEnabled={false}
           onViewableItemsChanged={onViewableItemsChanged}
@@ -1273,6 +1327,18 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     // through at the trailing edge on web, where CSS paints a `position:
     // absolute` sibling above a plain static one regardless of DOM order.
     backgroundColor: theme.background,
+  },
+  // Sits in the row's left gutter (16pt padding), vertically centred, so the
+  // avatar/text never move. Theme text colour — white, not an accent.
+  unreadDot: {
+    position: 'absolute',
+    left: 5,
+    top: '50%',
+    marginTop: -3,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.text,
   },
   // The Follow back / Following control (or the trailing thumbnail — see
   // `trailingThumb` at the call site) renders as a sibling of this
