@@ -2028,12 +2028,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/posts?limit=${limit}&offset=${offset}`),
       friendActivity: (limit = 30, offset = 0) =>
         get<any[]>(`/api/social/friends/activity?limit=${limit}&offset=${offset}`),
-      /** List buyers I follow */
-      following: (userId?: string) =>
-        quietGet<Array<{
+      /** List buyers I follow. `sort`: 'default' (recent first) | 'latest' | 'earliest'. */
+      following: (userId?: string, sort?: 'default' | 'latest' | 'earliest') => {
+        const params = new URLSearchParams();
+        if (userId) params.set('userId', userId);
+        if (sort && sort !== 'default') params.set('sort', sort);
+        const qs = params.toString();
+        return quietGet<Array<{
           userId: string; name: string; username: string | null; handle: string;
-          initials: string; color: string; followedAt: string;
-        }>>(`/api/social/following${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`),
+          initials: string; color: string; followedAt: string; isFollowing: boolean; followsMe: boolean;
+        }>>(`/api/social/following${qs ? `?${qs}` : ''}`);
+      },
       /** List buyers who follow me (with isFollowingBack flag) */
       followers: (userId?: string) =>
         quietGet<Array<{
