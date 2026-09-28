@@ -69,6 +69,7 @@ export function getPreviewBuyerOrder(id: string | null | undefined): Record<stri
     trackingStatus: 'in_transit',
     estimatedDelivery: new Date(now + 2 * DAY).toISOString(),
     shippedAt: iso(200 * 60_000), // matches the seeded "Your order shipped" row (200 min ago)
+    paidAt: iso(2 * DAY - 2 * 60_000), // captured two minutes after the order was placed
     isCustomerVisible: true,
     createdAt: iso(2 * DAY),
   };
