@@ -140,6 +140,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('@clerk/expo', () => ({
   useAuth: () => ({ userId: 'buyer-1' }),
+  useUser: () => ({ user: { hasImage: false, imageUrl: undefined } }),
 }));
 
 vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
@@ -281,6 +282,17 @@ vi.mock('@/lib/previewInbox', () => ({
   getPreviewMessages: () => [],
   isPreviewConversationId: () => false,
   subscribePreviewTyping: () => () => {},
+}));
+
+// previewStories.ts pulls in previewCatalog.ts, which imports expo-asset
+// directly at module scope — same unmockable-under-Vitest issue as
+// previewInbox.ts above, and equally a no-op here since __DEV__ is false.
+vi.mock('@/lib/previewStories', () => ({
+  isPreviewStoriesEnabled: () => false,
+  getPreviewStoryTrayRows: () => [],
+  getPreviewStoryFor: () => null,
+  markPreviewStorySeen: () => {},
+  PREVIEW_MY_STORY: { id: 'preview-my-story' },
 }));
 
 vi.mock('@/components/branding/BrandthreadLogo', () => ({
@@ -442,6 +454,13 @@ describe('buyer inbox', () => {
 
     expect(renderer.root.findAllByProps({ testID: 'inbox-conversation-c1' }, { deep: false })).toHaveLength(1);
     expect(renderer.root.findAllByProps({ testID: 'inbox-conversation-c2' }, { deep: false })).toHaveLength(1);
+
+    // The search field only mounts once the header's search icon opens it
+    // (Instagram-style: no permanent full-width search bar).
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'inbox-header-search' }).props.onPress();
+      await flushPromises();
+    });
 
     await act(async () => {
       renderer!.root.findByProps({ testID: 'inbox-search-input' }).props.onChangeText('shipped');

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   View, Text, FlatList, SectionList, Image,
   Alert, StyleSheet, ScrollView, RefreshControl,
-  Modal, TextInput, ActivityIndicator, Platform,
+  Modal, TextInput, ActivityIndicator, Platform, Animated,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -252,6 +252,10 @@ export default function InboxScreen() {
   // ScrollViews, one FlashList) mounts at a time, so sharing this ref is safe.
   const scrollResetRef = useScrollReset<any>();
   const insets = useSafeAreaInsets();
+  // Matches TabPageHeader's own topPad exactly, so the search-mode header row
+  // sits at the identical vertical position as the title/icon row it swaps
+  // with — see that component for why web needs the fixed 67 fallback.
+  const headerTopPad = Platform.OS === 'web' ? 67 : insets.top;
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const api = useApi();
@@ -298,6 +302,22 @@ export default function InboxScreen() {
   const [composeSuggested, setComposeSuggested] = useState<ComposePerson[]>([]);
   const [messagesSearchQuery, setMessagesSearchQuery] = useState('');
   const [messagesSearchFocused, setMessagesSearchFocused] = useState(false);
+  // Instagram-style header search: the header's title + icon row swaps for a
+  // focused text field + Cancel when the search icon is tapped, instead of
+  // the search box living permanently under the header.
+  const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
+  const messagesSearchInputRef = useRef<TextInput>(null);
+  // Quick, non-bouncy fade for the header <-> search-field swap (timing, not
+  // a spring — AnimatedEntrance's spring bounce doesn't fit this transition).
+  const searchHeaderFade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!isSearchBarOpen) { searchHeaderFade.setValue(0); return; }
+    Animated.timing(searchHeaderFade, {
+      toValue: 1,
+      duration: 140,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [isSearchBarOpen, searchHeaderFade]);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<InboxTab>('inbox');
   const [typingConvId, setTypingConvId] = useState<string | null>(null);
@@ -693,6 +713,18 @@ export default function InboxScreen() {
     setComposeQuery('');
     setComposeResults([]);
     setComposeVisible(true);
+  }
+
+  function openMessagesSearch() {
+    setIsSearchBarOpen(true);
+    // Ref isn't attached until this render commits the search field in.
+    setTimeout(() => messagesSearchInputRef.current?.focus(), 0);
+  }
+
+  function cancelMessagesSearch() {
+    messagesSearchInputRef.current?.blur();
+    setIsSearchBarOpen(false);
+    setMessagesSearchQuery('');
   }
 
   function closeCompose() {
@@ -1223,54 +1255,68 @@ export default function InboxScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: SCREEN_BG }]}>
-      <TabPageHeader
-        title="Messages"
-        gutter={gutter}
-        actions={[
-          { name: 'edit-3', onPress: openCompose, accessibilityLabel: 'New message', testID: 'inbox-header-compose' },
-        ]}
-      />
-
-      {/* Search — always available, not gated behind a tab */}
-      {!loading && (
-        <View style={{ paddingHorizontal: gutter }}>
-          <View
-            style={[
-              s.searchRow,
-              {
-                backgroundColor: theme.cardElevated,
-                borderColor: messagesSearchFocused ? theme.border : 'transparent',
-              },
-            ]}
-          >
-            <Feather name="search" size={16} color={theme.muted} />
-            <TextInput
-              style={[s.searchInput, { color: theme.text }]}
-              value={messagesSearchQuery}
-              onChangeText={setMessagesSearchQuery}
-              placeholder="Search"
-              placeholderTextColor={theme.muted}
-              autoCorrect={false}
-              autoCapitalize="none"
-              returnKeyType="search"
-              onFocus={() => setMessagesSearchFocused(true)}
-              onBlur={() => setMessagesSearchFocused(false)}
-              testID="inbox-search-input"
-              accessibilityLabel="Search conversations"
-            />
-            {messagesSearchQuery.length > 0 && (
-              <PressableScale
-                onPress={() => setMessagesSearchQuery('')}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-                rippleEnabled={NO_RIPPLE}
-              >
-                <Feather name="x" size={16} color={theme.muted} />
-              </PressableScale>
-            )}
+      {isSearchBarOpen ? (
+        <Animated.View style={{ opacity: searchHeaderFade }}>
+          <View style={[s.searchHeaderRow, { paddingTop: headerTopPad + 12, paddingHorizontal: gutter }]}>
+            <View
+              style={[
+                s.searchRow,
+                s.searchRowInHeader,
+                {
+                  backgroundColor: theme.cardElevated,
+                  borderColor: messagesSearchFocused ? theme.border : 'transparent',
+                },
+              ]}
+            >
+              <Feather name="search" size={16} color={theme.muted} />
+              <TextInput
+                ref={messagesSearchInputRef}
+                style={[s.searchInput, { color: theme.text }]}
+                value={messagesSearchQuery}
+                onChangeText={setMessagesSearchQuery}
+                placeholder="Search"
+                placeholderTextColor={theme.muted}
+                autoCorrect={false}
+                autoCapitalize="none"
+                returnKeyType="search"
+                onFocus={() => setMessagesSearchFocused(true)}
+                onBlur={() => setMessagesSearchFocused(false)}
+                testID="inbox-search-input"
+                accessibilityLabel="Search conversations"
+              />
+              {messagesSearchQuery.length > 0 && (
+                <PressableScale
+                  onPress={() => setMessagesSearchQuery('')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                  rippleEnabled={NO_RIPPLE}
+                >
+                  <Feather name="x" size={16} color={theme.muted} />
+                </PressableScale>
+              )}
+            </View>
+            <PressableScale
+              onPress={cancelMessagesSearch}
+              rippleEnabled={NO_RIPPLE}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel search"
+              testID="inbox-search-cancel"
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+            >
+              <Text style={[s.searchCancelText, { color: theme.text }]}>Cancel</Text>
+            </PressableScale>
           </View>
-        </View>
+        </Animated.View>
+      ) : (
+        <TabPageHeader
+          title="Messages"
+          gutter={gutter}
+          actions={[
+            { name: 'search', onPress: openMessagesSearch, accessibilityLabel: 'Search messages', testID: 'inbox-header-search' },
+            { name: 'edit-3', onPress: openCompose, accessibilityLabel: 'New message', testID: 'inbox-header-compose' },
+          ]}
+        />
       )}
 
       {/* Stories tray — Instagram-DM-style: "Your story" first, then people
@@ -1284,8 +1330,8 @@ export default function InboxScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={s.activeRail}
-              contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md }}
+              style={[s.activeRail, { marginVertical: -2 }]}
+              contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md, paddingVertical: 2 }}
             >
               {/* "Your story" — always first. */}
               <PressableScale
@@ -1737,6 +1783,23 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     height: 44,
     borderRadius: RADIUS.md,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  // The header's search-open state: the field sits inline with Cancel
+  // instead of stacked full-width below a title, so it drops searchRow's own
+  // bottom margin and grows to fill the space Cancel doesn't need.
+  searchHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    paddingBottom: 20,
+  },
+  searchRowInHeader: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  searchCancelText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
   },
   searchInput: {
     flex: 1,
