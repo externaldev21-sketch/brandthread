@@ -36,6 +36,7 @@
     "pino": "^9.14.0",
     "pino-http": "^10.5.0",
     "resend": "^6.30.0",
+    "sharp": "^0.35.4",
     "stripe": "^22.5.0"
   },
   "devDependencies": {
