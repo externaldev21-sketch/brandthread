@@ -126,7 +126,7 @@ async function handleFulfillmentWebhook(shopDomain: string, payload: any): Promi
       userId: updated.buyerId,
       category: "orders",
       type: "order_shipped",
-      title: "Your order has shipped! 🚚",
+      title: "Your order has shipped!",
       body: `Order #${updated.orderNumber} is on its way via ${carrier ?? "carrier"} — tracking: ${trackingNumber}`,
       targetId: updated.id,
       targetType: "order",
