@@ -1155,6 +1155,26 @@ export const storyViews = pgTable('story_views', {
   userIdx: index('story_views_user_idx').on(t.userId),
 }));
 
+// ─── Notes bubble above story avatars (IG "Notes", 24 h TTL) ─────────────────
+// Structurally parallel to `stories` above, but one row per author at most —
+// a new note replaces the old one (enforced by the unique index on
+// authorId), matching Instagram's real "only one active note" behavior.
+
+export const notes = pgTable('notes', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  authorId:       text('author_id').notNull(),
+  authorName:     text('author_name').notNull(),
+  authorHandle:   text('author_handle'),
+  authorInitials: text('author_initials'),
+  authorColor:    text('author_color'),
+  text:           text('text').notNull(),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+  expiresAt:      timestamp('expires_at').notNull(),
+}, (t) => ({
+  authorUniqueIdx: uniqueIndex('notes_author_unique_idx').on(t.authorId),
+  expiresAtIdx:    index('notes_expires_idx').on(t.expiresAt),
+}));
+
 // ─── Buyer-to-buyer follows (social graph) ────────────────────────────────────
 
 export const follows = pgTable('follows', {
