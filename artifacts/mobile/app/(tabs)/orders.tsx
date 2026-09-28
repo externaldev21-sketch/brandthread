@@ -30,6 +30,9 @@ import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryClient';
+import { prefetchOnPressIn } from '@/lib/prefetch';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,6 +71,7 @@ export function flattenOrderSections(sections: OrderSection[]): OrderListItem[] 
 
 type OrderRowActions = {
   press: (order: Order) => void;
+  pressIn: (order: Order) => void;
   longPress: (orderId: string) => void;
   markProcessing: (orderId: string) => void;
   markReady: (orderId: string) => void;
@@ -326,6 +330,7 @@ interface OrderRowProps {
   selected: boolean;
   selectionMode: boolean;
   onPress: () => void;
+  onPressIn?: () => void;
   onLongPress: () => void;
   onMarkProcessing: () => void;
   onMarkReady: () => void;
@@ -334,7 +339,7 @@ interface OrderRowProps {
 }
 
 export function OrderRow({
-  order, selected, selectionMode, onPress, onLongPress,
+  order, selected, selectionMode, onPress, onPressIn, onLongPress,
   onMarkProcessing, onMarkReady, onShip, isLast = false,
 }: OrderRowProps) {
   const { theme } = useAppTheme();
@@ -363,6 +368,7 @@ export function OrderRow({
       <TouchableOpacity
         activeOpacity={0.86}
         onPress={onPress}
+        onPressIn={onPressIn}
         onLongPress={onLongPress}
         style={[s.orderCard, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}
         accessibilityRole="button"
@@ -633,6 +639,7 @@ const OrderListRow = React.memo(function OrderListRow({
         selected={selected}
         selectionMode={selectionMode}
         onPress={() => actions.press(order)}
+        onPressIn={() => actions.pressIn(order)}
         onLongPress={() => actions.longPress(order.id)}
         onMarkProcessing={() => actions.markProcessing(order.id)}
         onMarkReady={() => actions.markReady(order.id)}
@@ -706,6 +713,7 @@ export default function OrdersScreen() {
   const tabBarMetrics = useTabBarMetrics();
 
   const api = useApi();
+  const queryClient = useQueryClient();
   const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
   // ?bt_preview=seller (web design-preview bypass, app/_layout.tsx): renders
   // this screen without ever waiting for Clerk to load or sign in, so
@@ -774,6 +782,14 @@ export default function OrdersScreen() {
       if (generationRef.current !== generation) return;
       const all = Array.isArray(rows) ? (rows as any[]).map(apiRowToOrder) : [];
       setOrders(all);
+      // Seed order-detail.tsx's cache from data already in hand — no extra
+      // network call — so opening any row it renders can paint immediately
+      // instead of showing its own spinner first (stale-while-revalidate;
+      // order-detail.tsx still refetches in the background on mount).
+      (rows as unknown[]).forEach((raw) => {
+        const rawId = (raw as { id?: string })?.id;
+        if (rawId) queryClient.setQueryData(queryKeys.order(rawId), raw);
+      });
       setOrdersOwnerId(requestOwnerId);
       setStats(computeStats(all));
       setUpdatesPaused(false);
@@ -804,7 +820,7 @@ export default function OrdersScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [api, authLoaded, isPreviewMode, isSignedIn, userId]);
+  }, [api, authLoaded, isPreviewMode, isSignedIn, userId, queryClient]);
 
   // Re-apply the ?filter= deep link every time this screen is focused (not
   // just on first mount) — the seller tab bar keeps this screen mounted, so
@@ -981,6 +997,18 @@ export default function OrdersScreen() {
     }
   }, [selectedIds, router]);
 
+  // Fires ~100-200ms before onPress (finger-down vs. finger-up): warms the
+  // query cache order-detail.tsx reads on mount, so by the time the tap
+  // completes and the screen mounts, its data is often already there.
+  const handleCardPressIn = useCallback((order: Order) => {
+    if (selectedIds.length > 0) return;
+    prefetchOnPressIn(
+      queryClient,
+      queryKeys.order(order.id),
+      () => api.orders.get(order.id),
+    )();
+  }, [selectedIds, queryClient, api]);
+
   const handleLongPress = useCallback((orderId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setSelectedIds(prev =>
@@ -1052,6 +1080,7 @@ export default function OrdersScreen() {
   // selection state changes.
   const actionsRef = useRef<OrderRowActions>({
     press: handleCardPress,
+    pressIn: handleCardPressIn,
     longPress: handleLongPress,
     markProcessing: handleMarkProcessing,
     markReady: handleMarkReady,
@@ -1059,6 +1088,7 @@ export default function OrdersScreen() {
   });
   actionsRef.current = {
     press: handleCardPress,
+    pressIn: handleCardPressIn,
     longPress: handleLongPress,
     markProcessing: handleMarkProcessing,
     markReady: handleMarkReady,
@@ -1066,6 +1096,7 @@ export default function OrdersScreen() {
   };
   const rowActions = useMemo<OrderRowActions>(() => ({
     press: (order) => actionsRef.current.press(order),
+    pressIn: (order) => actionsRef.current.pressIn(order),
     longPress: (orderId) => actionsRef.current.longPress(orderId),
     markProcessing: (orderId) => actionsRef.current.markProcessing(orderId),
     markReady: (orderId) => actionsRef.current.markReady(orderId),

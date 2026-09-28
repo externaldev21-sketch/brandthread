@@ -24,7 +24,9 @@ import { queryKeys } from '@/lib/queryClient';
 import { prefetchImage } from '@/lib/prefetch';
 import { setCachedFeedPosts } from '@/lib/feedPostsCache';
 import { setCachedTabData } from '@/lib/tabDataCache';
-import { getConversations, getNotifications, getThreadPostsPage, createThreadFeedCursor } from '@/services/socialService';
+import { getConversations, getNotifications, getThreadPostsPage, createThreadFeedCursor, getSellerPosts } from '@/services/socialService';
+import { getProducts, getProductStats } from '@/services/productService';
+import { getSellerShopPage } from '@/services/profileService';
 import type { BrandthreadApi } from '@/lib/api';
 
 const NEXT_POSTER_PREFETCH_COUNT = 3;
@@ -98,4 +100,63 @@ export function warmBuyerTabs(queryClient: QueryClient, api: BrandthreadApi, use
   void warmInbox(queryClient).catch(() => {});
   void warmThreadCash(queryClient, api).catch(() => {});
   if (userId) void warmProfile(queryClient, userId).catch(() => {});
+}
+
+// ─── Seller tabs ────────────────────────────────────────────────────────────
+// Same idea as warmBuyerTabs, mirrored for the seller bottom tabs (Dashboard,
+// Products, Orders, Profile). Each warmer calls the exact same service/API
+// function its real screen calls on mount, so that screen's own fetch either
+// dedupes onto this one (network calls, via lib/api.ts's in-flight dedupe)
+// or resolves instantly from the already-warmed module cache
+// (productService's `_products`, populated by getProducts/getProductStats).
+
+async function warmSellerDashboard(queryClient: QueryClient, api: BrandthreadApi): Promise<void> {
+  // 'week' matches SellerHomeCommerceDashboard's default `range` state.
+  await queryClient.fetchQuery({
+    queryKey: queryKeys.tabData('seller-dashboard'),
+    queryFn: () => Promise.all([
+      api.analytics.home('week'),
+      api.orders.list(),
+      api.products.list(),
+    ]),
+  });
+}
+
+async function warmSellerProducts(queryClient: QueryClient): Promise<void> {
+  // getProducts/getProductStats populate productService's own in-memory
+  // cache (see services/productService.ts) — the Products tab's own
+  // getProducts() call on mount reads from that same cache, so this alone
+  // is what makes the tab paint instantly instead of a fetch-then-render.
+  const [products] = await queryClient.fetchQuery({
+    queryKey: queryKeys.tabData('seller-products'),
+    queryFn: () => Promise.all([getProducts(), getProductStats()]),
+  });
+  setCachedTabData('seller-products', products);
+}
+
+async function warmSellerOrders(queryClient: QueryClient, api: BrandthreadApi): Promise<void> {
+  const orders = await queryClient.fetchQuery({
+    queryKey: queryKeys.orderList('all'),
+    queryFn: () => api.orders.list(),
+  });
+  setCachedTabData('seller-orders', orders);
+}
+
+async function warmSellerProfile(queryClient: QueryClient, userId: string): Promise<void> {
+  const [posts, shopPage] = await queryClient.fetchQuery({
+    queryKey: queryKeys.profile(userId),
+    queryFn: () => Promise.all([getSellerPosts(), getSellerShopPage(userId, 0)]),
+  });
+  setCachedTabData('seller-profile', { posts, shopPage });
+}
+
+/** Kick off every seller tab's first page of data. Same independent,
+ *  error-swallowing shape as warmBuyerTabs — a slow/broken warmer never
+ *  blocks another tab's warmup, and failures are invisible here since each
+ *  screen's own fetch on mount is still the real error path. */
+export function warmSellerTabs(queryClient: QueryClient, api: BrandthreadApi, userId: string | null): void {
+  void warmSellerDashboard(queryClient, api).catch(() => {});
+  void warmSellerProducts(queryClient).catch(() => {});
+  void warmSellerOrders(queryClient, api).catch(() => {});
+  if (userId) void warmSellerProfile(queryClient, userId).catch(() => {});
 }
