@@ -56,6 +56,7 @@ import { showActionSheet } from '@/components/ui/ActionSheet';
 import SwipeableActions from '@/components/SwipeableActions';
 import { RemoveFollowerSheet } from '@/components/social/RemoveFollowerSheet';
 import { CenteredToast } from '@/components/social/CenteredToast';
+import { ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from '@/components/thread-cash/ThreadCashBill';
 import { useApi } from '@/lib/api';
 import { ApiError } from '@/lib/networkNotice';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
@@ -187,12 +188,14 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
 
 function ActivityTypeBadge({ row, styles }: { row: ActivityRow; styles: Styles }) {
   const { theme } = useAppTheme();
-  // Monochrome like every other type badge — the green bill artwork was one
-  // of the Activity screen's only non-LIVE colour accents.
+  // Thread Cash keeps its green — the one deliberate exception to Activity's
+  // otherwise-monochrome rule (owner decision: LIVE red, end-call red, and
+  // Thread Cash green are the only allowed accents). Every other badge below
+  // stays monochrome.
   if (row.type === 'thread_cash_received') {
     return (
       <View style={styles.typeBadge}>
-        <Feather name="dollar-sign" size={10} color={theme.accentLight} />
+        <ThreadCashBillIcon size={14} />
       </View>
     );
   }
@@ -1363,10 +1366,12 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     fontSize: FS.sm,
     lineHeight: 18,
   },
-  // Thread Cash "+$5.00": bold, theme text colour — never green (the only
-  // colour accents allowed are LIVE red and end-call red).
+  // Thread Cash "+$5.00": bold, and green — the owner's one deliberate
+  // exception to Activity's monochrome rule (allowed accents: LIVE red,
+  // end-call red, and Thread Cash green). Every other detail line stays
+  // theme-text monochrome.
   cashAmount: {
-    color: theme.text,
+    color: THREAD_CASH_GREEN_MID,
     fontFamily: FONT.bold,
   },
 
