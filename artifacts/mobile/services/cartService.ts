@@ -873,12 +873,20 @@ export async function createReturnRequest(params: {
   preferredResolution: BuyerReturnResolution;
 }): Promise<BuyerReturnRequest> {
   const { api } = await import('@/lib/api');
+  // Photos picked on the device are uploaded first (POST /api/returns/evidence);
+  // only the stored object paths are attached, so the seller can see them.
+  const evidenceUrls: string[] = [];
+  for (const uri of params.imageUris) {
+    if (uri.startsWith('/objects/')) { evidenceUrls.push(uri); continue; }
+    const uploaded = await api.returns.uploadEvidence({ uri });
+    evidenceUrls.push(uploaded.objectPath);
+  }
   const result = await api.returns.create({
     orderId: params.orderId,
     reason: params.reason,
     notes: params.description,
     resolutionRequested: params.preferredResolution,
-    evidenceUrls: params.imageUris,
+    evidenceUrls,
     requestedItems: params.items,
   });
   return {

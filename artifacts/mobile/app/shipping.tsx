@@ -10,6 +10,7 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+import { returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
 import { FS, SP, RADIUS } from '@/lib/theme';
 import { dbStatusToOrderStatus } from '@/lib/orderStatusAdapter';
 import { parseDecimalToCents } from '@/lib/money';
@@ -198,11 +199,9 @@ export default function ShippingScreen() {
     return 'default';
   }
 
-  function returnBadge(status: string) {
-    const s = status?.toLowerCase();
-    if (s === 'approved') return 'success';
-    if (s === 'rejected' || s === 'denied') return 'error';
-    return 'warning';
+  // Monochrome (item 108): return states are neutral badges; the label carries the meaning.
+  function returnBadge(_status: string) {
+    return 'default';
   }
 
   // ── Ship-from country ────────────────────────────────────────────────────
@@ -512,16 +511,26 @@ export default function ShippingScreen() {
           </View>
         ) : (
           sellerReturns.map((r, i) => (
-            <View key={r.id} style={[styles.returnRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+            // Item 108: rows read the API's camelCase fields (they read
+            // r.buyer_id, so every row said "Buyer —") and open the return.
+            <TouchableOpacity
+              key={r.id}
+              style={[styles.returnRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+              onPress={() => router.push(`/return-detail?returnId=${encodeURIComponent(r.id)}` as never)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Return for order ${r.orderNumber ?? ''} from ${r.buyerName ?? 'buyer'}. Open to review`}
+            >
               <View style={styles.returnInfo}>
-                <Text style={[styles.returnId, { color: colors.primary }]}>
-                  {r.id?.slice(0, 8).toUpperCase()} · Buyer {r.buyer_id?.slice(0, 8) ?? '—'}
+                <Text style={[styles.returnId, { color: colors.mutedForeground }]}>
+                  #{r.orderNumber ?? '—'} · {r.buyerName ?? 'Buyer'}
                 </Text>
-                <Text style={[styles.returnItem, { color: colors.foreground }]}>{r.reason ?? '—'}</Text>
-                <Text style={[styles.returnReason, { color: colors.mutedForeground }]}>{r.notes ?? ''}</Text>
+                <Text style={[styles.returnItem, { color: colors.foreground }]}>{returnReasonLabel(String(r.reason ?? 'other'))}</Text>
+                {r.notes ? <Text style={[styles.returnReason, { color: colors.mutedForeground }]} numberOfLines={2}>{r.notes}</Text> : null}
               </View>
-              <Badge label={capitalize(r.status)} variant={returnBadge(r.status) as any} />
-            </View>
+              <Badge label={returnStatusLabel(r.status as ReturnStatusKey)} variant={returnBadge(r.status) as any} />
+              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
           ))
         )}
       </View>
