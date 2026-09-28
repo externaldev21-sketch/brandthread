@@ -157,6 +157,17 @@ async function blockedCounterpartIds(userId: string): Promise<string[]> {
   return rows.map((row) => (row.blockerId === userId ? row.blockedId : row.blockerId));
 }
 
+/** Which new-follower actors on this page the viewer already follows. */
+async function viewerFollowingFollowers(userId: string, rows: FeedRow[]): Promise<Set<string>> {
+  const actorIds = [...new Set(rows
+    .filter((row) => row.type === "new_follower" && row.actorId)
+    .map((row) => row.actorId!))];
+  if (actorIds.length === 0) return new Set();
+  const following = await db.select({ followingId: follows.followingId }).from(follows)
+    .where(and(eq(follows.followerId, userId), inArray(follows.followingId, actorIds)));
+  return new Set(following.map((row) => row.followingId));
+}
+
 buyerRouter.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { limit, offset } = parsePage(req.query as Record<string, unknown>);
@@ -172,11 +183,22 @@ buyerRouter.get("/", async (req, res) => {
     .orderBy(desc(notificationsFeed.createdAt), desc(notificationsFeed.id))
     .limit(limit)
     .offset(offset);
-  const [images, avatars] = await Promise.all([
+  const [images, avatars, followingActors] = await Promise.all([
     Promise.all(rows.map((row) => resolveTargetImage(row.targetImageUrl ?? null))),
     resolveActorAvatars(rows.map((row) => row.actorId).filter((id): id is string => !!id)),
+    viewerFollowingFollowers(userId, rows),
   ]);
-  return res.json(rows.map((row, index) => adapt(row, images[index], row.actorId ? avatars.get(row.actorId) ?? null : null)));
+  return res.json(rows.map((row, index) => {
+    const item = adapt(row, images[index], row.actorId ? avatars.get(row.actorId) ?? null : null);
+    // Live follow state for follow rows: the stored `cta: "Follow back"` is
+    // written once, at follow time, so it goes stale the moment the viewer
+    // follows back (here or anywhere else) — the inline pill must read
+    // "Following" after a reload, not offer "Follow back" again.
+    if (row.type === "new_follower" && row.actorId) {
+      return { ...item, isFollowingActor: followingActors.has(row.actorId) };
+    }
+    return item;
+  }));
 });
 
 /** Most feed ids one grouped-row lookup accepts ("Jay and 99 others"). */
