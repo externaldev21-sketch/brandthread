@@ -16,6 +16,11 @@ describe('seller orders read state', () => {
     expect(ordersSource).toContain('isLoaded: authLoaded');
     expect(ordersSource).toContain('if (!authLoaded || !isSignedIn || !userId)');
     expect(ordersSource).toContain('[authLoaded, isSignedIn, loadData, userId]');
+    // Safety-net effect for item 127's infinite-skeleton bug: useFocusEffect
+    // only re-runs on an actual focus event, not when auth becomes ready
+    // while the tab is already focused. See the comment above it in
+    // orders.tsx.
+    expect(ordersSource).toContain('if (hasLoadedRef.current || timerRef.current !== null) return;');
   });
 
   it('uses an honest empty state, without connection/API error banners, that gives the seller a real next step', () => {

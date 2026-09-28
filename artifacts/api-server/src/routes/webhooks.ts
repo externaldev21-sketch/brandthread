@@ -910,45 +910,55 @@ export async function handleCheckoutPaid(
     // Stripe refund is issued outside this transaction.
 
     // ── Low-stock notifications ───────────────────────────────────────────────────
-    // For each decremented variant, check if stock fell below threshold
+    // For each decremented variant, check if stock fell below threshold.
+    //
+    // Each alert runs in its own SAVEPOINT (tx.transaction inside the order
+    // transaction). A failed statement — e.g. notifications_feed_low_stock_unique
+    // when this variant already has a low-stock alert from an earlier order —
+    // aborts the whole Postgres transaction; catching the JS error alone is not
+    // enough, and the final COMMIT then silently rolls back: the buyer is
+    // charged but the order, its items and the stock decrement all vanish and
+    // the seller never sees it. The savepoint confines a failure to the alert.
     if (oversoldItems.length === 0) {
       for (const item of cartItems) {
         if (!item.variantId) continue;
         try {
-          const [variant] = await tx
-            .select({
-              stock: productVariants.stock,
-              lowStockThreshold: productVariants.lowStockThreshold,
-              productName: products.name,
-              ownerId: products.ownerId,
-            })
-            .from(productVariants)
-            .innerJoin(products, eq(products.id, productVariants.productId))
-            .where(eq(productVariants.id, item.variantId as any))
-            .limit(1);
+          await tx.transaction(async (sp) => {
+            const [variant] = await sp
+              .select({
+                stock: productVariants.stock,
+                lowStockThreshold: productVariants.lowStockThreshold,
+                productName: products.name,
+                ownerId: products.ownerId,
+              })
+              .from(productVariants)
+              .innerJoin(products, eq(products.id, productVariants.productId))
+              .where(eq(productVariants.id, item.variantId as any))
+              .limit(1);
 
-          if (
-            variant &&
-            variant.lowStockThreshold !== null &&
-            variant.lowStockThreshold > 0 &&
-            variant.stock >= 0 &&
-            variant.stock <= variant.lowStockThreshold
-          ) {
-            const isZero = variant.stock === 0;
-            await tx.insert(notificationsFeed).values({
-              id: crypto.randomUUID(),
-              userId: variant.ownerId,
-              type: isZero ? 'out_of_stock' : 'low_stock',
-              title: isZero ? 'Out of stock' : 'Low stock alert',
-              body: isZero
-                ? `${variant.productName} is now out of stock.`
-                : `${variant.productName} has only ${variant.stock} units left.`,
-              targetId: item.variantId,
-              targetType: 'variant',
-              isRead: false,
-              createdAt: new Date(),
-            });
-          }
+            if (
+              variant &&
+              variant.lowStockThreshold !== null &&
+              variant.lowStockThreshold > 0 &&
+              variant.stock >= 0 &&
+              variant.stock <= variant.lowStockThreshold
+            ) {
+              const isZero = variant.stock === 0;
+              await sp.insert(notificationsFeed).values({
+                id: crypto.randomUUID(),
+                userId: variant.ownerId,
+                type: isZero ? 'out_of_stock' : 'low_stock',
+                title: isZero ? 'Out of stock' : 'Low stock alert',
+                body: isZero
+                  ? `${variant.productName} is now out of stock.`
+                  : `${variant.productName} has only ${variant.stock} units left.`,
+                targetId: item.variantId,
+                targetType: 'variant',
+                isRead: false,
+                createdAt: new Date(),
+              }).onConflictDoNothing();
+            }
+          });
         } catch {
           // Non-critical — don't fail the order over a notification error
         }

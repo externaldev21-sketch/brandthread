@@ -249,6 +249,7 @@ export function getPreviewMessages(conversationId: string): Message[] {
   const seed = seedById(conversationId);
   const base: Message[] = !seed?.messages ? [] : seed.messages.map((m): Message => {
     const isMe = m.fromOfficialOrParticipant === 'me';
+    const ts = Date.now() - m.minutesAgo * 60_000;
     return {
       id: m.id,
       conversationId,
@@ -260,23 +261,37 @@ export function getPreviewMessages(conversationId: string): Message[] {
       attachment: toAttachment(m.attachment),
       reactions: [],
       status: 'read',
-      ts: Date.now() - m.minutesAgo * 60_000,
+      // Real conversations get `readAt` from the backend once the other
+      // participant marks the thread read (see
+      // artifacts/api-server/src/routes/conversations.ts). This seeded
+      // preview thread has no backend, so it approximates the same
+      // real-world shape — my own message read shortly after I sent it —
+      // purely so the "Seen" receipt (app/buyer-conversation.tsx) has
+      // something honest to render in preview mode.
+      readAt: isMe ? new Date(ts + 45_000).toISOString() : undefined,
+      ts,
       deletedForMe: false,
     };
   });
   return [...base, ...(previewExtraMessages.get(conversationId) ?? [])];
 }
 
-// ─── Transient "typing…" simulation (preview-only, not a real feature) ────────
+// ─── Transient "typing…" simulation (preview-only, demonstrates the real
+// `agentTyping` field) ──────────────────────────────────────────────────────
 //
-// socialTypes.ts has no real typing/presence signal (see the
-// ConversationParticipant.isOnline comment) — PR #75 explicitly left this
-// out rather than fabricate one. This is a purely local, seeded-preview-only
-// visual: it flips a flag for one seeded conversation on a timer so the
-// redesigned inbox has something to demo for a "typing…" row treatment. It
-// never touches real conversations and does nothing outside the preview.
+// The real backend has exactly one "someone is typing" signal today:
+// `Conversation.agentTyping` (services/socialTypes.ts), set only for the
+// Brandthread Agent's thread and polled via GET /api/conversations (see
+// api-server's conversations.ts `agentTypingUntil` handling — there is no
+// websocket/presence layer, and no equivalent for ordinary human-to-human
+// buyer<->seller or buyer<->buyer conversations). This preview-only helper
+// flips the *same* seeded thread's typing state on a timer purely so the
+// inbox's "typing…" row treatment has something to demo without a live
+// backend — it is gated to `BRANDTHREAD_AGENT_SEED` (see its `simulateTyping`
+// flag) and never an ordinary seller/buyer thread, so it never suggests a
+// presence signal that doesn't really exist in production.
 
-const TYPING_CONVERSATION_ID = PREVIEW_CONVERSATION_SEEDS.find(s => s.simulateTyping)?.id ?? null;
+const TYPING_CONVERSATION_ID = allSeeds().find(s => s.simulateTyping)?.id ?? null;
 const TYPING_INTERVAL_MS = 4000;
 
 /** Subscribes to the simulated typing flag; calls `cb(conversationId | null)`

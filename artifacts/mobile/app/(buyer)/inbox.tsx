@@ -10,6 +10,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
 import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale, PrimaryButton, useUndoToast } from '@/components/BrandthreadUI';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { useAuth, useUser } from '@clerk/expo';
@@ -452,8 +453,13 @@ export default function InboxScreen() {
     }
   }, [userId]);
 
-  // Preview-only: simulate a transient "typing…" row for one seeded thread
-  // (see lib/previewInbox.ts) — a no-op outside the dev/preview environment.
+  // Preview-only overlay for the "typing…" row treatment: real accounts get
+  // it purely from `conv.agentTyping` below (polled via GET /api/conversations
+  // — the only real "someone is typing" signal that exists today, and only
+  // ever true for the Brandthread Agent thread; there is no presence/typing
+  // mechanism for ordinary human buyer<->seller or buyer<->buyer threads).
+  // This just simulates that same field, on that same seeded Agent thread,
+  // for the seeded dev/preview inbox — a no-op outside that environment.
   useEffect(() => {
     const unsub = subscribePreviewTyping(setTypingConvId);
     return unsub;
@@ -1009,7 +1015,13 @@ export default function InboxScreen() {
     const participant = getParticipant(conv);
     if (!participant) return null;
     const isUnread = conv.unreadCount > 0;
-    const isTyping = typingConvId === conv.id;
+    // Real signal: `conv.agentTyping` (only ever true for the Brandthread
+    // Agent thread — see the field's comment on Conversation in
+    // services/socialTypes.ts). `typingConvId` is the preview-only overlay
+    // above, which flips the exact same seeded Agent thread's state so the
+    // row treatment demos the same real field rather than a fake parallel
+    // mechanism — it is never set for an ordinary buyer<->seller/buyer row.
+    const isTyping = conv.agentTyping === true || typingConvId === conv.id;
 
     const swipeActions: InboxSwipeAction[] = [
       {
@@ -1391,15 +1403,18 @@ export default function InboxScreen() {
                 s.searchRow,
                 s.searchRowInHeader,
                 {
-                  backgroundColor: theme.cardElevated,
-                  borderColor: messagesSearchFocused ? theme.border : 'transparent',
+                  // Focused state stays the same pill as unfocused — no
+                  // border/box appears on focus, only a very subtle fill
+                  // change (never anything boxy). borderWidth is 0 on the
+                  // base style itself (searchRow) at both rest and focus.
+                  backgroundColor: messagesSearchFocused ? 'rgba(255,255,255,0.10)' : theme.cardElevated,
                 },
               ]}
             >
               <Feather name="search" size={16} color={theme.muted} />
               <TextInput
                 ref={messagesSearchInputRef}
-                style={[s.searchInput, { color: theme.text }, Platform.OS === 'web' && s.searchInputWebNoOutline]}
+                style={[s.searchInput, { color: theme.text }, WEB_INPUT_RESET]}
                 value={messagesSearchQuery}
                 onChangeText={setMessagesSearchQuery}
                 placeholder="Search"
@@ -2062,8 +2077,8 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     marginBottom: SP.md,
     paddingHorizontal: SP.md,
     height: 44,
-    borderRadius: RADIUS.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    borderWidth: 0,
   },
   // The header's search-open state: the field sits inline with Cancel
   // instead of stacked full-width below a title, so it drops searchRow's own
