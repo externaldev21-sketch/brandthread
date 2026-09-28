@@ -8,6 +8,7 @@ import {
   applyRead,
   buildActivitySections,
   createReadTracker,
+  followControlState,
   groupByRecency,
   isFollowBackRow,
   newFollowersSummary,
@@ -328,5 +329,40 @@ describe('newFollowersSummary', () => {
     expect(summary!.count).toBe(2);
     expect(summary!.actors.map((a) => a.name)).toEqual(['Jay', 'Mina']);
     expect(summary!.hasUnread).toBe(true);
+  });
+});
+
+describe('follow row inline pill', () => {
+  const follow = (name: string, overrides: Partial<ActivityItem> = {}) => item({
+    type: 'new_follower', title: `${name} started following you`,
+    actorId: `u_${name}`, actorName: name, targetId: `u_${name}`, targetType: 'user', cta: 'Follow back',
+    ...overrides,
+  });
+
+  it('offers Follow back while the viewer does not follow them', () => {
+    const [row] = aggregateActivity([follow('Jay', { isFollowingActor: false })]);
+    expect(followControlState(row)).toEqual({ userId: 'u_Jay', following: false });
+    expect(isFollowBackRow(row)).toBe(true);
+  });
+
+  it('reads Following once the server says the viewer follows them, even with a stale cta', () => {
+    const [row] = aggregateActivity([follow('Jay', { isFollowingActor: true })]);
+    expect(followControlState(row)).toEqual({ userId: 'u_Jay', following: true });
+    // No longer a pinned Highlights follow-back.
+    expect(isFollowBackRow(row)).toBe(false);
+  });
+
+  it('falls back to the stored cta when the server sends no live state', () => {
+    const [pending] = aggregateActivity([follow('Jay')]);
+    expect(followControlState(pending)?.following).toBe(false);
+    const [mutual] = aggregateActivity([follow('Mina', { cta: undefined, title: 'Mina followed you back' })]);
+    expect(followControlState(mutual)?.following).toBe(true);
+  });
+
+  it('has no pill on merged or non-follow rows', () => {
+    const [merged] = aggregateActivity([follow('Jay'), follow('Mina')]);
+    expect(followControlState(merged)).toBeNull();
+    const [liked] = aggregateActivity([like('Jay', 'post1')]);
+    expect(followControlState(liked)).toBeNull();
   });
 });

@@ -30,6 +30,12 @@ export interface ActivityItem {
   targetType?: string;
   targetImageUrl?: string;
   cta?: string;
+  /**
+   * New-follower rows only: whether the viewer follows this person right
+   * now (live, from the feed endpoint). Absent from older servers/rows, in
+   * which case the stored `cta` is the only signal.
+   */
+  isFollowingActor?: boolean;
   createdAt: string;
 }
 
@@ -358,7 +364,26 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
 
 /** True for rows that render an inline "Follow back" button instead of navigating. */
 export function isFollowBackRow(row: ActivityRow): boolean {
-  return row.type === 'new_follower' && row.cta === 'Follow back' && row.actorCount === 1 && !!row.targetId;
+  return row.type === 'new_follower' && row.cta === 'Follow back' && row.actorCount === 1 && !!row.targetId
+    && row.isFollowingActor !== true;
+}
+
+/**
+ * The inline Follow back / Following pill on a single-person follow row
+ * ("bear.2123374 started following you · Follow back" — Instagram iOS
+ * Activity, https://mobbin.com/screens/1f627db9-fb0f-4870-b58d-35bec67239c7),
+ * or null when the row has no pill (merged rows, non-follow rows).
+ *
+ * `following` prefers the server's live `isFollowingActor`; without it, a
+ * row whose stored `cta` isn't "Follow back" was a follow-back ("…followed
+ * you back"), so the viewer already follows them.
+ */
+export function followControlState(row: ActivityRow): { userId: string; following: boolean } | null {
+  if (row.type !== 'new_follower' || row.actorCount !== 1 || !row.targetId) return null;
+  const following = typeof row.isFollowingActor === 'boolean'
+    ? row.isFollowingActor
+    : row.cta !== 'Follow back';
+  return { userId: row.targetId, following };
 }
 
 const q = encodeURIComponent;

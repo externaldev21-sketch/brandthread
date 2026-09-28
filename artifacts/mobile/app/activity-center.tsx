@@ -49,6 +49,7 @@ import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/compo
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { FollowPill } from '@/components/search/PersonRow';
 import { ThemedRefreshControl } from '@/components/ui';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import SwipeableActions from '@/components/SwipeableActions';
@@ -69,6 +70,7 @@ import {
   applyRead,
   buildActivitySections,
   createReadTracker,
+  followControlState,
   isFollowBackRow,
   relativeTime,
   type ActivityActor,
@@ -298,33 +300,41 @@ const ActivityRowView = React.memo(function ActivityRowView({
   unread,
   now,
   styles,
-  followState,
+  followOverride,
+  followPending,
   onPress,
   onDismiss,
-  onFollowBack,
+  onToggleFollow,
   onOpenMenu,
 }: {
   row: ActivityRow;
   unread: boolean;
   now: number;
   styles: Styles;
-  followState: 'idle' | 'pending' | 'done';
+  /** This session's follow/unfollow of the row's person, over the feed's state. */
+  followOverride: boolean | undefined;
+  followPending: boolean;
   onPress: (row: ActivityRow) => void;
   onDismiss: (row: ActivityRow) => void;
-  onFollowBack: (row: ActivityRow) => void;
+  onToggleFollow: (row: ActivityRow, currentlyFollowing: boolean) => void;
   onOpenMenu: (row: ActivityRow) => void;
 }) {
   const { theme } = useAppTheme();
   const parts = activityMessage(row);
   const detail = activityDetail(row);
-  const followBack = isFollowBackRow(row);
   // A follow row for a single person always shows a real Follow back /
-  // Following control instead of a generic icon — even once it's mutual
-  // (cta cleared), "Following" reads better than a bare person icon. (PR
-  // #118, re-applied on top of PR #123/#130's Threads-style row.)
-  const isSingleFollowRow = row.type === 'new_follower' && row.actorCount === 1 && !!row.targetId;
-  const alreadyFollowing = isSingleFollowRow && !followBack;
-  const showFollowControl = followBack || isSingleFollowRow;
+  // Following pill instead of a generic icon (Instagram iOS Activity:
+  // "bear.2123374 started following you. 6h [Follow back]",
+  // https://mobbin.com/screens/1f627db9-fb0f-4870-b58d-35bec67239c7). Its
+  // state is the server's live follow state (`isFollowingActor`), then this
+  // session's own taps on top.
+  const followControl = followControlState(row);
+  const following = followControl ? (followOverride ?? followControl.following) : false;
+  const showFollowControl = !!followControl;
+  const handleFollowPress = useCallback(
+    () => onToggleFollow(row, following),
+    [following, onToggleFollow, row],
+  );
   const sentence = parts.map((p) => p.text).join('');
   // "$5.00 · tap to view" → "+$5.00": the amount is the whole point of a
   // Thread Cash row, so it gets its own bold green line instead of reading
@@ -435,31 +445,19 @@ const ActivityRowView = React.memo(function ActivityRowView({
       </Pressable>
 
       {showFollowControl ? (
-        <PressableScale
-          style={[
-            styles.followBtn,
-            alreadyFollowing || followState === 'done' ? styles.followBtnFollowing : styles.followBtnNotFollowing,
-          ]}
-          disabled={alreadyFollowing || followState !== 'idle'}
-          onPress={() => onFollowBack(row)}
-          accessibilityRole="button"
-          accessibilityLabel={alreadyFollowing || followState === 'done' ? 'Following' : `Follow back ${row.actors[0]?.name ?? ''}`}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-        >
-          {followState === 'pending' ? (
-            <ActivityIndicator size="small" color={alreadyFollowing ? '#FFFFFF' : '#000000'} />
-          ) : (
-            <Text
-              style={[
-                styles.followText,
-                alreadyFollowing || followState === 'done' ? styles.followTextFollowing : styles.followTextNotFollowing,
-              ]}
-              numberOfLines={1}
-            >
-              {alreadyFollowing || followState === 'done' ? 'Following' : 'Follow back'}
-            </Text>
-          )}
-        </PressableScale>
+        // The shared Follow pill (components/search/PersonRow) — same one the
+        // grouped "New followers" list uses — as a sibling of `tapArea`, so
+        // tapping it never also opens the profile.
+        <FollowPill
+          following={following}
+          followBack={!following}
+          loading={followPending}
+          onPress={handleFollowPress}
+          accessibilityLabel={following
+            ? `Following ${row.actors[0]?.name ?? ''}, tap to unfollow`
+            : `Follow back ${row.actors[0]?.name ?? ''}`}
+          testID={`activity-follow-${row.targetId}`}
+        />
       ) : trailingThumb}
     </View>
     </SwipeableActions>
@@ -590,7 +588,10 @@ export default function ActivityCenterScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [followStates, setFollowStates] = useState<Record<string, 'pending' | 'done'>>({});
+  // Follow pill state on single-person follow rows, keyed by the person (not
+  // the row), so every row for the same person agrees.
+  const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
+  const [followPending, setFollowPending] = useState<ReadonlySet<string>>(() => new Set());
   const [removeFollowerTarget, setRemoveFollowerTarget] = useState<ActivityRow | null>(null);
   const [removingFollower, setRemovingFollower] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -828,25 +829,46 @@ export default function ActivityCenterScreen() {
     }
   }, []);
 
-  const handleFollowBack = useCallback(async (row: ActivityRow) => {
+  // Follow back / unfollow from a follow row's inline pill — the same
+  // POST/DELETE /api/social/follow every other Follow pill uses. Optimistic,
+  // one request per person at a time, rolled back on failure.
+  const followPendingRef = useRef(followPending);
+  followPendingRef.current = followPending;
+  const setFollowingPerson = useCallback(async (userId: string, next: boolean) => {
+    if (followPendingRef.current.has(userId)) return;
+    setFollowPending((prev) => new Set(prev).add(userId));
+    setFollowOverrides((prev) => ({ ...prev, [userId]: next }));
+    try {
+      await setSellerFollowing(userId, next);
+      if (next) hapticSuccessAction();
+    } catch {
+      setFollowOverrides((prev) => ({ ...prev, [userId]: !next }));
+      Alert.alert(next ? 'Could not follow' : 'Could not unfollow', 'Please try again in a moment.');
+    } finally {
+      setFollowPending((prev) => {
+        const copy = new Set(prev);
+        copy.delete(userId);
+        return copy;
+      });
+    }
+  }, []);
+
+  const handleToggleFollow = useCallback((row: ActivityRow, currentlyFollowing: boolean) => {
     const userId = row.targetId;
     if (!userId) return;
-    hapticPrimaryAction();
-    setFollowStates((prev) => ({ ...prev, [row.key]: 'pending' }));
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
-    try {
-      await setSellerFollowing(userId, true);
-      hapticSuccessAction();
-      setFollowStates((prev) => ({ ...prev, [row.key]: 'done' }));
-    } catch {
-      setFollowStates((prev) => {
-        const next = { ...prev };
-        delete next[row.key];
-        return next;
-      });
-      Alert.alert('Could not follow', 'Please try again in a moment.');
+    if (!currentlyFollowing) {
+      hapticPrimaryAction();
+      void setFollowingPerson(userId, true);
+      return;
     }
-  }, [tracker]);
+    // "Following" → Instagram's two-option unfollow confirm, same as the
+    // Following list (app/connections.tsx).
+    showActionSheet(undefined, undefined, [
+      { text: 'Unfollow', style: 'destructive', onPress: () => { void setFollowingPerson(userId, false); } },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [setFollowingPerson, tracker]);
 
   const showToast = useCallback((message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -971,13 +993,14 @@ export default function ActivityCenterScreen() {
       unread={row.ids.some((id) => !readIds.has(id))}
       now={now}
       styles={styles}
-      followState={followStates[row.key] ?? 'idle'}
+      followOverride={row.targetId ? followOverrides[row.targetId] : undefined}
+      followPending={!!row.targetId && followPending.has(row.targetId)}
       onPress={handlePress}
       onDismiss={handleDismiss}
-      onFollowBack={handleFollowBack}
+      onToggleFollow={handleToggleFollow}
       onOpenMenu={handleOpenMenu}
     />
-  ), [followStates, handleDismiss, handleFollowBack, handleOpenMenu, handlePress, now, readIds, styles]);
+  ), [followOverrides, followPending, handleDismiss, handleToggleFollow, handleOpenMenu, handlePress, now, readIds, styles]);
 
   const renderSectionHeader = useCallback(({ section }: { section: ListSection }) => (
     <View style={styles.sectionHeader}>
