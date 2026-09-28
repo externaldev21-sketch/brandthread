@@ -10,6 +10,8 @@
  * the app's own logo instead of a poster photo.
  */
 
+import { pickAvatarColor } from './avatarColors';
+
 export type PreviewMessageAttachmentSeed = {
   type: 'image' | 'video' | 'voice' | 'product' | 'post' | 'order' | 'profile' | 'thread_cash'
     | 'agent_card' | 'quick_replies';
@@ -176,7 +178,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Maison Vela',
     participantHandle: '@maison_vela',
     participantInitials: 'MV',
-    participantColor: '#8B5CF6',
+    participantColor: pickAvatarColor('preview-seller-02'),
     posterIndex: 1,
     lastMessage: 'Thank you so much — enjoy the dress!',
     lastMessageFromMe: false,
@@ -444,7 +446,7 @@ export const SELLER_PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantName: 'Ava Chen',
     participantHandle: '@ava.chen',
     participantInitials: 'AC',
-    participantColor: '#8B5CF6',
+    participantColor: pickAvatarColor('preview-buyer-01'),
     posterIndex: 4,
     lastMessage: 'Your jacket just shipped!',
     lastMessageFromMe: true,

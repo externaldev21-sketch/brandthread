@@ -21,7 +21,7 @@ const {
     MY_USER_ID: 'me',
     MY_NAME: 'Jordan',
     MY_INITIALS: 'J',
-    MY_COLOR: '#8B5CF6',
+    MY_COLOR: '#3D3D42',
   },
   apiMock: {
     conversations: { uploadMedia: vi.fn() },
@@ -276,7 +276,7 @@ function conversationFixture(overrides: Record<string, unknown> = {}) {
     id: 'conv-1',
     type: 'buyer_to_seller',
     participants: [
-      { userId: 'me', name: 'Jordan', handle: '@jordan', initials: 'J', color: '#8B5CF6', accountType: 'buyer' },
+      { userId: 'me', name: 'Jordan', handle: '@jordan', initials: 'J', color: '#3D3D42', accountType: 'buyer' },
       participant(),
     ],
     unreadCount: 0,
@@ -353,7 +353,7 @@ describe('buyer conversation chat redesign', () => {
   it('shows the participant name and presence status in the floating header', async () => {
     socialServiceMock.getConversation.mockResolvedValue(conversationFixture({
       participants: [
-        { userId: 'me', name: 'Jordan', handle: '@jordan', initials: 'J', color: '#8B5CF6', accountType: 'buyer' },
+        { userId: 'me', name: 'Jordan', handle: '@jordan', initials: 'J', color: '#3D3D42', accountType: 'buyer' },
         participant({ isOnline: true }),
       ],
     }));
