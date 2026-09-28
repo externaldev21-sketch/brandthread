@@ -2739,6 +2739,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
       redeem: (body: { amountCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body),
+      /** Return an unused, unattached redemption's amount to the balance (idempotent). */
+      cancelRedemption: (token: string) =>
+        post<{ ok: boolean; returnedCents: number; balanceCents: number }>(`/api/thread-cash/redeem/${encodeURIComponent(token)}/cancel`, {}),
       send: (body: { recipientId: string; conversationId?: string; note?: string; amountCents: number; idempotencyKey: string }) =>
         post<{ ok: boolean; transferId: string }>('/api/thread-cash/send', body),
       claim: (body: { transferId: string }) =>

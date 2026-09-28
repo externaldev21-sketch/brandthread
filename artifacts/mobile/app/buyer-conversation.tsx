@@ -39,7 +39,8 @@ import {
 } from 'expo-audio';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { VoiceRecordingBar } from '@/components/chat/VoiceRecordingBar';
-import { VoiceMessageBubble } from '@/components/chat/VoiceMessageBubble';
+import { VoiceMessageBubble, TRANSCRIPTION_STUB } from '@/components/chat/VoiceMessageBubble';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 import { useAuth } from '@clerk/expo';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
@@ -295,6 +296,7 @@ export default function BuyerConversationScreen() {
   const [agentTyping, setAgentTyping] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [transcriptionToast, setTranscriptionToast] = useState(false);
   const [threadCashNotice, setThreadCashNotice] = useState<string | null>(null);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
@@ -1157,6 +1159,10 @@ export default function BuyerConversationScreen() {
           onTogglePlay={() => att.uri && handlePlayVoice(att.uri, voiceSpeed)}
           onSeek={(fraction) => att.uri && handleSeekVoice(att.uri, fraction, durationSec)}
           onSpeedChange={(rate) => att.uri && handleVoiceSpeedChange(att.uri, rate)}
+          onViewTranscription={() => {
+            setTranscriptionToast(true);
+            setTimeout(() => setTranscriptionToast(false), 2600);
+          }}
         />
       );
     }
@@ -1535,7 +1541,12 @@ export default function BuyerConversationScreen() {
 
   function openOptions() {
     if (!participant) return;
-    Alert.alert('Options', undefined, [
+    // Alert.alert() with a button array is a silent no-op on web (see
+    // components/ui/ActionSheet.tsx's header comment) — this left the
+    // header "..." menu completely dead in the web preview. showActionSheet
+    // takes the identical { text, onPress, style }[] shape and renders a
+    // real themed bottom sheet on every platform.
+    showActionSheet('Options', undefined, [
       {
         text: 'Archive conversation',
         onPress: async () => {
@@ -2830,6 +2841,12 @@ export default function BuyerConversationScreen() {
         visible={copiedToast}
         message="Copied"
         onDismiss={() => setCopiedToast(false)}
+      />
+
+      <Snackbar
+        visible={transcriptionToast}
+        message={TRANSCRIPTION_STUB}
+        onDismiss={() => setTranscriptionToast(false)}
       />
 
       <Snackbar
