@@ -567,12 +567,15 @@ export function ProfileMeta({
   location,
   onOpenWebsite,
   children,
+  overMedia = false,
 }: {
   bio?: string | null;
   website?: string | null;
   location?: string | null;
   onOpenWebsite?: (url: string) => void;
   children?: React.ReactNode;
+  /** Set over a playing profile video: adds a legibility shadow to the bio. */
+  overMedia?: boolean;
 }) {
   const { theme } = useAppTheme();
   const [expanded, setExpanded] = useState(false);
@@ -580,7 +583,7 @@ export function ProfileMeta({
   return (
     <>
       {bio ? (
-        <Text style={[metaStyles.bio, { color: theme.text }]} numberOfLines={expanded ? undefined : 3}>
+        <Text style={[metaStyles.bio, { color: theme.text }, overMedia && metaStyles.overMedia]} numberOfLines={expanded ? undefined : 3}>
           {bio}
         </Text>
       ) : null}
@@ -622,6 +625,9 @@ export function ProfileMeta({
 
 const metaStyles = StyleSheet.create({
   bio: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+  overMedia: {
+    textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, // theme-exempt: legibility over cover media
+  },
   more: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: 32 },
   moreText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   links: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: SP.md },

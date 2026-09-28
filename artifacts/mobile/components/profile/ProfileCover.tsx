@@ -29,7 +29,7 @@ import { emitProfileEvent } from '@/lib/profileEvents';
 import { InteractionLayer, ProfileButton } from './ProfileControls';
 import { ProfileThread } from './ProfileThread';
 import {
-  COVER_TRIM_LENGTHS, clampTrim, defaultTrim, formatClock, needsTrim, pickerDurationSeconds, shouldShowCoverCoachmark,
+  COVER_MAX_SECONDS, COVER_TRIM_LENGTHS, clampTrim, defaultTrim, formatClock, needsTrim, pickerDurationSeconds, shouldShowCoverCoachmark,
 } from './profileCoverRules';
 
 export interface CoverMedia { videoUrl: string | null; posterUrl: string | null }
@@ -101,7 +101,7 @@ export function useProfileCover({ own, cover, userId }: { own: boolean; cover: C
         const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (!permission.granted) { notify('Camera access needed', 'Allow camera access to record a cover video.'); return; }
       }
-      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['videos'], quality: 1, videoMaxDuration: source === 'camera' ? 30 : undefined };
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['videos'], quality: 1, videoMaxDuration: source === 'camera' ? COVER_MAX_SECONDS : undefined };
       const result = source === 'camera'
         ? await ImagePicker.launchCameraAsync(options)
         : await ImagePicker.launchImageLibraryAsync(options);
