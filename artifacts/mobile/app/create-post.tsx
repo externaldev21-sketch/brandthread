@@ -46,6 +46,11 @@ import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { HapticSwitch } from '@/components/BrandthreadUI';
+import { BottomSheet } from '@/components/ui/BottomSheet';
+import { MediaGrid, type MediaGridAsset } from '@/components/create-post/MediaGrid';
+import { RADII } from '@/constants/radii';
+import { SPACING } from '@/constants/spacing';
+import { FADE_MS } from '@/constants/motion';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -74,9 +79,20 @@ const DEFAULT_VISIBILITY: PostVisibility = {
   isPublic: true, allowComments: true, allowReposts: true, showLikeCount: true,
 };
 
+// Effects tool (video-edit editor) — same clip-level filter/speed fields
+// camera-capture.tsx already threads onto a VideoClipLocal, just exposed
+// here as a post-capture editing surface instead of only at record time.
+const EDITOR_FILTERS: Array<{ id: 'none' | 'warm' | 'cool' | 'mono'; label: string }> = [
+  { id: 'none', label: 'Original' },
+  { id: 'warm', label: 'Warm' },
+  { id: 'cool', label: 'Cool' },
+  { id: 'mono', label: 'Mono' },
+];
+const EDITOR_SPEEDS: Array<0.5 | 1 | 2 | 3> = [0.5, 1, 2, 3];
+
 // ─── Full-screen video preview ─────────────────────────────────────────────────
-function FullVideoPreview({ uri, seekTime, playbackRate = 1 }: {
-  uri: string; seekTime?: number; playbackRate?: number;
+function FullVideoPreview({ uri, seekTime, playbackRate = 1, paused = false }: {
+  uri: string; seekTime?: number; playbackRate?: number; paused?: boolean;
 }) {
   const player = useVideoPlayer(uri, (p) => { p.loop = true; p.play(); });
   useEffect(() => {
@@ -84,6 +100,7 @@ function FullVideoPreview({ uri, seekTime, playbackRate = 1 }: {
     player.currentTime = Math.max(0, seekTime);
   }, [player, seekTime]);
   useEffect(() => { player.playbackRate = playbackRate; }, [playbackRate, player]);
+  useEffect(() => { if (paused) player.pause(); else player.play(); }, [paused, player]);
   return (
     <VideoView
       player={player}
@@ -107,23 +124,24 @@ function ThumbVideoPreview({ uri }: { uri: string }) {
   );
 }
 
-// ─── Floating right toolbar button ────────────────────────────────────────────
-function ToolBtn({ icon, label, onPress, accessibilityLabel, testID }: {
-  icon: keyof typeof Feather.glyphMap; label?: string; onPress?: () => void;
-  accessibilityLabel?: string; testID?: string;
+// ─── Editor tool-row chip (Text / Sticker / Audio / Clip / Overlay / Effects / Trim) ──
+function EditorToolChip({ icon, label, onPress, testID }: {
+  icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; testID?: string;
 }) {
   const { theme } = useAppTheme();
   return (
     <TouchableOpacity
       onPress={onPress}
-      style={ts.toolBtn}
+      style={ts.edToolChip}
       activeOpacity={0.75}
-      accessibilityLabel={accessibilityLabel ?? label ?? icon}
+      accessibilityLabel={label}
       accessibilityRole="button"
       testID={testID}
     >
-      <Feather name={icon} size={26} color={theme.text} />
-      {label ? <Text style={ts.toolBtnLabel}>{label}</Text> : null}
+      <View style={ts.edToolChipIconWrap}>
+        <Feather name={icon} size={19} color={theme.text} />
+      </View>
+      <Text style={ts.edToolChipLabel}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -460,6 +478,7 @@ export default function CreatePostScreen() {
   // ── Slide-edit text overlay editor state ──
   const [slideShowTextEditor, setSlideShowTextEditor] = useState(false);
   const [slideEditingOverlayId, setSlideEditingOverlayId] = useState<string | undefined>(undefined);
+  const [slideZoomed, setSlideZoomed] = useState(false);
   const [maxDuration,   setMaxDuration]  = useState<MaxVideoDuration>(30);
   const [trimStart,     setTrimStart]    = useState(0);
   const [trimEnd,       setTrimEnd]      = useState(0);
@@ -471,6 +490,14 @@ export default function CreatePostScreen() {
   const [processingPhase, setProcessingPhase] = useState<'idle'|'uploading'|'processing'|'error'|'ready'>('idle');
   const [processingError, setProcessingError] = useState<string | null>(null);
   const timelineWidthRef = useRef(1);
+
+  // ── Editor chrome (Instagram-style rounded card) ──
+  const [videoPaused, setVideoPaused] = useState(false);
+  const [showTrimSheet, setShowTrimSheet] = useState(false);
+  const [showEffectsSheet, setShowEffectsSheet] = useState(false);
+  const pauseGlyphAnim = useRef(new Animated.Value(0)).current;
+  const [showPauseGlyph, setShowPauseGlyph] = useState(false);
+  const pauseGlyphTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Post details ──
   const [caption,            setCaption]            = useState('');
@@ -642,6 +669,7 @@ export default function CreatePostScreen() {
   // ── Derived ──
   const hasMedia   = videoClips.length > 0 || slidePhotos.length > 0;
   const canProceed = hasMedia;
+  const previewClipIndexSafe = Math.min(previewClipIndex, Math.max(0, videoClips.length - 1));
 
   function inferContentType(): ContentType {
     if (isBuyer) return 'story';
@@ -651,6 +679,44 @@ export default function CreatePostScreen() {
   }
 
   function haptic(fn: () => void) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); fn(); }
+
+  /** Tap-to-pause on the editor's rounded media card: toggles playback and
+   *  fades a centered pause/play glyph in, then back out. */
+  function toggleCardPlayback() {
+    Haptics.selectionAsync();
+    setVideoPaused(prev => !prev);
+    setShowPauseGlyph(true);
+    pauseGlyphAnim.setValue(1);
+    if (pauseGlyphTimer.current) clearTimeout(pauseGlyphTimer.current);
+    Animated.timing(pauseGlyphAnim, { toValue: 1, duration: 0, useNativeDriver: true }).start(() => {
+      pauseGlyphTimer.current = setTimeout(() => {
+        Animated.timing(pauseGlyphAnim, { toValue: 0, duration: FADE_MS, useNativeDriver: true })
+          .start(() => setShowPauseGlyph(false));
+      }, 500);
+    });
+  }
+
+  /** Discard-changes confirm used by the editor's close (X) button — mirrors
+   *  camera-capture.tsx's "Discard clips?" alert (Keep editing / Discard). */
+  function confirmDiscardEdits(hasUnsavedEdits: boolean, onDiscard: () => void) {
+    if (!hasUnsavedEdits) { haptic(onDiscard); return; }
+    Alert.alert('Discard changes?', 'Your edits to this Thread will be lost.', [
+      { text: 'Keep editing', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: () => haptic(onDiscard) },
+    ]);
+  }
+
+  function setClipFilter(filterValue: VideoClipLocal['filter']) {
+    Haptics.selectionAsync();
+    setVideoClips(prev => prev.map((c, i) => i === previewClipIndexSafe ? { ...c, filter: filterValue } : c));
+    setComposedVideo(null); setProcessingPhase('idle'); setProcessingError(null);
+  }
+
+  function setClipSpeed(speedValue: VideoClipLocal['speed']) {
+    Haptics.selectionAsync();
+    setVideoClips(prev => prev.map((c, i) => i === previewClipIndexSafe ? { ...c, speed: speedValue } : c));
+    setComposedVideo(null); setProcessingPhase('idle'); setProcessingError(null);
+  }
 
   async function pickFromLibrary() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -907,238 +973,122 @@ export default function CreatePostScreen() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // SCREEN A: MEDIA PICK — camera-composer layout (ref: screenshot 1)
-  // Pure black. X top-left. Sound pill top-center. Right-edge tool column.
-  // Large canvas. Duration row above shutter. Effects | Shutter | Upload bottom.
-  // Camera / Story mode labels. Once media picked: full preview + Next pill.
+  // SCREEN A: MEDIA PICK — Instagram-style grid picker (ref: 01-picker-new-reel,
+  // 01b-picker-new-post). Header "New Thread" · X close · Next (once media is
+  // chosen). Large selection preview, "Recents" album row, camera tile + real
+  // device photo/video grid (components/create-post/MediaGrid.tsx), and a
+  // floating Thread/Story mode pill at the bottom.
   // ─────────────────────────────────────────────────────────────────────────────
   if (step === 'media-pick') {
-    const DURATIONS: MaxVideoDuration[] = [15, 30, 60];
-    const durLabel: Record<number, string> = { 15: '15s', 30: '30s', 60: '60s' };
+    const selectedVideoUri = videoClips[0]?.uri ?? null;
 
-    // ── State for selected tab label (no functional routing — just visual) ──
-    const modeLabels = isBuyer
-      ? ['Story']
-      : ['Camera', 'Story'];
+    function goToNext() {
+      haptic(() => {
+        if (videoClips.length > 0) {
+          setStep('video-edit');
+        } else {
+          const slides = slidePhotos.map(p => createPhotoSlide(p.id, p.uri));
+          setEditableSlides(slides);
+          setCurrentSlideIndex(0);
+          setComposedSlideshow(null);
+          setSlideProcessingPhase('idle');
+          setSlideProcessingError(null);
+          setStep('slide-edit');
+        }
+      });
+    }
+
+    function handleTogglePhoto(asset: MediaGridAsset) {
+      setSlidePhotos(prev => {
+        const exists = prev.some(p => p.uri === asset.uri);
+        if (exists) return prev.filter(p => p.uri !== asset.uri);
+        return [...prev, { uri: asset.uri, id: asset.id }];
+      });
+      setVideoClips([]);
+    }
+
+    function handleSelectVideo(asset: MediaGridAsset) {
+      const alreadySelected = selectedVideoUri === asset.uri;
+      if (alreadySelected) { setVideoClips([]); return; }
+      const d = Math.max(0.1, asset.duration || 1);
+      setVideoClips([{ uri: asset.uri, duration: d, id: `lib-${asset.id}`, speed: 1, filter: 'none' }]);
+      setTrimStart(0); setTrimEnd(d); setScrubTime(0); setPreviewSeekTime(0);
+      setPreviewClipIndex(0); setComposedVideo(null); setProcessingPhase('idle');
+      setProcessingError(null); setSlidePhotos([]);
+    }
 
     return (
       <View style={[ts.root, { backgroundColor: BG }]}>
         <StatusBar barStyle="light-content" backgroundColor={BG} />
 
-        {/* ── TOP BAR ─────────────────────────────────────────── */}
-        <View style={[ts.mpTopBar, { paddingTop: topPad + 4 }]}>
-          {/* X close */}
+        {/* ── HEADER ──────────────────────────────────────────── */}
+        <View style={[ts.pkHeader, { paddingTop: topPad + 4 }]}>
           <TouchableOpacity
             onPress={() => haptic(leaveSetupDestination)}
-            style={ts.mpTopBtn}
+            style={ts.pkHeaderBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Close"
+            accessibilityRole="button"
           >
-            <Feather name="x" size={26} color={FG} />
+            <Feather name="x" size={24} color={FG} />
           </TouchableOpacity>
-
-          {/* Right-top placeholder (keeps close button balanced) */}
-          <View style={ts.mpTopBtn} />
-          <View style={ts.mpTopBtn} />
-        </View>
-
-        {/* ── RIGHT-EDGE TOOL COLUMN ───────────────────────────── */}
-        <View style={[ts.mpRightTools, { top: topPad + 60 }]}>
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7} onPress={() => openTextEditor()}>
-            <Text style={ts.mpTextTool}>Aa</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── CANVAS ──────────────────────────────────────────── */}
-        <View style={ts.mpCanvas}>
-          {videoClips.length > 0 && (
-            <>
-              <FullVideoPreview uri={videoClips[0].uri} />
-              {/* Replace chip */}
-              <TouchableOpacity
-                style={ts.mpReplaceChip}
-                onPress={pickFromLibrary}
-                activeOpacity={0.8}
-              >
-                <Feather name="refresh-cw" size={12} color={FG} />
-                <Text style={ts.mpReplaceChipText}>Replace</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          {slidePhotos.length > 0 && (
-            <>
-              <Image
-                source={{ uri: slidePhotos[0].uri }}
-                style={StyleSheet.absoluteFill}
-                resizeMode="cover"
-              />
-              {/* Thumbnail strip */}
-              <View style={ts.mpPhotoStrip}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={{ flexDirection: 'row', gap: 5, paddingHorizontal: 8, paddingVertical: 6 }}>
-                    {slidePhotos.map((photo, idx) => (
-                      <View key={photo.id} style={ts.mpPhotoThumb}>
-                        <Image source={{ uri: photo.uri }} style={ts.mpPhotoThumbImg} resizeMode="cover" />
-                        <TouchableOpacity
-                          style={ts.mpRemoveChip}
-                          onPress={() => setSlidePhotos(prev => prev.filter(p => p.id !== photo.id))}
-                        >
-                          <Feather name="x" size={9} color={FG} />
-                        </TouchableOpacity>
-                        {idx === 0 && (
-                          <View style={ts.mpCoverBadge}>
-                            <Text style={ts.mpCoverBadgeText}>cover</Text>
-                          </View>
-                        )}
-                      </View>
-                    ))}
-                    {/* Add more */}
-                    <TouchableOpacity
-                      style={ts.mpAddMoreThumb}
-                      onPress={pickFromLibrary}
-                      activeOpacity={0.8}
-                    >
-                      <Feather name="plus" size={20} color={MUTED} />
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
-              </View>
-              {/* Replace chip */}
-              <TouchableOpacity
-                style={ts.mpReplaceChip}
-                onPress={pickFromLibrary}
-                activeOpacity={0.8}
-              >
-                <Feather name="plus" size={12} color={FG} />
-                <Text style={ts.mpReplaceChipText}>Add more</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-
-        {/* ── BOTTOM COMPOSER ZONE ─────────────────────────────── */}
-        <View style={[ts.mpBottom, { paddingBottom: botPad + 4 }]}>
-
-          {/* Duration selector row — always visible, above shutter */}
-          <View style={ts.mpDurationRow}>
-            {DURATIONS.map((d) => {
-              const sel = maxDuration === d;
-              return (
-                <TouchableOpacity
-                  key={d}
-                  onPress={() => { Haptics.selectionAsync(); setMaxDuration(d); }}
-                  style={ts.mpDurationBtn}
-                >
-                  <Text style={[ts.mpDurationText, sel && { color: FG, fontFamily: FONT.bold }]}>
-                    {durLabel[d]}
-                  </Text>
-                  {sel && <View style={ts.mpDurationUnderline} />}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Shutter row: Effects | Shutter | Upload */}
-          <View style={ts.mpShutterRow}>
-            {/* Effects (left) */}
-            <TouchableOpacity
-              style={ts.mpEffectsBtn}
-              activeOpacity={0.8}
-              onPress={() => router.push((`/camera-capture?maxDuration=${maxDuration}`) as never)}
-            >
-              <View style={ts.mpEffectsIcon}>
-                <Feather name="sliders" size={22} color={FG} />
-              </View>
-              <Text style={ts.mpEffectsLabel}>Effects</Text>
-            </TouchableOpacity>
-
-            {/* Shutter / Next (center) */}
-            {hasMedia ? (
-              /* Media selected — shutter becomes a Next pill */
-              <TouchableOpacity
-                style={ts.mpNextShutter}
-                activeOpacity={0.88}
-                onPress={() => haptic(() => {
-                  if (videoClips.length > 0) {
-                    setStep('video-edit');
-                  } else {
-                    // Enter slide-edit: build EditablePhotoSlide from slidePhotos
-                    const slides = slidePhotos.map(p =>
-                      createPhotoSlide(p.id, p.uri)
-                    );
-                    setEditableSlides(slides);
-                    setCurrentSlideIndex(0);
-                    setComposedSlideshow(null);
-                    setSlideProcessingPhase('idle');
-                    setSlideProcessingError(null);
-                    setStep('slide-edit');
-                  }
-                })}
-              >
-                <LinearGradient
-                  colors={theme.primaryGradient}
-                  style={ts.mpNextShutterGrad}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                >
-                  <Text style={[ts.mpNextShutterText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                    Next
-                  </Text>
-                  <Feather name="arrow-right" size={18} color={theme.onAccent} style={{ marginLeft: 6 }} />
-                </LinearGradient>
-              </TouchableOpacity>
-            ) : (
-              /* No media — white shutter ring */
-              <TouchableOpacity
-                style={ts.mpShutter}
-                activeOpacity={0.85}
-                onPress={() => router.push((`/camera-capture?maxDuration=${maxDuration}`) as never)}
-              >
-                <View style={ts.mpShutterInner} />
-              </TouchableOpacity>
+          <Text style={ts.pkHeaderTitle}>New Thread</Text>
+          <View style={ts.pkHeaderRight}>
+            {hasMedia && (
+              <Button label="Next" variant="primary" size="compact" onPress={goToNext} testID="picker-next-btn" />
             )}
-
-            {/* Upload (right) */}
-            <TouchableOpacity
-              style={ts.mpUploadBtn}
-              activeOpacity={0.8}
-              onPress={pickFromLibrary}
-            >
-              {slidePhotos.length > 0 ? (
-                /* Show last-selected thumbnail */
-                <Image
-                  source={{ uri: slidePhotos[slidePhotos.length - 1].uri }}
-                  style={ts.mpUploadThumb}
-                  resizeMode="cover"
-                />
-              ) : videoClips.length > 0 ? (
-                <View style={[ts.mpUploadThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1c1c1e' }]}>
-                  <Feather name="video" size={18} color={FG} />
-                </View>
-              ) : (
-                <View style={ts.mpUploadThumb}>
-                  <Feather name="image" size={18} color={MUTED} />
-                </View>
-              )}
-              <Text style={ts.mpUploadLabel}>Upload</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Mode tabs: Camera / Story */}
-          <View style={ts.mpModeRow}>
-            {modeLabels.map((label, i) => {
-              const active = i === 0;
-              return (
-                <View key={label} style={ts.mpModeItem}>
-                  <Text style={[ts.mpModeText, active && ts.mpModeTextActive]}>
-                    {label}
-                  </Text>
-                  {active && <View style={ts.mpModeDot} />}
-                </View>
-              );
-            })}
           </View>
         </View>
 
-        {/* Sound modal (accessible from Add sound pill) */}
+        {/* ── SELECTION PREVIEW ─────────────────────────────────── */}
+        <View style={ts.pkPreviewBox}>
+          {videoClips.length > 0 ? (
+            <FullVideoPreview uri={videoClips[0].uri} />
+          ) : slidePhotos.length > 0 ? (
+            <Image source={{ uri: slidePhotos[slidePhotos.length - 1].uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <View style={ts.pkPreviewEmpty}>
+              <Feather name="image" size={30} color={MUTED} />
+            </View>
+          )}
+          {slidePhotos.length > 1 && (
+            <View style={ts.pkMultiBadge}>
+              <Feather name="copy" size={12} color={FG} />
+              <Text style={ts.pkMultiBadgeText}>{slidePhotos.length}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* ── GRID (Recents dropdown + camera tile + device photos/videos) ── */}
+        <View style={ts.pkGridArea}>
+          <MediaGrid
+            selectedPhotoUris={slidePhotos.map(p => p.uri)}
+            selectedVideoUri={selectedVideoUri}
+            onTogglePhoto={handleTogglePhoto}
+            onSelectVideo={handleSelectVideo}
+            onPressCamera={() => router.push((`/camera-capture?maxDuration=${maxDuration}`) as never)}
+            onPressWebUpload={pickFromLibrary}
+          />
+        </View>
+
+        {/* ── FLOATING MODE PILL: Thread (selected) / Story ─────── */}
+        <View style={[ts.pkModePillWrap, { bottom: botPad + 16 }]}>
+          <View style={ts.pkModePill}>
+            <View style={[ts.pkModePillBtn, ts.pkModePillBtnActive]}>
+              <Text style={ts.pkModePillTextActive}>Thread</Text>
+            </View>
+            <TouchableOpacity
+              style={ts.pkModePillBtn}
+              onPress={() => { Haptics.selectionAsync(); router.replace('/buyer-story-create' as never); }}
+              accessibilityLabel="Switch to Story"
+              accessibilityRole="button"
+            >
+              <Text style={ts.pkModePillText}>Story</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Sound modal (still reachable — see editor's Audio tool) */}
         <SoundModal
           visible={showSoundModal} onClose={() => setShowSoundModal(false)}
           soundTab={soundTab} setSoundTab={setSoundTab}
@@ -1150,14 +1100,19 @@ export default function CreatePostScreen() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // SCREEN B2: SLIDE EDIT — photo slideshow editor with per-slide text overlays
-  // Shows the current slide full-screen, thumbnail strip at bottom,
-  // Aa button to add/edit text overlays. Next uploads + composes then goes to post-details.
+  // SCREEN B2: SLIDE EDIT — same rounded-card editor chrome as video-edit, for
+  // a photo/slideshow. Tap the card to view it large; tool row covers what
+  // applies to a photo (Text/Sticker/Overlay share the text-overlay system;
+  // Trim doesn't apply to a still photo so it's dropped; Effects has no
+  // filter/speed field on EditablePhotoSlide so it's dropped too — see the
+  // PR notes for the reasoning). Next uploads + composes then goes on to
+  // post-details.
   // ─────────────────────────────────────────────────────────────────────────────
   if (step === 'slide-edit') {
     const currentSlide = editableSlides[Math.min(currentSlideIndex, Math.max(0, editableSlides.length - 1))];
     const isBusy = slideProcessingPhase === 'uploading' || slideProcessingPhase === 'composing';
     const isReady = slideProcessingPhase === 'ready' && !!composedSlideshow;
+    const hasUnsavedSlideEdits = editableSlides.some(s => s.overlays.length > 0);
 
     function handleSlideTextOverlayDone(overlay: TextOverlay) {
       if (!currentSlide) return;
@@ -1203,36 +1158,197 @@ export default function CreatePostScreen() {
       <View style={[ts.root, { backgroundColor: BG }]}>
         <StatusBar barStyle="light-content" backgroundColor={BG} />
 
-        {/* Full-screen slide preview */}
-        {currentSlide && (
-          <Image
-            source={{ uri: currentSlide.uri }}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
-          />
-        )}
+        {/* Rounded media card — ends above the tool row / bottom pills */}
+        <View style={[ts.edCardOuter, { paddingTop: topPad + 16 }]}>
+          <View style={ts.edCard}>
+            {currentSlide && (
+              <Image source={{ uri: currentSlide.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            )}
 
-        {/* Overlay chips on current slide */}
-        {currentSlide && !slideShowTextEditor && (
-          <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]}
-            onLayout={(e) => {
-              const { width, height } = e.nativeEvent.layout;
-              setCanvasLayout({ width, height });
-            }}
-          >
-            {currentSlide.overlays.map(overlay => (
-              <OverlayChip
-                key={overlay.id}
-                overlay={overlay}
-                containerWidth={canvasLayout.width}
-                containerHeight={canvasLayout.height}
-                onTap={() => { setSlideEditingOverlayId(overlay.id); setSlideShowTextEditor(true); }}
-                onMove={(x, y) => moveSlideOverlay(overlay.id, x, y)}
-                onDelete={() => deleteSlideOverlay(overlay.id)}
-              />
-            ))}
+            {/* Tap-to-view-large layer — sits behind the overlay canvas and
+                the retry button below (later siblings win hit-testing), so
+                it never nests a Pressable inside another one. */}
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setSlideZoomed(true)}
+              accessibilityLabel="View photo large"
+              accessibilityRole="button"
+            />
+
+            {/* Overlay chips on current slide */}
+            {currentSlide && !slideShowTextEditor && (
+              <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]}
+                onLayout={(e) => {
+                  const { width, height } = e.nativeEvent.layout;
+                  setCanvasLayout({ width, height });
+                }}
+              >
+                {currentSlide.overlays.map(overlay => (
+                  <OverlayChip
+                    key={overlay.id}
+                    overlay={overlay}
+                    containerWidth={canvasLayout.width}
+                    containerHeight={canvasLayout.height}
+                    onTap={() => { setSlideEditingOverlayId(overlay.id); setSlideShowTextEditor(true); }}
+                    onMove={(x, y) => moveSlideOverlay(overlay.id, x, y)}
+                    onDelete={() => deleteSlideOverlay(overlay.id)}
+                  />
+                ))}
+              </View>
+            )}
+
+            {/* Slide count dots */}
+            {editableSlides.length > 1 && (
+              <View style={ts.slideDotsWrap} pointerEvents="none">
+                {editableSlides.map((slide, idx) => (
+                  <View key={slide.id} style={[ts.slideDot, idx === currentSlideIndex && ts.slideDotActive]} />
+                ))}
+              </View>
+            )}
+
+            {slideProcessingPhase === 'error' && slideProcessingError && (
+              <View style={ts.errorBanner}>
+                <Feather name="alert-triangle" size={14} color={ORANGE} style={{ marginRight: 8 }} />
+                <Text style={ts.errorBannerText} numberOfLines={2}>{slideProcessingError}</Text>
+                <TouchableOpacity onPress={processSlideshow} style={ts.errorRetryBtn}>
+                  <Text style={ts.errorRetryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
-        )}
+
+          {/* Dark circular X — over the card's top-left corner */}
+          <TouchableOpacity
+            disabled={isBusy}
+            onPress={() => confirmDiscardEdits(hasUnsavedSlideEdits, () => setStep('media-pick'))}
+            style={[ts.edCloseBtn, { top: topPad + 10 }]}
+            accessibilityLabel="Close editor"
+          >
+            <Feather name="x" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Slide selector strip — pick / reorder / remove a slide */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+          <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 8 }}>
+            {editableSlides.map((slide, idx) => {
+              const isActive = idx === currentSlideIndex;
+              return (
+                <View key={slide.id} style={{ alignItems: 'center' }}>
+                  <TouchableOpacity
+                    style={[ts.slideThumb, isActive && { borderColor: FG, borderWidth: 2 }]}
+                    onPress={() => setCurrentSlideIndex(idx)}
+                    accessibilityLabel={`Slide ${idx + 1}`}
+                  >
+                    <Image source={{ uri: slide.uri }} style={ts.slideThumbImg} resizeMode="cover" />
+                    {slide.overlays.length > 0 && (
+                      <View style={ts.slideOverlayBadge}>
+                        <Text style={ts.slideOverlayBadgeText}>{slide.overlays.length}</Text>
+                      </View>
+                    )}
+                    {slide.uploadState === 'error' && (
+                      <View style={[ts.slideOverlayBadge, { backgroundColor: RED }]}>
+                        <Feather name="alert-circle" size={8} color={theme.onAccent} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  {isActive && editableSlides.length > 1 && (
+                    <View style={ts.slideReorderRow}>
+                      <TouchableOpacity
+                        disabled={idx === 0}
+                        onPress={() => {
+                          setEditableSlides(prev => moveSlide(prev, idx, idx - 1));
+                          setCurrentSlideIndex(idx - 1);
+                          setComposedSlideshow(null);
+                        }}
+                        accessibilityLabel="Move slide earlier"
+                        style={[ts.slideReorderBtn, idx === 0 && { opacity: 0.3 }]}
+                      >
+                        <Feather name="chevron-left" size={14} color={FG} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        disabled={idx === editableSlides.length - 1}
+                        onPress={() => {
+                          setEditableSlides(prev => moveSlide(prev, idx, idx + 1));
+                          setCurrentSlideIndex(idx + 1);
+                          setComposedSlideshow(null);
+                        }}
+                        accessibilityLabel="Move slide later"
+                        style={[ts.slideReorderBtn, idx === editableSlides.length - 1 && { opacity: 0.3 }]}
+                      >
+                        <Feather name="chevron-right" size={14} color={FG} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        {/* Tool row: Text · Sticker · Overlay (share the text-overlay system) · Audio · Delete */}
+        <ScrollView
+          horizontal showsHorizontalScrollIndicator={false}
+          style={ts.edToolRow}
+          contentContainerStyle={ts.edToolRowContent}
+        >
+          <EditorToolChip
+            icon="type" label="Text"
+            onPress={() => { setSlideEditingOverlayId(undefined); setSlideShowTextEditor(true); }}
+            testID="slide-tool-text"
+          />
+          <EditorToolChip
+            icon="smile" label="Sticker"
+            onPress={() => { setSlideEditingOverlayId(undefined); setSlideShowTextEditor(true); }}
+            testID="slide-tool-sticker"
+          />
+          <EditorToolChip
+            icon="layers" label="Overlay"
+            onPress={() => { setSlideEditingOverlayId(undefined); setSlideShowTextEditor(true); }}
+            testID="slide-tool-overlay"
+          />
+          <EditorToolChip icon="music" label="Audio" onPress={() => setShowSoundModal(true)} testID="slide-tool-audio" />
+          {editableSlides.length > 1 && (
+            <EditorToolChip
+              icon="trash-2" label="Delete"
+              onPress={() => {
+                if (!currentSlide) return;
+                const newSlides = removePhotoSlide(editableSlides, currentSlide.id);
+                setEditableSlides(newSlides);
+                setCurrentSlideIndex(idx => Math.min(idx, newSlides.length - 1));
+                setComposedSlideshow(null);
+                setSlideProcessingPhase('idle');
+              }}
+              testID="slide-tool-delete"
+            />
+          )}
+        </ScrollView>
+
+        {/* Bottom row: Edit photo (secondary) | Next (primary) */}
+        <View style={[ts.edBottomRow, { paddingBottom: botPad + 8 }]}>
+          <Button
+            label="Edit photo" variant="secondary"
+            onPress={() => { setSlideEditingOverlayId(undefined); setSlideShowTextEditor(true); }}
+            style={{ flex: 1 }}
+            disabled={isBusy}
+            accessibilityLabel="Edit photo"
+          />
+          <Button
+            label={isBusy
+              ? (slideProcessingPhase === 'uploading' ? 'Uploading…' : 'Composing…')
+              : (isReady ? 'Next' : 'Process')}
+            icon={isReady && !isBusy ? 'arrow-right' : undefined}
+            variant="primary"
+            loading={isBusy}
+            onPress={async () => {
+              if (isReady) { haptic(() => setStep('post-details')); return; }
+              haptic(() => {});
+              await processSlideshow();
+            }}
+            style={{ flex: 1 }}
+            testID="slide-editor-next-btn"
+          />
+        </View>
 
         {/* Text overlay editor modal */}
         <TextOverlayEditor
@@ -1246,160 +1362,14 @@ export default function CreatePostScreen() {
           onCancel={handleSlideTextOverlayCancel}
         />
 
-        {/* Top bar */}
-        <View style={[ts.videoTopBar, { paddingTop: topPad + 6, zIndex: 20 }]}>
-          <TouchableOpacity
-            disabled={isBusy}
-            onPress={() => haptic(() => setStep('media-pick'))}
-            style={ts.videoTopBtn}
-          >
-            <Feather name="arrow-left" size={24} color={isBusy ? MUTED : FG} />
-          </TouchableOpacity>
-
-          <Text style={[ts.soundPillText, { color: FG, fontFamily: FONT.bold }]}>
-            Edit Slides ({currentSlideIndex + 1}/{editableSlides.length})
-          </Text>
-
-          <View style={{ width: 44 }} />
-        </View>
-
-        {/* Right tools — Aa (text overlay) + slide delete */}
-        <View style={[ts.rightToolbar, { paddingTop: topPad + 56, zIndex: 20 }]}>
-          <ToolBtn
-            icon="type"
-            label="Aa"
-            onPress={() => { setSlideEditingOverlayId(undefined); setSlideShowTextEditor(true); }}
-            accessibilityLabel="Add text overlay"
-          />
-          {editableSlides.length > 1 && (
-            <ToolBtn
-              icon="trash-2"
-              label="Del"
-              onPress={() => {
-                if (!currentSlide) return;
-                const newSlides = removePhotoSlide(editableSlides, currentSlide.id);
-                setEditableSlides(newSlides);
-                setCurrentSlideIndex(idx => Math.min(idx, newSlides.length - 1));
-                setComposedSlideshow(null);
-                setSlideProcessingPhase('idle');
-              }}
-              accessibilityLabel="Remove slide"
-            />
-          )}
-        </View>
-
-        {/* Slide selector strip at bottom */}
-        <View style={[ts.slideStripContainer, { bottom: botPad + 80 }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}>
-              {editableSlides.map((slide, idx) => {
-                const isActive = idx === currentSlideIndex;
-                return (
-                  <View key={slide.id} style={{ alignItems: 'center' }}>
-                    <TouchableOpacity
-                      style={[
-                        ts.slideThumb,
-                        isActive && { borderColor: ORANGE, borderWidth: 2 },
-                      ]}
-                      onPress={() => setCurrentSlideIndex(idx)}
-                      accessibilityLabel={`Slide ${idx + 1}`}
-                    >
-                      <Image source={{ uri: slide.uri }} style={ts.slideThumbImg} resizeMode="cover" />
-                      {slide.overlays.length > 0 && (
-                        <View style={ts.slideOverlayBadge}>
-                          <Text style={ts.slideOverlayBadgeText}>{slide.overlays.length}</Text>
-                        </View>
-                      )}
-                      {slide.uploadState === 'error' && (
-                        <View style={[ts.slideOverlayBadge, { backgroundColor: RED }]}>
-                          <Feather name="alert-circle" size={8} color={theme.onAccent} />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                    {isActive && editableSlides.length > 1 && (
-                      <View style={ts.slideReorderRow}>
-                        <TouchableOpacity
-                          disabled={idx === 0}
-                          onPress={() => {
-                            setEditableSlides(prev => moveSlide(prev, idx, idx - 1));
-                            setCurrentSlideIndex(idx - 1);
-                            setComposedSlideshow(null);
-                          }}
-                          accessibilityLabel="Move slide earlier"
-                          style={[ts.slideReorderBtn, idx === 0 && { opacity: 0.3 }]}
-                        >
-                          <Feather name="chevron-left" size={14} color={FG} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          disabled={idx === editableSlides.length - 1}
-                          onPress={() => {
-                            setEditableSlides(prev => moveSlide(prev, idx, idx + 1));
-                            setCurrentSlideIndex(idx + 1);
-                            setComposedSlideshow(null);
-                          }}
-                          accessibilityLabel="Move slide later"
-                          style={[ts.slideReorderBtn, idx === editableSlides.length - 1 && { opacity: 0.3 }]}
-                        >
-                          <Feather name="chevron-right" size={14} color={FG} />
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* Processing error banner */}
-        {slideProcessingPhase === 'error' && slideProcessingError && (
-          <View style={[ts.errorBanner, { bottom: botPad + 140 }]}>
-            <Feather name="alert-triangle" size={14} color={ORANGE} style={{ marginRight: 8 }} />
-            <Text style={ts.errorBannerText} numberOfLines={2}>{slideProcessingError}</Text>
-            <TouchableOpacity onPress={processSlideshow} style={ts.errorRetryBtn}>
-              <Text style={ts.errorRetryText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Bottom Next button */}
-        <View style={[ts.slideNextBar, { paddingBottom: botPad + 8 }]}>
-          {isBusy ? (
-            <View style={ts.slideNextBusy}>
-              <ActivityIndicator color={FG} size="small" style={{ marginRight: 10 }} />
-              <Text style={ts.slideNextBusyText}>
-                {slideProcessingPhase === 'uploading' ? 'Uploading slides…' : 'Composing slideshow…'}
-              </Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={ts.nextBtn}
-              activeOpacity={0.85}
-              onPress={async () => {
-                haptic(() => {});
-                if (isReady) {
-                  // Already composed — go straight to post details
-                  setStep('post-details');
-                  return;
-                }
-                // Need to upload+compose first
-                await processSlideshow();
-                // processSlideshow sets phase to 'ready' on success; watch via effect
-              }}
-            >
-              <LinearGradient
-                colors={theme.primaryGradient}
-                style={ts.nextBtnGrad}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              >
-                <Text style={[ts.nextBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                  {isReady ? 'Next →' : 'Process & Next'}
-                </Text>
-                <Feather name="arrow-right" size={18} color={theme.onAccent} style={{ marginLeft: 6 }} />
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Zoomed slide viewer */}
+        <Modal visible={slideZoomed} transparent animationType="fade" onRequestClose={() => setSlideZoomed(false)}>
+          <Pressable style={ts.slideZoomBackdrop} onPress={() => setSlideZoomed(false)}>
+            {currentSlide && (
+              <Image source={{ uri: currentSlide.uri }} style={ts.slideZoomImage} resizeMode="contain" />
+            )}
+          </Pressable>
+        </Modal>
 
         <SoundModal
           visible={showSoundModal} onClose={() => setShowSoundModal(false)}
@@ -1412,12 +1382,18 @@ export default function CreatePostScreen() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // SCREEN B: VIDEO EDIT — full-screen preview, floating right toolbar
+  // SCREEN B: VIDEO EDIT — rounded clip card, tap-to-pause, tool row, Edit
+  // video/Next (ref: 03-editor-pause, 03b-editor-tools, 03c-editor-tool-row)
   // ─────────────────────────────────────────────────────────────────────────────
   if (step === 'video-edit') {
     const busy         = processingPhase === 'uploading' || processingPhase === 'processing';
-    const previewClip  = videoClips[Math.min(previewClipIndex, Math.max(0, videoClips.length - 1))];
+    const previewClip  = videoClips[previewClipIndexSafe];
     const previewUri   = composedVideo?.mediaUrl ?? previewClip?.uri;
+    const hasUnsavedEdits = textOverlays.length > 0
+      || trimStart > 0 || (trimEnd > 0 && trimEnd < totalVideoDuration)
+      || videoClips.some(c => c.filter !== 'none' || c.speed !== 1);
+    const progressPct = Math.max(0, Math.min(100,
+      (scrubTime / Math.max(0.1, composedVideo?.duration ?? totalVideoDuration)) * 100));
 
     const seekFromLocation = (locationX: number) => {
       const width = Math.max(1, timelineWidthRef.current);
@@ -1442,185 +1418,256 @@ export default function CreatePostScreen() {
       <View style={[ts.root, { backgroundColor: BG }]}>
         <StatusBar barStyle="light-content" backgroundColor={BG} />
 
-        {/* Full-screen video */}
-        {previewUri ? (
-          <FullVideoPreview
-            uri={previewUri}
-            seekTime={previewSeekTime}
-            playbackRate={composedVideo ? 1 : (previewClip?.speed ?? 1)}
-          />
-        ) : null}
+        {/* Rounded media card — ends above the tool row / bottom pills */}
+        <View style={[ts.edCardOuter, { paddingTop: topPad + 16 }]}>
+          <View style={ts.edCard}>
+            {previewUri ? (
+              <FullVideoPreview
+                uri={previewUri}
+                seekTime={previewSeekTime}
+                playbackRate={composedVideo ? 1 : (previewClip?.speed ?? 1)}
+                paused={videoPaused}
+              />
+            ) : null}
 
-        {/* Top bar */}
-        <View style={[ts.videoTopBar, { paddingTop: topPad + 6 }]}>
-          <TouchableOpacity
-            disabled={busy}
-            onPress={() => haptic(() => setStep('media-pick'))}
-            style={ts.videoTopBtn}
-          >
-            <Feather name="arrow-left" size={24} color={busy ? MUTED : FG} />
-          </TouchableOpacity>
-
-          <View style={{ width: 44 }} />
-
-          <View style={{ width: 44 }} />
-        </View>
-
-        {/* Right floating toolbar */}
-        <View style={[ts.rightToolbar, { paddingTop: topPad + 56 }]}>
-          <ToolBtn
-            icon="type"
-            label="Text"
-            onPress={() => openTextEditor()}
-            accessibilityLabel="Add text overlay"
-            testID="toolbar-text-btn"
-          />
-        </View>
-
-        {/* Overlay canvas — text chips draggable on the video */}
-        <View
-          ref={videoCanvasRef}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="box-none"
-          onLayout={(e) => setCanvasLayout({
-            width: e.nativeEvent.layout.width,
-            height: e.nativeEvent.layout.height,
-          })}
-          accessibilityLabel="Text overlay canvas"
-          testID="overlay-canvas"
-        >
-          {textOverlays.map((ov) => (
-            <OverlayChip
-              key={ov.id}
-              overlay={ov}
-              containerWidth={canvasLayout.width}
-              containerHeight={canvasLayout.height}
-              onTap={() => openTextEditor(ov.id)}
-              onMove={(x, y) => moveOverlay(ov.id, x, y)}
-              onDelete={() => deleteOverlay(ov.id)}
+            {/* Tap-to-pause layer — sits behind the overlay canvas and the
+                cover/retry buttons below (later siblings win hit-testing),
+                so it never nests a Pressable inside another one. */}
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={toggleCardPlayback}
+              accessibilityLabel={videoPaused ? 'Play' : 'Pause'}
+              accessibilityRole="button"
             />
-          ))}
-        </View>
 
-        {/* Timeline + trim overlay at middle-bottom */}
-        <View style={[ts.timelinePanel, { paddingBottom: botPad + 100 }]}>
-          <View style={ts.timelineMeta}>
-            <Text style={ts.timelineMetaText}>
-              {videoClips.length} clip{videoClips.length === 1 ? '' : 's'}
-            </Text>
-            <Text style={ts.timelineMetaText}>
-              {(composedVideo?.duration ?? (trimEnd - trimStart)).toFixed(1)}s
-            </Text>
-          </View>
-          <Pressable
-            style={ts.timeline}
-            onLayout={(e) => { timelineWidthRef.current = e.nativeEvent.layout.width; }}
-            onPress={(e)      => seekFromLocation(e.nativeEvent.locationX)}
-            onTouchMove={(e)  => seekFromLocation(e.nativeEvent.touches[0]?.locationX ?? 0)}
-          >
-            {videoClips.map((clip, idx) => (
-              <View
-                key={clip.id}
-                style={[
-                  ts.timelineClip,
-                  { flex: Math.max(0.05, (clip.duration / clip.speed) / Math.max(0.1, totalVideoDuration)),
-                    backgroundColor: idx % 2 === 0 ? PURPLE : BORDER },
-                ]}
-              >
-                <Text style={ts.timelineClipText}>{idx + 1}</Text>
-              </View>
-            ))}
-            <View
-              pointerEvents="none"
-              style={[ts.scrubber, {
-                left: `${Math.max(0, Math.min(100, (scrubTime / Math.max(0.1, composedVideo?.duration ?? totalVideoDuration)) * 100))}%` as any,
-              }]}
-            />
-          </Pressable>
-          {/* Trim controls */}
-          <View style={ts.trimRow}>
-            <TouchableOpacity style={ts.trimBtn} disabled={busy} onPress={() => updateTrim(trimStart - 0.5, trimEnd)}>
-              <Feather name="minus" size={12} color={FG} /><Text style={ts.trimBtnText}>Start</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={ts.trimBtn} disabled={busy} onPress={() => updateTrim(trimStart + 0.5, trimEnd)}>
-              <Feather name="plus" size={12} color={FG} /><Text style={ts.trimBtnText}>Start</Text>
-            </TouchableOpacity>
-            <View style={ts.trimSpacer} />
-            <TouchableOpacity style={ts.trimBtn} disabled={busy} onPress={() => updateTrim(trimStart, trimEnd - 0.5)}>
-              <Feather name="minus" size={12} color={FG} /><Text style={ts.trimBtnText}>End</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={ts.trimBtn} disabled={busy} onPress={() => updateTrim(trimStart, trimEnd + 0.5)}>
-              <Feather name="plus" size={12} color={FG} /><Text style={ts.trimBtnText}>End</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Processing status */}
-        {busy && (
-          <View style={ts.processingBanner}>
-            <ActivityIndicator size="small" color={PURPLE} />
-            <Text style={ts.processingBannerText}>
-              {processingPhase === 'uploading' ? 'Uploading...' : 'Processing...'}
-            </Text>
-          </View>
-        )}
-        {processingError && !busy && (
-          <View style={ts.errorBanner}>
-            <Feather name="alert-circle" size={15} color={ORANGE} />
-            <Text style={ts.errorBannerText} numberOfLines={2}>{processingError}</Text>
-          </View>
-        )}
-        {composedVideo && !busy && (
-          <View style={ts.readyBanner}>
-            <Feather name="check-circle" size={15} color={PURPLE} />
-            <Text style={ts.readyBannerText}>Ready · {composedVideo.duration.toFixed(1)}s</Text>
-          </View>
-        )}
-
-        {composedVideo && !busy && (
-          <TouchableOpacity
-            style={ts.coverFrameBtn}
-            onPress={useCurrentFrameAsCover}
-            disabled={settingCover}
-            accessibilityLabel="Use this frame as cover"
-          >
-            {settingCover ? (
-              <ActivityIndicator size="small" color={FG} />
-            ) : (
-              <>
-                <Feather name="image" size={13} color={FG} />
-                <Text style={ts.coverFrameBtnText}>Use this frame as cover</Text>
-              </>
+            {showPauseGlyph && (
+              <Animated.View style={[ts.edPauseGlyph, { opacity: pauseGlyphAnim }]} pointerEvents="none">
+                <Feather name={videoPaused ? 'play' : 'pause'} size={30} color="#fff" />
+              </Animated.View>
             )}
-          </TouchableOpacity>
-        )}
 
-        {/* Bottom CTA */}
-        <View style={[ts.videoBottomBar, { paddingBottom: botPad + 8 }]}>
-          <TouchableOpacity
-            style={[ts.nextBtn, busy && { opacity: 0.5 }]}
-            disabled={busy}
-            onPress={() => {
-              if (composedVideo) setStep('post-details');
-              else void processVideo();
-            }}
-          >
-            <LinearGradient
-              colors={busy ? [theme.cardElevated, theme.cardElevated] : theme.primaryGradient}
-              style={ts.nextBtnGrad}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            {/* Overlay canvas — text chips draggable on the video */}
+            <View
+              ref={videoCanvasRef}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="box-none"
+              onLayout={(e) => setCanvasLayout({
+                width: e.nativeEvent.layout.width,
+                height: e.nativeEvent.layout.height,
+              })}
+              accessibilityLabel="Text overlay canvas"
+              testID="overlay-canvas"
             >
-              {busy
-                ? <ActivityIndicator size="small" color={theme.onAccent} />
-                : (
-                  <Text style={[ts.nextBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                    {processingPhase === 'error' ? 'Retry' : composedVideo ? 'Next' : 'Process'}
-                  </Text>
-                )
-              }
-            </LinearGradient>
+              {textOverlays.map((ov) => (
+                <OverlayChip
+                  key={ov.id}
+                  overlay={ov}
+                  containerWidth={canvasLayout.width}
+                  containerHeight={canvasLayout.height}
+                  onTap={() => openTextEditor(ov.id)}
+                  onMove={(x, y) => moveOverlay(ov.id, x, y)}
+                  onDelete={() => deleteOverlay(ov.id)}
+                />
+              ))}
+            </View>
+
+            {/* Processing / ready / error, positioned over the card only */}
+            {busy && (
+              <View style={ts.processingBanner}>
+                <ActivityIndicator size="small" color={PURPLE} />
+                <Text style={ts.processingBannerText}>
+                  {processingPhase === 'uploading' ? 'Uploading...' : 'Processing...'}
+                </Text>
+              </View>
+            )}
+            {processingError && !busy && (
+              <View style={ts.errorBanner}>
+                <Feather name="alert-circle" size={15} color={ORANGE} />
+                <Text style={ts.errorBannerText} numberOfLines={2}>{processingError}</Text>
+              </View>
+            )}
+            {composedVideo && !busy && (
+              <View style={ts.readyBanner}>
+                <Feather name="check-circle" size={15} color={PURPLE} />
+                <Text style={ts.readyBannerText}>Ready · {composedVideo.duration.toFixed(1)}s</Text>
+              </View>
+            )}
+            {composedVideo && !busy && (
+              <TouchableOpacity
+                style={ts.coverFrameBtn}
+                onPress={useCurrentFrameAsCover}
+                disabled={settingCover}
+                accessibilityLabel="Use this frame as cover"
+              >
+                {settingCover ? (
+                  <ActivityIndicator size="small" color={FG} />
+                ) : (
+                  <>
+                    <Feather name="image" size={13} color={FG} />
+                    <Text style={ts.coverFrameBtnText}>Use this frame as cover</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Dark circular X — over the card's top-left corner */}
+          <TouchableOpacity
+            disabled={busy}
+            onPress={() => confirmDiscardEdits(hasUnsavedEdits, () => setStep('media-pick'))}
+            style={[ts.edCloseBtn, { top: topPad + 10 }]}
+            accessibilityLabel="Close editor"
+            testID="editor-close-btn"
+          >
+            <Feather name="x" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
+
+        {/* Tool row: Text · Sticker · Audio · Clip · Overlay · Effects · Trim */}
+        <ScrollView
+          horizontal showsHorizontalScrollIndicator={false}
+          style={ts.edToolRow}
+          contentContainerStyle={ts.edToolRowContent}
+        >
+          <EditorToolChip icon="type" label="Text" onPress={() => openTextEditor()} testID="tool-text" />
+          <EditorToolChip icon="smile" label="Sticker" onPress={() => openTextEditor()} testID="tool-sticker" />
+          <EditorToolChip icon="music" label="Audio" onPress={() => setShowSoundModal(true)} testID="tool-audio" />
+          <EditorToolChip
+            icon="film" label="Clip"
+            onPress={() => router.push((`/camera-capture?maxDuration=${maxDuration}`) as never)}
+            testID="tool-clip"
+          />
+          <EditorToolChip icon="layers" label="Overlay" onPress={() => openTextEditor()} testID="tool-overlay" />
+          <EditorToolChip icon="sliders" label="Effects" onPress={() => setShowEffectsSheet(true)} testID="tool-effects" />
+          <EditorToolChip icon="scissors" label="Trim" onPress={() => setShowTrimSheet(true)} testID="tool-trim" />
+        </ScrollView>
+
+        {/* Swipe-up hint + thin non-interactive progress line (taps into Trim) */}
+        <TouchableOpacity
+          style={ts.edHintWrap}
+          activeOpacity={0.7}
+          onPress={() => setShowTrimSheet(true)}
+          accessibilityLabel="Edit trim"
+        >
+          <Feather name="chevron-up" size={14} color={MUTED} />
+          <Text style={ts.edHintText}>Swipe up to edit</Text>
+        </TouchableOpacity>
+        <View style={ts.edProgressLine} pointerEvents="none">
+          <View style={[ts.edProgressFill, { width: `${progressPct}%` as any }]} />
+        </View>
+
+        {/* Bottom row: Edit video (secondary) | Next (primary) */}
+        <View style={[ts.edBottomRow, { paddingBottom: botPad + 8 }]}>
+          <Button
+            label="Edit video" variant="secondary"
+            onPress={() => setShowTrimSheet(true)}
+            style={{ flex: 1 }}
+            disabled={busy}
+            accessibilityLabel="Edit video"
+          />
+          <Button
+            label={processingPhase === 'error' ? 'Retry' : composedVideo ? 'Next' : 'Process'}
+            icon={composedVideo && !busy ? 'arrow-right' : undefined}
+            variant="primary"
+            loading={busy}
+            onPress={() => { if (composedVideo) haptic(() => setStep('post-details')); else void processVideo(); }}
+            style={{ flex: 1 }}
+            testID="editor-next-btn"
+          />
+        </View>
+
+        {/* Trim bottom sheet */}
+        <BottomSheet visible={showTrimSheet} onClose={() => setShowTrimSheet(false)}>
+          <View style={{ paddingHorizontal: SPACING.md, paddingBottom: SPACING.md }}>
+            <Text style={[ts.sheetTitle, { color: FG }]}>Trim</Text>
+            <View style={ts.timelineMeta}>
+              <Text style={ts.timelineMetaText}>
+                {videoClips.length} clip{videoClips.length === 1 ? '' : 's'}
+              </Text>
+              <Text style={ts.timelineMetaText}>
+                {(composedVideo?.duration ?? (trimEnd - trimStart)).toFixed(1)}s
+              </Text>
+            </View>
+            <Pressable
+              style={ts.timeline}
+              onLayout={(e) => { timelineWidthRef.current = e.nativeEvent.layout.width; }}
+              onPress={(e)      => seekFromLocation(e.nativeEvent.locationX)}
+              onTouchMove={(e)  => seekFromLocation(e.nativeEvent.touches[0]?.locationX ?? 0)}
+            >
+              {videoClips.map((clip, idx) => (
+                <View
+                  key={clip.id}
+                  style={[
+                    ts.timelineClip,
+                    { flex: Math.max(0.05, (clip.duration / clip.speed) / Math.max(0.1, totalVideoDuration)),
+                      backgroundColor: idx % 2 === 0 ? PURPLE : BORDER },
+                  ]}
+                >
+                  <Text style={ts.timelineClipText}>{idx + 1}</Text>
+                </View>
+              ))}
+              <View
+                pointerEvents="none"
+                style={[ts.scrubber, {
+                  left: `${Math.max(0, Math.min(100, (scrubTime / Math.max(0.1, composedVideo?.duration ?? totalVideoDuration)) * 100))}%` as any,
+                }]}
+              />
+            </Pressable>
+            <View style={ts.trimRow}>
+              <TouchableOpacity style={ts.trimBtn} disabled={busy} onPress={() => updateTrim(trimStart - 0.5, trimEnd)}>
+                <Feather name="minus" size={12} color={FG} /><Text style={ts.trimBtnText}>Start</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={ts.trimBtn} disabled={busy} onPress={() => updateTrim(trimStart + 0.5, trimEnd)}>
+                <Feather name="plus" size={12} color={FG} /><Text style={ts.trimBtnText}>Start</Text>
+              </TouchableOpacity>
+              <View style={ts.trimSpacer} />
+              <TouchableOpacity style={ts.trimBtn} disabled={busy} onPress={() => updateTrim(trimStart, trimEnd - 0.5)}>
+                <Feather name="minus" size={12} color={FG} /><Text style={ts.trimBtnText}>End</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={ts.trimBtn} disabled={busy} onPress={() => updateTrim(trimStart, trimEnd + 0.5)}>
+                <Feather name="plus" size={12} color={FG} /><Text style={ts.trimBtnText}>End</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </BottomSheet>
+
+        {/* Effects bottom sheet — the clip's own filter/speed fields */}
+        <BottomSheet visible={showEffectsSheet} onClose={() => setShowEffectsSheet(false)}>
+          <View style={{ paddingHorizontal: SPACING.md, paddingBottom: SPACING.md }}>
+            <Text style={[ts.sheetTitle, { color: FG }]}>Filter</Text>
+            <View style={ts.effectsRow}>
+              {EDITOR_FILTERS.map(f => {
+                const active = (previewClip?.filter ?? 'none') === f.id;
+                return (
+                  <TouchableOpacity
+                    key={f.id}
+                    style={[ts.effectsChip, active && { borderColor: FG }]}
+                    onPress={() => setClipFilter(f.id)}
+                    accessibilityLabel={f.label}
+                  >
+                    <Text style={[ts.effectsChipText, { color: active ? FG : MUTED }]}>{f.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={[ts.sheetTitle, { color: FG, marginTop: SPACING.md }]}>Speed</Text>
+            <View style={ts.effectsRow}>
+              {EDITOR_SPEEDS.map(s => {
+                const active = (previewClip?.speed ?? 1) === s;
+                return (
+                  <TouchableOpacity
+                    key={s}
+                    style={[ts.effectsChip, active && { borderColor: FG }]}
+                    onPress={() => setClipSpeed(s)}
+                    accessibilityLabel={`${s}x speed`}
+                  >
+                    <Text style={[ts.effectsChipText, { color: active ? FG : MUTED }]}>{s}x</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </BottomSheet>
 
         <SoundModal
           visible={showSoundModal} onClose={() => setShowSoundModal(false)}
@@ -2256,140 +2303,51 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   nextBtnText: { fontSize: FS.base, fontFamily: FONT.bold },
 
   // ══════════════════════════════════════════════════════════════════
-  // SCREEN A — camera composer (mp = media-pick)
+  // SCREEN A — Instagram-style grid picker (pk = media-pick)
   // ══════════════════════════════════════════════════════════════════
 
-  // Top bar: X | sound pill | spacer
-  mpTopBar: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
+  pkHeader: {
+    position: 'relative',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingBottom: 10,
+    paddingHorizontal: 12, paddingBottom: 10, minHeight: 44,
   },
-  mpTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  mpSoundPill: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(40,40,40,0.88)',
-    borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9,
-    marginHorizontal: 8, maxWidth: SW * 0.52,
-    alignSelf: 'center',
-  },
-  mpSoundPillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG, flex: 1 },
-
-  // Right-edge tool column
-  mpRightTools: {
-    position: 'absolute', right: 10, zIndex: 25,
-    alignItems: 'center', gap: 2,
-  },
-  mpToolBtn:     { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  mpTextTool:    { color: FG, fontSize: 18, fontFamily: FONT.bold },
-  mpToolDivider: { width: 24, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4 },
-
-  // Canvas (fills between top bar and bottom zone)
-  mpCanvas: { flex: 1 },
-
-  // Media-in-canvas overlays
-  mpReplaceChip: {
-    position: 'absolute', top: 14, right: 12,
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(0,0,0,0.62)', borderRadius: 18,
-    paddingHorizontal: 11, paddingVertical: 6,
-  },
-  mpReplaceChipText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
-
-  mpPhotoStrip: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.52)',
-  },
-  mpPhotoThumb:    { width: 70, height: 70, borderRadius: 6, overflow: 'hidden', position: 'relative' },
-  mpPhotoThumbImg: { width: 70, height: 70 },
-  mpRemoveChip:    { position: 'absolute', top: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#000000AA', alignItems: 'center', justifyContent: 'center' },
-  mpCoverBadge:    { position: 'absolute', bottom: 4, left: 4, backgroundColor: '#000000AA', borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
-  mpCoverBadgeText:{ fontSize: FS.xs, fontFamily: FONT.bold, color: FG },
-  mpAddMoreThumb:  { width: 70, height: 70, borderRadius: 6, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-
-  // Bottom composer zone
-  mpBottom: {
-    backgroundColor: BG,
-    paddingTop: 10,
+  pkHeaderBtn:   { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  pkHeaderRight: { minWidth: 40, alignItems: 'flex-end' },
+  pkHeaderTitle: {
+    position: 'absolute', left: 0, right: 0, textAlign: 'center',
+    fontSize: FS.md, fontFamily: FONT.bold, color: FG,
   },
 
-  // Duration row (above shutter)
-  mpDurationRow: {
-    flexDirection: 'row', justifyContent: 'center',
-    gap: 0, marginBottom: 14, paddingHorizontal: 16,
+  pkPreviewBox: {
+    height: SW * 0.62, backgroundColor: '#0A0A0A',
+    position: 'relative', overflow: 'hidden',
   },
-  mpDurationBtn:      { alignItems: 'center', paddingHorizontal: 14, paddingBottom: 4 },
-  mpDurationText:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  mpDurationUnderline:{ height: 2, width: 20, backgroundColor: FG, borderRadius: 1, marginTop: 4, alignSelf: 'center' },
-
-  // Shutter row: Effects | Shutter/Next | Upload
-  mpShutterRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 28, marginBottom: 18,
+  pkPreviewEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  pkMultiBadge: {
+    position: 'absolute', top: 10, right: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12,
+    paddingHorizontal: 8, paddingVertical: 4,
   },
+  pkMultiBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: FG },
 
-  // Effects button (left)
-  mpEffectsBtn:   { alignItems: 'center', gap: 6, width: 70 },
-  mpEffectsIcon:  { width: 52, height: 52, borderRadius: 14, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' },
-  mpEffectsLabel: { fontSize: 11, fontFamily: FONT.medium, color: FG },
+  pkGridArea: { flex: 1 },
 
-  // White shutter ring (no media)
-  mpShutter: {
-    width: 76, height: 76, borderRadius: 38,
-    borderWidth: 4, borderColor: FG,
-    alignItems: 'center', justifyContent: 'center',
+  pkModePillWrap: {
+    position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 30,
   },
-  mpShutterInner: {
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: FG,
+  pkModePill: {
+    flexDirection: 'row', backgroundColor: 'rgba(30,30,30,0.88)',
+    borderRadius: RADII.pill, padding: 3,
   },
-
-  // Gradient Next pill (media selected, replaces shutter)
-  mpNextShutter: {
-    width: 130, height: 52, borderRadius: 26,
-    overflow: 'hidden',
+  pkModePillBtn: {
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: RADII.pill,
   },
-  mpNextShutterGrad: {
-    flex: 1, flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  mpNextShutterText: { fontSize: FS.base, fontFamily: FONT.bold },
-
-  // Upload thumbnail (right)
-  mpUploadBtn:   { alignItems: 'center', gap: 6, width: 70 },
-  mpUploadThumb: { width: 52, height: 52, borderRadius: 10, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  mpUploadLabel: { fontSize: 11, fontFamily: FONT.medium, color: FG },
-
-  // Camera / Story mode tabs
-  mpModeRow:       { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingBottom: 6 },
-  mpModeItem:      { alignItems: 'center', gap: 5 },
-  mpModeText:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  mpModeTextActive:{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
-  mpModeDot:       { width: 4, height: 4, borderRadius: 2, backgroundColor: FG },
+  pkModePillBtnActive: { backgroundColor: FG },
+  pkModePillText:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
+  pkModePillTextActive: { fontSize: FS.sm, fontFamily: FONT.bold, color: BG },
 
   // ── Video edit ──
-  videoTopBar: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 12,
-  },
-  videoTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  soundPill: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(30,30,30,0.85)', borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 8, maxWidth: SW * 0.55,
-  },
-  soundPillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG, flex: 1 },
-
-  rightToolbar: {
-    position: 'absolute', right: 12, zIndex: 20,
-    alignItems: 'center', gap: 6,
-  },
-  toolBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  toolBtnLabel:{ fontSize: FS.xs, fontFamily: FONT.regular, color: FG, marginTop: 2 },
-  toolDivider: { width: 30, height: StyleSheet.hairlineWidth, backgroundColor: BORDER, marginVertical: 4 },
-
   timelinePanel: {
     position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
     paddingHorizontal: 16,
@@ -2420,6 +2378,49 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: 20, paddingTop: 8,
     backgroundColor: 'rgba(0,0,0,0.60)',
   },
+
+  // ── Editor (video-edit / slide-edit): rounded card + tool row chrome ──
+  edCardOuter: {
+    flex: 1, paddingHorizontal: 16, paddingBottom: 12, position: 'relative',
+  },
+  edCard: {
+    flex: 1, borderRadius: RADII.sheet, overflow: 'hidden',
+    backgroundColor: '#000', position: 'relative',
+  },
+  edCloseBtn: {
+    position: 'absolute', left: 26, width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center',
+  },
+  edPauseGlyph: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center',
+  },
+  edToolRow: { flexGrow: 0 },
+  edToolRowContent: { flexDirection: 'row', gap: 14, paddingHorizontal: 16, paddingVertical: 10 },
+  edHintWrap: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    paddingBottom: 6,
+  },
+  edHintText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  edProgressLine: {
+    height: 2, marginHorizontal: 16, borderRadius: 1,
+    backgroundColor: BORDER, overflow: 'hidden', marginBottom: 10,
+  },
+  edProgressFill: { height: 2, backgroundColor: FG },
+  edBottomRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 4 },
+  sheetTitle: { fontSize: FS.sm, fontFamily: FONT.bold },
+  effectsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  effectsChip: {
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: RADII.chip,
+    borderWidth: 1, borderColor: BORDER,
+  },
+  effectsChipText: { fontSize: FS.xs, fontFamily: FONT.semibold },
+
+  edToolChip: { alignItems: 'center', justifyContent: 'center', gap: 4, width: 56 },
+  edToolChipIconWrap: {
+    width: 44, height: 44, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(120,120,128,0.16)', alignItems: 'center', justifyContent: 'center',
+  },
+  edToolChipLabel: { fontSize: 10, fontFamily: FONT.medium, color: MUTED },
 
   // ── Post details ──
   captionRow: {
@@ -2499,25 +2500,23 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   muted: { fontFamily: FONT.regular, color: MUTED },
 
   // ── Slide-edit step ──
-  slideStripContainer: {
-    position: 'absolute', left: 0, right: 0, zIndex: 20,
-    backgroundColor: 'rgba(0,0,0,0.60)',
-  },
   slideThumb:    { width: 60, height: 80, borderRadius: 6, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent', position: 'relative' },
   slideThumbImg: { width: 60, height: 80 },
   slideOverlayBadge: { position: 'absolute', top: 3, right: 3, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   slideReorderRow: { flexDirection: 'row', gap: 4, marginTop: 4 },
   slideReorderBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   slideOverlayBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: '#fff' },
-  slideNextBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,
-    paddingHorizontal: 20, paddingTop: 12,
-    backgroundColor: 'rgba(0,0,0,0.60)',
-  },
-  slideNextBusy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
-  slideNextBusyText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   errorRetryBtn: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   errorRetryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
+
+  slideDotsWrap: {
+    position: 'absolute', top: 10, left: 0, right: 0,
+    flexDirection: 'row', justifyContent: 'center', gap: 4,
+  },
+  slideDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.4)' },
+  slideDotActive: { backgroundColor: '#fff', width: 14 },
+  slideZoomBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
+  slideZoomImage: { width: '100%', height: '80%' },
   });
 };
 
