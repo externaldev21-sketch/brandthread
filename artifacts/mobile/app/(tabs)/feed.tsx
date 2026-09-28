@@ -381,6 +381,15 @@ const FASHION_PREVIEW_POSTER_URIS = FASHION_PREVIEW_POSTER_SOURCES.map(
   module => Asset.fromModule(module).uri,
 );
 
+// "Leather Ankle Boots" own bundled photo (see the productTags comment
+// below, and lib/previewCatalog.ts's matching BOOTS_IMAGE, for why it needs
+// one instead of reusing a runway poster) — used as this tag's `imageUri`
+// fallback so the ShopProductSheet's tag-switcher card always has a real
+// photo for it too, not just its hydrated catalog row.
+const BOOTS_TAG_IMAGE_URI = Asset.fromModule(
+  require('../../assets/images/products/leather-ankle-boots.jpg'),
+).uri;
+
 // Kick off the very first feed item's poster (and its video) the instant this
 // module evaluates — at import time, not inside a component's useEffect. The
 // JS bundle finishing is the earliest possible moment any network request
@@ -460,15 +469,14 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     //
     // Photo audit follow-up: this used to carry FASHION_PREVIEW_POSTER_URIS[3]
     // (the "Ivory Column Set" white gown photo — correct THERE, wrong here),
-    // which put a white bridal dress on a boots listing. No bundled poster
-    // in this set actually shows footwear (see the audit note in
-    // lib/previewCatalog.ts), so this tag now carries no `imageUri`
-    // fallback at all — the list row falls back to its hydrated catalog
-    // product (also photo-less, see previewCatalog.ts) and renders the
-    // app's existing no-photo placeholder instead of a wrong photo.
+    // which put a white bridal dress on a boots listing. No bundled runway
+    // poster actually shows footwear (see the audit note in
+    // lib/previewCatalog.ts), so this tag now points at its own bundled
+    // product photo (`BOOTS_TAG_IMAGE_URI` above), matching its hydrated
+    // catalog row's real photo instead of falling back to a placeholder.
     productTags: [
       { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000, imageUri: FASHION_PREVIEW_POSTER_URIS[0] },
-      { productId: 'preview-product-11', productName: 'Leather Ankle Boots', priceCents: 21000 },
+      { productId: 'preview-product-11', productName: 'Leather Ankle Boots', priceCents: 21000, imageUri: BOOTS_TAG_IMAGE_URI },
     ],
     commentsCount: 980,
   },
