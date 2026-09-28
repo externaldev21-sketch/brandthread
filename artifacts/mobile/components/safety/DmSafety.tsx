@@ -4,12 +4,13 @@
  * replacement shown when messaging is blocked in either direction.
  */
 import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
+import { showActionSheet } from '@/components/ui/ActionSheet';
 
 export interface DmCounterpart {
   userId: string;
@@ -36,7 +37,10 @@ export function openConversationOptions(params: {
   extraOptions?: Array<{ text: string; onPress: () => void }>;
 }) {
   const { router, social, counterpart, messaging, onChange, extraOptions = [] } = params;
-  Alert.alert(counterpart.name, undefined, [
+  // Alert.alert() with a button array is a silent no-op on web — this left
+  // the seller conversation header's "..." menu completely dead in the web
+  // preview. See components/ui/ActionSheet.tsx's header comment.
+  showActionSheet(counterpart.name, undefined, [
     ...extraOptions,
     {
       text: `Report ${counterpart.name}`,
@@ -74,7 +78,7 @@ export function openMessageOptions(params: {
   counterpart: DmCounterpart;
 }) {
   const { router, messageId, text, counterpart } = params;
-  Alert.alert('Message', text ? `“${text.slice(0, 140)}”` : undefined, [
+  showActionSheet('Message', text ? `“${text.slice(0, 140)}”` : undefined, [
     {
       text: 'Report message',
       onPress: () => router.push(reportHref({

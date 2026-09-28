@@ -15,6 +15,8 @@ import {
   buildActivitySections,
   createReadTracker,
   findActivityArrivals,
+  createDeferredDelete,
+  ACTIVITY_UNDO_MS,
   groupByRecency,
   groupedPeopleHref,
   groupedPeopleTitle,
@@ -536,5 +538,67 @@ describe('live arrivals', () => {
   it('ignores rows that only changed (read state) or went away', () => {
     expect(findActivityArrivals(shown, shown.map((row) => ({ ...row, isRead: !row.isRead })))).toEqual([]);
     expect(findActivityArrivals(shown, [shown[0]])).toEqual([]);
+  });
+});
+
+describe('delete with undo', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('only deletes on the server once the undo window has passed', async () => {
+    const commit = vi.fn(async () => [] as string[]);
+    const d = createDeferredDelete({ delayMs: ACTIVITY_UNDO_MS, commit });
+    d.schedule(['n1', 'n2']);
+    expect(d.isPending('n1')).toBe(true);
+    await vi.advanceTimersByTimeAsync(ACTIVITY_UNDO_MS - 1);
+    expect(commit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(commit).toHaveBeenCalledWith(['n1', 'n2']);
+    expect(d.isPending('n1')).toBe(false);
+  });
+
+  it('Undo cancels the delete entirely; too late once it has been sent', async () => {
+    const commit = vi.fn(async () => [] as string[]);
+    const d = createDeferredDelete({ delayMs: ACTIVITY_UNDO_MS, commit });
+    const first = d.schedule(['n1']);
+    expect(d.undo(first)).toBe(true);
+    expect(d.isPending('n1')).toBe(false);
+    await vi.advanceTimersByTimeAsync(ACTIVITY_UNDO_MS * 2);
+    expect(commit).not.toHaveBeenCalled();
+
+    const second = d.schedule(['n2']);
+    await vi.advanceTimersByTimeAsync(ACTIVITY_UNDO_MS);
+    expect(d.undo(second)).toBe(false);
+    expect(commit).toHaveBeenCalledWith(['n2']);
+  });
+
+  it('a newer delete, or leaving the screen, sends the waiting one straight away', async () => {
+    const commit = vi.fn(async () => [] as string[]);
+    const d = createDeferredDelete({ delayMs: ACTIVITY_UNDO_MS, commit });
+    const first = d.schedule(['n1']);
+    d.schedule(['n2']);
+    expect(commit).toHaveBeenCalledWith(['n1']);
+    expect(d.undo(first)).toBe(false);
+    d.flush();
+    expect(commit).toHaveBeenCalledWith(['n2']);
+    await vi.advanceTimersByTimeAsync(ACTIVITY_UNDO_MS);
+    expect(commit).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an id off screen while its delete is in flight, and hands back failures', async () => {
+    let resolve!: (failed: string[]) => void;
+    const onFailed = vi.fn();
+    const d = createDeferredDelete({
+      delayMs: ACTIVITY_UNDO_MS,
+      commit: () => new Promise<string[]>((r) => { resolve = r; }),
+      onFailed,
+    });
+    d.schedule(['n1', 'n2']);
+    await vi.advanceTimersByTimeAsync(ACTIVITY_UNDO_MS);
+    expect(d.isPending('n1')).toBe(true);
+    resolve(['n2']);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(d.isPending('n1')).toBe(false);
+    expect(onFailed).toHaveBeenCalledWith(['n2']);
   });
 });
