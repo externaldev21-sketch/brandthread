@@ -444,14 +444,22 @@ export const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     // any OTHER tag in the row falls back to a bag-icon placeholder until
     // it's tapped. Sculpted Wool Coat (the tag opened first) always reads
     // as hydrated, so it never showed the gap; Leather Ankle Boots, never
-    // the initially-active tag, did. Both now carry this post's own poster
-    // as their `imageUri` — the same bundled asset this preview post
-    // already uses for its own poster/gallery/seller-avatar fallbacks (see
-    // buildPreviewGalleryUris/buildPreviewShopProduct below) — so the tag
-    // card always has a real photo instead of a placeholder, active or not.
+    // the initially-active tag, did. Both carry an `imageUri` fallback so
+    // the tag card always has a real photo instead of a placeholder, active
+    // or not.
+    //
+    // Bug fix (live-check follow-up): Leather Ankle Boots used to carry
+    // both the SAME `imageUri` as Sculpted Wool Coat (this post's own
+    // poster) and a made-up productId ('preview-product-01b') with no
+    // matching catalog row, so it never actually hydrated through
+    // getBuyerProduct()/getPreviewBuyerProduct() — no seller row, and the
+    // list/detail steps always fell back to that shared poster image. It's
+    // now a real seeded catalog product (lib/previewCatalog.ts,
+    // `preview-product-11`) with its own photo and full seller data, same
+    // as every other tagged product in the app.
     productTags: [
       { productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000, imageUri: FASHION_PREVIEW_POSTER_URIS[0] },
-      { productId: 'preview-product-01b', productName: 'Leather Ankle Boots', priceCents: 21000, imageUri: FASHION_PREVIEW_POSTER_URIS[0] },
+      { productId: 'preview-product-11', productName: 'Leather Ankle Boots', priceCents: 21000, imageUri: FASHION_PREVIEW_POSTER_URIS[3] },
     ],
     commentsCount: 980,
   },
@@ -1930,7 +1938,13 @@ function buildPreviewShopProduct(
     category: 'High Fashion',
     isPreOrder: false,
     cancellationPolicy: 'Preview item — no real order will be placed.',
-    refundPolicy: 'Preview item — no payment will be collected.',
+    // Bug fix (live-check follow-up): this used to be a dev-mode disclaimer
+    // ('Preview item — no payment will be collected.') that leaked straight
+    // into the buyer-facing shipping/returns line in ShopProductSheet.tsx
+    // (`{SHIPPING_ESTIMATE_COPY} · {product.refundPolicy}`) — real per-
+    // product returns copy, same convention as the seeded catalog's own
+    // RETURNS_POLICY (lib/previewProducts.ts), not an internal note.
+    refundPolicy: 'Returns accepted within 14 days of delivery for unworn items with tags attached.',
     options: [{ id: optionId, name: 'Size', values: sizes }],
     variants: sizes.map((size, index) => ({
       id: `${tag.productId}-variant-${size.label.toLowerCase()}`,

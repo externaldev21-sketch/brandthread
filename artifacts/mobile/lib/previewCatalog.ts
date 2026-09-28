@@ -84,6 +84,18 @@ export interface PreviewCatalogProduct {
 // the muted, monochrome-leaning editorial look the rest of the catalog
 // keeps (item 45). "Crystal Mesh Top" reuses index 1's photo (also an
 // evening/going-out look) instead of a 7th distinct image.
+//
+// "Leather Ankle Boots" (posterIndex 3, shared with "Ivory Column Set" —
+// same reuse convention as Crystal Mesh Top above) was added so the Atelier
+// Noire preview post's second tagged product (feed.tsx's `productTags`,
+// preview-fashion-01) hydrates through this same real catalog path instead
+// of falling through to nothing: it used to carry a productId
+// ('preview-product-01b') with no matching catalog row, so
+// getBuyerProduct() -> getPreviewBuyerProduct() always returned null for
+// it — no seller row (sellerVerified, sellerDisplayName), and its LIST-step
+// thumbnail fell back to the post's own poster image, the same one the
+// first tagged product ("Sculpted Wool Coat") already shows. Now id
+// `preview-product-11`, matching this array's normal auto-id convention.
 const SEED: Array<Omit<PreviewCatalogProduct, 'images' | 'cutoutUri' | 'id' | 'productId' | 'sellerId' | 'sizeChartImageUrl'> & { posterIndex: number; sizeChartKey?: string }> = [
   { posterIndex: 0, name: 'Sculpted Wool Coat', sellerDisplayName: 'Atelier Noire', category: 'Outerwear', currentPriceCents: 48000, compareAtPriceCents: null, priceCents: 48000, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 18, remainingUnits: 6, demandCount: 142, tags: ['coat', 'wool', 'tailoring'], sizeChartKey: 'wool-coat' },
   { posterIndex: 1, name: 'Liquid Silver Dress', sellerDisplayName: 'Maison Vela', category: 'Dresses', currentPriceCents: 32500, compareAtPriceCents: 39000, priceCents: 32500, sizes: ['XS', 'S', 'M'], claimedUnits: 24, remainingUnits: 4, demandCount: 210, tags: ['dress', 'evening'] },
@@ -95,11 +107,12 @@ const SEED: Array<Omit<PreviewCatalogProduct, 'images' | 'cutoutUri' | 'id' | 'p
   { posterIndex: 7, name: 'Reconstructed Trench', sellerDisplayName: 'Noma Archive', category: 'Outerwear', currentPriceCents: 52000, compareAtPriceCents: null, priceCents: 52000, sizes: ['S', 'M', 'L', 'XL'], claimedUnits: 7, remainingUnits: 13, demandCount: 64, tags: ['trench', 'coat'] },
   { posterIndex: 8, name: 'Satin Power Suit', sellerDisplayName: 'Echelon', category: 'Suiting', currentPriceCents: 44500, compareAtPriceCents: 51000, priceCents: 44500, sizes: ['XS', 'S', 'M', 'L'], claimedUnits: 19, remainingUnits: 5, demandCount: 188, tags: ['suit'] },
   { posterIndex: 9, name: 'Sculpted Silk Gown', sellerDisplayName: 'Vale Studio', category: 'Dresses', currentPriceCents: 69000, compareAtPriceCents: null, priceCents: 69000, sizes: ['XS', 'S', 'M'], claimedUnits: 5, remainingUnits: 7, demandCount: 71, tags: ['gown', 'evening'] },
+  { posterIndex: 3, name: 'Leather Ankle Boots', sellerDisplayName: 'Atelier Noire', category: 'Footwear', currentPriceCents: 21000, compareAtPriceCents: null, priceCents: 21000, sizes: ['37', '38', '39', '40', '41'], claimedUnits: 14, remainingUnits: 5, demandCount: 118, tags: ['boots', 'leather', 'footwear'] },
 ];
 
 let cached: PreviewCatalogProduct[] | null = null;
 
-/** The full seeded preview catalog (10 products). Callers should still
+/** The full seeded preview catalog (11 products). Callers should still
  *  gate on `isPreviewCatalogEnabled()` before using this. */
 export function getPreviewCatalog(): PreviewCatalogProduct[] {
   if (cached) return cached;
