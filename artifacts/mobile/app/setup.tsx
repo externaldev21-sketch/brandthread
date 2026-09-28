@@ -21,7 +21,6 @@ import { useAuth } from '@clerk/expo';
 import {
   BG, CARD, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
-  SUCCESS, SUCCESS_DIM, GRAD_SUCCESS_G,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
@@ -80,7 +79,7 @@ function TaskCard({
           style={[ts.check, task.completed && ts.checkDone]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          {task.completed && <Feather name="check" size={ICON.sm} color={ON_DARK} />}
+          {task.completed && <Feather name="check" size={ICON.sm} color={colors.primaryForeground} />}
         </TouchableOpacity>
 
         {/* Center: content */}
@@ -118,7 +117,7 @@ const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.cr
   cardDone:   { opacity: 0.6 },
   check:      { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.primary,
                 alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  checkDone:  { backgroundColor: SUCCESS, borderColor: SUCCESS },
+  checkDone:  { backgroundColor: colors.primary, borderColor: colors.primary },
   body:       { flex: 1 },
   labelRow:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: 2 },
   label:      { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
@@ -228,7 +227,7 @@ export default function SetupScreen() {
             </Text>
           )}
           {allDone && (
-            <Text style={[s.progressNext, { color: SUCCESS }]}>
+            <Text style={[s.progressNext, { color: theme.text }]}>
               ✓ All required steps complete — you're ready to go!
             </Text>
           )}
@@ -237,12 +236,12 @@ export default function SetupScreen() {
         {/* All done card */}
         {allDone && (
           <GradientCard
-            colors={[SUCCESS_DIM, 'rgba(16,185,129,0.03)']}
-            style={{ marginBottom: SP.md, borderColor: SUCCESS + '44' }}
+            colors={[colors.accent, colors.card]}
+            style={{ marginBottom: SP.md, borderColor: theme.border }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
               <View style={s.doneIcon}>
-                <Feather name="check-circle" size={ICON.lg} color={SUCCESS} />
+                <Feather name="check-circle" size={ICON.lg} color={theme.text} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.title, { fontSize: FS.md }]}>Your store is ready!</Text>
@@ -254,7 +253,6 @@ export default function SetupScreen() {
               onPress={() => router.replace('/(tabs)/' as never)}
               icon="home"
               style={{ marginTop: SP.md }}
-              colors={GRAD_SUCCESS_G}
             />
           </GradientCard>
         )}
@@ -298,5 +296,5 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   progressCard: { marginBottom: SP.md },
   progressThread: { width: '100%', marginBottom: SP.sm },
   progressNext: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  doneIcon:     { width: 48, height: 48, borderRadius: RADIUS.md, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center' },
+  doneIcon:     { width: 48, height: 48, borderRadius: RADIUS.md, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
 });

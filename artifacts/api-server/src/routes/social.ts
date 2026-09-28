@@ -13,7 +13,7 @@
  */
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
+import { db, users, follows, stories, storyLikes, storyViews, notes, blocks, posts, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -135,6 +135,7 @@ async function buildBuyerPosts(
     mediaType: posts.mediaType,
     caption: posts.caption,
     styleTags: posts.styleTags,
+    postStatus: posts.postStatus,
     createdAt: posts.createdAt,
     name: users.name,
     displayName: users.displayName,
@@ -146,7 +147,11 @@ async function buildBuyerPosts(
       inArray(posts.userId, authorIds),
     ))
     .where(and(
-      sql`${posts.postStatus} NOT IN ('deleted', 'archived', 'draft')`,
+      sql`${posts.postStatus} NOT IN ('deleted', 'archived')`,
+      // A draft is never visible to anyone except its own author viewing
+      // their own profile (item 117: buyer drafts resume) — this never
+      // leaks another author's draft even when authorIds has several people.
+      sql`(${posts.postStatus} != 'draft' OR ${posts.userId} = ${viewerId})`,
       eq(posts.moderationStatus, "visible"),
       authorInGoodStanding(posts.userId),
       notBlockedWith(viewerId, posts.userId),
@@ -213,7 +218,7 @@ async function buildBuyerPosts(
       repostedByMe: mine.get(row.id)?.has("repost") ?? false,
       savedByMe: false,
       isArchived: false,
-      isDraft: false,
+      isDraft: row.postStatus === "draft",
       createdAt: row.createdAt,
       updatedAt: row.createdAt,
     };
@@ -1222,6 +1227,110 @@ router.post("/stories/:id/view", async (req, res) => {
   }
 
   res.json({ ok: true });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NOTES — bubble above story avatars (Instagram-style "Notes"). Structurally
+// parallel to stories above: short-lived (24h TTL, same pattern as
+// stories.expiresAt), per-author. Unlike stories, each author has at most
+// one active note — posting a new one replaces the old (enforced by the
+// unique index on notes.authorId via onConflictDoUpdate below).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const NOTE_MAX_CHARS = 60;
+
+function buildNoteView(row: typeof notes.$inferSelect) {
+  return {
+    authorId:       row.authorId,
+    authorName:     row.authorName,
+    authorHandle:   row.authorHandle ?? "",
+    authorInitials: row.authorInitials ?? "",
+    authorColor:    row.authorColor ?? "#71717A",
+    text:           row.text,
+    createdAt:      new Date(row.createdAt).getTime(),
+    expiresAt:      new Date(row.expiresAt).getTime(),
+  };
+}
+
+// ─── POST /api/social/notes — post/replace my own note ───────────────────────
+router.post("/notes", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const { text: rawText } = req.body as { text?: string };
+  const text = typeof rawText === "string" ? rawText.trim() : "";
+  if (!text) { res.status(400).json({ error: "text required" }); return; }
+  if (text.length > NOTE_MAX_CHARS) {
+    res.status(400).json({ error: `Notes are limited to ${NOTE_MAX_CHARS} characters` }); return;
+  }
+
+  const restriction = await publishingRestriction(myId);
+  if (restriction) { res.status(restriction.status).json(restriction.body); return; }
+
+  // Slurs and threats are filtered everywhere, including note text.
+  const decision = evaluateContent(text, "dm");
+  if (decision.action === "reject" && (decision.category === "hate_speech" || decision.category === "harassment")) {
+    res.status(422).json({ error: decision.reason, category: decision.category, code: "CONTENT_REJECTED" }); return;
+  }
+
+  const [me] = await db.select({
+    name: users.name, displayName: users.displayName, username: users.username,
+  }).from(users).where(eq(users.clerkId, myId)).limit(1);
+  if (!me) { res.status(403).json({ error: "Account not found" }); return; }
+  const myName = me.displayName || me.name || "Brandthread member";
+  const myHandle = me.username ? `@${me.username}` : `@${myName.toLowerCase().replace(/\s+/g, "")}`;
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  const [row] = await db.insert(notes).values({
+    authorId:       myId,
+    authorName:     myName,
+    authorHandle:   myHandle,
+    authorInitials: initials(myName),
+    authorColor:    avatarColor(myId),
+    text,
+    createdAt:      now,
+    expiresAt,
+  }).onConflictDoUpdate({
+    target: notes.authorId,
+    set: {
+      authorName:     myName,
+      authorHandle:   myHandle,
+      authorInitials: initials(myName),
+      authorColor:    avatarColor(myId),
+      text,
+      createdAt:      now,
+      expiresAt,
+    },
+  }).returning();
+
+  res.status(201).json(buildNoteView(row));
+});
+
+// ─── GET /api/social/notes/following — active notes tray ────────────────────
+// One entry per followed author (+ me) with a still-active (<24h) note —
+// piggybacks on the same follow-graph lookup /stories/following runs, so the
+// story tray can fetch "does this person have a note, and what does it say"
+// alongside "does this person have an active story."
+router.get("/notes/following", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const now  = new Date();
+
+  const followingRows = await db.select({ followingId: follows.followingId })
+    .from(follows).where(eq(follows.followerId, myId));
+  const authorIds = Array.from(new Set([myId, ...followingRows.map((r) => r.followingId)]));
+
+  const rows = await db.select().from(notes)
+    .where(and(inArray(notes.authorId, authorIds), gt(notes.expiresAt, now)));
+  if (!rows.length) { res.json([]); return; }
+
+  const blockedIds = new Set(
+    (await db.select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId }).from(blocks)
+      .where(or(eq(blocks.blockerId, myId), eq(blocks.blockedId, myId))))
+      .flatMap((b) => [b.blockerId === myId ? b.blockedId : b.blockerId]),
+  );
+
+  const visibleRows = rows.filter((r) => r.authorId === myId || !blockedIds.has(r.authorId));
+  res.json(visibleRows.map(buildNoteView));
 });
 
 // ─── Block CRUD ───────────────────────────────────────────────────────────────

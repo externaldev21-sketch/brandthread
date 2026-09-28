@@ -19,8 +19,10 @@ import {
   GROUPED_PEOPLE_MAX_IDS,
   isGroupedRow,
   isFollowBackRow,
+  isBuyerOrderNotification,
   newFollowersSummary,
   relativeTime,
+  stripEmoji,
   type ActivityItem,
 } from './activity';
 
@@ -53,7 +55,7 @@ function like(actor: string, postId: string, overrides: Partial<ActivityItem> = 
     actorId: `user_${actor}`,
     actorName: actor,
     actorInitials: actor.slice(0, 2).toUpperCase(),
-    actorColor: '#8B5CF6',
+    actorColor: '#3D3D42',
     targetId: postId,
     targetType: 'post',
     targetImageUrl: `https://cdn.test/${postId}.jpg`,
@@ -245,6 +247,28 @@ describe('read state', () => {
   });
 });
 
+describe('monochrome system titles', () => {
+  it('drops colour emoji from stored order titles', () => {
+    expect(stripEmoji('Your order has shipped! 🚚')).toBe('Your order has shipped!');
+    expect(stripEmoji('Your order was delivered! 📦')).toBe('Your order was delivered!');
+    expect(stripEmoji('New order! 🛍️')).toBe('New order!');
+    expect(stripEmoji('Your package is arriving today 🚚')).toBe('Your package is arriving today');
+    expect(stripEmoji('Big 🎉 news')).toBe('Big news');
+  });
+
+  it('keeps plain text and monochrome check glyphs', () => {
+    expect(stripEmoji('✓ Trial started')).toBe('✓ Trial started');
+    expect(stripEmoji('Order #BT-00042 — 2 items')).toBe('Order #BT-00042 — 2 items');
+  });
+
+  it('is applied to system rows only, never to a person-led sentence', () => {
+    const [system] = aggregateActivity([item({ type: 'order_shipped', category: 'orders', title: 'Your order has shipped! 🚚' })]);
+    expect(activityMessage(system)).toEqual([{ text: 'Your order has shipped!', bold: true }]);
+    const [person] = aggregateActivity([like('Mia 🌸', 'post1')]);
+    expect(activityMessage(person).map((p) => p.text).join('')).toBe('Mia 🌸 liked your post');
+  });
+});
+
 describe('relativeTime', () => {
   const now = new Date(2026, 8, 24, 15, 0).getTime();
   it('formats the notification style', () => {
@@ -292,6 +316,26 @@ describe('classification and routing', () => {
       .toBe('/thread-cash');
     expect(activityHref(item({ type: 'repost', targetType: 'post', targetId: 'p1' })))
       .toBe('/buyer-post-viewer?postId=p1');
+  });
+
+  it("routes buyer order updates to the buyer's order screen, whatever targetType they were stored with", () => {
+    for (const type of ['order_confirmed', 'order_shipped', 'order_out_for_delivery', 'order_delivered', 'order_cancelled', 'order_exception', 'order_returned_to_sender']) {
+      expect(activityHref(item({ type, category: 'orders', targetType: 'order', targetId: 'o1' }))).toBe('/buyer-order-detail?id=o1');
+      expect(activityHref(item({ type, category: 'orders', targetType: 'buyer_order', targetId: 'o1' }))).toBe('/buyer-order-detail?id=o1');
+      expect(isBuyerOrderNotification(type)).toBe(true);
+    }
+    // Seller-side order events keep the seller screen.
+    for (const type of ['new_order_received', 'order_cancelled_by_buyer', 'shopify_order_cancelled']) {
+      expect(activityHref(item({ type, category: 'orders', targetType: 'order', targetId: 'o2' }), 'seller')).toBe('/order-detail?id=o2');
+      expect(isBuyerOrderNotification(type)).toBe(false);
+    }
+    // Return status rows: Orders filter, and the same screen the push opens.
+    expect(activityKind({ category: 'returns', type: 'return_refunded' })).toBe('orders');
+    expect(activityHref(item({ type: 'return_approved', category: 'returns', targetType: 'return', targetId: 'r1' })))
+      .toBe('/return-detail?returnId=r1');
+    expect(activityIcon({ type: 'order_confirmed', category: 'orders' })).toBe('check-circle');
+    expect(activityIcon({ type: 'order_cancelled_by_buyer', category: 'orders' })).toBe('x-circle');
+    expect(activityIcon({ type: 'return_refunded', category: 'returns' })).toBe('rotate-ccw');
   });
 
   it('icons the new event types', () => {

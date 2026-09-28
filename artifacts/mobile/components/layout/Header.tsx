@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, GUTTER, ICON, SP } from '@/lib/theme';
+import { FONT, FS, GUTTER, ICON, SP, WEB_SAFE_AREA_TOP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export type HeaderAction = {
@@ -29,7 +29,10 @@ const COLLAPSE_DISTANCE = LARGE_TITLE_HEIGHT - COMPACT_HEIGHT;
 const ROOT_TITLE_SIZE = 20;
 const ROOT_TITLE_LETTER_SPACING = -0.4;
 const ROOT_TOP_GAP = 12;
-const ROOT_WEB_SAFE_TOP = 67;
+// Overnight batch item 40: shared stand-in (lib/theme.ts) for a real
+// device's status-bar inset on web preview — was its own hardcoded 67,
+// higher than a real device's actual inset at this preview size.
+const ROOT_WEB_SAFE_TOP = WEB_SAFE_AREA_TOP;
 const ROOT_ROW_HEIGHT = 44;
 
 /**

@@ -108,6 +108,32 @@ export function groupCornerRadii(
   };
 }
 
+export interface PreviewableMessage {
+  text?: string | null;
+  attachment?: { title?: string | null; type?: string | null } | null;
+}
+
+/** A short, human preview of a message's content — used both for the
+ *  swipe-to-reply "Replying to …" banner (ReplyBanner) and the in-bubble
+ *  quoted-reply strip. Falls back through the attachment's own title (e.g.
+ *  "Photo", "Voice message") for an attachment-only original with no text,
+ *  so a reply to a photo/voice/product card never renders a blank quote. */
+export function messagePreviewText(msg: PreviewableMessage): string {
+  const text = msg.text?.trim();
+  if (text) return text;
+  const title = msg.attachment?.title?.trim();
+  if (title) return title;
+  switch (msg.attachment?.type) {
+    case 'image': return 'Photo';
+    case 'video': return 'Video';
+    case 'voice': return 'Voice message';
+    case 'product': return 'Product';
+    case 'order': return 'Order';
+    case 'post': return 'Post';
+    default: return 'Message';
+  }
+}
+
 export interface SeenableMessage {
   id: string;
   fromId: string;

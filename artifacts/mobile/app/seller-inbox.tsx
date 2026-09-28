@@ -19,6 +19,7 @@ import { hapticPrimaryAction } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
+import { isPreviewInboxEnabled, getSellerPreviewConversations } from '@/lib/previewInbox';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -81,7 +82,21 @@ export default function SellerInboxScreen() {
   }, [clerkLoaded, myId]);
 
   const load = useCallback(async (generation: number, silent = false) => {
-    if (!clerkLoaded || !myId) return;
+    if (!clerkLoaded) return;
+    if (!myId) {
+      // The dev-web ?bt_preview=seller bypass never signs in through Clerk
+      // (see lib/devPreview.ts), so `myId` is empty here in that mode —
+      // without this branch the seller inbox had nothing to show at all in
+      // preview (see app/(buyer)/inbox.tsx's identical buyer-side guard,
+      // which this mirrors). Real accounts always have a myId and never hit
+      // this branch.
+      if (isPreviewInboxEnabled()) {
+        setConvs(getSellerPreviewConversations() as unknown as ConvView[]);
+        setLoadError(false);
+      }
+      setIsLoading(false);
+      return;
+    }
     // Keep one request in flight per focus cycle so a slow request cannot
     // overlap a later poll and corrupt the consecutive-failure count.
     if (requestGenerationRef.current === generation) return;
