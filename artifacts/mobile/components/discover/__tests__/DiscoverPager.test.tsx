@@ -69,6 +69,11 @@ vi.mock('react-native', () => {
     ActivityIndicator: el('ActivityIndicator'),
     Modal: el('Modal'),
     Linking: { openURL: vi.fn(async () => {}) },
+    // hooks/useCartBadgeBump reads Reduce Motion.
+    AccessibilityInfo: {
+      isReduceMotionEnabled: vi.fn(async () => false),
+      addEventListener: vi.fn(() => ({ remove: () => {} })),
+    },
     FlatList,
     Animated: {
       Value: class { constructor(public _value: number) {} setValue() {} interpolate() { return this; } },
