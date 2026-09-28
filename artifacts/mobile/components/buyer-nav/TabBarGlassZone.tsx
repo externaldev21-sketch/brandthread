@@ -26,14 +26,23 @@
  * floating tab bar: the feed's video, and any list screen (Activity,
  * Orders, …) that used to have a hard dark scrim there instead.
  *
- * Structured as one isolated component (not scattered inline per screen) so
- * it can be swapped later for a future shared `<Glass/>` primitive without
- * touching call sites — see the coordination note in this repo's PR history
- * for the in-flight shared Glass primitive this may eventually consume.
+ * Reuses the app's shared `<Glass/>` primitive (components/ui/Glass.tsx,
+ * from the Liquid Glass sweep) for its solid full-intensity body — same
+ * native GlassView/BlurView selection, same Android blur method, so this
+ * strip's material matches every other glass surface in the app. `Glass`
+ * itself has no partial-intensity or masking API (it's a fixed-material
+ * pill/panel primitive), so the feathered top edge — this component's own
+ * job — stays hand-rolled here: a real CSS mask on web, and a short run of
+ * stacked, ramping-intensity `BlurView` bands on native approximating the
+ * same soft ramp (there's no cheap alpha-mask for a native blur view without
+ * pulling in @react-native-masked-view). Kept as its own component, not
+ * inlined per screen, so it stays a single place to later fold into `Glass`
+ * itself if that primitive grows mask/intensity support.
  */
 import React from 'react';
 import { Platform, StyleSheet, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Glass } from '@/components/ui/Glass';
 
 export interface TabBarGlassZoneProps {
   /** Height of the glass strip, in points — normally the tab bar's `barTopInset`. */
@@ -131,12 +140,15 @@ function NativeGlassZone({ height, width, tint, featherHeight, style }: Required
           }}
         />
       ))}
-      {/* Body zone: one solid full-intensity blur (or system glass on iOS 26+). */}
+      {/* Body zone: the shared Glass primitive at full strength — same
+          material (GlassView on iOS 26+, BlurView elsewhere) as every other
+          glass surface in the app. */}
       {bodyHeight > 0 && (
-        <NativeBlurBand
+        <Glass
+          variant="regular"
           tint={tint}
-          intensity={85}
-          preferGlass
+          radius={0}
+          pointerEvents="none"
           style={{ position: 'absolute', top: featherHeight, left: 0, width, height: bodyHeight }}
         />
       )}
@@ -154,48 +166,28 @@ function NativeGlassZone({ height, width, tint, featherHeight, style }: Required
   );
 }
 
-let cachedIsLiquidGlassAvailable: boolean | null = null;
-function isLiquidGlassAvailable(): boolean {
-  if (cachedIsLiquidGlassAvailable != null) return cachedIsLiquidGlassAvailable;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('expo-glass-effect') as typeof import('expo-glass-effect');
-    cachedIsLiquidGlassAvailable = Platform.OS === 'ios' && mod.isLiquidGlassAvailable();
-  } catch {
-    cachedIsLiquidGlassAvailable = false;
-  }
-  return cachedIsLiquidGlassAvailable;
-}
-
 /**
- * One blur band. Lazily requires `expo-blur`/`expo-glass-effect` at first
- * render (matches GlassPanel's/IconButton's own lazy require) so a screen
- * that never mounts this zone doesn't pull the native blur module in.
+ * One feather-ramp blur band. Lazily requires `expo-blur` at first render
+ * (matches `Glass`'s own lazy require) so a screen that never mounts this
+ * zone doesn't pull the native blur module in.
  *
- * Android has no reliably-available live system blur across devices, so it
- * falls back to a flat, carefully-tuned translucent tint there instead of
- * `BlurView` — `expo-blur`'s Android path (`dimezisBlurViewSdk31Plus`) needs
- * SDK 31+ and still isn't universal, and a half-working blur reads worse
- * than a tuned gradient. iOS/web get the real thing.
+ * `blurMethod: 'dimezisBlurViewSdk31Plus'` on Android — the same real-blur
+ * attempt `Glass` itself makes on SDK 31+, falling back to `BlurView`'s own
+ * built-in semi-transparent-view behavior below that (see `BlurMethod`'s
+ * doc in expo-blur's types) rather than a hand-rolled flat tint here.
  */
-function NativeBlurBand({ style, intensity, tint, preferGlass = false }: { style: ViewStyle; intensity: number; tint: 'dark' | 'light'; preferGlass?: boolean }) {
-  if (Platform.OS === 'android') {
-    const rgb = TINT_RGB[tint];
-    return <View style={[style, { backgroundColor: `rgba(${rgb},${Math.min(0.6, (intensity / 85) * 0.5)})` }]} />;
-  }
-  if (preferGlass && isLiquidGlassAvailable()) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { GlassView } = require('expo-glass-effect') as typeof import('expo-glass-effect');
-      return <GlassView glassEffectStyle="regular" style={style} />;
-    } catch {
-      // fall through to BlurView
-    }
-  }
+function NativeBlurBand({ style, intensity, tint }: { style: ViewStyle; intensity: number; tint: 'dark' | 'light' }) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { BlurView } = require('expo-blur') as typeof import('expo-blur');
-    return <BlurView intensity={intensity} tint={tint} style={style} />;
+    return (
+      <BlurView
+        intensity={intensity}
+        tint={tint}
+        blurMethod={Platform.OS === 'android' ? 'dimezisBlurViewSdk31Plus' : undefined}
+        style={style}
+      />
+    );
   } catch {
     return null;
   }
