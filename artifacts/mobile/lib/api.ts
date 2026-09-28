@@ -2250,6 +2250,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>;
       }) =>
         post<any>('/api/returns', data),
+      /** Upload one return photo (buyer); send the returned objectPath in `evidenceUrls`. */
+      uploadEvidence: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ objectPath: string }>('/api/returns/evidence', image, getToken, getCacheScope),
       listBuyer:    () => get<any[]>('/api/returns/buyer'),
       listSeller:   () => get<any[]>('/api/returns'),
       get:          (id: string) => get<any>(`/api/returns/${id}`),

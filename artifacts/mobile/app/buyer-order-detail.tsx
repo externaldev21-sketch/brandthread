@@ -47,6 +47,7 @@ import { canBuyerCancel } from '@/services/orderPolicy';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
+import { isReturnEligible, returnReasonLabel, statusLabel as returnStatusLabel, type ReturnStatusKey } from '@/lib/returns';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -668,12 +669,18 @@ export default function BuyerOrderDetailScreen() {
     }
   }
 
+  // Item 108: the button only exists when it can do something. A delivered
+  // order opens the request form; an order with a return opens its status.
+  // (It used to show for every order and, on web, do nothing: Alert.alert
+  // is a no-op there.)
   function handleRequestReturn() {
     if (!order) return;
-    if (order.status === 'delivered') {
-      router.push(('/return-request?orderId=' + order.id) as never);
-    } else {
-      Alert.alert('Not Eligible', 'Returns are only available after your order has been delivered.');
+    if (returnRequest?.id) {
+      router.push(('/return-detail?returnId=' + encodeURIComponent(returnRequest.id)) as never);
+      return;
+    }
+    if (isReturnEligible(order.status)) {
+      router.push(('/return-request?orderId=' + encodeURIComponent(order.id)) as never);
     }
   }
 
@@ -841,37 +848,40 @@ export default function BuyerOrderDetailScreen() {
           </BrandthreadCard>
         </View>
 
-        {/* Return request */}
+        {/* Return request: tap for its full status (/return-detail). */}
         {returnRequest && (
-          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
+          <TouchableOpacity
+            style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}
+            onPress={handleRequestReturn}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Return ${returnStatusLabel(returnRequest.status as ReturnStatusKey)}. View return status`}
+            testID="order-return-card"
+          >
             <GradientCard colors={GRAD_CARD_GLOW}>
               <View style={styles.returnHeader}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.returnEyebrow}>RETURN / REFUND</Text>
-                  <Text style={styles.returnTitle}>
-                    {String(returnRequest.status).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
-                  </Text>
+                  <Text style={styles.returnEyebrow}>RETURN</Text>
+                  <Text style={styles.returnTitle}>{returnStatusLabel(returnRequest.status as ReturnStatusKey)}</Text>
                 </View>
-                <StatusBadge
-                  label={String(returnRequest.status).toUpperCase()}
-                  variant={returnRequest.status === 'refunded' ? 'success' : returnRequest.status === 'denied' ? 'error' : returnRequest.status === 'approved' ? 'info' : 'warning'}
-                />
+                <StatusBadge label={returnStatusLabel(returnRequest.status as ReturnStatusKey).toUpperCase()} variant="neutral" />
+                <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
               </View>
-              <Text style={styles.returnDetail}>Requested: {String(returnRequest.resolutionRequested ?? 'refund').replace(/_/g, ' ')}</Text>
+              <Text style={styles.returnDetail}>Reason: {returnReasonLabel(String(returnRequest.reason ?? 'other'))}</Text>
               {returnRequest.refundAmountCents != null && (
                 <Text style={styles.returnDetail}>Refunded: {formatCents(returnRequest.refundAmountCents)}</Text>
               )}
               {returnRequest.sellerResponse ? (
                 <View style={styles.sellerResponse}>
-                  <Text style={[styles.sellerResponseLabel, { color: PURPLE_LIGHT }]}>Seller response</Text>
+                  <Text style={[styles.sellerResponseLabel, { color: theme.muted }]}>Seller response</Text>
                   <Text style={styles.sellerResponseText}>{returnRequest.sellerResponse}</Text>
                 </View>
-              ) : (
+              ) : returnRequest.status === 'pending' ? (
                 <Text style={styles.returnPendingText}>Waiting for the seller to respond.</Text>
-              )}
+              ) : null}
               <Text style={styles.returnUpdated}>Updated {fmtDate(returnRequest.updatedAt)}</Text>
             </GradientCard>
-          </View>
+          </TouchableOpacity>
         )}
 
         <BuyerCancellationDetailsCard order={order} />
@@ -1030,12 +1040,13 @@ export default function BuyerOrderDetailScreen() {
               disabled={cancelling}
             />
           )}
-          <SecondaryButton
-            label={returnRequest ? 'Return Request Submitted' : 'Request Return'}
-            icon="refresh-ccw"
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleRequestReturn(); }}
-            disabled={!!returnRequest}
-          />
+          {returnRequest || isReturnEligible(order.status) ? (
+            <SecondaryButton
+              label={returnRequest ? 'View Return' : 'Request Return'}
+              icon="refresh-ccw"
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleRequestReturn(); }}
+            />
+          ) : null}
           <SecondaryButton label="Report a Problem" icon="alert-circle" onPress={handleReportProblem} accent={theme.error} />
           <SecondaryButton label="Report Seller" icon="flag" onPress={handleReportSeller} accent={theme.error} />
           {order.status === 'delivered' && (
@@ -1140,7 +1151,7 @@ const makeStyles = (theme: AppThemePreset) => {
     returnHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
     returnEyebrow: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.7 },
     returnTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md, marginTop: 2 },
-    returnDetail: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, textTransform: 'capitalize' },
+    returnDetail: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4 },
     sellerResponse: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, padding: SP.sm, marginTop: SP.sm },
     sellerResponseLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, marginBottom: 4 },
     sellerResponseText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },

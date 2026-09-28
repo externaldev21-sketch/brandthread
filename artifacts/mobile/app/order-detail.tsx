@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +17,8 @@ import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
+import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReasonLabel, statusLabel as returnRequestStatusLabel, type ReturnView } from '@/lib/returns';
+import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
 import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -432,6 +433,10 @@ export default function OrderDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>((tab as Tab) || 'overview');
+  // Item 108: this order's real return requests (GET /api/returns, seller).
+  // null = not loaded yet; the Returns tab shows a spinner until then.
+  const [orderReturns, setOrderReturns] = useState<ReturnView[] | null>(null);
+  const [returnsError, setReturnsError] = useState(false);
 
   // Cancel modal
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -466,6 +471,17 @@ export default function OrderDetailScreen() {
     if (requestGenerationRef.current === generation) return;
     requestGenerationRef.current = generation;
     if (!hasLoadedRef.current) setLoading(true);
+    api.returns.listSeller()
+      .then(rows => {
+        if (generationRef.current !== generation) return;
+        setOrderReturns((Array.isArray(rows) ? rows : []).filter((row: any) => row?.orderId === id).map(adaptReturnRow));
+        setReturnsError(false);
+      })
+      .catch(() => {
+        if (generationRef.current !== generation) return;
+        setReturnsError(true);
+        setOrderReturns(prev => prev ?? []);
+      });
     try {
       const raw = await api.orders.get(id);
       if (generationRef.current !== generation) return; // stale focus cycle
@@ -648,18 +664,6 @@ export default function OrderDetailScreen() {
     });
   }
 
-  async function handleReturnAction(returnId: string, status: ReturnStatus, deniedReason?: string) {
-    if (status === 'denied') hapticDestructiveConfirm();
-    else hapticSuccessAction();
-    // Returns not yet wired to API — update locally
-    if (order) {
-      setOrder({
-        ...order,
-        returns: order.returns.map(r => r.id === returnId ? { ...r, status, deniedReason } : r),
-      });
-    }
-  }
-
   // ── Render ───────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -726,7 +730,9 @@ export default function OrderDetailScreen() {
             accessibilityState={{ selected: activeTab === t.key }}
             accessibilityLabel={t.label}
           >
-            <Text style={[s.tabLabel, activeTab === t.key && s.tabLabelActive]}>{t.label}</Text>
+            <Text style={[s.tabLabel, activeTab === t.key && s.tabLabelActive]}>
+              {t.key === 'returns' && orderReturns && orderReturns.length > 0 ? `${t.label} (${orderReturns.length})` : t.label}
+            </Text>
           </PressableScale>
         ))}
       </ScrollView>
@@ -769,7 +775,7 @@ export default function OrderDetailScreen() {
         {activeTab === 'payment'     && <PaymentTab order={order} />}
         {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onUpdateTracking={handleUpdateTracking} updatingTracking={updatingTracking} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
         {activeTab === 'timeline'    && <TimelineTab order={order} noteText={noteText} setNoteText={setNoteText} onAddNote={handleAddNote} addingNote={addingNote} />}
-        {activeTab === 'returns'     && <ReturnsTab order={order} onAction={handleReturnAction} router={router} />}
+        {activeTab === 'returns'     && <ReturnsTab returns={orderReturns} loadError={returnsError} router={router} />}
         {activeTab === 'disputes'    && <DisputesTab order={order} router={router} />}
         {activeTab === 'notes'       && <NotesTab order={order} noteText={noteText} setNoteText={setNoteText} noteType={noteType} setNoteType={setNoteType} onAddNote={handleAddNote} addingNote={addingNote} onPinNote={handlePinNote} />}
       </ScrollView>
@@ -1490,98 +1496,69 @@ function TimelineTab({ order, noteText, setNoteText, onAddNote, addingNote }: {
 // TAB: RETURNS
 // ═══════════════════════════════════════════════════════
 
-function ReturnsTab({ order, onAction, router }: {
-  order: Order;
-  onAction: (returnId: string, status: ReturnStatus, reason?: string) => void;
+/**
+ * Item 108: the buyer's real return requests for this order (it used to
+ * render `order.returns`, which the API adapter always left empty, with
+ * Approve / Deny buttons that only changed local state). Each card opens
+ * /return-detail, where approving (refund) and declining call the API.
+ */
+function ReturnsTab({ returns, loadError, router }: {
+  returns: ReturnView[] | null;
+  loadError: boolean;
   router: ReturnType<typeof useRouter>;
 }) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const { theme } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
-  const [denyingReturnId, setDenyingReturnId] = useState<string | null>(null);
-  const [denyReason, setDenyReason] = useState('');
-  if (order.returns.length === 0) {
+  if (returns === null) {
     return (
-      <View style={s.tabContent}>
-        <EmptyState icon="package" title="No Return Requests" description="No return requests have been submitted for this order." />
+      <View style={[s.tabContent, { alignItems: 'center', paddingVertical: SP.xl }]}>
+        <ActivityIndicator color={theme.text} />
       </View>
     );
   }
-
+  if (returns.length === 0) {
+    return (
+      <View style={s.tabContent}>
+        <EmptyState
+          icon="rotate-ccw"
+          title={loadError ? 'Couldn’t load returns' : 'No return requests'}
+          description={loadError ? 'Check your connection. This tab refreshes with the order.' : 'If the buyer asks to return this order, the request shows up here and in Activity.'}
+        />
+      </View>
+    );
+  }
   return (
     <View style={s.tabContent}>
-      {order.returns.map(ret => (
-        <BrandthreadCard key={ret.id} style={s.returnCard}>
-          <View style={s.returnHeader}>
-            <StatusBadge label={ret.status.replace(/_/g, ' ').toUpperCase()} variant={ret.status === 'refunded' ? 'success' : ret.status === 'denied' ? 'error' : 'warning'} />
-            <Text style={s.returnResolution}>{ret.requestedResolution.replace(/_/g, ' ')}</Text>
-          </View>
-          <Text style={s.returnCustomer}>{ret.customerName}</Text>
-          <Text style={s.returnExplanation}>{ret.customerExplanation}</Text>
-
-          {/* Items */}
-          {ret.items.map(item => (
-            <View key={item.lineItemId} style={s.returnItemRow}>
-              <Feather name="package" size={ICON.xs} color={MUTED} />
-              <Text style={s.returnItemText}>{item.productName} · {item.variant} · ×{item.quantity}</Text>
-              <Text style={s.returnItemReason}>{returnReasonLabel(item.reason)}</Text>
+      {returns.map(ret => (
+        <TouchableOpacity
+          key={ret.id}
+          onPress={() => router.push(`/return-detail?returnId=${encodeURIComponent(ret.id)}` as never)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`Return ${returnRequestStatusLabel(ret.status)} from ${ret.buyerName}. Open to review`}
+          testID={`seller-return-${ret.id}`}
+        >
+          <BrandthreadCard style={s.returnCard}>
+            <View style={s.returnHeader}>
+              <StatusBadge label={returnRequestStatusLabel(ret.status).toUpperCase()} variant="neutral" />
+              <Text style={[s.returnResolution, { color: theme.muted, textTransform: 'none' }]}>{ret.status === 'pending' ? 'Needs your review' : `Updated ${fmtShort(ret.updatedAt)}`}</Text>
+              <View style={{ flex: 1 }} />
+              <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
             </View>
-          ))}
-
-          {/* Actions */}
-          <View style={s.returnActions}>
-            {ret.status === 'requested' && denyingReturnId !== ret.id && (
-              <>
-                <SecondaryButton label="Approve" onPress={() => onAction(ret.id, 'approved')} icon="check" small accent={SUCCESS} style={{ flex: 1 }} />
-                <SecondaryButton label="Deny" onPress={() => { setDenyReason(''); setDenyingReturnId(ret.id); }} icon="x" small accent={RED} style={{ flex: 1 }} />
-              </>
-            )}
-          </View>
-          {ret.status === 'requested' && denyingReturnId === ret.id && (
-            <View style={s.denyForm}>
-              <Text style={s.denyLabel}>Denial reason (required)</Text>
-              <TextInput
-                style={s.denyInput}
-                value={denyReason}
-                onChangeText={setDenyReason}
-                placeholder="Explain why the return is denied…"
-                placeholderTextColor={SUBTLE}
-                multiline
-                autoFocus
-              />
-              <View style={s.returnActions}>
-                <SecondaryButton
-                  label="Cancel"
-                  onPress={() => { setDenyingReturnId(null); setDenyReason(''); }}
-                  small
-                  style={{ flex: 1 }}
-                />
-                <PrimaryButton
-                  label="Submit denial"
-                  onPress={() => {
-                    if (!denyReason.trim()) return;
-                    onAction(ret.id, 'denied', denyReason.trim());
-                    setDenyingReturnId(null);
-                    setDenyReason('');
-                  }}
-                  disabled={!denyReason.trim()}
-                  small
-                  style={{ flex: 1 }}
-                />
+            <Text style={s.returnCustomer}>{ret.buyerName}</Text>
+            <Text style={[s.returnItemReason, { color: theme.text }]}>{returnRequestReasonLabel(ret.reason)}</Text>
+            {ret.notes ? <Text style={s.returnExplanation} numberOfLines={3}>{ret.notes}</Text> : null}
+            {ret.items.map(item => (
+              <View key={item.lineItemId} style={s.returnItemRow}>
+                <Feather name="package" size={ICON.xs} color={theme.muted} />
+                <Text style={s.returnItemText}>{[item.productName, item.variantTitle, `×${item.quantity}`].filter(Boolean).join(' · ')}</Text>
               </View>
-            </View>
-          )}
-          <View style={s.returnActions}>
-            {(ret.status === 'label_issued' || ret.status === 'in_transit') && (
-              <SecondaryButton label="Mark Received" onPress={() => onAction(ret.id, 'received')} icon="inbox" small style={{ flex: 1 }} />
-            )}
-            {ret.status === 'received' && (
-              <SecondaryButton label="Mark Inspected" onPress={() => onAction(ret.id, 'inspected')} icon="search" small style={{ flex: 1 }} />
-            )}
-            {(ret.status === 'inspected' || ret.status === 'refund_pending') && (
-              <PrimaryButton label="Issue Refund" onPress={() => router.push(`/refund-detail?orderId=${order.id}&returnId=${ret.id}`)} icon="credit-card" small style={{ flex: 1 }} />
-            )}
-          </View>
-        </BrandthreadCard>
+            ))}
+            <Text style={[s.returnExplanation, { marginTop: 2 }]}>
+              {ret.evidenceUrls.length > 0 ? `${ret.evidenceUrls.length} photo${ret.evidenceUrls.length === 1 ? '' : 's'} · ` : ''}Items {formatCents(itemsTotalCents(ret.items))}
+            </Text>
+          </BrandthreadCard>
+        </TouchableOpacity>
       ))}
     </View>
   );

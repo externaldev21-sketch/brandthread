@@ -1,479 +1,371 @@
-import React, { useEffect, useState, useCallback } from 'react';
+/**
+ * Return status: one screen for both sides of a return request.
+ *
+ * Opened by the return push, by Activity rows for both roles (#266: the
+ * buyer's "Return request received / approved / refunded", and the
+ * seller's new "<buyer> requested a return"), by the buyer's order screen
+ * and request form, and by the seller's order Returns tab and Shipping
+ * screen.
+ *
+ * Item 108 rebuilt it on real data:
+ *  - It loads GET /api/returns/:id, which both the buyer and the seller may
+ *    read. Who is looking comes from that row (buyerId / sellerId vs. the
+ *    signed-in user). It used to load the seller-only GET /api/orders/:id
+ *    with an `orderId` param that no link passed, so every buyer and every
+ *    Activity tap got "Couldn't load this return".
+ *  - It uses the server's statuses: pending → approved → refunded, or
+ *    denied. The old screen expected requested / under_review / …, so a
+ *    real pending return showed no step as current and no Approve / Decline
+ *    for the seller.
+ *  - Seller actions call PATCH /api/returns/:id/status. Approving refunds
+ *    through the refund service, and approving again only retries a refund
+ *    that didn't confirm. Declining needs a reason, which the buyer sees.
+ *  - Monochrome, theme tokens (no static purple / cyan / green); inline
+ *    errors (RN-web Alert is a no-op).
+ *
+ * References (Mobbin): the Shopee "Return/Refund Details" stepper and
+ * Klarna's vertical return timeline.
+ */
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import {
-  View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, TextInput, Image,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TextInput, Image, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import {
-  BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton,
-  SecondaryButton, StatusBadge,
-} from '@/components/BrandthreadUI';
-import { Order, ReturnRequest, RETURN_REASONS } from '@/services/orderTypes';
-import { useColors } from '@/hooks/useColors';
+import { BrandthreadCard, BrandthreadHeader, BrandthreadScreen, EmptyState } from '@/components/BrandthreadUI';
+import { Button } from '@/components/ui';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
-import { useApi } from '@/lib/api';
-import { adaptApiOrder } from '@/app/order-detail';
+import { useApi } from '@/hooks/useApi';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import {
+  adaptReturnRow, itemsTotalCents, returnHeadline, returnReasonLabel, returnSteps, statusLabel,
+  type ReturnView, type ReturnViewer,
+} from '@/lib/returns';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const RETURN_STATUSES = [
-  'requested', 'under_review', 'approved', 'denied',
-  'label_issued', 'in_transit', 'received', 'inspected',
-  'refund_pending', 'refunded', 'closed',
-] as const;
-
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDateTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 }
-
-function returnStatusVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
-  if (['refunded', 'exchange_completed', 'closed'].includes(status)) return 'success';
-  if (status === 'denied') return 'error';
-  if (['approved', 'label_issued', 'in_transit', 'received', 'inspected', 'refund_pending'].includes(status)) return 'info';
-  if (status === 'under_review') return 'warning';
-  return 'neutral';
-}
-
-function returnStatusLabel(status: string): string {
-  return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function resolutionLabel(r: string): string {
-  if (r === 'refund') return 'Refund';
-  if (r === 'exchange') return 'Exchange';
-  if (r === 'store_credit') return 'Store Credit';
-  return r;
-}
-
-// ─── Timeline Step ────────────────────────────────────────────────────────────
-
-function TimelineStep({ label, state }: { label: string; state: 'completed' | 'current' | 'future' }) {
-  return (
-    <View style={tlS.row}>
-      <View style={tlS.dotCol}>
-        {state === 'completed' ? (
-          <View style={[tlS.dot, tlS.dotDone]}>
-            <Feather name="check" size={10} color="#fff" />
-          </View>
-        ) : state === 'current' ? (
-          <View style={[tlS.dot, tlS.dotCurrent]} />
-        ) : (
-          <View style={[tlS.dot, tlS.dotFuture]} />
-        )}
-        <View style={tlS.line} />
-      </View>
-      <Text style={[tlS.label,
-        state === 'completed' && tlS.labelDone,
-        state === 'current' && tlS.labelCurrent,
-        state === 'future' && tlS.labelFuture,
-      ]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-const tlS = StyleSheet.create({
-  row:        { flexDirection: 'row', alignItems: 'flex-start', minHeight: 36 },
-  dotCol:     { alignItems: 'center', width: 24, marginRight: SP.sm },
-  dot:        { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  dotDone:    { backgroundColor: SUCCESS },
-  dotCurrent: { backgroundColor: PURPLE, borderWidth: 2, borderColor: PURPLE },
-  dotFuture:  { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: SUBTLE },
-  line:       { flex: 1, width: 1.5, backgroundColor: BORDER, marginTop: 2 },
-  label:      { fontSize: FS.sm, fontFamily: FONT.regular, paddingTop: 2 },
-  labelDone:  { color: SUCCESS },
-  labelCurrent:{ color: FG, fontFamily: FONT.semibold },
-  labelFuture:{ color: SUBTLE },
-});
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ReturnDetailScreen() {
-  const colors = useColors();
-  const { orderId, returnId } = useLocalSearchParams<{ orderId: string; returnId: string }>();
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const { returnId } = useLocalSearchParams<{ returnId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { userId } = useAuth();
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const [returnReq, setReturnReq] = useState<ReturnRequest | null>(null);
+  const [view, setView] = useState<ReturnView | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [denyReason, setDenyReason] = useState('');
+  const [loadError, setLoadError] = useState<'network' | 'not_found' | null>(null);
+  const [acting, setActing] = useState<'approve' | 'deny' | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [showDenyForm, setShowDenyForm] = useState(false);
+  const [denyReason, setDenyReason] = useState('');
 
   const load = useCallback(async () => {
+    if (!returnId) { setLoadError('not_found'); setLoading(false); return; }
     setLoading(true);
-    setLoadError(false);
+    setLoadError(null);
     try {
-      const [rawOrder, rawReturn] = await Promise.all([
-        api.orders.get(orderId),
-        api.returns.get(returnId),
-      ]);
-      const adaptedOrder = rawOrder ? adaptApiOrder(rawOrder) : null;
-      setOrder(adaptedOrder);
-      if (rawReturn) {
-        setReturnReq({
-          id: rawReturn.id ?? returnId,
-          orderId: rawReturn.orderId ?? orderId,
-          orderNumber: adaptedOrder?.orderNumber ?? '',
-          customerId: adaptedOrder?.customer.id ?? '',
-          customerName: adaptedOrder?.customer.name ?? 'Customer',
-          status: rawReturn.status,
-          items: Array.isArray(rawReturn.requestedItems) ? rawReturn.requestedItems.map((item: any, idx: number) => ({
-            lineItemId: item.lineItemId ?? String(idx),
-            productName: item.productName ?? 'Item',
-            variant: item.variantTitle ?? '',
-            quantity: item.quantity ?? 1,
-            unitPriceCents: item.unitPriceCents ?? 0,
-            reason: rawReturn.reason ?? 'other',
-          })) : [],
-          customerExplanation: rawReturn.notes ?? '',
-          imageUris: Array.isArray(rawReturn.evidenceUrls) ? rawReturn.evidenceUrls : [],
-          requestedResolution: rawReturn.resolutionRequested ?? 'refund',
-          returnDeadline: rawReturn.returnDeadline ?? rawReturn.createdAt ?? new Date().toISOString(),
-          deniedReason: rawReturn.status === 'denied' ? (rawReturn.sellerResponse ?? undefined) : undefined,
-          createdAt: rawReturn.createdAt ?? new Date().toISOString(),
-          updatedAt: rawReturn.updatedAt ?? rawReturn.createdAt ?? new Date().toISOString(),
-        });
-      } else {
-        setReturnReq(null);
-      }
+      const row = await api.returns.get(returnId);
+      setView(row ? adaptReturnRow(row) : null);
+      if (!row) setLoadError('not_found');
     } catch (err) {
-      if (__DEV__) console.warn('[return-detail] failed to load', err);
-      setLoadError(true);
+      const status = (err as { status?: number } | null)?.status;
+      setLoadError(status === 404 || status === 403 ? 'not_found' : 'network');
     } finally {
       setLoading(false);
     }
-  }, [api, orderId, returnId]);
+  }, [api, returnId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
-  const doAction = async (status: ReturnRequest['status'], reason?: string) => {
-    if (!order || !returnReq) return;
-    setActionLoading(true);
+  const viewer: ReturnViewer = view && userId && view.sellerId === userId && view.buyerId !== userId ? 'seller' : 'buyer';
+
+  async function updateStatus(status: 'approved' | 'denied', sellerResponse?: string) {
+    if (!view) return;
+    setActing(status === 'approved' ? 'approve' : 'deny');
+    setActionError(null);
     try {
-      await api.returns.updateStatus(returnReq.id, { status, sellerResponse: reason });
+      await api.returns.updateStatus(view.id, { status, sellerResponse });
+      setShowDenyForm(false);
+      setDenyReason('');
       await load();
     } catch (err) {
-      Alert.alert('Couldn’t update this return', 'Check your connection and try again.');
+      const raw = (err as { body?: string } | null)?.body ?? '';
+      let message = '';
+      try { message = JSON.parse(raw)?.error ?? ''; } catch { message = ''; }
+      setActionError(message || 'Couldn’t update this return. Check your connection and try again.');
     } finally {
-      setActionLoading(false);
-      setShowDenyForm(false);
+      setActing(null);
     }
-  };
+  }
 
-  if (loading || !returnReq || !order) {
+  const header = (
+    <BrandthreadHeader
+      title={view ? `Return · #${view.orderNumber}` : 'Return'}
+      subtitle={view ? (viewer === 'seller' ? view.buyerName : view.sellerName) : undefined}
+      onBack={() => goBackOr(router)}
+    />
+  );
+
+  if (loading && !view) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.loadingText}>
-          {loading ? 'Loading…' : loadError ? 'Couldn’t load this return. Check your connection and try again.' : 'Return not found.'}
-        </Text>
-      </View>
+      <BrandthreadScreen>
+        {header}
+        <View style={s.centered}><ActivityIndicator color={theme.text} size="large" /></View>
+      </BrandthreadScreen>
     );
   }
 
-  const status = returnReq.status;
-  const isExpired = returnReq.returnDeadline && new Date(returnReq.returnDeadline) < new Date();
+  if (!view) {
+    return (
+      <BrandthreadScreen>
+        {header}
+        {loadError === 'network' ? (
+          <EmptyState
+            icon="wifi-off"
+            title="Couldn’t load this return"
+            description="Check your connection and try again."
+            action={{ label: 'Try again', onPress: () => { void load(); } }}
+          />
+        ) : (
+          <EmptyState
+            icon="rotate-ccw"
+            title="Return not found"
+            description="It may have been removed, or it belongs to another account."
+            action={{ label: 'Go back', onPress: () => goBackOr(router) }}
+          />
+        )}
+      </BrandthreadScreen>
+    );
+  }
 
-  // Build timeline states
-  const currentIdx = RETURN_STATUSES.indexOf(status as typeof RETURN_STATUSES[number]);
-
-  const shipment = returnReq.shipmentId ? order.shipments.find(s => s.id === returnReq.shipmentId) : null;
-  const label = returnReq.labelId ? order.labels.find(l => l.id === returnReq.labelId) : null;
-
-  const reasonLabel = (r: string) => RETURN_REASONS.find(x => x.key === r)?.label ?? r;
+  const headline = returnHeadline(view, viewer, formatCents);
+  const steps = returnSteps(view, viewer);
+  const itemsTotal = itemsTotalCents(view.items);
+  const refundBasis = view.orderTotalCents || itemsTotal;
+  const orderHref = viewer === 'seller' ? `/order-detail?id=${encodeURIComponent(view.orderId)}` : `/buyer-order-detail?id=${encodeURIComponent(view.orderId)}`;
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
-      {/* HEADER */}
-      <BrandthreadHeader
-        title="Return Request"
-        onBack={() => goBackOr(router)}
-        rightElement={
-          <StatusBadge
-            label={returnStatusLabel(status)}
-            variant={returnStatusVariant(status)}
-          />
-        }
-      />
-
+    <BrandthreadScreen noSafeBottom>
+      {header}
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl, gap: SP.md }}
+        bounces={false}
+        overScrollMode="never"
+        keyboardShouldPersistTaps="handled"
+        // Extra room for the seller's floating tab bar (SellerGlobalTabBar shows on this route).
+        contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + (viewer === 'seller' ? 120 : SP.xxl), gap: SP.md }}
       >
-        {/* 2. STATUS TIMELINE */}
-        <BrandthreadCard style={styles.section}>
-          <Text style={styles.sectionTitle}>Status Timeline</Text>
-          {RETURN_STATUSES.map((s, i) => {
-            let state: 'completed' | 'current' | 'future' = 'future';
-            if (i < currentIdx) state = 'completed';
-            else if (i === currentIdx) state = 'current';
-            return <TimelineStep key={s} label={returnStatusLabel(s)} state={state} />;
-          })}
-        </BrandthreadCard>
-
-        {/* 3. CUSTOMER */}
-        <BrandthreadCard style={styles.section}>
-          <Text style={styles.sectionTitle}>Customer</Text>
-          <Text style={styles.customerName}>{order.customer.name}</Text>
-          <Text style={styles.customerEmail}>{order.customer.email}</Text>
-          <Text style={styles.metaRow}>Return requested {fmtDate(returnReq.createdAt)}</Text>
-          <View style={styles.metaRowView}>
-            <Text style={styles.metaLabel}>Return deadline:</Text>
-            <Text style={[styles.metaValue, isExpired && { color: ORANGE }]}>
-              {fmtDate(returnReq.returnDeadline)}{isExpired ? ' (Expired)' : ''}
-            </Text>
+        {/* Status + timeline */}
+        <BrandthreadCard>
+          <View style={s.statusPillRow}>
+            <View style={s.statusPill}><Text style={s.statusPillText}>{statusLabel(view.status).toUpperCase()}</Text></View>
           </View>
-          <View style={[styles.metaRowView, { marginTop: SP.sm }]}>
-            <Text style={styles.metaLabel}>Requested resolution:</Text>
-            <View style={styles.resolutionBadge}>
-              <Text style={styles.resolutionText}>{resolutionLabel(returnReq.requestedResolution)}</Text>
-            </View>
-          </View>
-        </BrandthreadCard>
+          <Text style={s.headline} accessibilityRole="header" testID="return-headline">{headline.title}</Text>
+          <Text style={s.headlineBody}>{headline.body}</Text>
 
-        {/* 4. ITEMS REQUESTED */}
-        <View>
-          <Text style={styles.sectionHeader}>Items Requested</Text>
-          {returnReq.items.map((item, idx) => (
-            <BrandthreadCard key={idx} style={[styles.section, { marginBottom: SP.sm }]}>
-              <Text style={styles.itemName}>{item.productName}</Text>
-              <Text style={styles.itemVariant}>{item.variant}</Text>
-              <View style={styles.itemRow}>
-                <Text style={styles.itemQty}>Qty: {item.quantity}</Text>
-                <Text style={styles.itemPrice}>× {formatCents(item.unitPriceCents)}</Text>
-                <Text style={styles.itemTotal}> = {formatCents(item.quantity * item.unitPriceCents)}</Text>
-              </View>
-              <View style={styles.reasonRow}>
-                <Text style={styles.metaLabel}>Reason: </Text>
-                <Text style={styles.reasonText}>{reasonLabel(item.reason)}</Text>
-              </View>
-            </BrandthreadCard>
-          ))}
-        </View>
-
-        {/* 5. CUSTOMER EXPLANATION */}
-        <View>
-          <Text style={styles.sectionHeader}>Customer Explanation</Text>
-          <View style={[styles.section, { backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md }]}>
-            <Text style={styles.explanationText}>
-              {returnReq.customerExplanation || 'No explanation provided.'}
-            </Text>
-            {returnReq.imageUris.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: SP.sm }}>
-                {returnReq.imageUris.map((uri, i) => (
-                  <Image key={i} source={{ uri }} style={styles.returnImage} />
-                ))}
-              </ScrollView>
-            ) : (
-              <Text style={styles.noPhotos}>No photos provided</Text>
-            )}
-          </View>
-        </View>
-
-        {/* 6. POLICY */}
-        <BrandthreadCard style={styles.section}>
-          <View style={styles.policyRow}>
-            <Feather name="info" size={ICON.sm} color={MUTED} />
-            <Text style={styles.policyText}>
-              Standard return policy: items must be returned within 30 days of delivery in original condition.
-            </Text>
-          </View>
-        </BrandthreadCard>
-
-        {/* 7. ACTIONS */}
-        <BrandthreadCard style={styles.section}>
-          <Text style={styles.sectionTitle}>Actions</Text>
-
-          {(status === 'requested' || status === 'under_review') && (
-            <View style={styles.actionsGap}>
-              <PrimaryButton
-                label="Approve Return"
-                onPress={() => doAction('approved')}
-                loading={actionLoading}
-              />
-              {!showDenyForm ? (
-                <SecondaryButton
-                  label="Deny Return"
-                  onPress={() => setShowDenyForm(true)}
-                  accent={RED}
-                />
-              ) : (
-                <View style={styles.denyForm}>
-                  <Text style={styles.denyLabel}>Denial reason (required)</Text>
-                  <TextInput
-                    style={styles.denyInput}
-                    value={denyReason}
-                    onChangeText={setDenyReason}
-                    placeholder="Explain why the return is denied…"
-                    placeholderTextColor={SUBTLE}
-                    multiline
-                  />
-                  <View style={styles.denyButtons}>
-                    <SecondaryButton
-                      label="Cancel"
-                      onPress={() => { setShowDenyForm(false); setDenyReason(''); }}
-                      small
-                      style={{ flex: 1 }}
-                    />
-                    <PrimaryButton
-                      label="Submit Denial"
-                      onPress={() => {
-                        if (!denyReason.trim()) {
-                          Alert.alert('Required', 'Please enter a denial reason.');
-                          return;
-                        }
-                        doAction('denied', denyReason.trim());
-                      }}
-                      loading={actionLoading}
-                      disabled={!denyReason.trim()}
-                      small
-                      style={{ flex: 1 }}
-                    />
+          <View style={s.steps}>
+            {steps.map((step, i) => (
+              <View key={step.key} style={s.stepRow} testID={`return-step-${step.key}`} accessibilityState={{ selected: step.state === 'current' }}>
+                <View style={s.railCol}>
+                  <View style={[
+                    s.dot,
+                    step.state === 'done' && { backgroundColor: theme.text, borderColor: theme.text },
+                    step.state === 'current' && { borderColor: theme.text },
+                  ]}>
+                    {step.state === 'done' ? <Feather name="check" size={12} color={theme.background} /> : null}
+                    {step.state === 'current' ? <View style={s.dotInner} /> : null}
                   </View>
+                  {i < steps.length - 1 ? <View style={[s.connector, step.state === 'done' && { backgroundColor: theme.text }]} /> : null}
                 </View>
-              )}
-            </View>
-          )}
-
-          {status === 'approved' && (
-            <View style={styles.actionsGap}>
-              {/* "Issue Return Label" and "Offer Store Credit" are hidden here
-                  until they call a real label/credit API — see shipping-label.tsx
-                  for the real label-purchase flow. */}
-              <SecondaryButton
-                label="Issue Refund Without Return"
-                onPress={() => router.push(`/refund-detail?orderId=${order.id}&returnId=${returnReq.id}`)}
-                accent={CYAN}
-              />
-            </View>
-          )}
-
-          {(status === 'label_issued' || status === 'in_transit') && (
-            <PrimaryButton
-              label="Mark Return Received"
-              onPress={() => doAction('received')}
-              loading={actionLoading}
-            />
-          )}
-
-          {status === 'received' && (
-            <PrimaryButton
-              label="Mark Inspected"
-              onPress={() => doAction('inspected')}
-              loading={actionLoading}
-              colors={[colors.primary, colors.accentForeground] as const}
-            />
-          )}
-
-          {status === 'inspected' && (
-            <View style={styles.actionsGap}>
-              <PrimaryButton
-                label="Issue Refund"
-                onPress={() => router.push(`/refund-detail?orderId=${order.id}&returnId=${returnReq.id}`)}
-              />
-              {/* "Issue Exchange" is hidden until a real exchange-order API exists. */}
-            </View>
-          )}
-
-          {(status === 'refunded' || status === 'closed' || status === 'denied') && (
-            <View style={[styles.readOnlySummary, status === 'denied' && { borderColor: RED + '55' }]}>
-              <Feather
-                name={status === 'denied' ? 'x-circle' : 'check-circle'}
-                size={ICON.md}
-                color={status === 'denied' ? RED : SUCCESS}
-              />
-              <Text style={[styles.readOnlyText, { color: status === 'denied' ? RED : SUCCESS }]}>
-                {status === 'denied'
-                  ? `Return denied${returnReq.deniedReason ? `: ${returnReq.deniedReason}` : ''}`
-                  : `Return ${returnStatusLabel(status)}`}
-              </Text>
-            </View>
-          )}
+                <View style={s.stepBody}>
+                  <Text style={[s.stepLabel, step.state === 'upcoming' && { color: theme.muted }, step.state === 'current' && { fontFamily: FONT.bold }]}>
+                    {step.label}
+                  </Text>
+                  {step.at ? <Text style={s.stepTime}>{fmtDateTime(step.at)}</Text> : null}
+                </View>
+              </View>
+            ))}
+          </View>
         </BrandthreadCard>
 
-        {/* 8. SHIPMENT TRACKING */}
-        {(label || shipment) && (
-          <BrandthreadCard style={styles.section}>
-            <Text style={styles.sectionTitle}>Shipment Tracking</Text>
-            {label && (
-              <View style={styles.trackingRow}>
-                <Text style={styles.metaLabel}>Carrier:</Text>
-                <Text style={styles.metaValue}>{label.carrier}</Text>
+        {/* Seller actions */}
+        {viewer === 'seller' && (view.status === 'pending' || view.status === 'approved') ? (
+          <BrandthreadCard>
+            <Text style={s.cardTitle}>{view.status === 'pending' ? 'Your decision' : 'Refund'}</Text>
+            <Text style={s.cardBody}>
+              {view.status === 'pending'
+                ? `Approving refunds ${formatCents(refundBasis)} to ${view.buyerName}’s original payment. Declining keeps the order as it is. Tell the buyer why.`
+                : `The refund of ${formatCents(refundBasis)} hasn’t been confirmed yet. Retrying is safe: the buyer is only ever refunded once.`}
+            </Text>
+            {actionError ? (
+              <View style={s.inlineError} accessibilityRole="alert" testID="return-action-error">
+                <Feather name="alert-circle" size={14} color={theme.text} />
+                <Text style={s.inlineErrorText}>{actionError}</Text>
               </View>
-            )}
-            {(label?.trackingNumber || shipment?.trackingNumber) && (
-              <View style={styles.trackingRow}>
-                <Text style={styles.metaLabel}>Tracking:</Text>
-                <Text style={styles.trackingNumber}>{label?.trackingNumber ?? shipment?.trackingNumber}</Text>
+            ) : null}
+            {!showDenyForm ? (
+              <View style={s.actions}>
+                <Button
+                  label={view.status === 'pending' ? `Approve and refund ${formatCents(refundBasis)}` : 'Retry refund'}
+                  variant="primary"
+                  fullWidth
+                  loading={acting === 'approve'}
+                  disabled={acting !== null}
+                  onPress={() => { void updateStatus('approved'); }}
+                  testID="return-approve"
+                />
+                {view.status === 'pending' ? (
+                  <Button
+                    label="Decline"
+                    variant="secondary"
+                    fullWidth
+                    disabled={acting !== null}
+                    onPress={() => { setActionError(null); setShowDenyForm(true); }}
+                    testID="return-decline"
+                  />
+                ) : null}
               </View>
-            )}
-            {shipment?.trackingStatus && (
-              <View style={styles.trackingRow}>
-                <Text style={styles.metaLabel}>Status:</Text>
-                <Text style={styles.metaValue}>{returnStatusLabel(shipment.trackingStatus)}</Text>
+            ) : (
+              <View style={s.actions}>
+                <Text style={s.fieldLabel}>Reason for the buyer</Text>
+                <TextInput
+                  style={s.input}
+                  value={denyReason}
+                  onChangeText={setDenyReason}
+                  placeholder="e.g. The item was worn and the tags were removed."
+                  placeholderTextColor={theme.subtle}
+                  multiline
+                  accessibilityLabel="Reason for declining"
+                  testID="return-decline-reason"
+                />
+                <View style={s.row}>
+                  <Button label="Cancel" variant="secondary" style={{ flex: 1 }} onPress={() => { setShowDenyForm(false); setDenyReason(''); }} />
+                  <Button
+                    label="Decline return"
+                    variant="primary"
+                    style={{ flex: 1 }}
+                    loading={acting === 'deny'}
+                    disabled={!denyReason.trim() || acting !== null}
+                    onPress={() => { void updateStatus('denied', denyReason.trim()); }}
+                    testID="return-decline-submit"
+                  />
+                </View>
               </View>
             )}
           </BrandthreadCard>
-        )}
+        ) : null}
+
+        {/* Items */}
+        <BrandthreadCard>
+          <Text style={s.cardTitle}>Items</Text>
+          {view.items.length === 0 ? (
+            <Text style={s.cardBody}>The whole order #{view.orderNumber}.</Text>
+          ) : view.items.map((item, idx) => (
+            <View key={item.lineItemId} style={[s.itemRow, idx > 0 && s.itemBorder]}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.itemName}>{item.productName}</Text>
+                <Text style={s.itemMeta}>{[item.variantTitle, `×${item.quantity}`].filter(Boolean).join(' · ')}</Text>
+              </View>
+              <Text style={s.itemPrice}>{formatCents(item.unitPriceCents * item.quantity)}</Text>
+            </View>
+          ))}
+        </BrandthreadCard>
+
+        {/* Reason, notes, photos */}
+        <BrandthreadCard>
+          <Text style={s.cardTitle}>Reason</Text>
+          <Text style={s.reason}>{returnReasonLabel(view.reason)}</Text>
+          {view.notes ? <Text style={[s.cardBody, { marginTop: SP.xs }]}>{view.notes}</Text> : null}
+          {view.evidenceUrls.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false} style={{ marginTop: SP.sm }}>
+              {view.evidenceUrls.map((uri, i) => (
+                <Image key={`${uri}-${i}`} source={{ uri }} style={s.photo} accessibilityLabel={`Return photo ${i + 1}`} />
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={s.noPhotos}>No photos added</Text>
+          )}
+          {view.sellerResponse && view.status !== 'denied' ? (
+            <View style={s.response}>
+              <Text style={s.fieldLabel}>{viewer === 'seller' ? 'Your note' : `${view.sellerName} replied`}</Text>
+              <Text style={s.cardBody}>{view.sellerResponse}</Text>
+            </View>
+          ) : null}
+          <Text style={s.meta}>Requested {fmtDateTime(view.createdAt)}</Text>
+        </BrandthreadCard>
+
+        <Button
+          label="View order"
+          variant="secondary"
+          icon="file-text"
+          fullWidth
+          onPress={() => router.push(orderHref as never)}
+          testID="return-view-order"
+        />
+        <View style={s.footNote}>
+          <Feather name="info" size={ICON.xs} color={theme.subtle} />
+          <Text style={s.footNoteText}>
+            {viewer === 'seller'
+              ? 'Refunds go back to the buyer’s original payment. Your payout for this order is adjusted automatically.'
+              : 'Refunds go back to your original payment method.'}
+          </Text>
+        </View>
       </ScrollView>
-    </View>
+    </BrandthreadScreen>
   );
 }
 
-const styles = StyleSheet.create({
-  centered:        { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  loadingText:     { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
-  section:         { gap: SP.sm },
-  sectionTitle:    { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginBottom: SP.xs },
-  sectionHeader:   { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginBottom: SP.sm },
-  customerName:    { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  customerEmail:   { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  metaRow:         { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs },
-  metaRowView:     { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
-  metaLabel:       { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  metaValue:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  resolutionBadge: { backgroundColor: PURPLE_DIM, paddingHorizontal: SP.sm, paddingVertical: 3, borderRadius: RADIUS.pill },
-  resolutionText:  { fontSize: FS.xs, fontFamily: FONT.bold, color: PURPLE },
-  itemName:        { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  itemVariant:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  itemRow:         { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  itemQty:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  itemPrice:       { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  itemTotal:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  reasonRow:       { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
-  reasonText:      { fontSize: FS.sm, fontFamily: FONT.semibold, color: CYAN },
-  explanationText: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
-  returnImage:     { width: 80, height: 80, borderRadius: RADIUS.sm, marginRight: SP.sm },
-  noPhotos:        { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: SP.sm },
-  policyRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
-  policyText:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, flex: 1, lineHeight: 18 },
-  actionsGap:      { gap: SP.sm },
-  denyForm:        { gap: SP.sm },
-  denyLabel:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  denyInput:       {
-    backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, borderWidth: 1,
-    borderColor: BORDER, padding: SP.md, minHeight: 90, color: FG,
-    fontFamily: FONT.regular, fontSize: FS.sm, textAlignVertical: 'top',
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  statusPillRow: { flexDirection: 'row', marginBottom: SP.sm },
+  statusPill: { borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 9, paddingVertical: 3 },
+  statusPillText: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.4, color: theme.muted },
+  headline: { fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.4, color: theme.text },
+  headlineBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: 4, lineHeight: 20 },
+
+  steps: { marginTop: SP.md },
+  stepRow: { flexDirection: 'row' },
+  railCol: { alignItems: 'center', width: 28 },
+  dot: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  dotInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.text },
+  connector: { width: 2, flex: 1, minHeight: 16, marginVertical: 2, backgroundColor: theme.border, borderRadius: 1 },
+  stepBody: { flex: 1, paddingLeft: SP.sm, paddingBottom: SP.md },
+  stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text, paddingTop: 2 },
+  stepTime: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 2 },
+
+  cardTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, letterSpacing: 0.4, textTransform: 'uppercase', color: theme.muted, marginBottom: SP.sm },
+  cardBody: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, lineHeight: 20 },
+  actions: { gap: SP.sm, marginTop: SP.md },
+  row: { flexDirection: 'row', gap: SP.sm },
+  fieldLabel: { fontFamily: FONT.semibold, fontSize: FS.xs + 1, color: theme.muted },
+  input: {
+    backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,
+    padding: SP.md, minHeight: 90, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, textAlignVertical: 'top',
   },
-  denyButtons:     { flexDirection: 'row', gap: SP.sm },
-  readOnlySummary: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: SUCCESS + '44', padding: SP.md,
-  },
-  readOnlyText:    { fontSize: FS.sm, fontFamily: FONT.semibold, flex: 1 },
-  trackingRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  trackingNumber:  { fontSize: FS.sm, fontFamily: FONT.medium, color: CYAN, flex: 1 },
+  inlineError: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginTop: SP.sm },
+  inlineErrorText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.xs + 1, color: theme.text, lineHeight: 18 },
+
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: 8 },
+  itemBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+  itemName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
+  itemMeta: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.muted, marginTop: 2 },
+  itemPrice: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
+
+  reason: { fontFamily: FONT.bold, fontSize: FS.base, color: theme.text },
+  photo: { width: 84, height: 84, borderRadius: RADIUS.sm, marginRight: SP.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
+  noPhotos: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.subtle, marginTop: SP.sm },
+  response: { marginTop: SP.md, gap: 4 },
+  meta: { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.subtle, marginTop: SP.md },
+
+  footNote: { flexDirection: 'row', gap: 6, alignItems: 'flex-start', paddingHorizontal: 2 },
+  footNoteText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: theme.subtle, lineHeight: 17 },
 });
