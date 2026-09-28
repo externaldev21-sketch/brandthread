@@ -151,6 +151,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     variants,
     isActive:           true,
     tags:               row.tags ?? [],
+    sizeChartImageUrl:  row.sizeChartImageUrl ?? null,
   };
 }
 
@@ -518,6 +519,7 @@ export default function BuyerProductDetailScreen() {
   const [reserved,        setReserved]        = useState(false);
   const [reserveLoading,  setReserveLoading]  = useState(false);
   const [sizeChartOpen,   setSizeChartOpen]   = useState(false);
+  const [sizeGuideOpen,   setSizeGuideOpen]   = useState(false);
 
   // Add to cart → the product photo flies to the bag icon, which bumps and
   // shows the count (the feed / shop sheet pattern, #287 / #291).
@@ -1083,6 +1085,24 @@ export default function BuyerProductDetailScreen() {
             );
           })}
 
+          {/* "Size guide" text link — only when the seller uploaded a size
+              chart photo, right under the size chips (mobbin.com/screens/
+              0c16f080-0cb8-487a-8928-6a7631cb205c). No placeholder link
+              when absent. */}
+          {!!product.sizeChartImageUrl && (
+            <TouchableOpacity
+              style={s.sizeGuideLink}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeGuideOpen(true); }}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Size guide"
+              testID="product-size-guide-link"
+            >
+              <Feather name="maximize" size={13} color={PURPLE_LIGHT} />
+              <Text style={[s.sizeGuideLinkText, { color: PURPLE_LIGHT }]}>Size guide</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Stock status */}
           {allSelected && variant && (
             <View style={s.stockRow}>
@@ -1294,6 +1314,12 @@ export default function BuyerProductDetailScreen() {
         </View>
       </BottomSheet>
 
+      <SizeGuideSheet
+        visible={sizeGuideOpen}
+        imageUri={product.sizeChartImageUrl ?? null}
+        onClose={() => setSizeGuideOpen(false)}
+      />
+
       {/* Persistent purchase bar remains visible while product content scrolls.
           This screen is pushed as a root stack card over the whole app (not
           nested under the buyer tab group), so it never sits behind the
@@ -1398,6 +1424,86 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
     </ScrollView>
   );
 }
+
+// ─── Size Guide Sheet (photo) ─────────────────────────────────────────────────
+// A seller-uploaded photo of their own size chart — distinct from the
+// structured SizeChartViewer table above. Mobbin refs: SHEIN's "Size Guide"
+// text link directly under the size chips (mobbin.com/screens/
+// 0c16f080-0cb8-487a-8928-6a7631cb205c) and Polarsteps' full-bleed,
+// pinch-zoomable photo viewer (mobbin.com/screens/
+// 7d855183-6163-4eb9-8776-7ac07592c47f) for the zoom behavior — adapted to
+// the app's own shared BottomSheet rather than a full-screen viewer, since
+// a translucent Glass blur over the chart photo itself would work against
+// the one thing this sheet exists to show clearly.
+
+function SizeGuideSheet({ visible, imageUri, onClose }: { visible: boolean; imageUri: string | null; onClose: () => void }) {
+  const { theme, FG, MUTED } = useThemeAliases();
+  const scale = useRef(new Animated.Value(1)).current;
+  const currentScale = useRef(1);
+  const pinchStartDistance = useRef(0);
+  const pinchStartScale = useRef(1);
+
+  const distance = (touches: readonly any[]) => {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const resetZoom = () => {
+    currentScale.current = 1;
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 4 }).start();
+  };
+
+  const responder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: event => event.nativeEvent.touches.length === 2,
+    onMoveShouldSetPanResponderCapture: event => event.nativeEvent.touches.length === 2,
+    onPanResponderGrant: event => {
+      pinchStartDistance.current = distance(event.nativeEvent.touches);
+      pinchStartScale.current = currentScale.current;
+    },
+    onPanResponderMove: event => {
+      const nextDistance = distance(event.nativeEvent.touches);
+      if (!pinchStartDistance.current || !nextDistance) return;
+      const nextScale = Math.max(1, Math.min(3.5, pinchStartScale.current * nextDistance / pinchStartDistance.current));
+      currentScale.current = nextScale;
+      scale.setValue(nextScale);
+    },
+    onPanResponderRelease: () => {
+      if (currentScale.current < 1.06) resetZoom();
+    },
+    onPanResponderTerminate: () => {
+      if (currentScale.current < 1.06) resetZoom();
+    },
+  })).current;
+
+  if (!imageUri) return null;
+
+  return (
+    <BottomSheet visible={visible} onClose={() => { resetZoom(); onClose(); }} testID="size-guide-sheet">
+      <View style={sgs.header}>
+        <Text style={[sgs.title, { color: FG }]}>Size guide</Text>
+        <IconButton name="x" size={20} variant="plain" onPress={() => { resetZoom(); onClose(); }} accessibilityLabel="Close size guide" />
+      </View>
+      <View style={sgs.imageWrap} {...responder.panHandlers}>
+        <Animated.Image
+          source={{ uri: imageUri }}
+          resizeMode="contain"
+          style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
+          accessibilityLabel="Size guide photo. Pinch with two fingers to zoom."
+        />
+      </View>
+      <Text style={[sgs.hint, { color: MUTED }]}>Pinch to zoom</Text>
+    </BottomSheet>
+  );
+}
+
+const sgs = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, marginBottom: SP.sm },
+  title: { fontFamily: FONT.bold, fontSize: FS.lg },
+  imageWrap: { width: '100%', aspectRatio: 4 / 3, backgroundColor: '#000', overflow: 'hidden' },
+  hint: { textAlign: 'center', fontFamily: FONT.regular, fontSize: FS.xs, marginTop: SP.sm, marginBottom: SP.xs },
+});
 
 function WornInVideos({ productId, productName }: { productId: string; productName: string }) {
   const router = useRouter();
@@ -1723,6 +1829,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   preOrderDetail: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   preOrderDisclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 4, lineHeight: 17 },
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.md },
+  sizeGuideLink: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -SP.xs, marginBottom: SP.sm },
+  sizeGuideLinkText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   stockRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SP.sm },
   stockDot: { width: 8, height: 8, borderRadius: 4 },
   stockText: { fontSize: FS.sm, fontFamily: FONT.medium },
