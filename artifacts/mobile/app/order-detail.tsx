@@ -278,7 +278,7 @@ export function adaptApiOrder(raw: any): Order {
           id:         `note-refund-pending-${raw.id}`,
           orderId:    raw.id,
           type:       'internal' as const,
-          content:    '⚠️ This order was cancelled and a refund was attempted automatically, but the refund may not have completed. Please verify in your Stripe dashboard and issue a manual refund if needed.',
+          content:    'This order was cancelled and a refund was attempted automatically, but the refund may not have completed. Please verify in your Stripe dashboard and issue a manual refund if needed.',
           isPinned:   true,
           fileIds:    [],
           authorName: 'System',

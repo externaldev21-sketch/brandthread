@@ -1080,7 +1080,7 @@ export default function DiscoverScreen() {
         <EditorialSectionHead
           kicker="Moving fast"
           title="High Demand"
-          sub="Products moving fast across the platform"
+          sub="What everyone’s buying right now"
           theme={theme}
         />
         {highDemandLoading ? (
@@ -1181,7 +1181,7 @@ export default function DiscoverScreen() {
 
       {/* ─ Trending — engagement-ranked posts, separate from High Demand ─ */}
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
-        <EditorialSectionHead kicker="Right now" title="Trending" sub="Real-time engagement across the platform" theme={theme} />
+        <EditorialSectionHead kicker="Right now" title="Trending" sub="What everyone’s talking about" theme={theme} />
       </ResponsiveContainer>
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
         <View style={{ gap: 10 }}>
@@ -1194,7 +1194,7 @@ export default function DiscoverScreen() {
               icon="activity"
               illustration="trending"
               title="No trending posts right now"
-              description="Posts with the most likes and saves across the platform show up here."
+              description="The most-loved posts land here first."
               action={{ label: 'Explore feed', onPress: () => router.push('/(buyer)/feed' as never) }}
             />
           ) : (

@@ -193,15 +193,27 @@ export const BREAKPOINT = {
 
 // Heading / body type scale (paired with FS above). Use these role names
 // instead of picking raw FS.* sizes per screen.
+//
+// Contrast-in-hierarchy rules for anything built on this scale:
+//  - Fewer weights: display/large titles use extrabold (800) or bold (700),
+//    body text uses regular (400) or semibold (600) for emphasis — avoid
+//    reaching for medium (500) in new call sites, it reads as indecisive
+//    between the two real weights on either side of it.
+//  - Big titles get tight negative tracking (-0.5 to -0.8) — large Inter
+//    reads loose otherwise. Small uppercase eyebrows get the opposite:
+//    loose positive tracking (+1) so the caps don't clump.
+//  - Prices, counts and balances always use TABULAR_NUMS (see
+//    constants/typography.ts) so digits don't shift width as they change.
 export const TYPE = {
-  // Large titles get a touch of negative tracking — big Inter Bold reads
-  // slightly loose otherwise; smaller roles keep the font's natural tracking.
-  largeTitle: { fontSize: FS.h1, fontFamily: FONT.bold, lineHeight: 42, letterSpacing: -0.3 },
-  title:      { fontSize: FS.h2, fontFamily: FONT.bold, lineHeight: 36, letterSpacing: -0.3 },
+  largeTitle: { fontSize: FS.h1, fontFamily: FONT.extrabold, lineHeight: 42, letterSpacing: -0.8 },
+  title:      { fontSize: FS.h2, fontFamily: FONT.bold, lineHeight: 36, letterSpacing: -0.5 },
   heading:    { fontSize: FS.xl, fontFamily: FONT.semibold, lineHeight: 28 },
   subheading: { fontSize: FS.lg, fontFamily: FONT.semibold, lineHeight: 24 },
   body:       { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 22 },
   bodyMedium: { fontSize: FS.base, fontFamily: FONT.medium, lineHeight: 22 },
   caption:    { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   label:      { fontSize: FS.xs, fontFamily: FONT.semibold, lineHeight: 14 },
+  // Small uppercase eyebrow/kicker text — always paired with
+  // textTransform: 'uppercase' at the call site.
+  micro:      { fontSize: FS.xs, fontFamily: FONT.semibold, lineHeight: 14, letterSpacing: 1 },
 } as const;

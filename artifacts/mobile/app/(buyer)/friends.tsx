@@ -508,7 +508,7 @@ export default function FriendsScreen() {
         <EmptyState
           icon="users"
           illustration="friends"
-          title="Find your crew"
+          title="Build your crew"
           description="Add friends to see what they're copping, saving, and dropping."
           action={{ label: 'Find friends', onPress: () => { hapticPrimaryAction(); router.push('/buyer-friend-requests' as never); } }}
         />

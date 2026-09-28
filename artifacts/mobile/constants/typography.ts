@@ -20,27 +20,39 @@ export type TypeRoleName =
   | 'body'
   | 'callout'
   | 'footnote'
-  | 'caption';
+  | 'caption'
+  | 'micro';
 
 type TypeRole = Pick<TextStyle, 'fontSize' | 'lineHeight' | 'fontFamily' | 'fontWeight' | 'letterSpacing'>;
 
 /**
  * fontSize / lineHeight, both in whole pixels, per the Phase 1 spec:
  * display 44/48, title1 28/34, title2 22/28, headline 17/22 (semibold),
- * body 15/20, callout 14/19, footnote 13/18, caption 11/13.
- * Large titles (display/title1) get letterSpacing: -0.3 — big Inter Bold
- * reads slightly loose otherwise; smaller roles are left at the font's
- * natural tracking.
+ * body 15/20, callout 14/19, footnote 13/18, caption 11/13, micro 11/13.
+ *
+ * Weights lean on three: extrabold (800) or bold (700) for display/title
+ * roles, semibold (600) for anything that needs to stand out in running
+ * text, regular (400) for everything else — new roles avoid medium (500),
+ * which reads as indecisive between the two real weights on either side of
+ * it (the pre-existing `caption` role is the one holdout, kept as-is here
+ * to avoid a visual shift in every screen already using it).
+ *
+ * Large titles (display/title1) get letterSpacing -0.8/-0.6 — big Inter
+ * reads loose otherwise. `micro` (small uppercase eyebrows/kickers) gets
+ * the opposite: +1 tracking so the caps don't clump; pair it with
+ * `textTransform: 'uppercase'` at the call site. Everything in between is
+ * left at the font's natural tracking.
  */
 export const TYPE_SCALE: Record<TypeRoleName, TypeRole> = {
-  display:  { fontSize: 44, lineHeight: 48, fontFamily: FONT.bold, letterSpacing: -0.3 },
-  title1:   { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, letterSpacing: -0.3 },
+  display:  { fontSize: 44, lineHeight: 48, fontFamily: FONT.extrabold, letterSpacing: -0.8 },
+  title1:   { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, letterSpacing: -0.6 },
   title2:   { fontSize: 22, lineHeight: 28, fontFamily: FONT.semibold },
   headline: { fontSize: 17, lineHeight: 22, fontFamily: FONT.semibold },
   body:     { fontSize: 15, lineHeight: 20, fontFamily: FONT.regular },
   callout:  { fontSize: 14, lineHeight: 19, fontFamily: FONT.regular },
   footnote: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular },
   caption:  { fontSize: 11, lineHeight: 13, fontFamily: FONT.medium },
+  micro:    { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, letterSpacing: 1 },
 } as const;
 
 /**
