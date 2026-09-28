@@ -64,6 +64,7 @@ import { ShopProductSheet } from '@/components/ShopProductSheet';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { FeedGestureGuide } from '@/components/FeedGestureGuide';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
 import { getCachedFeedPosts, hydrateFeedPostsCache, setCachedFeedPosts } from '@/lib/feedPostsCache';
 import { useCommentCountDelta } from '@/lib/commentCountBus';
@@ -78,7 +79,6 @@ import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
 import { useBuyerTabBarInset, useBuyerTabBarTopInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { RADII } from '@/constants/radii';
@@ -1717,7 +1717,7 @@ function SpotlightPageImpl({
           lives in the caption block (CaptionBlock's sound row) instead of a
           rail-mounted disc — matches dev's #129 rail exactly. */}
       <RightActionRail
-        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP }]}
+        style={[chromeStyle, { bottom: bottomClearance + RAIL_BOTTOM_GAP, right: 10 + insets.right }]}
         creator={item.creator}
         hostId={item.sellerId}
         avatarColor={item.avatarColor}
@@ -2016,6 +2016,14 @@ export default function FeedScreen({
   // centered tabs on both sides, at both 375pt and 390pt, without dropping
   // any icon into an overflow menu.
   const topRowIconGap = windowWidth < 380 ? 6 : 8;
+  // Guard width for the centered tabs (buyerTabSwitcherWrap below): the
+  // left cluster is 1 icon (LIVE), the right is 2 (search, cart) — always
+  // wider. Bounding the tabs' wrap symmetrically by the wider cluster's
+  // width (not a flat 0) keeps the tabs screen-centered (both bounds equal
+  // — that's what centering means here) while guaranteeing the underline
+  // labels' own box never physically reaches into either icon cluster's
+  // tap area at any screen width, down to 320pt.
+  const topRowSideGuard = 24 * 2 + topRowIconGap + 6;
   // The feed is the buyer Home tab, always shown with the tab bar's compact
   // (Instagram iOS 26-style) sizing — see BuyerTabBar/buyerTabBarMetrics —
   // so its own layout math uses the compact inset, not the regular one every
@@ -2995,6 +3003,26 @@ export default function FeedScreen({
               <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 }}>
                 {feedTab === 'following' ? 'Follow sellers to build your Following feed' : 'Check back soon for new drops'}
               </Text>
+              {feedTab === 'following' && (
+                // Friends' entry point moved off the top bar (item: buyer
+                // feed top-bar cleanup) — this is one of its two new homes,
+                // right where a seller-less Following tab already points
+                // the buyer to go find people to follow.
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    router.navigate('/(buyer)/friends' as never);
+                  }}
+                  style={styles.findFriendsBtn}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Find friends"
+                  testID="buyer-following-find-friends"
+                >
+                  <BuyerNavIcon name="friends" color={FG} size={18} strokeWidth={1.9} />
+                  <Text style={styles.findFriendsBtnText}>Find friends</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : null
         }
@@ -3165,14 +3193,35 @@ export default function FeedScreen({
           </View>
         </View>
       ) : isBuyerSurface ? (
-        <View style={[styles.topBar, { paddingTop: previewTopInset + 4 }]} pointerEvents="box-none">
+        <View
+          style={[
+            styles.topBar,
+            {
+              paddingTop: previewTopInset + 4,
+              // 16px gutter PLUS the real safe-area inset (notch/Dynamic-
+              // Island/landscape cutouts) on each side — a flat
+              // paddingHorizontal here is what let the cart icon sit
+              // flush against, and on some real devices past, the true
+              // safe edge. insets.left/right are 0 on a plain rectangular
+              // screen, so this is a no-op there and just widens the
+              // gutter exactly where a device actually has a cutout.
+              paddingLeft: 16 + insets.left,
+              paddingRight: 16 + insets.right,
+            },
+          ]}
+          pointerEvents="box-none"
+        >
           {/* Buyer Threads Home: For You feed chrome — one line, TikTok-
-              style: Friends/Drops/Live on the left, a centered "Following |
-              Threads" underline switcher (real SegmentedControl from the
-              shared design system — see components/ui/SegmentedControl.tsx),
-              search/activity/cart on the right. Search used to be a
-              persistent text bar of its own row; the owner wants it as a
-              plain magnifying-glass icon like every other top-row icon,
+              style: LIVE only on the left, a centered "Following | Threads"
+              underline switcher (real SegmentedControl from the shared
+              design system — see components/ui/SegmentedControl.tsx),
+              search/cart on the right. Friends and Drops used to also live
+              on the left (3 icons vs. the right's 2), crowding the row;
+              Friends moved to a "Find friends" row in the Following empty
+              state and the profile Menu, Drops moved to Discover — see
+              those screens for the relocated entry points. Search used to
+              be a persistent text bar of its own row; the owner wants it as
+              a plain magnifying-glass icon like every other top-row icon,
               opening the dedicated search screen instead of filtering
               in place — freeing up the whole row the bar used to need, so
               this can sit higher, right below the Dynamic Island. Solid
@@ -3187,39 +3236,11 @@ export default function FeedScreen({
                 activeOpacity={0.7}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  router.navigate('/(buyer)/friends' as never);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Friends"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                testID="buyer-home-friends"
-              >
-                <BuyerNavIcon name="friends" color={ON_DARK} size={24} strokeWidth={1.9} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.buyerTopIconBtn}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  router.push('/buyer-drops' as never);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Drops"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                testID="buyer-home-drops"
-              >
-                <Feather name="zap" size={24} color={ON_DARK} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.buyerTopIconBtn}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                   router.push('/live-feed' as never);
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Live"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
                 testID="buyer-home-live"
               >
                 <Feather name="tv" size={24} color={ON_DARK} />
@@ -3234,7 +3255,10 @@ export default function FeedScreen({
                 on a 390pt screen. pointerEvents box-none so it never steals
                 taps meant for the icon clusters underneath its empty
                 left/right margins. */}
-            <View style={styles.buyerTabSwitcherWrap} pointerEvents="box-none">
+            <View
+              style={[styles.buyerTabSwitcherWrap, { left: topRowSideGuard, right: topRowSideGuard }]}
+              pointerEvents="box-none"
+            >
               <SegmentedControl
                 variant="underline"
                 size="compact"
@@ -3264,7 +3288,7 @@ export default function FeedScreen({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Search"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
                 testID="buyer-home-search-icon"
               >
                 <Feather name="search" size={24} color={ON_DARK} style={styles.topRowIconShadow} />
@@ -3279,6 +3303,8 @@ export default function FeedScreen({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+                hitSlop={{ top: 4, bottom: 4, left: 10, right: 10 }}
+                testID="buyer-home-cart-icon"
               >
                 <Feather name="shopping-cart" size={24} color={ON_DARK} />
                 {cartCount > 0 && (
@@ -3613,14 +3639,15 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center',
   },
-  // Bug fix (urgent rail-fixes pass): was `top: 3, right: 1`, which sat the
-  // badge mostly *inside* the cart glyph's own silhouette (covering its
-  // basket) instead of offset to the icon's corner. Pulled to a true
-  // top-right corner position, matching this app's other notification-
-  // count-dot convention (see `unreadDot` above) — center of the badge
-  // lands just outside the glyph's top-right corner, with only a small,
-  // intentional overlap onto it (the standard iOS/Android badge look).
-  buyerCartBadge: { top: -4, right: -6 },
+  // `right: -6` (an earlier pass's "true top-right corner" polish) pushed
+  // the badge outward past the cart glyph's own box — fine with the old
+  // flat 10px row padding, but on a real device with a right-edge safe-area
+  // inset on top of that, it pushed the badge (on the last, rightmost icon
+  // in the row) outside the safe screen bounds entirely. `right: 0` keeps
+  // the same top-right-corner read without ever stepping outside the
+  // icon's own box, which the row's padding already keeps clear of the
+  // real edge (see the buyer topBar padding fix).
+  buyerCartBadge: { top: -4, right: 0 },
   // Same shadow as the rail's icons (RightActionRail's iconShadow) — the
   // top-row search icon sits directly on video with nothing behind it, so
   // it needs the same legibility treatment.
@@ -3641,6 +3668,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: BG, backgroundColor: '#FFFFFF',
   },
   cartCountText: { fontSize: 10, lineHeight: 12, fontFamily: FONT.bold, color: '#000000', ...TABULAR_NUMS },
+  findFriendsBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4,
+    paddingHorizontal: 18, paddingVertical: 10, borderRadius: RADII.pill,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+  },
+  findFriendsBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   topTitle: { flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   creatorTitle: {
     flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.semibold, color: ON_DARK,

@@ -8,6 +8,9 @@
  *                                       item sold out mid-payment and it was
  *                                       auto-refunded
  *   seller · order_cancelled_by_buyer — mirror of the buyer's own cancel
+ *   seller · return_request_received  — a buyer asked to return an order
+ *                                       (item 108; the buyer already got
+ *                                       return_requested)
  *
  * Every other transition already publishes (routes/orders.ts status and
  * tracking changes, webhooks-shippo/-shopify, dropLifecycle, returns). Copy
@@ -101,5 +104,32 @@ export async function notifySellerOrderCancelledByBuyer(input: {
     });
   } catch (err) {
     logger.warn({ err, orderId: input.orderId }, "Seller order-cancelled notification failed");
+  }
+}
+
+/** The seller hears when a buyer requests a return — the buyer is the actor; a tap opens /return-detail. */
+export async function notifySellerReturnRequested(input: {
+  sellerId: string;
+  buyerId: string;
+  returnId: string;
+  orderNumber: string;
+}): Promise<void> {
+  try {
+    const profile = (await profilesById([input.buyerId])).get(input.buyerId);
+    const actor = profile && !profile.deleted && !profile.suspended ? actorFieldsFromProfile(profile) : null;
+    const who = actor?.actorName ?? "A buyer";
+    await publishNotification({
+      userId: input.sellerId,
+      category: "returns",
+      type: "return_request_received",
+      title: `${who} requested a return`,
+      body: `Order #${input.orderNumber}. Review the request and approve or decline it.`,
+      ...(actor ?? {}),
+      targetId: input.returnId,
+      targetType: "return",
+      cta: "Review return",
+    });
+  } catch (err) {
+    logger.warn({ err, returnId: input.returnId }, "Seller return-requested notification failed");
   }
 }
