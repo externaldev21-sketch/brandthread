@@ -50,7 +50,7 @@ import { formatProfileCount } from '@/services/profileService';
 import { ProfileMeta } from '@/components/profile/ProfileShell';
 import { InteractionLayer, ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
-import { ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
+import { ProfileVideoAffordance, ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
 import { ProfileStoryAvatar } from '@/components/profile/ProfileStoryAvatar';
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { ProfileStoriesRow, type ProfileStoryItem } from '@/components/profile/ProfileStoriesRow';
@@ -632,12 +632,6 @@ export default function ProfileScreen() {
   }
 
   const hasCover = coverFlow.hasCover;
-  const coverAddLabel = coverFlow.busy === 'uploading'
-    ? 'Uploading video…'
-    : coverFlow.busy === 'removing'
-      ? 'Removing video…'
-      : hasCover ? 'Edit profile video' : 'Add profile video';
-  const showCoverPlusIcon = !hasCover && !coverFlow.busy;
   const hasActiveStory = myStoryIds.length > 0;
   const heroActive = focused && heroOnScreen && !heroPosterOnly;
 
@@ -739,21 +733,12 @@ export default function ProfileScreen() {
           />
         ) : null}
         coverAffordance={(
-          // Slim text-pill, never a big empty band. Plain `Pressable` with
-          // hitSlop: a comfortable tap area without growing the visible box.
-          <Pressable
-            onPress={hasCover ? coverFlow.openManage : coverFlow.startAdd}
-            disabled={!!coverFlow.busy}
-            accessibilityRole="button"
-            accessibilityLabel={coverAddLabel}
-            accessibilityHint={hasCover ? 'Change or remove your profile video' : 'Pick or record a video up to 25 seconds to play behind your profile'}
-            testID="profile-cover-affordance"
-            hitSlop={10}
-            style={({ pressed }) => [styles.coverAdd, { borderColor: theme.border }, pressed && styles.coverAddPressed]}
-          >
-            <Feather name={showCoverPlusIcon ? 'plus' : 'film'} size={12} color={theme.text} />
-            <Text style={[styles.coverAddText, { color: theme.text }]} numberOfLines={1}>{coverAddLabel}</Text>
-          </Pressable>
+          <ProfileVideoAffordance
+            hasVideo={hasCover}
+            busy={coverFlow.busy}
+            onAdd={coverFlow.startAdd}
+            onManage={coverFlow.openManage}
+          />
         )}
         stats={stats}
         statsLoading={loading}
@@ -931,14 +916,6 @@ function makeStyles(theme: AppThemePreset) {
       textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, // theme-exempt: legibility over cover media
     },
     topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 16, flexShrink: 0 },
-
-    coverAdd: {
-      flexDirection: 'row', alignItems: 'center', gap: 4, height: 26,
-      borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10,
-      backgroundColor: theme.cardGlass,
-    },
-    coverAddPressed: { opacity: 0.6 },
-    coverAddText: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },
 
     // Stats row → buttons: 16pt. Instagram proportions: two equal buttons
     // plus a square discover-people button, 6pt apart, 8pt corners.

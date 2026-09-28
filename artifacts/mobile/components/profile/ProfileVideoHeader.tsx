@@ -20,6 +20,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, SP } from '@/lib/theme';
@@ -164,6 +165,49 @@ export function ProfileVideoHeader({
   );
 }
 
+/**
+ * Slim owner-only "+ Add profile video" / "Edit profile video" pill (never a
+ * big empty band). Plain `Pressable` with hitSlop: a comfortable tap area
+ * without growing the visible box.
+ */
+export function ProfileVideoAffordance({
+  hasVideo,
+  busy,
+  onAdd,
+  onManage,
+}: {
+  hasVideo: boolean;
+  busy: null | 'uploading' | 'removing';
+  onAdd: () => void;
+  onManage: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const label = busy === 'uploading'
+    ? 'Uploading video…'
+    : busy === 'removing'
+      ? 'Removing video…'
+      : hasVideo ? 'Edit profile video' : 'Add profile video';
+  return (
+    <Pressable
+      onPress={hasVideo ? onManage : onAdd}
+      disabled={!!busy}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hasVideo ? 'Change or remove your profile video' : 'Pick or record a video up to 25 seconds to play behind your profile'}
+      testID="profile-cover-affordance"
+      hitSlop={10}
+      style={({ pressed }) => [
+        styles.affordance,
+        { borderColor: theme.border, backgroundColor: theme.cardGlass },
+        pressed && styles.affordancePressed,
+      ]}
+    >
+      <Feather name={!hasVideo && !busy ? 'plus' : 'film'} size={12} color={theme.text} />
+      <Text style={[styles.affordanceText, { color: theme.text }]} numberOfLines={1}>{label}</Text>
+    </Pressable>
+  );
+}
+
 /** Instagram stats: number over label, left to right, each tappable when it links somewhere. */
 export function ProfileStatColumns({ stats, loading }: { stats: ProfileStat[]; loading?: boolean }) {
   const { theme } = useAppTheme();
@@ -221,6 +265,13 @@ const styles = StyleSheet.create({
   // the fade lands on the solid background, right above the stats row.
   meta: { paddingHorizontal: SP.md, paddingTop: 12, gap: 2 },
   coverRow: { paddingHorizontal: SP.md, paddingTop: 10, alignItems: 'flex-start' },
+
+  affordance: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, height: 26,
+    borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10,
+  },
+  affordancePressed: { opacity: 0.6 },
+  affordanceText: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },
 
   statsRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: SP.md, paddingTop: 16 },
   statCell: { alignItems: 'flex-start', minWidth: 44 },

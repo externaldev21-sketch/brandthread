@@ -21,10 +21,17 @@
  *   └──────( ◉ Shop 12 products ↗ )┘  optional floating CTA
  *
  * On desktop web it fills the global WebAppShell column (components/web).
+ *
+ * `headerVariant="video"` (opt-in; the seller's own Profile tab) swaps the
+ * collapsing hero above for Instagram's own-profile header
+ * (`ProfileVideoHeader`): the profile video plays from the top of the screen
+ * behind the controls, avatar, name and bio and fades to solid at the stats
+ * row; controls scroll with the page (no compact bar). Every other consumer
+ * keeps the default `hero` layout unchanged.
  */
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, Animated, FlatList, RefreshControl, StyleSheet, Text, View,
+  AccessibilityInfo, Animated, FlatList, Platform, RefreshControl, StyleSheet, Text, View,
   type ListRenderItem,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -48,11 +55,22 @@ import { ProfileEmptyAreaContext } from './ProfileEmptyAreaContext';
 import { loadBuyerSettings } from '@/lib/buyerSettings';
 import { LiveAvatarRing } from '@/components/live/LiveAvatarRing';
 import { useLiveStreamForHost, useOpenLive } from '@/lib/live/useLiveDirectory';
+import { ProfileVideoHeader } from './ProfileVideoHeader';
+import { ProfileStoryAvatar } from './ProfileStoryAvatar';
+import { avatarGeometry } from './profileAvatarGeometry';
 /** Compact sticky header height below the status bar. */
 const COMPACT_BAR = 64;
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as unknown as typeof FlatList;
 const AVATAR = 88;
+const AVATAR_RING_BORDER = 2.5;
+const AVATAR_RING_PADDING = 2;
+/**
+ * Border-box: the ring's content box (size − 2 × (border + padding)) must
+ * equal the avatar exactly, or the avatar overflows and sits off-centre (it
+ * was AVATAR + 8 = 96 → 87pt of room for an 88pt avatar).
+ */
+const AVATAR_RING = AVATAR + 2 * (AVATAR_RING_BORDER + AVATAR_RING_PADDING);
 
 export interface ProfileIdentity {
   name: string;
@@ -80,7 +98,15 @@ export interface ProfileShellProps<T> {
      * avatar wears a red LIVE ring and tapping it opens their stream.
      */
     liveHostId?: string | null;
+    /** `headerVariant="video"` only: shows the white "+" story badge and handles its tap. */
+    onPressStoryBadge?: () => void;
   };
+  /** Default `hero` (collapsing parallax hero). `video` = Instagram own-profile header over the profile video. */
+  headerVariant?: 'hero' | 'video';
+  /** Tab bar look — `iconOnly` is Instagram's icon + underline. */
+  tabsVariant?: 'labeled' | 'iconOnly';
+  /** Directly under the tab bar, above the grid (e.g. a sub-filter for the active tab). */
+  belowTabs?: React.ReactNode;
   hero: { videoUri?: string | null; posterUri?: string | null };
   /** Owner-only cover-video affordance ("Add cover video" / "Edit cover"), shown in the hero. */
   coverAffordance?: React.ReactNode;
@@ -128,8 +154,9 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     testID, identity, avatar, hero, coverAffordance, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, belowStats, actions, extras,
     tabs, section, data, renderItem, keyExtractor, numColumns = 1, listKey,
     ListEmptyComponent, ListFooterComponent, onEndReached, refreshing = false, onRefresh,
-    renderFloating, bottomInset = 0,
+    renderFloating, bottomInset = 0, headerVariant = 'hero', tabsVariant = 'labeled', belowTabs,
   } = props;
+  const isVideoHeader = headerVariant === 'video';
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
@@ -147,6 +174,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const [leftWidth, setLeftWidth] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(layout.windowHeight);
   const [tabsHeight, setTabsHeight] = useState(0);
+  const [videoHeroHeight, setVideoHeroHeight] = useState(0);
 
   useFocusEffect(useCallback(() => {
     setFocused(true);
@@ -176,11 +204,11 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   useEffect(() => {
     const id = scrollY.addListener(({ value }) => {
       lastOffsetRef.current = value;
-      const next = value < heroHeight - 40;
+      const next = isVideoHeader ? value < Math.max(videoHeroHeight, 1) : value < heroHeight - 40;
       setHeroOnScreen((prev) => (prev === next ? prev : next));
     });
     return () => scrollY.removeListener(id);
-  }, [scrollY, heroHeight]);
+  }, [scrollY, heroHeight, isVideoHeader, videoHeroHeight]);
 
   // ── Preserve scroll position across an in-screen tab switch ─────────────
   // `listKey` changes when a tab needs a different `numColumns` (FlatList
@@ -291,7 +319,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const floatingBottom = bottomFloor + SP.sm;
   const emptyArea = computeEmptyArea({
     viewportHeight,
-    topChrome: insets.top + COMPACT_BAR,
+    topChrome: isVideoHeader ? insets.top : insets.top + COMPACT_BAR,
     tabsHeight,
     bottomInset: bottomFloor,
     floatingReserve,
@@ -315,7 +343,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   );
   // LIVE: red ring + tag around the avatar, and the avatar opens the stream.
   const avatarNode = (
-    <LiveAvatarRing live={!!liveStreamId} size={AVATAR + 8} testID={liveStreamId ? 'profile-live-ring' : undefined}>
+    <LiveAvatarRing live={!!liveStreamId} size={AVATAR_RING} testID={liveStreamId ? 'profile-live-ring' : undefined}>
       {avatarBody}
     </LiveAvatarRing>
   );
@@ -326,8 +354,50 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     ? `${identity.name} is live. Watch now`
     : avatar?.accessibilityLabel ?? `${identity.name} avatar`;
 
+  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const videoAvatarSize = avatarGeometry().outer;
+  const videoHeader = isVideoHeader ? (
+    <ProfileVideoHeader
+      hero={hero}
+      heroActive={heroActive}
+      posterOnly={heroPosterOnly}
+      topPad={topPad}
+      onHeroHeight={setVideoHeroHeight}
+      topBar={(
+        <>
+          <View style={styles.controlGroup}>{topLeft}</View>
+          <View style={styles.controlGroup}>
+            {isOwnProfile && walletChip ? <ProfileWalletChip balanceLabel={walletChip.balanceLabel} onPress={walletChip.onPress} /> : null}
+            {topRight}
+          </View>
+        </>
+      )}
+      avatar={(
+        <LiveAvatarRing live={!!liveStreamId} size={videoAvatarSize} testID={liveStreamId ? 'profile-live-ring' : undefined}>
+          <ProfileStoryAvatar
+            uri={identity.avatarUrl}
+            initials={identity.initials || '•'}
+            hasActiveStory={!!avatar?.ring}
+            onPress={avatarPress}
+            onPressBadge={isOwnProfile ? avatar?.onPressStoryBadge : undefined}
+            accessibilityLabel={avatarPressLabel}
+          />
+        </LiveAvatarRing>
+      )}
+      name={identity.name}
+      nameAccessory={identity.verified ? <Feather name="check-circle" size={16} color={theme.accent} accessibilityLabel="Verified" /> : null}
+      handle={identity.handle ?? null}
+      chip={<ProfileChip label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />}
+      meta={meta}
+      coverAffordance={isOwnProfile ? coverAffordance : null}
+      stats={stats}
+      statsLoading={statsLoading}
+    />
+  ) : null;
+
   const header = (
     <View>
+      {videoHeader ?? (<>
       {/* ── Hero ── */}
       <View style={[styles.hero, { height: heroHeight }]}>
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateY: heroTranslate }, { scale: heroScale }] }]}>
@@ -394,6 +464,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
 
       {meta ? <View style={styles.meta}>{meta}</View> : null}
       <ProfileStatsRow stats={stats} loading={statsLoading} />
+      </>)}
       {belowStats}
       {actions ? <View style={styles.actions}>{actions}</View> : null}
       {extras ? <View style={styles.extras}>{extras}</View> : null}
@@ -404,11 +475,12 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         onLayout={(event) => setTabsHeight(Math.round(event.nativeEvent.layout.height))}
       >
         {tabs ? (
-          <ProfileTabs tabs={tabs.items} active={tabs.active} onChange={tabs.onChange} />
+          <ProfileTabs tabs={tabs.items} active={tabs.active} onChange={tabs.onChange} variant={tabsVariant} />
         ) : section ? (
           <ProfileSectionLabel label={section.label} count={section.count} />
         ) : null}
       </View>
+      {belowTabs}
       <View style={{ height: PROFILE_GRID_GAP }} />
     </View>
   );
@@ -453,6 +525,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         </ProfileEmptyAreaContext.Provider>
 
         {/* Compact sticky header — fades in once the hero scrolls away */}
+        {isVideoHeader ? null : (<>
         <Animated.View
           pointerEvents="none"
           style={[styles.compact, { height: insets.top + 64, paddingTop: insets.top, opacity: compactOpacity, transform: [{ translateY: compactSlide }] }]}
@@ -490,6 +563,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
             {topRight}
           </View>
         </View>
+        </>)}
 
         {renderFloating ? renderFloating(floatingBottom) : null}
       </View>
@@ -509,8 +583,8 @@ function makeStyles(theme: AppThemePreset) {
     },
     avatarPress: { alignSelf: 'flex-start', marginBottom: SP.sm },
     avatarRing: {
-      width: AVATAR + 8, height: AVATAR + 8, borderRadius: (AVATAR + 8) / 2,
-      borderWidth: 2.5, borderColor: theme.text, padding: 2, backgroundColor: theme.background,
+      width: AVATAR_RING, height: AVATAR_RING, borderRadius: AVATAR_RING / 2,
+      borderWidth: AVATAR_RING_BORDER, borderColor: theme.text, padding: AVATAR_RING_PADDING, backgroundColor: theme.background,
     },
     avatar: {
       width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden',

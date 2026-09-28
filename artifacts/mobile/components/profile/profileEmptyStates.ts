@@ -9,7 +9,7 @@ import type { ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 export type ProfileEmptyTab =
   | 'buyer:posts' | 'buyer:tagged' | 'buyer:reposts' | 'buyer:saved'
   | 'buyer:liked' | 'buyer:orders'
-  | 'seller:post' | 'seller:draft' | 'seller:schedule' | 'seller:videos'
+  | 'seller:post' | 'seller:draft' | 'seller:schedule' | 'seller:videos' | 'seller:tagged'
   | 'shop';
 
 export interface ProfileEmptyCopy {
@@ -107,6 +107,12 @@ const TABLE: Record<ProfileEmptyTab, {
     message: 'Schedule a post and it will publish itself at the time you pick.',
     publicMessage: 'Scheduled posts are private.',
     cta: { label: 'Schedule a post', route: '/create-post?mode=schedule' },
+  },
+  'seller:tagged': {
+    icon: 'tag',
+    title: 'No tagged posts',
+    message: 'When shoppers tag your brand in a post, it shows up here.',
+    publicMessage: 'Posts that tag this brand will appear here.',
   },
   'seller:videos': {
     icon: 'film',

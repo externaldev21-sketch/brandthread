@@ -39,6 +39,12 @@ const FILES_TO_CHECK = [
   'components/search/BrandCard.tsx',
   'components/search/CategoryTile.tsx',
   'components/ShopProductSheet.tsx',
+  // Own-profile rebuild: the avatar and its "+" story badge are two sibling
+  // tap targets, and the header adds stat/affordance/filter pressables.
+  'app/(buyer)/profile.tsx',
+  'app/(tabs)/profile.tsx',
+  'components/profile/ProfileStoryAvatar.tsx',
+  'components/profile/ProfileVideoHeader.tsx',
 ];
 
 /**
