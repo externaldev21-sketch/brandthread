@@ -710,7 +710,7 @@ export default function BuyerStoryViewer() {
                     style={[styles.seenByAvatar, { marginLeft: i === 0 ? 0 : -10, zIndex: 3 - i }]}
                   >
                     {v.avatarUrl ? (
-                      <Image source={{ uri: v.avatarUrl }} style={styles.seenByAvatarImg} />
+                      <CachedImage source={{ uri: v.avatarUrl }} style={styles.seenByAvatarImg} />
                     ) : (
                       <Text style={styles.seenByInitials}>{v.name.charAt(0).toUpperCase()}</Text>
                     )}
