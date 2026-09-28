@@ -13,11 +13,14 @@
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { acceptPreviewMock, deletePreviewMock, blockUserMock, isPreviewIdMock } = vi.hoisted(() => ({
+const {
+  acceptPreviewMock, deletePreviewMock, blockUserMock, isPreviewIdMock, notifySocialMock,
+} = vi.hoisted(() => ({
   acceptPreviewMock: vi.fn(),
   deletePreviewMock: vi.fn(),
   blockUserMock: vi.fn(),
   isPreviewIdMock: vi.fn((id: string) => id.startsWith('preview-conversation-')),
+  notifySocialMock: vi.fn(),
 }));
 
 vi.mock('@/lib/previewInbox', () => ({
@@ -27,6 +30,7 @@ vi.mock('@/lib/previewInbox', () => ({
 }));
 vi.mock('@/services/socialService', () => ({
   blockUser: blockUserMock,
+  notifySocialListeners: notifySocialMock,
 }));
 
 const {
@@ -91,6 +95,44 @@ describe('scheduleDeleteConversationRequest / undoDeleteConversationRequest', ()
     await vi.advanceTimersByTimeAsync(4000);
     expect(api.conversations.decline).toHaveBeenCalledWith('real-conv-42');
     expect(deletePreviewMock).not.toHaveBeenCalled();
+  });
+
+  // Regression for item 75 (message-requests verification): a request row
+  // deleted from the Requests list was only ever hidden by the ~4s undo
+  // window's pending-delete filter — once the window closed with nothing
+  // telling the caller's own `conversations` state (or any other mounted
+  // screen) the delete was for real, the row silently reappeared. Both
+  // `onCommitted` (the caller's own state) and `notifySocialListeners()`
+  // (every other subscribed screen, e.g. Inbox after a Delete from the
+  // conversation screen's own bottom panel) must fire once — and only
+  // once — the delete actually commits.
+  it('calls onCommitted and notifySocialListeners once a preview delete commits, never on cancel', () => {
+    const api = fakeApi();
+    const onCommitted = vi.fn();
+    scheduleDeleteConversationRequest('preview-conversation-08', api, onCommitted);
+    vi.advanceTimersByTime(4000);
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    expect(notifySocialMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never calls onCommitted or notifySocialListeners when the delete is undone in time', () => {
+    const api = fakeApi();
+    const onCommitted = vi.fn();
+    scheduleDeleteConversationRequest('preview-conversation-08', api, onCommitted);
+    undoDeleteConversationRequest('preview-conversation-08');
+    vi.advanceTimersByTime(10_000);
+    expect(onCommitted).not.toHaveBeenCalled();
+    expect(notifySocialMock).not.toHaveBeenCalled();
+  });
+
+  it('calls onCommitted and notifySocialListeners for a real delete too, even if the API call fails', async () => {
+    const api = fakeApi();
+    api.conversations.decline.mockRejectedValue(new Error('already gone'));
+    const onCommitted = vi.fn();
+    scheduleDeleteConversationRequest('real-conv-42', api, onCommitted);
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    expect(notifySocialMock).toHaveBeenCalledTimes(1);
   });
 });
 

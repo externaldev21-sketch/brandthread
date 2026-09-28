@@ -113,6 +113,19 @@ export function subscribeSocial(fn: Listener): () => void {
 }
 function notify() { listeners.forEach(fn => fn()); }
 
+/** Lets a module outside this file tell every subscribeSocial() listener
+ *  (e.g. inbox.tsx's `subscribeSocial(() => { loadData(); ... })`) to
+ *  refetch — the same signal this file's own mutators send themselves via
+ *  the private notify() above. Used by lib/requestActions.ts once a
+ *  deferred message-request delete (lib/pendingRequestDeletes.ts) actually
+ *  commits, so a screen that's just sitting on the Requests list (not the
+ *  one that scheduled the delete — e.g. it was scheduled from the
+ *  request-mode conversation screen's Delete action, which navigates back
+ *  to Inbox immediately, well before the ~4s window elapses) still picks up
+ *  the real removal instead of the row silently reappearing once the undo
+ *  window's `isPendingConversationDelete()` stops hiding it. */
+export function notifySocialListeners(): void { notify(); }
+
 // ─── AsyncStorage helpers ─────────────────────────────────────────────────────
 
 async function load<T>(key: string, fallback: T): Promise<T> {

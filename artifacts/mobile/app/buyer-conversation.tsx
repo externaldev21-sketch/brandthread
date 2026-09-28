@@ -47,6 +47,7 @@ import {
   acceptConversationRequest, scheduleDeleteConversationRequest, undoDeleteConversationRequest,
   blockConversationRequestUser,
 } from '@/lib/requestActions';
+import { DELETE_GRACE_MS } from '@/lib/pendingRequestDeletes';
 import { confirmDestructiveActionSheet } from '@/lib/actionSheet';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
@@ -826,6 +827,10 @@ export default function BuyerConversationScreen() {
     showUndo({
       message: `Deleted request from ${name}`,
       undo: () => undoDeleteConversationRequest(conversationId),
+      // Match the toast's own visible window to the real undo grace period —
+      // see the same fix (and its doc comment) in inbox.tsx's
+      // deleteRequestConversation.
+      durationMs: DELETE_GRACE_MS,
     });
     goBackOr(router);
   }
@@ -1023,7 +1028,12 @@ export default function BuyerConversationScreen() {
   // background — rolled back to the pre-tap message list if it fails, so a
   // reaction never silently "sticks" client-side when the server rejected it.
   async function handleReact(msg: Message, type: ReactionType) {
-    if (!conv) return;
+    // Defense in depth alongside the request-mode guards on the long-press
+    // overlay and double-tap-to-like above: reacting is engagement gated
+    // behind Accept, so this single choke-point for every reaction mutation
+    // (long-press menu, double-tap-like, and the existing-chip re-tap below)
+    // refuses to fire while the request is still pending.
+    if (!conv || isRequestMode) return;
     hapticSelection();
     const prevMessages = messages;
     const { next } = applyOptimisticReaction(msg.reactions, myId, MY_NAME, type);
@@ -1046,6 +1056,10 @@ export default function BuyerConversationScreen() {
   }
 
   function handleBubblePress(msg: Message, event: { nativeEvent: { pageX: number; pageY: number } }) {
+    // Same request-mode gate as the long-press reaction overlay just below —
+    // double-tap-to-like also routes into handleReact(), which fires a real
+    // reaction API call for a non-preview conversation id.
+    if (isRequestMode) return;
     const now = Date.now();
     if (lastTapRef.current.id === msg.id && now - lastTapRef.current.at < DOUBLE_TAP_MS) {
       lastTapRef.current = { id: '', at: 0 };
@@ -1780,7 +1794,15 @@ export default function BuyerConversationScreen() {
             testID={`conversation-bubble-${msg.id}`}
             activeOpacity={0.88}
             onPress={(e) => handleBubblePress(msg, e)}
-            onLongPress={() => openReactionOverlay(msg)}
+            // Reacting is a form of engagement Instagram gates behind
+            // Accept, same as swipe-to-reply just above (SwipeToReplyBubble's
+            // own `disabled={isRequestMode}`) and the hidden composer below —
+            // without this, long-pressing a not-yet-accepted request's
+            // message would still fire a real POST /reactions call (see
+            // handleReact's `await addReaction(conv.id, ...)` for a non-
+            // preview conversation id), silently exposing an action the
+            // request-mode UI otherwise fully hides.
+            onLongPress={isRequestMode ? undefined : () => openReactionOverlay(msg)}
             delayLongPress={280}
             // Voice, product, order and (multi-photo) image attachments each
             // render their own interactive control inside this bubble
