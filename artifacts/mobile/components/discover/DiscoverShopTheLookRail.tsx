@@ -19,6 +19,9 @@ import { hapticLight } from '@/lib/haptics';
 import type { DiscoverPost } from '@/lib/discoverFeed';
 
 const CARD_WIDTH = 130;
+// 3:4 portrait (item 46) — consistent with every other Discover card/tile so
+// the full garment shows instead of a square crop.
+const CARD_IMAGE_HEIGHT = Math.round((CARD_WIDTH * 4) / 3);
 
 export function DiscoverShopTheLookRail({ posts, onPress }: { posts: DiscoverPost[]; onPress: (post: DiscoverPost) => void }) {
   const { theme } = useAppTheme();
@@ -39,7 +42,7 @@ export function DiscoverShopTheLookRail({ posts, onPress }: { posts: DiscoverPos
               style={{ width: CARD_WIDTH }}
             >
               {post.imageUri ? (
-                <CachedImage source={{ uri: post.imageUri }} style={styles.image} contentFit="cover" />
+                <CachedImage source={{ uri: post.imageUri }} style={styles.image} contentFit="cover" contentPosition="top center" />
               ) : (
                 <View style={[styles.image, styles.fallback, { backgroundColor: post.authorColor }]}>
                   <Text style={styles.fallbackText}>{post.authorInitials}</Text>
@@ -59,7 +62,7 @@ export function DiscoverShopTheLookRail({ posts, onPress }: { posts: DiscoverPos
 
 const styles = StyleSheet.create({
   track: { flexDirection: 'row', gap: 12 },
-  image: { width: CARD_WIDTH, height: CARD_WIDTH, borderRadius: RADII.card },
+  image: { width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT, borderRadius: RADII.card },
   fallback: { alignItems: 'center', justifyContent: 'center' },
   fallbackText: { fontSize: 28, fontFamily: FONT.bold, color: '#FFFFFF' },
   name: { fontSize: 13, fontFamily: FONT.semibold, marginTop: 6 },

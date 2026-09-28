@@ -58,7 +58,7 @@ export const EditorialTile = React.memo(function EditorialTile({ item, theme }: 
         style={[tile.imageWrap, { width: TILE_WIDTH, height: TILE_IMAGE_HEIGHT }]}
       >
         {item.imageUri ? (
-          <CachedImage source={{ uri: item.imageUri }} style={tile.image} contentFit="cover" />
+          <CachedImage source={{ uri: item.imageUri }} style={tile.image} contentFit="cover" contentPosition="top center" />
         ) : (
           <View style={[StyleSheet.absoluteFill, tile.fallback]}>
             <Text style={tile.fallbackText}>{item.initials}</Text>
