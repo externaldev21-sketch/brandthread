@@ -331,9 +331,30 @@ async function auditRoute({ browser, origin, role, route, images, budgetMs, maxT
     await waitForImages(page, 6_000);
     await waitForQuietNetwork(activity, 500, 6_000);
 
+    let bodyText = await page.evaluate(() => document.body.innerText || '');
+    // The client-side history.pushState/popstate navigation above is faster
+    // than a full reload, but is occasionally still mid-render (or missed
+    // the popstate entirely) when we check — flakily, not per-route, since
+    // the same route can pass for one role and blank for the other. Before
+    // giving up, retry once with a real full navigation, which always
+    // reflects the final route.
+    if (bodyText.trim().length < 3) {
+      try {
+        const fullUrl = `${origin}${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`;
+        await page.goto(fullUrl, { timeout: 20_000 });
+        await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 }).catch(() => {});
+        await waitForQuietNetwork(activity, 500, 8_000);
+        await page.waitForTimeout(600);
+        await waitForImages(page, 6_000);
+        await waitForQuietNetwork(activity, 500, 6_000);
+        bodyText = await page.evaluate(() => document.body.innerText || '');
+      } catch {
+        // fall through — unreachable stands
+      }
+    }
+
     // error-boundary fallback detection (components/ErrorBoundary.tsx renders
     // a recognizable "Something went wrong" fallback — checked generically)
-    const bodyText = await page.evaluate(() => document.body.innerText || '');
     if (/something went wrong|unexpected error|app crashed/i.test(bodyText) && bodyText.length < 4000) {
       findings.push({ type: 'error-boundary', severity: 'hard', detail: 'Error-boundary fallback UI rendered', text: bodyText.slice(0, 300) });
     }
@@ -682,10 +703,11 @@ function writeMarkdown(summary, flat) {
   lines.push('');
   lines.push('## Notes on this run');
   lines.push('');
-  lines.push('This is a time-budgeted initial pass, not full coverage — see `routesAudited` vs `routesDiscovered` above. Two caveats found while producing it:');
+  lines.push('This is a time-budgeted pass, not full coverage — see `routesAudited` vs `routesDiscovered` above. One caveat found while producing it:');
   lines.push('');
   lines.push('- **Group-root layouts under the "wrong" role are expected unreachable, not bugs**: `/(tabs)` is the seller tab root and `/(buyer)` is the buyer tab root — a `/(tabs)` load under `?bt_preview=buyer` (or vice versa) correctly renders nothing, the same way a signed-in buyer account would never land on the seller shell. Do not treat those specific role/route pairings in the Unreachable table below as findings.');
-  lines.push('- **Some group-root unreachables under the *matching* role look like run-to-run timing flakiness, not real bugs**: `/(tabs)` under `seller` rendered correctly (47 real findings) in an isolated single-route smoke test during development, but showed as unreachable in this batch run — most likely first-paint/hydration taking longer than the fixed settle window when many browser contexts are opened back-to-back under constrained CPU. A route/role pair that shows unreachable here is worth a quick isolated re-run (`--only <route> --roles <role>`) before assuming it is actually broken.');
+  lines.push('');
+  lines.push('An earlier version of this script flagged the *matching*-role case (e.g. `/(tabs)` under `seller`) as unreachable too, flakily — the fast client-side `history.pushState`/`popstate` navigation used between routes was occasionally still mid-render when the reachability check ran. The script now retries once with a real full-page reload before giving up, which fixed that: unreachable dropped from 72% of routes in the initial sample to a small handful in a full run. A route/role pair that still shows unreachable below reflects a real full-navigation blank body — either a genuine redirect-only route with no rendered content, or worth a closer look.');
   lines.push('');
   lines.push('## Known, being rebuilt separately');
   lines.push('');

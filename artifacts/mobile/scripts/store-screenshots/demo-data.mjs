@@ -742,7 +742,7 @@ export function respond({ method, path, query, role, options = {} }) {
       posts: [],
     };
   }
-  if (p === '/buyer/cart') return options.emptyCart ? { items: [], savedItems: [] } : CART;
+  if (p === '/buyer/cart') return (options.emptyCart || options.fresh) ? { items: [], savedItems: [] } : CART;
   // Seeded so the Activity redesign (swipe/menu/remove-follower/block, see
   // docs/activity-flows.md) has real rows to screenshot: two single-actor
   // new-follower rows (one unread → Highlights, one read → Today) and one
@@ -780,9 +780,9 @@ export function respond({ method, path, query, role, options = {} }) {
   // Seller
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
   if (p === '/finance/balance') return { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
-  if (p === '/orders') return sellerOrders(options.orderCount ?? 9);
-  if ((match = p.match(/^\/orders\/([^/]+)$/))) return sellerOrderDetail(match[1], options.orderCount ?? 9);
-  if (p === '/conversations') return role === 'seller' ? sellerConversations(options.conversationCount ?? 5) : [];
+  if (p === '/orders') return sellerOrders(options.fresh ? 0 : options.orderCount ?? 9);
+  if ((match = p.match(/^\/orders\/([^/]+)$/))) return sellerOrderDetail(match[1], options.fresh ? 0 : options.orderCount ?? 9);
+  if (p === '/conversations') return role === 'seller' ? sellerConversations(options.fresh ? 0 : options.conversationCount ?? 5) : [];
   if (p === '/manufacturers/public') return MANUFACTURERS;
   if ((match = p.match(/^\/manufacturers\/public\/([^/]+)$/))) return byId(MANUFACTURERS)(match[1]);
   if (p === '/manufacturers/favorites') return [{ manufacturerId: MANUFACTURERS[0].id, createdAt: iso(50 * DAY) }, { manufacturerId: MANUFACTURERS[2].id, createdAt: iso(40 * DAY) }];
@@ -815,7 +815,12 @@ export function localStorageSeed(role, options = {}) {
     [`@brandthread/app-theme:v1:${user.id}`]: options.themeId ?? 'monochrome',
     '@brandthread/app-theme:v1:guest': options.themeId ?? 'monochrome',
   };
-  if (role === 'buyer') {
+  // `options.fresh`: a brand-new account — skips the "already set up"
+  // seeds below so onboarding/empty states render instead of the fully
+  // populated demo, for the notch crawl's fresh-account pass (some chrome,
+  // e.g. an onboarding checklist banner, only exists in this state and
+  // isn't covered by the always-populated default demo pass).
+  if (role === 'buyer' && !options.fresh) {
     seed[`bt:checkout:${user.id}:v1`] = JSON.stringify(checkoutSession());
     seed['bt:repost-education:preview:v1'] = '1';
     // Own avatar (local-only field — see lib/buyerProfile.ts) so the
@@ -824,14 +829,16 @@ export function localStorageSeed(role, options = {}) {
     seed[`bt:buyer-profile:${user.id}:v2`] = JSON.stringify({ avatarUri: user.imageUrl });
   }
   if (role === 'seller') {
-    // A finished "Set up your business" checklist, so the dashboard shows the business, not onboarding.
-    const done = ['verify_account', 'connect_payments', 'first_product', 'shipping_rates', 'customize_store', 'publish_store', 'first_post', 'connect_manufacturer'];
-    seed[`@brandthread/setup_state:${user.id}`] = JSON.stringify({
-      started: true, dismissed: false, currentStep: null,
-      tasks: [...done.map((id) => ({ id, completed: true })), { id: 'connect_domain', skipped: true }],
-      dismissedTips: [], openedFeatures: ['create-post'], lastUpdated: DEMO_NOW,
-    });
-    seed['@brandthread/products'] = JSON.stringify(options.productCount ? manySellerProducts(options.productCount) : SELLER_PRODUCTS);
+    if (!options.fresh) {
+      // A finished "Set up your business" checklist, so the dashboard shows the business, not onboarding.
+      const done = ['verify_account', 'connect_payments', 'first_product', 'shipping_rates', 'customize_store', 'publish_store', 'first_post', 'connect_manufacturer'];
+      seed[`@brandthread/setup_state:${user.id}`] = JSON.stringify({
+        started: true, dismissed: false, currentStep: null,
+        tasks: [...done.map((id) => ({ id, completed: true })), { id: 'connect_domain', skipped: true }],
+        dismissedTips: [], openedFeatures: ['create-post'], lastUpdated: DEMO_NOW,
+      });
+    }
+    seed['@brandthread/products'] = JSON.stringify(options.fresh ? [] : options.productCount ? manySellerProducts(options.productCount) : SELLER_PRODUCTS);
     seed['@brandthread/migration_v1_demo_purged'] = '1';
   }
   return seed;
