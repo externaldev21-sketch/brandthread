@@ -1177,12 +1177,10 @@ export default function OrdersScreen() {
         <EmptyState
           icon="shopping-bag"
           message="Your orders will show up here once a buyer checks out."
-          actionLabel="Add your first product"
-          onAction={() => router.push('/add-product' as never)}
         />
       )}
     </View>
-  ), [loadError, router]);
+  ), [loadError]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -1224,14 +1222,14 @@ export default function OrdersScreen() {
           {/* Overnight batch item 37: SearchBar is the box now (no border, at
               rest or focus) — the outer `searchBox` wrapper used to draw a
               second bordered card around it, which is exactly the doubled-up
-              "rectangle bar" the owner flagged. The pin icon sits beside it
-              instead of inside a shared bordered box. */}
+              "rectangle bar" the owner flagged. Multi-location is gone from
+              the product, so there's no location pin and no "All locations"
+              prefix here anymore. */}
           <View style={s.searchBoxRow}>
-            <Feather name="map-pin" size={14} color={MUTED} />
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="All locations · Search orders"
+              placeholder="Search orders"
               style={s.searchBarFlex}
             />
           </View>
@@ -1479,11 +1477,6 @@ const createStyles = (theme: any) => {
   },
   emptyStateContainer: {
     marginHorizontal: SP.md,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    overflow: 'hidden',
     marginBottom: SP.sm,
   },
   sortIndicator: {

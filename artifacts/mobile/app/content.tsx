@@ -12,7 +12,7 @@ import {
   archiveSellerPost, deleteSellerPost, getSellerPosts, updateSellerPost,
 } from '@/services/socialService';
 import { useColors } from '@/hooks/useColors';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 
 type FilterTab = 'all' | ContentStatus;
@@ -195,7 +195,7 @@ export default function ContentScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <Header
+      <ScreenHeader
         title="Content"
         actions={[
           { icon: 'bar-chart-2', onPress: () => router.push('/(tabs)/analytics' as never), accessibilityLabel: 'View analytics' },

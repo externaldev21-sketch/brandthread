@@ -6,12 +6,10 @@
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { Button } from '@/components/ui/Button';
 import { hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
@@ -23,7 +21,6 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 export default function ConversationNicknamesScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(), []);
-  const headerTopPad = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{
@@ -56,19 +53,11 @@ export default function ConversationNicknamesScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: theme.background }]}>
-      <View style={[s.header, { paddingTop: headerTopPad + SP.xs }]}>
-        <PressableScale rippleEnabled={false}
-          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
-          style={s.roundBtn}
-          testID="conversation-nicknames-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-        </PressableScale>
-        <Text style={[s.headerTitle, { color: theme.text }]}>Nickname</Text>
-        <View style={s.roundBtn} />
-      </View>
+      <ScreenHeader
+        title="Nickname"
+        onBack={() => { hapticPrimaryAction(); goBackOr(router); }}
+        backTestID="conversation-nicknames-back"
+      />
 
       <View style={s.body}>
         <Text style={[s.label, { color: theme.muted }]}>
@@ -99,9 +88,6 @@ export default function ConversationNicknamesScreen() {
 
 const makeStyles = () => StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm },
-  roundBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: FONT.semibold, fontSize: FS.md },
   body: { paddingHorizontal: SP.md, paddingTop: SP.lg },
   label: { fontFamily: FONT.regular, fontSize: FS.sm, marginBottom: SP.md },
   input: { height: 48, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base },

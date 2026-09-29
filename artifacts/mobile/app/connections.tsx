@@ -32,7 +32,8 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useUser } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
-import { Header, ListSkeleton } from '@/components/layout';
+import { ListSkeleton } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, PressableScale, SearchBar } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -343,47 +344,43 @@ export default function ConnectionsScreen() {
 
   return (
     <View style={styles.root}>
-      <Header
-        title={title}
-        belowTitle={(
-          <View style={styles.headerExtras}>
-            <View style={styles.tabsRow}>
-              <TabButton
-                label={`${followers.length} ${followers.length === 1 ? 'follower' : 'followers'}`}
-                active={tab === 'followers'}
-                onPress={() => setTab('followers')}
-                theme={theme}
-              />
-              <TabButton
-                label={`${following.length} following`}
-                active={tab === 'following'}
-                onPress={() => setTab('following')}
-                theme={theme}
-              />
+      <ScreenHeader title={title} />
+      <View style={styles.headerExtras}>
+        <View style={styles.tabsRow}>
+          <TabButton
+            label={`${followers.length} ${followers.length === 1 ? 'follower' : 'followers'}`}
+            active={tab === 'followers'}
+            onPress={() => setTab('followers')}
+            theme={theme}
+          />
+          <TabButton
+            label={`${following.length} following`}
+            active={tab === 'following'}
+            onPress={() => setTab('following')}
+            theme={theme}
+          />
+        </View>
+        <SearchBar
+          value={query}
+          onChange={setQuery}
+          placeholder={`Search ${title.toLowerCase()}`}
+          style={styles.search}
+        />
+        {tab === 'following' ? (
+          <PressableScale
+            style={styles.sortRow}
+            onPress={() => setSortSheetOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Sort by"
+          >
+            <Text style={styles.sortLabel}>Sort by</Text>
+            <View style={styles.sortValueRow}>
+              <Text style={styles.sortValue}>{SORT_OPTIONS.find((o) => o.id === sort)?.label ?? 'Default'}</Text>
+              <Feather name="chevron-down" size={14} color={theme.muted} />
             </View>
-            <SearchBar
-              value={query}
-              onChange={setQuery}
-              placeholder={`Search ${title.toLowerCase()}`}
-              style={styles.search}
-            />
-            {tab === 'following' ? (
-              <PressableScale
-                style={styles.sortRow}
-                onPress={() => setSortSheetOpen(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Sort by"
-              >
-                <Text style={styles.sortLabel}>Sort by</Text>
-                <View style={styles.sortValueRow}>
-                  <Text style={styles.sortValue}>{SORT_OPTIONS.find((o) => o.id === sort)?.label ?? 'Default'}</Text>
-                  <Feather name="chevron-down" size={14} color={theme.muted} />
-                </View>
-              </PressableScale>
-            ) : null}
-          </View>
-        )}
-      />
+          </PressableScale>
+        ) : null}
+      </View>
 
       {loading && !listLoaded ? (
         <View style={styles.pad}><ListSkeleton rows={6} /></View>

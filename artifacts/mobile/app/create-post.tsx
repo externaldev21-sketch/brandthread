@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { FONT, FS } from '@/lib/theme';
@@ -2270,7 +2271,6 @@ interface SoundModalProps {
 function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setSoundSearch, onUse, insets }: SoundModalProps) {
   const colors = useColors();
   const { theme } = useAppTheme();
-  const FG = theme.text;
   const MUTED = theme.muted;
   const ORANGE = theme.warning;
   const PURPLE = colors.primary;
@@ -2285,12 +2285,7 @@ function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setS
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === 'android' ? 'fullScreen' : 'pageSheet'} onRequestClose={onClose}>
       <View style={[ms.root, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={ms.header}>
-          <Text style={ms.title}>Sounds</Text>
-          <TouchableOpacity onPress={onClose} style={ms.closeBtn}>
-            <Feather name="x" size={20} color={FG} />
-          </TouchableOpacity>
-        </View>
+        <ScreenHeader title="Sounds" variant="modal" onBack={onClose} />
         <View style={ms.searchWrap}>
           <Feather name="search" size={14} color={MUTED} style={{ marginRight: 8 }} />
           <TextInput style={[ms.searchInput, WEB_INPUT_RESET]} value={soundSearch} onChangeText={setSoundSearch} placeholder="Search sounds..." placeholderTextColor={MUTED} />
@@ -2340,7 +2335,6 @@ interface ProductModalProps {
 function ProductModal({ visible, onClose, productSearch, setProductSearch, productTags, onTag, taggableProducts, insets }: ProductModalProps) {
   const colors = useColors();
   const { theme } = useAppTheme();
-  const FG = theme.text;
   const MUTED = theme.muted;
   const ORANGE = theme.warning;
   const PURPLE = colors.primary;
@@ -2349,10 +2343,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === 'android' ? 'fullScreen' : 'pageSheet'} onRequestClose={onClose}>
       <View style={[ms.root, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={ms.header}>
-          <Text style={ms.title}>Tag Products</Text>
-          <TouchableOpacity onPress={onClose} style={ms.closeBtn}><Feather name="x" size={20} color={FG} /></TouchableOpacity>
-        </View>
+        <ScreenHeader title="Tag Products" variant="modal" onBack={onClose} />
         {productTags.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 44, paddingHorizontal: 16 }}>
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -2668,9 +2659,6 @@ const createMs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const MUTED = theme.muted;
   return StyleSheet.create({
   root:    { flex: 1, backgroundColor: BG_SOFT },
-  header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
-  title:   { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  closeBtn:{ width: 36, height: 36, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   searchWrap:{ flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10, marginHorizontal: 16, marginTop: 12 },
   searchInput:{ flex: 1, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
   tabPill:  { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },

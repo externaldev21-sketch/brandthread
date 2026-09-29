@@ -22,7 +22,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 import { useApi } from '@/lib/api';
-import { useAppTheme } from '@/contexts/AppThemeContext';
 import { reportNetworkError } from '@/lib/networkNotice';
 import {
   CARD, BORDER, FG, MUTED,
@@ -39,8 +38,9 @@ import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
-  ProfileButton, ProfileChip, ProfileGlassButton, ShopPill, type ProfileStat, type ProfileTab,
+  ProfileButton, ProfileChip, ShopPill, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
+import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
@@ -131,7 +131,6 @@ function DraftsFolderTile({
 export default function ProfileScreen() {
   const router  = useRouter();
   const api = useApi();
-  const { theme } = useAppTheme();
   // Instagram's own-profile grid: 3 columns, 1pt gutters, 4:5 tiles.
   const layout = useProfileLayout({ tileAspect: TILE_ASPECT_4_5 });
   // The seller tab bar floats over content (same metrics as the global bar).
@@ -472,23 +471,17 @@ export default function ProfileScreen() {
     : profile?.subscriptionStatus === 'active' ? 'Active Plan' : 'Free Plan';
   const hasPaidPlan = !!(profile?.subscriptionPlanId || profile?.subscriptionStatus === 'active');
 
+  // Plain text + chevron, no pill background — shared with the buyer
+  // own-profile header (components/profile/ProfileTopBar.tsx) so the two
+  // stay pixel-identical.
   const accountSwitcher = (
-    <TouchableOpacity
-      style={[s.switcher, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setAccountSwitcherOpen(true);
-      }}
-      activeOpacity={0.75}
-      accessibilityRole="button"
+    <ProfileAccountSwitcher
+      label={brandTitle}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAccountSwitcherOpen(true); }}
+      overMedia={coverFlow.hasCover}
       accessibilityLabel="Switch account"
       testID="profile-account-switcher"
-    >
-      <Text style={[s.brandNameTitle, { color: theme.text }]} numberOfLines={1}>
-        {brandTitle}
-      </Text>
-      <Feather name="chevron-down" size={16} color={theme.text} />
-    </TouchableOpacity>
+    />
   );
 
   // One table decides every tab's empty copy; each CTA opens the real flow.
@@ -549,10 +542,10 @@ export default function ProfileScreen() {
         hero={{ videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }}
         topLeft={accountSwitcher}
         topRight={(
-          <>
-            <ProfileGlassButton icon="bell" onPress={() => nav('/notifications-settings')} accessibilityLabel="Notification settings" />
-            <ProfileGlassButton
-              icon="share-2"
+          <ProfileTopBarIconRow>
+            <ProfileTopBarIcon name="bell" onPress={() => nav('/notifications-settings')} accessibilityLabel="Notification settings" />
+            <ProfileTopBarIcon
+              name="share-2"
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setShareSheetVisible(true);
@@ -561,8 +554,8 @@ export default function ProfileScreen() {
               accessibilityHint="Opens a shareable profile card, QR code, and link"
               testID="seller-share-profile-btn"
             />
-            <ProfileGlassButton icon="settings" onPress={() => nav('/settings')} accessibilityLabel="Seller settings" />
-          </>
+            <ProfileTopBarIcon name="settings" onPress={() => nav('/settings')} accessibilityLabel="Seller settings" />
+          </ProfileTopBarIconRow>
         )}
         meta={(
           <ProfileMeta bio={profile?.bio}>
@@ -798,11 +791,6 @@ export default function ProfileScreen() {
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  switcher: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 200,
-    minHeight: 44, borderRadius: 22, borderWidth: 1, paddingLeft: SP.md, paddingRight: SP.sm,
-  },
-  brandNameTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, flexShrink: 1 },
   dashboardRow: {
     backgroundColor: CARD, borderColor: BORDER, borderWidth: 1,
     borderRadius: RADIUS.md, marginBottom: SP.sm,

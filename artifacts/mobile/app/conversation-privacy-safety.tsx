@@ -10,7 +10,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -22,7 +22,6 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 export default function ConversationPrivacySafetyScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(), []);
-  const headerTopPad = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{ id: string; participantUserId: string; participantName: string }>();
@@ -49,19 +48,11 @@ export default function ConversationPrivacySafetyScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: theme.background }]}>
-      <View style={[s.header, { paddingTop: headerTopPad + SP.xs }]}>
-        <PressableScale rippleEnabled={false}
-          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
-          style={s.roundBtn}
-          testID="privacy-safety-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-        </PressableScale>
-        <Text style={[s.headerTitle, { color: theme.text }]}>Privacy & safety</Text>
-        <View style={s.roundBtn} />
-      </View>
+      <ScreenHeader
+        title="Privacy & safety"
+        onBack={() => { hapticPrimaryAction(); goBackOr(router); }}
+        backTestID="privacy-safety-back"
+      />
 
       <View style={[s.list, { borderColor: theme.border }]}>
         <PressableScale rippleEnabled={false} onPress={toggleBlock} testID="privacy-safety-block">
@@ -88,9 +79,6 @@ export default function ConversationPrivacySafetyScreen() {
 
 const makeStyles = () => StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm },
-  roundBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: FONT.semibold, fontSize: FS.md },
   list: { marginTop: SP.md, borderTopWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth },
   rowTitle: { fontSize: FS.base, fontFamily: FONT.medium },

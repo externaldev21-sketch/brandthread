@@ -189,7 +189,27 @@ export default function CustomersScreen() {
         })}
       </View>
 
-      {/* Customer List */}
+      {/* Customer List — the bordered/shaded card wrapper is for populated
+          rows and the loading/error states only. The empty state renders
+          flat, directly on the screen background, with no grey box behind
+          it (Dev's explicit "no grey boxes" call). */}
+      {!loading && !error && sortedCustomers.length === 0 ? (
+        <EmptyState
+          icon="users"
+          title={search.trim() ? 'No matching customers' : 'No customers yet'}
+          description={
+            search.trim()
+              ? 'Try a different name, email or tag.'
+              : 'Once someone buys from your store, they will show up here.'
+          }
+          // Dev's explicit call: Customers gets no action button, ever —
+          // there's nothing a seller can "do" from an empty customer list
+          // (see the fresh-preview empty-state action audit in this PR's
+          // description).
+          action={undefined}
+          compact
+        />
+      ) : (
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
           <View style={styles.custRow}>
@@ -200,22 +220,6 @@ export default function CustomersScreen() {
           <ErrorState
             message="Couldn't load your customers."
             onRetry={() => { setLoading(true); fetchCustomers(search); }}
-          />
-        ) : sortedCustomers.length === 0 ? (
-          <EmptyState
-            icon="users"
-            title={search.trim() ? 'No matching customers' : 'No customers yet'}
-            description={
-              search.trim()
-                ? 'Try a different name, email or tag.'
-                : 'Once someone buys from your store, they will show up here.'
-            }
-            // Dev's explicit call: Customers gets no action button, ever —
-            // there's nothing a seller can "do" from an empty customer list
-            // (see the fresh-preview empty-state action audit in this PR's
-            // description).
-            action={undefined}
-            compact
           />
         ) : (
           sortedCustomers.map((c, i) => {
@@ -257,6 +261,7 @@ export default function CustomersScreen() {
           })
         )}
       </View>
+      )}
     </ScrollView>
       <AIBrainFAB context={{ screen: 'customers' as const }} bottomOffset={0} />
     </View>

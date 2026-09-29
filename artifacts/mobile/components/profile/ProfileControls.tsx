@@ -261,16 +261,22 @@ export interface ProfileTab {
   count?: number;
 }
 
+/** TikTok's own-profile active-tab bar width (Mobbin reference) — short, centered under the icon. */
+const ICON_TAB_INDICATOR_WIDTH = 26;
+
 /**
  * Equal-width tabs with the icon stacked above the label, so four tabs fit a
  * 375pt phone without icons colliding into their labels. The active tab is
  * marked by an animated pill indicator that slides to whichever tab is
  * pressed, instead of each tab drawing its own static mark.
  *
- * `variant="iconOnly"` is Instagram's own-profile treatment: icons only (the
- * label stays as the accessibility label) with a full-cell-width underline
- * under the active tab. The default `labeled` look is unchanged for every
- * other caller.
+ * `variant="iconOnly"` is TikTok's own-profile treatment (matched 1:1 from
+ * Mobbin): icons only (the label stays as the accessibility label), evenly
+ * spaced, with a short ~26pt, 2pt, rounded bar centered under the active
+ * icon — not a full-cell-width underline — and no divider line below the
+ * row (TikTok's own profile tab row has none). The default `labeled` look
+ * (full-cell underline + hairline divider) is unchanged for every other
+ * caller.
  */
 export function ProfileTabs({
   tabs,
@@ -294,11 +300,13 @@ export function ProfileTabs({
   }, [activeIndex, indicatorX]);
 
   const cellWidth = tabs.length > 0 ? rowWidth / tabs.length : 0;
-  const indicatorWidth = iconOnly ? cellWidth : Math.max(0, Math.min(cellWidth - SP.md * 2, 64));
+  // TikTok's own-profile indicator is a short bar centered under the icon,
+  // not a full-cell-width underline — fixed at 26pt regardless of cell width.
+  const indicatorWidth = iconOnly ? ICON_TAB_INDICATOR_WIDTH : Math.max(0, Math.min(cellWidth - SP.md * 2, 64));
 
   return (
     <View
-      style={[styles.tabs, iconOnly && styles.tabsFlush, { borderColor: theme.border, backgroundColor: theme.background }]}
+      style={[styles.tabs, iconOnly ? styles.tabsFlush : styles.tabsDivider, { borderColor: theme.border, backgroundColor: theme.background }]}
       accessibilityRole="tablist"
       onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
     >
@@ -504,13 +512,15 @@ const styles = StyleSheet.create({
   statDivider: { width: StyleSheet.hairlineWidth, marginVertical: SP.md },
 
   tabs: {
-    flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: SP.xs, position: 'relative',
+    flexDirection: 'row', paddingHorizontal: SP.xs, position: 'relative',
   },
+  // Labeled tabs (every non-own-profile caller) keep the full-width hairline.
+  tabsDivider: { borderBottomWidth: StyleSheet.hairlineWidth },
   tab: { minHeight: 60, alignItems: 'center', justifyContent: 'flex-end', gap: 5, paddingTop: SP.sm, paddingBottom: SP.sm, paddingHorizontal: 2 },
   tabsFlush: { paddingHorizontal: 0 },
   tabIconOnly: { height: 44, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  tabIndicatorFlat: { height: 1.5, borderRadius: 0 },
+  // TikTok's short centered bar: ~26pt wide, 2pt tall, rounded.
+  tabIndicatorFlat: { height: 2, borderRadius: 1 },
   tabLabel: { fontFamily: FONT.semibold, fontSize: 12, lineHeight: 15 },
   tabLabelActive: { fontFamily: FONT.bold },
   tabIndicator: { position: 'absolute', bottom: -StyleSheet.hairlineWidth, left: 0, height: 2, borderRadius: 1 },

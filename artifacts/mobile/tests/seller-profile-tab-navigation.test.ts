@@ -14,16 +14,39 @@ describe('seller Profile tab navigation', () => {
 
   it('lets buyers switch profiles from their name in the profile header', () => {
     const buyerProfile = readFileSync(resolve(process.cwd(), 'app/(buyer)/profile.tsx'), 'utf8');
+    // The plain-text switcher (no pill background) is shared with the
+    // seller own-profile header — components/profile/ProfileTopBar.tsx,
+    // whose default accessibilityLabel is "Switch account" and whose icon
+    // is "chevron-down".
+    const topBar = readFileSync(resolve(process.cwd(), 'components/profile/ProfileTopBar.tsx'), 'utf8');
 
     expect(buyerProfile).toContain('testID="buyer-profile-account-switcher"');
-    expect(buyerProfile).toContain('accessibilityLabel="Switch account"');
+    expect(buyerProfile).toContain('<ProfileAccountSwitcher');
     // The switcher is a sheet on the profile screen now (see
     // components/AccountSwitcherSheet.tsx), not a pushed route.
     expect(buyerProfile).toContain('setAccountSwitcherOpen(true)');
     expect(buyerProfile).toContain('<AccountSwitcherSheet');
-    expect(buyerProfile).toContain('{displayHandle || displayName}</Text>');
+    expect(buyerProfile).toContain('label={displayHandle || displayName}');
     expect(buyerProfile).toContain('name={displayName}');
-    expect(buyerProfile).toContain('name="chevron-down"');
+    expect(topBar).toContain("accessibilityLabel = 'Switch account'");
+    expect(topBar).toContain('name="chevron-down"');
     expect(buyerProfile).not.toContain("name={isPrivate ? 'lock' : 'globe'}");
+  });
+
+  it('gives the seller own-profile top bar the exact same plain-chrome look as the buyer one (no grey pill, no grey circles)', () => {
+    const sellerProfile = readFileSync(resolve(process.cwd(), 'app/(tabs)/profile.tsx'), 'utf8');
+
+    // Reuses the shared, chrome-free controls instead of a bespoke pill
+    // switcher / ProfileGlassButton circles.
+    expect(sellerProfile).toContain("import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar'");
+    expect(sellerProfile).toContain('<ProfileAccountSwitcher');
+    expect(sellerProfile).toContain('<ProfileTopBarIconRow>');
+    expect(sellerProfile).toContain('<ProfileTopBarIcon name="bell"');
+    expect(sellerProfile).toContain('name="share-2"');
+    expect(sellerProfile).toContain('<ProfileTopBarIcon name="settings"');
+    expect(sellerProfile).not.toContain('ProfileGlassButton');
+    // The old pill-switcher style is gone entirely, not just unused.
+    expect(sellerProfile).not.toContain('switcher: {');
+    expect(sellerProfile).not.toContain('brandNameTitle: {');
   });
 });
