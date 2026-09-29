@@ -46,9 +46,13 @@ describe('seller profile action layout', () => {
     expect(profileSource).toContain("setTimeout(() => setStatsInitialLoading(false), 6000)");
   });
 
-  it('uses Instagram Posts / Shop / Tagged tabs, keeping drafts and scheduled posts as a Posts sub-filter', () => {
+  it('uses Instagram Posts / Shop / Tagged tabs, with Published / Drafts / Products as the Posts sub-filter', () => {
     expect(profileSource).toContain("const CONTENT_TABS = ['Posts', 'Shop', 'Tagged']");
-    expect(profileSource).toContain("const POST_FILTERS = ['Published', 'Drafts', 'Scheduled']");
+    // "Products" replaces the old standalone "Scheduled" filter — a
+    // scheduled-but-not-yet-live post now shows under "Drafts" instead
+    // (it isn't public yet either), and Products surfaces the seller's live
+    // catalog one tap further up (the same grid the Shop tab already shows).
+    expect(profileSource).toContain("const POST_FILTERS = ['Published', 'Drafts', 'Products']");
     expect(profileSource).toContain('tabsVariant="iconOnly"');
     expect(profileSource).not.toContain('Store performance');
   });
@@ -57,7 +61,7 @@ describe('seller profile action layout', () => {
     expect(profileSource).not.toContain('Share something with');
     // The empty Post tab offers "Create your first post" through the shared
     // profile empty-state table (components/profile/profileEmptyStates.ts).
-    expect(profileSource).toContain("{ Published: 'seller:post', Drafts: 'seller:draft', Scheduled: 'seller:schedule' }");
+    expect(profileSource).toContain("{ Published: 'seller:post', Drafts: 'seller:draft', Products: 'shop' }");
     expect(fs.readFileSync(path.join(__dirname, '../components/profile/profileEmptyStates.ts'), 'utf8'))
       .toContain("label: 'Create your first post', route: '/create-post'");
     const controlCenterSource = fs.readFileSync(
