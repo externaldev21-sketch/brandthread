@@ -167,15 +167,9 @@ export async function getSellerShopPage(
   };
 }
 
-// ─── Formatting ───────────────────────────────────────────────────────────────
-
-/** 1234 → "1.2K", 2_500_000 → "2.5M" — compact counts for tiles and stats. */
-export function formatProfileCount(value: number | null | undefined): string {
-  const n = Math.max(0, Math.floor(Number(value) || 0));
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(/\.0$/, '')}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1).replace(/\.0$/, '')}K`;
-  return String(n);
-}
+// Compact-count formatting (Posts/Followers/Likes stats, tile view/like
+// badges) lives in lib/compactFormat.ts's formatCompactCount — the single
+// shared helper for every count in the app.
 
 /** The poster a grid tile shows: a video's thumbnail, or a photo post's first image. */
 export function posterForPost(post: Pick<SellerThreadPost, 'contentType' | 'thumbnailUri' | 'mediaUris'>): string | null {

@@ -49,7 +49,7 @@ import type {
 } from '@/services/socialTypes';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
-import { formatProfileCount } from '@/services/profileService';
+import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileMeta } from '@/components/profile/ProfileShell';
 import { InteractionLayer, ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
@@ -737,21 +737,26 @@ export default function ProfileScreen() {
   const hasActiveStory = myStoryIds.length > 0;
   const heroActive = focused && heroOnScreen && !heroPosterOnly;
 
-  // Instagram order: Posts · Followers · Following. Drafts never count toward
-  // the public "Posts" stat (they aren't published).
+  // Drafts never count toward "published" (they aren't public); still used
+  // below for the share sheet's topPosts.
   const publishedPosts = posts.filter(p => !p.isDraft);
+  // Followers · Following · Likes — Posts was dropped (dev: a high count in
+  // any column was getting cut off; three columns gives each enough room).
+  // Likes is a real total summed from this buyer's own posts (never
+  // paginated — getMyPosts() always returns the full list), not fabricated.
+  const totalLikes = publishedPosts.reduce((sum, p) => sum + (p.likesCount || 0), 0);
   const stats: ProfileStat[] = [
-    { key: 'posts', label: 'Posts', value: formatProfileCount(publishedPosts.length) },
     {
       key: 'followers', label: 'Followers',
-      value: formatProfileCount(socialCounts?.followers ?? profile?.friendsCount ?? 0),
+      value: formatCompactCount(socialCounts?.followers ?? profile?.friendsCount ?? 0),
       onPress: () => router.push(connectionsHref('followers') as any),
     },
     {
       key: 'following', label: 'Following',
-      value: formatProfileCount(socialCounts?.following ?? profile?.followingBrandsCount ?? 0),
+      value: formatCompactCount(socialCounts?.following ?? profile?.followingBrandsCount ?? 0),
       onPress: () => router.push(connectionsHref('following') as any),
     },
+    { key: 'likes', label: 'Likes', value: formatCompactCount(totalLikes) },
   ];
 
   const highlightItems: ProfileStoryItem[] = highlights.map((h) => ({
