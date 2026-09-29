@@ -13,7 +13,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 
@@ -28,6 +27,7 @@ import { useColors } from '@/hooks/useColors';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   FilterChip, StatusBadge, SectionHeader, FormInput, EmptyState, HapticSwitch,} from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 import {
   getManufacturer, getRelationships, saveQuoteRequestDraft, submitQuoteRequest, getQuoteRequest,
@@ -660,19 +660,19 @@ export default function QuoteRequestScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[sc.root, { paddingTop: useHeaderTopInset() }]}
+      style={sc.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Header */}
-      <View style={sc.header}>
-        <TouchableOpacity onPress={handleExit} style={sc.headerBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="x" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={sc.headerTitle}>Quote Request</Text>
-        <TouchableOpacity onPress={handleSaveDraft} style={sc.saveDraftBtn}>
-          <Text style={sc.saveDraftText}>Save draft</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Quote Request"
+        variant="modal"
+        onBack={handleExit}
+        rightElement={
+          <TouchableOpacity onPress={handleSaveDraft} style={sc.saveDraftBtn}>
+            <Text style={sc.saveDraftText}>Save draft</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <ProgressBar step={step} total={totalSteps} titles={stepTitles} />
 

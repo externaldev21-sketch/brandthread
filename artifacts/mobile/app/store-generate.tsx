@@ -7,7 +7,6 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -20,6 +19,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard, HapticSwitch} from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { saveDraftAnswers, loadDraftAnswers, clearDraftAnswers,
   generateStoreFromAnswers, applyGenerationResult } from '@/services/storeService';
 import { StoreGenerationAnswers, StoreColorPalette,
@@ -104,7 +104,6 @@ export default function StoreGenerateScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ toast?: string }>();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const [step, setStep] = useState(1);
   const [aiToolLoading, setAiToolLoading] = useState<string | null>(null);
@@ -887,24 +886,21 @@ export default function StoreGenerateScreen() {
 
   return (
     <View style={[st.root, { backgroundColor: 'transparent' }]}>
-      {/* Header */}
-      <View style={[st.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <View style={st.headerTop}>
-          <TouchableOpacity onPress={handleBack} style={st.backBtn} activeOpacity={0.7}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <View style={st.headerCenter}>
-            <Text style={st.stepIndicator}>Step {step} of {TOTAL_STEPS}</Text>
-            <Text style={st.headerTitle}>Generate My Store</Text>
-          </View>
+      <ScreenHeader
+        title="Generate My Store"
+        subtitle={`Step ${step} of ${TOTAL_STEPS}`}
+        onBack={handleBack}
+        rightElement={
           <TouchableOpacity onPress={handleSaveAndExit} style={st.saveExitBtn} activeOpacity={0.7}>
             <Text style={st.saveExitText}>
               {saving ? 'Saving…' : saveFailed ? 'Retry' : 'Save & Exit'}
             </Text>
           </TouchableOpacity>
-        </View>
+        }
+      />
 
-        {/* Progress bar */}
+      {/* Progress bar */}
+      <View style={st.header}>
         <View style={st.progressTrack}>
           <LinearGradient
             colors={[...theme.primaryGradient]}
@@ -1038,25 +1034,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
   },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SP.sm,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerCenter: { alignItems: 'center', flex: 1 },
-  stepIndicator: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  headerTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   saveExitBtn: { paddingHorizontal: SP.sm, paddingVertical: SP.xs },
   saveExitText: { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   progressTrack: {

@@ -21,9 +21,10 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/hooks/useApi';
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard, EmptyState,
+  BrandthreadScreen, BrandthreadCard, EmptyState,
   StatusBadge, IconButton, PrimaryButton,
 } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { metaCampaignStatusVariant, metaCampaignStatusLabel, formatBudgetCents } from '@/services/metaAdsService';
 import type { MetaCampaign, MetaCampaignInsights } from '@/lib/api';
 
@@ -149,8 +150,8 @@ export default function MetaAdsManageScreen() {
 
   if (!connected) {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Meta Ads" onBack={() => goBackOr(router)} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Meta Ads" onBack={() => goBackOr(router)} />
         <EmptyState
           icon="link"
           title="Connect Meta to run ads"
@@ -163,8 +164,8 @@ export default function MetaAdsManageScreen() {
   }
 
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader
         title="Meta Ads"
         onBack={() => goBackOr(router)}
         rightElement={<IconButton name="plus" accessibilityLabel="New campaign" onPress={() => router.push('/meta-ads-setup')} />}

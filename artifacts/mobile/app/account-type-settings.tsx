@@ -15,7 +15,7 @@ import { useApi } from '@/lib/api';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@clerk/expo';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type AccountType = 'seller' | 'buyer';
 
@@ -114,7 +114,7 @@ export default function AccountTypeSettingsScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="Account type" />
+      <ScreenHeader title="Account type" />
 
       {loading ? (
         <View style={s.loadingWrap}>

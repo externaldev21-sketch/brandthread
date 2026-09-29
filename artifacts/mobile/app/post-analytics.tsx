@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PostAnalyticsResponse, useApi } from '@/lib/api';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
 import { FS } from '@/lib/theme';
 
@@ -176,11 +177,7 @@ export default function PostAnalyticsScreen() {
   if (!analytics) {
     return (
       <View style={styles.root}>
-        <View style={[styles.header, { paddingTop: headerTopInset }]}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
-            <Feather name="arrow-left" size={20} color={colors.text} />
-          </TouchableOpacity>
-        </View>
+        <ScreenHeader title="Post Analytics" onBack={() => goBackOr(router)} />
         <View style={styles.notFound}>
           <EmptyState
             icon="bar-chart-2"
@@ -198,15 +195,15 @@ export default function PostAnalyticsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: headerTopInset }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
-          <Feather name="arrow-left" size={20} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Post Analytics</Text>
-        <View style={styles.rangePill}>
-          <Text style={styles.rangePillText}>Live</Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title="Post Analytics"
+        onBack={() => goBackOr(router)}
+        rightElement={
+          <View style={styles.rangePill}>
+            <Text style={styles.rangePillText}>Live</Text>
+          </View>
+        }
+      />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.previewCard}>
           <LinearGradient colors={gradColors} style={styles.previewThumb} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />

@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
@@ -217,11 +218,12 @@ function AccountScopeSheet({
 }) {
   const colors = useColors();
   const s = useMemo(() => makeScopeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={s.backdrop}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close account reach options" />
-        <View style={s.card}>
+        <View style={[s.card, { paddingBottom: insets.bottom + 32 }]}>
           <View style={s.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={s.title}>Account reach</Text>
@@ -286,7 +288,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
 function makeScopeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: (colors as any).overlay ?? 'rgba(0,0,0,0.68)' },
-    card: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
+    card: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 20, paddingTop: 18 },
     headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 18 },
     title: { fontSize: 20, fontFamily: FONT.bold, color: colors.foreground },
     subtitle: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 4 },

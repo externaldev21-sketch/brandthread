@@ -12,7 +12,6 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getMarketingAnalytics, getFilterState } from '@/services/analyticsService';
@@ -20,8 +19,9 @@ import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsFi
 import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
+  AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
   ProgressBar, SectionTitle,
 } from '@/components/analytics/AnalyticsKit';
 
@@ -93,7 +93,6 @@ export default function AnalyticsMarketingScreen() {
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = useHeaderTopInset();
 
   const [data,       setData]       = useState<MarketingAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
@@ -129,29 +128,26 @@ export default function AnalyticsMarketingScreen() {
 
   const totalMarketing = data?.marketingRevenue.value ?? 1;
 
-  if (loading) {
-    return <AnalyticsSkeleton topPad={topPad} kpiCount={0} listRows={3} />;
-  }
-  if (loadError && !data) {
-    return (
-      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
-        <ErrorState message="Couldn't load marketing analytics." onRetry={() => load()} />
-      </View>
-    );
-  }
   return (
+    <View style={{ flex: 1 }}>
+      <ScreenHeader
+        title="Marketing Analytics"
+        subtitle={filter?.dateRange.label ?? '30 days'}
+        rightElement={<HeaderPillButton label="Marketing" onPress={() => router.push('/(tabs)/marketing' as never)} />}
+      />
+      {loading ? (
+        <AnalyticsSkeleton kpiCount={0} listRows={3} />
+      ) : loadError && !data ? (
+        <View style={s.loadWrap}>
+          <ErrorState message="Couldn't load marketing analytics." onRetry={() => load()} />
+        </View>
+      ) : (
     <ScrollView
       style={s.scroll}
-      contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
+      contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <AnalyticsHeader
-        title="Marketing Analytics"
-        subtitle={filter?.dateRange.label ?? '30 days'}
-        right={<HeaderPillButton label="Marketing" onPress={() => router.push('/(tabs)/marketing' as never)} />}
-      />
-
       {!data ? (
         <EmptyState
           icon="mail"
@@ -243,6 +239,8 @@ export default function AnalyticsMarketingScreen() {
 
       <View style={{ height: 120 }} />
     </ScrollView>
+      )}
+    </View>
   );
 }
 

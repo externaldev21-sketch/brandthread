@@ -5,7 +5,6 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
@@ -14,8 +13,9 @@ import {
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import {
-  BrandthreadCard, BrandthreadHeader, PrimaryButton,
+  BrandthreadCard, PrimaryButton,
   FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Order, RefundType } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
 import { useApi } from '@/lib/api';
@@ -108,10 +108,13 @@ export default function RefundDetailScreen() {
 
   if (loading || !order) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.loadingText}>
-          {loading ? 'Loading…' : loadError ? 'Couldn’t load this order. Check your connection and try again.' : 'Order not found.'}
-        </Text>
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScreenHeader title="Issue Refund" onBack={() => goBackOr(router)} />
+        <View style={styles.centered}>
+          <Text style={styles.loadingText}>
+            {loading ? 'Loading…' : loadError ? 'Couldn’t load this order. Check your connection and try again.' : 'Order not found.'}
+          </Text>
+        </View>
       </View>
     );
   }
@@ -176,8 +179,8 @@ export default function RefundDetailScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: useHeaderTopInset() }}>
-      <BrandthreadHeader title="Issue Refund" onBack={() => goBackOr(router)} />
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+      <ScreenHeader title="Issue Refund" onBack={() => goBackOr(router)} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

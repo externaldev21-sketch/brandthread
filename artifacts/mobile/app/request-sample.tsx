@@ -4,8 +4,8 @@ import {
   ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -90,23 +90,12 @@ export default function RequestSampleScreen() {
   if (!manufacturer) return <View style={styles.root} />;
 
   return (
-    <View style={[styles.root, { paddingTop: useHeaderTopInset() }]}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          accessibilityHint={`Returns without sending a sample request to ${manufacturer.name}`}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={colors.text} />
-        </TouchableOpacity>
-        <View>
-          <Text style={styles.headerTitle}>Request Sample</Text>
-          <Text style={styles.headerSub}>{manufacturer.name}</Text>
-        </View>
-        <View style={{ width: ICON.md }} />
-      </View>
+    <View style={styles.root}>
+      <ScreenHeader
+        title="Request Sample"
+        subtitle={manufacturer.name}
+        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+      />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Field label="Product type">
           <View style={styles.chips}>

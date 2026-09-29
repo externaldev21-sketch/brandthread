@@ -16,10 +16,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard, GradientCard,
+  BrandthreadScreen, BrandthreadCard, GradientCard,
   PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, FormInput,
   LoadingSkeleton, EmptyState,
 } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 import {
   getQuote, getCounteroffersForQuote, acceptQuote, declineQuote,
@@ -303,8 +304,8 @@ export default function QuoteDetailScreen() {
 
   if (loading) {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Quote Details" onBack={() => goBackOr(router)} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Quote Details" onBack={() => goBackOr(router)} />
         <View style={s.loadingContainer}>
           <LoadingSkeleton height={120} style={s.skeleton} />
           <LoadingSkeleton height={200} style={s.skeleton} />
@@ -316,8 +317,8 @@ export default function QuoteDetailScreen() {
 
   if (!quote) {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Quote Details" onBack={() => goBackOr(router)} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Quote Details" onBack={() => goBackOr(router)} />
         <View style={s.centered}>
           <EmptyState
             icon="file-text"
@@ -338,8 +339,8 @@ export default function QuoteDetailScreen() {
   const canAct = quote.status === 'quote_received';
 
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader
         title="Quote Details"
         subtitle={manufacturerName}
         onBack={() => goBackOr(router)}

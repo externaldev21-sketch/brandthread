@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { FormInput, PrimaryButton, EmptyState, StatusBadge } from '@/components/BrandthreadUI';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
@@ -110,7 +110,7 @@ export default function RfqPostScreen() {
 
   return (
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Header title="Request for Quotation" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Request for Quotation" onBack={() => goBackOr(router)} />
       <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + SP.xl }]} showsVerticalScrollIndicator={false}>
         <Text style={s.sectionLabel}>What are you sourcing?</Text>
         <View style={s.chipRow}>

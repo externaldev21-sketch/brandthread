@@ -12,7 +12,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, StatusBadge } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
 import { acceptQuote, declineQuote } from '@/services/manufacturerService';
@@ -90,7 +90,7 @@ export default function RfqCompareScreen() {
   if (loading) {
     return (
       <View style={s.root}>
-        <Header title="Compare Quotes" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
       </View>
     );
@@ -99,7 +99,7 @@ export default function RfqCompareScreen() {
   if (!rfq) {
     return (
       <View style={s.root}>
-        <Header title="Compare Quotes" onBack={() => goBackOr(router)} />
+        <ScreenHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
         <EmptyState icon="alert-circle" title="RFQ unavailable" description="This request could not be loaded." />
       </View>
     );
@@ -109,7 +109,7 @@ export default function RfqCompareScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="Compare Quotes" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
       <View style={s.summary}>
         <Text style={s.summaryTitle} numberOfLines={1}>{rfq.garmentType}</Text>
         <Text style={s.summaryMeta}>{rfq.quantity.toLocaleString('en-US')} units · sent to {rfq.manufacturersCount} manufacturers · {rfq.quotesReceivedCount} quoted</Text>

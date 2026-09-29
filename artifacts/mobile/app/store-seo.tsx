@@ -7,11 +7,11 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SectionHeader, HapticSwitch} from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { getStorefront, updateSEO } from '@/services/storeService';
 import { Storefront, StoreSEO } from '@/services/storeTypes';
 import { useApi } from '@/lib/api';
@@ -26,7 +26,6 @@ export default function StoreSEOScreen() {
   const RED_DIM = `${RED}20`;
   const se = React.useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
-  const headerTopInset = useHeaderTopInset();
   const [store, setStore] = useState<Storefront | null>(null);
   const [seo, setSeo] = useState<StoreSEO>({
     homepageTitle: '',
@@ -65,17 +64,11 @@ export default function StoreSEOScreen() {
 
   return (
     <View style={se.root}>
-      <View style={[se.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity
-          onPress={() => goBackOr(router)}
-          style={se.backBtn}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={se.headerTitle}>SEO</Text>
-        <PrimaryButton label={saving ? 'Saving...' : 'Save'} onPress={handleSave} loading={saving} small style={{ minWidth: 72 }} />
-      </View>
+      <ScreenHeader
+        title="SEO"
+        onBack={() => goBackOr(router)}
+        rightElement={<PrimaryButton label={saving ? 'Saving...' : 'Save'} onPress={handleSave} loading={saving} small style={{ minWidth: 72 }} />}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={se.scroll}>
 
@@ -267,17 +260,6 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => {
   const { foreground: FG, mutedForeground: MUTED, subtle: SUBTLE, card: CARD, surface: SURFACE, border: BORDER } = colors;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-    borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, flex: 1, marginLeft: SP.sm },
   scroll: { paddingBottom: 60 },
   sh: { marginTop: SP.lg, marginBottom: SP.sm },
   card: { marginHorizontal: SP.md, gap: SP.md },

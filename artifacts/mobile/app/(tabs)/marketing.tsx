@@ -1,10 +1,10 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/Badge';
 import { EmptyState, IconButton } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -74,7 +74,6 @@ export default function MarketingScreen() {
   const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
   const [referrals, setReferrals] = useState<ReferralStats | null>(null);
 
-  const topPad = useHeaderTopInset();
   const bottomPad = Platform.OS === 'web' ? 34 : 0;
 
   useFocusEffect(
@@ -103,29 +102,22 @@ export default function MarketingScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+    <ScreenHeader
+      title="Marketing"
+      subtitle="Campaigns, discounts & automation"
+      onBack={() => router.push('/(tabs)/more' as never)}
+      actions={[{
+        icon: 'bar-chart-2',
+        onPress: () => router.push('/(tabs)/analytics' as never),
+        accessibilityLabel: 'View analytics',
+      }]}
+    />
     <ScrollView
       ref={scrollResetRef}
       style={[styles.container, { backgroundColor: 'transparent' }]}
-      contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: bottomPad + 120, paddingHorizontal: 16 }}
+      contentContainerStyle={{ paddingTop: 16, paddingBottom: bottomPad + 120, paddingHorizontal: 16 }}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.headerRow}>
-        <IconButton
-          name="chevron-left"
-          onPress={() => router.push('/(tabs)/more' as never)}
-          accessibilityLabel="Back"
-        />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.pageTitle, { color: colors.foreground }]}>Marketing</Text>
-          <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Campaigns, discounts & automation</Text>
-        </View>
-        <IconButton
-          name="bar-chart-2"
-          onPress={() => router.push('/(tabs)/analytics' as never)}
-          accessibilityLabel="View analytics"
-        />
-      </View>
-
       {/* Stats Row */}
       <View style={styles.statsRow}>
         {[

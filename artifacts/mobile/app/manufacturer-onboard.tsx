@@ -12,7 +12,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThreadDraw } from '@/components/onboarding/ThreadLine';
 import { PillButton, Reveal, StepHeadline } from '@/components/onboarding/OnboardingUI';
 import { BG, BORDER, CARD, FG, FONT, FS, MUTED, SP, SUBTLE } from '@/lib/theme';
@@ -32,7 +32,7 @@ export default function ManufacturerOnboardScreen() {
 
   return (
     <View style={s.screen}>
-    <Header title="Manufacturer signup" onBack={() => (router.canGoBack() ? goBackOr(router) : router.replace('/' as never))} />
+    <ScreenHeader title="Manufacturer signup" onBack={() => (router.canGoBack() ? goBackOr(router) : router.replace('/' as never))} />
     <View style={[s.root, { paddingTop: SP.md, paddingBottom: insets.bottom + SP.md }]}>
       <View style={s.body}>
         <View style={s.hero}>

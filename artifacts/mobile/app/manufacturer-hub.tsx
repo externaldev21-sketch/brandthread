@@ -23,7 +23,8 @@ import { getEntitlementRejection } from '@/lib/entitlementError';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
-import { Header, ListSkeleton } from '@/components/layout';
+import { ListSkeleton } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
@@ -257,7 +258,7 @@ function HubHeader({ activeTab, router, onLeave }: {
   onLeave: () => void;
 }) {
   return (
-    <Header
+    <ScreenHeader
       title="Manufacturer Hub"
       onBack={onLeave}
       actions={[
