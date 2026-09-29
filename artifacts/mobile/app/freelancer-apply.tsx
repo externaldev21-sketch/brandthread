@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { FREELANCER_SERVICE_TYPES, apiErrorMessage } from '@/lib/freelancer';
 import {
@@ -30,6 +31,7 @@ export default function FreelancerApplyScreen() {
   const colors = useColors();
   const api = useApi();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -272,7 +274,7 @@ export default function FreelancerApplyScreen() {
         </ScrollView>
 
         {/* Footer buttons */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: SP.lg + 8 + insets.bottom }]}>
           {step > 0 && (
             <TouchableOpacity
               style={styles.backBtn}

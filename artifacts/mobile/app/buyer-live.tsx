@@ -18,6 +18,7 @@ import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BG, BORDER, FG, MUTED, SUBTLE, RED,
@@ -64,6 +65,7 @@ function BuyerLiveNativeScreen() {
   const params = useLocalSearchParams<{ streamId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const { user } = useUser();
 
@@ -457,7 +459,7 @@ function BuyerLiveNativeScreen() {
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
 
       {/* Top bar */}
-      <View style={[s.topBar, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 8 }]}>
+      <View style={[s.topBar, { paddingTop: headerTopInset + 8 }]}>
         <View style={s.topLeft}>
           <View style={[s.livePill, { backgroundColor: LIVE_RED }]}>
             <View style={s.liveDot} />
@@ -497,7 +499,7 @@ function BuyerLiveNativeScreen() {
       </View>
 
       {/* Stream title */}
-      <View style={[s.titleRow, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 48 }]}>
+      <View style={[s.titleRow, { paddingTop: headerTopInset + 48 }]}>
         <Text style={s.streamTitle} numberOfLines={2}>{stream?.title}</Text>
       </View>
 

@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/Badge';
 import { EmptyState, IconButton } from '@/components/BrandthreadUI';
@@ -67,7 +67,6 @@ function discountExpiryLabel(d: DiscountCode) {
 export default function MarketingScreen() {
   const scrollResetRef = useScrollReset<ScrollView>();
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
   const [klaviyo, setKlaviyo] = useState<KlaviyoStatus | null>(null);
@@ -75,7 +74,7 @@ export default function MarketingScreen() {
   const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
   const [referrals, setReferrals] = useState<ReferralStats | null>(null);
 
-  const topPad = insets.top;
+  const topPad = useHeaderTopInset();
   const bottomPad = Platform.OS === 'web' ? 34 : 0;
 
   useFocusEffect(

@@ -14,11 +14,13 @@ import { EmptyState, PrimaryButton, StatusBadge } from '@/components/Brandthread
 import { formatCents } from '@/lib/money';
 import { getManufacturerProduct, type ManufacturerProduct } from '@/services/manufacturerCatalog';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ManufacturerProductScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeS(theme), [theme]);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { manufacturerId, productId } = useLocalSearchParams<{ manufacturerId: string; productId: string }>();
 
   const [product, setProduct] = useState<ManufacturerProduct | null>(null);
@@ -114,7 +116,7 @@ export default function ManufacturerProductScreen() {
       )}
 
       {product && (
-        <View style={s.footer}>
+        <View style={[s.footer, { paddingBottom: SP.md + insets.bottom }]}>
           <PrimaryButton
             label="Request Quote for this Product"
             icon="file-text"

@@ -13,6 +13,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -56,6 +57,7 @@ export default function FulfillOrderScreen() {
   const { orderId, step: stepParam } = useLocalSearchParams<{ orderId: string; step?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
 
   // Deep-linkable step (e.g. order-detail's "Buy Label" jumps straight to
@@ -408,7 +410,7 @@ export default function FulfillOrderScreen() {
           onBarcodeScanned={handleScanBarcode}
         />
         <TouchableOpacity
-          style={[s.scannerClose, { top: insets.top + SP.md }]}
+          style={[s.scannerClose, { top: headerTopInset + SP.md }]}
           onPress={() => setShowScanner(false)}
           accessibilityRole="button"
           accessibilityLabel="Close scanner"

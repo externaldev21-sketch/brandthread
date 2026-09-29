@@ -33,6 +33,7 @@ import {
   Animated, Image, Modal, Platform, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -95,7 +96,7 @@ export function ShareProfileSheet({ visible, onClose, avatarUrl }: ShareProfileS
   const insets = useSafeAreaInsets();
   const api = useApi();
   const router = useRouter();
-  const topInset = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const topInset = useHeaderTopInset();
 
   const [identity, setIdentity] = useState<OwnIdentity | null>(null);
   const [loading, setLoading] = useState(true);

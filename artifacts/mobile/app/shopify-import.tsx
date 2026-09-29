@@ -15,6 +15,7 @@ import { Header } from '@/components/layout';
 import { useApi } from '@/hooks/useApi';
 import { BrandthreadCard, PrimaryButton, EmptyState, LoadingSkeleton, SkeletonText } from '@/components/BrandthreadUI';
 import { COMP } from '@/lib/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ShopifyProductRow = {
   shopifyProductId: string;
@@ -26,6 +27,7 @@ type ShopifyProductRow = {
 
 export default function ShopifyImportScreen() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const api = useApi();
 
   const [loadingStatus, setLoadingStatus] = useState(true);
@@ -252,7 +254,7 @@ export default function ShopifyImportScreen() {
             </View>
           )}
 
-          <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
+          <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: 16 + insets.bottom }]}>
             <PrimaryButton
               label={importing ? 'Importing…' : `Import ${selected.size || ''} product${selected.size === 1 ? '' : 's'}`}
               onPress={handleImport}

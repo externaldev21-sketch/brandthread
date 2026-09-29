@@ -4,10 +4,11 @@
  * create the group and land in the same conversation screen used for 1:1s.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -25,7 +26,7 @@ export default function ConversationGroupCreateScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(), []);
   const insets = useSafeAreaInsets();
-  const headerTopPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const headerTopPad = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{ role?: string }>();

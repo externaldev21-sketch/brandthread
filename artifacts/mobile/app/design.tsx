@@ -31,6 +31,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
@@ -145,7 +146,7 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
   }
 
   // Web inset: 67px status bar + 34px home bar
-  const topPad    = insets.top;
+  const topPad    = useHeaderTopInset();
   const bottomPad = insets.bottom;
 
   return (
@@ -920,7 +921,7 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
   const [masterLoading, setMasterLoading] = useState(false);
   if (!project) return null;
   const previewSize = Math.min(SCREEN_W - SP.xl * 2, 420);
-  const topInset = insets.top;
+  const topInset = useHeaderTopInset();
   const botInset = insets.bottom;
 
   return (
@@ -1257,7 +1258,7 @@ export default function DesignGalleryScreen() {
   const [recoveryVisible, setRecoveryVisible]   = useState(false);
 
   // Safe area — web gets hardcoded insets per SKILL.md
-  const topInset = insets.top;
+  const topInset = useHeaderTopInset();
   const botInset = insets.bottom;
 
   // ── Data load ──────────────────────────────────────────────────────────────

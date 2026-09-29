@@ -900,7 +900,7 @@ function FilterModal({ visible, filters, onApply, onClose }: {
 
         </ScrollView>
 
-        <View style={fm.footer}>
+        <View style={[fm.footer, { paddingBottom: SP.md + insets.bottom }]}>
           <SecondaryButton label="Reset" onPress={() => setLocal(DEFAULT_FILTERS)} style={fm.resetBtn} small />
           <PrimaryButton label="Apply filters" onPress={() => onApply(local)} style={fm.applyBtn} />
         </View>

@@ -1,13 +1,13 @@
 import React from 'react';
-import { Animated, Platform, View, Text, StyleSheet } from 'react-native';
+import { Animated, View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 export interface ScreenHeaderAction {
   icon: keyof typeof Feather.glyphMap;
@@ -52,19 +52,8 @@ export function ScreenHeader({
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
-  const insets = useSafeAreaInsets();
   const router = useRouter();
-  // Real safe-area inset on every platform, including web: the root HTML
-  // document sets `viewport-fit=cover` (see app/+html.tsx) so
-  // react-native-safe-area-context's web implementation can read the
-  // browser's actual `env(safe-area-inset-top)` instead of always 0. This
-  // used to hardcode a fixed value for web, which meant a simulated notch
-  // (e.g. Replit's phone-frame preview) never showed up in the header. A
-  // plain desktop/browser window has no notch at all though, so insets.top
-  // reads 0 there — Math.max floors it at 54 (a comfortable chrome-clear
-  // minimum) on web only, without touching the real, larger inset a
-  // simulated notch reports.
-  const topPad = (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm;
+  const topPad = useHeaderTopInset() + SP.sm;
 
   const largeTitleOpacity = scrollY
     ? scrollY.interpolate({ inputRange: [0, collapseDistance], outputRange: [1, 0], extrapolate: 'clamp' })

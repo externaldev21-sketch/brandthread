@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Platform }
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, FormInput } from '@/components/BrandthreadUI';
@@ -299,7 +300,7 @@ export default function DisputeDetailScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: useHeaderTopInset() }}>
       {/* 1. HEADER */}
       <BrandthreadHeader
         title="Dispute"

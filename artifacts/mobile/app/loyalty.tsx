@@ -5,10 +5,11 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, FlatList, Platform } from 'react-native';
+  StyleSheet, Alert, ActivityIndicator, FlatList } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
@@ -34,6 +35,7 @@ function fmtDate(iso: string) {
 export default function LoyaltyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api    = useApi();
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
@@ -85,7 +87,7 @@ export default function LoyaltyScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { alignItems: 'center', justifyContent: 'center', paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[s.root, { alignItems: 'center', justifyContent: 'center', paddingTop: headerTopInset }]}>
         <ActivityIndicator color={theme.accent} />
       </View>
     );
