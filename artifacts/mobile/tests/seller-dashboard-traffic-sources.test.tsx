@@ -53,6 +53,16 @@ describe('SellerDashboardTrafficSources', () => {
     expect(texts).toContain('store visits this period');
   });
 
+  it('shows a plain "No store visits yet" line for the zero/fresh state — never a bold "0"', async () => {
+    await act(async () => {
+      renderer = create(<SellerDashboardTrafficSources totalVisits={0} theme={theme} />);
+    });
+    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    expect(texts).toContain('No store visits yet');
+    expect(texts).not.toContain('0');
+    expect(texts).not.toContain('store visits this period');
+  });
+
   it('never fabricates a per-source number: every source category reads em-dash, not a number', async () => {
     await act(async () => {
       renderer = create(<SellerDashboardTrafficSources totalVisits={500} theme={theme} />);
