@@ -17,7 +17,7 @@ import { StatusBadge } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
 import { useUser } from '@clerk/expo';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type Customer = {
   id: string;
@@ -107,7 +107,7 @@ export default function CustomerOrdersScreen() {
 
   return (
     <View style={s.root}>
-      <Header title={customer?.name ?? 'Customer Orders'} />
+      <ScreenHeader title={customer?.name ?? 'Customer Orders'} />
 
       {loading ? (
         <View style={s.center}>
