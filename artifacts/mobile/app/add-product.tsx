@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, Platform, Switch, Image, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, Platform, Image, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -30,7 +30,7 @@ import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput } from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, FilterChip, StatusBadge, SectionHeader, FormInput, HapticSwitch } from '@/components/BrandthreadUI';
 
 import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
 import { useApi } from '@/hooks/useApi';
@@ -1288,7 +1288,7 @@ export default function AddProductScreen() {
       <>
         <View style={s.switchRow}>
           <Text style={s.switchLabel}>Track inventory</Text>
-          <Switch
+          <HapticSwitch
             value={trackInventory}
             onValueChange={v => {
               updateUnsavedState(setTrackInventory, v);
@@ -1330,7 +1330,7 @@ export default function AddProductScreen() {
         )}
         <View style={s.switchRow}>
           <Text style={s.switchLabel}>Allow overselling</Text>
-          <Switch
+          <HapticSwitch
             value={allowOversell}
             onValueChange={v => {
               updateUnsavedState(setAllowOversell, v);
@@ -1795,7 +1795,7 @@ export default function AddProductScreen() {
         )}
         <View style={s.switchRow}>
           <Text style={s.switchLabel}>Featured on homepage</Text>
-          <Switch
+          <HapticSwitch
             value={featuredHome}
             onValueChange={v => { setFeaturedHome(v); patchDraft({ storeSettings: { ...ss, featuredOnHomepage: v } }); }}
             trackColor={{ false: BORDER, true: theme.accent }}
@@ -1820,10 +1820,9 @@ export default function AddProductScreen() {
             <Text style={s.switchLabel}>Accept pre-orders</Text>
             <Text style={s.collapsibleHint}>Take orders before the item ships. Only enable if you can fulfil later.</Text>
           </View>
-          <Switch
+          <HapticSwitch
             value={isPreOrder}
             onValueChange={v => {
-              hapticToggle();
               setIsPreOrder(v);
               patchDraft({ salesModel: v ? 'pre-order' : 'pre-made' });
             }}

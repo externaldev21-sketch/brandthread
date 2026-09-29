@@ -7,7 +7,7 @@ import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contex
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
+  StyleSheet, Alert, Modal, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
@@ -27,8 +27,7 @@ import { Header, ListSkeleton } from '@/components/layout';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
-  StatCard,
-} from '@/components/BrandthreadUI';
+  StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
 import {
   searchManufacturers, getRelationships, getRelationship,
   saveManufacturer, getManufacturer,
@@ -881,7 +880,7 @@ function FilterModal({ visible, filters, onApply, onClose }: {
 
           <View style={fm.switchRow}>
             <Text style={fm.switchLabel}>Has factory photos</Text>
-            <Switch
+            <HapticSwitch
               value={local.hasPhotos}
               onValueChange={v => set('hasPhotos', v)}
               trackColor={{ true: theme.accent, false: theme.border }}
@@ -890,7 +889,7 @@ function FilterModal({ visible, filters, onApply, onClose }: {
           </View>
           <View style={fm.switchRow}>
             <Text style={fm.switchLabel}>Verified only</Text>
-            <Switch
+            <HapticSwitch
               value={local.verifiedOnly}
               onValueChange={v => set('verifiedOnly', v)}
               trackColor={{ true: theme.accent, false: theme.border }}

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, StyleSheet, Alert, Switch, TouchableOpacity, Platform } from 'react-native';
+  View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,8 +15,7 @@ import {
 import { useColors } from '@/hooks/useColors';
 import {
   BrandthreadCard, BrandthreadHeader, PrimaryButton,
-  FormInput,
-} from '@/components/BrandthreadUI';
+  FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
 import { Order, RefundType } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
 import { useApi } from '@/lib/api';
@@ -269,7 +268,7 @@ export default function RefundDetailScreen() {
           <BrandthreadCard style={styles.section}>
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>Include shipping ({formatCents(order.payment.shippingTotalCents)})</Text>
-              <Switch
+              <HapticSwitch
                 value={includeShipping}
                 onValueChange={setIncludeShipping}
                 trackColor={{ false: BORDER, true: PURPLE }}
@@ -292,7 +291,7 @@ export default function RefundDetailScreen() {
         <BrandthreadCard style={styles.section}>
           <View style={styles.switchRow}>
             <Text style={styles.switchLabel}>Return item to inventory</Text>
-            <Switch
+            <HapticSwitch
               value={restockInventory}
               onValueChange={setRestockInventory}
               trackColor={{ false: BORDER, true: PURPLE }}
@@ -305,7 +304,7 @@ export default function RefundDetailScreen() {
         <BrandthreadCard style={styles.section}>
           <View style={styles.switchRow}>
             <Text style={[styles.switchLabel, { color: SUBTLE }]}>Notify customer (always on)</Text>
-            <Switch value={true} disabled trackColor={{ false: BORDER, true: PURPLE }} thumbColor={FG} />
+            <HapticSwitch value={true} disabled trackColor={{ false: BORDER, true: PURPLE }} thumbColor={FG} />
           </View>
         </BrandthreadCard>
 

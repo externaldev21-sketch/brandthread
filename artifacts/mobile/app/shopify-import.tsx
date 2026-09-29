@@ -6,14 +6,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList,
-  ActivityIndicator, Alert, Image, Linking, Switch,
-} from 'react-native';
+  ActivityIndicator, Alert, Image, Linking, } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { Header } from '@/components/layout';
 import { useApi } from '@/hooks/useApi';
-import { BrandthreadCard, PrimaryButton, EmptyState, LoadingSkeleton, SkeletonText } from '@/components/BrandthreadUI';
+import { BrandthreadCard, PrimaryButton, EmptyState, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
 import { COMP } from '@/lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -179,7 +178,7 @@ export default function ShopifyImportScreen() {
             </TouchableOpacity>
             <View style={styles.publishToggleRow}>
               <Text style={[styles.publishLabel, { color: colors.mutedForeground }]}>Publish as active</Text>
-              <Switch value={publishActive} onValueChange={setPublishActive} />
+              <HapticSwitch value={publishActive} onValueChange={setPublishActive} />
             </View>
           </View>
 

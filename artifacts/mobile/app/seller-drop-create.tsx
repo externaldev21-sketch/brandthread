@@ -20,7 +20,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Alert, Image, Modal, Platform,
-  ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
+  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -32,7 +32,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { LoadingSkeleton } from '@/components/BrandthreadUI';
+import { LoadingSkeleton, HapticSwitch} from '@/components/BrandthreadUI';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
@@ -523,7 +523,7 @@ export default function SellerDropCreate() {
           <View style={styles.field}>
             <View style={styles.rowBetween}>
               <Text style={[styles.label, { color: theme.muted }]}>SET AN END TIME</Text>
-              <Switch value={hasEndDate} onValueChange={setHasEndDate} trackColor={{ true: theme.accent }} />
+              <HapticSwitch value={hasEndDate} onValueChange={setHasEndDate} trackColor={{ true: theme.accent }} />
             </View>
             {hasEndDate && (
               <View style={{ marginTop: 8 }}>
@@ -541,7 +541,7 @@ export default function SellerDropCreate() {
           <View style={styles.field}>
             <View style={styles.rowBetween}>
               <Text style={[styles.label, { color: theme.muted }]}>EARLY ACCESS FOR FOLLOWERS</Text>
-              <Switch value={earlyAccessEnabled} onValueChange={setEarlyAccessEnabled} trackColor={{ true: theme.accent }} />
+              <HapticSwitch value={earlyAccessEnabled} onValueChange={setEarlyAccessEnabled} trackColor={{ true: theme.accent }} />
             </View>
             {earlyAccessEnabled && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>

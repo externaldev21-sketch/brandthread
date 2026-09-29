@@ -4,7 +4,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
-  TextInput, StyleSheet, Alert, Switch, Animated, RefreshControl,
+  TextInput, StyleSheet, Alert, Animated, RefreshControl,
   PanResponder, GestureResponderEvent, PanResponderGestureState, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -22,8 +22,7 @@ import {
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard,
-} from '@/components/BrandthreadUI';
+  EmptyState, StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
 import {
   getStorefront, updateSection, toggleSection, deleteSection,
   duplicateSection, reorderSections, undoLastAction, redoLastAction,
@@ -156,7 +155,7 @@ function SwitchRow({ label, value, onChange }: { label: string; value: boolean; 
   return (
     <View style={swStyles.row}>
       <Text style={swStyles.label}>{label}</Text>
-      <Switch
+      <HapticSwitch
         value={value}
         onValueChange={onChange}
         trackColor={{ false: BORDER, true: theme.accent }}
