@@ -26,7 +26,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
-import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/components/layout';
+import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { SearchBar } from '@/components/BrandthreadUI';
 import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
 import { ApiError } from '@/lib/networkNotice';
@@ -227,13 +228,10 @@ export default function ActivityPeopleScreen() {
 
   return (
     <View style={styles.container}>
-      <PageHeader
-        title={title}
-        showBack
-        belowTitle={showSearch ? (
-          <SearchBar value={query} onChange={setQuery} placeholder="Search" style={styles.search} />
-        ) : undefined}
-      />
+      <ScreenHeader title={title} />
+      {showSearch && (
+        <SearchBar value={query} onChange={setQuery} placeholder="Search" style={styles.search} />
+      )}
 
       {status === 'loading' ? (
         <SkeletonRows styles={styles} />
@@ -286,7 +284,9 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     backgroundColor: theme.background,
   },
   search: {
+    marginTop: SP.sm,
     marginBottom: SP.sm,
+    marginHorizontal: SP.md,
   },
   listContent: {
     paddingTop: SP.xs,

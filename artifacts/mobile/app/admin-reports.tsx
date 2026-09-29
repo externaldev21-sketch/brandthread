@@ -13,14 +13,15 @@ import {
   Modal, Pressable, TextInput, Platform } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { EmptyState, PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import {
   REPORT_REASONS, TARGET_ICONS, TARGET_LABELS, apiErrorMessage, normalizeReportTarget, shortRelativeTime,
 } from '@/lib/safety';
@@ -52,6 +53,17 @@ const ACTION_LABELS: Record<string, string> = {
 
 function reasonLabel(reason: string) {
   return REPORT_REASONS.find((r) => r.id === reason)?.label ?? reason.replace(/_/g, ' ');
+}
+
+/**
+ * Reads `useSafeAreaInsets()` from wherever it's actually rendered, not
+ * from the component that returns it — so a value read inside
+ * `<ModalSafeArea>` (a Modal's own native root) is the fresh, modal-local
+ * inset rather than whatever the caller's own render position saw.
+ */
+function SheetBottomInset({ children }: { children: (bottom: number) => React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+  return <>{children(insets.bottom)}</>;
 }
 
 export default function ReviewQueueScreen() {
@@ -129,23 +141,16 @@ export default function ReviewQueueScreen() {
   const items = queue?.items ?? [];
 
   return (
-    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
-      <View style={s.header}>
-        <PressableScale onPress={() => goBackOr(router)} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
-        </PressableScale>
-        <View style={{ flex: 1 }}>
-          <Text style={s.headerTitle}>Review queue</Text>
-          {summary ? (
-            <Text style={s.headerSub}>
-              {summary.open} open · {summary.heldByFilter} held by filter · {summary.resolvedToday} resolved today
-            </Text>
-          ) : null}
-        </View>
-        <PressableScale onPress={() => router.push('/community-guidelines' as never)} style={s.headerBtn} accessibilityLabel="Community Guidelines">
-          <Feather name="book-open" size={ICON.md} color={theme.text} />
-        </PressableScale>
-      </View>
+    <View style={s.root}>
+      <ScreenHeader
+        title="Review queue"
+        subtitle={summary ? `${summary.open} open · ${summary.heldByFilter} held by filter · ${summary.resolvedToday} resolved today` : undefined}
+        actions={[{
+          icon: 'book-open',
+          onPress: () => router.push('/community-guidelines' as never),
+          accessibilityLabel: 'Community Guidelines',
+        }]}
+      />
 
       {access === 'denied' ? (
         <EmptyState
@@ -314,7 +319,6 @@ function ReviewSheet({
 }) {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<ModerationAction | 'reinstate' | null>(null);
   const [confirmSuspend, setConfirmSuspend] = useState(false);
@@ -359,8 +363,11 @@ function ReviewSheet({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <ModalSafeArea>
       <Pressable style={s.scrim} onPress={onClose} accessibilityLabel="Close review" />
-      <SheetRise style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
+      <SheetBottomInset>
+      {(insetBottom) => (
+      <SheetRise style={[s.sheet, { paddingBottom: insetBottom + SP.md }]}>
         <View style={s.sheetHandle} />
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={s.sheetHeader}>
@@ -471,16 +478,15 @@ function ReviewSheet({
           ) : null}
         </ScrollView>
       </SheetRise>
+      )}
+      </SheetBottomInset>
+      </ModalSafeArea>
     </Modal>
   );
 }
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.3 },
-  headerSub: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   segment: {
     flexDirection: 'row', marginHorizontal: SP.md, marginTop: SP.xs, padding: 4,
     backgroundColor: theme.card, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border,

@@ -9,11 +9,11 @@
  * the stat-row-above-chart hierarchy and the muted axis labels.
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { useAuth } from '@clerk/expo';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { GRID_MAX_WIDTH, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { GRID_MAX_WIDTH, SP } from '@/lib/theme';
 import { ResponsiveContainer } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { useScrollReset } from '@/hooks/useScrollReset';
@@ -86,7 +86,6 @@ export default function AnalyticsScreen() {
   const colors = useColors();
   const api = useApi();
   const { userId } = useAuth();
-  const topPad = useHeaderTopInset();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const scrollResetRef = useScrollReset<ScrollView>();
 
@@ -158,7 +157,8 @@ export default function AnalyticsScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1 }}>
-        <AnalyticsSkeleton topPad={topPad} kpiCount={2} listRows={0} />
+        <ScreenHeader title="Analytics" subtitle="Last 7 days" />
+        <AnalyticsSkeleton kpiCount={2} listRows={0} />
       </View>
     );
   }
@@ -169,10 +169,11 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <ScreenHeader title="Analytics" subtitle="Last 7 days" />
       <ScrollView
         ref={scrollResetRef}
         style={s.scroll}
-        contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
+        contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -183,10 +184,6 @@ export default function AnalyticsScreen() {
         }
       >
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
-          {/* ── Header ─────────────────────────────────────────────────────── */}
-          <Text style={s.pageTitle}>Analytics</Text>
-          <Text style={s.rangeLabel}>Last 7 days</Text>
-
           {/* ── Summary stats ──────────────────────────────────────────────── */}
           <View style={s.statsRow}>
             <StatTile label="Visits" value={summary.visits.toLocaleString()} changePct={summary.visitsChangePct} />
@@ -210,10 +207,7 @@ export default function AnalyticsScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:  { flex: 1, backgroundColor: 'transparent' },
-  content: {},
-
-  pageTitle:  { fontSize: 28, fontFamily: FONT.bold, color: colors.foreground, marginBottom: 4 },
-  rangeLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: colors.mutedForeground, marginBottom: SP.md },
+  content: { paddingTop: SP.md },
 
   statsRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.md },
 });
