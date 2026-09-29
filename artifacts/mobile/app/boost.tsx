@@ -53,7 +53,7 @@ import {
   buildBoostReturnUrl,
 } from '@/services/boostService';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -751,7 +751,7 @@ export default function BoostScreen() {
 
   function renderHeader(title: string) {
     return (
-      <Header
+      <ScreenHeader
         title={title}
         onBack={goBack}
         actions={[{ icon: 'x', onPress: () => goBackOr(router), accessibilityLabel: 'Close' }]}
