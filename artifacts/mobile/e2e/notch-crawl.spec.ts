@@ -152,7 +152,11 @@ const VIOLATION_SCRIPT = `(() => {
     // Skip a plain in-flow list row that merely straddles the viewport's
     // bottom edge — that's normal scroll clipping, not a home-indicator
     // clearance bug; the user scrolls to reach it, nothing hides it forever.
-    const isBottomPinned = rect.bottom > window.innerHeight - 100 && (style.position === 'fixed' || style.position === 'sticky' || (style.position === 'absolute' && style.bottom !== 'auto'));
+    // height < 100 rules out a swipeable list row's reveal-action button
+    // caught mid-drag by a synthetic click (its box briefly spans most of
+    // the row during the swipe animation) — a crawler click artifact, not a
+    // real sticky-footer element.
+    const isBottomPinned = rect.bottom > window.innerHeight - 100 && rect.height < 100 && (style.position === 'fixed' || style.position === 'sticky' || (style.position === 'absolute' && style.bottom !== 'auto'));
     // INPUT is excluded here (kept for the top check above): react-native-web
     // renders a Switch/checkbox as a visually-hidden <input> absolutely
     // positioned to cover its custom control for accessibility/hit-testing —
