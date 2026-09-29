@@ -18,19 +18,19 @@ function routeFiles(directory: string): string[] {
 
 describe('app background theme', () => {
   it('keeps buyer and seller screens on the onboarding background', () => {
-    expect(BG).toBe('#0A0A0B');
+    expect(BG).toBe('#000000');
     expect(colors.dark.background).toBe(BG);
     expect(SCREEN_BG).toBe('transparent');
   });
 
-  it('keeps app chrome strictly grayscale', () => {
-    expect(ACCENT).toBe('#F7F7FA');
+  it('keeps app chrome strictly black, white, and silver', () => {
+    expect(ACCENT).toBe('#FFFFFF');
     expect(ACCENT_LIGHT).toBe('#FFFFFF');
     expect(colors.dark.primary).toBe(ACCENT);
     expect(colors.dark.primaryForeground).toBe(BG);
-    // SUBTLE is now a solid opaque grey, not an alpha blend — see the
+    // SUBTLE is now a solid opaque silver, not an alpha blend — see the
     // "fix the type system" fine-print pass in lib/theme.ts.
-    expect(colors.dark.info).toBe('#8A8A93');
+    expect(colors.dark.info).toBe('#B0B0B0');
   });
 
   it('isolates every root stack scene on an opaque background plane', () => {

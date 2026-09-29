@@ -36,15 +36,16 @@ const palette = (
 ): Palette => ({
   background, surface, card, cardElevated: card,
   surfaceGlass: `${surface}E8`, cardGlass: `${card}E8`, cardElevatedGlass: `${card}F2`,
-  border: '#FFFFFF2B', borderSubtle: '#FFFFFF1A',
-  text: '#FAFAFA', muted: '#B8B8C0', subtle: '#A8A8B1',
+  border: '#C0C0C047', borderSubtle: '#C0C0C024',
+  text: '#FFFFFF', muted: '#C0C0C0', subtle: '#B0B0B0',
   accent, accentLight: accent, accentDim: `${accent}2E`, onAccent,
   secondary: accent, secondaryDim: `${accent}24`,
   primaryGradient, heroGradient, glowGradient, tabBarBackground: `${background}F5`,
   ...status, shadowColor: '#000000',
 });
 const STATUS = { success: '#7FF0B0', warning: '#FFD580', error: '#FFB4B4' } as const;
-const MONOCHROME = palette('#0A0A0B', '#111113', '#18181B', '#F7F7FA', '#0A0A0B', ['#F7F7FA', '#FFFFFF'], ['#0A0A0B', '#18181B'], ['#FFFFFF0F', '#FFFFFF03'], STATUS);
+// Black, white, and silver: pure black bg/surface/card, white accent.
+const MONOCHROME = palette('#000000', '#000000', '#000000', '#FFFFFF', '#000000', ['#FFFFFF', '#FFFFFF'], ['#000000', '#000000'], ['#FFFFFF0F', '#FFFFFF03'], STATUS);
 const PRESET_PALETTES: Record<Exclude<AppThemeId, 'monochrome'>, Palette> = {
   purple: palette('#281235', '#321844', '#3B1B4B', '#D990FF', '#190A24', ['#A24EDD', '#D990FF'], ['#281235', '#5A2670'], ['#A24EDD44', '#A24EDD0A'], STATUS),
   olive: palette('#2C311E', '#353B25', '#3B4129', '#C9D8A7', '#1C2113', ['#8D9B70', '#C9D8A7'], ['#2C311E', '#59633B'], ['#A5B38844', '#A5B3880A'], STATUS),
