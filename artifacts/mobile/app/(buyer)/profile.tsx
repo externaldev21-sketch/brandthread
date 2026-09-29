@@ -49,7 +49,7 @@ import type {
 } from '@/services/socialTypes';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
-import { formatProfileCount } from '@/services/profileService';
+import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileMeta } from '@/components/profile/ProfileShell';
 import { InteractionLayer, ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
@@ -69,7 +69,7 @@ import { profileEmptyState, computeEmptyArea, type ProfileEmptyTab } from '@/com
 import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
 import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRow';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
-import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
+import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
 // Realistic identity shown only when there is truly no signed-in user at all
@@ -494,8 +494,9 @@ export default function ProfileScreen() {
     // `__DEV__`-gated, so none of this ever fires in a production build.
     const applyPreviewFallback = () => {
       if (!active || !isPreviewThreadCashEnabled()) return;
-      setThreadCashBalanceCents(Math.max(0, PREVIEW_THREAD_CASH_STATUS.balanceCents));
-      setThreadCashStreak(PREVIEW_THREAD_CASH_STATUS.streak);
+      const status = getPreviewThreadCashStatus();
+      setThreadCashBalanceCents(Math.max(0, status.balanceCents));
+      setThreadCashStreak(status.streak);
     };
 
     if (!user?.id) {
@@ -737,21 +738,26 @@ export default function ProfileScreen() {
   const hasActiveStory = myStoryIds.length > 0;
   const heroActive = focused && heroOnScreen && !heroPosterOnly;
 
-  // Instagram order: Posts · Followers · Following. Drafts never count toward
-  // the public "Posts" stat (they aren't published).
+  // Drafts never count toward "published" (they aren't public); still used
+  // below for the share sheet's topPosts.
   const publishedPosts = posts.filter(p => !p.isDraft);
+  // Followers · Following · Likes — Posts was dropped (dev: a high count in
+  // any column was getting cut off; three columns gives each enough room).
+  // Likes is a real total summed from this buyer's own posts (never
+  // paginated — getMyPosts() always returns the full list), not fabricated.
+  const totalLikes = publishedPosts.reduce((sum, p) => sum + (p.likesCount || 0), 0);
   const stats: ProfileStat[] = [
-    { key: 'posts', label: 'Posts', value: formatProfileCount(publishedPosts.length) },
     {
       key: 'followers', label: 'Followers',
-      value: formatProfileCount(socialCounts?.followers ?? profile?.friendsCount ?? 0),
+      value: formatCompactCount(socialCounts?.followers ?? profile?.friendsCount ?? 0),
       onPress: () => router.push(connectionsHref('followers') as any),
     },
     {
       key: 'following', label: 'Following',
-      value: formatProfileCount(socialCounts?.following ?? profile?.followingBrandsCount ?? 0),
+      value: formatCompactCount(socialCounts?.following ?? profile?.followingBrandsCount ?? 0),
       onPress: () => router.push(connectionsHref('following') as any),
     },
+    { key: 'likes', label: 'Likes', value: formatCompactCount(totalLikes) },
   ];
 
   const highlightItems: ProfileStoryItem[] = highlights.map((h) => ({

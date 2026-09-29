@@ -28,7 +28,7 @@ import {
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { PREVIEW_STORIES, PREVIEW_FOLLOWING, PREVIEW_FRIEND_ACTIVITY } from '@/lib/previewFriends';
 
 type ApiFollowing = {
@@ -247,15 +247,22 @@ export default function FriendsScreen() {
       setApiFollowing(Array.isArray(followingRows) ? followingRows : []);
       setFeedPosts(Array.isArray(activityRows) ? activityRows : []);
     } catch (error) {
-      // No backend reachable in the dev-web preview — show the same seeded
-      // fixtures the buyer profile's Thread Cash streak uses, rather than a
-      // silently empty screen. Never reached for a real signed-in account.
+      // No backend reachable in the dev-web preview. Default is a brand-new,
+      // zero-state account (fresh install) — never reached for a real
+      // signed-in account. The seeded demo cast only shows behind the
+      // explicit ?bt_preview=buyer&demo=1 opt-in (see lib/devPreview.ts).
       if (isBuyerDevPreview()) {
         setLoadError(false);
         setFriends([]);
-        setApiFollowing(PREVIEW_FOLLOWING);
-        setStories(PREVIEW_STORIES);
-        setFeedPosts(PREVIEW_FRIEND_ACTIVITY);
+        if (isPreviewDemoMode()) {
+          setApiFollowing(PREVIEW_FOLLOWING);
+          setStories(PREVIEW_STORIES);
+          setFeedPosts(PREVIEW_FRIEND_ACTIVITY);
+        } else {
+          setApiFollowing([]);
+          setStories([]);
+          setFeedPosts([]);
+        }
       } else {
         setLoadError(true);
         setFriends([]);

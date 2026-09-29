@@ -110,6 +110,23 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
   return persistedPreviewRole() === 'seller';
 }
 
+/**
+ * Fresh vs. demo preview data mode — orthogonal to which role
+ * (isSellerDevPreview / isBuyerDevPreview) is being previewed.
+ *
+ * Default (`?bt_preview=seller`, no `demo` param): FRESH mode — a brand-new
+ * account with zero everything (no orders, no products, no seeded numbers).
+ * Dev's explicit call: preview must never look like it already has people on
+ * it. Opt-in only: `?bt_preview=seller&demo=1` — a populated demo dataset,
+ * for whoever needs to show the app with data in it (e.g. screenshots,
+ * design review). Nothing wires the demo dataset up as a default anywhere;
+ * a screen that wants to show one still has to check isPreviewDemoMode()
+ * itself and fall back to empty when it's false.
+ *
+ * Like isSellerDevPreview/isBuyerDevPreview, `demo` only has to be present on
+ * the first page load — it's mirrored into localStorage so it survives
+ * Expo Router navigations that drop query strings.
+ */
 function persistedPreviewDemo(): boolean {
   try {
     return typeof localStorage !== 'undefined' && localStorage.getItem('bt_preview_demo') === '1';
@@ -118,50 +135,48 @@ function persistedPreviewDemo(): boolean {
   }
 }
 
+function resolveSearch(searchOverride?: string): string | null {
+  if (searchOverride !== undefined) return searchOverride;
+  if (typeof window === 'undefined') return null;
+  return window.location.search;
+}
+
 /**
- * Returns true only inside the seller dev preview AND when the populated
- * "demo" dataset was explicitly requested via `?demo=1` (this navigation or
- * earlier this session) — e.g. `?bt_preview=seller&demo=1`.
- *
- * Mirrors isSellerDevPreview's persistence pattern (Expo Router drops query
- * params on plain in-app navigation, so a param that only has to be present
- * on the first load is mirrored into localStorage the same way `user_role`
- * is in app/_layout.tsx) so switching tabs doesn't silently fall back to the
- * default fresh/zero-state preview mid-session.
- *
- * Without `?demo=1`, the seller preview defaults to a brand-new, zero-sales
- * account — never fabricated activity — matching isSellerDevPreview's own
- * "no query param means the real thing" philosophy applied to the demo flag.
- *
- * NOTE: this is a narrowly-scoped companion to the chart fix in this PR. If
- * `claude/seller-fresh-preview` lands first (or is merged onto this branch),
- * prefer its `isPreviewFreshMode()`/`isPreviewDemoMode()` instead — the two
- * concepts should not coexist long-term. See the PR description.
- *
- * @param searchOverride  Optional query string supplied by tests instead of
- *   reading window.location.search.
+ * True only when a dev/web preview (buyer or seller) explicitly opted into
+ * the populated demo dataset via `&demo=1`. Never true by default, and never
+ * true outside a preview context (mirrors the __DEV__ / production-host
+ * gates isSellerDevPreview/isBuyerDevPreview apply).
  */
-export function isSellerPreviewDemoMode(searchOverride?: string): boolean {
-  if (!isSellerDevPreview(searchOverride)) return false;
+export function isPreviewDemoMode(searchOverride?: string): boolean {
+  if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return false;
+  if (Platform.OS !== 'web') return false;
+  if (isProductionPreviewHost()) return false;
+  if (!isSellerDevPreview(searchOverride) && !isBuyerDevPreview(searchOverride)) return false;
 
-  let search = searchOverride ?? '';
-  if (searchOverride === undefined) {
-    if (typeof window === 'undefined') return false;
-    search = window.location.search;
-  }
-
+  const search = resolveSearch(searchOverride);
+  if (search === null) return false;
   const v = new URLSearchParams(search).get('demo');
   if (v === '1') {
     try {
       if (typeof localStorage !== 'undefined') localStorage.setItem('bt_preview_demo', '1');
     } catch {
-      // Persistence is best-effort only.
+      // best-effort persistence only
     }
     return true;
   }
-  if (v !== null) return false; // an explicit non-'1' value always wins over the persisted flag
+  if (searchOverride === undefined) return persistedPreviewDemo();
+  return false;
+}
 
-  return persistedPreviewDemo();
+/**
+ * True whenever a dev/web preview (buyer or seller) is active and the demo
+ * dataset was NOT explicitly requested — i.e. the default, zero-everything,
+ * first-run state. This is the flag seller (and buyer) screens should check
+ * before rendering any seeded/sample record.
+ */
+export function isPreviewFreshMode(searchOverride?: string): boolean {
+  const inPreview = isSellerDevPreview(searchOverride) || isBuyerDevPreview(searchOverride);
+  return inPreview && !isPreviewDemoMode(searchOverride);
 }
 
 /**

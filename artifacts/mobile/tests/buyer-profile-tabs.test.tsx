@@ -320,9 +320,8 @@ vi.mock('@/contexts/FeatureFlagContext', async (importOriginal) => ({
 // isPreviewThreadCashEnabled() (a bare `__DEV__` check) would never fire in
 // this suite — mocked here with its own on/off switch so the "no user" /
 // "empty streak data" fallback tests can actually exercise it.
-const { previewThreadCashEnabled } = vi.hoisted(() => ({ previewThreadCashEnabled: { on: false } }));
-vi.mock('@/lib/previewThreadCash', () => ({
-  isPreviewThreadCashEnabled: () => previewThreadCashEnabled.on,
+const { previewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } = vi.hoisted(() => ({
+  previewThreadCashEnabled: { on: false },
   PREVIEW_THREAD_CASH_STATUS: {
     balanceCents: 480,
     config: { dailyAmountCents: 10, streakBonusCents: 100, streakBonusDays: 7, graceHours: 0, expiryDays: null, maxRedemptionPerOrderCents: null },
@@ -331,6 +330,11 @@ vi.mock('@/lib/previewThreadCash', () => ({
       timezone: 'UTC', alreadyCheckedInToday: true, dayInCycle: 3, streakBonusDays: 7,
     },
   },
+}));
+vi.mock('@/lib/previewThreadCash', () => ({
+  isPreviewThreadCashEnabled: () => previewThreadCashEnabled.on,
+  PREVIEW_THREAD_CASH_STATUS,
+  getPreviewThreadCashStatus: () => PREVIEW_THREAD_CASH_STATUS,
 }));
 
 vi.mock('@/components/BrandthreadUI', () => {
@@ -682,12 +686,12 @@ describe('buyer profile — Instagram layout', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-story-create');
   });
 
-  it('orders the stats Posts · Followers · Following', async () => {
+  it('orders the stats Followers · Following · Likes (Posts was dropped — dev: high counts were getting cut off)', async () => {
     renderer = await renderScreen();
     const row = renderer.root.findByProps({ testID: 'profile-stats-row' });
     const keys = row.findAll((node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('profile-stat-') && typeof node.type === 'string')
       .map((node) => node.props.testID);
-    expect([...new Set(keys)]).toEqual(['profile-stat-posts', 'profile-stat-followers', 'profile-stat-following']);
+    expect([...new Set(keys)]).toEqual(['profile-stat-followers', 'profile-stat-following', 'profile-stat-likes']);
   });
 
   it('puts the avatar and stats on the same row (Instagram order), with name/@handle/bio below it', async () => {
