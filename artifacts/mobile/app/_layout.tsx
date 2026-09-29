@@ -8,6 +8,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { isProductionPreviewHost } from '@/lib/devPreview';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -419,6 +420,10 @@ const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_T
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  // Hard gate: never activate on the real production host, even if
+  // NAVIGATION_ISOLATION_TEST somehow reached a production build — see
+  // lib/devPreview.ts's isProductionPreviewHost doc comment.
+  if (isProductionPreviewHost()) return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
   if (v !== 'buyer' && v !== 'seller') return null;
   return v;
@@ -739,6 +744,16 @@ function ServiceConfigurer() {
       // must be dropped explicitly or the previous account's plan tier would
       // gate features for the next signed-in account.
       invalidatePlanCache();
+      // The shared TanStack queryClient (lib/queryClient.ts) is NOT scoped
+      // by userId — its query keys (queryKeys.tabData/orderList/productList/
+      // profile) carry no userId of their own, so without this, a query
+      // cached under account A's session (gcTime is 24h) would still be
+      // readable — and, worse, is persisted to AsyncStorage and rehydrated
+      // on a cold launch — after switching straight to account B, with
+      // nothing re-scoping it. Clearing it here matches the same
+      // "wipe the previous user's cache before init'ing the next" pattern
+      // clearSocialCache/clearCartCache already use.
+      queryClient.clear();
     }
     prevUserIdRef.current = newUserId;
     initSocialService(newUserId);

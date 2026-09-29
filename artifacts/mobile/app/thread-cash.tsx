@@ -18,6 +18,7 @@ import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard, EmptyState } from '@/components/BrandthreadUI';
 import { SkeletonBlock } from '@/components/ui';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { TABULAR_NUMS, tabularType } from '@/constants/typography';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
@@ -130,6 +131,9 @@ export default function ThreadCashScreen() {
   const [status, setStatus] = useState<ThreadCashStatus | null>(null);
   const [history, setHistory] = useState<ThreadCashEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed fetch must never render as a genuine "$0.00" balance — track it
+  // separately so we can show a retry row instead of fabricating a zero.
+  const [loadError, setLoadError] = useState(false);
 
   // Dev-only: a hidden long-press on the balance replays the money-burst
   // celebration on demand, so it can be screenshotted/recorded without
@@ -157,18 +161,22 @@ export default function ThreadCashScreen() {
     // on a microtask instead means it always actually completes.
     if (isBuyerDevPreview()) {
       setLoading(true);
+      setLoadError(false);
       await Promise.resolve();
       setStatus(PREVIEW_STATUS);
       setHistory(PREVIEW_HISTORY);
       setLoading(false);
       return;
     }
+    setLoadError(false);
     try {
       const [s, h] = await Promise.all([api.threadCash.get(), api.threadCash.history(30)]);
       setStatus(s);
       setHistory(h.history);
     } catch {
-      // Keep whatever was last shown; the screen still renders its chrome.
+      // Keep whatever was last shown, but flag the failure so the balance
+      // never silently reads as a genuine "$0.00" when nothing loaded yet.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -204,9 +212,15 @@ export default function ThreadCashScreen() {
                 <ThreadCashBillStack width={280} style={styles.balanceStack} />
               </Pressable>
               <Text style={[styles.balanceLabel, { color: theme.muted }]}>Your balance</Text>
-              <Text style={[styles.balanceValue, tabularType('display'), { color: theme.text }]}>
-                {formatCents(status?.balanceCents ?? 0)}
-              </Text>
+              {loadError && status == null ? (
+                <View style={{ marginTop: SP.sm, marginBottom: SP.xs }}>
+                  <RetryRow label="Couldn't load balance" onRetry={() => void load()} />
+                </View>
+              ) : (
+                <Text style={[styles.balanceValue, tabularType('display'), { color: theme.text }]}>
+                  {formatCents(status?.balanceCents ?? 0)}
+                </Text>
+              )}
               <Text style={styles.balanceHint} numberOfLines={2}>
                 Thread Cash isn't money — it can't be cashed out or transferred for cash. Use it toward purchases in the app.
               </Text>
@@ -269,7 +283,9 @@ export default function ThreadCashScreen() {
 
           {/* History */}
           <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
-          {history.length === 0 ? (
+          {loadError && history.length === 0 ? (
+            <RetryRow label="Couldn't load history" onRetry={() => void load()} />
+          ) : history.length === 0 ? (
             <EmptyState
               compact
               icon="dollar-sign"

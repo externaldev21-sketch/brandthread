@@ -18,6 +18,7 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getContentAnalytics, getFilterState } from '@/services/analyticsService';
 import { ContentAnalytics, ContentPostRow, VideoRetentionPoint, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
@@ -94,6 +95,7 @@ export default function AnalyticsContentScreen() {
   const [data,       setData]       = useState<ContentAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tab,        setTab]        = useState<'videos' | 'slideshows' | 'top_revenue'>('videos');
   const requestUser = useRef<string | null>(null);
@@ -109,9 +111,11 @@ export default function AnalyticsContentScreen() {
       const next = await getContentAnalytics(f);
       if (requestUser.current !== requestedUser) return;
       setData(next);
+      setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
-    } finally { setLoading(false); setRefreshing(false); }
+      setLoadError(true);
+        } finally { setLoading(false); setRefreshing(false); }
   }, [filter, authLoaded, userId]);
 
   useEffect(() => {
@@ -127,6 +131,13 @@ export default function AnalyticsContentScreen() {
 
   if (loading) {
     return <AnalyticsSkeleton topPad={topPad} kpiCount={3} listRows={3} />;
+  }
+  if (loadError && !data) {
+    return (
+      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
+        <ErrorState message="Couldn't load content analytics." onRetry={() => load()} />
+      </View>
+    );
   }
   return (
     <ScrollView
@@ -212,6 +223,7 @@ export default function AnalyticsContentScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
+  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
   attrCard: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: colors.elevated, borderRadius: RADIUS.md, padding: SP.sm + 2, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg },
   attrTitle:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.foreground },

@@ -10,12 +10,21 @@
  * Viewer routes are open to every signed-in user (buyers watch lives);
  * only the host routes (start / end / products) require the Pro plan.
  *  GET    /api/live/:id                 stream details (public, for viewer)
- *  POST   /api/live/:id/join            viewer gets token + increments count
- *  POST   /api/live/:id/leave           viewer decrements count
+ *  POST   /api/live/:id/join            viewer gets a token + is now present
+ *  POST   /api/live/:id/leave           viewer is no longer present
+ *  POST   /api/live/:id/heartbeat       HTTP presence fallback (see below)
  *  POST   /api/live/:id/end             seller ends stream (saves replay)
  *  PATCH  /api/live/:id/products        update tagged products mid-stream
  *  POST   /api/live/:id/comment         add a chat comment
- *  GET    /api/live/:id/comments        poll recent comments
+ *  GET    /api/live/:id/comments        poll recent comments (one-shot backfill)
+ *
+ * Realtime: new comments and product-tag changes are broadcast to the
+ * stream's WebSocket room (see ws/liveHub.ts) right after they're written
+ * here — this file stays the sole write path, the socket only fans out
+ * what was just committed. viewer_count is NOT incremented/decremented by
+ * join/leave anymore; it's a live presence count derived from the
+ * `live_viewers` table (a WebSocket heartbeat, or the /heartbeat route as
+ * an HTTP fallback) by jobs/liveViewersPresence.ts.
  */
 import { Router } from "express";
 import { db } from "@workspace/db";
@@ -26,6 +35,7 @@ import { optionalViewerId, publishingRestriction } from "../lib/safety";
 import { rankLiveFeed } from "../lib/liveFeed";
 import { logger } from "../lib/logger";
 import { beginCloudRecording, stopCloudRecordingAndMaybeFinalize } from "../lib/liveReplay";
+import { broadcastToRoom } from "../ws/liveHub";
 
 const router = Router();
 
@@ -244,12 +254,15 @@ router.post("/:id/join", requireAuth, async (req, res) => {
       return res.status(410).json({ error: "Stream has ended" });
     }
 
-    // Increment viewer count
+    // Presence: mark this viewer live right away so the count feels instant
+    // even before the periodic recompute job's next tick. The WebSocket
+    // connection (or the /heartbeat fallback) keeps this row fresh from
+    // here on — this is not an increment, just the first heartbeat.
     await db.execute(sql`
-      UPDATE live_streams
-      SET viewer_count      = viewer_count + 1,
-          peak_viewer_count = GREATEST(peak_viewer_count, viewer_count + 1)
-      WHERE id = ${id}::uuid
+      INSERT INTO live_viewers (stream_id, user_id_or_session_id, last_seen)
+      VALUES (${id}::uuid, ${viewerId}, now())
+      ON CONFLICT (stream_id, user_id_or_session_id)
+      DO UPDATE SET last_seen = now()
     `);
 
     const appId   = process.env.AGORA_APP_ID ?? "";
@@ -270,11 +283,31 @@ router.post("/:id/join", requireAuth, async (req, res) => {
 
 // ─── POST /api/live/:id/leave ─────────────────────────────────────────────────
 router.post("/:id/leave", requireAuth, async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
   try {
     await db.execute(sql`
-      UPDATE live_streams
-      SET viewer_count = GREATEST(0, viewer_count - 1)
-      WHERE id = ${req.params.id}::uuid AND status = 'live'
+      DELETE FROM live_viewers
+      WHERE stream_id = ${req.params.id}::uuid AND user_id_or_session_id = ${viewerId}
+    `);
+    return res.json({ ok: true });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── POST /api/live/:id/heartbeat ─────────────────────────────────────────────
+// HTTP fallback presence path for the client's slow-polling fallback mode
+// (used when a WebSocket connection genuinely can't be established). The
+// WebSocket heartbeat (ws/liveHub.ts) is the preferred path and covers this
+// same row when the socket is up.
+router.post("/:id/heartbeat", requireAuth, async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  try {
+    await db.execute(sql`
+      INSERT INTO live_viewers (stream_id, user_id_or_session_id, last_seen)
+      VALUES (${req.params.id}::uuid, ${viewerId}, now())
+      ON CONFLICT (stream_id, user_id_or_session_id)
+      DO UPDATE SET last_seen = now()
     `);
     return res.json({ ok: true });
   } catch (e: any) {
@@ -345,7 +378,9 @@ router.patch("/:id/products", requireAuth, hostPlan, async (req, res) => {
       RETURNING product_tags
     `);
     if (!result.rows.length) return res.status(404).json({ error: "Not found" });
-    return res.json({ productTags: (result.rows[0] as any).product_tags });
+    const updatedTags = (result.rows[0] as any).product_tags;
+    broadcastToRoom(String(req.params.id), { type: "products", productTags: updatedTags });
+    return res.json({ productTags: updatedTags });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
@@ -389,7 +424,9 @@ router.post("/:id/comment", requireAuth, async (req, res) => {
       VALUES (${req.params.id}::uuid, ${userId}, ${displayName ?? "Viewer"}, ${avatarUrl ?? null}, ${message.trim()})
       RETURNING *
     `);
-    return res.status(201).json({ comment: result.rows[0] });
+    const comment = result.rows[0];
+    broadcastToRoom(String(req.params.id), { type: "comment", comment });
+    return res.status(201).json({ comment });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

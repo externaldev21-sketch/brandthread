@@ -1,33 +1,36 @@
 /**
- * Server-authoritative stock reservation for the one-page checkout.
+ * One-page-checkout-specific stock *hold*, layered on top of the shared
+ * atomic-decrement primitives in `lib/stockReservation.ts`.
  *
- * `reserveStock` takes stock out of `product_variants` at pay time with one
- * conditional UPDATE per variant:
+ * The shared seam (`reserveStockForOrder`/`reserveStockAtomic`) decrements
+ * stock at order-creation time, inside the same transaction as the order
+ * insert — that's correct for a webhook that creates the order synchronously
+ * with the charge. The one-page checkout doesn't have that luxury: it must
+ * take stock out *before* the buyer confirms an Apple Pay / Google Pay /
+ * inline-card PaymentIntent, since that confirmation is an async, client-side
+ * step that can take anywhere from seconds to (if abandoned) never. So this
+ * module reserves the units up front, at "Pay" time, and tracks each
+ * reservation as a `stock_reservations` row with a status:
  *
- *   UPDATE product_variants SET stock = stock - n WHERE id = $v AND stock >= n
- *
- * It runs inside the caller's transaction, all or nothing: if any line can't
- * be covered, it throws and the caller's rollback puts back every line
- * already taken. Variants are locked in a fixed order, so two carts sharing
- * variants can't deadlock.
- *
- * A reservation then ends one of three ways:
- *  - committed: the paid webhook creates the order and skips its own stock
- *    decrement (the units were already taken here);
- *  - released: payment failed, was cancelled, or the reservation expired.
- *    The units go back;
+ *  - held: units are out of `product_variants.stock`, checkout is in flight;
+ *  - committed: the paid webhook created the order and reused these units
+ *    (see `commitStockReservation` — no second decrement needed);
+ *  - released: payment failed, was cancelled, or the reservation expired
+ *    (see `releaseStockReservation`). The units go back;
  *  - a payment that lands after an expiry sees "released", so the webhook
- *    falls back to its normal stock check (and refunds if it's now oversold).
+ *    falls back to the shared seam's normal reserve-at-order-creation path
+ *    (and refunds if that now finds it oversold).
  *
  * Every transition is a conditional UPDATE on `status`, so each is exactly
- * once under retries and races.
- *
- * This is the primitive the products/inventory work (Workstream C) was also
- * asked to expose. Whichever of the two merges second should call the other's
- * function rather than keep two.
+ * once under retries and races. The actual stock arithmetic — the
+ * conditional decrement and its inverse restore — is not reimplemented here;
+ * it delegates to `reserveStockAtomic`/`restoreStockForOrder` in
+ * `lib/stockReservation.ts`, the same primitives `reserveStockForOrder` (used
+ * by the Stripe webhook and `POST /api/orders`) is built from.
  */
 import { sql } from "drizzle-orm";
 import type { DbExecutor } from "./ledger";
+import { reserveStockAtomic, restoreStockForOrder } from "../stockReservation";
 
 /** How long a checkout may sit between "Pay" and Stripe's answer before its units go back. */
 export const STOCK_RESERVATION_TTL_MS = 30 * 60_000;
@@ -66,12 +69,8 @@ export async function reserveStock(
   const now = options.now ?? new Date();
   const expiresAt = new Date(now.valueOf() + (options.ttlMs ?? STOCK_RESERVATION_TTL_MS));
   for (const line of [...merged.values()].sort((a, b) => a.variantId.localeCompare(b.variantId))) {
-    const taken = rows<{ id: string }>(await tx.execute(sql`
-      UPDATE product_variants SET stock = stock - ${line.quantity}
-      WHERE id = ${line.variantId}::uuid AND stock >= ${line.quantity}
-      RETURNING id
-    `));
-    if (taken.length === 0) {
+    const ok = await reserveStockAtomic(tx, line.variantId, line.quantity);
+    if (!ok) {
       throw new StockReservationError(
         `${line.productName ?? "An item"} doesn't have enough stock left`,
         line.variantId,
@@ -102,11 +101,7 @@ export async function releaseStockReservation(tx: DbExecutor, checkoutSessionId:
     WHERE checkout_session_id = ${checkoutSessionId}::uuid AND status = 'held'
     RETURNING variant_id, quantity
   `));
-  for (const line of released.sort((a, b) => a.variant_id.localeCompare(b.variant_id))) {
-    await tx.execute(sql`
-      UPDATE product_variants SET stock = stock + ${line.quantity} WHERE id = ${line.variant_id}::uuid
-    `);
-  }
+  await restoreStockForOrder(tx, released.map((line) => ({ variantId: line.variant_id, quantity: line.quantity })));
   return released.length;
 }
 

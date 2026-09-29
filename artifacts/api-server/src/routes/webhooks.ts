@@ -68,6 +68,7 @@ import {
 import { postLedgerTransaction } from "../lib/money/ledger";
 import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
 import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
+import { reserveStockForOrder } from "../lib/stockReservation";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -836,32 +837,32 @@ export async function handleCheckoutPaid(
 
   await db.transaction(async (tx) => {
     // One-page checkout reserved these units when the buyer tapped Pay
-    // (lib/money/stockReservation.ts). A still-held reservation becomes this
-    // order's stock: no second check or decrement. An expired (released)
-    // one falls through to the normal check below.
+    // (lib/money/stockReservation.ts — a hold on top of the shared seam
+    // below, needed because that reservation happens before this order
+    // exists, while the PaymentIntent is still in flight). A still-held
+    // reservation becomes this order's stock: no second check or decrement.
+    // An expired (released) one falls through to the normal path below.
     const stockAlreadyReserved = chargeModel === "transfer"
       ? (await commitStockReservation(tx, csRecord.id)) > 0
       : false;
 
-    // Step 1: Lock all variant rows in deterministic order (prevents deadlocks)
-    const sortedItems = [...cartItems].sort((a, b) =>
-      a.variantId.localeCompare(b.variantId),
-    );
-    const stockMap = new Map<string, number>();
+    // Step 1-2: Atomically reserve stock for every line, all-or-nothing —
+    // see lib/stockReservation.ts for the lock/check/decrement guarantees.
+    // This also performs the decrement (was Step 6, decrement-after-insert)
+    // since it's the same DB transaction either way; doing it here lets this
+    // handler and routes/orders.ts (POST /) share one implementation instead
+    // of each hand-rolling the lock dance. Skipped when the one-page
+    // checkout's own reservation above already took (and will keep) these
+    // units.
     if (!stockAlreadyReserved) {
-      for (const item of sortedItems) {
-        const result = await tx.execute(
-          sql`SELECT stock FROM product_variants WHERE id = ${item.variantId}::uuid FOR UPDATE`,
-        );
-        const rows = (result as any).rows ?? [];
-        stockMap.set(item.variantId, rows[0]?.stock ?? 0);
-      }
-
-      // Step 2: Check ALL aggregated quantities against locked stock
-      for (const item of cartItems) {
-        const available = stockMap.get(item.variantId) ?? 0;
-        if (available < item.quantity) {
-          oversoldItems.push(item.productName);
+      const reservation = await reserveStockForOrder(
+        tx,
+        cartItems.map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
+      );
+      if (!reservation.ok) {
+        const oversoldSet = new Set(reservation.oversoldVariantIds);
+        for (const item of cartItems) {
+          if (oversoldSet.has(item.variantId)) oversoldItems.push(item.productName);
         }
       }
     }
@@ -1022,17 +1023,12 @@ export async function handleCheckoutPaid(
       })),
     );
 
-    // Step 6: Decrement stock ONLY if every aggregated line passed (all-or-nothing)
-    // (a committed one-page-checkout reservation already took these units)
-    if (oversoldItems.length === 0 && !stockAlreadyReserved) {
-      for (const item of cartItems) {
-        await tx.execute(
-          sql`UPDATE product_variants SET stock = stock - ${item.quantity} WHERE id = ${item.variantId}::uuid`,
-        );
-      }
-    }
-    // If oversold: zero decrements committed — inventory stays intact.
-    // Stripe refund is issued outside this transaction.
+    // Step 6: stock was already reserved (decremented) above — either by the
+    // one-page checkout's own hold (stockAlreadyReserved, committed via
+    // commitStockReservation) or by reserveStockForOrder — in the same
+    // transaction as this order/items insert. If oversold: zero decrements
+    // were committed — inventory stays intact. Stripe refund is issued
+    // outside this transaction.
 
     // ── Low-stock notifications ───────────────────────────────────────────────────
     // For each decremented variant, check if stock fell below threshold.

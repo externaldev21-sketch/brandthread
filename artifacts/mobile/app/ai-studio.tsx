@@ -202,7 +202,7 @@ export default function AIStudioScreen() {
               return;
             }
             if (tool.label === 'Background Removal') {
-              router.push('/bg-removal' as never);
+              router.push('/design-bg-removal' as never);
               return;
             }
             if (tool.label === 'Lifestyle Images') {

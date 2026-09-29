@@ -39,6 +39,35 @@ import { Platform } from 'react-native';
 
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
+/**
+ * Hard gate, independent of EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST: the
+ * preview bypass must never activate on the app's real production hosts,
+ * even if that build-time env var were ever accidentally baked into a
+ * production bundle (it's an EXPO_PUBLIC_* var, so nothing prevents a
+ * misconfigured build pipeline from setting it for the wrong profile —
+ * this is the defense-in-depth layer docs/app-store/release-flow.md and
+ * docs/polish/screens/02-onboarding-auth.md warn about, enforced in code
+ * instead of relying purely on release-process discipline).
+ *
+ * `brandthread.app` is the canonical production origin and
+ * `brandthread.replit.app` is its Replit-hosted alias — both are the real,
+ * public production destinations (see server/serve.js's own
+ * CANONICAL_ORIGIN/GENERATED_HOST). Every other web host (the Replit dev
+ * workspace's own *.replit.dev preview domain, localhost, a Vercel/preview
+ * deploy, this sandbox's screenshot harness) is a dev/preview host and may
+ * use the bypass.
+ */
+const PRODUCTION_HOSTS = new Set(['brandthread.app', 'www.brandthread.app', 'brandthread.replit.app']);
+
+export function isProductionPreviewHost(hostnameOverride?: string): boolean {
+  let hostname = hostnameOverride;
+  if (hostname === undefined) {
+    if (typeof window === 'undefined') return false;
+    hostname = window.location.hostname;
+  }
+  return PRODUCTION_HOSTS.has(hostname.toLowerCase());
+}
+
 function persistedPreviewRole(): 'buyer' | 'seller' | null {
   try {
     const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('user_role') : null;
@@ -63,6 +92,10 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
   // Native (iOS / Android): never activate
   if (Platform.OS !== 'web') return false;
 
+  // Hard gate: never activate on the real production host, even if the
+  // NAVIGATION_ISOLATION_TEST env var somehow reached a production build.
+  if (isProductionPreviewHost()) return false;
+
   // Resolve the search string: explicit override > window.location.search > ''
   let search = searchOverride ?? '';
   if (searchOverride === undefined) {
@@ -84,6 +117,7 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
 export function isBuyerDevPreview(searchOverride?: string): boolean {
   if (!__DEV__ && !NAVIGATION_ISOLATION_TEST) return false;
   if (Platform.OS !== 'web') return false;
+  if (isProductionPreviewHost()) return false;
 
   let search = searchOverride ?? '';
   if (searchOverride === undefined) {

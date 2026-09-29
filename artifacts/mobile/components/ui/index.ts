@@ -17,6 +17,7 @@ export * from './OptionSheet';
 export * from './Snackbar';
 export * from './Skeleton';
 export * from './ErrorState';
+export * from './RetryRow';
 export * from './MotionPrimitives';
 export * from './ThemedRefreshControl';
 export * from './GlassPanel';
