@@ -29,7 +29,7 @@ import {
   BrandthreadCard, PrimaryButton, SecondaryButton, TertiaryButton,
   StatusBadge, SectionHeader, EmptyState, HapticSwitch,
 } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
 type AppliesTo = 'entire_store' | 'specific_products';
@@ -105,7 +105,7 @@ function fmtDate(iso: string | null) {
 
 export default function DiscountsScreen() {
   const { theme } = useAppTheme();
-  const { text: FG, muted: MUTED, border: BORDER } = theme;
+  const { muted: MUTED, border: BORDER } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -350,7 +350,7 @@ export default function DiscountsScreen() {
 
   return (
     <View style={s.root}>
-      <Header
+      <ScreenHeader
         title="Discounts"
         actions={[{ icon: 'plus', onPress: openNewModal, accessibilityLabel: 'New discount' }]}
       />
@@ -392,13 +392,12 @@ export default function DiscountsScreen() {
 
       {/* Create / Edit Modal — one page */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowModal(false)}>
-        <View style={[s.modal, { paddingTop: 20 }]}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>{editingId ? 'Edit Discount Code' : 'New Discount Code'}</Text>
-            <TouchableOpacity onPress={() => setShowModal(false)} style={s.modalClose}>
-              <Feather name="x" size={18} color={FG} />
-            </TouchableOpacity>
-          </View>
+        <View style={s.modal}>
+          <ScreenHeader
+            title={editingId ? 'Edit Discount Code' : 'New Discount Code'}
+            variant="modal"
+            onBack={() => setShowModal(false)}
+          />
 
           <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ padding: SP.md, gap: SP.md, paddingBottom: 60 }}>
 
@@ -593,13 +592,13 @@ export default function DiscountsScreen() {
 
       {/* Product picker sheet */}
       <Modal visible={showProductPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowProductPicker(false)}>
-        <View style={[s.modal, { paddingTop: 20 }]}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Choose products</Text>
-            <TouchableOpacity onPress={() => setShowProductPicker(false)} style={s.modalClose}>
-              <Feather name="check" size={18} color={FG} />
-            </TouchableOpacity>
-          </View>
+        <View style={s.modal}>
+          <ScreenHeader
+            title="Choose products"
+            variant="modal"
+            onBack={() => setShowProductPicker(false)}
+            actions={[{ icon: 'check', onPress: () => setShowProductPicker(false), accessibilityLabel: 'Done choosing products' }]}
+          />
           <ScrollView contentContainerStyle={{ padding: SP.md, gap: 8 }}>
             {products.length === 0 ? (
               <Text style={{ color: MUTED, fontSize: FS.sm, textAlign: 'center', marginTop: 30 }}>No products found.</Text>
@@ -708,9 +707,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   statText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
   modal:       { flex: 1, backgroundColor: BG },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  modalTitle:  { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  modalClose:  { width: 36, height: 36, backgroundColor: CARD_ELEVATED, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
 
   summaryCard: { backgroundColor: CARD_ELEVATED, borderWidth: 1.5, borderRadius: RADIUS.md, padding: SP.md, gap: 6 },
   summaryCode: { fontSize: FS.md, fontFamily: FONT.bold, letterSpacing: 1.5 },
