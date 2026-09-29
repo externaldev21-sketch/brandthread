@@ -58,7 +58,13 @@ export function bucketLabel(value: string, range: SellerHomeTimeRange): string {
     return WEEKDAY_LABELS[date.getDay()];
   }
   if (range === 'month') {
-    return String(date.getDate());
+    // "Mon D" (e.g. "Sep 1"), not a bare day number — a lone "1"/"15"/"30"
+    // doesn't read as a date at all. Each label uses its OWN bucket's month
+    // (not a single assumed month for the whole range), so a 30-day window
+    // that spans a calendar-month boundary (e.g. late Aug into Sep) still
+    // labels each point correctly instead of mislabeling the tail either as
+    // the start month or as day-numbers-only that silently wrap past 30/31.
+    return `${MONTH_LABELS[date.getMonth()]} ${date.getDate()}`;
   }
   if (range === 'year') {
     return MONTH_LABELS[date.getMonth()];
@@ -68,6 +74,14 @@ export function bucketLabel(value: string, range: SellerHomeTimeRange): string {
     // month name alone (e.g. "Jan") is ambiguous/repeats across every
     // bucket's Jan-1 anchor once there's more than one year of data, which
     // is the same class of bug this fix addresses for "Year".
+    //
+    // Judgment call (see PR description): kept as a bare year ("2024"), not
+    // upgraded to "Mon 'YY" — the API's "all" buckets are genuinely
+    // year-granularity (one bucket per calendar year, always anchored at
+    // that year's Jan 1; see previewSellerChartData.ts's own 'all' case and
+    // the API contract in lib/api.ts), so a month component would be
+    // meaningless/always "Jan" here, unlike Month's day-granularity buckets
+    // which really do need their own month attached.
     return String(date.getFullYear());
   }
   return formatClockLabel(date, range === 'live');
