@@ -26,10 +26,35 @@ export function formatCentsCompact(cents: number): string {
   return `${sign}$${scaleWithSuffix(dollars)}`;
 }
 
-/** Compact plain count (orders, visitors): 8_400 -> "8.4K". */
-export function formatCompactCount(value: number): string {
-  const sign = value < 0 ? '-' : '';
-  const magnitude = Math.abs(value);
-  if (magnitude < 1000) return `${sign}${Math.round(magnitude)}`;
-  return `${sign}${scaleWithSuffix(magnitude)}`;
+/**
+ * One decimal place, scaled by threshold, with its suffix — but only when
+ * the rounded result still fits under 1000 in that unit (e.g. 999.95K must
+ * not render as "1000.0K"); returns null to signal the caller should retry
+ * one unit up instead.
+ */
+function tryScale(magnitude: number, threshold: number, suffix: string): string | null {
+  const fixed = (magnitude / threshold).toFixed(1);
+  if (parseFloat(fixed) >= 1000) return null;
+  return `${fixed.endsWith('.0') ? fixed.slice(0, -2) : fixed}${suffix}`;
+}
+
+/**
+ * Instagram/TikTok-style compact count, guaranteed to never overflow a
+ * fixed-width stat cell: exact value with commas under 10,000, then K/M/B
+ * with at most one decimal (trailing .0 dropped). A value whose rounded K
+ * (or M) form would hit 1000 promotes to the next unit instead of showing
+ * e.g. "1000.0K" (see formatCompactCount.test.ts for the exact edge cases).
+ * This is the single source of truth for every count in the app — likes,
+ * comments, shares, view/viewer counts, and follower/following/post totals.
+ */
+export function formatCompactCount(value: number | null | undefined): string {
+  const sign = Number(value) < 0 ? '-' : '';
+  const magnitude = Math.max(0, Math.floor(Math.abs(Number(value) || 0)));
+  if (magnitude < 10_000) return `${sign}${magnitude.toLocaleString('en-US')}`;
+  const scaled = magnitude < 1_000_000
+    ? tryScale(magnitude, 1_000, 'K') ?? tryScale(magnitude, 1_000_000, 'M') ?? tryScale(magnitude, 1_000_000_000, 'B')
+    : magnitude < 1_000_000_000
+      ? tryScale(magnitude, 1_000_000, 'M') ?? tryScale(magnitude, 1_000_000_000, 'B')
+      : tryScale(magnitude, 1_000_000_000, 'B');
+  return `${sign}${scaled ?? String(magnitude)}`;
 }

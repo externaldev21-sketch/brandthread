@@ -132,15 +132,9 @@ export function fmtCount(n: number): string {
   return n.toLocaleString('en-US');
 }
 
-/**
- * Human-readable compact: "1.2K", "4.8M"
- * Use for follower counts, view counts, etc.
- */
-export function fmtCompact(n: number): string {
-  if (n < 1_000) return String(n);
-  if (n < 1_000_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
-  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
-}
+// Human-readable compact counts ("1.2K", "4.8M") live in
+// lib/compactFormat.ts's formatCompactCount — the one shared helper for
+// follower/view/like counts and everything else in this family.
 
 // ─── Names ──────────────────────────────────────────────────────────────────
 

@@ -10,16 +10,11 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { PRESS_SCALE, pressScaleAnim } from '@/constants/motion';
+import { formatCompactCount } from '@/lib/compactFormat';
 import type { SearchVideo } from '@/lib/searchData';
 
 // Fixed 9:16 aspect ratio — dark video tiles like Instagram/TikTok grids.
 export const VIDEO_TILE_ASPECT = 9 / 16;
-
-function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
-  return String(n);
-}
 
 /** Video grid card — 9:16 dark thumbnail, center play affordance, caption/author overlay. */
 export function VideoTile({ item, width, onPress }: {
@@ -66,7 +61,7 @@ export function VideoTile({ item, width, onPress }: {
             {item.likesCount > 0 && (
               <View style={styles.likesRow}>
                 <Feather name="heart" size={10} color="#FFFFFF" />
-                <Text style={styles.likesText}>{formatCount(item.likesCount)}</Text>
+                <Text style={styles.likesText}>{formatCompactCount(item.likesCount)}</Text>
               </View>
             )}
           </View>

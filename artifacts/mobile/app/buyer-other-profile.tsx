@@ -24,7 +24,7 @@ import { requestContextualPushPermission } from '@/lib/contextualPushPermission'
 import { confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { emitProfileEvent, subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
-import { formatProfileCount } from '@/services/profileService';
+import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -241,15 +241,18 @@ export default function BuyerOtherProfileScreen() {
     else router.replace('/(buyer)/' as never);
   };
 
-  const postsCount = videos.restricted ? (profile?.postsCount ?? 0) : Math.max(videos.total, 0);
+  // Followers · Following — Posts was dropped (dev: a high count in any
+  // column was getting cut off). No honest "Likes" total exists for another
+  // buyer's public profile (their posts are paginated, so summing only the
+  // loaded page would undercount), so this stays a two-column row rather
+  // than showing a fabricated number.
   const stats: ProfileStat[] = [
-    { key: 'posts', label: 'Posts', value: formatProfileCount(postsCount) },
     {
-      key: 'followers', label: 'Followers', value: formatProfileCount(profile?.followersCount ?? 0),
+      key: 'followers', label: 'Followers', value: formatCompactCount(profile?.followersCount ?? 0),
       onPress: canonicalReady ? () => router.push(connectionsHref('followers', canonicalUserId) as never) : undefined,
     },
     {
-      key: 'following', label: 'Following', value: formatProfileCount(profile?.followingCount ?? 0),
+      key: 'following', label: 'Following', value: formatCompactCount(profile?.followingCount ?? 0),
       onPress: canonicalReady ? () => router.push(connectionsHref('following', canonicalUserId) as never) : undefined,
     },
   ];
