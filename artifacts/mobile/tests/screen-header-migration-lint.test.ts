@@ -74,11 +74,7 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/add-product.tsx',
   'app/ai-assistant.tsx',
   'app/bg-removal.tsx',
-  'app/boost.tsx',
   'app/buyer-account-control.tsx',
-  'app/buyer-archive.tsx',
-  'app/buyer-collection.tsx',
-  'app/buyer-conversation.tsx',
   'app/buyer-drafts.tsx',
   'app/buyer-drop-detail.tsx',
   'app/buyer-friend-requests.tsx',
@@ -209,7 +205,6 @@ const SCREENHEADER_MIGRATION_ALLOWLIST = new Set([
   'app/thread-checkout.tsx',
   'app/thread-explainer.tsx',
   'app/thread-product-detail.tsx',
-  'app/u/[username].tsx',
   'app/vacation-mode.tsx',
 ]);
 
@@ -226,8 +221,6 @@ function isRouteFile(full: string, entry: string): boolean {
 // yet reference useSafeAreaInsets/useHeaderTopInset/SafeAreaView anywhere.
 const MODAL_INSETS_ALLOWLIST = new Set([
   'app/(tabs)/profile.tsx',
-  'app/ai-studio.tsx',
-  'app/buyer-collection.tsx',
   'app/design-ai-photoshoot.tsx',
   'app/design-bg-replace.tsx',
   'app/help.tsx',
@@ -286,7 +279,8 @@ describe('every in-screen <Modal> respects safe-area insets', () => {
     .sort();
 
   function hasInsetsRef(source: string): boolean {
-    return source.includes('useSafeAreaInsets') || source.includes('useHeaderTopInset') || source.includes('SafeAreaView');
+    return source.includes('useSafeAreaInsets') || source.includes('useHeaderTopInset') || source.includes('SafeAreaView')
+      || source.includes('ModalSafeArea');
   }
 
   it('a <Modal> without an insets reference is on the migration allowlist', () => {
