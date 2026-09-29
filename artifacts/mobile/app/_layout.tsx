@@ -739,6 +739,16 @@ function ServiceConfigurer() {
       // must be dropped explicitly or the previous account's plan tier would
       // gate features for the next signed-in account.
       invalidatePlanCache();
+      // The shared TanStack queryClient (lib/queryClient.ts) is NOT scoped
+      // by userId — its query keys (queryKeys.tabData/orderList/productList/
+      // profile) carry no userId of their own, so without this, a query
+      // cached under account A's session (gcTime is 24h) would still be
+      // readable — and, worse, is persisted to AsyncStorage and rehydrated
+      // on a cold launch — after switching straight to account B, with
+      // nothing re-scoping it. Clearing it here matches the same
+      // "wipe the previous user's cache before init'ing the next" pattern
+      // clearSocialCache/clearCartCache already use.
+      queryClient.clear();
     }
     prevUserIdRef.current = newUserId;
     initSocialService(newUserId);
