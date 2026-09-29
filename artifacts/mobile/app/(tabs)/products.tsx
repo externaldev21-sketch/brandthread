@@ -12,17 +12,17 @@ import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, Lay
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, SearchBar, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
-import { IconButton } from '@/components/ui/IconButton';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
+import { StockEditorSheet } from '@/components/products/StockEditorSheet';
 import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, updateProduct } from '@/services/productService';
 import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
@@ -369,7 +369,6 @@ export default function ProductsScreen() {
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const { background: SCREEN_BG, surface: SURFACE, card: CARD, border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE, accent: PURPLE, accentLight: PURPLE_LIGHT } = theme;
   const BG = theme.surface;
-  const topInset = useHeaderTopInset();
   const router = useRouter();
   const { showUndo } = useUndoToast();
   const tabBar = useTabBarMetrics();
@@ -380,15 +379,18 @@ export default function ProductsScreen() {
   const contentWidth = Math.min(screenWidth, 1080) - gridGutter * 2;
   const cardWidth = (contentWidth - gridGap * (gridColumns - 1)) / gridColumns;
 
+  const params = useLocalSearchParams<{ filter?: ProductFilter }>();
   const [products, setProducts] = useState<Product[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [filter, setFilter] = useState<ProductFilter>('all');
+  const [filter, setFilter] = useState<ProductFilter>(params.filter ?? 'all');
   const [sort, setSort] = useState<SortKey>('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionProduct, setActionProduct] = useState<Product | null>(null);
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
   const [quickEditProduct, setQuickEditProduct] = useState<Product | null>(null);
   const [quickEditVisible, setQuickEditVisible] = useState(false);
+  const [stockEditProduct, setStockEditProduct] = useState<Product | null>(null);
+  const [stockEditVisible, setStockEditVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -428,6 +430,17 @@ export default function ProductsScreen() {
       setLoading(false);
     }
   }, [filter, debouncedQuery, loadStats]);
+
+  // Re-apply the ?filter= deep link every time this screen is focused (not
+  // just on first mount) — the seller tab bar keeps this screen mounted
+  // (e.g. SellerDashboardActionNeeded's "N items low on stock" row), so
+  // tapping it a second time needs to re-apply the filter even though
+  // Products never unmounted. Same pattern as orders.tsx's own ?filter=.
+  useFocusEffect(useCallback(() => {
+    const requested = params.filter;
+    const valid: ProductFilter[] = ['all', 'active', 'draft', 'scheduled', 'archived', 'pre-order', 'pre-made', 'low-stock', 'out-of-stock'];
+    if (requested && valid.includes(requested)) setFilter(requested);
+  }, [params.filter]));
 
   // useFocusEffect also re-runs while focused whenever loadProducts changes
   // (filter or search), so a separate mount effect would load everything twice.
@@ -542,6 +555,8 @@ export default function ProductsScreen() {
     { label: 'Active', value: 'active' },
     { label: 'Draft', value: 'draft' },
     { label: 'Archived', value: 'archived' },
+    { label: 'Low Stock', value: 'low-stock' },
+    { label: 'Out of Stock', value: 'out-of-stock' },
   ];
 
   const currentSortLabel = SORT_OPTIONS.find(o => o.key === sort)?.label ?? 'Sort';
@@ -556,6 +571,18 @@ export default function ProductsScreen() {
     setActionProduct(product);
     setActionSheetVisible(true);
   }, []);
+
+  const openStockEditor = useCallback((product: Product) => {
+    hapticPrimaryAction();
+    setStockEditProduct(product);
+    setStockEditVisible(true);
+  }, []);
+
+  const handleStockChanged = useCallback((updated: Product) => {
+    setProducts(prev => prev.map(p => (p.id === updated.id ? updated : p)));
+    setStockEditProduct(updated);
+    void loadStats();
+  }, [loadStats]);
 
   const queryClient = useQueryClient();
   const onProductPressIn = useCallback((product: Product) => {
@@ -577,9 +604,10 @@ export default function ProductsScreen() {
         onMore={openActionSheet}
         onQuickArchive={handleQuickArchive}
         onQuickDelete={handleDelete}
+        onEditStock={openStockEditor}
       />
     </View>
-  ), [openProduct, onProductPressIn, openActionSheet, cardWidth, gridGap]);
+  ), [openProduct, onProductPressIn, openActionSheet, openStockEditor, cardWidth, gridGap]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
@@ -627,48 +655,25 @@ export default function ProductsScreen() {
   return (
     <View style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
       {/* ── Fixed header ── */}
-      <View style={[s.header, { paddingTop: topInset + 12, backgroundColor: palette.surface ?? BG }]}>
-        {/* Title row */}
-        <View style={s.titleRow}>
-          <PressableScale
-            style={s.titleBtn}
-            onPress={() => {
-              hapticPrimaryAction();
-              Alert.alert('Product view', 'Choose a view', [
-                { text: 'All products', onPress: () => setFilter('all') },
+      <View style={{ backgroundColor: palette.surface ?? BG }}>
+        <ScreenHeader
+          title="Products"
+          onBack={() => router.replace('/(tabs)/' as never)}
+          actions={[
+            { icon: 'plus', onPress: () => router.push('/add-product' as never), accessibilityLabel: 'Add product' },
+            {
+              icon: 'more-horizontal',
+              onPress: () => showActionSheet('Products', 'Choose an action', [
                 { text: 'Collections', onPress: () => router.push('/store-collections' as never) },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            }}
-            accessibilityLabel="Products, choose a view"
-          >
-            <Text style={[s.titleText, { color: palette.foreground ?? FG }]}>Products</Text>
-            <Feather name="chevron-down" size={ICON.sm} color={MUTED} />
-          </PressableScale>
-          <View style={s.titleActions}>
-            <IconButton
-              name="plus"
-              variant="plain"
-              size={ICON.md}
-              color={FG}
-              onPress={() => router.push('/add-product' as never)}
-              accessibilityLabel="Add product"
-            />
-            <IconButton
-              name="more-horizontal"
-              variant="plain"
-              size={ICON.md}
-              color={FG}
-              onPress={() => showActionSheet('Products', 'Choose an action', [
                 { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
                 { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
                 { text: 'Export products', onPress: () => { void handleExportProducts(); } },
                 { text: 'Cancel', style: 'cancel' },
-              ])}
-              accessibilityLabel="More product actions"
-            />
-          </View>
-        </View>
+              ]),
+              accessibilityLabel: 'More product actions',
+            },
+          ]}
+        />
 
         {/* Persistent search row */}
         <View style={s.searchRow}>
@@ -721,6 +726,8 @@ export default function ProductsScreen() {
                 pill.value === 'active' ? stats?.active ?? 0 :
                 pill.value === 'draft' ? stats?.draft ?? 0 :
                 pill.value === 'archived' ? stats?.archived ?? 0 :
+                pill.value === 'low-stock' ? stats?.lowStock ?? 0 :
+                pill.value === 'out-of-stock' ? stats?.outOfStock ?? 0 :
                 undefined
               }
             />
@@ -792,6 +799,14 @@ export default function ProductsScreen() {
           setSort(k);
         }}
         onClose={() => setSortModalVisible(false)}
+      />
+
+      {/* Quick stock editor — tapping a card's stock chip/label opens this. */}
+      <StockEditorSheet
+        product={stockEditProduct}
+        visible={stockEditVisible}
+        onClose={() => setStockEditVisible(false)}
+        onChanged={handleStockChanged}
       />
     </View>
   );

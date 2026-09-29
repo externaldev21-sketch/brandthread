@@ -62,7 +62,6 @@ const STUDIO_ITEMS: NavItem[] = [
 ];
 
 const OPERATIONS_ITEMS: NavItem[] = [
-  { icon: 'archive', label: 'Inventory', desc: 'Track stock levels', accent: 'accentLight', route: '/inventory' },
   { icon: 'truck', label: 'Shipping', desc: 'Rates, zones and carriers', accent: 'warning', route: '/shipping' },
   // FIX ↑ previously had no route — now wired to shipping.tsx
   { icon: 'tool', label: 'Manufacturer Hub', desc: 'Find and manage manufacturers', accent: 'accent', badge: true, route: '/manufacturer-hub' },

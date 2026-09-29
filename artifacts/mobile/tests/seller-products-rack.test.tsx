@@ -107,6 +107,7 @@ vi.mock('expo-router', () => ({
     const React = require('react') as typeof import('react');
     React.useEffect(callback, [callback]);
   },
+  useLocalSearchParams: () => ({}),
   useScrollToTop: () => {},
 }));
 
