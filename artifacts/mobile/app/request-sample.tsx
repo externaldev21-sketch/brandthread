@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
-  TextInput, TouchableOpacity, View,
-} from 'react-native';
+  TextInput, TouchableOpacity, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -90,7 +89,7 @@ export default function RequestSampleScreen() {
   if (!manufacturer) return <View style={styles.root} />;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}

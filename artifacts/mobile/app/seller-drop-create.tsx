@@ -634,7 +634,7 @@ export default function SellerDropCreate() {
       </View>
 
       <Modal visible={tzPickerOpen} animationType="slide" onRequestClose={() => setTzPickerOpen(false)}>
-        <View style={[styles.root, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+        <View style={[styles.root, { backgroundColor: theme.background, paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
           <View style={styles.tzHeader}>
             <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg }}>Choose timezone</Text>
             <TouchableOpacity onPress={() => setTzPickerOpen(false)}>

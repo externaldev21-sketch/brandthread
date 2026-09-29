@@ -165,7 +165,7 @@ function SellerGoLiveNativeScreen() {
   if (permissionsRequested && (!camGranted || !micGranted)) {
     const blocked = camBlocked || micBlocked;
     return (
-      <View style={[s.permRoot, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
+      <View style={[s.permRoot, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), paddingBottom: insets.bottom + 24 }]}>
         <TouchableOpacity onPress={() => goBackOr(router)} style={[s.closeBtn, { top: insets.top + 8 }]} accessibilityLabel="Close">
           <Feather name="x" size={22} color={FG} />
         </TouchableOpacity>
@@ -219,7 +219,7 @@ function SellerGoLiveNativeScreen() {
       </Animated.View>
 
       {/* Top bar */}
-      <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
+      <View style={[s.topBar, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 8 }]}>
         <TouchableOpacity onPress={() => goBackOr(router)} style={s.iconBtn} accessibilityLabel="Close">
           <Feather name="x" size={20} color={FG} />
         </TouchableOpacity>

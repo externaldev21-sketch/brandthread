@@ -382,7 +382,7 @@ export function DiscoverPager() {
 
 function DiscoverSkeleton({ insets, cardWidth }: { insets: { top: number }; cardWidth: number }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }}>
       <CardSkeleton width={cardWidth * 0.72} />
     </View>
   );

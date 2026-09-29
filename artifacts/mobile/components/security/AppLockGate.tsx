@@ -121,6 +121,7 @@ export default function AppLockGate() {
 
   return (
     <Modal visible animationType="fade" transparent={false} statusBarTranslucent onRequestClose={() => {}}>
+      {/* Native-only past this point (line 120 already returns null on web) — insets.top is real here. */}
       <View style={[styles.root, { backgroundColor: theme.background, paddingTop: insets.top, paddingBottom: insets.bottom + SP.lg }]}>
             <View style={styles.center}>
               <View style={[styles.mark, { backgroundColor: theme.accent }]}>

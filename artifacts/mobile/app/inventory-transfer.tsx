@@ -253,7 +253,7 @@ export default function InventoryTransferScreen() {
     const stepIdx = timelineIndex(transfer.status);
 
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         {/* HEADER */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => goBackOr(router)} style={styles.backBtn}>

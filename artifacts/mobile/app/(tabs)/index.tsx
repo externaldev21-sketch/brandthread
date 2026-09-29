@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import SellerHomeCommerceDashboard from '@/components/SellerHomeCommerceDashboard';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
@@ -62,7 +62,7 @@ export default function SellerHomeScreen() {
     return (
       <View style={[styles.root, { backgroundColor: theme.background }]}>
         <StripeConnectWarning />
-        <View style={[styles.loadingRoot, { paddingTop: insets.top + SP.md }]}>
+        <View style={[styles.loadingRoot, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.md }]}>
           <LoadingSkeleton height={16} style={{ width: 120 }} />
           <LoadingSkeleton height={52} style={{ width: 220, marginTop: SP.sm }} />
           <LoadingSkeleton height={168} style={{ marginTop: SP.lg, borderRadius: RADIUS.md }} />

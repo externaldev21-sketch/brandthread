@@ -358,7 +358,7 @@ export default function PublicProfileRoute() {
     // Skeleton in the profile shell's shape (hero, avatar, name) — the fetch
     // itself is time-boxed, so this always resolves to data or an error.
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]} accessibilityLabel="Loading profile" accessible>
+      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]} accessibilityLabel="Loading profile" accessible>
         <SkeletonBlock width="100%" height={260} radius={0} />
         <View style={styles.skeletonIdentity}>
           <SkeletonBlock width={84} height={84} radius={42} />
@@ -375,7 +375,7 @@ export default function PublicProfileRoute() {
   // ── Not found ─────────────────────────────────────────────────────────────
   if (state.kind === 'not_found') {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <View style={styles.header}>
           <PressableScale
             style={styles.backBtn}
@@ -412,7 +412,7 @@ export default function PublicProfileRoute() {
   // ── Error / retry ─────────────────────────────────────────────────────────
   if (state.kind === 'error') {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <View style={styles.header}>
           <PressableScale
             style={styles.backBtn}

@@ -104,7 +104,7 @@ export default function DeleteAccountScreen() {
 
   if (step === 'done') {
     return (
-      <View style={[s.root, { paddingTop: insets.top + SP.xxl, paddingBottom: insets.bottom + SP.lg }]}>
+      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.xxl, paddingBottom: insets.bottom + SP.lg }]}>
         <View style={s.doneBody}>
           <View style={s.doneIcon}><Feather name="check" size={30} color={theme.onAccent} /></View>
           <Text style={s.title}>Your account has been deleted</Text>

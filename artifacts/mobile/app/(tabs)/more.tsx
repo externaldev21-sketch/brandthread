@@ -188,7 +188,7 @@ export default function MoreScreen() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       <ScrollView
         ref={scrollResetRef}
         showsVerticalScrollIndicator={false}

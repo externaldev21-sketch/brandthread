@@ -157,7 +157,7 @@ export default function ManufacturerProfileScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator color={PURPLE} size="large" />
       </View>
     );
@@ -165,7 +165,7 @@ export default function ManufacturerProfileScreen() {
 
   if (!manufacturer) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
@@ -188,7 +188,7 @@ export default function ManufacturerProfileScreen() {
           colors={theme.heroGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[s.hero, { paddingTop: insets.top + SP.sm }]}
+          style={[s.hero, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}
         >
           {/* Back button */}
           <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtnHero} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

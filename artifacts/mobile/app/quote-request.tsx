@@ -660,7 +660,7 @@ export default function QuoteRequestScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[sc.root, { paddingTop: insets.top }]}
+      style={[sc.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Header */}
