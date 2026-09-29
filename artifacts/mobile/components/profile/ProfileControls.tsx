@@ -64,7 +64,15 @@ export function ProfileButton({
   icon?: FeatherName;
   onPress: () => void;
   onLongPress?: () => void;
-  variant?: 'primary' | 'secondary';
+  /**
+   * 'primary' — accent fill, for the one standout action in a row.
+   * 'secondary' — translucent glass fill.
+   * 'neutral' — solid `theme.cardElevated` fill, no accent — the buyer
+   * own-profile's Edit/Share row look (see app/(buyer)/profile.tsx), used
+   * where every button in the row should read as equally weighted rather
+   * than one being visually promoted above the others.
+   */
+  variant?: 'primary' | 'secondary' | 'neutral';
   disabled?: boolean;
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -91,7 +99,9 @@ export function ProfileButton({
           styles.button,
           primary
             ? { backgroundColor: theme.accent, borderColor: theme.accent }
-            : { backgroundColor: theme.cardGlass, borderColor: theme.border },
+            : variant === 'neutral'
+              ? { backgroundColor: theme.cardElevated, borderColor: theme.cardElevated }
+              : { backgroundColor: theme.cardGlass, borderColor: theme.border },
           disabled && styles.disabled,
         ]}
       >
