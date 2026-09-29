@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BG, CARD, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -191,7 +191,7 @@ export default function StoreFromSocialScreen() {
 
   return (
     <View style={ss.root}>
-      <Header title="Generate from Social" />
+      <ScreenHeader title="Generate from Social" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ss.scroll}>
         <Text style={ss.subtitle}>

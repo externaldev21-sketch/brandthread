@@ -751,11 +751,11 @@ export default function AiBrainScreen() {
           // Real signed-out production behavior above is unchanged.
           <View style={styles.signInGate}>
             <Feather name="cpu" size={28} color={colors.mutedForeground} />
-            <Text style={styles.signInGateTitle}>Brandthread AI — preview</Text>
+            <Text style={styles.signInGateTitle}>Brandthread AI</Text>
             <Text style={styles.signInGateBody}>
-              In the live app, Brandthread AI reads your store's real sales, orders and inventory to answer
-              questions like "What's my best seller this week?" or "Draft a restock reminder for low-stock items."
-              Sign in on a real account to chat with your own data.
+              Brandthread AI reads your store's sales, orders and inventory to answer questions like
+              "What's my best seller this week?" or "Draft a restock reminder for low-stock items."
+              Sign in to chat with your own data.
             </Text>
             <TouchableOpacity
               style={[styles.signInGateBtn, { backgroundColor: colors.primary }]}

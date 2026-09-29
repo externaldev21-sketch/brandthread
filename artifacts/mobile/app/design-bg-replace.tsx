@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -420,13 +422,8 @@ export default function DesignBgReplaceScreen({
         presentationStyle="formSheet"
         onRequestClose={() => setShowProductPicker(false)}
       >
-        <View style={s.pickerRoot}>
-          <View style={s.pickerHeader}>
-            <Text style={s.pickerTitle}>Choose a product</Text>
-            <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
-              <Feather name="x" size={ICON.sm} color={FG} />
-            </TouchableOpacity>
-          </View>
+        <SafeAreaProvider style={s.pickerRoot}>
+          <ScreenHeader title="Choose a product" variant="modal" onBack={() => setShowProductPicker(false)} />
           <Text style={s.pickerSub}>The image will be added to the product's media gallery.</Text>
           {loadingPickerProducts ? (
             <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />
@@ -453,7 +450,7 @@ export default function DesignBgReplaceScreen({
               )}
             />
           )}
-        </View>
+        </SafeAreaProvider>
       </Modal>
     </BrandthreadScreen>
   );
@@ -519,9 +516,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   overlayTitle:       { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   overlaySub:         { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   bottomPad:          { height: 40 },
-  pickerRoot:         { flex: 1, backgroundColor: BG, paddingTop: SP.md },
-  pickerHeader:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.lg },
-  pickerTitle:        { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
+  pickerRoot:         { flex: 1, backgroundColor: BG },
   pickerSub:          { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, paddingHorizontal: SP.lg, marginTop: SP.xs, marginBottom: SP.sm },
   productRow:         { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.sm, marginBottom: SP.sm },
   productThumb:       { width: 52, height: 52, borderRadius: RADIUS.sm },

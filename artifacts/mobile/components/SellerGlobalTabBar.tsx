@@ -69,9 +69,7 @@ const TABS: {
     matchSegments: [
       'products', 'add-product', 'product-detail', 'product-editor',
       'product-store', 'product-import', 'product-size-chart',
-      'product-bundles', 'product-bundle-edit', 'drafts', 'inventory',
-      'inventory-detail', 'inventory-adjust', 'inventory-transfer',
-      'inventory-incoming', 'inventory-count', 'inventory-location',
+      'product-bundles', 'product-bundle-edit', 'drafts',
     ],
     destination: '/(tabs)/products',
   },
@@ -119,13 +117,6 @@ const ROUTE_TO_TAB: Record<string, string> = {
   'product-bundles': 'products',
   'product-bundle-edit': 'products',
   'drafts': 'products',
-  'inventory': 'products',
-  'inventory-detail': 'products',
-  'inventory-adjust': 'products',
-  'inventory-transfer': 'products',
-  'inventory-incoming': 'products',
-  'inventory-count': 'products',
-  'inventory-location': 'products',
   // Orders
   'orders': 'orders',
   'order-detail': 'orders',
@@ -341,7 +332,10 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
 
             const onPress = () => {
               if (!isFocused) hapticTabChange();
-              router.replace(tabDef.destination as never);
+              // navigate() (not replace()) so the (tabs) navigator sees a
+              // real focus change and runs its transitionSpec — replace()
+              // swaps the route with no transition at all.
+              router.navigate(tabDef.destination as never);
             };
 
             return (
@@ -350,6 +344,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
                 focused={isFocused}
                 width={metrics.itemWidth}
                 height={metrics.capsuleHeight}
+                theme={theme}
                 accessibilityLabel={
                   showOrderBadge
                     ? `${tabDef.label} tab, ${newOrderCount} new orders`

@@ -329,6 +329,7 @@ export function BuyerTabBar({
                 focused={focused}
                 width={metrics.itemWidth}
                 height={metrics.capsuleHeight}
+                theme={theme}
                 hitSlop={isCompact ? compactHitSlop : undefined}
                 onPress={() => openRoute(item.route)}
                 onPressIn={() => pressIndicator(index)}

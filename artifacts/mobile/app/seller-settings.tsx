@@ -18,7 +18,7 @@ import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
 import { SettingsProfileCard, SettingsSearchBar, SettingsSection, SettingsRow, ConfirmSheet } from '@/components/settings/SettingsKit';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -128,12 +128,10 @@ export default function SellerSettingsScreen() {
 
   return (
     <View style={s.page}>
-      {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
-      <Header
+      <ScreenHeader
         title="Settings"
-        largeTitle
-        showBack={false}
-        actions={[{ icon: 'x', onPress: () => { hapticLight(); goBackOr(router); }, accessibilityLabel: 'Close settings' }]}
+        variant="modal"
+        onBack={() => { hapticLight(); goBackOr(router); }}
       />
 
       <ScrollView

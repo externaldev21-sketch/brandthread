@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { Animated, Easing, useWindowDimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { useColors } from '@/hooks/useColors';
@@ -11,54 +11,17 @@ import { getConversations, getNotifications, subscribeSocial } from '@/services/
 import { ThreadCashActiveTimeTracker } from '@/components/thread-cash/ThreadCashActiveTimeTracker';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { getPreviewConversations, getPreviewNotifications } from '@/lib/previewInbox';
-
-// ─── Tab switch transition ──────────────────────────────────────────────────
-// Instagram/TikTok-style directional slide: the incoming tab slides in from
-// the side of the tab bar it was tapped from, the outgoing one slides out
-// the other way. `current.progress` (from React Navigation's bottom-tabs)
-// is -1/0/1 based on the tapped screen's REGISTRATION index relative to the
+// Instagram/TikTok-style directional slide — shared with the seller tab
+// layout (app/(tabs)/_layout.tsx) so both sides use the same duration/
+// easing. `current.progress` (from React Navigation's bottom-tabs) is
+// -1/0/1 based on the tapped screen's REGISTRATION index relative to the
 // active one — see the Tabs.Screen order below, which is deliberately kept
 // in the same left-to-right order as the capsule (Home, Discover, Inbox,
 // Activity, Profile) so that order, not just tab-bar visual position, is
 // what decides slide direction.
-const SLIDE_DURATION = 280;
-// cubic-bezier(0.2, 0.8, 0.2, 1): ease-out, no bounce/overshoot.
-const SLIDE_EASING = Easing.bezier(0.2, 0.8, 0.2, 1);
-
-const SLIDE_TRANSITION_SPEC = {
-  animation: 'timing' as const,
-  config: { duration: SLIDE_DURATION, easing: SLIDE_EASING },
-};
-
-const REDUCED_MOTION_TRANSITION_SPEC = {
-  animation: 'timing' as const,
-  config: { duration: 150, easing: Easing.linear },
-};
-
-function forDirectionalSlide(width: number) {
-  return ({ current }: { current: { progress: Animated.Value } }) => ({
-    sceneStyle: {
-      transform: [{
-        translateX: current.progress.interpolate({
-          inputRange: [-1, 0, 1],
-          outputRange: [-width, 0, width],
-        }),
-      }],
-    },
-  });
-}
-
-// Reduced-motion fallback: a plain crossfade, no positional movement at all.
-function forReducedMotionCrossfade({ current }: { current: { progress: Animated.Value } }) {
-  return {
-    sceneStyle: {
-      opacity: current.progress.interpolate({
-        inputRange: [-1, 0, 1],
-        outputRange: [0, 1, 0],
-      }),
-    },
-  };
-}
+import {
+  SLIDE_TRANSITION_SPEC, REDUCED_MOTION_TRANSITION_SPEC, forDirectionalSlide, forReducedMotionCrossfade,
+} from '@/lib/tabSlideTransition';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
 // Floating capsule: Home · Discover · Inbox · Search, plus a separate Profile

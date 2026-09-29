@@ -197,19 +197,34 @@ function useTabMotion(
     ],
   }));
 
-  return { onPressIn, onPressOut, iconStyle };
+  // Fills in under the icon on press — a fixed-diameter circle (not the
+  // slot's own width) so it's never clipped at the ends of a row: see
+  // `PRESS_HIGHLIGHT_SIZE`/`highlightStyle` at each call site.
+  const highlightStyle = useAnimatedStyle(() => ({ opacity: press.value }));
+
+  return { onPressIn, onPressOut, iconStyle, highlightStyle };
 }
+
+/**
+ * Every press/active highlight in the tab bar is this same fixed-diameter
+ * circle, centered on the touch target — never sized to the row/slot's own
+ * (often edge-adjacent) width, which is what let it read as "cut off flat"
+ * on the first/last item (see tests/seller-tab-switch-transition.test.ts).
+ */
+const PRESS_HIGHLIGHT_SIZE = 40;
 
 // ─── Icon-only tab slot ───────────────────────────────────────────────────────
 
 export function TabBarSlot({
   focused, width, height, onPress, onPressIn: onExternalPressIn, onLongPress, testID, accessibilityLabel, hidden = false, badge, children,
-  animatedStyle, hitSlop, pillTarget, pillIndex,
+  animatedStyle, hitSlop, pillTarget, pillIndex, theme,
 }: {
   focused: boolean;
   width: number;
   height: number;
   onPress: () => void;
+  /** Tints the press highlight — see PRESS_HIGHLIGHT_SIZE. */
+  theme: AppThemePreset;
   /** Fires before `onPress`/the real navigation commit — the tab bars use
    *  this to kick the pill's spring and this slot's own pop immediately on
    *  touch-down (see `pillTarget`/`pillIndex`), so the glide starts the same
@@ -237,7 +252,7 @@ export function TabBarSlot({
   pillTarget?: SharedValue<number>;
   pillIndex?: number;
 }) {
-  const { onPressIn, onPressOut, iconStyle } = useTabMotion(focused, pillTarget, pillIndex);
+  const { onPressIn, onPressOut, iconStyle, highlightStyle } = useTabMotion(focused, pillTarget, pillIndex);
   const handlePressIn = () => {
     onExternalPressIn?.();
     onPressIn();
@@ -257,6 +272,14 @@ export function TabBarSlot({
       hitSlop={hitSlop}
       style={[styles.slot, { width, height, pointerEvents: hidden ? 'none' : 'auto' }, animatedStyle]}
     >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.pressHighlight,
+          { backgroundColor: `${theme.accent}22` },
+          highlightStyle,
+        ]}
+      />
       <Animated.View style={iconStyle}>
         {children}
         {badge}
@@ -295,7 +318,7 @@ export function TabBarCircle({
    *  its corner rounding tracks an animated `size` (see `animatedStyle`). */
   glassAnimatedStyle?: object;
 }) {
-  const { onPressIn, onPressOut, iconStyle } = useTabMotion(active);
+  const { onPressIn, onPressOut, iconStyle, highlightStyle } = useTabMotion(active);
   const handlePressIn = () => {
     onExternalPressIn?.();
     onPressIn();
@@ -316,6 +339,16 @@ export function TabBarCircle({
       style={[TAB_BAR_SHADOW, { width: size, height: size, borderRadius: size / 2 }, animatedStyle]}
     >
       <TabBarGlass theme={theme} radius={size / 2} animatedStyle={glassAnimatedStyle} />
+      {/* Full-circle press fill — this button IS the circle (no row/capsule
+          edge to clip against), so it's sized to the whole button rather
+          than the fixed PRESS_HIGHLIGHT_SIZE the packed capsule slots use. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: size / 2, backgroundColor: `${theme.accent}22` },
+          highlightStyle,
+        ]}
+      />
       {active && (
         <View
           style={[
@@ -528,6 +561,19 @@ export const TAB_BAR_SHADOW = {
 } as const;
 
 const styles = StyleSheet.create({
+  // Fixed-diameter circle, centered regardless of the parent's own size —
+  // never sized to the row/slot width, so it can't be clipped at either end
+  // of the capsule (see PRESS_HIGHLIGHT_SIZE).
+  pressHighlight: {
+    position: 'absolute',
+    width: PRESS_HIGHLIGHT_SIZE,
+    height: PRESS_HIGHLIGHT_SIZE,
+    borderRadius: PRESS_HIGHLIGHT_SIZE / 2,
+    top: '50%',
+    left: '50%',
+    marginTop: -PRESS_HIGHLIGHT_SIZE / 2,
+    marginLeft: -PRESS_HIGHLIGHT_SIZE / 2,
+  },
   slot: {
     minWidth: 44,
     minHeight: 44,

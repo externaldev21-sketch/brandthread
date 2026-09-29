@@ -5,7 +5,12 @@
  * SellerGlobalTabBar (components/SellerGlobalTabBar.tsx) and is now rendered
  * once at the root layout level (app/_layout.tsx → SellerBarGate) so it
  * persists across all seller screens — including root Stack siblings that are
- * not inside this (tabs) group.
+ * not inside this (tabs) group. Because that bar lives outside this
+ * navigator, it can't reach into it with `navigation.navigate()` the way
+ * BuyerTabBar does from inside the buyer Tabs' own `tabBar` render prop —
+ * SellerGlobalTabBar instead calls `router.navigate()` on the tapped tab's
+ * destination, which still drives this navigator's own focus change (and
+ * therefore this screenOptions' transitionSpec) the same way.
  *
  * This layout uses `tabBar={() => null}` to suppress the local tab bar and
  * prevent duplicates. All tab registration is preserved so Expo Router can
@@ -16,8 +21,15 @@
  */
 
 import { Tabs } from 'expo-router';
+import { useWindowDimensions } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
+// Same Instagram/TikTok-style directional slide as the buyer tab layout —
+// see lib/tabSlideTransition.ts for the shared duration/easing/interpolators.
+import {
+  SLIDE_TRANSITION_SPEC, REDUCED_MOTION_TRANSITION_SPEC, forDirectionalSlide, forReducedMotionCrossfade,
+} from '@/lib/tabSlideTransition';
 
 // ─── Tab label constants (referenced by navigation contract tests) ─────────────
 // Keep these assignments even though the tab bar is hidden — they satisfy
@@ -35,6 +47,8 @@ void _LABEL_PROFILE;
 
 export default function TabLayout() {
   const { theme } = useAppTheme();
+  const { width } = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
   return (
     <Tabs
       // See the buyer tab layout for why this is false: keeps every tab's
@@ -48,8 +62,13 @@ export default function TabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
-        // Same instant tab switch as the buyer side — no transition delay.
-        animation: 'none',
+        // Directional slide between tabs, same as the buyer side (see
+        // lib/tabSlideTransition.ts). `animation` is deliberately left
+        // unset — React Navigation's bottom-tabs enables per-frame
+        // animation whenever a transitionSpec is present, and leaving it
+        // out (rather than 'none') is what makes that so.
+        transitionSpec: reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC,
+        sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width),
         sceneStyle: { backgroundColor: theme.background },
       }}
     >

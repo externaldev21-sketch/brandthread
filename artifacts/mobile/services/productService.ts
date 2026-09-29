@@ -17,6 +17,46 @@ import { calcTotalInventory } from '@/lib/productUtils';
 import { centsAtBasisPoints } from '@/lib/money';
 import { serviceRequest } from '@/lib/serviceConfig';
 
+// ─── Demo preview overlay (?bt_preview=seller&demo=1) ─────────────────────────
+// A real account's store always starts empty (see header comment above) —
+// exactly the "fresh state" the Products tab needs by default. `&demo=1`
+// overlays a small seeded catalog (lib/previewSellerProducts.ts) purely
+// in-memory, session-scoped, never written to AsyncStorage, so a stray
+// `demo=1` can never leave fake products behind in a real account's data.
+// Both devPreview (which imports react-native's Platform) and
+// previewSellerProducts (which imports expo-asset) are lazily, dynamically
+// imported — not statically imported — so pulling either into the module
+// graph never happens for a caller that only ever touches the plain
+// CRUD/draft functions below (what let this module stay mockable with just
+// AsyncStorage/serviceConfig/money in existing narrowly-scoped tests), and
+// so `vi.mock` can still substitute them in tests that do exercise demo mode.
+let _previewProducts: Product[] | null = null;
+
+async function demoActive(): Promise<boolean> {
+  try {
+    const { isPreviewDemoMode } = await import('@/lib/devPreview');
+    return isPreviewDemoMode();
+  } catch {
+    // Narrowly-scoped tests that mock only this module's own direct
+    // dependencies (AsyncStorage/serviceConfig/money) never resolve this —
+    // demo mode is inert there, exactly like it is outside a dev-web preview.
+    return false;
+  }
+}
+
+async function ensurePreviewProducts(): Promise<Product[]> {
+  if (_previewProducts === null) {
+    const seed = await import('@/lib/previewSellerProducts');
+    _previewProducts = seed.getPreviewSellerProducts();
+  }
+  return _previewProducts;
+}
+
+async function findPreviewProduct(id: string): Promise<Product | undefined> {
+  if (!(await demoActive())) return undefined;
+  return (await ensurePreviewProducts()).find(p => p.id === id);
+}
+
 // ─── Storage Keys (scoped by user ID so two accounts never share storage) ─────
 
 /** Legacy, unscoped keys from before per-account scoping. Migrated once into
@@ -156,7 +196,7 @@ function uid(): string {
 
 export async function getProducts(query?: ProductSearchQuery): Promise<Product[]> {
   await ensureInitialized();
-  let list = [..._products];
+  let list = (await demoActive()) ? [..._products, ...(await ensurePreviewProducts())] : [..._products];
 
   if (query?.filter && query.filter !== 'all') {
     list = list.filter(p => {
@@ -204,7 +244,7 @@ export async function getProducts(query?: ProductSearchQuery): Promise<Product[]
 
 export async function getProduct(id: string): Promise<Product | undefined> {
   await ensureInitialized();
-  return _products.find(p => p.id === id);
+  return _products.find(p => p.id === id) ?? (await findPreviewProduct(id));
 }
 
 // Convenience alias
@@ -266,10 +306,23 @@ export async function createProduct(data: Partial<Product>): Promise<Product> {
 export async function updateProduct(id: string, patch: Partial<Product>): Promise<Product | undefined> {
   await ensureInitialized();
   const idx = _products.findIndex(p => p.id === id);
-  if (idx === -1) return undefined;
-  _products[idx] = { ..._products[idx], ...patch, id, updatedAt: new Date().toISOString() };
-  await persist();
-  return _products[idx];
+  if (idx !== -1) {
+    _products[idx] = { ..._products[idx], ...patch, id, updatedAt: new Date().toISOString() };
+    await persist();
+    return _products[idx];
+  }
+  // Demo preview products live only in the in-memory overlay above — edits
+  // (e.g. from the stock editor) apply there so the demo stays interactive
+  // without ever touching a real account's AsyncStorage.
+  if (await demoActive()) {
+    const preview = await ensurePreviewProducts();
+    const previewIdx = preview.findIndex(p => p.id === id);
+    if (previewIdx !== -1) {
+      preview[previewIdx] = { ...preview[previewIdx], ...patch, id, updatedAt: new Date().toISOString() };
+      return preview[previewIdx];
+    }
+  }
+  return undefined;
 }
 
 export async function publishProduct(id: string): Promise<Product | undefined> {
@@ -366,6 +419,73 @@ export async function adjustInventory(
   return adj;
 }
 
+/**
+ * Adjusts a single variant's stock (the per-variant "size/color" quick
+ * editor) and keeps `Product.inventory`'s aggregate fields — `totalStock`,
+ * `availableStock`, `variantStock` — in sync with the variant list, the
+ * same fields `adjustInventory` above and the Products list/cards already
+ * read. Reuses the existing `ProductVariant.inventoryQuantity` /
+ * `ProductInventory.variantStock` fields (populated by Add Product) rather
+ * than introducing a new stock model.
+ */
+export async function adjustVariantStock(
+  productId: string,
+  variantId: string,
+  delta: number,
+  reason: string
+): Promise<InventoryAdjustment | undefined> {
+  const product = await getProduct(productId);
+  if (!product) return undefined;
+  const variantIdx = product.variants.findIndex(v => v.id === variantId);
+  if (variantIdx === -1) return undefined;
+
+  const variant = product.variants[variantIdx];
+  const newQty = Math.max(0, variant.inventoryQuantity + delta);
+  const actualDelta = newQty - variant.inventoryQuantity;
+
+  const variants = [...product.variants];
+  variants[variantIdx] = { ...variant, inventoryQuantity: newQty, updatedAt: new Date().toISOString() };
+  const totalStock = variants.reduce((sum, v) => sum + v.inventoryQuantity, 0);
+  const variantStock = variants.map(v => ({ variantId: v.id, quantity: v.inventoryQuantity }));
+
+  const adj: InventoryAdjustment = {
+    id: 'adj_' + Math.random().toString(36).slice(2),
+    productId,
+    variantId,
+    locationId: product.inventory.locationStock[0]?.locationId ?? '',
+    delta: actualDelta,
+    reason,
+    createdBy: product.sellerId || 'seller',
+    createdAt: new Date().toISOString(),
+  };
+
+  await updateProduct(productId, {
+    variants,
+    inventory: {
+      ...product.inventory,
+      totalStock,
+      availableStock: Math.max(0, product.inventory.availableStock + actualDelta),
+      variantStock,
+    },
+  });
+
+  return adj;
+}
+
+/** Sets a variant's stock to an exact value (the stock editor's direct-entry
+ *  field) by computing and applying the equivalent delta. */
+export async function setVariantStock(
+  productId: string,
+  variantId: string,
+  quantity: number,
+  reason: string
+): Promise<InventoryAdjustment | undefined> {
+  const product = await getProduct(productId);
+  const variant = product?.variants.find(v => v.id === variantId);
+  if (!variant) return undefined;
+  return adjustVariantStock(productId, variantId, Math.max(0, Math.round(quantity)) - variant.inventoryQuantity, reason);
+}
+
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export async function getProductAnalytics(productId: string): Promise<ProductAnalytics> {
@@ -453,7 +573,7 @@ export async function getTaggableProducts(forDraftContent = false): Promise<Prod
 
 export async function getProductStats() {
   await ensureInitialized();
-  const list = _products;
+  const list = (await demoActive()) ? [..._products, ...(await ensurePreviewProducts())] : _products;
   return {
     total: list.length,
     active: list.filter(p => p.status === 'active').length,
