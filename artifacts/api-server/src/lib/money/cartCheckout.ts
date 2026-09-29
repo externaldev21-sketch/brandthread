@@ -318,11 +318,14 @@ export async function calculateGroupTax(
     const calculation = await stripeClient.tax.calculations.create({
       currency: "usd",
       customer_details: {
+        // A quote may have only city/state/ZIP (wallet sheets share no
+        // street until the buyer pays); Stripe Tax needs just ZIP + country
+        // in the US, so empty parts are left out rather than sent blank.
         address: {
-          line1: shipping.street,
+          ...(shipping.street ? { line1: shipping.street } : {}),
           ...(shipping.line2 ? { line2: shipping.line2 } : {}),
-          city: shipping.city,
-          state: shipping.state,
+          ...(shipping.city ? { city: shipping.city } : {}),
+          ...(shipping.state ? { state: shipping.state } : {}),
           postal_code: shipping.zip,
           country: shipping.country,
         },

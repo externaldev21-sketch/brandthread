@@ -4,6 +4,9 @@
  * by the Stripe SDK.
  * Mounted at /api/buyer/checkout/payment-intent.
  *
+ * POST /quote      prices the cart for an address (shipping, promo, Stripe
+ *                  Tax) without reserving anything, so the page and the
+ *                  Apple Pay / Google Pay sheet show the real total.
  * POST /           prices every seller group (lib/money/cartCheckout.ts),
  *                  reserves stock atomically, persists one checkout row per
  *                  seller, creates the PaymentIntent. Returns its client
@@ -71,11 +74,24 @@ const addressSchema = z.object({
   postalCode: z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9 -]{1,15}$/),
   country: z.string().trim().length(2).default("US"),
 });
+const groupsSchema = z.array(z.object({
+  items: z.array(itemSchema).min(1).max(100),
+  discountCode: z.string().trim().min(1).max(64).optional(),
+})).min(1).max(MAX_CART_GROUPS);
+/** A quote only needs where the order goes (a wallet sheet shares no street until the buyer pays). */
+const quoteSchema = z.object({
+  groups: groupsSchema,
+  shippingAddress: z.object({
+    street: z.string().trim().max(160).optional(),
+    line2: z.string().trim().max(160).nullable().optional(),
+    city: z.string().trim().max(160).optional(),
+    state: z.string().trim().max(160).optional(),
+    postalCode: z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9 -]{1,15}$/),
+    country: z.string().trim().length(2).default("US"),
+  }),
+});
 const createSchema = z.object({
-  groups: z.array(z.object({
-    items: z.array(itemSchema).min(1).max(100),
-    discountCode: z.string().trim().min(1).max(64).optional(),
-  })).min(1).max(MAX_CART_GROUPS),
+  groups: groupsSchema,
   contactEmail: requestPrimitives.email,
   contactPhone: z.string().trim().regex(/^[0-9+(). -]{7,32}$/),
   shippingAddress: addressSchema,
@@ -111,6 +127,56 @@ function breakdownFromRows(rows: Array<typeof checkoutSessions.$inferSelect>): G
   });
 }
 
+type PricedCartGroup = PricedGroup & { taxCents: number; calculationId: string | null; totalCents: number };
+
+/** Prices every seller group, then its Stripe Tax. Throws CartCheckoutError. */
+async function priceCart(
+  stripe: ReturnType<typeof requireStripe>,
+  buyerId: string,
+  groups: z.infer<typeof groupsSchema>,
+  shipping: CartShipping,
+): Promise<PricedCartGroup[]> {
+  const priced: PricedCartGroup[] = [];
+  const sellers = new Set<string>();
+  for (const group of groups) {
+    const pricedGroup = await priceCartGroup({ buyerId, items: group.items, discountCode: group.discountCode ?? null, shipping });
+    if (sellers.has(pricedGroup.sellerId)) {
+      throw new CartCheckoutError(400, "DUPLICATE_SELLER_GROUP", "Each seller's items must be in one group.");
+    }
+    sellers.add(pricedGroup.sellerId);
+    const tax = await calculateGroupTax(stripe, pricedGroup, shipping);
+    priced.push({
+      ...pricedGroup,
+      taxCents: tax.taxCents,
+      calculationId: tax.calculationId,
+      totalCents: pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents,
+    });
+  }
+  return priced;
+}
+
+function breakdown(priced: PricedCartGroup[], rows?: Array<{ id: string }>): GroupBreakdown[] {
+  return priced.map((group, index) => ({
+    sellerId: group.sellerId,
+    checkoutSessionId: rows?.[index]?.id ?? "",
+    subtotalCents: group.subtotalCents,
+    shippingCents: group.shippingCents,
+    discountCents: group.discountCents,
+    taxCents: group.taxCents,
+    totalCents: group.totalCents,
+    processingDays: group.processingDays,
+  }));
+}
+
+function stripeFor(res: Response): ReturnType<typeof requireStripe> | null {
+  try {
+    return requireStripe();
+  } catch {
+    res.status(503).json({ error: "Payments are unavailable right now.", code: "STRIPE_NOT_CONFIGURED" });
+    return null;
+  }
+}
+
 function sendError(res: Response, error: unknown): boolean {
   if (error instanceof CartCheckoutError) {
     res.status(error.status).json({ error: error.message, code: error.code, ...error.details });
@@ -123,17 +189,40 @@ function sendError(res: Response, error: unknown): boolean {
   return false;
 }
 
+router.post("/quote", validateRequest({ body: quoteSchema }), async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
+  const body = req.body as z.infer<typeof quoteSchema>;
+  const stripe = stripeFor(res);
+  if (!stripe) return;
+  const address = body.shippingAddress;
+  const shipping: CartShipping = {
+    name: "",
+    street: address.street ?? "",
+    line2: address.line2 ?? null,
+    city: address.city ?? "",
+    state: address.state ?? "",
+    zip: address.postalCode.toUpperCase(),
+    country: address.country.toUpperCase(),
+    phone: "",
+  };
+  try {
+    const priced = await priceCart(stripe, buyerId, body.groups, shipping);
+    res.json({
+      amountCents: priced.reduce((sum, group) => sum + group.totalCents, 0),
+      groups: breakdown(priced),
+    });
+  } catch (error) {
+    if (sendError(res, error)) return;
+    throw error;
+  }
+});
+
 router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
   const body = req.body as z.infer<typeof createSchema>;
   const key = body.clientIdempotencyKey;
-  let stripe: ReturnType<typeof requireStripe>;
-  try {
-    stripe = requireStripe();
-  } catch {
-    res.status(503).json({ error: "Payments are unavailable right now.", code: "STRIPE_NOT_CONFIGURED" });
-    return;
-  }
+  const stripe = stripeFor(res);
+  if (!stripe) return;
 
   // ── Retried pay attempt: hand back the same intent ────────────────────────
   const likeKey = key.replace(/[\\%_]/g, (ch) => `\\${ch}`);
@@ -172,23 +261,9 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
   };
 
   // ── Price every seller group and its tax ──────────────────────────────────
-  const priced: Array<PricedGroup & { taxCents: number; calculationId: string | null; totalCents: number }> = [];
+  let priced: PricedCartGroup[];
   try {
-    const sellers = new Set<string>();
-    for (const group of body.groups) {
-      const pricedGroup = await priceCartGroup({ buyerId, items: group.items, discountCode: group.discountCode ?? null, shipping });
-      if (sellers.has(pricedGroup.sellerId)) {
-        throw new CartCheckoutError(400, "DUPLICATE_SELLER_GROUP", "Each seller's items must be in one group.");
-      }
-      sellers.add(pricedGroup.sellerId);
-      const tax = await calculateGroupTax(stripe, pricedGroup, shipping);
-      priced.push({
-        ...pricedGroup,
-        taxCents: tax.taxCents,
-        calculationId: tax.calculationId,
-        totalCents: pricedGroup.subtotalCents + pricedGroup.shippingCents - pricedGroup.discountCents + tax.taxCents,
-      });
-    }
+    priced = await priceCart(stripe, buyerId, body.groups, shipping);
   } catch (error) {
     if (sendError(res, error)) return;
     throw error;
@@ -302,16 +377,7 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
     clientSecret: intent.client_secret,
     status: intent.status,
     amountCents,
-    groups: priced.map((group, index) => ({
-      sellerId: group.sellerId,
-      checkoutSessionId: rows[index].id,
-      subtotalCents: group.subtotalCents,
-      shippingCents: group.shippingCents,
-      discountCents: group.discountCents,
-      taxCents: group.taxCents,
-      totalCents: group.totalCents,
-      processingDays: group.processingDays,
-    } satisfies GroupBreakdown)),
+    groups: breakdown(priced, rows),
   });
 });
 

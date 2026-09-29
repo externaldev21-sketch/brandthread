@@ -201,6 +201,22 @@ describe("POST /api/buyer/checkout/payment-intent", () => {
     }
   });
 
+  it("quotes the cart for a ZIP alone without reserving stock or creating an intent", async () => {
+    const cart = await seedCart("quote");
+    const res = await call(app.base, "POST", "/api/buyer/checkout/payment-intent/quote", cart.buyer, {
+      groups: cart.groups, shippingAddress: { postalCode: "10012", country: "US" },
+    });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const taxA = Math.round((10_000 + 1_200) * 0.08);
+    const taxB = Math.round(2_500 * 0.08);
+    expect(res.body.amountCents).toBe(10_000 + 1_200 + taxA + 2_500 + taxB);
+    expect(res.body.groups[0]).toMatchObject({ sellerId: cart.sellerA, shippingCents: 1_200, taxCents: taxA });
+    // No street was sent, so none is passed to Stripe Tax.
+    expect(fake.state.taxCalculations[0].params.customer_details.address).toEqual({ postal_code: "10012", country: "US" });
+    expect(fake.state.paymentIntents.size).toBe(0);
+    expect(await stockOf(cart.productA.variantId)).toBe(5);
+  });
+
   it("returns the same intent for a retried pay attempt without reserving twice", async () => {
     const cart = await seedCart("retry");
     const payload = body(cart.groups);
