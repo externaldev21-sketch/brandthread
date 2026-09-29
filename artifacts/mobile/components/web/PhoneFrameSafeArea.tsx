@@ -28,7 +28,7 @@ const IPHONE_INSETS = { top: 59, bottom: 34, left: 0, right: 0 } as const;
 export function PhoneFrameSafeArea({ children }: { children: React.ReactNode }) {
   const { width, height } = useWindowDimensions();
 
-  if (Platform.OS !== 'web' || width > PHONE_FRAME_MAX_WIDTH) {
+  if (Platform.OS !== 'web' || width > PHONE_FRAME_MAX_WIDTH || process.env.EXPO_PUBLIC_NOTCH_CRAWL_DISABLE_PHONE_FRAME === '1') {
     return <>{children}</>;
   }
 

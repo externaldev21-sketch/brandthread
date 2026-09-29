@@ -132,6 +132,10 @@ const VIOLATION_SCRIPT = `(() => {
     // Scrolled off-screen (above or below the visible viewport) — not
     // actually clipped by anything, just not on screen right now.
     if (rect.bottom <= 0 || rect.top >= window.innerHeight) continue;
+    // An element spanning the exact full viewport is a deliberate full-bleed
+    // overlay (a modal scrim, a tap-out-to-dismiss backdrop, a coach-mark's
+    // full-screen touchable) — edge-to-edge is the point, not a notch bug.
+    if (rect.x === 0 && rect.y === 0 && rect.width === window.innerWidth && rect.height === window.innerHeight) continue;
     if (rect.top < TOP_SAFE_LINE) {
       results.push({ edge: 'top', box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, element: (tag + (el.id ? '#' + el.id : '') + ' "' + (el.textContent || '').slice(0, 40) + '"') });
     }
@@ -149,7 +153,13 @@ const VIOLATION_SCRIPT = `(() => {
     // bottom edge — that's normal scroll clipping, not a home-indicator
     // clearance bug; the user scrolls to reach it, nothing hides it forever.
     const isBottomPinned = rect.bottom > window.innerHeight - 100 && (style.position === 'fixed' || style.position === 'sticky' || (style.position === 'absolute' && style.bottom !== 'auto'));
-    if (rect.bottom > BOTTOM_SAFE_LINE && isBottomPinned && (tag === 'BUTTON' || el.getAttribute('role') === 'button' || tag === 'INPUT')) {
+    // INPUT is excluded here (kept for the top check above): react-native-web
+    // renders a Switch/checkbox as a visually-hidden <input> absolutely
+    // positioned to cover its custom control for accessibility/hit-testing —
+    // that's an implementation detail of whatever row it happens to be in,
+    // not a real sticky-footer element, and flags on whatever toggle a
+    // scrollable list happens to have scrolled to the bottom of the viewport.
+    if (rect.bottom > BOTTOM_SAFE_LINE && isBottomPinned && (tag === 'BUTTON' || el.getAttribute('role') === 'button')) {
       results.push({ edge: 'bottom', box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, element: (tag + (el.id ? '#' + el.id : '') + ' "' + (el.textContent || '').slice(0, 40) + '"') });
     }
   }
@@ -188,7 +198,10 @@ test('every screen clears the notch and the home indicator', async () => {
   const images = await ensureDemoImages(browser, path.join(outDir, 'images'));
 
   let routes = discoverRoutes(MOBILE_ROOT);
-  if (process.env.NOTCH_CRAWL_LIMIT) {
+  if (process.env.NOTCH_CRAWL_ONLY) {
+    const only = process.env.NOTCH_CRAWL_ONLY.split(',');
+    routes = routes.filter((r) => only.includes(r));
+  } else if (process.env.NOTCH_CRAWL_LIMIT) {
     routes = routes.slice(0, Number(process.env.NOTCH_CRAWL_LIMIT));
   }
   const failures: Failure[] = [];
