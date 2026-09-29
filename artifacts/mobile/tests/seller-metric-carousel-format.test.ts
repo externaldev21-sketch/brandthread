@@ -26,13 +26,16 @@ describe('formatCentsCompact', () => {
 });
 
 describe('formatCompactCount', () => {
-  it('shows exact counts under 1,000', () => {
+  // Full edge-case coverage lives in tests/compactFormat.test.ts — these two
+  // just confirm the seller metric carousel gets the same shared behavior.
+  it('shows exact counts with commas under 10,000', () => {
     expect(formatCompactCount(0)).toBe('0');
     expect(formatCompactCount(842)).toBe('842');
+    expect(formatCompactCount(8400)).toBe('8,400');
   });
 
   it('compacts large counts', () => {
-    expect(formatCompactCount(8400)).toBe('8.4K');
+    expect(formatCompactCount(12_500)).toBe('12.5K');
     expect(formatCompactCount(1_200_000)).toBe('1.2M');
   });
 });
