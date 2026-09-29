@@ -306,7 +306,7 @@ export function DiscoverPager() {
                 scrollX={scrollX}
                 insets={insets}
                 theme={theme}
-                onBrandPress={() => push(`/seller-profile?id=${encodeURIComponent(item.brandId)}` as never)}
+                onBrandPress={() => push(`/seller-profile?id=${encodeURIComponent(item.brandId)}&src=feed` as never)}
                 onAddToCart={(startX, startY) => handleAddToCartPress(item, startX, startY)}
                 onBuyNow={() => setBuyNowItem(item)}
               />

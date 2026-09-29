@@ -102,7 +102,9 @@ export default function ProfileProductsScreen() {
   }, [hasMore, loadingMore, sellerId]);
 
   const openProduct = useCallback((product: ShopProduct) => {
-    router.push(productDetailHref(product.id, { isOwner }) as never);
+    // Reached from a seller's own profile ("Shop N products") — a real
+    // traffic-source signal for that seller's Dashboard > Traffic sources.
+    router.push(productDetailHref(product.id, { isOwner, src: 'profile' }) as never);
   }, [isOwner, router]);
 
   const goBack = useCallback(() => {
