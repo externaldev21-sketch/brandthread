@@ -9,11 +9,11 @@ function read(relativePath: string) {
 }
 
 describe('seller dashboard neutral glass surfaces', () => {
-  it('defines desaturated graphite glass tokens', () => {
+  it('defines black, silver-bordered dashboard glass tokens', () => {
     const theme = read('lib/theme.ts');
 
-    expect(theme).toContain("SELLER_DASHBOARD_GLASS = 'rgba(16, 16, 16, 0.54)'");
-    expect(theme).toContain("SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(26, 26, 26, 0.68)'");
+    expect(theme).toContain("SELLER_DASHBOARD_GLASS = 'rgba(0, 0, 0, 0.54)'");
+    expect(theme).toContain("SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(0, 0, 0, 0.68)'");
   });
 
   it('keeps dashboard-owned panels off the blue-violet surface tokens', () => {

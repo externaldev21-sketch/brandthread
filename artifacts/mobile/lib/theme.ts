@@ -9,35 +9,37 @@
  */
 
 // ─── Backgrounds ─────────────────────────────────────────────────────────────
-export const BG            = '#0A0A0B';
+// Black, white, and silver: pure black everywhere, silver-bordered black
+// surfaces (never a grey fill) — see BORDER below.
+export const BG            = '#000000';
 // Transparent route surface used by screen roots so the shared animated shell
 // remains visible. Keep BG opaque for cards, inputs, modals, and other
 // semantic dark surfaces.
 export const SCREEN_BG      = 'transparent';
-export const SURFACE       = '#111113';
-export const CARD          = '#18181B';
-export const CARD_ELEVATED = '#222226';
+export const SURFACE       = '#000000';
+export const CARD          = '#000000';
+export const CARD_ELEVATED = '#000000';
 export const OVERLAY       = 'rgba(0,0,0,0.72)'; // modal overlay
-export const SURFACE_GLASS = 'rgba(17, 17, 19, 0.72)';
-export const CARD_GLASS    = 'rgba(24, 24, 27, 0.58)';
-export const CARD_ELEVATED_GLASS = 'rgba(34, 34, 38, 0.72)';
-export const SKELETON_GLASS = 'rgba(255,255,255,0.05)'; // translucent shimmer
-export const SELLER_DASHBOARD_GLASS = 'rgba(16, 16, 16, 0.54)'; // neutral graphite dashboard panels
-export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(26, 26, 26, 0.68)'; // neutral elevated dashboard panels
+export const SURFACE_GLASS = 'rgba(0, 0, 0, 0.72)';
+export const CARD_GLASS    = 'rgba(0, 0, 0, 0.58)';
+export const CARD_ELEVATED_GLASS = 'rgba(0, 0, 0, 0.72)';
+export const SKELETON_GLASS = 'rgba(192,192,192,0.10)'; // translucent shimmer
+export const SELLER_DASHBOARD_GLASS = 'rgba(0, 0, 0, 0.54)'; // black dashboard panels, silver-bordered
+export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(0, 0, 0, 0.68)'; // black elevated dashboard panels, silver-bordered
 
 
 // ─── Borders ─────────────────────────────────────────────────────────────────
-// Borders/washes stay translucent on purpose (they sit on top of varying
-// card/image content) — only TEXT colors were the "blurry fine print" bug.
-export const BORDER          = 'rgba(255,255,255,0.08)';
-export const BORDER_SUBTLE   = 'rgba(255,255,255,0.04)';
-export const BORDER_ACTIVE   = '#F7F7FA';
-export const BORDER_FOCUS    = '#F7F7FA';
+// Surfaces are black fill + thin silver border, never a grey fill. Borders
+// stay translucent on purpose (they sit on top of varying card/image content).
+export const BORDER          = 'rgba(192,192,192,0.28)';
+export const BORDER_SUBTLE   = 'rgba(192,192,192,0.14)';
+export const BORDER_ACTIVE   = '#FFFFFF';
+export const BORDER_FOCUS    = '#FFFFFF';
 // Translucent washes for the handful of non-text call sites (dot/timeline
 // backgrounds, a hairline border) that legitimately want the old
 // see-through look. Never use these for `color:` — see MUTED/SUBTLE below.
-export const MUTED_WASH  = 'rgba(247,247,250,0.58)';
-export const SUBTLE_WASH = 'rgba(247,247,250,0.50)';
+export const MUTED_WASH  = 'rgba(192,192,192,0.35)';
+export const SUBTLE_WASH = 'rgba(192,192,192,0.28)';
 
 // ─── Text ─────────────────────────────────────────────────────────────────────
 // Every text color here is a SOLID opaque grey, not an alpha blend. A
@@ -48,19 +50,19 @@ export const SUBTLE_WASH = 'rgba(247,247,250,0.50)';
 // read as soft/smudgy no matter the font size. Fixed opaque greys read
 // crisp at any size. Never reintroduce `rgba(..., <1)` for a text color —
 // use SUBTLE_WASH/MUTED_WASH (above) only for non-text backgrounds/borders.
-export const FG      = '#F7F7FA';
+export const FG      = '#FFFFFF';
 export const TEXT_PRIMARY   = FG;
-export const TEXT_SECONDARY = '#B4B4BC';
-export const TEXT_TERTIARY  = '#8A8A93';
+export const TEXT_SECONDARY = '#C0C0C0';
+export const TEXT_TERTIARY  = '#B0B0B0';
 export const MUTED   = TEXT_SECONDARY;
 export const SUBTLE  = TEXT_TERTIARY;
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
-export const ON_DARK_MUTED = '#C7C7CE';   // secondary text on gradient/colored bg — solid, not alpha
+export const ON_DARK_MUTED = '#C0C0C0';   // secondary text on gradient/colored bg — solid, not alpha
 
 // ─── Primary Emphasis ─────────────────────────────────────────────────────────
-export const ACCENT        = '#F7F7FA';
+export const ACCENT        = '#FFFFFF';
 export const ACCENT_LIGHT  = '#FFFFFF';
-// No colored panel wash: compatibility dim tokens resolve to neutral graphite.
+// No colored panel wash: compatibility dim tokens resolve to a black/silver wash.
 export const ACCENT_DIM    = 'rgba(255,255,255,0.055)';
 /** @deprecated Use ACCENT. Kept for compatibility with legacy screens. */
 export const PURPLE        = ACCENT;
@@ -91,12 +93,12 @@ export const GOLD           = '#F59E0B';   // premium, pro
 
 // ─── Gradients ────────────────────────────────────────────────────────────────
 export const GRAD_PRIMARY   = [ACCENT, ACCENT] as const;
-export const GRAD_HERO      = ['#0A0A0B', '#18181B'] as const;
+export const GRAD_HERO      = ['#000000', '#000000'] as const;
 export const GRAD_CARD_GLOW = ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.01)'] as const;
 export const GRAD_SUCCESS_G = ['#10B981', '#34D399'] as const;
 export const GRAD_REVENUE   = ['#39FF88', '#10B981'] as const;
-export const GRAD_DARK_FADE = ['rgba(10,10,11,0)', 'rgba(10,10,11,1)'] as const;
-export const GRAD_TAB_BAR   = ['rgba(10,10,11,0.96)', 'rgba(17,17,19,1)'] as const;
+export const GRAD_DARK_FADE = ['rgba(0,0,0,0)', 'rgba(0,0,0,1)'] as const;
+export const GRAD_TAB_BAR   = ['rgba(0,0,0,0.96)', 'rgba(0,0,0,1)'] as const;
 
 // ─── Typography ───────────────────────────────────────────────────────────────
 export const FONT = {
