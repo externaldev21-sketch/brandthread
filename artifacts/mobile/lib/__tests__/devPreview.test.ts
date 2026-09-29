@@ -232,3 +232,59 @@ describe('isSellerDevPreview real export (module path exists)', () => {
     expect(src).toContain('persistedPreviewRole()');
   });
 });
+
+// ── Production-host hard gate ───────────────────────────────────────────────
+// Defense-in-depth: the preview bypass must never activate on the app's real
+// production hosts even if EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST somehow
+// reached a production build (it's a build-time env var; nothing in code
+// enforces which build profile sets it — see isProductionPreviewHost's own
+// doc comment in lib/devPreview.ts). Same Rollup/react-native constraint as
+// above, so the matching logic (which has no react-native dependency of its
+// own) is tested via a pure local replica, plus source checks confirming the
+// real functions actually call it.
+
+const PRODUCTION_HOSTS = new Set(['brandthread.app', 'www.brandthread.app', 'brandthread.replit.app']);
+function isProductionPreviewHostReplica(hostname: string): boolean {
+  return PRODUCTION_HOSTS.has(hostname.toLowerCase());
+}
+
+describe('isProductionPreviewHost — matching logic', () => {
+  it('matches the canonical production host and its www/Replit-alias variants', () => {
+    expect(isProductionPreviewHostReplica('brandthread.app')).toBe(true);
+    expect(isProductionPreviewHostReplica('www.brandthread.app')).toBe(true);
+    expect(isProductionPreviewHostReplica('brandthread.replit.app')).toBe(true);
+    expect(isProductionPreviewHostReplica('BRANDTHREAD.APP')).toBe(true); // case-insensitive
+  });
+
+  it('does not match dev/preview hosts', () => {
+    expect(isProductionPreviewHostReplica('localhost')).toBe(false);
+    expect(isProductionPreviewHostReplica('127.0.0.1')).toBe(false);
+    expect(isProductionPreviewHostReplica('my-workspace.abc123.replit.dev')).toBe(false);
+    expect(isProductionPreviewHostReplica('some-other-app.vercel.app')).toBe(false);
+  });
+
+  it('does not match a lookalike host that merely contains the production domain', () => {
+    // Guards against a naive `.includes('brandthread.app')` implementation,
+    // which an attacker-controlled subdomain could spoof.
+    expect(isProductionPreviewHostReplica('brandthread.app.evil.example')).toBe(false);
+    expect(isProductionPreviewHostReplica('notbrandthread.app')).toBe(false);
+  });
+});
+
+describe('production-host hard gate is wired into the real module (source check)', () => {
+  it('lib/devPreview.ts exports isProductionPreviewHost and both preview functions call it', () => {
+    const { readFileSync } = require('fs');
+    const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
+    expect(src).toContain('export function isProductionPreviewHost');
+    // Both isSellerDevPreview and isBuyerDevPreview must call the gate.
+    const callSites = src.match(/if \(isProductionPreviewHost\(\)\) return (false|null);/g) ?? [];
+    expect(callSites.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("app/_layout.tsx's PREVIEW_ROLE also calls the same gate (no duplicated, unguarded copy)", () => {
+    const { readFileSync } = require('fs');
+    const layoutSrc: string = readFileSync(resolve(__dirname, '../../app/_layout.tsx'), 'utf8');
+    expect(layoutSrc).toContain("import { isProductionPreviewHost } from '@/lib/devPreview';");
+    expect(layoutSrc).toContain('if (isProductionPreviewHost()) return null;');
+  });
+});

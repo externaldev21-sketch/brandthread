@@ -18,6 +18,7 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProductionAnalytics, getFilterState } from '@/services/analyticsService';
 import { ProductionAnalytics, ManufacturerAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   AnalyticsHeader, AnalyticsSkeleton, HeaderPillButton, ProgressBar, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
@@ -88,6 +89,7 @@ export default function AnalyticsProductionScreen() {
   const [data,       setData]       = useState<ProductionAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const requestUser = useRef<string | null>(null);
 
@@ -102,9 +104,11 @@ export default function AnalyticsProductionScreen() {
       const next = await getProductionAnalytics(f);
       if (requestUser.current !== requestedUser) return;
       setData(next);
+      setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
-    } finally { setLoading(false); setRefreshing(false); }
+      setLoadError(true);
+        } finally { setLoading(false); setRefreshing(false); }
   }, [filter, authLoaded, userId]);
 
   useEffect(() => {
@@ -116,6 +120,13 @@ export default function AnalyticsProductionScreen() {
 
   if (loading) {
     return <AnalyticsSkeleton topPad={topPad} kpiCount={3} listRows={3} />;
+  }
+  if (loadError && !data) {
+    return (
+      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
+        <ErrorState message="Couldn't load production analytics." onRetry={() => load()} />
+      </View>
+    );
   }
   return (
     <ScrollView
@@ -191,6 +202,7 @@ export default function AnalyticsProductionScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
+  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
   gaugeCard:{ backgroundColor: colors.elevated, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg },
   gaugeHeader:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SP.sm },

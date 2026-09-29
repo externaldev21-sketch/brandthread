@@ -38,6 +38,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { Hairline } from './CheckoutPrimitives';
+import { groupDeliveryWindow } from './OrderSummarySection';
 import { OrderConfetti } from './OrderConfetti';
 
 export interface VerifiedOrderRef {
@@ -61,6 +62,37 @@ function Row({ label, children, testID }: { label: string; children: React.React
       <Text style={[styles.rowLabel, { color: theme.muted }]}>{label}</Text>
       <View style={styles.rowValue}>{children}</View>
     </View>
+  );
+}
+
+/**
+ * A secondary action as a plain text row in the scroll content (icon, label,
+ * chevron), not a full-width button. `subtle` is quieter still (muted, no
+ * icon weight) for "Create an account".
+ */
+function LinkRow({ icon, label, hint, onPress, subtle, testID }: {
+  icon: React.ComponentProps<typeof Feather>['name'];
+  label: string;
+  hint?: string;
+  onPress: () => void;
+  subtle?: boolean;
+  testID?: string;
+}) {
+  const { theme } = useAppTheme();
+  return (
+    <PressableScale
+      onPress={onPress}
+      style={styles.linkRow}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      rippleEnabled={false}
+      testID={testID}
+    >
+      <Feather name={icon} size={subtle ? 16 : 18} color={subtle ? theme.muted : theme.text} />
+      <Text style={[subtle ? styles.linkSubtle : styles.linkLabel, { color: subtle ? theme.muted : theme.text }]}>{label}</Text>
+      <Feather name="chevron-right" size={16} color={theme.muted} />
+    </PressableScale>
   );
 }
 
@@ -128,12 +160,12 @@ export function OrderConfirmation({
   const { theme } = useAppTheme();
   const router = useRouter();
   const api = useApi();
-  const { userId } = useAuth();
+  const { userId, isSignedIn } = useAuth();
 
   const items = session.deliveryGroups.flatMap(group => group.items);
   const deliveryEstimates = session.deliveryGroups
-    .map(group => group.availableMethods.find(method => method.id === group.selectedMethodId)?.estimatedDelivery)
-    .filter((value): value is string => !!value);
+    .filter(group => group.availableMethods.some(method => method.id === group.selectedMethodId))
+    .map(group => groupDeliveryWindow(group));
   const preOrderEstimates = items.map(item => item.preOrderEstShipDate).filter((value): value is string => !!value);
   const estimates = [...new Set([...deliveryEstimates, ...preOrderEstimates])];
   const firstGroup = session.deliveryGroups[0];
@@ -165,6 +197,12 @@ export function OrderConfirmation({
     });
     return () => { alive = false; };
   }, [finalizing, session.id]);
+
+  function openOrder() {
+    // ONLY navigate with a verified server order ID — never the display number.
+    if (!firstVerified?.id) return;
+    router.push(('/buyer-order-detail?id=' + encodeURIComponent(firstVerified.id)) as never);
+  }
 
   function messageSeller() {
     if (!firstGroup) return;
@@ -310,6 +348,42 @@ export function OrderConfirmation({
         </View>
       ) : null}
 
+      {/* Secondary actions live in the scroll content as text rows; only
+          Track order is pinned (OrderConfirmationActions). */}
+      <View style={styles.section} testID="order-confirmation-links">
+        {firstVerified?.id && !finalizing ? (
+          <>
+            <Hairline style={styles.linkHairline} />
+            <LinkRow
+              icon="file-text"
+              label="View receipt"
+              hint="Opens this order's details and receipt"
+              onPress={openOrder}
+              testID="checkout-view-receipt"
+            />
+          </>
+        ) : null}
+        <Hairline style={styles.linkHairline} />
+        <LinkRow
+          icon="compass"
+          label="Continue shopping"
+          onPress={() => router.replace('/(buyer)/discover' as never)}
+          testID="checkout-continue-shopping"
+        />
+        {!isSignedIn ? (
+          <>
+            <Hairline style={styles.linkHairline} />
+            <LinkRow
+              icon="user-plus"
+              label="Create an account to track orders faster"
+              onPress={() => router.replace('/sign-in' as never)}
+              subtle
+              testID="checkout-create-account"
+            />
+          </>
+        ) : null}
+      </View>
+
       {!finalizing && singleSeller ? (
         <SellerProductsCarousel sellerId={singleSeller.sellerId} sellerName={singleSeller.sellerName} />
       ) : null}
@@ -318,11 +392,12 @@ export function OrderConfirmation({
 }
 
 /**
- * Primary/secondary actions — a SIBLING of the screen's ScrollView (see
- * app/buyer-checkout.tsx), never inside its scrollable content, so they sit
- * pinned above the home indicator on every screen height and can never be
- * clipped or scrolled past. Its own safe-area bottom padding never lets it
- * sit flush with the edge, even on web or a device with no home indicator.
+ * The ONE pinned action — Track order (or "Check order status" while the
+ * order is still finalizing). A SIBLING of the screen's ScrollView (see
+ * app/buyer-checkout.tsx), never inside its scrollable content, so it sits
+ * above the home indicator on every screen height. View receipt, Continue
+ * shopping and Create an account are text rows in the scroll content, so the
+ * item list stays visible.
  */
 export function OrderConfirmationActions({
   verifiedOrders, finalizing, onRefresh, refreshing,
@@ -334,7 +409,6 @@ export function OrderConfirmationActions({
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isSignedIn } = useAuth();
   const { theme } = useAppTheme();
   const firstVerified = verifiedOrders[0] ?? null;
 
@@ -351,26 +425,15 @@ export function OrderConfirmationActions({
       {finalizing ? (
         <Button label="Check order status" variant="primary" loading={refreshing} onPress={onRefresh} fullWidth />
       ) : (
-        <>
-          <Button
-            label="Track order"
-            icon="package"
-            variant="primary"
-            disabled={!firstVerified?.id}
-            onPress={trackOrder}
-            fullWidth
-            testID="checkout-track-order"
-          />
-          {/* Stacked full-width, not side-by-side: at a narrow width (320pt)
-              two half-width secondary buttons truncated both labels badly
-              ("View rec…" / "Continu…") — full width keeps both readable on
-              every phone size. */}
-          <Button label="View receipt" variant="secondary" disabled={!firstVerified?.id} onPress={trackOrder} fullWidth testID="checkout-view-receipt" />
-          <Button label="Continue shopping" variant="secondary" onPress={() => router.replace('/(buyer)/discover' as never)} fullWidth />
-          {!isSignedIn ? (
-            <Button label="Create an account" variant="tertiary" onPress={() => router.replace('/sign-in' as never)} fullWidth />
-          ) : null}
-        </>
+        <Button
+          label="Track order"
+          icon="package"
+          variant="primary"
+          disabled={!firstVerified?.id}
+          onPress={trackOrder}
+          fullWidth
+          testID="checkout-track-order"
+        />
       )}
     </View>
   );
@@ -406,6 +469,10 @@ const styles = StyleSheet.create({
   itemPrice: { fontFamily: FONT.semibold, fontSize: FS.sm },
 
   helpRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingVertical: SP.sm },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, minHeight: 48 },
+  linkLabel: { flex: 1, fontFamily: FONT.medium, fontSize: FS.base },
+  linkSubtle: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm },
+  linkHairline: { marginVertical: 0 },
 
   moreSection: { marginTop: SP.xs, marginBottom: SP.md },
   moreScroll: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm + 4 },

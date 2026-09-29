@@ -21,6 +21,7 @@ import {
   BuyerRefundRequest, BuyerProblemReport, BuyerProblemType,
 } from './cartTypes';
 import { formatCents } from '@/lib/money';
+import { deliveryWindowLabel } from '@/lib/checkoutPayment';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
@@ -570,21 +571,24 @@ export function calculateCartSummary(items: CartItem[], discountTotalCents = 0, 
 async function fetchShippingRateDetails(
   sellerId: string,
   subtotalCents: number,
-): Promise<{ id: string; name: string; amountCents: number }> {
+): Promise<{ id: string; name: string; amountCents: number; processingDays: number | null }> {
   // Dev-web preview only: a seeded preview seller has no rate row
   // (lib/previewCheckout.ts; null for every real seller and in production).
   const previewRate = previewShippingRate(sellerId, subtotalCents);
-  if (previewRate) return previewRate;
+  if (previewRate) return { ...previewRate, processingDays: null };
   const resp = await serviceRequest<{
     shippingCents: number;
     rateName: string;
     isFree: boolean;
+    /** Seller's processing time from their shipping zone, when set. */
+    processingDays?: number | null;
   }>(`/api/shipping-rates/calculate?sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`);
   if (typeof resp.shippingCents !== 'number') throw new Error('Seller shipping rate is unavailable.');
   return {
     id: `seller_rate_${sellerId}`,
     name: resp.rateName || (resp.isFree ? 'Free shipping' : 'Standard shipping'),
     amountCents: resp.shippingCents,
+    processingDays: typeof resp.processingDays === 'number' ? resp.processingDays : null,
   };
 }
 
@@ -646,8 +650,10 @@ export async function createCheckoutSession(
       carrier: 'Seller shipping',
       service: rate.name,
       priceCents: rate.amountCents,
-      estimatedDays: 0,
-      estimatedDelivery: group.hasPreOrder ? 'Ships after production' : 'Seller will confirm delivery date',
+      estimatedDays: rate.processingDays ?? 0,
+      // A real window, never blank: the seller's processing time, else a
+      // generic estimate (lib/checkoutPayment.ts deliveryWindowLabel).
+      estimatedDelivery: deliveryWindowLabel({ isPreOrder: group.hasPreOrder, processingDays: rate.processingDays }),
       trackingIncluded: false,
       isRecommended: true,
       ...(group.hasPreOrder ? { isPreOrderEstimate: true } : {}),

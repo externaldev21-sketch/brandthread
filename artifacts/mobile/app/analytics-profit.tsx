@@ -14,6 +14,7 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProfitAnalytics, getPayoutAnalytics, getFilterState } from '@/services/analyticsService';
 import { ProfitAnalytics, PayoutAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { RetryRow } from '@/components/ui/RetryRow';
 import {
   AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, Sparkline, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
@@ -28,6 +29,7 @@ export default function AnalyticsProfitScreen() {
   const [payout,     setPayout]     = useState<PayoutAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tab,        setTab]        = useState<'profit' | 'payout'>('profit');
   const requestUser = useRef<string | null>(null);
@@ -43,8 +45,12 @@ export default function AnalyticsProfitScreen() {
       const [p, pay] = await Promise.all([getProfitAnalytics(f), getPayoutAnalytics()]);
       if (requestUser.current !== requestedUser) return;
       setProfit(p); setPayout(pay);
+      setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
+      // A failed fetch must never be indistinguishable from "not synced
+      // yet" — never render this as a genuine $0 profit/payout state.
+      setLoadError(true);
     } finally { setLoading(false); setRefreshing(false); }
   }, [filter, authLoaded, userId]);
 
@@ -74,7 +80,13 @@ export default function AnalyticsProfitScreen() {
         scroll={false}
       />
 
-      {tab === 'profit' && !profit && (
+      {tab === 'profit' && !profit && loadError && (
+        <View style={{ marginTop: SP.xl, alignItems: 'center' }}>
+          <RetryRow label="Couldn't load profit data" onRetry={() => load()} />
+        </View>
+      )}
+
+      {tab === 'profit' && !profit && !loadError && (
         <EmptyState icon="trending-up" title="Profit insights are on the way" description="We'll show margins once your sales and costs sync." style={{ marginTop: SP.lg }} />
       )}
 
@@ -130,7 +142,13 @@ export default function AnalyticsProfitScreen() {
         </>
       )}
 
-      {tab === 'payout' && !payout && (
+      {tab === 'payout' && !payout && loadError && (
+        <View style={{ marginTop: SP.xl, alignItems: 'center' }}>
+          <RetryRow label="Couldn't load payout balance" onRetry={() => load()} />
+        </View>
+      )}
+
+      {tab === 'payout' && !payout && !loadError && (
         <EmptyState icon="dollar-sign" title="Payout insights are on the way" description="We'll show balances once your sales and payouts sync." style={{ marginTop: SP.lg }} />
       )}
 

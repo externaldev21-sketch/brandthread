@@ -25,10 +25,22 @@ export interface GrowthTool {
 }
 
 /**
- * Temporary testing bypass. Keep all plan definitions and entitlement data
- * intact; set this back to true to restore Growth-plan enforcement.
+ * Growth-plan enforcement is ON by default and can only be bypassed in a
+ * dev build (__DEV__, stripped to `false` in every production bundle) or
+ * with an explicit `EXPO_PUBLIC_BT_GROWTH_BYPASS=1` build-time env var —
+ * never a silent hardcoded `false` that ships to production (see
+ * lib/__tests__/growthTools.test.ts for the CI assertion that production
+ * config never sets the bypass var).
+ *
+ * This only controls the CLIENT UI's lock/upsell badges — it is not the
+ * security boundary. The real gate is server-side: api-server's Growth-
+ * gated routes (logo/mockup/photography/bg-removal/lifestyle/techpack,
+ * manufacturer hub) require `requirePlan("growth")`/`requireGrowthSeller`
+ * independent of this flag, so a paid feature is never reachable just
+ * because a client build shipped with the bypass on.
  */
-export const GROWTH_PLAN_ENFORCEMENT_ENABLED = false;
+export const GROWTH_PLAN_ENFORCEMENT_ENABLED =
+  !(__DEV__ || process.env.EXPO_PUBLIC_BT_GROWTH_BYPASS === '1');
 
 export type GrowthToolId = (typeof GROWTH_STUDIO_TOOLS)[number]['id'];
 

@@ -18,6 +18,7 @@ import { getProductAnalytics, getFilterState } from '@/services/analyticsService
 import { formatCents } from '@/lib/money';
 import { ProductAnalytics, ProductAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
@@ -99,6 +100,7 @@ export default function AnalyticsProductsScreen() {
   const [data,       setData]       = useState<ProductAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [sortKey,    setSortKey]    = useState<SortKey>('topByRevenue');
   const requestUser = useRef<string | null>(null);
@@ -114,9 +116,11 @@ export default function AnalyticsProductsScreen() {
       const next = await getProductAnalytics(f);
       if (requestUser.current !== requestedUser) return;
       setData(next);
+      setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
-    } finally { setLoading(false); setRefreshing(false); }
+      setLoadError(true);
+        } finally { setLoading(false); setRefreshing(false); }
   }, [filter, authLoaded, userId]);
 
   useEffect(() => {
@@ -130,6 +134,13 @@ export default function AnalyticsProductsScreen() {
 
   if (loading) {
     return <AnalyticsSkeleton topPad={topPad} kpiCount={3} listRows={4} />;
+  }
+  if (loadError && !data) {
+    return (
+      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
+        <ErrorState message="Couldn't load product analytics." onRetry={() => load()} />
+      </View>
+    );
   }
   return (
     <ScrollView
@@ -174,6 +185,7 @@ export default function AnalyticsProductsScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
+  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
   prodRow:  { flexDirection: 'row', alignItems: 'center', minHeight: COMP.minTouchTarget, paddingHorizontal: SP.sm + 2, paddingVertical: SP.sm, gap: SP.sm },
   rankBadge:{ width: 22, height: 22, borderRadius: RADIUS.xs, backgroundColor: colors.elevated, alignItems: 'center', justifyContent: 'center' },

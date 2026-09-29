@@ -113,9 +113,11 @@ describe('checkout redesign helpers', () => {
 
   it('validates every required address field', () => {
     expect(Object.keys(getCheckoutAddressErrors({})).sort()).toEqual(
-      ['city', 'country', 'firstName', 'lastName', 'line1', 'postalCode', 'state'],
+      ['city', 'country', 'firstName', 'line1', 'postalCode', 'state'],
     );
     expect(getCheckoutAddressErrors(address)).toEqual({});
+    // One "Full name" field: a single-word name is a complete name.
+    expect(getCheckoutAddressErrors({ ...address, lastName: '' })).toEqual({});
   });
 
   it('drops only the legacy client-side terms checkbox, never pre-order acknowledgments', () => {

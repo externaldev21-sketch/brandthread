@@ -15,6 +15,7 @@ import { FinanceMoneyFlow } from '@/components/FinanceMoneyFlow';
 import type { FinanceSummary } from '@/lib/financeSummary';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticPrimaryAction } from '@/lib/haptics';
+import { RetryRow } from '@/components/ui/RetryRow';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -41,6 +42,9 @@ export default function FinanceScreen() {
   // Held vs on-the-way vs available vs paid out (owner only on the server).
   const [summary,      setSummary]      = useState<FinanceSummary | null>(null);
   const [summaryError, setSummaryError] = useState(false);
+  // The Stripe balance/transactions fetch failing must never be shown as a
+  // genuine "$0.00" — that misrepresents an outage as an honest zero balance.
+  const [balanceError, setBalanceError] = useState(false);
 
   // Subscription status for the dashboard card
   const [subStatus, setSubStatus] = useState<{
@@ -50,6 +54,7 @@ export default function FinanceScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     setSummaryError(false);
+    setBalanceError(false);
     // Loaded independently: a Stripe hiccup on the transactions list must not
     // hide the ledger figures, and vice versa.
     const summaryRequest = api.finance.summary()
@@ -65,7 +70,9 @@ export default function FinanceScreen() {
       setTransactions(txs.transactions ?? []);
       if (sub) setSubStatus(sub as any);
     } catch {
-      // Keep the empty state when finance data is unavailable.
+      // A failed balance/transactions fetch must render a retry affordance,
+      // never a silent $0.00 — see balanceError below.
+      setBalanceError(true);
     }
     await summaryRequest;
     setLoading(false);
@@ -195,36 +202,48 @@ export default function FinanceScreen() {
       {/* Overview (Stripe balance) — shown when the ledger summary is unavailable */}
       {(isReadOnly || (!summary && summaryError)) && (
       <View style={styles.overviewRow}>
-        {overviewCards.map((card) => (
-          <View key={card.label} style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name={card.icon} size={16} color={card.color} />
-            <Text style={[styles.overviewVal, TABULAR_NUMS, { color: card.color }]}>{card.value}</Text>
-            <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>{card.label}</Text>
+        {!loading && balanceError ? (
+          <View style={[styles.overviewCard, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, alignItems: 'flex-start' }]}>
+            <RetryRow label="Couldn't load balance" onRetry={load} />
           </View>
-        ))}
+        ) : (
+          overviewCards.map((card) => (
+            <View key={card.label} style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Feather name={card.icon} size={16} color={card.color} />
+              <Text style={[styles.overviewVal, TABULAR_NUMS, { color: card.color }]}>{card.value}</Text>
+              <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>{card.label}</Text>
+            </View>
+          ))
+        )}
       </View>
       )}
 
       {/* P&L */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Summary</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {PL_DATA_FALLBACK.map((item, i) => (
-          <View
-            key={item.label}
-            style={[
-              styles.plRow,
-              i > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
-              item.highlight && { backgroundColor: colors.accent },
-            ]}
-          >
-            <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
-              {item.label}
-            </Text>
-            <Text style={[styles.plValue, TABULAR_NUMS, { color: item.positive ? (item.highlight ? colors.primary : colors.success) : colors.destructive, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
-              {item.value}
-            </Text>
+        {!loading && balanceError ? (
+          <View style={{ padding: 16, alignItems: 'flex-start' }}>
+            <RetryRow label="Couldn't load summary" onRetry={load} />
           </View>
-        ))}
+        ) : (
+          PL_DATA_FALLBACK.map((item, i) => (
+            <View
+              key={item.label}
+              style={[
+                styles.plRow,
+                i > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
+                item.highlight && { backgroundColor: colors.accent },
+              ]}
+            >
+              <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
+                {item.label}
+              </Text>
+              <Text style={[styles.plValue, TABULAR_NUMS, { color: item.positive ? (item.highlight ? colors.primary : colors.success) : colors.destructive, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
+                {item.value}
+              </Text>
+            </View>
+          ))
+        )}
       </View>
 
       {/* Recent Transactions */}
@@ -232,6 +251,10 @@ export default function FinanceScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ margin: 20 }} />
+        ) : balanceError ? (
+          <View style={{ padding: 20, alignItems: 'flex-start' }}>
+            <RetryRow label="Couldn't load transactions" onRetry={load} />
+          </View>
         ) : expenseRows.length === 0 ? (
           <View style={{ padding: 20, alignItems: 'center' }}>
             <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>

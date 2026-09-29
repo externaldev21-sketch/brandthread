@@ -593,8 +593,41 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   dropId: uuid('drop_id'),                  // server-derived from the products
   platformFeeCents: integer('platform_fee_cents'),
   processingFeeEstimateCents: integer('processing_fee_estimate_cents'),
+  // One-page checkout (in-app PaymentIntent, chargeModel 'transfer'): this
+  // seller group's share of the cart's single PaymentIntent, fixed when the
+  // intent was created. The paid webhook builds the order from these instead
+  // of a Stripe Checkout Session's totals. NULL for hosted-Checkout rows.
+  amountTotalCents: integer('amount_total_cents'),
+  shippingCents: integer('shipping_cents'),
+  taxCents: integer('tax_cents'),
+  stripeTaxCalculationId: text('stripe_tax_calculation_id'),
+  stripePaymentIntentId: text('stripe_payment_intent_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (t) => ({
+  paymentIntentIdx: index('checkout_sessions_payment_intent_idx').on(t.stripePaymentIntentId),
+}));
+
+// ─── Stock reservations ───────────────────────────────────────────────────────
+// One-page checkout reserves stock when the PaymentIntent is created, with a
+// single conditional UPDATE per variant (stock = stock - n WHERE stock >= n),
+// so two buyers can never both pay for the last unit. A reservation is
+// committed by the paid webhook (the order then skips its own decrement) or
+// released (stock added back) on payment failure, cancel, or expiry.
+export const stockReservations = pgTable('stock_reservations', {
+  id:                uuid('id').primaryKey().defaultRandom(),
+  checkoutSessionId: uuid('checkout_session_id').notNull(),
+  variantId:         uuid('variant_id').notNull(),
+  quantity:          integer('quantity').notNull(),
+  /** 'held' | 'committed' | 'released' */
+  status:            text('status').notNull().default('held'),
+  stripePaymentIntentId: text('stripe_payment_intent_id'),
+  expiresAt:         timestamp('expires_at').notNull(),
+  createdAt:         timestamp('created_at').defaultNow().notNull(),
+  updatedAt:         timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  checkoutIdx: index('stock_reservations_checkout_idx').on(t.checkoutSessionId),
+  statusExpiresIdx: index('stock_reservations_status_expires_idx').on(t.status, t.expiresAt),
+}));
 
 // ─── Buyer address book ─────────────────────────────────────────────────────
 // Addresses belong to the Clerk buyer ID, never to a caller supplied user ID.
@@ -1830,6 +1863,21 @@ export const liveComments = pgTable('live_comments', {
   createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   streamCreatedIdx: index('live_comments_stream_created_idx').on(table.streamId, table.createdAt),
+}));
+
+// Presence-based viewer tracking (migration 105) — see that file for why
+// this replaced the old increment/decrement counter on
+// live_streams.viewer_count. One row per (stream_id, viewer); refreshed by
+// a WebSocket heartbeat (preferred) or an HTTP heartbeat fallback every
+// ~15s. viewer_count/peak_viewer_count are derived from this table by
+// jobs/liveViewersPresence.ts, not written here directly.
+export const liveViewers = pgTable('live_viewers', {
+  streamId:           uuid('stream_id').notNull().references(() => liveStreams.id, { onDelete: 'cascade' }),
+  userIdOrSessionId:  text('user_id_or_session_id').notNull(),
+  lastSeen:           timestamp('last_seen', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.streamId, table.userIdOrSessionId] }),
+  streamLastSeenIdx: index('live_viewers_stream_last_seen_idx').on(table.streamId, table.lastSeen),
 }));
 
 // ─── Seller Tax Configuration ─────────────────────────────────────────────────

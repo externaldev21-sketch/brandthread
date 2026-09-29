@@ -1,8 +1,10 @@
 /**
- * Guards for the checkout redesign (GOAT Order Review–based rebuild):
+ * Guards for the one-page checkout (Shop "Review & Pay"–based rebuild):
  *  - no pressable nested inside another pressable anywhere on the screen
  *    (the Discover "For You" nested-<button> bug class, fixed in #213);
- *  - the price breakdown renders once, the footer CTA carries the total;
+ *  - flat black page: no card containers, hairline dividers, a header bar
+ *    fully below the notch;
+ *  - the price breakdown renders once, the sticky CTA carries the total;
  *  - terms are a plain line with links, not a checkbox;
  *  - no-bounce scroll views; the chat composer's bottom-inset floor.
  */
@@ -64,33 +66,45 @@ describe('checkout never nests a pressable inside another pressable', () => {
 
 describe('checkout screen structure', () => {
   const screen = read('app/buyer-checkout.tsx');
+  const primitives = read('components/checkout/CheckoutPrimitives.tsx');
 
-  it('has a Checkout title and a close (X) button', () => {
+  it('has a Checkout title and a close (X) button in an opaque bar below the notch', () => {
     expect(screen).toContain("header('Checkout', leaveCheckout, 'Close checkout')");
     expect(screen).toContain('name="x"');
+    expect(screen).toContain('const HEADER_WEB_MIN_TOP = 54;');
+    expect(screen).toContain("Platform.OS === 'web' ? Math.max(insets.top, HEADER_WEB_MIN_TOP) : insets.top");
+    expect(screen).toMatch(/header: \{[^}]*backgroundColor: CK\.bg/);
   });
 
-  it('renders the price breakdown exactly once and puts the live total in the CTA label', () => {
-    expect(screen.match(/<PriceBreakdownCard\b/g)).toHaveLength(1);
-    expect(screen).toContain("`${canRetryPayment ? 'Try again' : 'Place order'} · ${formatCents(totals.totalCents)}`");
-    // No separate "Total" row in the sticky footer any more.
-    expect(screen).not.toContain('stickyTotalRow');
+  it('is one flat page: no card containers, hairline dividers, uppercase section labels', () => {
+    for (const file of CHECKOUT_FILES) {
+      const source = read(file);
+      expect(source, file).not.toMatch(/\bCheckoutCard\b/);
+      expect(source, file).not.toMatch(/from '@\/components\/ui\/Glass'/);
+    }
+    expect(primitives).toContain("divider: 'rgba(255,255,255,0.08)'");
+    expect(primitives).toContain("bg: '#000000'");
+    expect(primitives).toContain("textTransform: 'uppercase'");
+    // Contact, shipping and payment all live on this one screen: no address sheet, no second screen.
+    expect(screen).toContain('<ContactSection');
+    expect(screen).toContain('<ShippingSection');
+    expect(screen).toContain('<PaymentSection');
+    expect(read('components/checkout/ShippingSection.tsx')).not.toContain('<Modal');
   });
 
-  it('item 110: the breakdown folds into the footer total, a sibling of Place order', () => {
-    const footer = screen.slice(screen.indexOf('<StickyFooter'), screen.indexOf('</StickyFooter>'));
-    expect(footer).toContain('<PriceBreakdownCard');
-    expect(footer).toContain('collapsible={{');
-    // The toggle and Place order are separate controls, not nested.
-    expect(footer.indexOf('<PriceBreakdownCard')).toBeLessThan(footer.indexOf('testID="checkout-place-order"'));
-    const card = read('components/checkout/PriceBreakdownCard.tsx');
-    expect(card).toContain('Easing.out(Easing.cubic)');
-    expect(card).not.toMatch(/Animated\.spring|bounciness/);
-    expect(card).toContain('isReduceMotionEnabled');
-    expect(card).toContain('accessibilityState={{ expanded }}');
+  it('renders the price breakdown exactly once and puts the live total in the Pay button', () => {
+    expect(screen.match(/<OrderSummarySection\b/g)).toHaveLength(1);
+    expect(screen).toContain('`Pay ${formatCents(totals.totalCents)}`');
   });
 
-  it('gates Place order on checkoutReadiness and shows what is missing', () => {
+  it('shows a real delivery window, never "Rate set by seller"', () => {
+    for (const file of [...CHECKOUT_FILES, 'services/cartService.ts']) {
+      expect(read(file), file).not.toContain('Rate set by seller');
+    }
+    expect(read('components/checkout/OrderSummarySection.tsx')).toContain('deliveryWindowLabel(');
+  });
+
+  it('gates Pay on checkoutReadiness and shows what is missing', () => {
     expect(screen).toContain('getCheckoutBlockingSection(contact, address, current) === null');
     expect(screen).toContain('disabled={!ready}');
     expect(screen).toContain('getCheckoutNextStepHint(');
@@ -110,8 +124,8 @@ describe('checkout screen structure', () => {
   });
 
   it('never bounces its scroll views', () => {
-    const scrollViews = [screen, read('components/checkout/ShippingAddressCard.tsx')]
-      .flatMap(source => source.split('<ScrollView').slice(1))
+    const scrollViews = [screen, primitives]
+      .flatMap(source => source.split(/<(?:ScrollView|FlatList)/).slice(1))
       // Skip type arguments like useRef<ScrollView>(null) — only JSX tags.
       .filter(chunk => /^\s/.test(chunk))
       .map(chunk => chunk.slice(0, tagEnd(chunk, 0)));
@@ -122,8 +136,16 @@ describe('checkout screen structure', () => {
     }
   });
 
-  it('keeps every existing payment/order call', () => {
+  it('pays in the app with one PaymentIntent, and keeps the hosted flow as the fallback', () => {
     for (const call of [
+      'api.buyer.checkout.paymentIntent.create(buildCreatePaymentIntentBody(',
+      'api.buyer.checkout.paymentIntent.quote(',
+      'api.buyer.checkout.paymentIntent.get(',
+      'api.buyer.checkout.paymentIntent.cancel(',
+      'controller.confirmCard(',
+      'controller.confirmSaved(',
+      'choosePaymentPath(',
+      // hosted fallback, unchanged
       'api.buyer.checkout.createSession(',
       'api.guest.checkout.createSession(',
       'WebBrowser.openBrowserAsync(result.url)',
@@ -132,16 +154,52 @@ describe('checkout screen structure', () => {
       'validateCart(',
       'removeCartItems(',
       'api.buyer.addresses.create(',
-      "trackAndRelayConversionEvent(\n            'Purchase'",
       "createCheckoutSession(cart, source === 'buynow')",
     ]) {
       expect(screen).toContain(call);
     }
+    // Preview keeps its no-Stripe path.
+    expect(screen).toContain('placePreviewOrder(');
   });
 
   it('routes Track order with the verified order id only', () => {
     const confirmation = read('components/checkout/OrderConfirmation.tsx');
     expect(confirmation).toContain("'/buyer-order-detail?id=' + encodeURIComponent(firstVerified.id)");
     expect(confirmation).toContain('disabled={!firstVerified?.id}');
+  });
+});
+
+describe('order confirmation actions', () => {
+  const confirmation = read('components/checkout/OrderConfirmation.tsx');
+  const actions = confirmation.slice(confirmation.indexOf('export function OrderConfirmationActions'), confirmation.indexOf('const styles = StyleSheet.create'));
+
+  it('pins ONE primary button (Track order, or Check order status while finalizing)', () => {
+    expect(actions.match(/<Button\b/g)).toHaveLength(2); // the finalizing and the confirmed branch, one each
+    expect(actions).toContain('label="Track order"');
+    expect(actions).not.toContain('View receipt');
+    expect(actions).not.toContain('Continue shopping');
+    expect(actions).not.toContain('Create an account');
+  });
+
+  it('moves View receipt, Continue shopping and Create an account into the scroll content as text rows', () => {
+    const content = confirmation.slice(0, confirmation.indexOf('export function OrderConfirmationActions'));
+    expect(content).toContain('label="View receipt"');
+    expect(content).toContain('label="Continue shopping"');
+    expect(content).toMatch(/label="Create an account[^"]*"\s+onPress=\{[^}]+\}\s+subtle/);
+    expect(content).not.toMatch(/<Button[^>]*View receipt/);
+  });
+});
+
+describe('cart matches the flat checkout', () => {
+  const cart = read('app/(buyer)/cart.tsx');
+
+  it('has no card containers, only checkout sections and hairlines', () => {
+    expect(cart).not.toMatch(/<Card\b/);
+    expect(cart).toContain("import { CK, CheckoutSection } from '@/components/checkout/CheckoutPrimitives'");
+    expect(cart).toContain('<CheckoutSection first={first}');
+    expect(cart).toContain('<CheckoutSection title="Order summary"');
+    expect(cart).not.toMatch(/cardGlass|cardElevatedGlass, borderBottomWidth/);
+    expect(cart).toContain('backgroundColor: CK.bg');
+    expect(cart).not.toContain('opacity: 0.06');
   });
 });

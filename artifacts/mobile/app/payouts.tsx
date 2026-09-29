@@ -9,6 +9,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
@@ -208,14 +209,18 @@ export default function PayoutsScreen() {
         <Text style={styles.balanceHeroLabel}>Available balance</Text>
         {loading ? (
           <LoadingSkeleton height={44} style={{ width: 160, marginTop: 6, marginBottom: 6 }} />
+        ) : loadError ? (
+          <View style={{ marginTop: 6, marginBottom: 6 }}>
+            <RetryRow label="Couldn't load balance" onRetry={() => { haptic(); void load(); }} />
+          </View>
         ) : (
           <Text style={styles.balanceHeroAmount}>{availFmt}</Text>
         )}
-        <Text style={styles.balanceHeroSub}>Next payout {nextDate}</Text>
+        <Text style={styles.balanceHeroSub}>{loadError ? '—' : `Next payout ${nextDate}`}</Text>
         <View style={styles.balanceDivider} />
         <View style={styles.balancePendingRow}>
           <Text style={styles.balancePendingLabel}>Pending</Text>
-          <Text style={styles.balancePendingAmount}>{pendFmt}</Text>
+          <Text style={styles.balancePendingAmount}>{loadError ? '—' : pendFmt}</Text>
         </View>
       </View>
 

@@ -15,7 +15,9 @@ import { startStoryCleanupJob } from "./jobs/storyCleanup";
 import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
 import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
 import { startLiveRecordingFinalizeJob } from "./jobs/liveRecordingFinalize";
+import { startLiveViewersPresenceJob } from "./jobs/liveViewersPresence";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
+import { attachLiveWebSocket } from "./ws/liveHub";
 import { pool } from "@workspace/db";
 
 validateEnv();
@@ -43,6 +45,10 @@ const server = app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
+  // Live-stream WebSocket — attached to this same HTTP server (upgrade
+  // requests to /ws/live), not a second port.
+  attachLiveWebSocket(server);
+
   // Ensure Stripe webhook endpoint includes all required event types
   // (especially customer.subscription.* for live seller subscription updates)
   ensureWebhookEvents().catch((err) =>
@@ -62,6 +68,7 @@ const server = app.listen(port, (err) => {
   startPushReceiptCleanupJob();
   startNotificationBatchFlushJob();
   startLiveRecordingFinalizeJob();
+  startLiveViewersPresenceJob();
 });
 
 // ─── Graceful shutdown ──────────────────────────────────────────────────────

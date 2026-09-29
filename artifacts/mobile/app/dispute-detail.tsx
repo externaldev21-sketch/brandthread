@@ -11,6 +11,8 @@ import { useApi } from '@/lib/api';
 import { Dispute, DisputeEvidence, DISPUTE_TYPES } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { RetryRow } from '@/components/ui/RetryRow';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -86,6 +88,9 @@ export default function DisputeDetailScreen() {
   const [order, setOrder] = useState<any | null>(null);
   const [dispute, setDispute] = useState<Dispute | null>(null);
   const [loading, setLoading] = useState(true);
+  // A failed real fetch must show a retry affordance, never the demo
+  // orderService fallback — that path is preview-only from here on.
+  const [loadError, setLoadError] = useState(false);
   const [evidenceType, setEvidenceType] = useState<EvidenceType>('tracking');
   const [evidenceDesc, setEvidenceDesc] = useState('');
   const [submittingEvidence, setSubmittingEvidence] = useState(false);
@@ -96,6 +101,7 @@ export default function DisputeDetailScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       // Try real API first (requires disputeId to be the DB UUID)
       if (disputeId) {
@@ -133,9 +139,23 @@ export default function DisputeDetailScreen() {
         setLoading(false);
         return;
       }
-    } catch (_) { /* fall through to legacy path */ }
+    } catch (_) {
+      // Real API failed. In a production build this must surface as an
+      // honest retry state — never fall through to fabricated demo data on
+      // a dispute, which is a financial/legal surface. The orderService
+      // demo fallback below is reachable ONLY in preview mode (bt_preview),
+      // matching how other screens (e.g. thread-cash.tsx) gate sample data.
+      if (!isSellerDevPreview()) {
+        setLoadError(true);
+        setLoading(false);
+        return;
+      }
+    }
 
-    // Legacy path: load from orderService (demo data)
+    // Preview-only legacy path: load sample data from orderService so the
+    // seller preview (?bt_preview=seller) still has something to show.
+    // Unreachable in a real production build — see the isSellerDevPreview()
+    // guard above.
     try {
       const { getOrder } = await import('@/services/orderService');
       const o = await getOrder(orderId);
@@ -150,7 +170,9 @@ export default function DisputeDetailScreen() {
         const d = o.disputes.find(x => x.id === disputeId);
         setDispute(d ?? null);
       }
-    } catch (_) {}
+    } catch (_) {
+      setLoadError(true);
+    }
     setLoading(false);
   }, [orderId, disputeId]);
 
@@ -159,7 +181,13 @@ export default function DisputeDetailScreen() {
   if (loading || !dispute || !order) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.loadingText}>{loading ? 'Loading…' : 'Dispute not found.'}</Text>
+        {loading ? (
+          <Text style={styles.loadingText}>Loading…</Text>
+        ) : loadError ? (
+          <RetryRow label="Couldn't load dispute" onRetry={() => void load()} />
+        ) : (
+          <Text style={styles.loadingText}>Dispute not found.</Text>
+        )}
       </View>
     );
   }

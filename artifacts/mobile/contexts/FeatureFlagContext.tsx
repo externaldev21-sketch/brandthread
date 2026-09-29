@@ -11,7 +11,8 @@ export type FeatureFlagKey =
   | 'threadCashCheckoutDiscount'
   | 'threadCashSend'
   | 'oauthGoogleEnabled'
-  | 'oauthAppleEnabled';
+  | 'oauthAppleEnabled'
+  | 'hostedCheckoutFallback';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -34,6 +35,9 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   // kill switch) — this fallback only covers the brief window before the
   // real flags load.
   threadCashSend: true,
+  // One-page checkout kill switch (migration 107): ON sends every buyer back
+  // to Stripe-hosted Checkout instead of paying in the app.
+  hostedCheckoutFallback: false,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';

@@ -16,11 +16,19 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import type {
+  CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
+} from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
   `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+
+/** The api-server's own base URL — exported so callers that need a raw
+ * WebSocket connection (see lib/live/useLiveSocket.ts) can derive a
+ * ws(s):// URL from the same host this client already talks to over HTTP. */
+export const API_BASE_URL = BASE;
 
 /**
  * Every request gets a hard ceiling so a hung connection (dead server, black
@@ -1359,6 +1367,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             /** Plain-language decline reason from Stripe, when available. Never a raw Stripe string. */
             declineReason: string | null;
           }>(`/api/buyer/checkout/session/${encodeURIComponent(sessionId)}`),
+        /**
+         * One-page checkout: ONE PaymentIntent for the whole cart, confirmed
+         * in the app with Stripe's own fields (routes/checkout-intent.ts).
+         * Bodies come only from lib/checkoutPayment.ts's whitelisted builders,
+         * so no card data can ever be sent here.
+         */
+        paymentIntent: {
+          quote: (body: QuoteBody) => post<CartQuote>('/api/buyer/checkout/payment-intent/quote', body),
+          create: (body: CreatePaymentIntentBody) => post<PaymentIntentStart>('/api/buyer/checkout/payment-intent', body),
+          get: (paymentIntentId: string) =>
+            get<PaymentIntentStatus>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}`),
+          cancel: (paymentIntentId: string) =>
+            post<{ ok: boolean }>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}/cancel`, {}),
+        },
       },
       orders: {
         list:   () => get<any[]>('/api/buyer/orders'),
@@ -2499,6 +2521,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get:            (id: string) => get<{ stream: any }>(`/api/live/${encodeURIComponent(id)}`),
       join:           (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/join`, {}),
       leave:          (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/leave`, {}),
+      /** HTTP presence fallback — only used when the WebSocket can't connect (see lib/live/useLiveSocket.ts). */
+      heartbeat:      (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/heartbeat`, {}),
       end:            (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/end`, {}),
       updateProducts: (id: string, productTags: any[]) =>
         patch<any>(`/api/live/${encodeURIComponent(id)}/products`, { productTags }),

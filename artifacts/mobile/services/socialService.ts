@@ -917,7 +917,25 @@ export async function getFriendRequests(k: SocialKeys = K()): Promise<FriendRequ
   return load<FriendRequest[]>(k.requests, []);
 }
 export async function getFriendSuggestions(): Promise<FriendSuggestion[]> {
-  return Promise.resolve([]);
+  const remote = await serviceRequest<Array<{
+    userId: string; name: string; handle: string; initials: string; color: string;
+    reason: string; mutualCount: number;
+  }>>('/api/social/suggested');
+  if (!Array.isArray(remote)) return [];
+  return remote.map((row) => ({
+    id: row.userId,
+    userId: row.userId,
+    name: row.name,
+    handle: row.handle,
+    initials: row.initials,
+    color: row.color,
+    reason: row.reason,
+    mutualCount: row.mutualCount,
+  }));
+}
+/** Dismisses one suggestion (e.g. "Not interested") so /suggested stops offering it. */
+export async function dismissFriendSuggestion(userId: string): Promise<void> {
+  await serviceRequest(`/api/social/suggested/${encodeURIComponent(userId)}/dismiss`, { method: 'POST' });
 }
 export async function isFriend(userId: string): Promise<boolean> {
   const k = K();
@@ -1337,6 +1355,7 @@ export async function trackStoryView(storyId: string): Promise<void> {
   });
 }
 export async function deleteStory(storyId: string): Promise<void> {
+  await serviceRequest(`/api/social/stories/${encodeURIComponent(storyId)}`, { method: 'DELETE' });
   const k = K();
   const stories = await loadStories(k);
   await save(k.stories, stories.filter(s => s.id !== storyId)); notify();

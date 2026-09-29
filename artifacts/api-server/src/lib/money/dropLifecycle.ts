@@ -13,6 +13,7 @@ import { logger } from "../logger";
 import { publishNotification } from "../../routes/notifications-feed";
 import { reversePurchasePointsOnce } from "../../routes/loyalty";
 import { advanceDropEscrow, recoverLabelCost, sweepOrderReleases } from "./escrow";
+import { expireStockReservations, sweepTransferOrders } from "./cartTransfers";
 import { refundOrder, RefundError } from "./refunds";
 import { DROP_OPEN_STATES, orderStatusMachine, type OrderStatus } from "./stateMachines";
 
@@ -163,6 +164,8 @@ export async function failDrop(
  *  2. Keep retrying drops that are mid-failure.
  *  3. Finish per-order releases left behind by a crash or Stripe outage.
  *  4. Retry label-cost recovery for in-stock orders.
+ *  5. One-page checkout: retry seller transfers that didn't go out, and give
+ *     back stock held by abandoned payments (lib/money/cartTransfers.ts).
  */
 export async function runMoneySweep(now = new Date()): Promise<{
   failedDrops: DropFailureSummary[];
@@ -206,12 +209,19 @@ export async function runMoneySweep(now = new Date()): Promise<{
 
   const unrecovered = rows<{ id: string }>(await db.execute(sql`
     SELECT l.id FROM shipping_labels l JOIN orders o ON o.id = l.order_id
-    WHERE o.charge_model = 'destination' AND l.status = 'active'
+    WHERE o.charge_model IN ('destination', 'transfer') AND l.status = 'active'
       AND EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label/' || l.id)
       AND NOT EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label-recovery/' || l.id)
     LIMIT 100
   `));
   for (const label of unrecovered) await recoverLabelCost(label.id);
+
+  try {
+    await sweepTransferOrders();
+    await expireStockReservations({ now });
+  } catch (error) {
+    logger.error({ err: error }, "One-page checkout sweep failed; the next run retries");
+  }
 
   return { failedDrops, completedDrops, releasesSettled };
 }
