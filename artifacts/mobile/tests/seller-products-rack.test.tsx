@@ -93,6 +93,11 @@ vi.mock('@expo/vector-icons', () => ({
     React.createElement('Feather', { name, color }),
 }));
 
+vi.mock('expo-linear-gradient', () => ({
+  LinearGradient: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('LinearGradient', props, children),
+}));
+
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn().mockResolvedValue(undefined),
   notificationAsync: vi.fn().mockResolvedValue(undefined),
@@ -107,6 +112,7 @@ vi.mock('expo-router', () => ({
     const React = require('react') as typeof import('react');
     React.useEffect(callback, [callback]);
   },
+  useLocalSearchParams: () => ({}),
   useScrollToTop: () => {},
 }));
 
@@ -149,6 +155,7 @@ vi.mock('@/lib/theme', () => ({
   RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, xl: 22, pill: 999 },
   COMP: { tabBarH: 64, iconBtn: 40, minTouchTarget: 44 },
   ICON: { xs: 12, sm: 16, md: 20, lg: 24, xl: 28, xxl: 40 },
+  GRAD_DARK_FADE: ['rgba(10,10,11,0)', 'rgba(10,10,11,1)'],
 }));
 
 vi.mock('@/components/BrandthreadUI', () => {

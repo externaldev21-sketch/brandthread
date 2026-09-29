@@ -53,7 +53,6 @@ import { clearCartCache, initCartService } from '@/services/cartService';
 import { initDesignService } from '@/services/designService';
 import { initProductService } from '@/services/productService';
 import { initOrderService } from '@/services/orderService';
-import { initInventoryService } from '@/services/inventoryService';
 import { initAnalyticsService } from '@/services/analyticsService';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
@@ -778,7 +777,6 @@ function ServiceConfigurer() {
     initBuyerProfile(newUserId);
     initProductService(newUserId);
     initOrderService(newUserId);
-    initInventoryService(newUserId);
     initAnalyticsService(newUserId);
 
     if (!newUserId || !isSignedIn) return;
@@ -1085,7 +1083,6 @@ function RootLayoutNav() {
         <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="inventory"        options={{ headerShown: false }} />
         <Stack.Screen name="store-builder"    options={{ headerShown: false }} />
         <Stack.Screen name="content"          options={{ headerShown: false }} />
         <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1107,12 +1104,6 @@ function RootLayoutNav() {
         <Stack.Screen name="refund-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="dispute-detail"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-order-detail"  options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="inventory-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="inventory-adjust"   options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="inventory-transfer" options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="inventory-incoming" options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="inventory-count"    options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="inventory-location" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-generate"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="store-generating"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="store-theme-picker"   options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1139,7 +1130,6 @@ function RootLayoutNav() {
         <Stack.Screen name="analytics-content"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="analytics-store"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="analytics-marketing"   options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="analytics-inventory"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="analytics-production"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer commerce screens */}

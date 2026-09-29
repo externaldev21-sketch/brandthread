@@ -52,12 +52,16 @@ interface ProductCardProps {
   onMore: (product: Product) => void;
   onQuickArchive: (product: Product) => void;
   onQuickDelete: (product: Product) => void;
+  /** Opens the quick per-variant stock editor. Tapping the stock chip/label
+   *  specifically (not the rest of the card) — same nested-pressable-inside-
+   *  the-card pattern already used by the "more" button below. */
+  onEditStock: (product: Product) => void;
 }
 
 // Memoized with stable handlers so a recycled card only re-renders when its
 // own product changes, not on every search keystroke or stats refresh.
 export const ProductCard = React.memo(function ProductCard({
-  product, width, onPress, onPressIn, onMore, onQuickArchive, onQuickDelete,
+  product, width, onPress, onPressIn, onMore, onQuickArchive, onQuickDelete, onEditStock,
 }: ProductCardProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
@@ -146,11 +150,17 @@ export const ProductCard = React.memo(function ProductCard({
               </View>
             </PressableScale>
 
-            {/* Stock warning chip, bottom of image */}
+            {/* Stock warning chip, bottom of image — tap opens the quick
+                per-variant stock editor. */}
             {(stock === 0 || stock <= threshold) && (
-              <View style={[s.chipBottomLeft, { backgroundColor: stockColor }]}>
+              <PressableScale
+                style={[s.chipBottomLeft, { backgroundColor: stockColor }]}
+                onPress={() => onEditStock(product)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityLabel={`Edit stock for ${product.name}, ${stockLabel}`}
+              >
                 <Text style={s.chipBottomLabel} numberOfLines={1}>{stockLabel}</Text>
-              </View>
+              </PressableScale>
             )}
           </View>
 
@@ -173,7 +183,13 @@ export const ProductCard = React.memo(function ProductCard({
             </View>
 
             {stock > threshold && (
-              <Text style={[s.stock, { color: stockColor }]}>{stockLabel}</Text>
+              <PressableScale
+                onPress={() => onEditStock(product)}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                accessibilityLabel={`Edit stock for ${product.name}, ${stockLabel}`}
+              >
+                <Text style={[s.stock, { color: stockColor }]}>{stockLabel}</Text>
+              </PressableScale>
             )}
           </View>
         </PressableScale>

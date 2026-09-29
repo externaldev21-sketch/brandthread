@@ -12,17 +12,18 @@ import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, Lay
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+import { SellerListHeader, sellerListCountRowStyles } from '@/components/SellerListHeader';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { PrimaryButton, SearchBar, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+import { PrimaryButton, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
-import { IconButton } from '@/components/ui/IconButton';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
+import { StockEditorSheet } from '@/components/products/StockEditorSheet';
 import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, updateProduct } from '@/services/productService';
 import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
@@ -380,15 +381,18 @@ export default function ProductsScreen() {
   const contentWidth = Math.min(screenWidth, 1080) - gridGutter * 2;
   const cardWidth = (contentWidth - gridGap * (gridColumns - 1)) / gridColumns;
 
+  const params = useLocalSearchParams<{ filter?: ProductFilter }>();
   const [products, setProducts] = useState<Product[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [filter, setFilter] = useState<ProductFilter>('all');
+  const [filter, setFilter] = useState<ProductFilter>(params.filter ?? 'all');
   const [sort, setSort] = useState<SortKey>('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionProduct, setActionProduct] = useState<Product | null>(null);
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
   const [quickEditProduct, setQuickEditProduct] = useState<Product | null>(null);
   const [quickEditVisible, setQuickEditVisible] = useState(false);
+  const [stockEditProduct, setStockEditProduct] = useState<Product | null>(null);
+  const [stockEditVisible, setStockEditVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -428,6 +432,17 @@ export default function ProductsScreen() {
       setLoading(false);
     }
   }, [filter, debouncedQuery, loadStats]);
+
+  // Re-apply the ?filter= deep link every time this screen is focused (not
+  // just on first mount) — the seller tab bar keeps this screen mounted
+  // (e.g. SellerDashboardActionNeeded's "N items low on stock" row), so
+  // tapping it a second time needs to re-apply the filter even though
+  // Products never unmounted. Same pattern as orders.tsx's own ?filter=.
+  useFocusEffect(useCallback(() => {
+    const requested = params.filter;
+    const valid: ProductFilter[] = ['all', 'active', 'draft', 'scheduled', 'archived', 'pre-order', 'pre-made', 'low-stock', 'out-of-stock'];
+    if (requested && valid.includes(requested)) setFilter(requested);
+  }, [params.filter]));
 
   // useFocusEffect also re-runs while focused whenever loadProducts changes
   // (filter or search), so a separate mount effect would load everything twice.
@@ -542,6 +557,8 @@ export default function ProductsScreen() {
     { label: 'Active', value: 'active' },
     { label: 'Draft', value: 'draft' },
     { label: 'Archived', value: 'archived' },
+    { label: 'Low Stock', value: 'low-stock' },
+    { label: 'Out of Stock', value: 'out-of-stock' },
   ];
 
   const currentSortLabel = SORT_OPTIONS.find(o => o.key === sort)?.label ?? 'Sort';
@@ -556,6 +573,18 @@ export default function ProductsScreen() {
     setActionProduct(product);
     setActionSheetVisible(true);
   }, []);
+
+  const openStockEditor = useCallback((product: Product) => {
+    hapticPrimaryAction();
+    setStockEditProduct(product);
+    setStockEditVisible(true);
+  }, []);
+
+  const handleStockChanged = useCallback((updated: Product) => {
+    setProducts(prev => prev.map(p => (p.id === updated.id ? updated : p)));
+    setStockEditProduct(updated);
+    void loadStats();
+  }, [loadStats]);
 
   const queryClient = useQueryClient();
   const onProductPressIn = useCallback((product: Product) => {
@@ -577,21 +606,22 @@ export default function ProductsScreen() {
         onMore={openActionSheet}
         onQuickArchive={handleQuickArchive}
         onQuickDelete={handleDelete}
+        onEditStock={openStockEditor}
       />
     </View>
-  ), [openProduct, onProductPressIn, openActionSheet, cardWidth, gridGap]);
+  ), [openProduct, onProductPressIn, openActionSheet, openStockEditor, cardWidth, gridGap]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
   const ListHeader = useMemo(() => (
-    <View style={s.groupHeaderRow}>
-      <Text style={s.groupCount}>{sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}</Text>
+    <View style={sellerListCountRowStyles.row}>
+      <Text style={[sellerListCountRowStyles.text, { color: SUBTLE }]}>{sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}</Text>
     </View>
-  ), [sortedProducts.length]);
+  ), [sortedProducts.length, SUBTLE]);
 
   // Rich, per-filter empty states instead of one generic message.
-  const emptyCopy: Record<ProductFilter, { icon: keyof typeof Feather.glyphMap; message: string }> = {
-    'all': { icon: 'package', message: 'Your first product starts here. Add media, pricing, variants and inventory.' },
+  const emptyCopy: Record<ProductFilter, { icon: keyof typeof Feather.glyphMap; title?: string; message: string }> = {
+    'all': { icon: 'package', title: 'No products yet', message: 'Add your first product to start selling.' },
     'active': { icon: 'check-circle', message: 'No active products yet. Publish a draft to see it here.' },
     'draft': { icon: 'edit-2', message: 'No draft products yet. Start one and finish it later.' },
     'scheduled': { icon: 'clock', message: 'Nothing scheduled. Set a publish date on a draft to line it up.' },
@@ -615,6 +645,7 @@ export default function ProductsScreen() {
       <View style={s.emptyWrap}>
         <EmptyState
           icon={copy.icon}
+          title={copy.title}
           message={copy.message}
           // Every filter's empty state gets a real next step, not just "all".
           actionLabel="Add your first product"
@@ -625,108 +656,57 @@ export default function ProductsScreen() {
   }, [router, filter]);
 
   return (
-    <View style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
+    <View style={[s.root, { paddingTop: topInset + 12, backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
       {/* ── Fixed header ── */}
-      <View style={[s.header, { paddingTop: topInset + 12, backgroundColor: palette.surface ?? BG }]}>
-        {/* Title row */}
-        <View style={s.titleRow}>
-          <PressableScale
-            style={s.titleBtn}
-            onPress={() => {
-              hapticPrimaryAction();
-              Alert.alert('Product view', 'Choose a view', [
-                { text: 'All products', onPress: () => setFilter('all') },
-                { text: 'Collections', onPress: () => router.push('/store-collections' as never) },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            }}
-            accessibilityLabel="Products, choose a view"
-          >
-            <Text style={[s.titleText, { color: palette.foreground ?? FG }]}>Products</Text>
-            <Feather name="chevron-down" size={ICON.sm} color={MUTED} />
-          </PressableScale>
-          <View style={s.titleActions}>
-            <IconButton
-              name="plus"
-              variant="plain"
-              size={ICON.md}
-              color={FG}
-              onPress={() => router.push('/add-product' as never)}
-              accessibilityLabel="Add product"
-            />
-            <IconButton
-              name="more-horizontal"
-              variant="plain"
-              size={ICON.md}
-              color={FG}
-              onPress={() => showActionSheet('Products', 'Choose an action', [
-                { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
-                { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
-                { text: 'Export products', onPress: () => { void handleExportProducts(); } },
-                { text: 'Cancel', style: 'cancel' },
-              ])}
-              accessibilityLabel="More product actions"
-            />
-          </View>
-        </View>
-
-        {/* Persistent search row */}
-        <View style={s.searchRow}>
-          {/* Overnight batch item 37: SearchBar is the box now (no border, at
-              rest or focus) — the outer `searchBox` wrapper used to draw a
-              second bordered card around it, and this file's own
-              `searchInput` style forced SearchBar's own fill to transparent
-              to compensate, which is exactly the doubled-up "rectangle bar"
-              the owner flagged. */}
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search products…"
-            style={s.searchBarFlex}
-          />
-          <PressableScale
-            style={[s.controlBtn, hasActiveFilter && s.controlBtnActive]}
-            onPress={() => { hapticPrimaryAction(); setFilterModalVisible(true); }}
-            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-            accessibilityLabel={hasActiveFilter ? `Filter: ${filter}` : 'Filter products'}
-          >
-            <Feather name="sliders" size={ICON.xs} color={hasActiveFilter ? PURPLE_LIGHT : MUTED} />
-          </PressableScale>
-          <PressableScale
-            style={s.controlBtn}
-            onPress={() => { hapticPrimaryAction(); setSortModalVisible(true); }}
-            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-            accessibilityLabel={`Sort: ${currentSortLabel}`}
-          >
-            <Feather name="chevrons-down" size={ICON.xs} color={MUTED} />
-          </PressableScale>
-        </View>
-
-        {/* Status pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.pillsRow}
-        >
-          {filterPills.map(pill => (
-            <FilterChip
-              key={pill.value}
-              label={pill.label}
-              active={filter === pill.value}
-              onPress={() => {
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                setFilter(pill.value);
-              }}
-              count={
-                pill.value === 'active' ? stats?.active ?? 0 :
-                pill.value === 'draft' ? stats?.draft ?? 0 :
-                pill.value === 'archived' ? stats?.archived ?? 0 :
-                undefined
-              }
-            />
-          ))}
-        </ScrollView>
-      </View>
+      <SellerListHeader
+        title="Products"
+        onTitlePress={() => {
+          hapticPrimaryAction();
+          Alert.alert('Product view', 'Choose a view', [
+            { text: 'All products', onPress: () => setFilter('all') },
+            { text: 'Collections', onPress: () => router.push('/store-collections' as never) },
+            { text: 'Cancel', style: 'cancel' },
+          ]);
+        }}
+        titleAccessibilityLabel="Products, choose a view"
+        actions={[
+          { icon: 'plus', onPress: () => router.push('/add-product' as never), accessibilityLabel: 'Add product' },
+          {
+            icon: 'more-horizontal',
+            onPress: () => showActionSheet('Products', 'Choose an action', [
+              { text: 'Import products (CSV)', onPress: () => router.push('/product-import' as never) },
+              { text: 'Import from Shopify', onPress: () => router.push('/shopify-import' as never) },
+              { text: 'Export products', onPress: () => { void handleExportProducts(); } },
+              { text: 'Cancel', style: 'cancel' },
+            ]),
+            accessibilityLabel: 'More product actions',
+          },
+        ]}
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search products…"
+        onFilterPress={() => { hapticPrimaryAction(); setFilterModalVisible(true); }}
+        hasActiveFilter={hasActiveFilter}
+        filterAccessibilityLabel={hasActiveFilter ? `Filter: ${filter}` : 'Filter products'}
+        onSortPress={() => { hapticPrimaryAction(); setSortModalVisible(true); }}
+        sortAccessibilityLabel={`Sort: ${currentSortLabel}`}
+        chips={filterPills.map(pill => ({
+          key: pill.value,
+          label: pill.label,
+          active: filter === pill.value,
+          onPress: () => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setFilter(pill.value);
+          },
+          count:
+            pill.value === 'active' ? stats?.active ?? 0 :
+            pill.value === 'draft' ? stats?.draft ?? 0 :
+            pill.value === 'archived' ? stats?.archived ?? 0 :
+            pill.value === 'low-stock' ? stats?.lowStock ?? 0 :
+            pill.value === 'out-of-stock' ? stats?.outOfStock ?? 0 :
+            undefined,
+        }))}
+      />
 
       {/* ── Product grid ── */}
       {loading && sortedProducts.length === 0 ? (
@@ -793,6 +773,14 @@ export default function ProductsScreen() {
         }}
         onClose={() => setSortModalVisible(false)}
       />
+
+      {/* Quick stock editor — tapping a card's stock chip/label opens this. */}
+      <StockEditorSheet
+        product={stockEditProduct}
+        visible={stockEditVisible}
+        onClose={() => setStockEditVisible(false)}
+        onChanged={handleStockChanged}
+      />
     </View>
   );
 }
@@ -807,80 +795,6 @@ const createStyles = (theme: any) => {
   root: {
     flex: 1,
     backgroundColor: SCREEN_BG,
-  },
-
-  // Header
-  header: {
-    backgroundColor: BG,
-    paddingBottom: 0,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    minHeight: COMP.minTouchTarget,
-  },
-  titleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  titleText: {
-    fontSize: 20,
-    fontFamily: FONT.bold,
-    color: FG,
-    letterSpacing: -0.4,
-  },
-  titleActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-  },
-
-  // Search row
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-  },
-  searchBarFlex: { flex: 1, height: 36 },
-  controlBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: CARD,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  controlBtnActive: {
-    borderColor: BORDER_ACTIVE,
-    backgroundColor: PURPLE_DIM,
-  },
-
-  // Status pills row
-  pillsRow: {
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    paddingTop: 2,
-    gap: SP.xs,
-  },
-
-  // Grid section header ("N products")
-  groupHeaderRow: {
-    paddingHorizontal: SP.xs,
-    paddingBottom: SP.sm,
-    paddingTop: SP.sm,
-  },
-  groupCount: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: SUBTLE,
   },
 
   emptyWrap: {

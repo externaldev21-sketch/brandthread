@@ -80,8 +80,8 @@ describe('Default pinned shortcuts', () => {
 describe('Pin / unpin / reorder — pure array helpers', () => {
   it('pinItem appends a new id without mutating the input', () => {
     const before = ['orders'];
-    const after = pinItem(before, 'inventory');
-    expect(after).toEqual(['orders', 'inventory']);
+    const after = pinItem(before, 'discounts');
+    expect(after).toEqual(['orders', 'discounts']);
     expect(before).toEqual(['orders']); // unmutated
   });
 
@@ -140,10 +140,10 @@ describe('Account switch — loads correct pins per user', () => {
   beforeEach(() => { clearStore(); vi.clearAllMocks(); });
 
   it('loads user A pins without mixing user B pins', async () => {
-    await savePinnedIds('user_alice', ['payouts', 'inventory']);
+    await savePinnedIds('user_alice', ['payouts', 'discounts']);
     await savePinnedIds('user_bob', ['analytics']);
 
-    expect(await loadPinnedIds('user_alice')).toEqual(['payouts', 'inventory']);
+    expect(await loadPinnedIds('user_alice')).toEqual(['payouts', 'discounts']);
     expect(await loadPinnedIds('user_bob')).toEqual(['analytics']);
   });
 
