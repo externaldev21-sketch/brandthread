@@ -37,7 +37,7 @@ import { ResponsiveContainer, SkeletonBlock, useBreakpoint } from '@/components/
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { bucketLabel, type SellerHomeTimeRange } from '@/lib/sellerHomeChartLabels';
-import { isSellerDevPreview, isSellerPreviewDemoMode } from '@/lib/devPreview';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { formatCents } from '@/lib/money';
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
@@ -252,11 +252,12 @@ export default function SellerHomeCommerceDashboard({
     // reported bug (every range showing the same stale bucket data, "Year"
     // relabeling the current month 8x instead of 12 distinct trailing
     // months). Generate deterministic local chart data instead: a flat $0
-    // baseline by default (a brand-new seller, never fake activity), or a
-    // realistic, range-varying curve behind the explicit ?demo=1 flag. See
-    // lib/previewSellerChartData.ts and lib/devPreview.ts.
+    // baseline in fresh mode (a brand-new seller, never fake activity), or a
+    // realistic, range-varying curve in demo mode (isPreviewDemoMode() —
+    // explicit ?demo=1 opt-in). See lib/previewSellerChartData.ts and
+    // lib/devPreview.ts.
     if (isSellerDevPreview()) {
-      const next = buildPreviewSellerAnalytics(range, isSellerPreviewDemoMode() ? 'demo' : 'fresh');
+      const next = buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh');
       setAnalyticsError(false);
       setSnapshot({ key: requestKey, data: next });
       setLoading(false);
