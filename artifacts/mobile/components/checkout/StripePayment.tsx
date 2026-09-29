@@ -60,7 +60,7 @@ export function stripePaymentAvailable(): boolean {
   return sdk() !== null;
 }
 
-export function StripePaymentProvider({ children }: { amountCents: number; children: React.ReactNode }) {
+export function StripePaymentProvider({ children }: { amountCents: number; children: React.ReactNode; onUnavailable?: () => void }) {
   const stripe = sdk();
   if (!stripe) return <>{children}</>;
   const { StripeProvider } = stripe;

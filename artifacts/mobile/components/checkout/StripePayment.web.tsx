@@ -17,9 +17,12 @@
  * Needs EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY. Without it, checkout falls back to
  * Stripe-hosted Checkout.
  */
-import React, { useImperativeHandle, useMemo, useRef } from 'react';
+import React, { useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { View } from 'react-native';
-import { loadStripe, type Stripe, type StripeElements, type StripeElementsOptions } from '@stripe/stripe-js';
+// The /pure entry doesn't inject Stripe.js on import: it only loads when
+// loadStripe() runs, i.e. when an order actually pays in the app.
+import { loadStripe } from '@stripe/stripe-js/pure';
+import type { Stripe, StripeElements, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, ExpressCheckoutElement, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { MIN_CARD_CHARGE_CENTS_CLIENT, type CartQuote, type WalletContact } from '@/lib/checkoutPayment';
 import {
@@ -28,16 +31,21 @@ import {
 } from './stripePaymentTypes';
 
 let stripePromise: Promise<Stripe | null> | null = null;
+/** Stripe.js couldn't load (offline, blocked by an extension or network). */
+let stripeLoadFailed = false;
 
 function stripeLoader(): Promise<Stripe | null> | null {
   const key = stripePublishableKey();
-  if (!key) return null;
-  stripePromise ??= loadStripe(key);
+  if (!key || stripeLoadFailed) return null;
+  // A failed load resolves to null instead of throwing inside <Elements>.
+  stripePromise ??= loadStripe(key)
+    .then(stripe => { if (!stripe) stripeLoadFailed = true; return stripe; })
+    .catch(() => { stripeLoadFailed = true; return null; });
   return stripePromise;
 }
 
 export function stripePaymentAvailable(): boolean {
-  return !!stripePublishableKey();
+  return !!stripePublishableKey() && !stripeLoadFailed;
 }
 
 /** Monochrome, Inter, dark fields with a hairline border (the page's own field style). */
@@ -66,8 +74,19 @@ const APPEARANCE: StripeElementsOptions['appearance'] = {
   },
 };
 
-export function StripePaymentProvider({ amountCents, children }: { amountCents: number; children: React.ReactNode }) {
+export function StripePaymentProvider({ amountCents, children, onUnavailable }: {
+  amountCents: number;
+  children: React.ReactNode;
+  /** Stripe.js failed to load: the screen falls back to hosted Checkout. */
+  onUnavailable?: () => void;
+}) {
   const loader = stripeLoader();
+  useEffect(() => {
+    let active = true;
+    void loader?.then(stripe => { if (active && !stripe) onUnavailable?.(); });
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loader]);
   const options = useMemo<StripeElementsOptions>(() => ({
     mode: 'payment',
     currency: 'usd',

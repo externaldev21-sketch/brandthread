@@ -143,6 +143,7 @@ export default function BuyerCheckoutScreen() {
   const [walletAvailable, setWalletAvailable] = useState(false);
   const [quote, setQuote] = useState<{ key: string; value: CartQuote } | null>(null);
   const [serverSaidHosted, setServerSaidHosted] = useState(false);
+  const [stripeLoadFailed, setStripeLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [placing, setPlacing] = useState(false);
@@ -343,12 +344,12 @@ export default function BuyerCheckoutScreen() {
     previewOnly,
     signedIn: !!isSignedIn,
     hostedFallbackFlag,
-    stripeAvailable: stripePaymentAvailable(),
+    stripeAvailable: stripePaymentAvailable() && !stripeLoadFailed,
     hasPreOrder: !!session?.deliveryGroups.some(group => group.hasPreOrder || group.items.some(item => item.isPreOrder)),
     threadCashApplied: (session?.threadCashRedemption?.discountCents ?? 0) > 0,
     loyaltyApplied: (session?.loyaltyRedemption?.discountCents ?? 0) > 0,
     serverSaidHosted,
-  }), [previewOnly, isSignedIn, hostedFallbackFlag, session, serverSaidHosted]);
+  }), [previewOnly, isSignedIn, hostedFallbackFlag, session, serverSaidHosted, stripeLoadFailed]);
   const inApp = payment.path === 'in_app';
 
   // ── Server quote: real shipping + tax for the address (in-app only) ─────
@@ -971,8 +972,7 @@ export default function BuyerCheckoutScreen() {
 
   const expressVisible = inApp ? walletAvailable : true;
 
-  return (
-    <StripePaymentProvider amountCents={totals.totalCents}>
+  const page = (
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {header('Checkout', leaveCheckout, 'Close checkout')}
         {inApp ? <PaymentController ref={controllerRef} /> : null}
@@ -1015,7 +1015,7 @@ export default function BuyerCheckoutScreen() {
             )}
           </ExpressSection>
 
-          <ContactSection contact={contact} onChange={setContact} showErrors={false} first={!expressVisible} />
+          <ContactSection contact={contact} onChange={setContact} showErrors={false} first />
 
           <ShippingSection
             address={address}
@@ -1129,8 +1129,11 @@ export default function BuyerCheckoutScreen() {
           </View>
         </StickyFooter>
       </KeyboardAvoidingView>
-    </StripePaymentProvider>
   );
+  // Stripe (and Stripe.js on web) is only loaded when this order pays in the app.
+  return inApp
+    ? <StripePaymentProvider amountCents={totals.totalCents} onUnavailable={() => setStripeLoadFailed(true)}>{page}</StripePaymentProvider>
+    : page;
 }
 
 /** The wallet sheet supplies contact and address itself; only pre-order terms must be accepted first. */

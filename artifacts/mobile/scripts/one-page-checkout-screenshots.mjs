@@ -94,6 +94,8 @@ const STRIPE_STUB = `
   window.Stripe = function Stripe() {
     return {
       _registerWrapper() {}, registerAppInfo() {},
+      // react-stripe-js checks these exist before accepting the object.
+      createToken: async () => ({}), createPaymentMethod: async () => ({}), confirmCardPayment: async () => ({}),
       elements() { return { create(type) { return type === 'expressCheckout' ? expressElement() : paymentElement(); }, getElement() { return null; }, update() {}, submit: async () => ({}), fetchUpdates: async () => ({}) }; },
       confirmPayment: async (opts) => { window.__btConfirms = (window.__btConfirms || 0) + 1; window.__btLastConfirm = JSON.stringify(opts?.confirmParams ?? {}); return { paymentIntent: { id: 'pi_demo', status: 'succeeded' } }; },
     };
