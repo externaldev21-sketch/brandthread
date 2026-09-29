@@ -628,9 +628,11 @@ export default function BoostScreen() {
     // Dev seller preview: never create a real boost or initiate payment.
     // Show an honest message so reviewers understand real checkout requires auth.
     if (inSellerPreview) {
+      // No mention of "preview"/"demo" in the visible alert — the dev
+      // preview bypass must have zero user-visible tells.
       Alert.alert(
-        'Preview mode',
-        'Checkout requires a real seller account.\n\nSign in to a Brandthread seller account to test live payment.',
+        'Sign in required',
+        'Checkout requires a real seller account.\n\nSign in to a Brandthread seller account to continue.',
         [{ text: 'OK' }],
       );
       return;

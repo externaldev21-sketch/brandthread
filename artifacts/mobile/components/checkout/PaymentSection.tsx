@@ -176,7 +176,11 @@ export function PaymentSection({
       <CheckoutSection title="Payment" testID="checkout-payment">
         <View style={styles.noteRow} testID="checkout-preview-note">
           <Feather name="info" size={14} color={CK.muted} style={styles.noteIcon} />
-          <Text style={styles.note}>Preview order: paying won’t charge a card or reach Stripe.</Text>
+          {/* No mention of "preview"/"demo" here — the dev/demo preview
+              bypass must have zero user-visible tells (Dev's explicit
+              request). The underlying `path === 'preview'` code path stays;
+              only the copy shown for it changed. */}
+          <Text style={styles.note}>This order won’t be charged.</Text>
         </View>
       </CheckoutSection>
     );

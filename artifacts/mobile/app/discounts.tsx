@@ -229,7 +229,7 @@ export default function DiscountsScreen() {
 
   async function handleSave() {
     if (previewOnly && userId) {
-      Alert.alert('Preview only', 'Wait for your account to finish loading before saving.');
+      Alert.alert('Sign in required', 'Wait for your account to finish loading before saving.');
       return;
     }
     if (discType !== 'free_shipping' && discType !== 'free_item') {

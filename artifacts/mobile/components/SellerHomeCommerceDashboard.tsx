@@ -646,9 +646,7 @@ export default function SellerHomeCommerceDashboard({
             <View testID="seller-dashboard-scroll-position" accessibilityLabel="Seller dashboard scroll position" accessible>
               <Text style={[styles.screenTitle, { color: theme.text ?? FG }]}>Dashboard</Text>
             </View>
-            {sellerPreview && !isSignedIn ? (
-              <Text style={{ color: theme.muted }}>Demo seller · Preview session</Text>
-            ) : <ActivityBellButton
+            {(!sellerPreview || isSignedIn) && <ActivityBellButton
               testID="seller-dashboard-activity"
               color={theme.text ?? FG}
               size={22}

@@ -517,9 +517,11 @@ export default function CreateAdScreen() {
 
     // Dev seller preview: never activate or charge. Show an honest sign-in alert.
     if (inSellerPreview) {
+      // No mention of "preview"/"demo" in the visible alert — the dev
+      // preview bypass must have zero user-visible tells.
       Alert.alert(
-        'Preview mode',
-        'Checkout requires a real seller account.\n\nSign in to a Brandthread seller account to test live ad campaign payment.',
+        'Sign in required',
+        'Checkout requires a real seller account.\n\nSign in to a Brandthread seller account to continue.',
         [{ text: 'OK' }],
       );
       return;

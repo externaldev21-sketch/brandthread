@@ -414,7 +414,7 @@ export default function ProductsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const showPreviewOnlyFeedback = useCallback(() => {
-    Alert.alert('Preview only', 'Product management is unavailable in this signed-out preview.');
+    Alert.alert('Sign in required', 'Sign in to manage products.');
   }, []);
 
   const loadStats = useCallback(async () => {
