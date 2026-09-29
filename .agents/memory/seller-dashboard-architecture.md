@@ -5,12 +5,19 @@ description: Seller-side screen inventory, color system, service layer, shared c
 
 ## Design System (lib/theme.ts)
 Single source of truth — all seller screens MUST import from here, no local color redefinitions.
-- BG='#07070F', SURFACE='#0C0C17', CARD='#12121F', CARD_ELEVATED='#18182E'
-- BORDER='rgba(255,255,255,0.07)', BORDER_ACTIVE='rgba(139,92,246,0.45)'
-- FG='#F4F4FF', MUTED='rgba(244,244,255,0.50)', SUBTLE='rgba(244,244,255,0.28)'
-- PURPLE='#8B5CF6', CYAN='#22D3EE' — primary brand accents (NOT green)
-- SUCCESS='#10B981', GREEN_BRIGHT='#39FF88' — green ONLY for revenue/success/completion
-- GRAD_PRIMARY=['#8B5CF6','#22D3EE'] — primary button gradient
+Current values (monochrome brand — updated, this section previously described an
+old purple/cyan palette that no longer matches lib/theme.ts):
+- BG='#0A0A0B', SURFACE='#111113', CARD='#18181B', CARD_ELEVATED='#222226'
+- BORDER='rgba(255,255,255,0.08)', BORDER_ACTIVE='#F7F7FA'
+- FG='#F7F7FA', MUTED/SUBTLE are solid opaque greys (TEXT_SECONDARY '#B4B4BC',
+  TEXT_TERTIARY '#8A8A93') — not alpha blends; a translucent color reads as
+  smudgy on this near-black background, see lib/theme.ts's own doc comment
+- ACCENT='#F7F7FA', ACCENT_LIGHT='#FFFFFF' — the app is grayscale; PURPLE/CYAN
+  are `@deprecated` aliases in lib/theme.ts that now resolve to ACCENT/
+  ACCENT_LIGHT/ACCENT_DIM, kept only for legacy screens that still import them
+- SUCCESS='#10B981', GREEN_BRIGHT='#39FF88' — green ONLY for revenue/success/
+  completion; RED — LIVE and end-call only. No other colored accents.
+- GRAD_PRIMARY=[ACCENT, ACCENT] — no colored gradient; buttons are monochrome
 
 **Critical rule:** Do NOT redeclare any theme constant locally — Metro bundler throws "Duplicate declaration" at runtime even if TypeScript doesn't catch it (Babel scope check). Always import from '@/lib/theme'.
 
@@ -88,4 +95,8 @@ id is assigned at top of object literal — do NOT add a second `id` field at th
 - product-import (modal from bottom)
 
 ## Design rule
-GREEN is ONLY for: revenue, success states, completed tasks, available status, positive analytics. NEVER for buttons or tab bar. Purple/Cyan are primary.
+Monochrome brand: FG/ACCENT (near-white) are the primary color everywhere —
+buttons, tab bar, chrome. GREEN is ONLY for: revenue, success states,
+completed tasks, available status, positive analytics. RED is ONLY for LIVE
+and end-call. Purple/Cyan are NOT primary — see the Design System section
+above; they're deprecated aliases kept only for legacy screens.
