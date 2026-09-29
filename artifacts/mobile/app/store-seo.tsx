@@ -2,8 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, TextInput, Switch,
-  StyleSheet, Alert, TouchableOpacity, Image, ActivityIndicator,
+  View, Text, ScrollView, TextInput, StyleSheet, Alert, TouchableOpacity, Image, ActivityIndicator,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -12,7 +11,7 @@ import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { BrandthreadCard, PrimaryButton, SectionHeader } from '@/components/BrandthreadUI';
+import { BrandthreadCard, PrimaryButton, SectionHeader, HapticSwitch} from '@/components/BrandthreadUI';
 import { getStorefront, updateSEO } from '@/services/storeService';
 import { Storefront, StoreSEO } from '@/services/storeTypes';
 import { useApi } from '@/lib/api';
@@ -170,7 +169,7 @@ export default function StoreSEOScreen() {
               <Text style={se.switchLabel}>Sitemap Enabled</Text>
               <Text style={se.switchDesc}>Include store in search sitemaps</Text>
             </View>
-            <Switch
+            <HapticSwitch
               value={seo.sitemapEnabled}
               onValueChange={v => patch({ sitemapEnabled: v })}
               trackColor={{ false: colors.border, true: PURPLE }}
@@ -183,7 +182,7 @@ export default function StoreSEOScreen() {
               <Text style={se.switchLabel}>Search Visible</Text>
               <Text style={se.switchDesc}>Allow search engines to index your store</Text>
             </View>
-            <Switch
+            <HapticSwitch
               value={seo.searchVisible}
               onValueChange={v => patch({ searchVisible: v })}
               trackColor={{ false: colors.border, true: PURPLE }}

@@ -14,7 +14,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator, Switch, Platform } from 'react-native';
+  TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -31,8 +31,7 @@ import {
 import { useColors } from '@/hooks/useColors';
 import {
   BrandthreadHeader, PrimaryButton, SecondaryButton,
-  BrandedLoadingState,
-} from '@/components/BrandthreadUI';
+  BrandedLoadingState, HapticSwitch,} from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { formatCents, integerPercent, parseDecimalToCents } from '@/lib/money';
 
@@ -251,9 +250,9 @@ export default function ProductBundleEditScreen() {
               <Text style={s.fieldLabel}>Active</Text>
               <Text style={s.fieldHint}>Buyers can see and purchase active bundles.</Text>
             </View>
-            <Switch
+            <HapticSwitch
               value={isActive}
-              onValueChange={v => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setIsActive(v); }}
+              onValueChange={setIsActive}
               trackColor={{ false: BORDER, true: PURPLE_DIM }}
               thumbColor={isActive ? PURPLE_LIGHT : MUTED}
             />
