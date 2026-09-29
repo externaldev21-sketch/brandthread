@@ -9,6 +9,8 @@ import { BuyerTabBar } from '@/components/buyer-nav/BuyerTabBar';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
 import { getConversations, getNotifications, subscribeSocial } from '@/services/socialService';
 import { ThreadCashActiveTimeTracker } from '@/components/thread-cash/ThreadCashActiveTimeTracker';
+import { isBuyerDevPreview } from '@/lib/devPreview';
+import { getPreviewConversations, getPreviewNotifications } from '@/lib/previewInbox';
 
 // ─── Tab switch transition ──────────────────────────────────────────────────
 // Instagram/TikTok-style directional slide: the incoming tab slides in from
@@ -73,10 +75,15 @@ function BuyerTabLayout() {
 
   const loadBadgeCount = useCallback(async () => {
     try {
-      const [conversations, notifications] = await Promise.all([
-        getConversations(),
-        getNotifications(),
-      ]);
+      // Dev-web preview: no real backend/account, so route through the same
+      // demo-gated preview data the Inbox screen itself renders
+      // (lib/previewInbox.ts) instead of calling the real API — otherwise a
+      // reachable dev/staging backend answering with unrelated real rows
+      // (or the real endpoint simply not existing yet) puts a stray number
+      // on a fresh, zero-state preview account's tab bar.
+      const [conversations, notifications] = isBuyerDevPreview()
+        ? [getPreviewConversations(), getPreviewNotifications()]
+        : await Promise.all([getConversations(), getNotifications()]);
       const unreadMessages = conversations.reduce(
         (sum, conv) => sum + (conv.unreadCount ?? 0), 0,
       );
