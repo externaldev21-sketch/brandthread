@@ -27,7 +27,7 @@ import {
 import { getProject, createBrandAsset } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 import DesignLayerCompositor from '@/components/DesignLayerCompositor';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PANEL_H = SCREEN_H * 0.6;
@@ -146,7 +146,7 @@ export default function DesignMockupPreviewScreen() {
   if (!project) {
     return (
       <View style={styles.root}>
-        <Header title="Mockup Preview" />
+        <ScreenHeader title="Mockup Preview" />
         <View style={styles.centered}>
           <Feather name="image" size={48} color={SUBTLE} />
           <Text style={styles.disclaimer}>Open a garment project to see the mockup preview.</Text>
@@ -158,7 +158,7 @@ export default function DesignMockupPreviewScreen() {
 
   return (
     <View style={styles.root}>
-      <Header title="Mockup Preview" />
+      <ScreenHeader title="Mockup Preview" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* View tabs */}

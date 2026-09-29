@@ -11,6 +11,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
@@ -111,14 +112,8 @@ export default function DesignExportScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: headerTopInset }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Export</Text>
-        <TouchableOpacity onPress={() => goBackOr(router)} style={styles.closeBtn}>
-          <Feather name="x" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-      </View>
+    <View style={styles.root}>
+      <ScreenHeader title="Export" variant="modal" onBack={() => goBackOr(router)} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
@@ -220,13 +215,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   scrollContent: { paddingBottom: 120, paddingHorizontal: SP.md },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-  },
-  headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  closeBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 
   thumbWrap: { alignItems: 'center', marginBottom: SP.md, marginTop: SP.sm },
   thumb: {

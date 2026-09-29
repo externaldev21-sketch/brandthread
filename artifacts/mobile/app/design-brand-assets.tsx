@@ -21,7 +21,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Share } from 'react-native';
 import {
   getBrandAssets, addBrandAsset, renameBrandAsset, deleteBrandAsset, getProjects,
@@ -223,7 +223,7 @@ export default function DesignBrandAssetsScreen() {
 
   return (
     <View style={bas.root}>
-      <Header
+      <ScreenHeader
         title="Brand Assets"
         actions={[{ icon: 'plus', onPress: handleAddAsset, accessibilityLabel: 'Add asset' }]}
       />
