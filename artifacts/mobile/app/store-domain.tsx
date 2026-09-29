@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -148,7 +148,7 @@ export default function StoreDomainScreen() {
 
   return (
     <View style={dm.root}>
-      <Header title="Domains" onBack={leaveSetupDestination} />
+      <ScreenHeader title="Domains" onBack={leaveSetupDestination} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={dm.scroll}>
 

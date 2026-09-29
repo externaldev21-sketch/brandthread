@@ -9,13 +9,13 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadHeader, PrimaryButton, SecondaryButton, GradientCard, BrandedLoadingState } from '@/components/BrandthreadUI';
+import { PrimaryButton, SecondaryButton, GradientCard, BrandedLoadingState } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
@@ -193,8 +193,8 @@ export default function SellerVerificationScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
-        <BrandthreadHeader title="Identity Verification" onBack={leaveSetupDestination} />
+      <View style={s.root}>
+        <ScreenHeader title="Identity Verification" onBack={leaveSetupDestination} />
         <BrandedLoadingState message="Checking verification status…" />
       </View>
     );
@@ -204,8 +204,8 @@ export default function SellerVerificationScreen() {
   const cfg = statusConfig(theme)[status];
 
   return (
-    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
-      <BrandthreadHeader title="Identity Verification" onBack={leaveSetupDestination} />
+    <View style={s.root}>
+      <ScreenHeader title="Identity Verification" onBack={leaveSetupDestination} />
 
       <ScrollView
         style={{ flex: 1 }}

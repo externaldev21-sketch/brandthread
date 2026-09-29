@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
@@ -436,7 +436,7 @@ export default function ShippingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <Header title="Shipping & Fulfillment" onBack={leaveSetupDestination} />
+      <ScreenHeader title="Shipping & Fulfillment" onBack={leaveSetupDestination} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
