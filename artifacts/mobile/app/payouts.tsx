@@ -13,11 +13,11 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
 import { useTeamRole } from '@/hooks/useTeamRole';
-import { isSellerDevPreview } from '@/lib/devPreview';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { scheduleLabel, requirementLabel, taxInfoConfig } from '@/lib/payoutSetup';
@@ -62,10 +62,14 @@ export default function PayoutsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { isLoaded: authLoaded, isSignedIn } = useAuth();
-  const isPreview = isSellerDevPreview() && (!authLoaded || !isSignedIn);
+  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
+  const isPreviewMode = isSellerDevPreview();
+  const isPreview = (isPreviewMode && !userId) || (isPreviewMode && (!authLoaded || !isSignedIn));
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const api    = useApi();
+  // ?bt_preview=seller with no real signed-in account: no token to fetch
+  // real payout data with — resolve straight to the honest empty/no-history
+  // state (same convention as app/(tabs)/orders.tsx's isPreviewMode guard).
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
@@ -89,7 +93,11 @@ export default function PayoutsScreen() {
   }
 
   const refreshConnectStatus = useCallback(async () => {
-    if (isPreview) return;
+    if (isPreview) {
+      setConnectStatus(null);
+      setConnectLoading(false);
+      return;
+    }
     if (connectRequestRef.current) return;
     connectRequestRef.current = true;
     try {
@@ -110,11 +118,11 @@ export default function PayoutsScreen() {
 
   const load = useCallback(async () => {
     if (isPreview) {
-      setBalance(null);
+      setBalance({ available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false });
       setPayouts([]);
+      setLoadError(false);
       setLoading(false);
-      setConnectStatus(null);
-      setConnectLoading(false);
+      void refreshConnectStatus();
       return;
     }
     setLoading(true);

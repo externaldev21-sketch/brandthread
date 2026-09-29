@@ -402,19 +402,6 @@ function pressTab(renderer: ReactTestRenderer, tab: string) {
   });
 }
 
-// Orders lives inside the Posts tab's own Published / Drafts / Orders
-// segmented control (folded in from its old, separate top-level tab).
-function pressPostFilter(renderer: ReactTestRenderer, filter: 'Published' | 'Drafts' | 'Orders') {
-  const matches = renderer.root.findAll(
-    node => node.props.accessibilityLabel === `${filter} posts` && typeof node.props.onPress === 'function',
-  );
-  expect(matches.length).toBeGreaterThan(0);
-  return act(async () => {
-    matches[0].props.onPress();
-    await flushPromises();
-  });
-}
-
 const baseProfile = {
   name: 'Ava Buyer',
   username: 'ava',
@@ -459,13 +446,12 @@ describe('buyer profile tabs', () => {
     }
   });
 
-  it('renders all three tabs, each selectable', async () => {
+  it('renders all four tabs, each selectable', async () => {
     renderer = await renderScreen();
 
-    // Orders is no longer a top-level tab — it moved into the Posts tab's
-    // own Published / Drafts / Orders segmented control (see the "shows the
-    // buyer's orders" test below).
-    for (const tab of ['Posts', 'Saved', 'Liked']) {
+    // Posts / Saved / Liked / Orders — Orders is a top-level icon tab again,
+    // the Published/Drafts/Orders segmented control was removed.
+    for (const tab of ['Posts', 'Saved', 'Liked', 'Orders']) {
       const matches = renderer.root.findAll(
         node => node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === `${tab} tab`,
       );
@@ -517,7 +503,7 @@ describe('buyer profile tabs', () => {
     });
 
     renderer = await renderScreen();
-    await pressPostFilter(renderer, 'Orders');
+    await pressTab(renderer, 'Orders');
 
     expect(renderer.root.findAll(
       node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('BT-2001'),

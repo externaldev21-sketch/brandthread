@@ -49,6 +49,32 @@ export type FinanceSummary = {
   }>;
 };
 
+/** A brand-new store's honest, genuinely-zero summary — not a fetch failure
+ * substitute. Used by the seller fresh-preview mode (app/finance.tsx) where
+ * there is no signed-in account to fetch a real summary for. */
+export function zeroFinanceSummary(): FinanceSummary {
+  const zero = { amount: 0, formatted: formatCents(0) };
+  return {
+    currency: 'usd',
+    connected: false,
+    stripeError: false,
+    held: { ...zero, drops: [] },
+    releasing: { ...zero, count: 0 },
+    available: zero,
+    pending: zero,
+    paidOut: { ...zero, toBank: zero },
+    owed: zero,
+    credit: zero,
+    lifetime: {
+      grossSales: zero,
+      refunded: zero,
+      platformFees: zero,
+      processingFees: zero,
+    },
+    activity: [],
+  };
+}
+
 export type Tone = 'neutral' | 'positive' | 'caution' | 'negative';
 
 export type MoneyTile = {

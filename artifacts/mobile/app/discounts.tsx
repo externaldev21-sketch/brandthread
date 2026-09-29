@@ -19,6 +19,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { addPreviewDiscount, deletePreviewDiscount, getPreviewDiscounts, updatePreviewDiscount, type PreviewDiscount } from '@/lib/previewSellerFreshStore';
 import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -108,8 +109,14 @@ export default function DiscountsScreen() {
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
-  const previewOnly = isSellerDevPreview() && (!authLoaded || !isSignedIn || !userId);
   const api = useApi();
+  // ?bt_preview=seller with no real signed-in account: no token to fetch or
+  // save real discounts with. Reads/writes go through
+  // lib/previewSellerFreshStore.ts's in-session store instead of the API, so
+  // "Create discount" still genuinely works for the rest of the preview
+  // session (same convention as app/(tabs)/orders.tsx's isPreviewMode guard).
+  const [isPreviewMode] = useState(() => isSellerDevPreview());
+  const previewOnly = isPreviewMode && (!authLoaded || !isSignedIn || !userId);
 
   const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
   const [products, setProducts] = useState<Array<{ id: string; name: string; images?: string[] }>>([]);
@@ -137,7 +144,7 @@ export default function DiscountsScreen() {
 
   const loadDiscounts = useCallback(async () => {
     if (previewOnly) {
-      setDiscounts([]);
+      setDiscounts(getPreviewDiscounts().map(normalizeDiscount));
       setProducts([]);
       setLoadError(false);
       setLoading(false);
@@ -221,8 +228,8 @@ export default function DiscountsScreen() {
     : `${startDate ? `Starts ${startDate}` : 'Starts immediately'}${hasEnd && endDate ? ` · Ends ${endDate}` : hasEnd ? '' : ' · No end date'}`;
 
   async function handleSave() {
-    if (previewOnly) {
-      Alert.alert('Preview only', 'Discount codes can’t be created or edited in this signed-out preview.');
+    if (previewOnly && userId) {
+      Alert.alert('Preview only', 'Wait for your account to finish loading before saving.');
       return;
     }
     if (discType !== 'free_shipping' && discType !== 'free_item') {
@@ -267,7 +274,32 @@ export default function DiscountsScreen() {
         startsAt: startDate ? new Date(startDate).toISOString() : null,
         expiresAt: hasEnd && endDate ? new Date(endDate).toISOString() : null,
       };
-      if (editingId) {
+      if (isPreviewMode && !userId) {
+        if (editingId) {
+          const updated = updatePreviewDiscount(editingId, payload);
+          if (updated) setDiscounts(prev => prev.map(d => d.id === editingId ? normalizeDiscount(updated) : d));
+        } else {
+          const created: PreviewDiscount = {
+            id: 'preview_discount_' + Math.random().toString(36).slice(2, 11),
+            code: (payload.code || randomCode()).toUpperCase(),
+            type: payload.type,
+            value: payload.value,
+            minOrderCents: payload.minOrderCents,
+            appliesTo: payload.appliesTo,
+            productIds: payload.productIds,
+            maxUses: payload.maxUses,
+            usesCount: 0,
+            oneUsePerCustomer: payload.oneUsePerCustomer,
+            startsAt: payload.startsAt,
+            expiresAt: payload.expiresAt,
+            active: true,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+          };
+          addPreviewDiscount(created);
+          setDiscounts(prev => [normalizeDiscount(created), ...prev]);
+        }
+      } else if (editingId) {
         const updated = await api.discountCodes.update(editingId, payload);
         setDiscounts(prev => prev.map(d => d.id === editingId ? normalizeDiscount(updated) : d));
       } else {
@@ -284,13 +316,13 @@ export default function DiscountsScreen() {
   }
 
   async function togglePause(d: DiscountCode) {
-    if (previewOnly) {
-      Alert.alert('Preview only', 'Discount codes can’t be changed in this signed-out preview.');
-      return;
-    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const nextActive = !d.active;
     setDiscounts(prev => prev.map(x => x.id === d.id ? { ...x, active: nextActive, status: nextActive ? 'active' : 'paused' } : x));
+    if (previewOnly) {
+      updatePreviewDiscount(d.id, { active: nextActive, status: nextActive ? 'active' : 'paused' });
+      return;
+    }
     try {
       await api.discountCodes.update(d.id, { active: nextActive });
     } catch {
@@ -299,16 +331,16 @@ export default function DiscountsScreen() {
   }
 
   async function handleDelete(d: DiscountCode) {
-    if (previewOnly) {
-      Alert.alert('Preview only', 'Discount codes can’t be deleted in this signed-out preview.');
-      return;
-    }
     Alert.alert('Delete discount?', `Remove code "${d.code}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           setDiscounts(prev => prev.filter(x => x.id !== d.id));
+          if (previewOnly) {
+            deletePreviewDiscount(d.id);
+            return;
+          }
           try { await api.discountCodes.delete(d.id); }
           catch { loadDiscounts(); }
         },
@@ -345,7 +377,7 @@ export default function DiscountsScreen() {
               icon="tag"
               title="No discount codes yet"
               description={previewOnly
-                ? 'Preview only · Create a code to explore discount options. Changes won’t be saved.'
+                ? 'Preview only · Create a code to explore discount options. Changes last until you reload.'
                 : 'Create a code to offer buyers a percentage off, a fixed amount, free shipping or a free item.'}
               action={{ label: 'Create code', onPress: openNewModal }}
             />
@@ -557,7 +589,7 @@ export default function DiscountsScreen() {
             </View>
 
             <PrimaryButton
-              label={previewOnly ? 'Preview only — not saved' : saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Code'}
+              label={saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Code'}
               onPress={handleSave}
               disabled={saving}
               style={{ marginTop: SP.sm }}

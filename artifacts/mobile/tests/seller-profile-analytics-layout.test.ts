@@ -46,22 +46,30 @@ describe('seller profile action layout', () => {
     expect(profileSource).toContain("setTimeout(() => setStatsInitialLoading(false), 6000)");
   });
 
-  it('uses Instagram Posts / Shop / Tagged tabs, with Published / Drafts / Products as the Posts sub-filter', () => {
+  it('uses Instagram Posts / Products / Tagged icon tabs with no second filter row', () => {
     expect(profileSource).toContain("const CONTENT_TABS = ['Posts', 'Shop', 'Tagged']");
-    // "Products" replaces the old standalone "Scheduled" filter — a
-    // scheduled-but-not-yet-live post now shows under "Drafts" instead
-    // (it isn't public yet either), and Products surfaces the seller's live
-    // catalog one tap further up (the same grid the Shop tab already shows).
-    expect(profileSource).toContain("const POST_FILTERS = ['Published', 'Drafts', 'Products']");
+    // The old Published/Drafts/Products segmented control under Posts is
+    // gone — the icon tab row above the grid is the only tab control now.
+    // "Shop" keeps its internal key (every activeTab === 'Shop' branch is
+    // unchanged) but its accessible label is "Products", so the products
+    // grid is still explicitly reachable from an icon tab.
+    expect(profileSource).toContain("{ key: 'Shop', label: 'Products', icon: 'shopping-bag' }");
+    expect(profileSource).not.toContain('POST_FILTERS');
+    expect(profileSource).not.toContain('seller-post-filters');
     expect(profileSource).toContain('tabsVariant="iconOnly"');
     expect(profileSource).not.toContain('Store performance');
+  });
+
+  it('surfaces drafts as an Instagram-style folder tile in the Posts grid instead of a filter pill', () => {
+    expect(profileSource).toContain("testID=\"seller-profile-drafts-tile\"");
+    expect(profileSource).toContain("router.push('/content?tab=draft' as never)");
+    expect(profileSource).toContain("kind: 'draftsTile'");
   });
 
   it('reaches post creation from the Studio control center instead of a top action button', () => {
     expect(profileSource).not.toContain('Share something with');
     // The empty Post tab offers "Create your first post" through the shared
     // profile empty-state table (components/profile/profileEmptyStates.ts).
-    expect(profileSource).toContain("{ Published: 'seller:post', Drafts: 'seller:draft', Products: 'shop' }");
     expect(fs.readFileSync(path.join(__dirname, '../components/profile/profileEmptyStates.ts'), 'utf8'))
       .toContain("label: 'Create your first post', route: '/create-post'");
     const controlCenterSource = fs.readFileSync(
