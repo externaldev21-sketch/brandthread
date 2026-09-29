@@ -1832,6 +1832,21 @@ export const liveComments = pgTable('live_comments', {
   streamCreatedIdx: index('live_comments_stream_created_idx').on(table.streamId, table.createdAt),
 }));
 
+// Presence-based viewer tracking (migration 105) — see that file for why
+// this replaced the old increment/decrement counter on
+// live_streams.viewer_count. One row per (stream_id, viewer); refreshed by
+// a WebSocket heartbeat (preferred) or an HTTP heartbeat fallback every
+// ~15s. viewer_count/peak_viewer_count are derived from this table by
+// jobs/liveViewersPresence.ts, not written here directly.
+export const liveViewers = pgTable('live_viewers', {
+  streamId:           uuid('stream_id').notNull().references(() => liveStreams.id, { onDelete: 'cascade' }),
+  userIdOrSessionId:  text('user_id_or_session_id').notNull(),
+  lastSeen:           timestamp('last_seen', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.streamId, table.userIdOrSessionId] }),
+  streamLastSeenIdx: index('live_viewers_stream_last_seen_idx').on(table.streamId, table.lastSeen),
+}));
+
 // ─── Seller Tax Configuration ─────────────────────────────────────────────────
 export const sellerTaxConfig = pgTable('seller_tax_config', {
   id:                  uuid('id').primaryKey().defaultRandom(),
