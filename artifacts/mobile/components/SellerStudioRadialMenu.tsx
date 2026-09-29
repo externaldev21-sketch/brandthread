@@ -43,6 +43,7 @@ import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
 import { initFromStorage, subscribe as subscribeOrderBadge } from '@/lib/orderBadgeStore';
 import { SearchBar, PressableScale, SheetHandle } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 import {
   ALL_ITEMS,
   DEFAULT_PINNED_IDS,
@@ -468,6 +469,9 @@ export default function SellerStudioRadialMenu({
             },
           ]}
         >
+          <GlassPanel radius={0} style={StyleSheet.absoluteFill}>
+            {null}
+          </GlassPanel>
           <View {...panResponder.panHandlers}>
             <SheetHandle />
 
@@ -706,11 +710,10 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: theme.card,
+    // Surface is GlassPanel now (frosted + its own hairline edge) — no flat
+    // fill or border here, just the shape it clips to.
     borderTopLeftRadius: RADIUS.xxl,
     borderTopRightRadius: RADIUS.xxl,
-    borderTopWidth: 1,
-    borderColor: theme.border,
     overflow: 'hidden',
     maxWidth: isTablet ? 620 : undefined,
     alignSelf: isTablet ? 'center' : undefined,
