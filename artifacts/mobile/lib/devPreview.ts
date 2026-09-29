@@ -11,7 +11,7 @@
  *   - Inert when window is unavailable (SSR / test environments without window)
  *   - ?bt_preview=buyer|seller explicitly selects and persists a preview role
  *   - in dev, the saved tab role is used when the URL has no selection; a fresh
- *     dev-web session temporarily defaults to buyer preview
+ *     dev-web session opens the seller preview
  *
  * Expo Router drops the query on in-app navigation. Dev builds retain the
  * tab-scoped choice; exported screenshot builds use the role that _layout
@@ -28,9 +28,9 @@
 import { Platform } from 'react-native';
 import { resolvePreviewRole, type PreviewRole } from './previewRoleSelection';
 
-// Separate temporary key so an earlier saved seller preference cannot override
-// the buyer-first testing entry. Restore the old key with the old default.
-const PREVIEW_ROLE_KEY = 'bt:previewRole:buyer-test';
+// Use a new session key so the former buyer-first default does not keep an
+// already-open preview tab on the buyer side after switching to seller-first.
+const PREVIEW_ROLE_KEY = 'bt:previewRole:seller-default';
 
 export function getDevWebPreviewRole(searchOverride?: string): PreviewRole | null {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
@@ -73,7 +73,7 @@ function persistedPreviewRole(): 'buyer' | 'seller' | null {
 
 /**
  * Returns true in the dev-web seller preview context. The URL selection takes
- * precedence, then the saved browser-session role, with buyer as the temporary default.
+ * precedence, then the saved browser-session role, with seller as the default.
  *
  * @param searchOverride  Optional query string (e.g. '?bt_preview=buyer')
  *   supplied by tests instead of reading window.location.search.

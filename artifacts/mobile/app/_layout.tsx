@@ -411,7 +411,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 // ─── DEV design-preview bypass (web only) ─────────────────────────────────────
-// The temporary default development web preview opens the buyer side.
+// The default development web preview opens the seller side.
 // Explicit ?bt_preview=buyer and ?bt_preview=seller links switch preview roles.
 // The web guard keeps this inert on native builds. Expo Go follows real auth;
 // non-dev navigation-isolation tests require an explicit preview role.
