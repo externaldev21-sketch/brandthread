@@ -29,6 +29,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -276,7 +277,6 @@ export default function PublicProfileRoute() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const params = useLocalSearchParams<{ username?: string }>();
 
@@ -361,7 +361,8 @@ export default function PublicProfileRoute() {
     // Skeleton in the profile shell's shape (hero, avatar, name) — the fetch
     // itself is time-boxed, so this always resolves to data or an error.
     return (
-      <View style={[styles.root, { paddingTop: headerTopInset }]} accessibilityLabel="Loading profile" accessible>
+      <View style={styles.root} accessibilityLabel="Loading profile" accessible>
+        <ScreenHeader title="Profile" onBack={() => goBackOr(router)} />
         <SkeletonBlock width="100%" height={260} radius={0} />
         <View style={styles.skeletonIdentity}>
           <SkeletonBlock width={84} height={84} radius={42} />
@@ -378,17 +379,8 @@ export default function PublicProfileRoute() {
   // ── Not found ─────────────────────────────────────────────────────────────
   if (state.kind === 'not_found') {
     return (
-      <View style={[styles.root, { paddingTop: headerTopInset }]}>
-        <View style={styles.header}>
-          <PressableScale
-            style={styles.backBtn}
-            onPress={() => { hapticLight(); goBackOr(router); }}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-          </PressableScale>
-        </View>
+      <View style={styles.root}>
+        <ScreenHeader title="Profile" onBack={() => { hapticLight(); goBackOr(router); }} />
         <View style={styles.center}>
           <View style={styles.iconBox}>
             <Feather name="user-x" size={40} color={theme.muted} />
@@ -415,17 +407,8 @@ export default function PublicProfileRoute() {
   // ── Error / retry ─────────────────────────────────────────────────────────
   if (state.kind === 'error') {
     return (
-      <View style={[styles.root, { paddingTop: headerTopInset }]}>
-        <View style={styles.header}>
-          <PressableScale
-            style={styles.backBtn}
-            onPress={() => { hapticLight(); goBackOr(router); }}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-          </PressableScale>
-        </View>
+      <View style={styles.root}>
+        <ScreenHeader title="Profile" onBack={() => { hapticLight(); goBackOr(router); }} />
         <View style={styles.center}>
           <Feather name="wifi-off" size={40} color={theme.muted} />
           <Text style={styles.notFoundTitle}>Couldn't load this profile</Text>

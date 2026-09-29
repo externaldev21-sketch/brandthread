@@ -57,6 +57,7 @@ import {
   CheckoutAddress, CheckoutContact, CheckoutDiscount, CheckoutSession,
 } from '@/services/cartTypes';
 import { useApi } from '@/hooks/useApi';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { formatCents } from '@/lib/money';
 import {
   getCheckoutBlockingSection,
@@ -110,8 +111,6 @@ type CheckoutError = { title: string; message: string };
 
 /** Pending reconciliation entry for an in-app payment (vs a hosted Checkout Session id). */
 const PI_PREFIX = 'pi:';
-
-const HEADER_WEB_MIN_TOP = 54;
 
 function wait(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -885,9 +884,10 @@ export default function BuyerCheckoutScreen() {
   // (seller-conversation.tsx): never flush with the screen edge, even on web
   // or a device with no home indicator.
   const footerBottomPad = Math.max(insets.bottom, SP.sm) + SP.sm;
-  // Fully below the notch / Dynamic Island. Web can't always read the inset,
-  // so it gets the ScreenHeader floor (54).
-  const headerTop = Platform.OS === 'web' ? Math.max(insets.top, HEADER_WEB_MIN_TOP) : insets.top;
+  // Fully below the notch / Dynamic Island — the same shared inset every
+  // ScreenHeader uses, so this custom (deliberately flat pure-black,
+  // theme-independent) header bar never drifts from that canonical number.
+  const headerTop = useHeaderTopInset();
 
   const header = (title: string, onClose: () => void, closeLabel: string) => (
     <View style={[styles.header, { paddingTop: headerTop }]} testID="checkout-header">

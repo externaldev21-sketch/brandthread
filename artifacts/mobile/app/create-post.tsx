@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -2284,7 +2284,7 @@ function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setS
   const filtered: Sound[] = [];
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === 'android' ? 'fullScreen' : 'pageSheet'} onRequestClose={onClose}>
-      <View style={[ms.root, { paddingBottom: insets.bottom + 16 }]}>
+      <SafeAreaProvider style={[ms.root, { paddingBottom: insets.bottom + 16 }]}>
         <ScreenHeader title="Sounds" variant="modal" onBack={onClose} />
         <View style={ms.searchWrap}>
           <Feather name="search" size={14} color={MUTED} style={{ marginRight: 8 }} />
@@ -2319,7 +2319,7 @@ function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setS
             </View>
           ))}
         </ScrollView>
-      </View>
+      </SafeAreaProvider>
     </Modal>
   );
 }
@@ -2342,7 +2342,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
   const statusColor = (st: string) => st === 'active' ? PURPLE : st === 'scheduled' ? ORANGE : MUTED;
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === 'android' ? 'fullScreen' : 'pageSheet'} onRequestClose={onClose}>
-      <View style={[ms.root, { paddingBottom: insets.bottom + 16 }]}>
+      <SafeAreaProvider style={[ms.root, { paddingBottom: insets.bottom + 16 }]}>
         <ScreenHeader title="Tag Products" variant="modal" onBack={onClose} />
         {productTags.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 44, paddingHorizontal: 16 }}>
@@ -2400,7 +2400,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
             <Text style={ms.doneBtnText}>Done</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaProvider>
     </Modal>
   );
 }

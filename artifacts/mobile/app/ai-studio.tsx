@@ -11,6 +11,7 @@ import { FS } from '@/lib/theme';
 import { getProjects } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 
 const STUDIO_TOOLS = [
   { label: 'AI Clothing Mockups', icon: 'image' as const, desc: 'Generate photorealistic product mockups', badge: 'Popular' },
@@ -246,45 +247,47 @@ export default function AIStudioScreen() {
         transparent
         onRequestClose={() => setNewCanvasVisible(false)}
       >
-        <View style={styles.sheetOverlay}>
-          <SheetRise style={[styles.sheetCard, { backgroundColor: colors.card }]}>
-            <TouchableOpacity style={styles.sheetCancel} activeOpacity={0.7} onPress={() => setNewCanvasVisible(false)}>
-              <Text style={[styles.sheetCancelText, { color: colors.mutedForeground }]}>Cancel</Text>
-            </TouchableOpacity>
+        <ModalSafeArea>
+          <View style={styles.sheetOverlay}>
+            <SheetRise style={[styles.sheetCard, { backgroundColor: colors.card }]}>
+              <TouchableOpacity style={styles.sheetCancel} activeOpacity={0.7} onPress={() => setNewCanvasVisible(false)}>
+                <Text style={[styles.sheetCancelText, { color: colors.mutedForeground }]}>Cancel</Text>
+              </TouchableOpacity>
 
-            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>New canvas</Text>
-            <View style={styles.sheetSubRow}>
-              <Text style={[styles.sheetSubActive, { color: colors.foreground }]}>Custom Size</Text>
-              <Text style={[styles.sheetSubMuted, { color: colors.mutedForeground }]}>From Clipboard</Text>
-            </View>
+              <Text style={[styles.sheetTitle, { color: colors.foreground }]}>New canvas</Text>
+              <View style={styles.sheetSubRow}>
+                <Text style={[styles.sheetSubActive, { color: colors.foreground }]}>Custom Size</Text>
+                <Text style={[styles.sheetSubMuted, { color: colors.mutedForeground }]}>From Clipboard</Text>
+              </View>
 
-            <TouchableOpacity
-              style={[styles.sheetSoloRow, { backgroundColor: colors.elevated }]}
-              activeOpacity={0.7}
-              onPress={() => openCanvas(SCREEN_SIZE)}
-            >
-              <Text style={[styles.sheetRowLabel, { color: colors.foreground }]}>{SCREEN_SIZE.label}</Text>
-              <Text style={[styles.sheetRowDims, { color: colors.mutedForeground }]}>{SCREEN_SIZE.dims}</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sheetSoloRow, { backgroundColor: colors.elevated }]}
+                activeOpacity={0.7}
+                onPress={() => openCanvas(SCREEN_SIZE)}
+              >
+                <Text style={[styles.sheetRowLabel, { color: colors.foreground }]}>{SCREEN_SIZE.label}</Text>
+                <Text style={[styles.sheetRowDims, { color: colors.mutedForeground }]}>{SCREEN_SIZE.dims}</Text>
+              </TouchableOpacity>
 
-            <View style={[styles.sheetGroup, { backgroundColor: colors.elevated }]}>
-              {SIZE_PRESETS.map((p, i) => (
-                <TouchableOpacity
-                  key={p.label}
-                  style={[styles.sheetRow, i > 0 && [styles.sheetRowBorder, { borderTopColor: colors.border }]]}
-                  activeOpacity={0.7}
-                  onPress={() => openCanvas(p)}
-                >
-                  <Text style={[styles.sheetRowLabel, { color: colors.foreground }]}>{p.label}</Text>
-                  <View style={styles.sheetRowRight}>
-                    {p.profile != null && <Text style={[styles.sheetRowProfile, { color: colors.mutedForeground }]}>{p.profile}</Text>}
-                    <Text style={[styles.sheetRowDims, { color: colors.mutedForeground }]}>{p.dims}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </SheetRise>
-        </View>
+              <View style={[styles.sheetGroup, { backgroundColor: colors.elevated }]}>
+                {SIZE_PRESETS.map((p, i) => (
+                  <TouchableOpacity
+                    key={p.label}
+                    style={[styles.sheetRow, i > 0 && [styles.sheetRowBorder, { borderTopColor: colors.border }]]}
+                    activeOpacity={0.7}
+                    onPress={() => openCanvas(p)}
+                  >
+                    <Text style={[styles.sheetRowLabel, { color: colors.foreground }]}>{p.label}</Text>
+                    <View style={styles.sheetRowRight}>
+                      {p.profile != null && <Text style={[styles.sheetRowProfile, { color: colors.mutedForeground }]}>{p.profile}</Text>}
+                      <Text style={[styles.sheetRowDims, { color: colors.mutedForeground }]}>{p.dims}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </SheetRise>
+          </View>
+        </ModalSafeArea>
       </Modal>
     </View>
   );
