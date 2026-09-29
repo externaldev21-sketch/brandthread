@@ -141,9 +141,10 @@ export function validateForPublish(product: {
   media: unknown[];
   variants: unknown[];
 }): string[] {
+  // Title, price and a photo are the only hard requirements — description
+  // (like Shopify's own) is optional and can be filled in after publishing.
   const warnings: string[] = [];
   if (!product.name?.trim()) warnings.push('Product name is required');
-  if (!product.description?.trim()) warnings.push('Product description is required');
   if (!product.pricing?.priceCents || product.pricing.priceCents <= 0) warnings.push('A valid price is required');
   if (!product.media?.length) warnings.push('At least one product image is required');
   return warnings;
