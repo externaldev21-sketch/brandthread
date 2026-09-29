@@ -16,7 +16,7 @@ import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeSta
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { useApi } from '@/lib/api';
-import { useImageSourceSheet } from '@/components/profile/ImageSourceSheet';
+import { useImageSourceSheet, AVATAR_VIDEO_MAX_SECONDS } from '@/components/profile/ImageSourceSheet';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -121,6 +121,10 @@ export default function BuyerEditProfileScreen() {
   const [loadedProfile, setLoadedProfile] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
   const [loaded, setLoaded] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  // A moving profile picture — set only when the avatar is a video; picking
+  // a plain photo (the existing flow below) always clears this back out,
+  // since the two are mutually exclusive.
+  const [avatarVideoUri, setAvatarVideoUri] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarProgress, setAvatarProgress] = useState(0);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -196,14 +200,18 @@ export default function BuyerEditProfileScreen() {
   }
 
   async function pickAvatar() {
-    const asset = await openAvatarSheet({ aspect: [1, 1] });
+    const asset = await openAvatarSheet({ aspect: [1, 1], enableVideo: true });
     if (!asset) return;
+    if (asset.type === 'video') { await pickAvatarVideo(asset); return; }
+
     setAvatarError(null);
     setAvatarUploading(true);
     setAvatarProgress(0);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const previousUri = avatarUri;
+    const previousVideoUri = avatarVideoUri;
     setAvatarUri(asset.uri); // optimistic local preview while it uploads
+    setAvatarVideoUri(null); // a plain photo always replaces a moving avatar
     try {
       let finalUri = asset.uri;
       if (preview) {
@@ -222,15 +230,74 @@ export default function BuyerEditProfileScreen() {
           setAvatarProgress,
         );
         finalUri = result.profileImageUrl;
+        // A photo replaces any existing moving avatar server-side too.
+        if (previousVideoUri) await api.avatarVideo.remove().catch(() => {});
       }
       setAvatarUri(finalUri);
-      setLoadedProfile(prev => ({ ...prev, avatarUri: finalUri }));
-      await saveBuyerProfile({ ...loadedProfile, avatarUri: finalUri });
+      setLoadedProfile(prev => ({ ...prev, avatarUri: finalUri, avatarVideoUri: '' }));
+      await saveBuyerProfile({ ...loadedProfile, avatarUri: finalUri, avatarVideoUri: '' });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast('Photo updated');
     } catch {
       setAvatarUri(previousUri);
+      setAvatarVideoUri(previousVideoUri);
       setAvatarError('Could not upload photo. Check your connection and try again.');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  /**
+   * A moving profile picture. Checked client-side against the 10s limit
+   * first (immediate, no wasted upload) — the server re-validates the same
+   * limit on the actual rendered duration regardless, so this is purely a
+   * faster/friendlier rejection, never the only guard.
+   */
+  async function pickAvatarVideo(asset: { uri: string; mimeType?: string | null; duration?: number | null }) {
+    const seconds = typeof asset.duration === 'number' ? asset.duration / 1000 : null;
+    if (seconds !== null && seconds > AVATAR_VIDEO_MAX_SECONDS + 0.25) {
+      Alert.alert(
+        'Video too long',
+        `Avatar videos can be at most ${AVATAR_VIDEO_MAX_SECONDS} seconds. Pick a shorter clip and try again.`,
+      );
+      return;
+    }
+    setAvatarError(null);
+    setAvatarUploading(true);
+    setAvatarProgress(0);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const previousUri = avatarUri;
+    const previousVideoUri = avatarVideoUri;
+    setAvatarVideoUri(asset.uri); // optimistic local preview (loops immediately) while it uploads
+    try {
+      let finalVideoUri = asset.uri;
+      let finalPosterUri = avatarUri ?? '';
+      if (preview) {
+        // No upload endpoint to hit in preview mode — there's no ffmpeg here
+        // to render a real poster frame, so the previous photo (if any)
+        // keeps standing in for it; only the profile header, which prefers
+        // the video itself, shows the moving picture.
+        for (const pct of [30, 65, 100]) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+          setAvatarProgress(pct);
+        }
+      } else {
+        setAvatarProgress(50);
+        const result = await api.avatarVideo.upload(asset.uri, asset.mimeType ?? 'video/mp4');
+        finalVideoUri = result.avatarVideoUrl;
+        finalPosterUri = result.avatarPosterUrl;
+        setAvatarProgress(100);
+      }
+      setAvatarUri(finalPosterUri || null);
+      setAvatarVideoUri(finalVideoUri);
+      setLoadedProfile(prev => ({ ...prev, avatarUri: finalPosterUri, avatarVideoUri: finalVideoUri }));
+      await saveBuyerProfile({ ...loadedProfile, avatarUri: finalPosterUri, avatarVideoUri: finalVideoUri });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Profile video updated');
+    } catch {
+      setAvatarUri(previousUri);
+      setAvatarVideoUri(previousVideoUri);
+      setAvatarError('Could not upload video. Check your connection and try again.');
     } finally {
       setAvatarUploading(false);
     }
@@ -255,6 +322,7 @@ export default function BuyerEditProfileScreen() {
         setInitial(merged);
         setLoadedProfile(profileState);
         if (profileState.avatarUri) setAvatarUri(profileState.avatarUri);
+        if (profileState.avatarVideoUri) setAvatarVideoUri(profileState.avatarVideoUri);
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
@@ -346,6 +414,7 @@ export default function BuyerEditProfileScreen() {
         gender: extra.gender,
         aiCreator: extra.aiCreator,
         avatarUri: avatarUri || '',
+        avatarVideoUri: avatarVideoUri || '',
       };
       const nameParts = cleanedFields.name.trim().split(' ').filter(Boolean);
       const initials = nameParts.length >= 2
@@ -462,7 +531,7 @@ export default function BuyerEditProfileScreen() {
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar} disabled={avatarUploading}>
               <Text style={[styles.editPhotoLink, { color: theme.accentLight }]}>
-                {avatarUploading ? `Uploading… ${avatarProgress}%` : 'Change profile photo'}
+                {avatarUploading ? `Uploading… ${avatarProgress}%` : 'Change profile photo or video'}
               </Text>
             </TouchableOpacity>
             {avatarError && (

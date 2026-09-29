@@ -226,7 +226,7 @@ function SellerLiveNativeScreen() {
   }
 
   async function handleEnd() {
-    Alert.alert('End stream?', 'Your stream will be saved as a replay in the Thread feed.', [
+    Alert.alert('End stream?', "We'll try to save your stream as a replay in the Thread feed. This can take a few minutes, and isn't guaranteed.", [
       { text: 'Keep going', style: 'cancel' },
       {
         text: 'End & save', style: 'destructive',

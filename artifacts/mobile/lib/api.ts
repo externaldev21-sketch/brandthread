@@ -1572,6 +1572,26 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       coachmark: () => freshGet<{ seen: boolean; hasCover: boolean }>('/api/profile/cover-coachmark'),
       markCoachmarkSeen: () => post<{ seen: true }>('/api/profile/cover-coachmark/seen', {}),
     },
+    /**
+     * Avatar video (moving profile picture, any account type). The server
+     * enforces <=10s with no trim endpoint — a 400 ApiError's message is the
+     * user-facing "Avatar videos can be at most 10 seconds…".
+     */
+    avatarVideo: {
+      get: () => freshGet<{
+        avatarVideoUrl: string | null;
+        avatarPosterUrl: string | null;
+        avatarVideoUpdatedAt: string | null;
+      }>('/api/profile/avatar-video'),
+      upload: (uri: string, mimeType?: string | null) =>
+        uploadVideo<{ avatarVideoUrl: string; avatarPosterUrl: string; avatarVideoUpdatedAt: string }>(
+          '/api/profile/avatar-video',
+          { uri, mimeType },
+          getToken,
+          getCacheScope,
+        ),
+      remove: () => del<{ avatarVideoUrl: null; avatarPosterUrl: null }>('/api/profile/avatar-video'),
+    },
     publicProducts: {
       list: (opts: { limit?: number; category?: string; tag?: string } = {}) => {
         const params = new URLSearchParams();

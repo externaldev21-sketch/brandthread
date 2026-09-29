@@ -14,6 +14,7 @@ import { startMoneySweepJob } from "./jobs/moneySweep";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
 import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
 import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
+import { startLiveRecordingFinalizeJob } from "./jobs/liveRecordingFinalize";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { pool } from "@workspace/db";
 
@@ -60,6 +61,7 @@ const server = app.listen(port, (err) => {
   startStoryCleanupJob();
   startPushReceiptCleanupJob();
   startNotificationBatchFlushJob();
+  startLiveRecordingFinalizeJob();
 });
 
 // ─── Graceful shutdown ──────────────────────────────────────────────────────

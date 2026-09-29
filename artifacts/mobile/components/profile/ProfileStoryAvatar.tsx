@@ -13,10 +13,11 @@
  * story when there is one (otherwise creates one), tapping "+" always
  * creates a new story.
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT } from '@/lib/theme';
@@ -24,8 +25,28 @@ import { avatarGeometry } from './profileAvatarGeometry';
 
 export const STORY_BADGE_SIZE = 22;
 
+/** A moving profile picture: muted, looping, autoplaying the instant it mounts. */
+function AvatarVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+  useEffect(() => { player.play(); }, [player]);
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+      testID="profile-avatar-video"
+    />
+  );
+}
+
 export function ProfileStoryAvatar({
   uri,
+  videoUri,
   initials,
   hasActiveStory,
   onPress,
@@ -35,6 +56,8 @@ export function ProfileStoryAvatar({
   testID = 'profile-avatar',
 }: {
   uri?: string | null;
+  /** A moving profile picture — when set, this plays instead of the static `uri` (its poster frame). */
+  videoUri?: string | null;
   initials: string;
   hasActiveStory: boolean;
   onPress?: () => void;
@@ -68,7 +91,9 @@ export function ProfileStoryAvatar({
           testID={`${testID}-inner`}
           style={[styles.avatar, { width: g.avatar, height: g.avatar, borderRadius: g.avatar / 2 }]}
         >
-          {uri ? (
+          {videoUri ? (
+            <AvatarVideo uri={videoUri} />
+          ) : uri ? (
             <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <>

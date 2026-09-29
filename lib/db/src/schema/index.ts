@@ -102,6 +102,15 @@ export const users = pgTable('users', {
   // First-visit coach mark ("add a cover video") — shown exactly once per
   // account, server-side so it survives reinstalls and other devices.
   coverCoachmarkSeenAt:       timestamp('cover_coachmark_seen_at', { withTimezone: true }),
+  // Avatar video (moving profile picture) — separate from both the plain
+  // avatar photo (profileImageUrl) and the cover video above. Server-render
+  // a center-cropped square, always-muted, <=10s clip + poster frame, both
+  // public object paths served via /api/profile/avatar-media. `avatarUrl`/
+  // `profileImageUrl` still hold the poster-equivalent for every screen that
+  // only ever shows a static avatar.
+  avatarVideoUrl:       text('avatar_video_url'),
+  avatarPosterUrl:      text('avatar_poster_url'),
+  avatarVideoUpdatedAt: timestamp('avatar_video_updated_at', { withTimezone: true }),
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
   // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
   username: text('username').unique(),
@@ -1794,6 +1803,15 @@ export const liveStreams = pgTable('live_streams', {
   endedAt:          timestamp('ended_at', { withTimezone: true }),
   replayPostId:     uuid('replay_post_id').references(() => posts.id, { onDelete: 'set null' }),
   replayUrl:        text('replay_url'),
+  // Agora Cloud Recording bookkeeping (migration 106) — see that file for
+  // the recording_status state machine and idempotency notes.
+  recordingStatus:      text('recording_status').notNull().default('none'),
+  recordingResourceId:  text('recording_resource_id'),
+  recordingSid:         text('recording_sid'),
+  recordingUid:         integer('recording_uid'),
+  recordingStartedAt:   timestamp('recording_started_at', { withTimezone: true }),
+  recordingStoppedAt:   timestamp('recording_stopped_at', { withTimezone: true }),
+  recordingError:       text('recording_error'),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   statusViewerIdx: index('live_streams_status_viewer_idx')
