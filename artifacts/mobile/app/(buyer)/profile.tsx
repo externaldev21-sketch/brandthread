@@ -16,11 +16,12 @@
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Modal, Animated, Share, Linking, Alert, ScrollView, Platform, Pressable,
+  View, Text, StyleSheet, Modal, Animated, Share, Linking, Alert, ScrollView, Pressable,
   useWindowDimensions, type LayoutChangeEvent, type FlatList,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
@@ -311,7 +312,6 @@ type ListRow =
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const barInset = useBuyerTabBarInset();
-  const insets = useSafeAreaInsets();
   const router  = useRouter();
   const { user } = useUser();
   const api     = useApi();
@@ -327,7 +327,7 @@ export default function ProfileScreen() {
   const listPadding = { paddingBottom: barInset + SP.lg };
   const savedColumns = layout.gridColumns >= 4 ? 3 : 2;
   const savedCellSize = Math.floor((layout.columnWidth - SP.md * 2) / savedColumns);
-  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const topPad = useHeaderTopInset();
 
   // The whole header (video hero, identity, buttons, highlights, streak,
   // tabs) scrolls away with the list — nothing stays pinned above the empty

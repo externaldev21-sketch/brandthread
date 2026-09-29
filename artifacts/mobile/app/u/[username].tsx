@@ -28,6 +28,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -130,6 +131,7 @@ function PublicProfileLanding({
 }) {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const headerTopInset = useHeaderTopInset();
   const layout = useProfileLayout();
   const initials = getInitials(profile.displayName, profile.username);
   const displayName = profile.displayName || `@${profile.username}`;
@@ -153,7 +155,7 @@ function PublicProfileLanding({
             locations={[0.4, 0.9, 1]}
             style={StyleSheet.absoluteFill}
           />
-          <View style={[styles.logoRow, { top: insets.top + SP.md }]}>
+          <View style={[styles.logoRow, { top: headerTopInset + SP.md }]}>
             <BrandthreadLogo size={28} />
             <Text style={styles.logoText} accessibilityRole="text">
               Brandthread
@@ -274,6 +276,7 @@ export default function PublicProfileRoute() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const params = useLocalSearchParams<{ username?: string }>();
 
@@ -358,7 +361,7 @@ export default function PublicProfileRoute() {
     // Skeleton in the profile shell's shape (hero, avatar, name) — the fetch
     // itself is time-boxed, so this always resolves to data or an error.
     return (
-      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]} accessibilityLabel="Loading profile" accessible>
+      <View style={[styles.root, { paddingTop: headerTopInset }]} accessibilityLabel="Loading profile" accessible>
         <SkeletonBlock width="100%" height={260} radius={0} />
         <View style={styles.skeletonIdentity}>
           <SkeletonBlock width={84} height={84} radius={42} />
@@ -375,7 +378,7 @@ export default function PublicProfileRoute() {
   // ── Not found ─────────────────────────────────────────────────────────────
   if (state.kind === 'not_found') {
     return (
-      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[styles.root, { paddingTop: headerTopInset }]}>
         <View style={styles.header}>
           <PressableScale
             style={styles.backBtn}
@@ -412,7 +415,7 @@ export default function PublicProfileRoute() {
   // ── Error / retry ─────────────────────────────────────────────────────────
   if (state.kind === 'error') {
     return (
-      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[styles.root, { paddingTop: headerTopInset }]}>
         <View style={styles.header}>
           <PressableScale
             style={styles.backBtn}

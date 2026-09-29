@@ -16,7 +16,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image, Modal, FlatList,
-  Platform, Dimensions,
+  Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -27,6 +27,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
@@ -95,6 +96,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
   const router = useRouter();
   const { getToken } = useAuth();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [phase, setPhase] = useState<Phase>('pick');
@@ -539,7 +541,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
       {/* Header */}
-      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
+      <View style={[s.header, { paddingTop: headerTopInset + SP.sm }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => goBackOr(router)} activeOpacity={0.7}>
           <Feather name="arrow-left" size={ICON.sm} color={FG} />
         </TouchableOpacity>
@@ -755,7 +757,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
         presentationStyle="formSheet"
         onRequestClose={() => setShowProductPicker(false)}
       >
-        <View style={[s.pickerRoot, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.md }]}>
+        <View style={[s.pickerRoot, { paddingTop: headerTopInset + SP.md }]}>
           <View style={s.pickerHeader}>
             <Text style={s.pickerTitle}>Choose a product</Text>
             <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>

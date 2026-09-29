@@ -8,6 +8,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -72,6 +73,7 @@ export default function StoreBuilderScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ from?: string }>();
   const insets = useSafeAreaInsets();
+  const topInset = useHeaderTopInset();
   const [store, setStore] = useState<Storefront | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -229,7 +231,7 @@ export default function StoreBuilderScreen() {
 
   if (loading) {
     return (
-      <View style={[s.loadingContainer, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[s.loadingContainer, { paddingTop: topInset }]}>
         <ActivityIndicator color={PURPLE} size="large" />
       </View>
     );
@@ -247,7 +249,7 @@ export default function StoreBuilderScreen() {
           colors={[...theme.primaryGradient]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[s.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.md }]}
+          style={[s.header, { paddingTop: topInset + SP.md }]}
         >
           <TouchableOpacity
             onPress={leaveSetupDestination}

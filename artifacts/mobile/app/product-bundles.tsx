@@ -11,6 +11,7 @@ import {
   ActivityIndicator, RefreshControl, Platform } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -85,7 +86,7 @@ export default function ProductBundlesScreen() {
   function onRefresh() { setRefreshing(true); load(true); }
 
   return (
-    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
       <BrandthreadHeader
         title="Bundles"
         onBack={() => goBackOr(router)}

@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import SellerHomeCommerceDashboard from '@/components/SellerHomeCommerceDashboard';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { getSetupState, type SetupState } from '@/lib/setupStore';
@@ -31,6 +32,7 @@ const DEFAULT_SETUP: SetupState = {
 export default function SellerHomeScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const { userId } = useAuth();
   const api = useApi();
 
@@ -62,7 +64,7 @@ export default function SellerHomeScreen() {
     return (
       <View style={[styles.root, { backgroundColor: theme.background }]}>
         <StripeConnectWarning />
-        <View style={[styles.loadingRoot, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.md }]}>
+        <View style={[styles.loadingRoot, { paddingTop: headerTopInset + SP.md }]}>
           <LoadingSkeleton height={16} style={{ width: 120 }} />
           <LoadingSkeleton height={52} style={{ width: 220, marginTop: SP.sm }} />
           <LoadingSkeleton height={168} style={{ marginTop: SP.lg, borderRadius: RADIUS.md }} />

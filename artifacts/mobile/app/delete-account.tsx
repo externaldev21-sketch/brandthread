@@ -17,6 +17,7 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
@@ -36,6 +37,7 @@ export default function DeleteAccountScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const { signOut } = useAuth();
@@ -104,7 +106,7 @@ export default function DeleteAccountScreen() {
 
   if (step === 'done') {
     return (
-      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.xxl, paddingBottom: insets.bottom + SP.lg }]}>
+      <View style={[s.root, { paddingTop: headerTopInset + SP.xxl, paddingBottom: insets.bottom + SP.lg }]}>
         <View style={s.doneBody}>
           <View style={s.doneIcon}><Feather name="check" size={30} color={theme.onAccent} /></View>
           <Text style={s.title}>Your account has been deleted</Text>

@@ -10,10 +10,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
+  TextInput, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -45,6 +46,7 @@ export default function ProductSizeChartScreen() {
   const router = useRouter();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api    = useApi();
 
   const [loading, setLoading]     = useState(true);
@@ -177,14 +179,14 @@ export default function ProductSizeChartScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), alignItems: 'center', justifyContent: 'center' }]}>
+      <View style={[s.root, { paddingTop: headerTopInset, alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator color={theme.accentLight} />
       </View>
     );
   }
 
   return (
-    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+    <View style={[s.root, { paddingTop: headerTopInset }]}>
       <BrandthreadHeader
         title="Size Chart"
         subtitle={productName ?? undefined}

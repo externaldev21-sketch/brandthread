@@ -26,6 +26,7 @@ import {
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 // ─── Agora SDK — native only, gracefully absent on web / Expo Go ──────────────
 let AgoraModule: any = null;
@@ -84,6 +85,7 @@ export default function CallScreen() {
 function NativeCallScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const topInset = useHeaderTopInset();
   const router = useRouter();
   const api    = useApi();
 
@@ -401,7 +403,7 @@ function NativeCallScreen() {
                               'Call ended';
 
   return (
-    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), paddingBottom: insets.bottom + SP.lg }]}>
+    <View style={[s.root, { paddingTop: topInset, paddingBottom: insets.bottom + SP.lg }]}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <View style={s.header}>

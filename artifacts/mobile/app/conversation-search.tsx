@@ -4,10 +4,11 @@
  * (GET /api/conversations/:id/messages?q=...), never a global search.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, FlatList, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -23,7 +24,7 @@ export default function ConversationSearchScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(), []);
   const insets = useSafeAreaInsets();
-  const headerTopPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const headerTopPad = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{ id: string; role?: string }>();

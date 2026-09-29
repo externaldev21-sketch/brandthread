@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   EFFECTIVE_DATE, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_VERSION,
   type LegalDocId,
@@ -32,7 +33,7 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const topInset = insets.top;
+  const topInset = useHeaderTopInset();
   const bottomInset = insets.bottom;
   const doc = LEGAL_DOCUMENTS[docId];
 

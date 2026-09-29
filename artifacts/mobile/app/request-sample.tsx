@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -89,7 +90,7 @@ export default function RequestSampleScreen() {
   if (!manufacturer) return <View style={styles.root} />;
 
   return (
-    <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+    <View style={[styles.root, { paddingTop: useHeaderTopInset() }]}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}

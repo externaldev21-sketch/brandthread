@@ -6,9 +6,10 @@
  * Stripe sends a webhook that flips the status; the screen polls on re-focus.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -192,7 +193,7 @@ export default function SellerVerificationScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
         <BrandthreadHeader title="Identity Verification" onBack={leaveSetupDestination} />
         <BrandedLoadingState message="Checking verification status…" />
       </View>
@@ -203,7 +204,7 @@ export default function SellerVerificationScreen() {
   const cfg = statusConfig(theme)[status];
 
   return (
-    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
       <BrandthreadHeader title="Identity Verification" onBack={leaveSetupDestination} />
 
       <ScrollView

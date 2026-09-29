@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   PressableScale, PrimaryButton, SecondaryButton, HapticSwitch, AnimatedEntrance,
 } from '@/components/BrandthreadUI';
@@ -37,6 +38,7 @@ export default function ReportScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{
@@ -141,7 +143,7 @@ export default function ReportScreen() {
 
   if (!params.targetId) {
     return (
-      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[s.root, { paddingTop: headerTopInset }]}>
         {header}
         <View style={s.centerState}>
           <Feather name="alert-circle" size={36} color={theme.muted} />
@@ -155,7 +157,7 @@ export default function ReportScreen() {
 
   if (step === 'done') {
     return (
-      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), paddingBottom: insets.bottom + SP.md }]}>
+      <View style={[s.root, { paddingTop: headerTopInset, paddingBottom: insets.bottom + SP.md }]}>
         <ScrollView contentContainerStyle={s.doneScroll} showsVerticalScrollIndicator={false}>
           <AnimatedEntrance>
             <View style={s.doneIcon}>
@@ -220,7 +222,7 @@ export default function ReportScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}
+      style={[s.root, { paddingTop: headerTopInset }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {header}

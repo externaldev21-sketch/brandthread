@@ -13,7 +13,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
@@ -30,11 +30,10 @@ const BRACKET = 44;
 const FRAME_SIZE = 260;
 
 export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const [handled, setHandled] = useState(false);
-  const topInset = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const topInset = useHeaderTopInset();
 
   // Prompt once on mount (native only — web has no meaningful permission
   // prompt here and should show the "not available in preview" state).

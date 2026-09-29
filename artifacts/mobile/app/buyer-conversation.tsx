@@ -8,6 +8,7 @@ import { KeyboardAvoidingView, KeyboardGestureArea } from 'react-native-keyboard
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
@@ -631,11 +632,7 @@ export default function BuyerConversationScreen() {
   const statusLine = isAgentConv
     ? (agentTyping ? 'typing…' : 'AI assistant')
     : (conv?.otherTyping ? 'typing…' : (participant?.isOnline ? 'Active now' : statusLineFor(participant)));
-  // react-native-web doesn't fill in a real top safe-area inset (no notch/
-  // dynamic-island polyfill), so insets.top reads 0 on web and the header
-  // clipped under the dynamic island in a device-frame screenshot — same
-  // fix already applied to app/(buyer)/discover.tsx and inbox.tsx.
-  const headerTopPad = Platform.OS === 'web' ? 67 : insets.top;
+  const headerTopPad = useHeaderTopInset();
   // Same reasoning at the bottom: react-native-web never fills in a real
   // bottom safe-area inset (no home-indicator polyfill), so insets.bottom
   // reads 0 on web and the composer sat flush against the viewport edge —

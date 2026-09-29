@@ -20,6 +20,7 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -100,12 +101,7 @@ interface LiveRoom {
 export default function LiveFeedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  // Outside a real device (or a preview frame that emulates one), the
-  // browser never fills in a non-zero `env(safe-area-inset-top)`, so
-  // insets.top reads 0 on web and the host row sat level with the Dynamic
-  // Island in a plain browser preview — same fallback every tab header and
-  // app/live.tsx already use.
-  const topInset = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const topInset = useHeaderTopInset();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const api = useApi();
   const [activeIndex, setActiveIndex] = useState(0);

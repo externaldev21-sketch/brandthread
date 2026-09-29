@@ -7,13 +7,14 @@
  *   updated since the last agreement → asks the person to review and agree.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, View, Platform } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { PressableScale, PrimaryButton } from '@/components/BrandthreadUI';
 import { LegalConsent } from '@/components/legal/LegalConsent';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -30,6 +31,7 @@ export default function LegalAcceptanceGate() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   const [needsAgreement, setNeedsAgreement] = useState(false);
   const [previouslyAgreed, setPreviouslyAgreed] = useState(false);
@@ -107,7 +109,7 @@ export default function LegalAcceptanceGate() {
   return (
     <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={() => {}}>
       <View style={[styles.root, isWebShell && styles.rootWebShell, { backgroundColor: theme.background }]}>
-      <View style={[styles.content, isWebShell && styles.contentWebShell, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.lg, paddingBottom: insets.bottom + SP.md }]}>
+      <View style={[styles.content, isWebShell && styles.contentWebShell, { paddingTop: headerTopInset + SP.lg, paddingBottom: insets.bottom + SP.md }]}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: SP.lg }} showsVerticalScrollIndicator={false}>
           <View style={[styles.icon, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Feather name="file-text" size={22} color={theme.text} />

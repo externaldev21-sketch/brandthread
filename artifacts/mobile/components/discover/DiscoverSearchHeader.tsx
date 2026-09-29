@@ -9,11 +9,11 @@
  * position) fused onto the same row instead of Instagram's bare search bar.
  */
 import React from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { FONT, GUTTER, WEB_SAFE_AREA_TOP } from '@/lib/theme';
+import { FONT, GUTTER } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { IconButton } from '@/components/ui/IconButton';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -30,11 +30,8 @@ export function DiscoverSearchHeader({
   onBellPress?: () => void;
   bellBadge?: number;
 }) {
-  const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
-  // Overnight batch item 40: shared stand-in (lib/theme.ts) for a real
-  // device's status-bar inset on web preview — see its own comment.
-  const topPad = Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top;
+  const topPad = useHeaderTopInset();
 
   return (
     <View style={[styles.row, { paddingTop: topPad + 12 }]}>

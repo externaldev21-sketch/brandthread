@@ -11,6 +11,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { getQuotesForRequest, acceptQuote, getManufacturer } from '@/services/manufacturerService';
 import { Quote, Manufacturer } from '@/services/manufacturerTypes';
@@ -151,7 +152,7 @@ export default function QuoteCompareScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: useHeaderTopInset() }}>
       <BrandthreadHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
 
       {loadError ? (

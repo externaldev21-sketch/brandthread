@@ -7,6 +7,7 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Activi
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -107,6 +108,7 @@ export default function InventoryDetailScreen() {
   const d = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const params = useLocalSearchParams<{ id: string }>();
   const itemId = params.id ?? '';
 
@@ -492,7 +494,7 @@ export default function InventoryDetailScreen() {
   return (
     <View style={[d.root, { backgroundColor: 'transparent' }]}>
       {/* Header */}
-      <View style={[d.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.xs }]}>
+      <View style={[d.header, { paddingTop: headerTopInset + SP.xs }]}>
         <TouchableOpacity
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
           style={d.backBtn}

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useColors } from '@/hooks/useColors';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER,
@@ -115,6 +116,7 @@ export default function BuyerStoryViewer() {
   const PURPLE = colors.primary, PURPLE_DIM = colors.accent;
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const { storyId, allStoryIds } = useLocalSearchParams<{ storyId: string; allStoryIds: string }>();
 
@@ -412,7 +414,7 @@ export default function BuyerStoryViewer() {
 
   if (!currentStory || !currentSlide) {
     return (
-      <View style={[styles.container, styles.loadState, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[styles.container, styles.loadState, { paddingTop: headerTopInset }]}>
         <StatusBar style="light" />
         {loading ? (
           // A thin progress-bar-shaped skeleton instead of a bare "Loading…" line,
@@ -424,7 +426,7 @@ export default function BuyerStoryViewer() {
             <Text style={styles.loadText}>This story's no longer available.</Text>
           </>
         )}
-        <View style={[styles.closeBtnWrap, { top: insets.top + SP.sm }]}>
+        <View style={[styles.closeBtnWrap, { top: headerTopInset + SP.sm }]}>
           <IconButton name="x" onPress={() => goBackOr(router)} accessibilityLabel="Close" color={ON_DARK} variant="plain" />
         </View>
       </View>
@@ -578,7 +580,7 @@ export default function BuyerStoryViewer() {
       />
 
       {/* PROGRESS BAR */}
-      <View style={[styles.progressContainer, { top: insets.top + SP.sm }]}>
+      <View style={[styles.progressContainer, { top: headerTopInset + SP.sm }]}>
         {currentStory.media.map((_, i) => (
           <View
             key={i}
@@ -609,7 +611,7 @@ export default function BuyerStoryViewer() {
       </View>
 
       {/* AUTHOR INFO */}
-      <View style={[styles.authorRow, { top: insets.top + SP.sm + 3 + 12 + SP.xs }]}>
+      <View style={[styles.authorRow, { top: headerTopInset + SP.sm + 3 + 12 + SP.xs }]}>
         <View style={[styles.avatar, { backgroundColor: currentStory.authorColor }]}>
           <Text style={styles.avatarText}>{currentStory.authorInitials}</Text>
         </View>

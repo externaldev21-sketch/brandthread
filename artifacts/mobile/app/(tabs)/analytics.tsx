@@ -11,7 +11,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { useAuth } from '@clerk/expo';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { GRID_MAX_WIDTH, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { ResponsiveContainer } from '@/components/layout';
 import { useColors } from '@/hooks/useColors';
@@ -86,8 +86,7 @@ export default function AnalyticsScreen() {
   const colors = useColors();
   const api = useApi();
   const { userId } = useAuth();
-  const insets = useSafeAreaInsets();
-  const topPad = insets.top;
+  const topPad = useHeaderTopInset();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const scrollResetRef = useScrollReset<ScrollView>();
 
