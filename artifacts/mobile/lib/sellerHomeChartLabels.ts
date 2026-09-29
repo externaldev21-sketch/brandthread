@@ -101,5 +101,8 @@ export function selectEvenlySpacedIndices(count: number, want: number, anchorEnd
       : Math.min(count - 1, Math.round((i * count) / want));
     indices.add(idx);
   }
+  // De-duped Sets can end up with fewer than `want` entries when rounding
+  // collides two targets onto the same bucket (small count, large want) —
+  // always return them in ascending order regardless.
   return Array.from(indices).sort((a, b) => a - b);
 }
