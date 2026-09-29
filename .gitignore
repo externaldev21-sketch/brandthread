@@ -56,3 +56,6 @@ Thumbs.db
 
 # Local environment overrides
 .env
+
+# Notch-crawl scratch output (screenshots + JSON report from e2e/notch-crawl.spec.ts)
+artifacts/mobile/.notch-crawl/

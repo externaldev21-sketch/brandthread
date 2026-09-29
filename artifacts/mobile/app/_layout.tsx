@@ -58,6 +58,7 @@ import { initAnalyticsService } from '@/services/analyticsService';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
 import { WebAppShell } from '@/components/web/WebAppShell';
+import { PhoneFrameSafeArea } from '@/components/web/PhoneFrameSafeArea';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
@@ -1310,6 +1311,7 @@ export default function RootLayout() {
 
   const appTree = (
     <SafeAreaProvider>
+      <PhoneFrameSafeArea>
       <ErrorBoundary>
         <PersistQueryClientProvider
           client={queryClient}
@@ -1347,6 +1349,7 @@ export default function RootLayout() {
           </GestureHandlerRootView>
         </PersistQueryClientProvider>
       </ErrorBoundary>
+      </PhoneFrameSafeArea>
     </SafeAreaProvider>
   );
 

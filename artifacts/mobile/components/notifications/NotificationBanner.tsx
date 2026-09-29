@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -31,7 +31,7 @@ const ICON_BY_CATEGORY: Record<string, keyof typeof Feather.glyphMap> = {
  */
 export default function NotificationBanner() {
   const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const [payload, setPayload] = useState<BannerPayload | null>(null);
   const translateY = useRef(new Animated.Value(-200)).current;
@@ -99,7 +99,7 @@ export default function NotificationBanner() {
   };
 
   return (
-    <View pointerEvents="box-none" style={[styles.host, { top: insets.top + SP.xs }]}>
+    <View pointerEvents="box-none" style={[styles.host, { top: headerTopInset + SP.xs }]}>
       <Animated.View
         {...panResponder.panHandlers}
         style={[

@@ -28,6 +28,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 
@@ -82,6 +83,7 @@ export default function SellerStudioRadialMenu({
 }: SellerStudioRadialMenuProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isTablet = screenWidth >= BREAKPOINT.tablet;
   const { theme } = useAppTheme();
@@ -102,7 +104,7 @@ export default function SellerStudioRadialMenu({
   // Was previously pinned to `insets.top + SP.xl` regardless of sheet
   // height, which put it on top of the header row on most phone sizes.
   const sheetTop = screenHeight - sheetHeight;
-  const closeButtonTop = Math.max(insets.top + SP.md, sheetTop - 52 - SP.md);
+  const closeButtonTop = Math.max(headerTopInset + SP.md, sheetTop - 52 - SP.md);
 
   const [open, setOpen] = useState(false);
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
@@ -426,7 +428,7 @@ export default function SellerStudioRadialMenu({
           onPress={expand}
           style={({ pressed }) => [
             styles.toggle,
-            { top: insets.top + SP.xl, backgroundColor: theme.accent, shadowColor: theme.shadowColor },
+            { top: headerTopInset + SP.xl, backgroundColor: theme.accent, shadowColor: theme.shadowColor },
             pressed && styles.pressed,
           ]}
         >
