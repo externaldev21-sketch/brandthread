@@ -115,3 +115,14 @@ describe('quote totals and errors', () => {
     expect(paymentErrorMessage(null)).toContain('didn’t go through');
   });
 });
+
+describe('quote responses', () => {
+  it('accepts only a well-formed quote', async () => {
+    const { isCartQuote } = await import('./checkoutPayment');
+    expect(isCartQuote({ amountCents: 100, groups: [{ totalCents: 100, taxCents: 0, shippingCents: 0 }] })).toBe(true);
+    expect(isCartQuote({})).toBe(false);
+    expect(isCartQuote(null)).toBe(false);
+    expect(isCartQuote({ amountCents: 100 })).toBe(false);
+    expect(isCartQuote({ amountCents: 100, groups: [{}] })).toBe(false);
+  });
+});

@@ -1,0 +1,126 @@
+{
+  "cartGreyBoxes": [
+    {
+      "bg": "rgb(10, 10, 11)",
+      "w": 390,
+      "h": 844,
+      "testid": null
+    },
+    {
+      "bg": "rgb(10, 10, 11)",
+      "w": 390,
+      "h": 844,
+      "testid": null
+    },
+    {
+      "bg": "rgb(10, 10, 11)",
+      "w": 390,
+      "h": 844,
+      "testid": null
+    },
+    {
+      "bg": "rgb(10, 10, 11)",
+      "w": 390,
+      "h": 844,
+      "testid": null
+    },
+    {
+      "bg": "rgb(10, 10, 11)",
+      "w": 390,
+      "h": 111,
+      "testid": null
+    },
+    {
+      "bg": "rgb(24, 24, 27)",
+      "w": 358,
+      "h": 635,
+      "testid": "cart-seller-user_northline"
+    },
+    {
+      "bg": "rgb(24, 24, 27)",
+      "w": 356,
+      "h": 202,
+      "testid": null
+    },
+    {
+      "bg": "rgb(24, 24, 27)",
+      "w": 356,
+      "h": 224,
+      "testid": null
+    },
+    {
+      "bg": "rgb(24, 24, 27)",
+      "w": 358,
+      "h": 380,
+      "testid": "cart-seller-user_field"
+    },
+    {
+      "bg": "rgb(24, 24, 27)",
+      "w": 356,
+      "h": 180,
+      "testid": null
+    },
+    {
+      "bg": "rgba(247, 247, 250, 0.14)",
+      "w": 358,
+      "h": 72,
+      "testid": null
+    },
+    {
+      "bg": "rgba(24, 24, 27, 0.91)",
+      "w": 358,
+      "h": 151,
+      "testid": null
+    },
+    {
+      "bg": "rgb(24, 24, 27)",
+      "w": 358,
+      "h": 261,
+      "testid": null
+    },
+    {
+      "bg": "rgb(24, 24, 27)",
+      "w": 358,
+      "h": 147,
+      "testid": null
+    },
+    {
+      "bg": "rgb(10, 10, 11)",
+      "w": 390,
+      "h": 69,
+      "testid": null
+    }
+  ],
+  "confirmation": {
+    "fullWidthButtons": [
+      {
+        "label": "Message Northline Studio",
+        "top": 917,
+        "h": 56
+      },
+      {
+        "label": "Track order",
+        "top": 656,
+        "h": 52
+      },
+      {
+        "label": "View receipt",
+        "top": 716,
+        "h": 52
+      },
+      {
+        "label": "Continue shopping",
+        "top": 776,
+        "h": 52
+      }
+    ],
+    "pinnedAreaHeight": 188,
+    "labels": [
+      "Close",
+      "Message Northline Studio",
+      "Track order",
+      "View receipt",
+      "Continue shopping"
+    ]
+  }
+}

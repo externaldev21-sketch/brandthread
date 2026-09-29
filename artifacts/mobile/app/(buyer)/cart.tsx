@@ -32,20 +32,23 @@ import { useScrollReset } from '@/hooks/useScrollReset';
 import { ThreadIllustration } from '@/components/illustrations/EmptyStateArt';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
+// Same flat-black language as the one-page checkout: sections on pure black,
+// uppercase labels, 1px hairlines. No card containers.
+import { CK, CheckoutSection } from '@/components/checkout/CheckoutPrimitives';
 import { isPreviewCheckoutGroup } from '@/lib/previewCheckout';
 import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { useApi } from '@/hooks/useApi';
 import SwipeableActions, { type SwipeAction } from '@/components/SwipeableActions';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
-  FONT, FS, SP, RADIUS, COMP, ICON, TYPE, SHADOW_SM,
+  FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
 } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import {
   BrandedLoader, PressableScale, useUndoToast,
 } from '@/components/BrandthreadUI';
 import {
-  Button, Card, ErrorState, QuantityStepper, StickyBottomCTA, ThemedRefreshControl,
+  Button, ErrorState, QuantityStepper, StickyBottomCTA, ThemedRefreshControl,
 } from '@/components/ui';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
@@ -300,12 +303,12 @@ function CartItemRow({
 const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm, alignItems: 'flex-start' },
   rowBusy: { opacity: 0.7 },
-  // The swipe row spans the card's full inner width (edge to edge, cancelling
-  // the Card's 16pt padding) so the revealed actions sit flush with the card
-  // edge; the row pads itself back in, so at rest nothing moves. Opaque card
-  // fill so the actions never show through behind the row at rest (web).
+  // The swipe row spans the full screen width (edge to edge, cancelling the
+  // list's 16pt gutter) so the revealed actions sit flush with the screen
+  // edge; the row pads itself back in, so at rest nothing moves. Opaque black
+  // (the page color) so the actions never show through at rest (web).
   swipeBleed: { marginHorizontal: -SP.md },
-  swipeFront: { paddingHorizontal: SP.md, backgroundColor: theme.card },
+  swipeFront: { paddingHorizontal: SP.md, backgroundColor: CK.bg },
   checkbox: { width: COMP.minTouchTarget, height: 72, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
   checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {
@@ -359,9 +362,11 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
 // ─── Seller Group ─────────────────────────────────────────────────────────────
 
 function SellerGroup({
-  group, pendingByItemId, selectedIds, checkingOut, checkoutDisabled, onCheckoutGroup, onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+  group, first, pendingByItemId, selectedIds, checkingOut, checkoutDisabled, onCheckoutGroup, onToggleSelect, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
 }: {
   group: CartSellerGroup;
+  /** The first section has no hairline above it. */
+  first: boolean;
   pendingByItemId: Record<string, RowPendingAction>;
   selectedIds: Set<string>;
   /** This seller's own checkout is starting. */
@@ -386,7 +391,7 @@ function SellerGroup({
   const checkoutThisSeller = useCallback(() => onCheckoutGroup(group.sellerId), [onCheckoutGroup, group.sellerId]);
   const hasAvailable = group.items.some(item => item.isAvailable);
   return (
-    <Card style={sg.root} testID={`cart-seller-${group.sellerId}`}>
+    <CheckoutSection first={first} testID={`cart-seller-${group.sellerId}`}>
       {/* Seller header — avatar, name, and a chevron to the store (the
           whole row is the tap target, not a separate "Visit store" button).
           Same per-seller grouping as checkout: both come from
@@ -460,7 +465,7 @@ function SellerGroup({
           testID={`cart-group-checkout-${group.sellerId}`}
         />
       </View>
-    </Card>
+    </CheckoutSection>
   );
 }
 
@@ -506,21 +511,15 @@ function SellerGroupLine({
 }
 
 const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
-  root: {
-    marginBottom: SP.md, borderRadius: RADII.card,
-    ...SHADOW_SM, shadowColor: theme.shadowColor, shadowOpacity: 0.12,
-  },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   avatar: { width: 38, height: 38, borderRadius: RADII.pill, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   sellerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
-  // Softened to a fixed 6%-white hairline (same treatment as the header's
-  // dividerVariant="subtle") — the full-strength theme.border read as a
-  // heavier second divider right under the already-subtle header line.
-  divider: { height: 1, backgroundColor: '#FFFFFF', opacity: 0.06, marginVertical: SP.xs },
-  footer: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
+  // The checkout's hairline (CK.divider), between lines and above the footer.
+  divider: { height: 1, backgroundColor: CK.divider, marginVertical: SP.xs },
+  footer: { borderTopWidth: 1, borderTopColor: CK.divider, marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   footerText: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted },
   groupSubtotal: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginTop: 4 },
@@ -580,7 +579,7 @@ const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
   actions: { flexDirection: 'row', gap: SP.sm },
 });
 
-// ─── Summary Card ─────────────────────────────────────────────────────────────
+// ─── Order summary ─────────────────────────────────────────────────────────────
 
 function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrder }: {
   subtotal: number; discountTotal: number; shipping: number; tax: number; total: number; hasPreOrder: boolean;
@@ -596,8 +595,7 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
     );
   }
   return (
-    <Card style={sum.root}>
-      <Text style={sum.title}>Order summary</Text>
+    <CheckoutSection title="Order summary" testID="cart-order-summary">
       <Row label="Subtotal" value={fmtPrice(subtotal)} />
       <Row label="Discounts" value={discountTotal > 0 ? `–${fmtPrice(discountTotal)}` : fmtPrice(0)} accent={discountTotal > 0 ? theme.success : undefined} />
       <Row label="Shipping & fees" value={fmtPrice(shipping)} small />
@@ -614,19 +612,17 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
           <Text style={[sum.preOrderNoteText, { color: theme.secondary }]}>Pre-order items will ship after production. Items may ship separately.</Text>
         </View>
       )}
-    </Card>
+    </CheckoutSection>
   );
 }
 
 const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
-  root: { marginBottom: SP.md },
-  title: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
   label: { ...TYPE.body, color: theme.muted },
   labelSm: { fontSize: FS.sm },
   value: { ...TYPE.bodyMedium, ...TABULAR_NUMS, fontFamily: FONT.semibold, color: theme.text },
   valueSm: { fontSize: FS.sm },
-  divider: { height: 1, backgroundColor: theme.border, marginVertical: SP.sm },
+  divider: { height: 1, backgroundColor: CK.divider, marginVertical: SP.sm },
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: SP.xs },
   totalLabel: { ...TYPE.subheading, color: theme.text },
   totalValue: { ...TYPE.subheading, ...TABULAR_NUMS, color: theme.text },
@@ -1005,7 +1001,7 @@ export default function CartScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <View style={{ flex: 1, backgroundColor: CK.bg }}>
         <BrandedLoader label="Gathering your picks…" />
       </View>
     );
@@ -1015,7 +1011,7 @@ export default function CartScreen() {
   const hasSaved = cart.savedItems.length > 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <View style={{ flex: 1, backgroundColor: CK.bg }}>
       {/* Pushed-screen header: back chevron + "Cart (N)" + Edit, matching
           every other stack screen (not the tab-root large-title header) —
           this is a screen reached from the feed's cart icon or Shop the
@@ -1023,6 +1019,8 @@ export default function CartScreen() {
       <Header
         title={`Cart${hasItems ? ` (${cart.items.reduce((sum, i) => sum + i.quantity, 0)})` : ''}`}
         showBack
+        // Over the page's pure black (no second, lighter band).
+        transparent
         rightElement={hasItems ? (
           <TouchableOpacity
             onPress={() => { Haptics.selectionAsync(); setEditMode(e => !e); }}
@@ -1120,10 +1118,11 @@ export default function CartScreen() {
             }}
           >
             {/* Seller groups */}
-            {groups.map(group => (
+            {groups.map((group, index) => (
               <SellerGroup
                 key={group.sellerId}
                 group={group}
+                first={index === 0}
                 pendingByItemId={pendingByItemId}
                 selectedIds={selectedIds}
                 checkingOut={checkingOutSellerId === group.sellerId}
@@ -1142,16 +1141,16 @@ export default function CartScreen() {
             {hasItems && (
               <>
               {groups.length > 1 && (
-                <View style={[s.multiSellerNotice, { backgroundColor: theme.secondaryDim }]}>
-                  <Feather name="layers" size={16} color={theme.secondary} />
-                  <Text style={[s.multiSellerText, { color: theme.secondary }]}>Items from {groups.length} sellers require a separate secure Stripe payment for each seller.</Text>
+                <View style={s.multiSellerNotice}>
+                  <Feather name="layers" size={15} color={CK.muted} style={{ marginTop: 2 }} />
+                  <Text style={[s.multiSellerText, { color: CK.muted }]}>Items from {groups.length} sellers ship separately, each with its own delivery estimate.</Text>
                 </View>
               )}
               {isSignedIn && (
-              <View style={[s.loyaltyCard, { borderColor: theme.accent }]}>
+              <View style={s.loyaltyCard}>
                 <View style={s.loyaltyHeading}>
-                  <View style={[s.loyaltyIcon, { backgroundColor: theme.accentDim }]}>
-                    <Feather name="gift" size={15} color={theme.accentLight} />
+                  <View style={s.loyaltyIcon}>
+                    <Feather name="gift" size={15} color={CK.text} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.loyaltyTitle}>Use points</Text>
@@ -1232,7 +1231,7 @@ export default function CartScreen() {
             {hasSaved && (
               <View style={s.savedSection}>
                 <Text style={s.savedTitle}>Saved for later ({cart.savedItems.length})</Text>
-                <Card>
+                <View>
                   {cart.savedItems.map((item, idx) => (
                     <View key={item.id}>
                       {idx > 0 && <View style={s.divider} />}
@@ -1243,7 +1242,7 @@ export default function CartScreen() {
                       />
                     </View>
                   ))}
-                </Card>
+                </View>
               </View>
             )}
 
@@ -1260,7 +1259,7 @@ export default function CartScreen() {
               BUYER_TAB_BAR_HIDDEN_ROUTES), so it pads by insets.bottom + 8,
               not the tab bar's occupied height. */}
           {hasItems && (
-            <StickyFooter style={{ paddingBottom: insets.bottom + 8 }}>
+            <StickyFooter style={{ paddingBottom: insets.bottom + 8, backgroundColor: CK.bg, borderTopColor: CK.divider }}>
               <View style={s.checkoutBarRow}>
                 <View>
                   <Text style={s.checkoutSummaryLabel}>
@@ -1308,7 +1307,7 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   editBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    backgroundColor: theme.cardElevatedGlass, borderBottomWidth: 1, borderBottomColor: theme.border,
+    backgroundColor: CK.bg, borderBottomWidth: 1, borderBottomColor: CK.divider,
   },
   editBarText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   selectAllRow: {
@@ -1317,18 +1316,20 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   selectAllBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   selectAllText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
-  savedSection: { marginBottom: SP.md },
-  savedTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
-  divider: { height: 1, backgroundColor: '#FFFFFF', opacity: 0.06, marginVertical: SP.xs },
-  multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
+  // Same label + hairline as a checkout section (CheckoutPrimitives).
+  savedSection: { borderTopWidth: 1, borderTopColor: CK.divider, paddingTop: 14, marginBottom: SP.md },
+  savedTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: CK.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: SP.sm + 4 },
+  divider: { height: 1, backgroundColor: CK.divider, marginVertical: SP.xs },
+  multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderTopWidth: 1, borderTopColor: CK.divider, paddingVertical: 14 },
   multiSellerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
-  loyaltyCard: { backgroundColor: theme.cardGlass, borderRadius: RADII.card, borderWidth: 1, padding: SP.md, marginBottom: SP.md },
+  loyaltyCard: { borderTopWidth: 1, borderTopColor: CK.divider, paddingVertical: 14 },
   loyaltyHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
+  loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: CK.fieldBorder, alignItems: 'center', justifyContent: 'center' },
   loyaltyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
   loyaltySub: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: 2 },
   pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
-  pointsInput: { flex: 1, height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, color: theme.text, fontFamily: FONT.regular, paddingHorizontal: SP.md },
+  // The checkout's dark field with a hairline border.
+  pointsInput: { flex: 1, height: 48, borderRadius: 12, backgroundColor: CK.bg, borderWidth: 1, borderColor: CK.fieldBorder, color: CK.text, fontFamily: FONT.regular, paddingHorizontal: 14 },
   pointsPreview: { fontSize: FS.meta, fontFamily: FONT.medium, color: theme.muted, marginTop: SP.xs, lineHeight: 17 },
   appliedPoints: { flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.success}26`, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },
