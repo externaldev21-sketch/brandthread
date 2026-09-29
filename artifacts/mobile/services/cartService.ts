@@ -647,7 +647,7 @@ export async function createCheckoutSession(
       service: rate.name,
       priceCents: rate.amountCents,
       estimatedDays: 0,
-      estimatedDelivery: group.hasPreOrder ? 'Ships after production' : 'Rate set by seller',
+      estimatedDelivery: group.hasPreOrder ? 'Ships after production' : 'Seller will confirm delivery date',
       trackingIncluded: false,
       isRecommended: true,
       ...(group.hasPreOrder ? { isPreOrderEstimate: true } : {}),
