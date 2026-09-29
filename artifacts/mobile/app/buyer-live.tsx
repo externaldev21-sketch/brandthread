@@ -31,6 +31,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui/IconButton';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticLight, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 
 const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
@@ -91,10 +92,14 @@ function BuyerLiveNativeScreen() {
   const [postalCode, setPostalCode]       = useState('');
   const lastHighlightedRef = useRef<string | null>(null);
 
-  const engineRef   = useRef<any>(null);
-  const scrollRef   = useRef<ScrollView>(null);
-  const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastTs      = useRef<string>(new Date().toISOString());
+  const engineRef       = useRef<any>(null);
+  const scrollRef       = useRef<ScrollView>(null);
+  // Slow-polling fallback loop — only runs when the WebSocket genuinely
+  // can't connect (see useLiveSocket's onFallback below). Not used while
+  // the socket is up.
+  const fallbackPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastTs          = useRef<string>(new Date().toISOString());
+  const joinedRef        = useRef(false);
 
   useEffect(() => {
     if (!orderSnackbar) return;
@@ -107,9 +112,48 @@ function BuyerLiveNativeScreen() {
     init();
     return () => {
       handleLeave(false);
-      clearInterval(pollRef.current!);
+      if (fallbackPollRef.current) clearInterval(fallbackPollRef.current);
     };
   }, []);
+
+  // ─── Realtime: WebSocket room for this stream, replacing the old 3s poll ──────
+  const handleLiveEvent = React.useCallback((event: LiveSocketEvent) => {
+    if (event.type === 'comment') {
+      lastTs.current = event.comment.created_at;
+      setComments(prev => [...prev, event.comment].slice(-80));
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    } else if (event.type === 'products') {
+      setProductTags(event.productTags);
+      const highlighted = event.productTags.find(tag => tag.highlighted);
+      if (highlighted && highlighted.productId !== lastHighlightedRef.current) {
+        lastHighlightedRef.current = highlighted.productId;
+        void openPurchase(highlighted);
+      }
+    } else if (event.type === 'viewerCount') {
+      setViewerCount(event.count);
+    }
+  }, []);
+
+  const startFallbackPolling = React.useCallback((active: boolean) => {
+    if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
+    if (!active) return;
+    // HTTP fallback: refresh via the same one-shot backfill the socket
+    // normally makes unnecessary, and keep this viewer's presence row alive
+    // with the HTTP heartbeat route (the WebSocket heartbeat covers this
+    // when the socket is up — see ws/liveHub.ts).
+    fallbackPollRef.current = setInterval(() => {
+      void poll();
+      if (joinedRef.current) void (api as any).live.heartbeat(params.streamId).catch(() => {});
+    }, 15000);
+  }, []);
+
+  useLiveSocket({
+    streamId: params.streamId,
+    enabled: !loading && !ended && !!params.streamId,
+    onEvent: handleLiveEvent,
+    onConnected: () => { void poll(); },
+    onFallback: startFallbackPolling,
+  });
 
   async function init() {
     try {
@@ -121,8 +165,11 @@ function BuyerLiveNativeScreen() {
       setViewerCount(s.viewer_count ?? 0);
       setProductTags(Array.isArray(s.product_tags) ? s.product_tags : []);
 
-      // Join — get Agora token
+      // Join — get Agora token. From here on this viewer is "present": the
+      // WebSocket connection below (enabled once loading clears) heartbeats
+      // presence while it's up; the HTTP /heartbeat route is the fallback.
       const joinData = await (api as any).live.join(params.streamId) as any;
+      joinedRef.current = true;
 
       // Init Agora if available
       if (AgoraModule && joinData.agoraAppId) {
@@ -155,10 +202,9 @@ function BuyerLiveNativeScreen() {
     } finally {
       setLoading(false);
     }
-
-    // Start polling comments + viewer count
-    pollRef.current = setInterval(poll, 3000);
-    poll();
+    // Realtime updates now come from useLiveSocket above (connects once
+    // `loading` clears) — it does its own one-shot backfill via poll() on
+    // connect, and falls back to polling only if the socket can't connect.
   }
 
   async function poll() {
@@ -186,7 +232,7 @@ function BuyerLiveNativeScreen() {
   }
 
   async function handleLeave(navigate = true) {
-    clearInterval(pollRef.current!);
+    if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
     try { await (api as any).live.leave(params.streamId); } catch {}
     try { engineRef.current?.leaveChannel(); engineRef.current?.release(); } catch {}
     if (navigate) goBackOr(router);
