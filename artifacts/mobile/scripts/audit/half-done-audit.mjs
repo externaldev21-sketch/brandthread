@@ -331,9 +331,30 @@ async function auditRoute({ browser, origin, role, route, images, budgetMs, maxT
     await waitForImages(page, 6_000);
     await waitForQuietNetwork(activity, 500, 6_000);
 
+    let bodyText = await page.evaluate(() => document.body.innerText || '');
+    // The client-side history.pushState/popstate navigation above is faster
+    // than a full reload, but is occasionally still mid-render (or missed
+    // the popstate entirely) when we check — flakily, not per-route, since
+    // the same route can pass for one role and blank for the other. Before
+    // giving up, retry once with a real full navigation, which always
+    // reflects the final route.
+    if (bodyText.trim().length < 3) {
+      try {
+        const fullUrl = `${origin}${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`;
+        await page.goto(fullUrl, { timeout: 20_000 });
+        await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 }).catch(() => {});
+        await waitForQuietNetwork(activity, 500, 8_000);
+        await page.waitForTimeout(600);
+        await waitForImages(page, 6_000);
+        await waitForQuietNetwork(activity, 500, 6_000);
+        bodyText = await page.evaluate(() => document.body.innerText || '');
+      } catch {
+        // fall through — unreachable stands
+      }
+    }
+
     // error-boundary fallback detection (components/ErrorBoundary.tsx renders
     // a recognizable "Something went wrong" fallback — checked generically)
-    const bodyText = await page.evaluate(() => document.body.innerText || '');
     if (/something went wrong|unexpected error|app crashed/i.test(bodyText) && bodyText.length < 4000) {
       findings.push({ type: 'error-boundary', severity: 'hard', detail: 'Error-boundary fallback UI rendered', text: bodyText.slice(0, 300) });
     }
