@@ -198,7 +198,7 @@ export function PickerField({
       </PressableScale>
       <FieldMessage error={visibleError} />
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
-        <View style={[styles.sheet, { paddingTop: Platform.OS === 'web' ? Math.max(insets.top, SP.sm) : SP.sm }]}>
+        <View style={[styles.sheet, { paddingTop: Platform.OS === 'web' ? Math.max(insets.top, 54) : SP.sm }]}>
           <View style={styles.sheetHeader}>
             <IconButton name="x" variant="plain" onPress={() => setOpen(false)} accessibilityLabel={`Close ${label} list`} />
             <Text style={styles.sheetTitle}>{label}</Text>
