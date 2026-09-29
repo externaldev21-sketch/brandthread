@@ -51,7 +51,8 @@ import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileMeta } from '@/components/profile/ProfileShell';
-import { InteractionLayer, ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
+import { ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
+import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { ProfileVideoHeader, useHeroPosterOnly } from '@/components/profile/ProfileVideoHeader';
 import { ProfileStoryAvatar } from '@/components/profile/ProfileStoryAvatar';
@@ -205,26 +206,9 @@ function CompactWalletChip({ balanceLabel, onPress, onLongPress, theme }: {
   );
 }
 
-function TopBarIcon({ name, onPress, accessibilityLabel, theme, badge }: {
-  name: keyof typeof Feather.glyphMap;
-  onPress: () => void;
-  accessibilityLabel: string;
-  theme: AppThemePreset;
-  badge?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={() => { hapticLight(); onPress(); }}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      hitSlop={8}
-      style={topBarStyles.iconButton}
-    >
-      <Feather name={name} size={24} color={theme.text} />
-      {badge ? <View style={[topBarStyles.iconBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} /> : null}
-    </Pressable>
-  );
-}
+// The plain (no circle background) icon button and the plain-text account
+// switcher live in ProfileTopBar.tsx, shared with the seller own-profile
+// screen so the two headers stay pixel-identical.
 
 // ─── Memoized non-grid cells ─────────────────────────────────────────────────
 const SavedCell = React.memo(function SavedCell({
@@ -766,26 +750,14 @@ export default function ProfileScreen() {
 
   const topBar = (
     <>
-      <PressableScale
-        style={styles.topBarLeft}
-        onPress={() => {
-          hapticLight();
-          setAccountSwitcherOpen(true);
-        }}
-        activeOpacity={0.75}
-        accessibilityRole="button"
+      <ProfileAccountSwitcher
+        label={displayHandle || displayName}
+        onPress={() => { hapticLight(); setAccountSwitcherOpen(true); }}
+        overMedia={hasCover}
         accessibilityLabel="Switch account"
         testID="buyer-profile-account-switcher"
-      >
-        {(state) => (
-          <>
-            <InteractionLayer state={state as { pressed: boolean }} radius={RADIUS.sm} theme={theme} />
-            <Text style={[styles.topBarUsername, { color: theme.text }, hasCover && styles.overMedia]} numberOfLines={1}>{displayHandle || displayName}</Text>
-            <Feather name="chevron-down" size={16} color={theme.text} />
-          </>
-        )}
-      </PressableScale>
-      <View style={styles.topBarRight}>
+      />
+      <ProfileTopBarIconRow>
         {threadCashEnabled ? (
           <CompactWalletChip
             balanceLabel={formatCents(threadCashBalanceCents)}
@@ -794,9 +766,9 @@ export default function ProfileScreen() {
             theme={theme}
           />
         ) : null}
-        <TopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" theme={theme} />
-        <TopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" theme={theme} />
-      </View>
+        <ProfileTopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
+        <ProfileTopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" />
+      </ProfileTopBarIconRow>
     </>
   );
 
@@ -990,16 +962,6 @@ function makeStyles(theme: AppThemePreset) {
     errorRoot: { flex: 1, backgroundColor: theme.background, justifyContent: 'center' },
     gridRow: { gap: 1 },
 
-    topBarLeft: {
-      flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32,
-      borderRadius: RADIUS.sm, overflow: 'hidden',
-    },
-    topBarUsername: { fontFamily: FONT.semibold, fontSize: 18, flexShrink: 1, minWidth: 0 },
-    overMedia: {
-      textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, // theme-exempt: legibility over cover media
-    },
-    topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 16, flexShrink: 0 },
-
     // Stats row → buttons: 16pt. Instagram proportions: two equal buttons
     // plus a square discover-people button, 6pt apart, 8pt corners.
     actionsRow: { flexDirection: 'row', gap: 6, paddingHorizontal: SP.md, paddingTop: 16, alignItems: 'center' },
@@ -1022,8 +984,6 @@ const topBarStyles = StyleSheet.create({
     gap: 4, paddingHorizontal: 8, overflow: 'hidden',
   },
   walletText: { fontFamily: FONT.bold, fontSize: FS.xs, fontVariant: ['tabular-nums'] },
-  iconButton: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  iconBadge: { position: 'absolute', top: -2, right: -2, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
 });
 
 const cellStyles = StyleSheet.create({
