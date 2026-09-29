@@ -17,6 +17,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, SearchBar } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
 import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { filterOrders, sortOrders } from '@/services/orderService';
@@ -1141,16 +1142,9 @@ export default function OrdersScreen() {
   const ListHeaderComponent = useCallback(() => (
     <View style={s.listHeader}>
       {(loadError || updatesPaused) && (
-        <TouchableOpacity
-          style={s.retryBanner}
-          onPress={onRefresh}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Couldn't refresh orders. Tap to try again."
-        >
-          <Feather name="alert-circle" size={14} color={theme.error} />
-          <Text style={s.retryBannerText}>Couldn{'’'}t refresh orders. Pull to try again.</Text>
-        </TouchableOpacity>
+        <View style={s.retryBannerWrap}>
+          <RetryRow label="Couldn't refresh orders" onRetry={onRefresh} />
+        </View>
       )}
       {/* Results count */}
       <View style={s.resultsRow}>
@@ -1467,23 +1461,9 @@ const createStyles = (theme: any) => {
   listHeader: {
     paddingTop: SP.sm,
   },
-  retryBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
+  retryBannerWrap: {
     marginHorizontal: SP.md,
     marginBottom: SP.sm,
-    padding: SP.sm,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: theme.error,
-    backgroundColor: theme.cardElevated ?? theme.card,
-  },
-  retryBannerText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: theme.error,
-    flex: 1,
   },
   resultsRow: {
     flexDirection: 'row',
