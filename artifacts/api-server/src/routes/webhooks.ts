@@ -65,6 +65,7 @@ import {
 import { postLedgerTransaction } from "../lib/money/ledger";
 import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
 import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
+import { reserveStockForOrder } from "../lib/stockReservation";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -736,24 +737,20 @@ export async function handleCheckoutPaid(
   let createdOrderId: string | null = null;
 
   await db.transaction(async (tx) => {
-    // Step 1: Lock all variant rows in deterministic order (prevents deadlocks)
-    const sortedItems = [...cartItems].sort((a, b) =>
-      a.variantId.localeCompare(b.variantId),
+    // Step 1-2: Atomically reserve stock for every line, all-or-nothing —
+    // see lib/stockReservation.ts for the lock/check/decrement guarantees.
+    // This also performs the decrement (was Step 6, decrement-after-insert)
+    // since it's the same DB transaction either way; doing it here lets this
+    // handler and routes/orders.ts (POST /) share one implementation instead
+    // of each hand-rolling the lock dance.
+    const reservation = await reserveStockForOrder(
+      tx,
+      cartItems.map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
     );
-    const stockMap = new Map<string, number>();
-    for (const item of sortedItems) {
-      const result = await tx.execute(
-        sql`SELECT stock FROM product_variants WHERE id = ${item.variantId}::uuid FOR UPDATE`,
-      );
-      const rows = (result as any).rows ?? [];
-      stockMap.set(item.variantId, rows[0]?.stock ?? 0);
-    }
-
-    // Step 2: Check ALL aggregated quantities against locked stock
-    for (const item of cartItems) {
-      const available = stockMap.get(item.variantId) ?? 0;
-      if (available < item.quantity) {
-        oversoldItems.push(item.productName);
+    if (!reservation.ok) {
+      const oversoldSet = new Set(reservation.oversoldVariantIds);
+      for (const item of cartItems) {
+        if (oversoldSet.has(item.variantId)) oversoldItems.push(item.productName);
       }
     }
 
@@ -909,16 +906,10 @@ export async function handleCheckoutPaid(
       })),
     );
 
-    // Step 6: Decrement stock ONLY if every aggregated line passed (all-or-nothing)
-    if (oversoldItems.length === 0) {
-      for (const item of cartItems) {
-        await tx.execute(
-          sql`UPDATE product_variants SET stock = stock - ${item.quantity} WHERE id = ${item.variantId}::uuid`,
-        );
-      }
-    }
-    // If oversold: zero decrements committed — inventory stays intact.
-    // Stripe refund is issued outside this transaction.
+    // Stock was already reserved (decremented) or left untouched above by
+    // reserveStockForOrder, in the same transaction as this order/items
+    // insert. If oversold: zero decrements were committed — inventory stays
+    // intact. Stripe refund is issued outside this transaction.
 
     // ── Low-stock notifications ───────────────────────────────────────────────────
     // For each decremented variant, check if stock fell below threshold.
