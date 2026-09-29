@@ -36,7 +36,7 @@ const CHART_HEIGHT = 168;
 // bucket, which was truncating "12 AM"/"6 PM"-style text down to a couple
 // of characters once the visible count was much smaller than the bucket
 // count (e.g. 4 visible of 24 hourly buckets for Today).
-const AXIS_LABEL_WIDTH = 44;
+export const AXIS_LABEL_WIDTH = 44;
 
 // How many x-axis labels to actually show text for, per range — a handful
 // of evenly-spaced, non-overlapping labels (Shopify's own Sales Report/
@@ -293,6 +293,9 @@ export function SellerDashboardChart({
       {labels.length > 0 && width > 0 && visibleAxisIndices.length > 0 && (
         <View style={styles.axisRow} pointerEvents="none" testID="seller-dashboard-chart-axis">
           {visibleAxisIndices.map((bucketIndex, i) => {
+            const n = visibleAxisIndices.length;
+            const isFirst = n > 1 && i === 0;
+            const isLast = n > 1 && i === n - 1;
             // Rendered in perfectly even PIXEL columns across the row,
             // independent of the underlying bucket's own x — selecting
             // `want` labels out of an uneven bucket count can't always land
@@ -300,13 +303,26 @@ export function SellerDashboardChart({
             // to gaps of 2,2,3,2,2 — one integer gap is inevitably larger),
             // but the rendered columns themselves must still be even, or
             // that rounding artifact shows up as a visibly uneven gap.
-            const t = visibleAxisIndices.length > 1 ? i / (visibleAxisIndices.length - 1) : 0.5;
+            const t = n > 1 ? i / (n - 1) : 0.5;
             const x = t * width;
-            const left = Math.max(0, Math.min(width - AXIS_LABEL_WIDTH, x - AXIS_LABEL_WIDTH / 2));
+            // The first/last label anchor exactly to the chart's true
+            // edges (x=0 / x=width), left/right-aligned within their box,
+            // instead of being centered-then-clamped like the middle
+            // labels — centering + clamping was shifting the two end
+            // labels inward by half a label-width, shrinking their gap to
+            // the next label relative to every other (evenly-spaced) gap.
+            // Middle labels stay centered on their evenly-spaced x — they
+            // never approach either edge, so no clamping is needed there.
+            const left = isFirst
+              ? 0
+              : isLast
+                ? Math.max(0, width - AXIS_LABEL_WIDTH)
+                : Math.max(0, Math.min(width - AXIS_LABEL_WIDTH, x - AXIS_LABEL_WIDTH / 2));
+            const textAlign = isFirst ? 'left' : isLast ? 'right' : 'center';
             return (
               <Text
                 key={`${labels[bucketIndex]}-${bucketIndex}`}
-                style={[styles.axisLabel, { color: theme.subtle, left }]}
+                style={[styles.axisLabel, { color: theme.subtle, left, textAlign }]}
                 numberOfLines={1}
               >
                 {labels[bucketIndex]}

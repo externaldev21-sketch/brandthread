@@ -97,7 +97,7 @@ vi.mock('react-native-svg', () => {
   return { default: el('Svg'), Svg: el('Svg'), Defs: el('Defs'), LinearGradient: el('LinearGradient'), Stop: el('Stop'), Path: el('Path') };
 });
 
-import { DASHBOARD_RANGES, SellerDashboardChart } from '@/components/SellerDashboardChart';
+import { AXIS_LABEL_WIDTH, DASHBOARD_RANGES, SellerDashboardChart } from '@/components/SellerDashboardChart';
 
 const theme = {
   accent: '#F7F7FA',
@@ -331,16 +331,51 @@ describe('SellerDashboardChart', () => {
     await layoutChart(width);
     const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
     const texts = axisRow.findAllByType('Text' as React.ElementType);
-    const lefts = texts.map((t) => flattenStyle(t.props.style).left as number);
     expect(texts.map((t) => t.props.children)).toEqual(['Oct', 'Dec', 'Feb', 'May', 'Jul', 'Sep']);
-    const gaps = lefts.slice(1).map((left, i) => left - lefts[i]);
-    // Every INTERIOR gap (not touching the clamped left/right screen edge)
-    // must be exactly even — this is the "large gap in the middle" bug:
-    // "Feb" → "May" (crossing the 2,2,3,2,2 index-gap artifact) must be the
-    // same width as every other interior gap, not visibly larger.
-    const interiorGaps = gaps.slice(1, -1);
-    const first = interiorGaps[0];
-    for (const gap of interiorGaps) expect(Math.abs(gap - first)).toBeLessThan(0.01);
+    // Each label's own anchor point: the first is left-aligned at its box's
+    // left edge, the last is right-aligned at its box's right edge, and
+    // every middle label is centered in its box — so the *anchor* (not the
+    // raw box `left`, which differs in meaning at the edges vs the middle)
+    // is what must land in perfectly even columns.
+    const anchors = texts.map((t) => {
+      const style = flattenStyle(t.props.style);
+      const left = style.left as number;
+      if (style.textAlign === 'left') return left;
+      if (style.textAlign === 'right') return left + AXIS_LABEL_WIDTH;
+      return left + AXIS_LABEL_WIDTH / 2;
+    });
+    const gaps = anchors.slice(1).map((a, i) => a - anchors[i]);
+    // Every gap — including the two end gaps, previously shrunk by the
+    // center-then-clamp approach — must be exactly even now.
+    const first = gaps[0];
+    for (const gap of gaps) expect(Math.abs(gap - first)).toBeLessThan(0.01);
+  });
+
+  it('anchors the first label to the true left edge and the last label to the true right edge (no inward clamp shrinking the end gaps)', async () => {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const width = 355;
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={labels.map(() => 10)}
+          labels={labels}
+          theme={theme}
+          range="week"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    await layoutChart(width);
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType);
+    const first = flattenStyle(texts[0].props.style);
+    const last = flattenStyle(texts[texts.length - 1].props.style);
+    expect(first.left).toBe(0);
+    expect(first.textAlign).toBe('left');
+    expect(last.left).toBe(width - AXIS_LABEL_WIDTH);
+    expect(last.textAlign).toBe('right');
   });
 
   it('places the axis labels directly under the chart, ABOVE the range-selector pills (Shopify/Robinhood order)', async () => {
