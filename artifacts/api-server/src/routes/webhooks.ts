@@ -617,7 +617,7 @@ async function recordCartTaxTransaction(group: typeof checkoutSessions.$inferSel
 export async function handleCartPaymentEnded(pi: any, failed: boolean): Promise<void> {
   if (failed && stripe && pi.status !== "canceled" && pi.status !== "succeeded") {
     try {
-      await stripe.paymentIntents.cancel(pi.id, { cancellation_reason: "failed_invoice" as any });
+      await stripe.paymentIntents.cancel(pi.id, { cancellation_reason: "abandoned" });
     } catch (err) {
       // Already cancelled or succeeded in the meantime; the release below is
       // still safe (a succeeded intent's reservations are committed, not held).

@@ -25,7 +25,7 @@
  */
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { and, eq, inArray, like } from "drizzle-orm";
-import { db, checkoutSessions, orders } from "@workspace/db";
+import { db, checkoutSessions, orders, stockReservations } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ensureStripeCustomer, requireStripe } from "../lib/stripe";
 import { logger } from "../lib/logger";
@@ -136,8 +136,9 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
   }
 
   // ── Retried pay attempt: hand back the same intent ────────────────────────
+  const likeKey = key.replace(/[\\%_]/g, (ch) => `\\${ch}`);
   const prior = await db.select().from(checkoutSessions)
-    .where(and(eq(checkoutSessions.buyerId, buyerId), like(checkoutSessions.clientIdempotencyKey, `${key}\\_%`)));
+    .where(and(eq(checkoutSessions.buyerId, buyerId), like(checkoutSessions.clientIdempotencyKey, `${likeKey}\\_%`)));
   if (prior.length > 0) {
     const intentId = prior[0].stripePaymentIntentId;
     if (!intentId) {
@@ -291,13 +292,10 @@ router.post("/", validateRequest({ body: createSchema }), async (req, res) => {
         stripeSessionId: `${intent.id}:${row.id}`,
       }).where(eq(checkoutSessions.id, row.id));
     }
+    // Link the reservations to the intent so the expiry sweep cancels it first.
+    await tx.update(stockReservations).set({ stripePaymentIntentId: intent.id })
+      .where(inArray(stockReservations.checkoutSessionId, rows.map((row) => row.id)));
   });
-  const reservationIds = rows.map((row) => row.id);
-  await db.execute(
-    // Link the reservations to the intent so the expiry sweep can cancel it first.
-    (await import("drizzle-orm")).sql`UPDATE stock_reservations SET stripe_payment_intent_id = ${intent.id}
-      WHERE checkout_session_id = ANY(${reservationIds}::uuid[])`,
-  );
 
   res.json({
     paymentIntentId: intent.id,

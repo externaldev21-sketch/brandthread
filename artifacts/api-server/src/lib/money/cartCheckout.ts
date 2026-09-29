@@ -81,7 +81,11 @@ export function containsCardNumber(value: string): boolean {
  */
 export function findCardDataInRequest(body: unknown, path = "body", depth = 0): string | null {
   if (depth > 8 || body == null) return null;
-  if (typeof body === "string") return containsCardNumber(body) ? path : null;
+  if (typeof body === "string") {
+    // Ids (UUIDs) can hold long digit runs; they are never card numbers.
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body)) return null;
+    return containsCardNumber(body) ? path : null;
+  }
   if (typeof body === "number") return containsCardNumber(String(body)) ? path : null;
   if (Array.isArray(body)) {
     for (let i = 0; i < body.length; i++) {

@@ -57,6 +57,15 @@ export function createFakeStripe() {
     checkoutSessionCreates: [] as Array<{ params: any; options: any }>,
     coupons: [] as any[],
     customers: [] as any[],
+    /** PaymentIntents created by the one-page checkout route. */
+    paymentIntents: new Map<string, any>(),
+    paymentIntentKeys: new Map<string, any>(),
+    paymentIntentCreates: [] as Array<{ params: any; options: any }>,
+    /** Tax per Stripe Tax calculation (default 8% of the taxable amount). */
+    taxRate: 0.08,
+    taxFails: false,
+    taxCalculations: [] as Array<{ params: any; options: any; id: string; tax: number }>,
+    taxTransactions: [] as Array<{ params: any; options: any }>,
   };
 
   const stripe = {
@@ -109,10 +118,34 @@ export function createFakeStripe() {
       retrieve: async (id: string) => ({ id, deleted: false }),
     },
     paymentIntents: {
+      create: async (params: any, options: any = {}) => {
+        state.paymentIntentCreates.push({ params, options });
+        return idempotent(state.paymentIntentKeys, options?.idempotencyKey, () => {
+          const id = nextId("pi_cart");
+          const intent = {
+            id,
+            object: "payment_intent",
+            client_secret: `${id}_secret_test`,
+            status: "requires_payment_method",
+            ...params,
+          };
+          state.paymentIntents.set(id, intent);
+          return intent;
+        });
+      },
+      cancel: async (id: string, params: any = {}) => {
+        const intent = state.paymentIntents.get(id);
+        if (!intent) throw stripeError("definitive", "No such payment_intent");
+        if (intent.status === "succeeded") throw stripeError("definitive", "PaymentIntent already succeeded");
+        intent.status = "canceled";
+        intent.cancellation_reason = params.cancellation_reason ?? null;
+        return intent;
+      },
       retrieve: async (id: string) => {
         if (state.retrieveFails) throw stripeError("ambiguous", "Stripe unavailable");
         const fee = state.chargeFees.has(id) ? state.chargeFees.get(id)! : 320;
         return {
+          ...(state.paymentIntents.get(id) ?? {}),
           id,
           latest_charge: {
             id: `ch_${id}`,
@@ -176,6 +209,25 @@ export function createFakeStripe() {
           return created;
         }),
     },
+    tax: {
+      calculations: {
+        create: async (params: any, options: any = {}) => {
+          if (state.taxFails) throw stripeError("definitive", "Stripe Tax is not set up for this account");
+          const taxable = (params.line_items ?? []).reduce((sum: number, line: any) => sum + line.amount, 0)
+            + (params.shipping_cost?.amount ?? 0);
+          const tax = Math.round(taxable * state.taxRate);
+          const id = nextId("taxcalc");
+          state.taxCalculations.push({ params, options, id, tax });
+          return { id, tax_amount_exclusive: tax };
+        },
+      },
+      transactions: {
+        createFromCalculation: async (params: any, options: any = {}) => {
+          state.taxTransactions.push({ params, options });
+          return { id: nextId("taxtxn"), ...params };
+        },
+      },
+    },
     accounts: {
       retrieve: async (id: string) => ({
         id, charges_enabled: true, payouts_enabled: true, details_submitted: true,
@@ -215,6 +267,13 @@ export function createFakeStripe() {
     state.checkoutSessionCreates.length = 0;
     state.coupons.length = 0;
     state.customers.length = 0;
+    state.paymentIntents.clear();
+    state.paymentIntentKeys.clear();
+    state.paymentIntentCreates.length = 0;
+    state.taxRate = 0.08;
+    state.taxFails = false;
+    state.taxCalculations.length = 0;
+    state.taxTransactions.length = 0;
   }
 
   /** A signed webhook body + header, exactly as Stripe would deliver it. */

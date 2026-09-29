@@ -214,8 +214,10 @@ export async function recordOrderPaid(executor: DbExecutor, input: PaidOrderInpu
     processingFeeChargedCents: processingCharged,
     sellerNetCents: sellerNet,
     stripeChargeId: input.charge.chargeId,
-    stripeTransferId: input.charge.transferId,
-    stripeApplicationFeeId: input.charge.applicationFeeId,
+    // A transfer order's transfer is created afterwards by settleTransferOrder;
+    // the cart charge itself has no transfer or application fee.
+    stripeTransferId: transfer ? null : input.charge.transferId,
+    stripeApplicationFeeId: transfer ? null : input.charge.applicationFeeId,
     updatedAt: new Date(),
   }).where(and(eq(orders.id, input.orderId), sql`${orders.fundsState} IS NULL`))
     .returning({ id: orders.id });

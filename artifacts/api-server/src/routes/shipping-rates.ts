@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, shippingRates } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { db, shippingRates, shippingZones } from "@workspace/db";
+import { eq, and, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import crypto from "crypto";
 
@@ -28,8 +28,19 @@ router.get("/calculate", async (req, res) => {
     .where(and(eq(shippingRates.sellerId, String(sellerId)), eq(shippingRates.active, true)))
     .limit(1);
 
+  // How long the seller takes to ship (their domestic shipping zone), so
+  // checkout can show a delivery window. null when the seller never set one;
+  // the app then shows a generic estimate.
+  const zones = await db
+    .select({ processingDays: shippingZones.processingDays, zoneType: shippingZones.zoneType })
+    .from(shippingZones)
+    .where(and(eq(shippingZones.sellerId, String(sellerId)), eq(shippingZones.active, true)))
+    .orderBy(asc(shippingZones.sortOrder));
+  const zone = zones.find((z) => z.zoneType === "domestic") ?? zones[0];
+  const processingDays = zone?.processingDays ?? null;
+
   if (!rate) {
-    res.json({ shippingCents: 0, isFree: true, rateName: "Free Shipping" });
+    res.json({ shippingCents: 0, isFree: true, rateName: "Free Shipping", processingDays });
     return;
   }
 
@@ -39,6 +50,7 @@ router.get("/calculate", async (req, res) => {
       shippingCents: 0,
       isFree: true,
       rateName: `${rate.name} (Free above $${threshold})`,
+      processingDays,
     });
     return;
   }
@@ -47,6 +59,7 @@ router.get("/calculate", async (req, res) => {
     shippingCents: rate.flatRateCents,
     isFree: rate.flatRateCents === 0,
     rateName: rate.name,
+    processingDays,
   });
 });
 

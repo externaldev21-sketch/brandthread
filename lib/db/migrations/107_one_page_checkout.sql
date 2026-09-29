@@ -29,6 +29,13 @@ CREATE INDEX IF NOT EXISTS stock_reservations_checkout_idx
 CREATE INDEX IF NOT EXISTS stock_reservations_status_expires_idx
   ON stock_reservations (status, expires_at);
 
+-- Orders paid through it use the new "transfer" charge model. Widen the
+-- allowed values (the old ones stay valid).
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_charge_model_valid;
+ALTER TABLE orders ADD CONSTRAINT orders_charge_model_valid CHECK (
+  charge_model IS NULL OR charge_model IN ('destination', 'held', 'transfer')
+);
+
 -- The in-app flow is the default; this flag turns the old Stripe-hosted
 -- Checkout back on as the primary path (a kill switch) without a release.
 INSERT INTO feature_flags (key, enabled, description)
