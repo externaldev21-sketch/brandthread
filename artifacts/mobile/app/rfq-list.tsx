@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, StatusBadge, PrimaryButton } from '@/components/BrandthreadUI';
 import { getRfqs, cancelRfq, type Rfq, type RfqStatus } from '@/services/manufacturerRfq';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -60,7 +60,7 @@ export default function RfqListScreen() {
 
   return (
     <View style={s.root}>
-      <Header
+      <ScreenHeader
         title="My RFQs"
         onBack={() => goBackOr(router)}
         actions={[{ icon: 'plus', onPress: () => router.push('/rfq-post' as never), accessibilityLabel: 'Post a new RFQ' }]}

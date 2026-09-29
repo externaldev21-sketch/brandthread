@@ -25,7 +25,8 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@clerk/expo';
 import { localTimeLabel } from '@workspace/manufacturer-flow';
-import { BrandthreadHeader, EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
+import { EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import OrderCardBubble from '@/components/manufacturer/OrderCardBubble';
 import { useOrderCardPayment } from '@/components/manufacturer/useOrderCardPayment';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -322,28 +323,26 @@ export default function ManufacturerMessagesScreen() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const header = (
-    <View style={{ paddingTop: headerTopInset, backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border }}>
-      <BrandthreadHeader
-        title={mfrName}
-        subtitle={localTime ? `${localTime} for them` : 'Manufacturer conversation'}
-        onBack={() => goBackOr(router)}
-        rightElement={
-          <View style={{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' }}>
-            {manufacturerId ? (
-              <TouchableOpacity onPress={() => router.push({ pathname: '/manufacturer-profile', params: { id: manufacturerId } } as never)} style={s.headerBtn} accessibilityLabel="View manufacturer profile">
-                <Feather name="info" size={16} color={theme.text} />
-              </TouchableOpacity>
-            ) : null}
-            <TouchableOpacity onPress={() => startCall('voice')} accessibilityRole="button" accessibilityLabel={callingEnabled ? 'Start voice call' : 'Calls coming soon'} testID="manufacturer-voice-call" style={[s.headerBtn, !callingEnabled && { opacity: 0.55 }]}>
-              <Feather name="phone" size={16} color={theme.text} />
+    <ScreenHeader
+      title={mfrName}
+      subtitle={localTime ? `${localTime} for them` : 'Manufacturer conversation'}
+      onBack={() => goBackOr(router)}
+      rightElement={
+        <View style={{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' }}>
+          {manufacturerId ? (
+            <TouchableOpacity onPress={() => router.push({ pathname: '/manufacturer-profile', params: { id: manufacturerId } } as never)} style={s.headerBtn} accessibilityLabel="View manufacturer profile">
+              <Feather name="info" size={16} color={theme.text} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => startCall('video')} accessibilityRole="button" accessibilityLabel={callingEnabled ? 'Start video call' : 'Calls coming soon'} testID="manufacturer-video-call" style={[s.headerBtn, !callingEnabled && { opacity: 0.55 }]}>
-              <Feather name="video" size={16} color={theme.text} />
-            </TouchableOpacity>
-          </View>
-        }
-      />
-    </View>
+          ) : null}
+          <TouchableOpacity onPress={() => startCall('voice')} accessibilityRole="button" accessibilityLabel={callingEnabled ? 'Start voice call' : 'Calls coming soon'} testID="manufacturer-voice-call" style={[s.headerBtn, !callingEnabled && { opacity: 0.55 }]}>
+            <Feather name="phone" size={16} color={theme.text} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => startCall('video')} accessibilityRole="button" accessibilityLabel={callingEnabled ? 'Start video call' : 'Calls coming soon'} testID="manufacturer-video-call" style={[s.headerBtn, !callingEnabled && { opacity: 0.55 }]}>
+            <Feather name="video" size={16} color={theme.text} />
+          </TouchableOpacity>
+        </View>
+      }
+    />
   );
 
   if (loading) {

@@ -199,7 +199,11 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={[s.modal, { paddingTop: Platform.OS === 'android' ? 24 : 0 }]}>
+      {/* presentationStyle="pageSheet" only clears the notch/status bar on
+          iOS; statusBarTranslucent draws Android full-bleed under it, so
+          Android needs the real inset here (a hardcoded 24 undershoots a
+          notch/punch-hole camera's actual height on many devices). */}
+      <View style={[s.modal, { paddingTop: Platform.OS === 'android' ? insets.top : 0 }]}>
         {/* Header */}
         <View style={s.modalHeader}>
           <View style={s.headerLeft}>

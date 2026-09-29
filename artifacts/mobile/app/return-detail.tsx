@@ -33,7 +33,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandthreadCard, BrandthreadHeader, BrandthreadScreen, EmptyState } from '@/components/BrandthreadUI';
+import { BrandthreadCard, BrandthreadScreen, EmptyState } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
@@ -108,7 +109,7 @@ export default function ReturnDetailScreen() {
   }
 
   const header = (
-    <BrandthreadHeader
+    <ScreenHeader
       title={view ? `Return · #${view.orderNumber}` : 'Return'}
       subtitle={view ? (viewer === 'seller' ? view.buyerName : view.sellerName) : undefined}
       onBack={() => goBackOr(router)}
@@ -117,7 +118,7 @@ export default function ReturnDetailScreen() {
 
   if (loading && !view) {
     return (
-      <BrandthreadScreen>
+      <BrandthreadScreen noSafeTop>
         {header}
         <View style={s.centered}><ActivityIndicator color={theme.text} size="large" /></View>
       </BrandthreadScreen>
@@ -126,7 +127,7 @@ export default function ReturnDetailScreen() {
 
   if (!view) {
     return (
-      <BrandthreadScreen>
+      <BrandthreadScreen noSafeTop>
         {header}
         {loadError === 'network' ? (
           <EmptyState
@@ -154,7 +155,7 @@ export default function ReturnDetailScreen() {
   const orderHref = viewer === 'seller' ? `/order-detail?id=${encodeURIComponent(view.orderId)}` : `/buyer-order-detail?id=${encodeURIComponent(view.orderId)}`;
 
   return (
-    <BrandthreadScreen noSafeBottom>
+    <BrandthreadScreen noSafeTop noSafeBottom>
       {header}
       <ScrollView
         showsVerticalScrollIndicator={false}

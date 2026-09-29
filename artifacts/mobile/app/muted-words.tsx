@@ -16,7 +16,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { apiErrorMessage } from '@/lib/safety';
 import type { MutedWord } from '@/lib/safetyTypes';
 
@@ -93,7 +93,7 @@ export default function MutedWordsScreen() {
 
   return (
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Header title="Muted words" />
+      <ScreenHeader title="Muted words" />
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }} keyboardShouldPersistTaps="handled">
         <Text style={s.lead}>
