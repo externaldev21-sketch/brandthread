@@ -37,7 +37,8 @@ describe('screens behind the floating buyer bar', () => {
     expect(cart).not.toContain('useBuyerTabBarInset');
     expect(cart).toContain("import { useSafeAreaInsets } from 'react-native-safe-area-context';");
     expect(cart).toContain('const insets = useSafeAreaInsets();');
-    expect(cart).toContain('<StickyFooter style={{ paddingBottom: insets.bottom + 8 }}>');
+    // (Flat black since the checkout follow-up: same bar, black fill + hairline.)
+    expect(cart).toContain('<StickyFooter style={{ paddingBottom: insets.bottom + 8, backgroundColor: CK.bg, borderTopColor: CK.divider }}>');
 
     const tabBar = read('components/buyer-nav/BuyerTabBar.tsx');
     expect(tabBar).toContain("BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile', 'cart']);");
