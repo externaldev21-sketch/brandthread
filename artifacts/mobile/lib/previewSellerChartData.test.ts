@@ -78,11 +78,11 @@ describe('buildPreviewSellerAnalytics — demo mode (populated)', () => {
     expect(new Set(labels).size).toBe(12); // never the same month repeated
   });
 
-  it('"month" produces one bucket per day of the current calendar month', () => {
+  it('"month" produces one bucket per day of the current calendar month, labeled "Mon D"', () => {
     const data = buildPreviewSellerAnalytics('month', 'demo', NOW);
     expect(data.buckets).toHaveLength(30); // September has 30 days
     const labels = data.buckets.map((b) => bucketLabel(b.bucket, 'month'));
-    expect(labels).toEqual(Array.from({ length: 30 }, (_, i) => String(i + 1)));
+    expect(labels).toEqual(Array.from({ length: 30 }, (_, i) => `Sep ${i + 1}`));
   });
 
   it('"week" produces Monday through Sunday of the current calendar week', () => {
