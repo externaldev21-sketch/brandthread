@@ -12,7 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   GRACE_OPTIONS, authenticateForAppLock, getDeviceSecurity, loadAppLockSettings, saveAppLockSettings,
   type AppLockSettings, type DeviceSecurity, type GraceSeconds,
@@ -69,7 +69,7 @@ export default function AppLockSettingsScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="App Lock" />
+      <ScreenHeader title="App Lock" />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>

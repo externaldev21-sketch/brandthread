@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, ImageSourcePropType, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { APP_THEME_PRESETS, AppThemeId, AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { goBackOr } from '@/lib/navigation/goBackOr';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type ThemeImageContext = {
   (key: string): ImageSourcePropType;
@@ -66,7 +64,6 @@ function ThemePreview({ option, selected }: { option: AppThemePreset; selected: 
 }
 
 export default function AppThemeScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme, selectTheme } = useAppTheme();
 
@@ -78,16 +75,8 @@ export default function AppThemeScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: useHeaderTopInset(), backgroundColor: theme.background }]}>
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => goBackOr(router)} style={[styles.back, { borderColor: theme.border, backgroundColor: theme.card }]} accessibilityRole="button" accessibilityLabel="Back to settings">
-          <Feather name="arrow-left" size={20} color={theme.text} />
-        </TouchableOpacity>
-        <View style={styles.headerCopy}>
-          <Text style={[styles.title, { color: theme.text }]}>App theme</Text>
-          <Text style={[styles.subtitle, { color: theme.muted }]}>Choose your Brandthread finish</Text>
-        </View>
-      </View>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
+      <ScreenHeader title="App theme" subtitle="Choose your Brandthread finish" />
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.current, { borderColor: theme.accent + '66', backgroundColor: theme.accentDim }]}>
@@ -127,11 +116,6 @@ export default function AppThemeScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth },
-  back: { width: 44, height: 44, borderRadius: RADIUS.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  headerCopy: { flex: 1 },
-  title: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.2 },
-  subtitle: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   content: { padding: SP.md },
   current: { minHeight: 46, borderRadius: RADIUS.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13 },
   currentDot: { width: 10, height: 10, borderRadius: 5 },
