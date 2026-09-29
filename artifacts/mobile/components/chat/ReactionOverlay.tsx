@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Glass } from '@/components/ui/Glass';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { FONT, FS } from '@/lib/theme';
@@ -63,6 +64,7 @@ export function ReactionOverlay({
 }: ReactionOverlayProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const anim = useRef(new Animated.Value(0)).current;
   const [rowH, setRowH] = useState(0);
   const [menuH, setMenuH] = useState(0);
@@ -89,7 +91,7 @@ export function ReactionOverlay({
   if (!visible || !anchor) return null;
 
   const { width: screenW, height: screenH } = Dimensions.get('window');
-  const topInset = insets.top + 8;
+  const topInset = headerTopInset + 8;
   const bottomInset = insets.bottom + 8;
   const hintBlockH = 26;
 

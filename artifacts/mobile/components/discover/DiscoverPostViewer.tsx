@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { Dimensions, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -142,7 +143,7 @@ export function DiscoverPostViewer({
   onOpenShopTheLook: (post: DiscoverPost) => void;
   onSafetyMenu: (post: DiscoverPost) => void;
 }) {
-  const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
 
   function openProfile(post: DiscoverPost) {
@@ -174,7 +175,7 @@ export function DiscoverPostViewer({
           onPress={onClose}
           accessibilityLabel="Close"
           testID="discover-viewer-close"
-          style={[styles.backBtn, { top: insets.top + 8 }]}
+          style={[styles.backBtn, { top: headerTopInset + 8 }]}
         />
       </View>
     </Modal>

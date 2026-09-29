@@ -18,7 +18,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ApiError } from '@/lib/networkNotice';
-import { isSellerDevPreview } from '@/lib/devPreview';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { subscribeStoreContext } from '@/lib/api';
 import {
@@ -39,6 +38,8 @@ import { ResponsiveContainer, SkeletonBlock, useBreakpoint } from '@/components/
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { bucketLabel, type SellerHomeTimeRange } from '@/lib/sellerHomeChartLabels';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { formatCents } from '@/lib/money';
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
 import { computeMetricChange } from '@/lib/sellerMetricChange';
@@ -116,26 +117,6 @@ const PERIOD_LABEL: Record<SellerDashboardRange, string> = {
   year: 'last year',
   all: '',
 };
-
-function previewSellerHomeAnalytics(range: SellerDashboardRange): SellerHomeAnalyticsSnapshot['data'] {
-  const now = Date.now();
-  const totals = [12900, 8999, 21499, 5999, 14999, 27248, 7999, 18998];
-  return {
-    range,
-    totalCents: totals.reduce((sum, value) => sum + value, 0),
-    orderCount: 12,
-    visitorCount: 684,
-    previous: { totalCents: 90500, orderCount: 9, visitorCount: 520 },
-    toFulfill: 4,
-    toCapture: 2,
-    buckets: totals.map((totalCents, index) => ({
-      bucket: new Date(now - (totals.length - index - 1) * 60 * 60 * 1000).toISOString(),
-      totalCents,
-      orderCount: index % 3 === 0 ? 2 : 1,
-      visitorCount: 70 + index * 5,
-    })),
-  };
-}
 
 function metricSeries(
   metric: MetricKey,
@@ -260,9 +241,13 @@ export default function SellerHomeCommerceDashboard({
   // ── Range-scoped analytics (hero + chart + stat grid) ────────────────────
   useEffect(() => {
     if (sellerPreview) {
+      // Signed-out web previews use the same range-aware chart contract as
+      // the live dashboard, without querying a seller account.
+      const next = buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh');
+      setAnalyticsError(false);
       setSnapshot({
         key: sellerHomeAnalyticsKey(analyticsUserId ?? 'demo-seller', range),
-        data: previewSellerHomeAnalytics(range),
+        data: next,
       });
       setLoading(false);
       return;
@@ -274,6 +259,7 @@ export default function SellerHomeCommerceDashboard({
     let active = true;
     const requestKey = sellerHomeAnalyticsKey(analyticsUserId, range);
     setLoading(true);
+
     api.analytics.home(range as SellerHomeTimeRange)
       .then((next) => {
         if (!active) return;
@@ -685,7 +671,12 @@ export default function SellerHomeCommerceDashboard({
                 >
                   {formatMetricValue(metric, heroDisplay)}
                 </Text>
-                {deltaLine && scrubIndex === null ? (
+                {isEmptyChart && scrubIndex === null ? (
+                  // Never a fabricated "+31.1%"-style comparison for a
+                  // brand-new/zero-sales account — matches Shopify's own
+                  // zero-state chart ("$0.00 —", no percent).
+                  <Text style={[styles.heroDelta, { color: theme.muted }]}>No sales yet</Text>
+                ) : deltaLine && scrubIndex === null ? (
                   <Text
                     style={[
                       styles.heroDelta,

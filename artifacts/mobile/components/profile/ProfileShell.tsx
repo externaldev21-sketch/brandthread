@@ -163,6 +163,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const liveStreamId = useLiveStreamForHost(isOwnProfile ? null : avatar?.liveHostId);
   const openLive = useOpenLive();
   const layout = useProfileLayout();
@@ -322,7 +323,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const floatingBottom = bottomFloor + SP.sm;
   const emptyArea = computeEmptyArea({
     viewportHeight,
-    topChrome: isVideoHeader ? insets.top : insets.top + COMPACT_BAR,
+    topChrome: isVideoHeader ? headerTopInset : headerTopInset + COMPACT_BAR,
     tabsHeight,
     bottomInset: bottomFloor,
     floatingReserve,
@@ -357,7 +358,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     ? `${identity.name} is live. Watch now`
     : avatar?.accessibilityLabel ?? `${identity.name} avatar`;
 
-  const topPad = useHeaderTopInset();
+  const topPad = headerTopInset;
   const videoAvatarSize = avatarGeometry().outer;
   const videoHeader = isVideoHeader ? (
     <ProfileVideoHeader
@@ -417,10 +418,10 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         <LinearGradient
           pointerEvents="none"
           colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']} // theme-exempt: keeps floating controls legible over bright video
-          style={[styles.topScrim, { height: insets.top + 110 }]}
+          style={[styles.topScrim, { height: headerTopInset + 110 }]}
         />
         {isOwnProfile && coverAffordance ? (
-          <View style={[styles.coverSlot, { top: insets.top + 64 }]} pointerEvents="box-none">{coverAffordance}</View>
+          <View style={[styles.coverSlot, { top: headerTopInset + 64 }]} pointerEvents="box-none">{coverAffordance}</View>
         ) : null}
         <Animated.View
           style={[
