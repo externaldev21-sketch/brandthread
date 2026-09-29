@@ -23,7 +23,7 @@
  */
 import { and, eq, sql } from "drizzle-orm";
 import type Stripe from "stripe";
-import { db, orderItems, orderRefunds, orderReleases, orders, productVariants } from "@workspace/db";
+import { db, orderItems, orderRefunds, orderReleases, orders } from "@workspace/db";
 import { stripe as defaultStripe } from "../stripe";
 import { logger } from "../logger";
 import { platformFeeRefundCents } from "./fees";
@@ -35,6 +35,7 @@ import {
   type OrderFundsState, type OrderStatus,
 } from "./stateMachines";
 import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode } from "./stripeMoney";
+import { restoreStockForOrder } from "../stockReservation";
 
 export type RefundReason =
   | "buyer_cancelled" | "seller_cancelled" | "return_approved" | "drop_failed" | "oversold";
@@ -392,12 +393,10 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
     if (options.cancelOrder?.restock) {
       const items = await tx.select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
         .from(orderItems).where(eq(orderItems.orderId, locked.id));
-      for (const item of items) {
-        if (!item.variantId) continue;
-        await tx.update(productVariants)
-          .set({ stock: sql`${productVariants.stock} + ${item.quantity}` })
-          .where(eq(productVariants.id, item.variantId));
-      }
+      await restoreStockForOrder(
+        tx,
+        items.filter((i): i is { variantId: string; quantity: number } => Boolean(i.variantId)),
+      );
     }
     await options.onSucceeded?.(tx, { order: locked, amountCents: amount, refundId: refund.id });
     // A full refund/cancellation returns any Thread Cash the buyer spent on
