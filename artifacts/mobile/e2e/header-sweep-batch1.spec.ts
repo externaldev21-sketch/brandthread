@@ -8,9 +8,13 @@ import { test } from '@playwright/test';
  */
 
 const DIR = 'docs/polish/screenshots/header-sweep-batch1';
+// browser.newContext() bypasses playwright.config.ts's `use.baseURL`, so
+// relative page.goto() paths silently fail (swallowed below) and leave a
+// blank page. Build absolute URLs instead.
+const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:5000';
 
 async function shot(page: import('@playwright/test').Page, path: string, name: string) {
-  await page.goto(path, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
+  await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => {});
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${DIR}/${name}.png` });
 }
@@ -21,7 +25,7 @@ test('batch 1 screens @ 393x852', async ({ browser }) => {
   await page.route('**/api/v1/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
 
   await shot(page, '/analytics?bt_preview=seller&demo=1', '01-tabs-analytics');
-  await shot(page, '/this-route-does-not-exist-xyz', '02-not-found');
+  await shot(page, '/this-route-does-not-exist-xyz?bt_preview=seller', '02-not-found');
   await shot(page, '/account-type-settings?bt_preview=buyer', '03-account-type-settings');
   await shot(page, '/activity-center?bt_preview=seller&demo=1', '04-activity-center');
   await shot(page, '/activity-people?bt_preview=buyer&type=followers&ids=', '05-activity-people');
@@ -41,7 +45,7 @@ test('batch 1 screens @ 393x852', async ({ browser }) => {
 
   // admin-reports: try to open the review-detail modal too (best effort —
   // depends on demo data actually producing a queue row).
-  await page.goto('/admin-reports?bt_preview=seller&demo=1', { waitUntil: 'networkidle' }).catch(() => {});
+  await page.goto(`${BASE}/admin-reports?bt_preview=seller&demo=1`, { waitUntil: 'networkidle' }).catch(() => {});
   await page.waitForTimeout(700);
   const row = page.locator('[role="button"], button, [data-testid]').filter({ hasText: /review|report/i }).first();
   await row.click({ timeout: 3000 }).catch(() => {});
