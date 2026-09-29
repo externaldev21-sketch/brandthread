@@ -14,7 +14,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 
@@ -36,6 +35,7 @@ import {
   GradientCard, PrimaryButton, SecondaryButton,
   SectionHeader,
 } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThreadProgress } from '@/components/onboarding/ThreadLine';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -134,7 +134,6 @@ export default function SetupScreen() {
   const colors = useColors();
   const s = createStyles(colors);
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const { userId } = useAuth();
   const api = useApi();
@@ -190,23 +189,17 @@ export default function SetupScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
-          style={s.back}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="x" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.title}>Store setup</Text>
-          <Text style={s.subtitle}>{done} of {total} required completed</Text>
-        </View>
-        <View style={s.pctBadge}>
-          <Text style={s.pctText}>{pct}%</Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title="Store setup"
+        subtitle={`${done} of ${total} required completed`}
+        variant="modal"
+        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
+        rightElement={
+          <View style={s.pctBadge}>
+            <Text style={s.pctText}>{pct}%</Text>
+          </View>
+        }
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -286,10 +279,6 @@ export default function SetupScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', gap: SP.md,
-                  paddingHorizontal: SP.md, paddingBottom: SP.md },
-  back:         { width: 36, height: 36, borderRadius: RADIUS.pill, backgroundColor: CARD,
-                  borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   title:        { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, color: FG, letterSpacing: -0.7 },
   subtitle:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   pctBadge:     { backgroundColor: colors.accent, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },

@@ -44,7 +44,8 @@ import { useUser } from '@clerk/expo';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
-import { EmptyState, PageHeader, SkeletonBlock, useScreenPadding } from '@/components/layout';
+import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useScrollReset } from '@/hooks/useScrollReset';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
@@ -1252,17 +1253,15 @@ export default function ActivityCenterScreen() {
       {/* Unstyled wrapper, only to measure where the list starts (the
           "New activity" pill sits just below the header — item 84). */}
       <View onLayout={handleHeaderLayout}>
-        <PageHeader
+        <ScreenHeader
           title="Activity"
-          showBack={false}
-          largeTitle
           actions={hasUnread ? [{
             icon: 'check-circle',
             onPress: () => { void handleMarkAll(); },
             accessibilityLabel: 'Mark all activity as read',
           }] : []}
-          belowTitle={<ActivityFilterChips selected={chip} onSelect={setChip} styles={styles} />}
         />
+        <ActivityFilterChips selected={chip} onSelect={setChip} styles={styles} />
       </View>
 
       {status === 'loading' ? (
@@ -1383,19 +1382,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   // this row always reserves real vertical space in the screen's flex
   // column, however the horizontal ScrollView itself sizes on a given
   // platform — nothing below it can ever render through/over the chips.
-  // Rendered inside PageHeader's `belowTitle` slot, which applies the
-  // screen's horizontal gutter to a non-scrolling wrapper — that insets the
-  // ScrollView's own bounding box, but doesn't reliably reach all the way to
-  // where its *scrollable content* starts on every platform. The standard
-  // edge-to-edge-scroller fix: cancel belowTitle's gutter with a matching
-  // negative margin so this ScrollView's box spans the full screen width
-  // (so "All" can still scroll fully off the left edge once you've scrolled
-  // right, and the last chip isn't artificially clipped early), then apply
-  // the real 16pt inset via the content container itself, which a
-  // ScrollView always honors for where its content begins.
+  // Rendered directly below ScreenHeader (a plain sibling, full width), so
+  // the real 16pt inset comes only from the content container itself, which
+  // a ScrollView always honors for where its content begins.
   chipRow: {
     height: 36 + SP.sm,
-    marginHorizontal: -SP.md,
     position: 'relative',
   },
   chipScrollContent: {

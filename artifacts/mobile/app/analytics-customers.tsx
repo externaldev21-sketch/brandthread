@@ -11,7 +11,6 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { fmtDate } from '@/lib/format';
@@ -20,8 +19,9 @@ import { getCustomerAnalytics, getFilterState } from '@/services/analyticsServic
 import { CustomerAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, SectionTitle, StatRow, ProgressBar,
+  AnalyticsSkeleton, Card, CardDivider, SectionTitle, StatRow, ProgressBar,
 } from '@/components/analytics/AnalyticsKit';
 
 type TopCustomer = {
@@ -48,7 +48,6 @@ export default function AnalyticsCustomersScreen() {
   const router = useRouter();
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = useHeaderTopInset();
 
   const [data,       setData]       = useState<CustomerAnalytics | null>(null);
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
@@ -87,25 +86,22 @@ export default function AnalyticsCustomersScreen() {
     if (authLoaded && userId) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
-  if (loading) {
-    return <AnalyticsSkeleton topPad={topPad} kpiCount={0} listRows={4} />;
-  }
-  if (loadError && !data) {
-    return (
-      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
-        <ErrorState message="Couldn't load customer analytics." onRetry={() => load()} />
-      </View>
-    );
-  }
   return (
+    <View style={{ flex: 1 }}>
+      <ScreenHeader title="Customer Analytics" subtitle="All time" />
+      {loading ? (
+        <AnalyticsSkeleton kpiCount={0} listRows={4} />
+      ) : loadError && !data ? (
+        <View style={s.loadWrap}>
+          <ErrorState message="Couldn't load customer analytics." onRetry={() => load()} />
+        </View>
+      ) : (
     <ScrollView
       style={s.scroll}
-      contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
+      contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <AnalyticsHeader title="Customer Analytics" subtitle="All time" />
-
       {/* KPIs */}
       <SectionTitle>Overview</SectionTitle>
       <Card>
@@ -218,6 +214,8 @@ export default function AnalyticsCustomersScreen() {
 
       <View style={{ height: 120 }} />
     </ScrollView>
+      )}
+    </View>
   );
 }
 

@@ -14,7 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deriveCardState, formatMoney, formatTimestamp, localTimeLabel, orderStatusLabel, orderTypeLabel } from '@workspace/manufacturer-flow';
 import { EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import ProductionTimeline from '@/components/manufacturer/ProductionTimeline';
 import { useOrderCardPayment } from '@/components/manufacturer/useOrderCardPayment';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -121,7 +121,7 @@ export default function ProductionDetailScreen() {
     ]);
   };
 
-  const header = <Header title={order ? `${orderTypeLabel(order.orderType)} tracker` : 'Order'} />;
+  const header = <ScreenHeader title={order ? `${orderTypeLabel(order.orderType)} tracker` : 'Order'} />;
 
   if (loading) {
     return (

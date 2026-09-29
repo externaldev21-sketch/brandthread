@@ -9,21 +9,20 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProfitAnalytics, getPayoutAnalytics, getFilterState } from '@/services/analyticsService';
 import { ProfitAnalytics, PayoutAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { RetryRow } from '@/components/ui/RetryRow';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, Sparkline, StatTileRow,
+  AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, Sparkline, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
 
 export default function AnalyticsProfitScreen() {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = useHeaderTopInset();
 
   const [profit,     setProfit]     = useState<ProfitAnalytics | null>(null);
   const [payout,     setPayout]     = useState<PayoutAnalytics | null>(null);
@@ -61,18 +60,18 @@ export default function AnalyticsProfitScreen() {
     if (authLoaded && userId) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
-  if (loading) {
-    return <AnalyticsSkeleton topPad={topPad} kpiCount={0} listRows={3} />;
-  }
   return (
+    <View style={{ flex: 1 }}>
+      <ScreenHeader title="Profit & Payout" subtitle={filter?.dateRange.label ?? '30 days'} />
+      {loading ? (
+        <AnalyticsSkeleton kpiCount={0} listRows={3} />
+      ) : (
     <ScrollView
       style={s.scroll}
-      contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
+      contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <AnalyticsHeader title="Profit & Payout" subtitle={filter?.dateRange.label ?? '30 days'} />
-
       <PillTabs
         options={[{ key: 'profit', label: 'Profit' }, { key: 'payout', label: 'Payouts' }] as const}
         value={tab}
@@ -199,6 +198,8 @@ export default function AnalyticsProfitScreen() {
 
       <View style={{ height: 120 }} />
     </ScrollView>
+      )}
+    </View>
   );
 }
 
