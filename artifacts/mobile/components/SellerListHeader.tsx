@@ -17,8 +17,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { COMP, FONT, FS, GRAD_DARK_FADE, ICON, RADIUS, SP } from '@/lib/theme';
+import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, PressableScale, SearchBar } from '@/components/BrandthreadUI';
 
@@ -133,28 +132,23 @@ export function SellerListHeader({
         </PressableScale>
       </View>
 
-      {/* Status chips — horizontal scroll with a trailing fade so the last
-          chip reads as scrollable instead of abruptly clipped. */}
-      <View style={{ position: 'relative' }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.pillsRow}>
-          {chips.map((chip) => (
-            <FilterChip
-              key={chip.key}
-              label={chip.label}
-              active={chip.active}
-              onPress={chip.onPress}
-              count={chip.count}
-            />
-          ))}
-        </ScrollView>
-        <LinearGradient
-          pointerEvents="none"
-          colors={GRAD_DARK_FADE}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 0 }}
-          style={s.pillsFade}
-        />
-      </View>
+      {/* Status chips — horizontal scroll, edge-to-edge. `pillsRow`'s own
+          horizontal padding is what lets the last chip clip naturally at
+          the screen edge as a scroll affordance — no gradient overlay on
+          top of the chips (a previous `GRAD_DARK_FADE` scrim here went
+          fully opaque at its own edge, painting a solid black block over
+          the last chip instead of fading it). */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.pillsRow}>
+        {chips.map((chip) => (
+          <FilterChip
+            key={chip.key}
+            label={chip.label}
+            active={chip.active}
+            onPress={chip.onPress}
+            count={chip.count}
+          />
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -216,12 +210,5 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     paddingBottom: SP.sm,
     paddingTop: 2,
     gap: SP.xs,
-  },
-  pillsFade: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: SP.sm,
-    width: 28,
   },
 });

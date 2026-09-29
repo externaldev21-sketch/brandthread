@@ -28,9 +28,10 @@ import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/hooks/useApi';
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
+  BrandthreadScreen, BrandthreadCard,
   PrimaryButton, EmptyState, FormInput, HapticSwitch,
 } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   BUDGET_STEPS, BUDGET_MIN_CENTS, BUDGET_MAX_CENTS, formatBudgetCents,
   META_OBJECTIVE_OPTIONS, META_CTA_OPTIONS, formatReachRange,
@@ -345,8 +346,8 @@ export default function MetaAdsSetupScreen() {
   }
   if (!connected) {
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
+      <BrandthreadScreen noSafeTop>
+        <ScreenHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
         <EmptyState
           icon="link"
           title="Connect Meta first"
@@ -371,7 +372,7 @@ export default function MetaAdsSetupScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <BrandthreadHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Run a Meta ad" onBack={() => goBackOr(router)} />
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 110, gap: SP.xl }}

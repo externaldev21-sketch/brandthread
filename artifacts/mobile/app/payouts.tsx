@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
@@ -194,7 +194,7 @@ export default function PayoutsScreen() {
   if (isLoadingRole) {
     return (
       <View style={styles.root}>
-        <Header title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
+        <ScreenHeader title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
         <View style={{ padding: SP.md, gap: SP.sm }}>
           <LoadingSkeleton height={140} />
           <LoadingSkeleton height={44} />
@@ -206,7 +206,7 @@ export default function PayoutsScreen() {
   if (!hasPayoutsAccess(currentRole) && !isReadOnly) {
     return (
       <View style={styles.root}>
-        <Header title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
+        <ScreenHeader title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
         <RoleLockedView screenTitle="payouts" currentRole={currentRole ?? undefined} />
       </View>
     );
@@ -214,7 +214,7 @@ export default function PayoutsScreen() {
 
   return (
     <View style={styles.root}>
-      <Header
+      <ScreenHeader
         title="Payouts"
         onBack={() => { haptic(); leaveSetupDestination(); }}
         actions={[{

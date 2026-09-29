@@ -11,11 +11,11 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { getQuotesForRequest, acceptQuote, getManufacturer } from '@/services/manufacturerService';
 import { Quote, Manufacturer } from '@/services/manufacturerTypes';
-import { BrandthreadHeader, BrandthreadCard, PrimaryButton, StatusBadge } from '@/components/BrandthreadUI';
+import { BrandthreadCard, PrimaryButton, StatusBadge } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { ErrorState } from '@/components/ui/ErrorState';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -152,8 +152,8 @@ export default function QuoteCompareScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: useHeaderTopInset() }}>
-      <BrandthreadHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+      <ScreenHeader title="Compare Quotes" onBack={() => goBackOr(router)} />
 
       {loadError ? (
         <ErrorState

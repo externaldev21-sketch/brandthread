@@ -37,7 +37,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -401,7 +401,6 @@ export default function AiBrainScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
   const { width } = useWindowDimensions();
   const isTablet = width >= BREAKPOINT.tablet;
   const { getToken, userId, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
@@ -702,37 +701,15 @@ export default function AiBrainScreen() {
         keyboardVerticalOffset={0}
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <View style={[styles.header, { paddingTop: headerTopInset }]}>
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={() => goBackOr(router)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Feather name="x" size={20} color={colors.text} />
-          </TouchableOpacity>
-
-          <View style={styles.headerCenter}>
-            <BrandthreadLogo size={18} />
-            <Text style={styles.headerLabel} numberOfLines={1}>{label}</Text>
-          </View>
-
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.headerBtn}
-              onPress={handleClear}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Feather name="rotate-ccw" size={18} color={colors.mutedForeground} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.headerBtn, { marginLeft: 4 }]}
-              onPress={() => router.push('/ai-settings' as any)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Feather name="sliders" size={18} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ScreenHeader
+          title={label}
+          variant="modal"
+          onBack={() => goBackOr(router)}
+          actions={[
+            { icon: 'rotate-ccw', onPress: handleClear, accessibilityLabel: 'Clear conversation' },
+            { icon: 'sliders', onPress: () => router.push('/ai-settings' as any), accessibilityLabel: 'AI settings' },
+          ]}
+        />
 
         {/* ── Error banner ────────────────────────────────────────────────── */}
         {errorMsg ? (
@@ -849,41 +826,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   kav: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-
-  // ── Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    minHeight: 56,
-  },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerCenter: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: SP.sm,
-  },
-  headerLabel: {
-    color: colors.mutedForeground,
-    fontSize: FS.sm,
-    fontFamily: FONT.medium,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
 
   // ── Error banner
