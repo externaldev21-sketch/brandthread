@@ -77,7 +77,7 @@ export default function PublicCollectionScreen() {
 
   if (state.kind === 'loading') {
     return (
-      <View style={[styles.root, styles.center]}>
+      <View style={[styles.root, styles.center, { paddingTop: headerTopInset }]}>
         <ActivityIndicator color={FG} />
       </View>
     );
