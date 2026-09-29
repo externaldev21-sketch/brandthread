@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
@@ -17,7 +16,7 @@ import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } 
 import { getBuyerOrdersWithStatus } from '@/services/orderService';
 import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
 import { formatCents } from '@/lib/money';
-import { FONT, FS, SP, RADIUS, ICON, GRAD_DARK_FADE } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   BrandthreadScreen, FilterChip,
   StatusBadge, EmptyState,
@@ -352,31 +351,28 @@ export default function BuyerOrdersScreen() {
       {/* Shared page header — identical large-title size/weight/offset to every other tab-root page */}
       <Header title="My Orders" largeTitle showBack={false} />
 
-      {/* Filter chips — horizontal scroll with a trailing fade so the last
-          chip reads as scrollable instead of abruptly clipped. */}
-      <View style={{ position: 'relative' }}>
-        <FlatList
-          horizontal
-          data={FILTER_CHIPS}
-          keyExtractor={i => i.key}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: centeredPadding, gap: 8, paddingBottom: SP.sm }}
-          renderItem={({ item }) => (
-            <FilterChip
-              label={item.label}
-              active={filter === item.key}
-              onPress={() => setFilter(item.key)}
-            />
-          )}
-        />
-        <LinearGradient
-          pointerEvents="none"
-          colors={GRAD_DARK_FADE}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 0 }}
-          style={{ position: 'absolute', right: 0, top: 0, bottom: SP.sm, width: 28 }}
-        />
-      </View>
+      {/* Filter chips — horizontal scroll, edge-to-edge. The screen's own
+          gutter (`centeredPadding`) on the content container is what lets
+          the last chip clip naturally at the screen edge as a scroll
+          affordance — no gradient overlay on top of the chips themselves
+          (a previous `GRAD_DARK_FADE` scrim here went fully opaque at its
+          own edge, painting a solid black block over the last chip instead
+          of fading it — same antipattern the tab-bar glass zone replaced
+          for Activity, see app/activity-center.tsx's history). */}
+      <FlatList
+        horizontal
+        data={FILTER_CHIPS}
+        keyExtractor={i => i.key}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: centeredPadding, gap: 8, paddingBottom: SP.sm }}
+        renderItem={({ item }) => (
+          <FilterChip
+            label={item.label}
+            active={filter === item.key}
+            onPress={() => setFilter(item.key)}
+          />
+        )}
+      />
 
       {visibleLoading ? (
         <View style={{ paddingHorizontal: centeredPadding, paddingTop: SP.sm }}>
