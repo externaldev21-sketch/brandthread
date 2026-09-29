@@ -2115,7 +2115,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           userId: string; name: string; username: string | null;
           displayName: string | null; bio: string | null; avatarUrl: string | null;
           accountType: string; initials: string; color: string; handle: string;
-          followersCount: number; followingCount: number; postsCount: number;
+           followersCount: number; followingCount: number; likesCount: number; postsCount: number;
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),

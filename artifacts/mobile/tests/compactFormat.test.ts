@@ -30,6 +30,10 @@ describe('formatCompactCount', () => {
     expect(formatCompactCount(1e9)).toBe('1B');
     expect(formatCompactCount(1_200_000_000)).toBe('1.2B');
   });
+  it('keeps public profile likes within a three-column stat row', () => {
+    expect([0, 9_999, 10_000, 12_500, 999_950, 1_200_000].map(formatCompactCount))
+      .toEqual(['0', '9,999', '10K', '12.5K', '1M', '1.2M']);
+  });
 
   it('treats null/undefined/negative/non-finite input as 0', () => {
     expect(formatCompactCount(null)).toBe('0');
