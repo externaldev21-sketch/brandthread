@@ -12,6 +12,11 @@ vi.mock("@/lib/serviceConfig", () => ({
   serviceRequest,
 }));
 
+vi.mock("@/lib/devPreview", () => ({
+  isBuyerDevPreview: () => false,
+  isPreviewDemoMode: () => false,
+}));
+
 import { getThreadPosts } from "./socialService";
 
 type ApiPost = {

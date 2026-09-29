@@ -69,7 +69,7 @@ import { profileEmptyState, computeEmptyArea, type ProfileEmptyTab } from '@/com
 import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
 import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRow';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
-import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
+import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
 // Realistic identity shown only when there is truly no signed-in user at all
@@ -494,8 +494,9 @@ export default function ProfileScreen() {
     // `__DEV__`-gated, so none of this ever fires in a production build.
     const applyPreviewFallback = () => {
       if (!active || !isPreviewThreadCashEnabled()) return;
-      setThreadCashBalanceCents(Math.max(0, PREVIEW_THREAD_CASH_STATUS.balanceCents));
-      setThreadCashStreak(PREVIEW_THREAD_CASH_STATUS.streak);
+      const status = getPreviewThreadCashStatus();
+      setThreadCashBalanceCents(Math.max(0, status.balanceCents));
+      setThreadCashStreak(status.streak);
     };
 
     if (!user?.id) {

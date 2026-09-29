@@ -16,6 +16,7 @@
  */
 import { Asset } from 'expo-asset';
 import { isPreviewCatalogEnabled } from './previewCatalog';
+import { isPreviewDemoMode } from './devPreview';
 import type { ActivityItem } from './activity';
 import { pickAvatarColor } from './avatarColors';
 
@@ -133,6 +134,10 @@ export function getPreviewActivity(): ActivityItem[] {
 
 function seedPreviewActivity(): ActivityItem[] {
   if (cached) return withPreviewLiveArrivals(cached);
+  // Fresh install by default: "who liked/followed/commented on my stuff" is
+  // personal to an account with real history — a brand-new account has none.
+  // The full seeded feed only appears under the explicit `demo=1` opt-in.
+  if (!isPreviewDemoMode()) { cached = []; return cached; }
   const p = PEOPLE;
   cached = [
     // ── New (unread) ──────────────────────────────────────────────────────
@@ -276,7 +281,7 @@ function withPreviewLiveArrivals(feed: ActivityItem[]): ActivityItem[] {
 
 /** True until this session's one preview live event has been delivered. */
 export function hasPendingPreviewLiveArrival(): boolean {
-  return isPreviewActivityEnabled() && !liveArrivalDelivered;
+  return isPreviewActivityEnabled() && isPreviewDemoMode() && !liveArrivalDelivered;
 }
 
 /** Delivers this session's preview live event (a fresh, unread like). No-op after the first call. */

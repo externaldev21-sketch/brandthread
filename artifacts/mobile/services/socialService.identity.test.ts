@@ -24,6 +24,11 @@ vi.mock("@/lib/serviceConfig", () => ({
   serviceRequest: vi.fn(),
 }));
 
+vi.mock("@/lib/devPreview", () => ({
+  isBuyerDevPreview: () => false,
+  isPreviewDemoMode: () => false,
+}));
+
 import {
   getMyProfile,
   hydrateMyProfileFromAccount,

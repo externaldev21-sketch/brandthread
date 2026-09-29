@@ -28,6 +28,8 @@ vi.mock('@/lib/serviceConfig', () => ({
   serviceRequest: (...args: any[]) => mockServiceRequest(...args),
 }));
 
+vi.mock('@/lib/devPreview', () => ({ isBuyerDevPreview: () => false, isPreviewDemoMode: () => false }));
+
 import { initSocialService, createSellerPost, updateSellerPost } from './socialService';
 
 const userId = 'test-seller-001';

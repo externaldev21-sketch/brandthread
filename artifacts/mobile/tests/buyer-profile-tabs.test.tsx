@@ -320,9 +320,8 @@ vi.mock('@/contexts/FeatureFlagContext', async (importOriginal) => ({
 // isPreviewThreadCashEnabled() (a bare `__DEV__` check) would never fire in
 // this suite — mocked here with its own on/off switch so the "no user" /
 // "empty streak data" fallback tests can actually exercise it.
-const { previewThreadCashEnabled } = vi.hoisted(() => ({ previewThreadCashEnabled: { on: false } }));
-vi.mock('@/lib/previewThreadCash', () => ({
-  isPreviewThreadCashEnabled: () => previewThreadCashEnabled.on,
+const { previewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } = vi.hoisted(() => ({
+  previewThreadCashEnabled: { on: false },
   PREVIEW_THREAD_CASH_STATUS: {
     balanceCents: 480,
     config: { dailyAmountCents: 10, streakBonusCents: 100, streakBonusDays: 7, graceHours: 0, expiryDays: null, maxRedemptionPerOrderCents: null },
@@ -331,6 +330,11 @@ vi.mock('@/lib/previewThreadCash', () => ({
       timezone: 'UTC', alreadyCheckedInToday: true, dayInCycle: 3, streakBonusDays: 7,
     },
   },
+}));
+vi.mock('@/lib/previewThreadCash', () => ({
+  isPreviewThreadCashEnabled: () => previewThreadCashEnabled.on,
+  PREVIEW_THREAD_CASH_STATUS,
+  getPreviewThreadCashStatus: () => PREVIEW_THREAD_CASH_STATUS,
 }));
 
 vi.mock('@/components/BrandthreadUI', () => {

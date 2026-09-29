@@ -6,6 +6,7 @@ vi.mock('@/lib/serviceConfig', () => ({ serviceRequest: serviceRequestMock }));
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn(), multiRemove: vi.fn(), getAllKeys: vi.fn(async () => []) },
 }));
+vi.mock('@/lib/devPreview', () => ({ isBuyerDevPreview: () => false, isPreviewDemoMode: () => false }));
 
 import {
   formatProfileCount,

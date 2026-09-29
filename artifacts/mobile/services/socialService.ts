@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
@@ -226,7 +227,22 @@ export async function hydrateMyProfileFromAccount(
 
 // ─── Posts ────────────────────────────────────────────────────────────────────
 
+// Posts created this preview session (?bt_preview=buyer, no real account —
+// createPost() has no real endpoint to call at all, signed-in or not). Empty
+// by default (a fresh install has posted nothing); a post made during the
+// session appears immediately, the same empty->populated behavior a real
+// new account would show once buyer post publishing ships for real.
+// Module-level, cleared on reload — same lifetime as every other preview
+// session store (lib/previewInbox.ts, lib/previewNotes.ts, etc.).
+let previewMyPosts: BuyerPost[] = [];
+
+/** Test-only reset — mirrors previewFollowStore.ts's resetPreviewFollowStore(). */
+export function resetPreviewMyPostsForTests(): void {
+  previewMyPosts = [];
+}
+
 export async function getMyPosts(k: SocialKeys = K()): Promise<BuyerPost[]> {
+  if (isBuyerDevPreview()) return previewMyPosts;
   if (k.userId === 'anon') return [];
   const remote = await serviceRequest<BuyerPost[]>(
     `/api/social/profile/${encodeURIComponent(k.userId)}/posts`,
@@ -253,7 +269,42 @@ export async function createPost(params: {
   profileVisibility: BuyerPost['profileVisibility'];
   isDraft?: boolean;
 }): Promise<BuyerPost> {
-  throw new Error('Buyer post publishing is not available yet.');
+  if (!isBuyerDevPreview()) throw new Error('Buyer post publishing is not available yet.');
+  // Preview mode only: no real endpoint exists for this yet (real accounts
+  // still hit the throw above), but "post" must fully work in a fresh preview
+  // session — see getMyPosts()'s previewMyPosts store above.
+  const k = K();
+  const profile = await getMyProfile(k);
+  const now = iso();
+  const post: BuyerPost = {
+    id: `preview-mypost-${uid()}`,
+    authorId: MY_USER_ID,
+    authorName: profile.name || MY_NAME,
+    authorHandle: profile.username ? `@${profile.username}` : MY_HANDLE,
+    authorInitials: profile.avatarInitials || MY_INITIALS,
+    authorColor: profile.avatarColor || MY_COLOR,
+    authorAccountType: 'buyer',
+    feedEligibility: 'profile_only',
+    profileVisibility: params.profileVisibility,
+    type: params.type,
+    caption: params.caption,
+    hashtags: params.hashtags,
+    mediaColors: params.mediaColors,
+    likesCount: 0,
+    commentsCount: 0,
+    repostsCount: 0,
+    likedByMe: false,
+    savedByMe: false,
+    repostedByMe: false,
+    isArchived: false,
+    isDraft: !!params.isDraft,
+    createdAt: now,
+    updatedAt: now,
+  };
+  previewMyPosts.unshift(post);
+  if (!post.isDraft) await updateMyProfile({ postsCount: profile.postsCount + 1 }, k);
+  notify();
+  return post;
 }
 export async function updatePost(id: string, updates: Partial<Pick<BuyerPost, 'caption' | 'hashtags' | 'profileVisibility' | 'isDraft'>>, k: SocialKeys = K()): Promise<BuyerPost | null> {
   const posts = await getMyPosts(k);
@@ -268,7 +319,12 @@ export async function updatePost(id: string, updates: Partial<Pick<BuyerPost, 'c
 export async function deletePost(id: string): Promise<void> {
   const k = K();
   const posts = await getMyPosts(k);
-  await save(k.posts, posts.filter(p => p.id !== id));
+  if (isBuyerDevPreview()) {
+    const idx = previewMyPosts.findIndex(p => p.id === id);
+    if (idx >= 0) previewMyPosts.splice(idx, 1);
+  } else {
+    await save(k.posts, posts.filter(p => p.id !== id));
+  }
   const p = await getMyProfile(k);
   await updateMyProfile({ postsCount: Math.max(0, p.postsCount - 1) }, k);
   notify();
