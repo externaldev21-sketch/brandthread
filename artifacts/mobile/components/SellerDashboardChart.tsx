@@ -36,7 +36,7 @@ const CHART_HEIGHT = 168;
 // bucket, which was truncating "12 AM"/"6 PM"-style text down to a couple
 // of characters once the visible count was much smaller than the bucket
 // count (e.g. 4 visible of 24 hourly buckets for Today).
-const AXIS_LABEL_WIDTH = 44;
+export const AXIS_LABEL_WIDTH = 44;
 
 // How many x-axis labels to actually show text for, per range — a handful
 // of evenly-spaced, non-overlapping labels (Shopify's own Sales Report/
@@ -293,6 +293,9 @@ export function SellerDashboardChart({
       {labels.length > 0 && width > 0 && visibleAxisIndices.length > 0 && (
         <View style={styles.axisRow} pointerEvents="none" testID="seller-dashboard-chart-axis">
           {visibleAxisIndices.map((bucketIndex, i) => {
+            const n = visibleAxisIndices.length;
+            const isFirst = n > 1 && i === 0;
+            const isLast = n > 1 && i === n - 1;
             // Rendered in perfectly even PIXEL columns across the row,
             // independent of the underlying bucket's own x — selecting
             // `want` labels out of an uneven bucket count can't always land
@@ -300,13 +303,50 @@ export function SellerDashboardChart({
             // to gaps of 2,2,3,2,2 — one integer gap is inevitably larger),
             // but the rendered columns themselves must still be even, or
             // that rounding artifact shows up as a visibly uneven gap.
-            const t = visibleAxisIndices.length > 1 ? i / (visibleAxisIndices.length - 1) : 0.5;
+            const t = n > 1 ? i / (n - 1) : 0.5;
             const x = t * width;
+            // The first/last label anchor exactly to the chart's true
+            // edges (x=0 / x=width) instead of being centered-then-clamped
+            // like the middle labels — centering + clamping shifted the
+            // whole FIXED-WIDTH box inward by half a label-width, shrinking
+            // its gap to the next label relative to every other
+            // (evenly-spaced) gap. A fixed-width box with only its inner
+            // textAlign flipped does NOT fix this: the box itself (what
+            // "where is this label" actually measures) stays the same
+            // width and position, just the glyphs shift inside it — so the
+            // edge boxes must drop the fixed AXIS_LABEL_WIDTH and size to
+            // their own text instead, anchored with `left`/`right` (not a
+            // computed `left` + textAlign) so the box's true edge sits
+            // exactly at x=0 / x=width. Middle labels stay centered in a
+            // fixed-width box on their evenly-spaced x — they never
+            // approach either edge, so no clamping is needed there.
+            if (isFirst) {
+              return (
+                <Text
+                  key={`${labels[bucketIndex]}-${bucketIndex}`}
+                  style={[styles.axisLabelBase, styles.axisLabelEdge, { color: theme.subtle, left: 0 }]}
+                  numberOfLines={1}
+                >
+                  {labels[bucketIndex]}
+                </Text>
+              );
+            }
+            if (isLast) {
+              return (
+                <Text
+                  key={`${labels[bucketIndex]}-${bucketIndex}`}
+                  style={[styles.axisLabelBase, styles.axisLabelEdge, { color: theme.subtle, right: 0 }]}
+                  numberOfLines={1}
+                >
+                  {labels[bucketIndex]}
+                </Text>
+              );
+            }
             const left = Math.max(0, Math.min(width - AXIS_LABEL_WIDTH, x - AXIS_LABEL_WIDTH / 2));
             return (
               <Text
                 key={`${labels[bucketIndex]}-${bucketIndex}`}
-                style={[styles.axisLabel, { color: theme.subtle, left }]}
+                style={[styles.axisLabelBase, styles.axisLabel, { color: theme.subtle, left }]}
                 numberOfLines={1}
               >
                 {labels[bucketIndex]}
@@ -415,12 +455,27 @@ const styles = StyleSheet.create({
     height: 14,
     marginTop: SP.xs,
   },
-  axisLabel: {
+  // Shared base — deliberately has no `width`. RN's style-array flattening
+  // does NOT let a later `width: undefined` unset an earlier numeric
+  // `width` (the key is simply skipped, not applied as "auto"), so the
+  // fixed-width middle-label style and the auto-width edge-label style
+  // must each independently opt in to a `width`, rather than one trying to
+  // cancel the other's.
+  axisLabelBase: {
     position: 'absolute',
     top: 0,
-    width: AXIS_LABEL_WIDTH,
     fontFamily: FONT.regular,
     fontSize: 9,
+  },
+  // Middle labels: fixed-width box, centered on their evenly-spaced x.
+  axisLabel: {
+    width: AXIS_LABEL_WIDTH,
     textAlign: 'center',
+  },
+  // Edge labels (first/last): no fixed width at all, so the rendered box
+  // shrinks to the text itself and its true left/right edge lands exactly
+  // at the chart's x=0 / x=width — see the render-time comment above.
+  axisLabelEdge: {
+    maxWidth: AXIS_LABEL_WIDTH * 1.5,
   },
 });
