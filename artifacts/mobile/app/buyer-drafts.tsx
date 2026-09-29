@@ -10,7 +10,7 @@ import React, { useCallback, useState } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticSelection } from '@/lib/haptics';
 import { getMyPosts } from '@/services/socialService';
@@ -54,7 +54,7 @@ export default function BuyerDraftsScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]} testID="buyer-drafts">
-      <Header title="Drafts" />
+      <ScreenHeader title="Drafts" />
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}

@@ -14,7 +14,8 @@ import type { FriendSuggestion } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
-import { Header, ListSkeleton } from '@/components/layout';
+import { ListSkeleton } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button, SegmentedControl } from '@/components/ui';
 import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -316,7 +317,7 @@ export default function BuyerFriendRequestsScreen() {
 
   return (
     <View style={s.container}>
-      <Header
+      <ScreenHeader
         title="Connections"
         actions={[{ icon: 'search', onPress: () => router.push('/buyer-search' as never), accessibilityLabel: 'Search' }]}
       />

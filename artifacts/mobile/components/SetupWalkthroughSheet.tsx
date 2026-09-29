@@ -8,8 +8,9 @@
  */
 import React, { useCallback, useMemo } from 'react';
 import {
-  Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
+  Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Pressable,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
+import { useSheetTransition } from '@/components/ui/BottomSheet';
 import {
   SetupState, SetupTask, SetupTaskId,
   completionPercent, nextTask, completedRequiredTaskCount, requiredTaskCount,
@@ -42,6 +44,20 @@ export default function SetupWalkthroughSheet({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const s = useMemo(() => createStyles(theme), [theme]);
+
+  // Backdrop opacity and sheet translateY animate on their own timeline
+  // (reanimated, UI thread) instead of both riding RN `Modal`'s single
+  // `animationType="slide"` transform: that transform slides the WHOLE
+  // modal subtree — backdrop included — as one block, so mid-close a
+  // shrinking sliver of the still-partially-onscreen, still-opaque backdrop
+  // sweeps across the very bottom of the viewport and paints straight over
+  // the floating tab bar (a separate, always-on-top layer the sliding
+  // Modal portal has no relationship to) for a frame or two — the "thin
+  // dark bar flashing over the tab bar" bug. `useSheetTransition` is the
+  // same shared engine `components/ui/BottomSheet.tsx` uses: the backdrop
+  // only ever fades in place, never moves, so nothing but the sheet card
+  // itself is ever in transit.
+  const { modalVisible, sheetStyle, backdropStyle } = useSheetTransition(visible, onClose);
 
   const pct = completionPercent(setupState);
   const active = nextTask(setupState);
@@ -84,9 +100,19 @@ export default function SetupWalkthroughSheet({
   }, [onSetupStateChange, userId]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <View style={s.backdrop}>
-        <View style={[s.sheet, { paddingBottom: insets.bottom + SP.lg }]}>
+    <Modal visible={modalVisible} animationType="none" transparent onRequestClose={handleClose}>
+      <View style={s.root}>
+        <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            style={StyleSheet.absoluteFill}
+            onPress={handleClose}
+          >
+            <View style={[StyleSheet.absoluteFill, s.backdropFill]} />
+          </Pressable>
+        </Animated.View>
+        <Animated.View style={[s.sheet, { paddingBottom: insets.bottom + SP.lg }, sheetStyle]}>
           <View style={s.grabber} />
 
           <View style={s.header}>
@@ -172,15 +198,20 @@ export default function SetupWalkthroughSheet({
           <TouchableOpacity style={s.secondaryBtn} onPress={handleClose}>
             <Text style={s.secondaryBtnText}>Continue setup later</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 }
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  root: { flex: 1, justifyContent: 'flex-end' },
+  backdropFill: { backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
     borderWidth: 1, borderColor: theme.border, borderBottomWidth: 0,
     paddingHorizontal: SP.lg, paddingTop: SP.sm, maxHeight: '86%',

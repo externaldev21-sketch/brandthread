@@ -9,6 +9,8 @@ import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { PressableScale, StatusBadge, useUndoToast } from '@/components/BrandthreadUI';
 import { dbStatusToOrderStatus, orderStatusBadgeLabel, orderStatusBadgeVariant, carrierTrackingUrl } from '@/lib/orderStatusAdapter';
 import { CachedImage } from '@/components/CachedImage';
@@ -2651,35 +2653,37 @@ export default function BuyerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowMediaSheet(false)}
       >
-        <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
-        <SheetRise style={s.mediaSheet}>
-          <View style={s.mediaSheetHandle} />
-          <Text style={s.mediaSheetTitle}>Add to message</Text>
-          <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickPhoto}>
-            <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
-            <View>
-              <Text style={s.mediaSheetLabel}>Photos</Text>
-              <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
-            </View>
-          </PressableScale>
-          <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo}>
-            <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
-            <View>
-              <Text style={s.mediaSheetLabel}>Video clip</Text>
-              <Text style={s.mediaSheetDesc}>Under 1 minute</Text>
-            </View>
-          </PressableScale>
-          {isSellerConv && (
-            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={openAttachmentPicker}>
-              <View style={s.mediaSheetIcon}><Feather name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
+        <ModalSafeArea>
+          <PressableScale rippleEnabled={false} style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
+          <SheetRise style={s.mediaSheet}>
+            <View style={s.mediaSheetHandle} />
+            <Text style={s.mediaSheetTitle}>Add to message</Text>
+            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickPhoto}>
+              <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
               <View>
-                <Text style={s.mediaSheetLabel}>Product or post</Text>
-                <Text style={s.mediaSheetDesc}>Share from {displayName}'s store</Text>
+                <Text style={s.mediaSheetLabel}>Photos</Text>
+                <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
               </View>
             </PressableScale>
-          )}
-          <View style={{ height: 20 }} />
-        </SheetRise>
+            <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={handlePickVideo}>
+              <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
+              <View>
+                <Text style={s.mediaSheetLabel}>Video clip</Text>
+                <Text style={s.mediaSheetDesc}>Under 1 minute</Text>
+              </View>
+            </PressableScale>
+            {isSellerConv && (
+              <PressableScale rippleEnabled={false} style={s.mediaSheetOption} onPress={openAttachmentPicker}>
+                <View style={s.mediaSheetIcon}><Feather name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
+                <View>
+                  <Text style={s.mediaSheetLabel}>Product or post</Text>
+                  <Text style={s.mediaSheetDesc}>Share from {displayName}'s store</Text>
+                </View>
+              </PressableScale>
+            )}
+            <View style={{ height: 20 }} />
+          </SheetRise>
+        </ModalSafeArea>
       </Modal>
 
       <Modal
@@ -2688,21 +2692,16 @@ export default function BuyerConversationScreen() {
         animationType="slide"
         onRequestClose={() => setShowAttachmentPicker(false)}
       >
-        <View style={s.modalBackdrop}>
-          <View style={s.productPicker}>
-            <View style={s.pickerHeader}>
-              <View>
-                <Text style={s.pickerTitle}>Attach to message</Text>
-                <Text style={s.pickerSubtitle}>Choose from {displayName}'s store</Text>
-              </View>
-              <PressableScale rippleEnabled={false}
-                onPress={() => setShowAttachmentPicker(false)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Feather name="x" size={ICON.md} color={theme.muted} />
-              </PressableScale>
-            </View>
-            <View style={s.attachmentTabs}>
+        <ModalSafeArea>
+          <View style={s.modalBackdrop}>
+            <View style={s.productPicker}>
+              <ScreenHeader
+                title="Attach to message"
+                subtitle={`Choose from ${displayName}'s store`}
+                variant="modal"
+                onBack={() => setShowAttachmentPicker(false)}
+              />
+              <View style={s.attachmentTabs}>
               <PressableScale rippleEnabled={false}
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('product')}
@@ -2816,8 +2815,9 @@ export default function BuyerConversationScreen() {
                 </ScrollView>
               )
             )}
+            </View>
           </View>
-        </View>
+        </ModalSafeArea>
       </Modal>
 
       {/* Long-press reactions — Glass overlay. Mobbin: Instagram DM "Tap and

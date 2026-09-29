@@ -34,12 +34,21 @@ export function SellerDashboardTrafficSources({
   return (
     <View testID="seller-dashboard-traffic-sources">
       <Text style={[styles.sectionHeader, { color: theme.muted }]}>Traffic sources</Text>
-      <View style={styles.totalRow}>
-        <Text style={[styles.totalValue, { color: theme.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-          {formatCompactCount(totalVisits)}
+      {totalVisits > 0 ? (
+        // One line, one size — the count and its label read as a single
+        // sentence (e.g. "1,240 store visits this period"), not a big
+        // number stat next to small grey caption text.
+        <Text style={styles.totalLine} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+          <Text style={[styles.totalLineValue, { color: theme.text }]}>{formatCompactCount(totalVisits)}</Text>
+          <Text style={[styles.totalLineLabel, { color: theme.muted }]}> </Text>
+          <Text style={[styles.totalLineLabel, { color: theme.muted }]}>store visits this period</Text>
         </Text>
-        <Text style={[styles.totalLabel, { color: theme.muted }]}>store visits this period</Text>
-      </View>
+      ) : (
+        // Zero/fresh state: a plain empty-state line, matching the rest of
+        // this dashboard's zero states (e.g. the hero chart's "No sales
+        // yet") — never a big bold "0" that reads like a rendering glitch.
+        <Text style={[styles.totalLineLabel, { color: theme.muted }]}>No store visits yet</Text>
+      )}
       <View style={[styles.breakdownCard, { borderColor: theme.borderSubtle }]}>
         <View style={styles.breakdownHeader}>
           <Feather name="lock" size={12} color={theme.subtle} />
@@ -72,20 +81,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: SP.sm,
   },
-  totalRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: SP.xs,
+  totalLine: {
     marginBottom: SP.sm,
   },
-  totalValue: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xl,
-    letterSpacing: -0.4,
+  totalLineValue: {
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
     fontVariant: ['tabular-nums'],
   },
-  totalLabel: {
-    fontFamily: FONT.regular,
+  totalLineLabel: {
+    fontFamily: FONT.medium,
     fontSize: FS.sm,
   },
   breakdownCard: {

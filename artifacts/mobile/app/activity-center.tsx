@@ -40,11 +40,10 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
-import { FONT, FS, GRAD_DARK_FADE, ICON, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { EmptyState, SkeletonBlock, useScreenPadding } from '@/components/layout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useScrollReset } from '@/hooks/useScrollReset';
@@ -175,16 +174,13 @@ function ActivityFilterChips({ selected, onSelect, styles }: {
           />
         ))}
       </ScrollView>
-      {/* Hints that the row scrolls further — same right-edge fade pattern
-          used on the seller Orders filter pills — instead of the last chip
-          just cutting off with no visual cue. */}
-      <LinearGradient
-        pointerEvents="none"
-        colors={GRAD_DARK_FADE}
-        start={{ x: 1, y: 0 }}
-        end={{ x: 0, y: 0 }}
-        style={styles.chipFade}
-      />
+      {/* No edge-fade overlay on top of the chips: `chipScrollContent`'s own
+          trailing padding is what lets the last chip clip naturally at the
+          screen edge as a scroll affordance. A `GRAD_DARK_FADE` scrim used
+          to sit here (same one already removed from the tab-bar's own
+          bottom strip, see this file's history below) — it went fully
+          opaque at its own edge, painting a solid black block over the last
+          chip instead of fading it. */}
     </View>
   );
 }
@@ -1398,15 +1394,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingBottom: SP.sm,
     gap: SP.sm,
     alignItems: 'center',
-  },
-  // 16pt trailing inset (matches `chipScrollContent`'s own paddingHorizontal)
-  // so the fade sits fully inside the last chip's own padding, not overlapping it.
-  chipFade: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: SP.sm,
-    width: SP.md,
   },
   sectionHeader: {
     paddingHorizontal: SP.md,

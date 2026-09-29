@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { InlineSlider } from '@/components/InlineSlider';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -399,7 +399,7 @@ export default function DiscountsScreen() {
 
       {/* Create / Edit Modal — one page */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowModal(false)}>
-        <View style={s.modal}>
+        <SafeAreaProvider style={s.modal}>
           <ScreenHeader
             title={editingId ? 'Edit Discount Code' : 'New Discount Code'}
             variant="modal"
@@ -594,12 +594,12 @@ export default function DiscountsScreen() {
               style={{ marginTop: SP.sm }}
             />
           </ScrollView>
-        </View>
+        </SafeAreaProvider>
       </Modal>
 
       {/* Product picker sheet */}
       <Modal visible={showProductPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowProductPicker(false)}>
-        <View style={s.modal}>
+        <SafeAreaProvider style={s.modal}>
           <ScreenHeader
             title="Choose products"
             variant="modal"
@@ -626,7 +626,7 @@ export default function DiscountsScreen() {
               );
             })}
           </ScrollView>
-        </View>
+        </SafeAreaProvider>
       </Modal>
     </View>
   );

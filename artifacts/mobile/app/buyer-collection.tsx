@@ -22,7 +22,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getCollectionItems, updateCollection, deleteCollection, moveSavedItemToCollection } from '@/services/socialService';
 import { SavedItem, SavedCollection } from '@/services/socialTypes';
 import { reportNetworkError } from '@/lib/networkNotice';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { CachedImage } from '@/components/CachedImage';
 import { GridSkeleton } from '@/components/layout/Skeleton';
 import { EmptyState, HapticSwitch } from '@/components/BrandthreadUI';
@@ -114,6 +115,15 @@ export default function BuyerCollection() {
     }
   }
 
+  function openMoreOptions() {
+    if (!collection) return;
+    Alert.alert(collection.name, undefined, [
+      { text: 'Rename', onPress: () => { setRenameValue(collection.name); setRenameOpen(true); } },
+      { text: 'Delete', style: 'destructive', onPress: handleDelete },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
   function handleDelete() {
     if (!collection) return;
     Alert.alert('Delete collection?', 'Saved items stay in "All" — they won’t be removed.', [
@@ -179,12 +189,11 @@ export default function BuyerCollection() {
 
   return (
     <View style={styles.root}>
-      <Header
+      <ScreenHeader
         title={collection?.name ?? 'Collection'}
         actions={collection ? [
-          { icon: 'edit-2', onPress: () => { setRenameValue(collection.name); setRenameOpen(true); }, accessibilityLabel: 'Rename collection' },
           { icon: 'share', onPress: handleShare, accessibilityLabel: 'Share collection' },
-          { icon: 'trash-2', onPress: handleDelete, accessibilityLabel: 'Delete collection' },
+          { icon: 'more-horizontal', onPress: openMoreOptions, accessibilityLabel: 'More collection options' },
         ] : []}
       />
 
@@ -224,32 +233,34 @@ export default function BuyerCollection() {
       )}
 
       <Modal transparent animationType="fade" visible={renameOpen} onRequestClose={() => setRenameOpen(false)}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setRenameOpen(false)} />
-        <View style={styles.centerModal}>
-          <View style={styles.renameCard}>
-            <Text style={styles.renameTitle}>Rename collection</Text>
-            <TextInput
-              style={styles.input}
-              value={renameValue}
-              onChangeText={setRenameValue}
-              autoFocus
-              onSubmitEditing={handleRename}
-              returnKeyType="done"
-            />
-            <View style={styles.modalActions}>
-              <Button label="Cancel" variant="tertiary" size="small" onPress={() => setRenameOpen(false)} />
-              <Button
-                label="Save"
-                variant="primary"
-                size="small"
-                loading={saving}
-                disabled={!renameValue.trim() || saving}
-                onPress={handleRename}
-                style={styles.modalSave}
+        <ModalSafeArea>
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setRenameOpen(false)} />
+          <View style={styles.centerModal}>
+            <View style={styles.renameCard}>
+              <Text style={styles.renameTitle}>Rename collection</Text>
+              <TextInput
+                style={styles.input}
+                value={renameValue}
+                onChangeText={setRenameValue}
+                autoFocus
+                onSubmitEditing={handleRename}
+                returnKeyType="done"
               />
+              <View style={styles.modalActions}>
+                <Button label="Cancel" variant="tertiary" size="small" onPress={() => setRenameOpen(false)} />
+                <Button
+                  label="Save"
+                  variant="primary"
+                  size="small"
+                  loading={saving}
+                  disabled={!renameValue.trim() || saving}
+                  onPress={handleRename}
+                  style={styles.modalSave}
+                />
+              </View>
             </View>
           </View>
-        </View>
+        </ModalSafeArea>
       </Modal>
     </View>
   );

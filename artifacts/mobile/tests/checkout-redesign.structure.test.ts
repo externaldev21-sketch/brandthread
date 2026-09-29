@@ -71,8 +71,10 @@ describe('checkout screen structure', () => {
   it('has a Checkout title and a close (X) button in an opaque bar below the notch', () => {
     expect(screen).toContain("header('Checkout', leaveCheckout, 'Close checkout')");
     expect(screen).toContain('name="x"');
-    expect(screen).toContain('const HEADER_WEB_MIN_TOP = 54;');
-    expect(screen).toContain("Platform.OS === 'web' ? Math.max(insets.top, HEADER_WEB_MIN_TOP) : insets.top");
+    // The same canonical inset every ScreenHeader uses, so this custom
+    // (deliberately flat, theme-independent) header bar can't drift from it.
+    expect(screen).toContain("import { useHeaderTopInset } from '@/hooks/useHeaderTopInset'");
+    expect(screen).toContain('const headerTop = useHeaderTopInset();');
     expect(screen).toMatch(/header: \{[^}]*backgroundColor: CK\.bg/);
   });
 

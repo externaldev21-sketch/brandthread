@@ -19,7 +19,8 @@ import {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyPosts, unarchivePost, deletePost } from '@/services/socialService';
 import type { BuyerPost } from '@/services/socialTypes';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { EmptyState } from '@/components/BrandthreadUI';
 
 const { width } = Dimensions.get('window');
@@ -111,7 +112,7 @@ export default function BuyerArchive() {
 
   return (
     <View style={styles.page}>
-      <Header title="Archive" />
+      <ScreenHeader title="Archive" />
 
       {/* Tab toggle */}
       <View style={styles.tabRow}>
@@ -166,30 +167,32 @@ export default function BuyerArchive() {
         animationType="slide"
         onRequestClose={() => setSelectedPost(null)}
       >
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setSelectedPost(null)}>
-          <TouchableOpacity activeOpacity={1} style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle} numberOfLines={1}>{selectedPost?.caption || 'Archived post'}</Text>
+        <ModalSafeArea>
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setSelectedPost(null)}>
+            <TouchableOpacity activeOpacity={1} style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.sheetTitle} numberOfLines={1}>{selectedPost?.caption || 'Archived post'}</Text>
 
-            <TouchableOpacity style={styles.sheetRow} onPress={handleRestore}>
-              <Feather name="rotate-ccw" size={20} color={PURPLE} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sheetRowLabel}>Restore to profile</Text>
-                <Text style={styles.sheetRowSub}>Move this post back to your profile grid</Text>
-              </View>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.sheetRow} onPress={handleRestore}>
+                <Feather name="rotate-ccw" size={20} color={PURPLE} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sheetRowLabel}>Restore to profile</Text>
+                  <Text style={styles.sheetRowSub}>Move this post back to your profile grid</Text>
+                </View>
+              </TouchableOpacity>
 
-            <View style={styles.sheetDivider} />
+              <View style={styles.sheetDivider} />
 
-            <TouchableOpacity style={styles.sheetRow} onPress={handleDelete}>
-              <Feather name="trash-2" size={20} color={RED} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sheetRowLabel, { color: RED }]}>Delete permanently</Text>
-                <Text style={styles.sheetRowSub}>Cannot be undone</Text>
-              </View>
+              <TouchableOpacity style={styles.sheetRow} onPress={handleDelete}>
+                <Feather name="trash-2" size={20} color={RED} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.sheetRowLabel, { color: RED }]}>Delete permanently</Text>
+                  <Text style={styles.sheetRowSub}>Cannot be undone</Text>
+                </View>
+              </TouchableOpacity>
             </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
+        </ModalSafeArea>
       </Modal>
     </View>
   );

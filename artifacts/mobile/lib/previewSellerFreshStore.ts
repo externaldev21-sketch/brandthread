@@ -1,25 +1,32 @@
 /**
- * In-memory, module-scoped mutation store for the seller fresh-preview
- * session (?bt_preview=seller, no `demo=1` — lib/devPreview.ts's
- * isPreviewFreshMode()).
+ * Module-scoped mutation store for the seller fresh-preview session
+ * (?bt_preview=seller, with or without `demo=1` — lib/devPreview.ts's
+ * isSellerDevPreview()).
  *
  * Fresh preview has no real account and no token, so mutations that would
  * normally hit the API (create a discount, go live, edit the storefront)
  * have nowhere real to land. Products already have a working local-first
  * store for this (services/productService.ts is AsyncStorage-backed and
- * starts empty regardless of account — see its own header comment), so it
- * isn't duplicated here. This module covers the handful of seller actions
- * that don't have an existing local-first store: discounts, going live, and
- * storefront copy — so a fresh-preview seller who adds one of these sees it
- * reflected immediately, on every screen that reads it, for the rest of the
- * session, without inventing a second per-feature mechanism.
+ * starts empty regardless of account — see its own header comment); this
+ * module follows the same AsyncStorage-backed, local-first pattern for the
+ * handful of seller actions that don't have their own store: discounts,
+ * going live, and storefront copy — so a preview seller who adds one of
+ * these sees it reflected immediately, on every screen that reads it, and
+ * it survives a reload the same way a real seller's data would, instead of
+ * silently vanishing the moment the tab refreshes.
  *
- * Deliberately plain in-memory state (not AsyncStorage): the task only
- * requires mutations to persist "within the preview session" — surviving an
- * app reload is explicitly not required, and staying in-memory keeps this
- * preview-only scaffolding from ever leaking into a real device's storage.
- * Never imported by non-preview code paths.
+ * The in-memory `state` stays as the synchronous read path every existing
+ * call site (`getPreviewDiscounts()` etc.) already relies on; `hydrate()`
+ * loads it from AsyncStorage once at module init (best-effort, notifies
+ * listeners when it resolves) and every mutation persists back to
+ * AsyncStorage (fire-and-forget — never blocks the caller). Scoped to one
+ * shared key: preview sessions have no real account to key by, and this
+ * data is explicitly throwaway scaffolding, never real user data, so it's
+ * fine for a fresh `?bt_preview=seller` session on the same device to pick
+ * up where a previous one left off. Never imported by non-preview code
+ * paths.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface PreviewDiscount {
   id: string;
@@ -65,9 +72,33 @@ function initialState(): PreviewSellerFreshState {
 
 let state: PreviewSellerFreshState = initialState();
 
+const STORAGE_KEY = 'bt_preview_seller_fresh_store_v1';
+
+function persist(): void {
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => { /* non-fatal — stays in memory for this session */ });
+}
+
+// Best-effort hydrate from a previous session on this device. Fire-and-forget
+// at module load; every call site already reads the synchronous in-memory
+// `state`, so this only matters for whichever renders happen to occur after
+// it resolves (typically well before the user reaches a preview screen).
+AsyncStorage.getItem(STORAGE_KEY)
+  .then((raw) => {
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Partial<PreviewSellerFreshState>;
+    state = {
+      discounts: Array.isArray(parsed.discounts) ? parsed.discounts : [],
+      liveSessions: Array.isArray(parsed.liveSessions) ? parsed.liveSessions : [],
+      storefront: parsed.storefront ?? { headline: null, bio: null, updatedAt: null },
+    };
+    notify();
+  })
+  .catch(() => { /* non-fatal — starts from initialState() */ });
+
 type Listener = () => void;
 const listeners = new Set<Listener>();
 function notify(): void {
+  persist();
   listeners.forEach((l) => l());
 }
 
