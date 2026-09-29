@@ -8,6 +8,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Avatar } from '@/components/ui/Avatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -370,7 +371,7 @@ export default function BuyerEditProfileScreen() {
     goBackOr(router);
   }
 
-  const topPad = insets.top;
+  const topPad = useHeaderTopInset();
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof CoreFields, string>> = {};

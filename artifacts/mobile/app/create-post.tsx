@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { FONT, FS } from '@/lib/theme';
@@ -467,7 +468,7 @@ export default function CreatePostScreen() {
   const editId   = typeof params.editId === 'string' ? params.editId : undefined;
   const isSellerSetup = isSellerSetupOrigin(params.from);
 
-  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const topPad = useHeaderTopInset();
   const botPad = insets.bottom;
 
   function leaveSetupDestination() {

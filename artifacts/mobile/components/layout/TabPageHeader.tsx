@@ -6,12 +6,12 @@
  * and top offsets.
  */
 import React from 'react';
-import { Platform, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { FONT, GUTTER, WEB_SAFE_AREA_TOP } from '@/lib/theme';
+import { FONT, GUTTER } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { IconButton } from '@/components/ui/IconButton';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 export interface TabPageHeaderAction {
   name: keyof typeof Feather.glyphMap;
@@ -29,13 +29,8 @@ interface TabPageHeaderProps {
 }
 
 export function TabPageHeader({ title, actions, gutter = GUTTER, style }: TabPageHeaderProps) {
-  const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
-  // Overnight batch item 40: WEB_SAFE_AREA_TOP (lib/theme.ts) is the one
-  // shared stand-in for a real device's status-bar inset, since
-  // react-native-safe-area-context reads `insets.top` as 0 outside a real
-  // device or an emulating preview frame.
-  const topPad = Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top;
+  const topPad = useHeaderTopInset();
 
   return (
     <View style={[styles.row, { paddingTop: topPad + 12, paddingHorizontal: gutter }, style]}>

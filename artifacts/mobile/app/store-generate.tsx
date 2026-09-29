@@ -7,6 +7,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -103,6 +104,7 @@ export default function StoreGenerateScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ toast?: string }>();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const [step, setStep] = useState(1);
   const [aiToolLoading, setAiToolLoading] = useState<string | null>(null);
@@ -887,7 +889,7 @@ export default function StoreGenerateScreen() {
   return (
     <View style={[st.root, { backgroundColor: 'transparent' }]}>
       {/* Header */}
-      <View style={[st.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
+      <View style={[st.header, { paddingTop: headerTopInset + SP.sm }]}>
         <View style={st.headerTop}>
           <TouchableOpacity onPress={handleBack} style={st.backBtn} activeOpacity={0.7}>
             <Feather name="arrow-left" size={ICON.md} color={FG} />

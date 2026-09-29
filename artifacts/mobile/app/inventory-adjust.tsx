@@ -13,6 +13,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButt
 import { getInventoryItems, getLocations, adjustStock } from '@/services/inventoryService';
 import { InventoryItem, InventoryLocation, AdjustmentType, ADJUSTMENT_TYPES } from '@/services/inventoryTypes';
 import { Header } from '@/components/layout';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 export default function InventoryAdjustScreen() {
@@ -129,7 +130,7 @@ export default function InventoryAdjustScreen() {
 
   if (resultAdj) {
     return (
-      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[styles.root, { paddingTop: useHeaderTopInset() }]}>
         <ScrollView contentContainerStyle={styles.successContainer}>
           <GradientCard colors={['rgba(16,185,129,0.18)', 'rgba(16,185,129,0.06)']} glow style={styles.successCard}>
             <View style={styles.successIcon}>

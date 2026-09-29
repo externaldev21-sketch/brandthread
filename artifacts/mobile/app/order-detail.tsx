@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, EmptyState, PressableScale } from '@/components/BrandthreadUI';
@@ -434,6 +435,7 @@ export default function OrderDetailScreen() {
   const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const queryClient = useQueryClient();
 
@@ -744,7 +746,7 @@ export default function OrderDetailScreen() {
 
   if (!order) {
     return (
-      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[s.root, { paddingTop: headerTopInset }]}>
         {updatesPaused && (
           <PressableScale
             style={s.pausedBanner}

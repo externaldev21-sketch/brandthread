@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Linking, Modal, Platform, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -104,6 +105,7 @@ export default function SellerProfileScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; sellerId?: string; isOwner?: string }>();
   const routeSellerId = params.id ?? params.sellerId;
@@ -387,7 +389,7 @@ export default function SellerProfileScreen() {
   // ── Error: the profile itself couldn't load ────────────────────────────────
   if (profileError && !seller) {
     return (
-      <View style={[styles.errorRoot, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
+      <View style={[styles.errorRoot, { paddingTop: headerTopInset + SP.sm }]}>
         <View style={styles.errorBar}>
           <ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />
         </View>

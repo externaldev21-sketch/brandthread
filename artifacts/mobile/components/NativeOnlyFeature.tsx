@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 
 interface NativeOnlyFeatureProps {
@@ -24,6 +25,7 @@ export default function NativeOnlyFeature({
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   return (
     <View
@@ -31,7 +33,7 @@ export default function NativeOnlyFeature({
         styles.root,
         {
           backgroundColor: colors.background,
-          paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 24,
+          paddingTop: headerTopInset + 24,
           paddingBottom: insets.bottom + 24,
         },
       ]}

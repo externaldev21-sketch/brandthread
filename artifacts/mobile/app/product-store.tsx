@@ -6,11 +6,12 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
@@ -86,6 +87,7 @@ export default function ProductStoreScreen() {
   const router = useRouter();
   const { id, variantId } = useLocalSearchParams<{ id: string; variantId?: string }>();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   const api = useApi();
   const [product, setProduct] = useState<Product | null>(null);
@@ -234,7 +236,7 @@ export default function ProductStoreScreen() {
 
   if (loading) {
     return (
-      <View style={[s.screen, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[s.screen, { paddingTop: headerTopInset }]}>
         <Text style={s.loadingText}>Loading…</Text>
       </View>
     );
@@ -242,7 +244,7 @@ export default function ProductStoreScreen() {
 
   if (!product) {
     return (
-      <View style={[s.screen, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), alignItems: 'center', justifyContent: 'center', padding: SP.xl }]}>
+      <View style={[s.screen, { paddingTop: headerTopInset, alignItems: 'center', justifyContent: 'center', padding: SP.xl }]}>
         <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
         <Text style={[s.loadingText, { marginTop: SP.md, textAlign: 'center' }]}>
           Product not found or no longer available.

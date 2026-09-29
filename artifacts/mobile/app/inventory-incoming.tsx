@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, FlatList, ActivityIndicator, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -119,7 +119,7 @@ export default function IncomingInventoryScreen() {
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   // Mode
   const [mode, setMode] = useState<ScreenMode>(id ? 'view' : 'list');
@@ -258,7 +258,7 @@ export default function IncomingInventoryScreen() {
 
   if (loading && mode === 'list') {
     return (
-      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[s.root, { paddingTop: headerTopInset }]}>
         <ActivityIndicator color={PURPLE} style={{ marginTop: 80 }} />
       </View>
     );
@@ -267,7 +267,7 @@ export default function IncomingInventoryScreen() {
   // ══════════ LIST MODE ══════════
   if (mode === 'list') {
     return (
-      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[s.root, { paddingTop: headerTopInset }]}>
         {/* Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtn}>
@@ -490,7 +490,7 @@ export default function IncomingInventoryScreen() {
 
     if (receiveResult) {
       return (
-        <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), justifyContent: 'center', alignItems: 'center', paddingHorizontal: SP.xl }]}>
+        <View style={[s.root, { paddingTop: headerTopInset, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SP.xl }]}>
           <View style={s.successIcon}>
             <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
           </View>
@@ -632,7 +632,7 @@ export default function IncomingInventoryScreen() {
   const currentStepIndex = STATUS_TIMELINE.indexOf(rec.status === 'partially_received' ? 'in_transit' : rec.status as IncomingStatus);
 
   return (
-    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+    <View style={[s.root, { paddingTop: headerTopInset }]}>
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => setMode('list')} style={s.backBtn}>

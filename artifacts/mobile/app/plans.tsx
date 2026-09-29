@@ -42,6 +42,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -95,6 +96,7 @@ export default function PlansScreen() {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const insets    = useSafeAreaInsets();
+  const topPad    = useHeaderTopInset();
   const router    = useRouter();
   const api       = useApi();
   const { fromOnboarding } = useLocalSearchParams<{ fromOnboarding?: string }>();
@@ -376,7 +378,6 @@ export default function PlansScreen() {
   const isCurrentSelected = !isOnboarding && selectedPlan.id === currentPlanId && currentPlanStatus !== 'none';
 
   // ── Layout ────────────────────────────────────────────────────────────────
-  const topPad    = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
   const bottomPad = insets.bottom;
 
   return (

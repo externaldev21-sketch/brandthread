@@ -12,7 +12,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRAD_DARK_FADE, WEB_SAFE_AREA_TOP } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRAD_DARK_FADE } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, SearchBar } from '@/components/BrandthreadUI';
 import { Button } from '@/components/ui/Button';
@@ -34,6 +34,7 @@ import { isSellerDevPreview } from '@/lib/devPreview';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -708,6 +709,7 @@ export default function OrdersScreen() {
   const palette = theme as typeof theme & Record<string, string>;
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const topInset = useHeaderTopInset();
   // Extra centering padding beyond each row's own SP.md gutter — 0 on phone,
   // grows on iPad so the list doesn't stretch edge to edge.
   const listSidePad = Math.max(0, useCenteredContentPadding() - SP.md);
@@ -1184,10 +1186,8 @@ export default function OrdersScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  // Overnight batch item 40: shared WEB_SAFE_AREA_TOP (lib/theme.ts), not a
-  // hardcoded 67 — see its own comment.
   return (
-    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? WEB_SAFE_AREA_TOP : insets.top) + 12, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
+    <View style={[s.root, { paddingTop: topInset + 12, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
       {/* ── Fixed header ── */}
       <View style={s.header}>
         {/* Title row */}

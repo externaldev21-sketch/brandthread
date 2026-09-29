@@ -10,7 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -185,7 +185,7 @@ export default function InventoryScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
   const { userId } = useAuth();
-  const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [overview, setOverview] = useState<InventoryOverview | null>(null);
@@ -285,7 +285,7 @@ export default function InventoryScreen() {
   // ─── Header ────────────────────────────────────────────────────────────────
 
   const renderHeader = () => (
-    <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
+    <View style={[s.header, { paddingTop: headerTopInset + SP.sm }]}>
       <TouchableOpacity
         onPress={() => goBackOr(router)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

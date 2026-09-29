@@ -22,15 +22,21 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// Real device metrics for the three reference viewports.
+// Real device metrics for the three reference viewports, plus a plain web
+// browser — no notch to report (insets.top reads 0), but still real browser
+// chrome (tabs, address bar) a header must clear. See useHeaderTopInset's
+// doc: native trusts insets.top as-is; web floors it at 54.
 const DEVICES = [
-  { name: 'iPhone SE', width: 375, height: 667, insets: { top: 20, bottom: 0, left: 0, right: 0 } },
-  { name: 'iPhone 13/14', width: 390, height: 844, insets: { top: 47, bottom: 34, left: 0, right: 0 } },
-  { name: 'iPhone 14 Pro Max', width: 430, height: 932, insets: { top: 59, bottom: 34, left: 0, right: 0 } },
+  { name: 'iPhone SE', platform: 'ios', width: 375, height: 667, insets: { top: 20, bottom: 0, left: 0, right: 0 } },
+  { name: 'iPhone 13/14', platform: 'ios', width: 390, height: 844, insets: { top: 47, bottom: 34, left: 0, right: 0 } },
+  { name: 'iPhone 14 Pro Max', platform: 'ios', width: 430, height: 932, insets: { top: 59, bottom: 34, left: 0, right: 0 } },
+  { name: 'web, no simulated notch', platform: 'web', width: 390, height: 844, insets: { top: 0, bottom: 0, left: 0, right: 0 } },
+  { name: 'web, simulated notch (phone-frame preview)', platform: 'web', width: 390, height: 844, insets: { top: 47, bottom: 34, left: 0, right: 0 } },
 ] as const;
 
-const { currentInsets, nativeComponent } = vi.hoisted(() => ({
+const { currentInsets, currentPlatform, nativeComponent } = vi.hoisted(() => ({
   currentInsets: { top: 20, bottom: 0, left: 0, right: 0 },
+  currentPlatform: { OS: 'ios' },
   nativeComponent: (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
@@ -50,7 +56,7 @@ vi.mock('react-native', () => {
   };
   return {
     Animated,
-    Platform: { OS: 'ios' },
+    Platform: currentPlatform,
     StyleSheet: {
       create: (styles: unknown) => styles,
       hairlineWidth: 1,
@@ -85,7 +91,8 @@ describe('Header (components/layout/Header.tsx) vs insets, at all three viewport
     renderer = null;
   });
 
-  it.each(DEVICES)('pads exactly insets.top under the notch at $name ($width×$height)', async ({ insets }) => {
+  it.each(DEVICES)('pads under the notch (or, on web with no notch, a comfortable floor) at $name ($width×$height)', async ({ platform, insets }) => {
+    currentPlatform.OS = platform;
     currentInsets.top = insets.top;
     currentInsets.bottom = insets.bottom;
     const { Header } = await import('@/components/layout/Header');
@@ -97,10 +104,12 @@ describe('Header (components/layout/Header.tsx) vs insets, at all three viewport
     });
 
     const wrap = renderer!.root.findAllByType('View' as React.ElementType)[0];
-    expect(flattenStyle(wrap.props.style).paddingTop).toBe(insets.top);
+    const expected = platform === 'web' ? Math.max(insets.top, 54) : insets.top;
+    expect(flattenStyle(wrap.props.style).paddingTop).toBe(expected);
   });
 
-  it.each(DEVICES)('keeps back button + title + actions on one row that never overflows at $width px', async ({ width, insets }) => {
+  it.each(DEVICES)('keeps back button + title + actions on one row that never overflows at $width px', async ({ platform, width, insets }) => {
+    currentPlatform.OS = platform;
     currentInsets.top = insets.top;
     currentInsets.bottom = insets.bottom;
     const { Header } = await import('@/components/layout/Header');
@@ -139,7 +148,8 @@ describe('ScreenHeader (components/ScreenHeader.tsx) vs insets, at all three vie
     renderer = null;
   });
 
-  it.each(DEVICES)('pads insets.top + a fixed gap under the notch at $name', async ({ insets }) => {
+  it.each(DEVICES)('pads under the notch (or a comfortable web floor) + a fixed gap at $name', async ({ platform, insets }) => {
+    currentPlatform.OS = platform;
     currentInsets.top = insets.top;
     currentInsets.bottom = insets.bottom;
     const { ScreenHeader } = await import('@/components/ScreenHeader');
@@ -150,10 +160,12 @@ describe('ScreenHeader (components/ScreenHeader.tsx) vs insets, at all three vie
     });
 
     const wrap = renderer!.root.findAllByType('View' as React.ElementType)[0];
-    expect(flattenStyle(wrap.props.style).paddingTop).toBe(insets.top + SP.sm);
+    const expectedTopInset = platform === 'web' ? Math.max(insets.top, 54) : insets.top;
+    expect(flattenStyle(wrap.props.style).paddingTop).toBe(expectedTopInset + SP.sm);
   });
 
-  it.each(DEVICES)('shrinks the title instead of overflowing past back/action buttons at $width px', async ({ width, insets }) => {
+  it.each(DEVICES)('shrinks the title instead of overflowing past back/action buttons at $width px', async ({ platform, width, insets }) => {
+    currentPlatform.OS = platform;
     currentInsets.top = insets.top;
     currentInsets.bottom = insets.bottom;
     const { ScreenHeader } = await import('@/components/ScreenHeader');
@@ -177,5 +189,103 @@ describe('ScreenHeader (components/ScreenHeader.tsx) vs insets, at all three vie
     const backBtn = renderer!.root.findByProps({ accessibilityLabel: 'Go back from An extremely long product name that would otherwise overflow the header' });
     expect((flattenStyle(backBtn.props.style).width as number)).toBeLessThan(width);
     expect((flattenStyle(backBtn.props.style).width as number)).toBeLessThanOrEqual(44);
+  });
+});
+
+// ─── useHeaderTopInset (hooks/useHeaderTopInset.ts) ────────────────────────────
+// Direct coverage of the one hook every header in the app now shares
+// (ScreenHeader, BrandthreadScreen, ProfileShell, LegalDocument, Header, and
+// every hand-rolled header row migrated to it) — the single place a future
+// regression to this logic would actually need to happen for every one of
+// those call sites to break at once.
+describe('useHeaderTopInset', () => {
+  let renderer: ReactTestRenderer | null = null;
+
+  afterEach(() => {
+    renderer?.unmount();
+    renderer = null;
+  });
+
+  it.each(DEVICES)('returns $insets.top on $platform when the real inset already clears the web floor, $name', async ({ platform, insets }) => {
+    currentPlatform.OS = platform;
+    currentInsets.top = insets.top;
+    const { useHeaderTopInset } = await import('@/hooks/useHeaderTopInset');
+
+    let result: number | null = null;
+    function Probe() { result = useHeaderTopInset(); return null; }
+    await act(async () => { renderer = create(<Probe />); });
+
+    const expected = platform === 'web' ? Math.max(insets.top, 54) : insets.top;
+    expect(result).toBe(expected);
+  });
+
+  it('floors at 54 on web when insets.top is 0 (a plain browser window, no notch)', async () => {
+    currentPlatform.OS = 'web';
+    currentInsets.top = 0;
+    const { useHeaderTopInset } = await import('@/hooks/useHeaderTopInset');
+
+    let result: number | null = null;
+    function Probe() { result = useHeaderTopInset(); return null; }
+    await act(async () => { renderer = create(<Probe />); });
+
+    expect(result).toBe(54);
+  });
+
+  it('never floors on native — a device with no notch (insets.top 0) stays 0', async () => {
+    currentPlatform.OS = 'ios';
+    currentInsets.top = 0;
+    const { useHeaderTopInset } = await import('@/hooks/useHeaderTopInset');
+
+    let result: number | null = null;
+    function Probe() { result = useHeaderTopInset(); return null; }
+    await act(async () => { renderer = create(<Probe />); });
+
+    expect(result).toBe(0);
+  });
+});
+
+// ─── Repo-wide guard against reinventing this logic, badly ─────────────────────
+// The bug this file exists to catch (a screen's header sitting under the
+// notch/Dynamic Island on web) came from screens/components computing their
+// own top-inset web floor ad hoc instead of importing the one shared hook —
+// with a floor lower than the 54 every current call site (migrated or not)
+// agrees on, e.g. a stray 47 (`WEB_SAFE_AREA_TOP`) or 40. A plain
+// `Math.max(insets.top, 54)` is still fine wherever it already appears (most
+// of the app hasn't been migrated onto the hook yet — that's a separate,
+// larger effort); this guard only catches a NEW inconsistent, too-low floor
+// reappearing anywhere, which is exactly the shape of bug that shipped
+// twice (Order confirmation, then Shipping address) before this hook
+// existed. buyer-checkout.tsx and components/checkout/** are excluded: a
+// parallel effort is rebuilding that flow and owns its header/inset code.
+describe('no file introduces a too-low web top-inset floor (the useHeaderTopInset bug class)', () => {
+  it('every `Math.max(insets.top, N)` in app/ or components/ uses N >= 54', async () => {
+    const { readFileSync, readdirSync, statSync } = await import('node:fs');
+    const path = await import('node:path');
+    const root = path.resolve(import.meta.dirname, '..');
+    const scanDirs = ['app', 'components'].map((d) => path.join(root, d));
+    const excluded = [path.join(root, 'app', 'buyer-checkout.tsx'), path.join(root, 'components', 'checkout')];
+    const offenders: string[] = [];
+    const pattern = /Math\.max\(\s*insets\.top\s*,\s*(\d+)\s*\)/g;
+
+    function walk(dir: string) {
+      for (const entry of readdirSync(dir)) {
+        const full = path.join(dir, entry);
+        if (excluded.some((e) => full === e || full.startsWith(`${e}${path.sep}`))) continue;
+        const stat = statSync(full);
+        if (stat.isDirectory()) {
+          if (entry === 'node_modules') continue;
+          walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry) || entry.endsWith('.test.tsx') || entry.endsWith('.test.ts')) continue;
+        const source = readFileSync(full, 'utf8');
+        for (const match of source.matchAll(pattern)) {
+          if (Number(match[1]) < 54) offenders.push(`${path.relative(root, full)}: Math.max(insets.top, ${match[1]})`);
+        }
+      }
+    }
+    for (const dir of scanDirs) walk(dir);
+
+    expect(offenders).toEqual([]);
   });
 });

@@ -9,13 +9,13 @@
  * has no end-call button of its own — that lives on the restored call view.
  */
 import React from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCallSession } from '@/lib/calls/CallSessionContext';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { TYPE_SCALE } from '@/constants/typography';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { CallAvatarCircle } from './CallAvatarCircle';
 import { formatCallDuration } from './CallControls';
 
@@ -23,8 +23,7 @@ export function CallBar() {
   const { theme } = useAppTheme();
   const { session, restore } = useCallSession();
   const [durationSec, setDurationSec] = React.useState(0);
-  const insets = useSafeAreaInsets();
-  const topInset = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const topInset = useHeaderTopInset();
 
   React.useEffect(() => {
     if (!session?.connectedAt) return;

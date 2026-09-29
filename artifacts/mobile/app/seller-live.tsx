@@ -16,6 +16,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 
 const LIVE_RED = '#FF3B30';
@@ -58,6 +59,7 @@ function SellerLiveNativeScreen() {
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const { user } = useUser();
 
@@ -292,7 +294,7 @@ function SellerLiveNativeScreen() {
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
 
       {/* Top bar */}
-      <View style={[s.topBar, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 8 }]}>
+      <View style={[s.topBar, { paddingTop: headerTopInset + 8 }]}>
         <View style={s.topLeft}>
           <View style={[s.livePill, { backgroundColor: LIVE_RED }]}>
             <View style={s.liveDot} />
@@ -306,7 +308,7 @@ function SellerLiveNativeScreen() {
       </View>
 
       {/* Viewer count */}
-      <View style={[s.viewerRow, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 48 }]}>
+      <View style={[s.viewerRow, { paddingTop: headerTopInset + 48 }]}>
         <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
           <Feather name="eye" size={13} color="#fff" />
           <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
@@ -314,7 +316,7 @@ function SellerLiveNativeScreen() {
       </View>
 
       {/* Right action rail */}
-      <View style={[s.rightRail, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 80 }]}>
+      <View style={[s.rightRail, { paddingTop: headerTopInset + 80 }]}>
         {/* Products */}
         <TouchableOpacity onPress={() => setShowProductPicker(true)} style={s.railBtn} activeOpacity={0.7}>
           <Feather name="shopping-bag" size={22} color="#fff" />

@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
 import { useColors } from '@/hooks/useColors';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -494,6 +495,7 @@ export default function BuyerProductDetailScreen() {
   const usesThreadPull = pathname === '/thread-product-detail';
   const leaveProduct = () => usesThreadPull ? back() : goBackOr(router);
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api    = useApi();
   const { isSignedIn } = useAuth();
 
@@ -692,7 +694,7 @@ export default function BuyerProductDetailScreen() {
           <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm }}>Loading product…</Text>
         </View>
         {/* Back button remains accessible */}
-        <View style={{ position: 'absolute', left: SP.md, top: insets.top + SP.sm }}>
+        <View style={{ position: 'absolute', left: SP.md, top: headerTopInset + SP.sm }}>
           <IconButton
             name="arrow-left"
             onPress={leaveProduct}
@@ -717,7 +719,7 @@ export default function BuyerProductDetailScreen() {
           <Button label="Go back" onPress={leaveProduct} variant="secondary" size="small" icon="chevron-left" />
         </View>
         {/* Back button */}
-        <View style={{ position: 'absolute', left: SP.md, top: insets.top + SP.sm }}>
+        <View style={{ position: 'absolute', left: SP.md, top: headerTopInset + SP.sm }}>
           <IconButton
             name="arrow-left"
             onPress={leaveProduct}
@@ -822,7 +824,7 @@ export default function BuyerProductDetailScreen() {
   /** The product photo lifts off the gallery and lands in the bag icon (skipped under Reduce Motion). */
   async function flyToCart(): Promise<void> {
     if (!shouldAnimateCartSuccess(reduceMotion)) return;
-    const fallback = { x: GALLERY_WIDTH - 40, y: insets.top + SP.sm + 22 };
+    const fallback = { x: GALLERY_WIDTH - 40, y: headerTopInset + SP.sm + 22 };
     const [target, photoRect] = await Promise.all([
       measureCartTarget(cartTargetRef.current?.measureInWindow?.bind(cartTargetRef.current), fallback),
       measureWindowRect(galleryRef.current?.measureInWindow?.bind(galleryRef.current)),
@@ -933,7 +935,7 @@ export default function BuyerProductDetailScreen() {
               shimmer/glitch PR #109 killed on the video feed, so this uses
               the same solid rgba(0,0,0,0.6) scrim pattern that PR used over
               other media chrome, not a frosted blur. */}
-          <View style={[s.backBtnWrap, { top: insets.top + SP.sm, left: SP.md + insets.left }]}>
+          <View style={[s.backBtnWrap, { top: headerTopInset + SP.sm, left: SP.md + insets.left }]}>
             <IconButton
               name="arrow-left"
               onPress={leaveProduct}
@@ -947,7 +949,7 @@ export default function BuyerProductDetailScreen() {
           <Animated.View
             ref={cartTargetRef}
             collapsable={false}
-            style={[s.cartBtnWrap, { top: insets.top + SP.sm, right: SP.md + insets.right, transform: [{ scale: cartPulse }] }]}
+            style={[s.cartBtnWrap, { top: headerTopInset + SP.sm, right: SP.md + insets.right, transform: [{ scale: cartPulse }] }]}
             testID="product-cart-button"
           >
             <IconButton

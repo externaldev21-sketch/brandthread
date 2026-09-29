@@ -28,6 +28,7 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -168,6 +169,7 @@ export default function SellerDropCreate() {
   const api = useApi();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const topInset = useHeaderTopInset();
   const { theme } = useAppTheme();
   const { dropId } = useLocalSearchParams<{ dropId?: string }>();
   const isEdit = !!dropId;
@@ -634,7 +636,7 @@ export default function SellerDropCreate() {
       </View>
 
       <Modal visible={tzPickerOpen} animationType="slide" onRequestClose={() => setTzPickerOpen(false)}>
-        <View style={[styles.root, { backgroundColor: theme.background, paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+        <View style={[styles.root, { backgroundColor: theme.background, paddingTop: topInset }]}>
           <View style={styles.tzHeader}>
             <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg }}>Choose timezone</Text>
             <TouchableOpacity onPress={() => setTzPickerOpen(false)}>

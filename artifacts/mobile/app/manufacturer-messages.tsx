@@ -20,6 +20,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@clerk/expo';
@@ -146,6 +147,7 @@ export default function ManufacturerMessagesScreen() {
   const params = useLocalSearchParams<{ threadId?: string; mfrName?: string; mfrId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
 
@@ -320,7 +322,7 @@ export default function ManufacturerMessagesScreen() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const header = (
-    <View style={{ paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+    <View style={{ paddingTop: headerTopInset, backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border }}>
       <BrandthreadHeader
         title={mfrName}
         subtitle={localTime ? `${localTime} for them` : 'Manufacturer conversation'}
@@ -495,7 +497,7 @@ export default function ManufacturerMessagesScreen() {
       <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
         <Pressable style={s.viewer} onPress={() => setViewer(null)} accessibilityLabel="Close photo">
           {viewer ? <Image source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} resizeMode="contain" /> : null}
-          <View style={[s.viewerClose, { top: insets.top + SP.sm }]}><Feather name="x" size={22} color="#fff" /></View>
+          <View style={[s.viewerClose, { top: headerTopInset + SP.sm }]}><Feather name="x" size={22} color="#fff" /></View>
         </Pressable>
       </Modal>
     </KeyboardAvoidingView>

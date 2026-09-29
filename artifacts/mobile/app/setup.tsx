@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 
@@ -133,6 +134,7 @@ export default function SetupScreen() {
   const colors = useColors();
   const s = createStyles(colors);
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const { userId } = useAuth();
   const api = useApi();
@@ -189,7 +191,7 @@ export default function SetupScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       {/* Header */}
-      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
+      <View style={[s.header, { paddingTop: headerTopInset + SP.sm }]}>
         <TouchableOpacity
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
           style={s.back}

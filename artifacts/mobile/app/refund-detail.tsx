@@ -5,6 +5,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
@@ -176,7 +177,7 @@ export default function RefundDetailScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: useHeaderTopInset() }}>
       <BrandthreadHeader title="Issue Refund" onBack={() => goBackOr(router)} />
 
       <ScrollView

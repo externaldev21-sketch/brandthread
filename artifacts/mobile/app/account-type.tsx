@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -65,9 +66,10 @@ export function AccountTypeStep({
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const cards = React.useMemo(() => getCards(theme), [theme]);
   const insets  = useSafeAreaInsets();
+  const topInset = useHeaderTopInset();
 
   return (
-    <View style={[styles.root, { paddingTop: embedded ? 0 : insets.top }]}>
+    <View style={[styles.root, { paddingTop: embedded ? 0 : topInset }]}>
       <StatusBar barStyle="light-content" />
 
       {/* Header — one question, left-aligned */}

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { WebView } from 'react-native-webview';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
@@ -103,7 +104,7 @@ export default function StorePreview() {
   const scale = device === 'desktop' ? screenWidth / DESKTOP_WIDTH : 1;
 
   return (
-    <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+    <View style={[styles.root, { paddingTop: useHeaderTopInset() }]}>
       <View style={styles.bar}>
         <TouchableOpacity
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}

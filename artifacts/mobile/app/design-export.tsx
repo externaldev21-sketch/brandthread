@@ -7,9 +7,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Dimensions, Platform } from 'react-native';
+  Alert, ActivityIndicator, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -62,7 +62,7 @@ export default function DesignExportScreen() {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const styles = createStyles(theme);
   const router   = useRouter();
-  const insets   = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
 
   const [project, setProject]       = useState<DesignProject | null>(null);
@@ -104,14 +104,14 @@ export default function DesignExportScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[styles.root, { paddingTop: headerTopInset, justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator color={PURPLE} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+    <View style={[styles.root, { paddingTop: headerTopInset }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Export</Text>

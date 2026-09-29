@@ -5,10 +5,10 @@
  * use in buyer-conversation.tsx / seller-conversation.tsx's message rows).
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -23,8 +23,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 export default function ConversationNicknamesScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(), []);
-  const insets = useSafeAreaInsets();
-  const headerTopPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const headerTopPad = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{

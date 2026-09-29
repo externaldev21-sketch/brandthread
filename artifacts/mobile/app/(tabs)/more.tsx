@@ -10,7 +10,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser, useAuth } from '@clerk/expo';
@@ -114,7 +114,7 @@ export default function MoreScreen() {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const router   = useRouter();
-  const insets   = useSafeAreaInsets();
+  const topInset = useHeaderTopInset();
   const { user } = useUser();
   const { signOut } = useAuth();
   const api = useApi();
@@ -188,7 +188,7 @@ export default function MoreScreen() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+    <View style={[styles.root, { paddingTop: topInset }]}>
       <ScrollView
         ref={scrollResetRef}
         showsVerticalScrollIndicator={false}

@@ -6,13 +6,13 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View, Platform } from 'react-native';
+  View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useSegments, useGlobalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   getStoreContext,
   setStoreContext,
@@ -79,7 +79,7 @@ export default function StoreContextBanner() {
   const router = useRouter();
   const segments = useSegments();
   const { isOwner } = useGlobalSearchParams<{ isOwner?: string }>();
-  const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const { theme } = useAppTheme();
   const sellerRoute = isSellerRoute(segments, isOwner === 'true');
   const [memberships, setMemberships] = useState<StoreMembership[]>([]);
@@ -155,7 +155,7 @@ export default function StoreContextBanner() {
   const activeStoreName = activeMembership?.ownerName?.trim() || 'My store';
 
   return (
-    <View style={[styles.safeArea, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+    <View style={[styles.safeArea, { paddingTop: headerTopInset }]}>
       <View style={styles.root} accessibilityRole="summary">
         <View style={styles.message}>
           <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>

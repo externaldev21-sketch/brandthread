@@ -9,11 +9,11 @@
  * the one deliberate exception, `CALL_DANGER_RED` (see its own doc comment).
  */
 import React from 'react';
-import { Platform, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { RED } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 
@@ -30,13 +30,6 @@ import { TYPE_SCALE } from '@/constants/typography';
  * // theme-exempt: the one allowed accent, per the call-UI hard rule
  */
 export const CALL_DANGER_RED = RED;
-
-/** `Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top` — the exact
- *  hard-rule formula, shared so every call surface computes it identically. */
-export function useCallTopInset(): number {
-  const insets = useSafeAreaInsets();
-  return Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
-}
 
 export function formatCallDuration(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
@@ -60,7 +53,7 @@ export interface CallScreenShellProps {
 
 export function CallScreenShell({ children, topLeft, topRight, style }: CallScreenShellProps) {
   const { theme } = useAppTheme();
-  const topInset = useCallTopInset();
+  const topInset = useHeaderTopInset();
   return (
     <View style={[styles.root, { backgroundColor: theme.background }, style]}>
       <View style={[styles.topBar, { paddingTop: topInset + 8 }]}>

@@ -6,13 +6,14 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
@@ -64,6 +65,7 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const params = useLocalSearchParams<{ id: string; tab?: string }>();
   const id = params.id;
 
@@ -126,7 +128,7 @@ export default function ProductDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[s.root, { paddingTop: headerTopInset }]}>
         <View style={s.header}>
           <LoadingSkeleton height={36} style={{ width: 200 }} />
         </View>
@@ -141,7 +143,7 @@ export default function ProductDetailScreen() {
 
   if (!product) {
     return (
-      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+      <View style={[s.root, { paddingTop: headerTopInset }]}>
         <View style={s.header}>
           <PressableScale
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
@@ -168,7 +170,7 @@ export default function ProductDetailScreen() {
   const coverImage = product.media.find(m => m.isCover) ?? product.media[0];
 
   return (
-    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
+    <View style={[s.root, { paddingTop: headerTopInset }]}>
       {/* ── Fixed Header ── */}
       <View style={s.header}>
         {/* Fix 3: back button uses goBackOr(router) */}

@@ -7,7 +7,7 @@
  * so it renders instantly and correctly across all 12 themes.
  */
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View, Platform, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Glow, ThreadDraw } from './ThreadLine';
 import { PillButton, Reveal, StepHeadline } from './OnboardingUI';
 import { MOTION, SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
@@ -38,6 +39,7 @@ export function WelcomeStep({
   const { theme } = useAppTheme();
   const { reduceMotion } = useOnboardingMotion();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const { width, height } = useWindowDimensions();
   // Grow with wider screens, but leave room for the copy and CTAs on short phones/windows.
   const logoSize = Math.min(248, Math.max(PHONE_LOGO_SIZE, Math.round(width * 0.3)), Math.round(height * 0.28));
@@ -74,7 +76,7 @@ export function WelcomeStep({
         style={styles.topWash}
       />
 
-      <View style={[styles.content, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SPACE.md, paddingBottom: insets.bottom + SPACE.lg }]}>
+      <View style={[styles.content, { paddingTop: headerTopInset + SPACE.md, paddingBottom: insets.bottom + SPACE.lg }]}>
         <Reveal>
           <Text style={[TYPE.eyebrow, { color: theme.muted }]}>BRANDTHREAD</Text>
         </Reveal>

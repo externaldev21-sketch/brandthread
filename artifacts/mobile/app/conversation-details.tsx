@@ -15,10 +15,11 @@
  * (see docs/dm-flows.md) rather than a real-time push-based one.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, Alert, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Alert, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -51,7 +52,7 @@ export default function ConversationDetailsScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const headerTopPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const headerTopPad = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{

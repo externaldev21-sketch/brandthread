@@ -36,6 +36,7 @@ import { PRESS_SCALE, PRESS_DURATION_MS } from '@/constants/motion';
 import { ThreadIllustration, type ThreadMotif } from '@/components/illustrations/EmptyStateArt';
 import { a11yHidden } from '@/lib/a11yHidden';
 import { WEB_INPUT_RESET } from '@/lib/inputReset';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 // ─── Shared undo action/toast ─────────────────────────────────────────────────
 // Mutations remain responsible for their own server/local rollback. This provider
@@ -244,11 +245,12 @@ export function BrandthreadScreen({
   children, style, scrollable = false, noSafeTop = false, noSafeBottom = false,
 }: BrandthreadScreenProps) {
   const insets = useSafeAreaInsets();
+  const topInset = useHeaderTopInset();
   const colors = useColors();
   const containerStyle: ViewStyle = {
     flex: 1,
     backgroundColor: colors.background,
-    paddingTop: noSafeTop ? 0 : insets.top,
+    paddingTop: noSafeTop ? 0 : topInset,
     paddingBottom: noSafeBottom ? 0 : 0,
   };
   if (scrollable) {
