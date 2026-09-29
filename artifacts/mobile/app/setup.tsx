@@ -9,8 +9,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Animated, Alert,
-} from 'react-native';
+  StyleSheet, Animated, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -190,7 +189,7 @@ export default function SetupScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
+      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
         <TouchableOpacity
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
           style={s.back}

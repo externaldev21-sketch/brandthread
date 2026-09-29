@@ -312,7 +312,10 @@ export function DiscoverPager() {
           />
 
           {/* ─ Top chrome: back, brand handled per-card, cart icon ─ */}
-          <View style={[styles.topBar, { top: insets.top + 8 }]} pointerEvents="box-none">
+          <View
+            style={[styles.topBar, { top: insets.top + 8, left: SP.md + insets.left, right: SP.md + insets.right }]}
+            pointerEvents="box-none"
+          >
             <IconButton
               name="chevron-left"
               variant="glass"
@@ -379,7 +382,7 @@ export function DiscoverPager() {
 
 function DiscoverSkeleton({ insets, cardWidth }: { insets: { top: number }; cardWidth: number }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }}>
       <CardSkeleton width={cardWidth * 0.72} />
     </View>
   );

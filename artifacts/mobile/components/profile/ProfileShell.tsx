@@ -77,6 +77,8 @@ export interface ProfileIdentity {
   handle?: string | null;
   initials: string;
   avatarUrl?: string | null;
+  /** A moving profile picture — when set, plays instead of the static `avatarUrl` (its poster frame) in the video-header own-profile avatar. */
+  avatarVideoUrl?: string | null;
   verified?: boolean;
   /** "Seller" / "Buyer" — shown as a chip beside the handle. */
   roleLabel: string;
@@ -376,6 +378,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         <LiveAvatarRing live={!!liveStreamId} size={videoAvatarSize} testID={liveStreamId ? 'profile-live-ring' : undefined}>
           <ProfileStoryAvatar
             uri={identity.avatarUrl}
+            videoUri={identity.avatarVideoUrl}
             initials={identity.initials || '•'}
             hasActiveStory={!!avatar?.ring}
             onPress={avatarPress}
@@ -528,7 +531,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         {isVideoHeader ? null : (<>
         <Animated.View
           pointerEvents="none"
-          style={[styles.compact, { height: insets.top + 64, paddingTop: insets.top, opacity: compactOpacity, transform: [{ translateY: compactSlide }] }]}
+          style={[styles.compact, { height: topPad + 64, paddingTop: topPad, opacity: compactOpacity, transform: [{ translateY: compactSlide }] }]}
         >
           <View style={[styles.compactInner, { paddingLeft: compactLeft, paddingRight: compactRight }]}>
             {compactRoom >= 140 ? (

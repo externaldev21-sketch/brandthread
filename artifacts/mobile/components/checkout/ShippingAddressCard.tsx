@@ -212,7 +212,12 @@ function AddressSheet({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onCancel}>
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[styles.sheetHeader, { paddingTop: Platform.OS === 'web' ? Math.max(insets.top, SP.sm) : SP.sm, borderBottomColor: theme.border }]}>
+        {/* Math.max(insets.top, 54) — the standard web notch/Dynamic-Island
+            gate (react-native-safe-area-context reads 0 for insets.top on
+            the plain web preview, with no real notch to measure); SP.sm was
+            nowhere near enough there. Native keeps its own SP.sm — a
+            pageSheet modal already gets its own safe-area handling there. */}
+        <View style={[styles.sheetHeader, { paddingTop: Platform.OS === 'web' ? Math.max(insets.top, 54) : SP.sm, borderBottomColor: theme.border }]}>
           <IconButton name="x" variant="plain" onPress={onCancel} accessibilityLabel="Close address form" />
           <Text style={[styles.sheetTitle, { color: theme.text }]}>Shipping address</Text>
           <View style={{ width: 44 }} />

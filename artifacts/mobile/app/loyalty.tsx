@@ -5,8 +5,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, FlatList,
-} from 'react-native';
+  StyleSheet, Alert, ActivityIndicator, FlatList, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -86,7 +85,7 @@ export default function LoyaltyScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }]}>
+      <View style={[s.root, { alignItems: 'center', justifyContent: 'center', paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <ActivityIndicator color={theme.accent} />
       </View>
     );

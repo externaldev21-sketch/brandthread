@@ -5,8 +5,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   TextInput, StyleSheet, Alert, Switch, Animated, RefreshControl,
-  PanResponder, GestureResponderEvent, PanResponderGestureState,
-} from 'react-native';
+  PanResponder, GestureResponderEvent, PanResponderGestureState, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1140,7 +1139,7 @@ export default function StoreEditor() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerRow1}>

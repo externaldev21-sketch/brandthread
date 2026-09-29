@@ -19,6 +19,7 @@ import { getMarketingAnalytics, getFilterState } from '@/services/analyticsServi
 import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
   ProgressBar, SectionTitle,
@@ -98,6 +99,7 @@ export default function AnalyticsMarketingScreen() {
   const [data,       setData]       = useState<MarketingAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const requestUser = useRef<string | null>(null);
 
@@ -112,9 +114,11 @@ export default function AnalyticsMarketingScreen() {
       const next = await getMarketingAnalytics(f);
       if (requestUser.current !== requestedUser) return;
       setData(next);
+      setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
-    } finally { setLoading(false); setRefreshing(false); }
+      setLoadError(true);
+        } finally { setLoading(false); setRefreshing(false); }
   }, [filter, authLoaded, userId]);
 
   useEffect(() => {
@@ -128,6 +132,13 @@ export default function AnalyticsMarketingScreen() {
 
   if (loading) {
     return <AnalyticsSkeleton topPad={topPad} kpiCount={0} listRows={3} />;
+  }
+  if (loadError && !data) {
+    return (
+      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
+        <ErrorState message="Couldn't load marketing analytics." onRetry={() => load()} />
+      </View>
+    );
   }
   return (
     <ScrollView
@@ -238,6 +249,7 @@ export default function AnalyticsMarketingScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
+  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
   heroCard: { backgroundColor: colors.elevated, borderRadius: RADIUS.lg, padding: SP.lg, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg, alignItems: 'center' },
   heroLabel:{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: SP.sm },

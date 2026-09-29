@@ -539,7 +539,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
+      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => goBackOr(router)} activeOpacity={0.7}>
           <Feather name="arrow-left" size={ICON.sm} color={FG} />
         </TouchableOpacity>
@@ -755,7 +755,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
         presentationStyle="formSheet"
         onRequestClose={() => setShowProductPicker(false)}
       >
-        <View style={[s.pickerRoot, { paddingTop: insets.top + SP.md }]}>
+        <View style={[s.pickerRoot, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.md }]}>
           <View style={s.pickerHeader}>
             <Text style={s.pickerTitle}>Choose a product</Text>
             <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>

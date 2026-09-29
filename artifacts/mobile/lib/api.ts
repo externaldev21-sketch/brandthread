@@ -22,6 +22,11 @@ const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
   `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
+/** The api-server's own base URL — exported so callers that need a raw
+ * WebSocket connection (see lib/live/useLiveSocket.ts) can derive a
+ * ws(s):// URL from the same host this client already talks to over HTTP. */
+export const API_BASE_URL = BASE;
+
 /**
  * Every request gets a hard ceiling so a hung connection (dead server, black
  * hole route, a device that fell asleep mid-request) always resolves into an
@@ -1572,6 +1577,26 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       coachmark: () => freshGet<{ seen: boolean; hasCover: boolean }>('/api/profile/cover-coachmark'),
       markCoachmarkSeen: () => post<{ seen: true }>('/api/profile/cover-coachmark/seen', {}),
     },
+    /**
+     * Avatar video (moving profile picture, any account type). The server
+     * enforces <=10s with no trim endpoint — a 400 ApiError's message is the
+     * user-facing "Avatar videos can be at most 10 seconds…".
+     */
+    avatarVideo: {
+      get: () => freshGet<{
+        avatarVideoUrl: string | null;
+        avatarPosterUrl: string | null;
+        avatarVideoUpdatedAt: string | null;
+      }>('/api/profile/avatar-video'),
+      upload: (uri: string, mimeType?: string | null) =>
+        uploadVideo<{ avatarVideoUrl: string; avatarPosterUrl: string; avatarVideoUpdatedAt: string }>(
+          '/api/profile/avatar-video',
+          { uri, mimeType },
+          getToken,
+          getCacheScope,
+        ),
+      remove: () => del<{ avatarVideoUrl: null; avatarPosterUrl: null }>('/api/profile/avatar-video'),
+    },
     publicProducts: {
       list: (opts: { limit?: number; category?: string; tag?: string } = {}) => {
         const params = new URLSearchParams();
@@ -2479,6 +2504,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get:            (id: string) => get<{ stream: any }>(`/api/live/${encodeURIComponent(id)}`),
       join:           (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/join`, {}),
       leave:          (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/leave`, {}),
+      /** HTTP presence fallback — only used when the WebSocket can't connect (see lib/live/useLiveSocket.ts). */
+      heartbeat:      (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/heartbeat`, {}),
       end:            (id: string) => post<any>(`/api/live/${encodeURIComponent(id)}/end`, {}),
       updateProducts: (id: string, productTags: any[]) =>
         patch<any>(`/api/live/${encodeURIComponent(id)}/products`, { productTags }),

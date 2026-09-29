@@ -28,6 +28,7 @@ import aiRouter from "./ai";
 import publicRouter from "./public";
 import profileMediaRouter from "./profile-media";
 import profileCoverRouter from "./profile-cover";
+import avatarVideoRouter from "./avatar-video";
 import buyerRouter from "./buyer";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter from "./connect";
@@ -108,6 +109,7 @@ router.use("/config/features", featureFlagsRouter);
 router.use("/public",          publicRouter);
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
+router.use("/profile",         avatarVideoRouter);  // avatar video (moving profile picture), all account types
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);

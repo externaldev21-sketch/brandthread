@@ -15,7 +15,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput, Platform, useWindowDimensions,
+  View, Text, StyleSheet, FlatList, TextInput, Platform, Share, useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
@@ -23,16 +23,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Image as ExpoImage } from 'expo-image';
 import ReanimatedAnimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
 import { hapticLight } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS } from '@/lib/theme';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
+import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
+import { LiveMoreSheet } from '@/components/live/LiveMoreSheet';
 import { SHEET_TIMING } from '@/constants/motion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
@@ -158,32 +162,38 @@ export default function LiveFeedScreen() {
 
   return (
     <View style={styles.root}>
-      <FlatList
-        data={rooms}
-        keyExtractor={item => item.id}
-        renderItem={({ item, index }) => (
-          <LiveRoomPage
-            room={item}
-            isActive={index === activeIndex}
-            pageWidth={windowWidth}
-            pageHeight={windowHeight}
-            insetTop={topInset}
-            insetBottom={insets.bottom}
-            onClose={close}
-            onJoinReal={(streamId) => router.push(`/buyer-live?streamId=${encodeURIComponent(streamId)}` as never)}
-          />
-        )}
-        pagingEnabled
-        disableIntervalMomentum
-        showsVerticalScrollIndicator={false}
-        decelerationRate="fast"
-        bounces={false}
-        alwaysBounceVertical={false}
-        overScrollMode="never"
-        getItemLayout={(_, index) => ({ length: windowHeight, offset: windowHeight * index, index })}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-      />
+      {/* Local toast host (report/not-interested/copy-link feedback) — the
+          same banner components/EngagementButton.tsx's feed rows already
+          use, scoped to this full-screen route rather than relying on
+          whatever provider (if any) wraps app/(tabs)/feed.tsx underneath. */}
+      <FeedToastProvider>
+        <FlatList
+          data={rooms}
+          keyExtractor={item => item.id}
+          renderItem={({ item, index }) => (
+            <LiveRoomPage
+              room={item}
+              isActive={index === activeIndex}
+              pageWidth={windowWidth}
+              pageHeight={windowHeight}
+              insetTop={topInset}
+              insetBottom={insets.bottom}
+              onClose={close}
+              onJoinReal={(streamId) => router.push(`/buyer-live?streamId=${encodeURIComponent(streamId)}` as never)}
+            />
+          )}
+          pagingEnabled
+          disableIntervalMomentum
+          showsVerticalScrollIndicator={false}
+          decelerationRate="fast"
+          bounces={false}
+          alwaysBounceVertical={false}
+          overScrollMode="never"
+          getItemLayout={(_, index) => ({ length: windowHeight, offset: windowHeight * index, index })}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+        />
+      </FeedToastProvider>
     </View>
   );
 }
@@ -242,6 +252,27 @@ function LiveRoomPage({
     if (isActive) player.play(); else player.pause();
   }, [isActive, player]);
 
+  // The poster (already fetched as part of the room's data, and already
+  // rendered elsewhere in this file for the pinned product card) wasn't
+  // being rendered under the video at all — every room opened to a hard
+  // black frame until the video finished loading over the dev server. Fade
+  // the video in once it reports a real playable frame so the poster is
+  // never left showing under the loaded video, and never re-shown once the
+  // fade has completed (readyToPlay can fire more than once).
+  const videoOpacity = useSharedValue(0);
+  const [videoReady, setVideoReady] = useState(false);
+  useEffect(() => {
+    if (!player) return undefined;
+    const sub = player.addListener('statusChange', ({ status }) => {
+      if (status === 'readyToPlay') {
+        setVideoReady(true);
+        videoOpacity.value = withTiming(1, { duration: 220 });
+      }
+    });
+    return () => sub.remove();
+  }, [player, videoOpacity]);
+  const videoStyle = useAnimatedStyle(() => ({ opacity: videoOpacity.value }));
+
   // Sample rooms drip in a couple more chat lines after mount so the overlay
   // reads as a live conversation rather than a frozen mock — capped well
   // short of SAMPLE_CHAT_LINES.length, and only while this page is active.
@@ -249,9 +280,15 @@ function LiveRoomPage({
     if (!room.isSample || !isActive) return undefined;
     let i = 2;
     const id = setInterval(() => {
-      if (i >= SAMPLE_CHAT_LINES.length) { clearInterval(id); return; }
-      setChat(prev => [...prev, SAMPLE_CHAT_LINES[i]]);
+      // Capture the line before incrementing — the previous version read
+      // SAMPLE_CHAT_LINES[i] lazily inside the setChat updater, by which
+      // point i had already been bumped past the array's end, pushing
+      // `undefined` into chat and crashing the render below on
+      // `line.user`.
+      const next = SAMPLE_CHAT_LINES[i];
       i += 1;
+      if (!next) { clearInterval(id); return; }
+      setChat(prev => [...prev, next]);
     }, 2600);
     return () => clearInterval(id);
   }, [room.isSample, isActive]);
@@ -268,21 +305,97 @@ function LiveRoomPage({
     if (!room.isSample && room.streamId) onJoinReal(room.streamId);
   }
 
+  // ─── Right rail: Share / Thread Cash / More ────────────────────────────
+  const { showToast } = useFeedToast();
+  const [threadCashOpen, setThreadCashOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [captionsOn, setCaptionsOn] = useState(false);
+  const [dataSaver, setDataSaver] = useState(false);
+  const roomLink = `https://brandthread.app/live/${room.streamId ?? room.id}`;
+
+  async function handleShare() {
+    hapticLight();
+    const message_ = `${room.brandName} is live on Brandthread — ${room.title}`;
+    if (Platform.OS === 'web') {
+      const nav = (globalThis as any).navigator;
+      if (nav?.share) {
+        try { await nav.share({ title: room.brandName, text: message_, url: roomLink }); } catch { /* user cancelled */ }
+        return;
+      }
+      try {
+        await Clipboard.setStringAsync(roomLink);
+        showToast('Link copied to clipboard', 'info');
+      } catch {
+        showToast('Could not copy link', 'error');
+      }
+      return;
+    }
+    try {
+      await Share.share({ message: `${message_} ${roomLink}`, url: roomLink });
+    } catch {
+      showToast('Could not share this live', 'error');
+    }
+  }
+
+  function handleSendThreadCash(amountCents: number) {
+    setChat(prev => [...prev, { user: 'You', text: `sent $${(amountCents / 100).toFixed(2)} Thread Cash` }]);
+    showToast(`You sent ${formatCents(amountCents)} Thread Cash`, 'info');
+  }
+
+  async function handleCopyLink() {
+    try {
+      await Clipboard.setStringAsync(roomLink);
+      showToast('Link copied to clipboard', 'info');
+    } catch {
+      showToast('Could not copy link', 'error');
+    }
+  }
+
+  function handleReport() {
+    showToast('Thanks for the report. Our team will review this live.', 'info');
+  }
+
+  function handleNotInterested() {
+    showToast('We’ll show you fewer lives like this.', 'info');
+  }
+
+  // Data Saver has a real, observable effect — freezing playback on the
+  // poster frame — rather than being a toggle that does nothing (house
+  // rule: no dead buttons). It only pauses; the active/inactive effect
+  // above remains the source of truth for whether this page *should* be
+  // playing at all, so leaving the room's page still resumes normally.
+  useEffect(() => {
+    if (!player || !isActive) return;
+    if (dataSaver) player.pause(); else player.play();
+  }, [dataSaver, player, isActive]);
+
   return (
     <View style={[styles.page, { height: pageHeight }]}>
       {room.videoSource ? (
-        // Explicit numeric width/height, not just absoluteFill: on web the
-        // style lands on a <video> element, which ignores inset-only sizing
-        // and renders at its own intrinsic size instead — left uncentered
-        // and cropped off-subject (see the same fix/comment on VideoVisual
-        // in app/(tabs)/feed.tsx, where this was first found).
-        <VideoView
-          player={player}
-          style={[styles.video, { width: pageWidth, height: pageHeight }]}
-          contentFit="cover"
-          nativeControls={false}
-          pointerEvents="none"
-        />
+        <>
+          {room.posterSource && !videoReady && (
+            <ExpoImage
+              source={room.posterSource}
+              style={[styles.video, { width: pageWidth, height: pageHeight }]}
+              contentFit="cover"
+            />
+          )}
+          {/* Explicit numeric width/height, not just absoluteFill: on web the
+              style lands on a <video> element, which ignores inset-only
+              sizing and renders at its own intrinsic size instead — left
+              uncentered and cropped off-subject (see the same fix/comment on
+              VideoVisual in app/(tabs)/feed.tsx, where this was first
+              found). */}
+          <ReanimatedAnimated.View style={[styles.video, { width: pageWidth, height: pageHeight }, videoStyle]}>
+            <VideoView
+              player={player}
+              style={{ width: pageWidth, height: pageHeight }}
+              contentFit="cover"
+              nativeControls={false}
+              pointerEvents="none"
+            />
+          </ReanimatedAnimated.View>
+        </>
       ) : room.thumbnailUrl ? (
         <ExpoImage source={{ uri: room.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
@@ -368,23 +481,61 @@ function LiveRoomPage({
           anchored to the top of the bottom chrome instead of floating at a
           fixed mid-screen offset. */}
       <View style={[styles.rail, { bottom: insetBottom + 56 + (room.productName != null ? 72 : 0) }]}>
-        <PressableScale style={styles.railBtn} onPress={() => hapticLight()} accessibilityRole="button" accessibilityLabel="Share this live">
+        <PressableScale style={styles.railBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share this live">
           <Feather name="share" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
-        <PressableScale style={styles.railBtn} onPress={() => hapticLight()} accessibilityRole="button" accessibilityLabel="Send Thread Cash">
+        <PressableScale style={styles.railBtn} onPress={() => { hapticLight(); setThreadCashOpen(true); }} accessibilityRole="button" accessibilityLabel="Send Thread Cash">
           {/* ThreadCashBillIcon, not the full <ThreadCashBill/> — below its
               ~32pt threshold the full bill's art just turns to mush, which is
               why the gift icon effectively vanished from the rail before. */}
           <ThreadCashBillIcon size={26} />
         </PressableScale>
-        <PressableScale style={styles.railBtn} onPress={() => hapticLight()} accessibilityRole="button" accessibilityLabel="More options">
+        <PressableScale style={styles.railBtn} onPress={() => { hapticLight(); setMoreOpen(true); }} accessibilityRole="button" accessibilityLabel="More options">
           <Feather name="more-vertical" size={26} color="#fff" style={styles.railIconShadow} />
         </PressableScale>
       </View>
 
-      {/* Bottom: chat overlay + input + pinned product */}
+      {captionsOn && chat.filter(Boolean).length > 0 && (
+        <View pointerEvents="none" style={[styles.captionStrip, { bottom: insetBottom + 128 + (room.productName != null ? 72 : 0) }]}>
+          {(() => {
+            const last = chat.filter(Boolean)[chat.filter(Boolean).length - 1];
+            return (
+              <Text style={styles.captionText} numberOfLines={2}>
+                <Text style={styles.captionUser}>{last.user}: </Text>
+                {last.text}
+              </Text>
+            );
+          })()}
+        </View>
+      )}
+
+      <LiveThreadCashSheet
+        visible={threadCashOpen}
+        brandName={room.brandName}
+        onClose={() => setThreadCashOpen(false)}
+        onSent={handleSendThreadCash}
+      />
+      <LiveMoreSheet
+        visible={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        onReport={handleReport}
+        onNotInterested={handleNotInterested}
+        onCopyLink={handleCopyLink}
+        captionsOn={captionsOn}
+        onToggleCaptions={() => setCaptionsOn(v => !v)}
+        dataSaverOn={dataSaver}
+        onToggleDataSaver={() => setDataSaver(v => !v)}
+      />
+
+      {/* Bottom: chat overlay + input + pinned product. box-none: this
+          wrapper's own box is transparent and grows tall as the chat drips
+          in more lines, and it's later in paint order than the rail above —
+          without box-none its empty space silently swallows taps meant for
+          the rail once chat grows past a couple of lines (found live-testing
+          the rail buttons below; chatWrap already opts out the same way). */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        pointerEvents="box-none"
         style={[styles.bottom, { paddingBottom: insetBottom + 12 }]}
       >
         {(room.productName != null) && (
@@ -420,7 +571,7 @@ function LiveRoomPage({
               never ends in a hard cutoff line. */}
           <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']} style={styles.chatTopFade} />
           <View style={styles.chatList}>
-            {chat.slice(-4).map((line, i) => (
+            {chat.filter(Boolean).slice(-4).map((line, i) => (
               <Text key={i} style={styles.chatLine} numberOfLines={2}>
                 <Text style={styles.chatUser}>{line.user} </Text>
                 {line.text}
@@ -509,6 +660,17 @@ const styles = StyleSheet.create({
   railIconShadow: {
     textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
   },
+
+  // Captions toggle (More sheet): the newest chat line, larger and centered,
+  // over the video — same rail-clearance margin as the pinned product card.
+  captionStrip: {
+    position: 'absolute', left: 12, right: 56, alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 6,
+  },
+  captionText: {
+    color: '#fff', fontFamily: FONT.medium, fontSize: 14, textAlign: 'center', lineHeight: 18,
+  },
+  captionUser: { fontFamily: FONT.bold },
 
   bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 12, gap: 8 },
   // The rail sits at right:10, width:38 (occupying the rightmost 48pt of

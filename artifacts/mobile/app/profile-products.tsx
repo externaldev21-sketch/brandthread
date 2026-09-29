@@ -10,7 +10,7 @@
  * Params: sellerId, sellerName?, isOwner?
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -150,7 +150,7 @@ export default function ProfileProductsScreen() {
 
   const header = (
     <View
-      style={[styles.header, { paddingTop: insets.top + SP.sm }]}
+      style={[styles.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}
       onLayout={(event) => setHeaderHeight(Math.round(event.nativeEvent.layout.height))}
     >
       <View style={styles.headerRow}>

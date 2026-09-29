@@ -3196,7 +3196,7 @@ export default function FeedScreen({
             >
               <Feather name="arrow-left" size={24} color={ON_DARK} />
             </TouchableOpacity>
-            <Text style={styles.creatorTitle} numberOfLines={1} accessibilityRole="header">
+            <Text style={styles.creatorTitle} numberOfLines={1} maxFontSizeMultiplier={1.2} accessibilityRole="header">
               {creatorFeed?.title || (creatorFeed?.source === 'product' ? 'Featured in' : 'Videos')}
             </Text>
             <Animated.View ref={cartTargetRef} testID="feed-cart-button" style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
@@ -3656,8 +3656,12 @@ const styles = StyleSheet.create({
   // Full 44x44 touch target — used by the creator-profile-videos player's
   // simpler back/cart top bar (isCreatorFeed), distinct from the compact
   // buyer Threads Home top row above which needs to fit more controls.
-  buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  buyerTopCluster: { flexDirection: 'row', alignItems: 'center' },
+  buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  // flexShrink: 0 — the LIVE cluster (left) and search+cart cluster
+  // (right) must never shrink or get squeezed out of the row by the
+  // center tabs; only the tabs (buyerTabSwitcherWrap/SegmentedControl)
+  // are allowed to shrink under Dynamic Type or a narrow screen.
+  buyerTopCluster: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
   // Absolutely centered on the row (left:0/right:0), not a flex sibling of
   // the icon clusters: those two clusters are different widths (3 icons
   // left, 2 right), so centering the tabs in the flex space *between* them
@@ -3668,6 +3672,12 @@ const styles = StyleSheet.create({
   buyerTabSwitcherWrap: {
     position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center',
+    // Hard backstop: even with SegmentedControl's own flexShrink/
+    // maxFontSizeMultiplier caps, this keeps an inflated "Following |
+    // Threads" label from ever rendering past its own left/right bounds
+    // (topRowSideGuard) and overlapping the LIVE or search/cart icons,
+    // which sit outside this wrap entirely and are unaffected by it.
+    overflow: 'hidden',
   },
   // `right: -6` (an earlier pass's "true top-right corner" polish) pushed
   // the badge outward past the cart glyph's own box — fine with the old

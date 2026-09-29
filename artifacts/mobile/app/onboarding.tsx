@@ -377,7 +377,7 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
   const doneCount = done.filter(Boolean).length;
 
   return (
-    <View style={[sl.root, { paddingTop: insets.top + SPACE.xxl, paddingBottom: insets.bottom + SPACE.xxl }]}>
+    <View style={[sl.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SPACE.xxl, paddingBottom: insets.bottom + SPACE.xxl }]}>
 
       {/* Logo */}
       <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], marginBottom: SPACE.xl, alignItems: 'center' }}>
@@ -468,7 +468,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
     : ['New orders', 'Production milestones', 'Payout confirmations', 'Customer messages'];
 
   return (
-    <View style={[sn.root, { paddingTop: insets.top + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
+    <View style={[sn.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
 
       <View style={sn.body}>
         {/* Hero: the thread passes through the bell */}
@@ -541,7 +541,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
     : 'Your brand now has one home for design, production, selling and growth.';
 
   return (
-    <View style={[ss.root, { paddingTop: insets.top + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
+    <View style={[ss.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
       <LinearGradient
         pointerEvents="none"
         colors={theme.heroGradient}
@@ -2755,7 +2755,7 @@ export default function OnboardingScreen() {
 
       {/* Standard header for form steps */}
       {!isFullScreen && (
-        <View style={[sm.header, { paddingTop: insets.top + 8 }]}>
+        <View style={[sm.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 8 }]}>
           {!isAccountTypeStep && (
             <PressableScale
               style={sm.backBtn}
@@ -2780,7 +2780,7 @@ export default function OnboardingScreen() {
       {isFullScreen && showsProgressBar() && (
         <View
           pointerEvents="none"
-          style={[sm.progressOverlay, { paddingTop: insets.top + 8 }]}
+          style={[sm.progressOverlay, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 8 }]}
         >
           <StepDots current={progressSteps().current} total={progressSteps().total} />
         </View>

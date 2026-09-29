@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -76,7 +76,7 @@ export default function ProductStoreScreen() {
   const {
     background: BG, surface: SURFACE, card: CARD, border: BORDER,
     text: FG, muted: MUTED, subtle: SUBTLE, success: SUCCESS,
-    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    accent: ACCENT, accentLight: ACCENT_LIGHT, accentDim: ACCENT_DIM,
     secondary: CYAN, secondaryDim: CYAN_DIM, warning: ORANGE, error: RED,
     onAccent: ON_DARK,
   } = theme;
@@ -206,7 +206,7 @@ export default function ProductStoreScreen() {
       '&participantName=' + encodeURIComponent(sellerName) +
       '&participantHandle=' + encodeURIComponent(sellerHandle) +
       '&participantInitials=' + encodeURIComponent(sellerInitials) +
-      '&participantColor=' + encodeURIComponent(PURPLE) +
+      '&participantColor=' + encodeURIComponent(ACCENT) +
       '&participantAccountType=seller' +
       '&type=buyer_to_seller_product' +
       '&contextProductName=' + encodeURIComponent(product.name) +
@@ -234,7 +234,7 @@ export default function ProductStoreScreen() {
 
   if (loading) {
     return (
-      <View style={[s.screen, { paddingTop: insets.top }]}>
+      <View style={[s.screen, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <Text style={s.loadingText}>Loading…</Text>
       </View>
     );
@@ -242,13 +242,13 @@ export default function ProductStoreScreen() {
 
   if (!product) {
     return (
-      <View style={[s.screen, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center', padding: SP.xl }]}>
+      <View style={[s.screen, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), alignItems: 'center', justifyContent: 'center', padding: SP.xl }]}>
         <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
         <Text style={[s.loadingText, { marginTop: SP.md, textAlign: 'center' }]}>
           Product not found or no longer available.
         </Text>
         <TouchableOpacity style={{ marginTop: SP.md }} onPress={() => goBackOr(router)} activeOpacity={0.7}>
-          <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.base }}>Go Back</Text>
+          <Text style={{ color: ACCENT_LIGHT, fontFamily: FONT.semibold, fontSize: FS.base }}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -353,7 +353,7 @@ export default function ProductStoreScreen() {
                 style={s.followBtn}
               />
               <TouchableOpacity style={s.msgIconBtn} onPress={handleMessageSeller} activeOpacity={0.75}>
-                <Feather name="mail" size={ICON.sm} color={PURPLE_LIGHT} />
+                <Feather name="mail" size={ICON.sm} color={ACCENT_LIGHT} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.msgIconBtn}
@@ -552,7 +552,7 @@ export default function ProductStoreScreen() {
               onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)}
             >
               <View style={s.sellerProfileIcon}>
-                <Feather name="user" size={ICON.md} color={PURPLE_LIGHT} />
+                <Feather name="user" size={ICON.md} color={ACCENT_LIGHT} />
               </View>
               <View style={s.sellerProfileInfo}>
                 <Text style={s.sellerProfileLabel}>Shop {product.vendor}</Text>
@@ -600,7 +600,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const {
     background: BG, surface: SURFACE, card: CARD, border: BORDER,
     text: FG, muted: MUTED, subtle: SUBTLE, success: SUCCESS,
-    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    accent: ACCENT, accentLight: ACCENT_LIGHT, accentDim: ACCENT_DIM,
     secondary: CYAN, secondaryDim: CYAN_DIM, error: RED, onAccent: ON_DARK,
   } = theme;
   const SUCCESS_DIM = `${SUCCESS}26`;
@@ -714,14 +714,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   avatarCircle: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: PURPLE + '33',
-    borderWidth: 1, borderColor: PURPLE + '55',
+    backgroundColor: ACCENT + '33',
+    borderWidth: 1, borderColor: ACCENT + '55',
     alignItems: 'center', justifyContent: 'center',
   },
   avatarInitial: {
     fontSize: FS.base,
     fontFamily: FONT.bold,
-    color: PURPLE_LIGHT,
+    color: ACCENT_LIGHT,
   },
   sellerInfo: {
     flex: 1,
@@ -835,7 +835,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   preorderCard: {
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: PURPLE + '40',
+    borderColor: ACCENT + '40',
     padding: SP.md,
     gap: SP.sm,
   },
@@ -870,7 +870,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   progressFill: {
     height: '100%',
     borderRadius: RADIUS.pill,
-    backgroundColor: PURPLE,
+    backgroundColor: ACCENT,
   },
   progressText: {
     fontSize: FS.xs,
@@ -1012,7 +1012,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   sellerProfileIcon: {
     width: 40, height: 40, borderRadius: RADIUS.sm,
-    backgroundColor: PURPLE + '18',
+    backgroundColor: ACCENT + '18',
     alignItems: 'center', justifyContent: 'center',
   },
   sellerProfileInfo: {

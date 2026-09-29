@@ -486,7 +486,7 @@ export default function BuyerDropDetail() {
             />
           )}
 
-          <View style={[styles.heroHeader, { paddingTop: insets.top + SP.sm }]}>
+          <View style={[styles.heroHeader, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
             <TouchableOpacity style={styles.roundButton} onPress={() => goBackOr(router)} hitSlop={4} accessibilityLabel="Go back">
               <Feather name="arrow-left" size={21} color={ON_DARK} />
             </TouchableOpacity>

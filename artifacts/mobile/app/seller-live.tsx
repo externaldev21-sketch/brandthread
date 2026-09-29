@@ -16,6 +16,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
+import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
 
 const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
@@ -72,7 +73,9 @@ function SellerLiveNativeScreen() {
 
   const engineRef     = useRef<any>(null);
   const commentsRef   = useRef<ScrollView>(null);
-  const pollRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Slow-polling fallback loop — only runs when the WebSocket genuinely
+  // can't connect (see useLiveSocket's onFallback below).
+  const fallbackPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const consecutiveFailuresRef = useRef(0);
   const generationRef = useRef(0);
@@ -103,8 +106,10 @@ function SellerLiveNativeScreen() {
       engine.startPreview();
       engine.registerEventHandler({
         onJoinChannelSuccess: () => setAgoraReady(true),
-        onUserJoined:  ()    => setViewerCount(c => c + 1),
-        onUserOffline: ()    => setViewerCount(c => Math.max(0, c - 1)),
+        // viewerCount is now a real presence count broadcast over the
+        // live WebSocket (see the useLiveSocket call below /
+        // jobs/liveViewersPresence.ts) — not derived from Agora's own
+        // channel-membership events, which only ever went up.
         onError:       (err: any) => console.warn('[Agora]', err),
       });
       engine.joinChannel(
@@ -126,21 +131,48 @@ function SellerLiveNativeScreen() {
     };
   }, []);
 
-  // ─── Timers: duration + comment polling ──────────────────────────────────────
+  // ─── Duration timer + initial data ─────────────────────────────────────────
   useEffect(() => {
-    const generation = ++generationRef.current;
+    generationRef.current += 1;
     consecutiveFailuresRef.current = 0;
     timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
-    pollRef.current  = setInterval(() => pollComments(generation), 3000);
-    pollComments(generation);
     loadProducts();
     return () => {
       clearInterval(timerRef.current!);
-      if (pollRef.current !== null) clearInterval(pollRef.current);
-      pollRef.current = null;
+      if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
     };
   }, []);
 
+  // ─── Realtime: WebSocket room for this stream, replacing the old 3s poll ──────
+  const handleLiveEvent = React.useCallback((event: LiveSocketEvent) => {
+    if (event.type === 'comment') {
+      lastCommentTs.current = event.comment.created_at;
+      setComments(prev => [...prev, event.comment].slice(-80));
+      setTimeout(() => commentsRef.current?.scrollToEnd({ animated: true }), 100);
+    } else if (event.type === 'products') {
+      setProductTags(event.productTags);
+    } else if (event.type === 'viewerCount') {
+      setViewerCount(event.count);
+    }
+  }, []);
+
+  const startFallbackPolling = React.useCallback((active: boolean) => {
+    if (fallbackPollRef.current) { clearInterval(fallbackPollRef.current); fallbackPollRef.current = null; }
+    if (!active) return;
+    fallbackPollRef.current = setInterval(() => { void pollComments(generationRef.current); }, 15000);
+  }, []);
+
+  useLiveSocket({
+    streamId: params.streamId,
+    enabled: !!params.streamId,
+    asHost: true,
+    onEvent: handleLiveEvent,
+    onConnected: () => { void pollComments(generationRef.current); },
+    onFallback: startFallbackPolling,
+  });
+
+  /** One-shot HTTP backfill — used on WebSocket connect/reconnect, and as
+   * the fallback loop's refresh when the socket can't connect at all. */
   async function pollComments(generation: number) {
     if (requestGenerationRef.current === generation) return;
     requestGenerationRef.current = generation;
@@ -155,12 +187,7 @@ function SellerLiveNativeScreen() {
       }
       consecutiveFailuresRef.current = 0;
     } catch {
-      if (generationRef.current !== generation) return;
       consecutiveFailuresRef.current += 1;
-      if (consecutiveFailuresRef.current >= 3 && pollRef.current !== null) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
     } finally {
       if (requestGenerationRef.current === generation) {
         requestGenerationRef.current = null;
@@ -226,7 +253,7 @@ function SellerLiveNativeScreen() {
   }
 
   async function handleEnd() {
-    Alert.alert('End stream?', 'Your stream will be saved as a replay in the Thread feed.', [
+    Alert.alert('End stream?', "We'll try to save your stream as a replay in the Thread feed. This can take a few minutes, and isn't guaranteed.", [
       { text: 'Keep going', style: 'cancel' },
       {
         text: 'End & save', style: 'destructive',
@@ -265,7 +292,7 @@ function SellerLiveNativeScreen() {
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
 
       {/* Top bar */}
-      <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
+      <View style={[s.topBar, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 8 }]}>
         <View style={s.topLeft}>
           <View style={[s.livePill, { backgroundColor: LIVE_RED }]}>
             <View style={s.liveDot} />
@@ -279,7 +306,7 @@ function SellerLiveNativeScreen() {
       </View>
 
       {/* Viewer count */}
-      <View style={[s.viewerRow, { paddingTop: insets.top + 48 }]}>
+      <View style={[s.viewerRow, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 48 }]}>
         <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
           <Feather name="eye" size={13} color="#fff" />
           <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
@@ -287,7 +314,7 @@ function SellerLiveNativeScreen() {
       </View>
 
       {/* Right action rail */}
-      <View style={[s.rightRail, { paddingTop: insets.top + 80 }]}>
+      <View style={[s.rightRail, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 80 }]}>
         {/* Products */}
         <TouchableOpacity onPress={() => setShowProductPicker(true)} style={s.railBtn} activeOpacity={0.7}>
           <Feather name="shopping-bag" size={22} color="#fff" />

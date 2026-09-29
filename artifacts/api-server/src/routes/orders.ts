@@ -14,6 +14,7 @@ import { reversePurchasePointsOnce } from "./loyalty";
 import { buildOrderStatusUpdate, orderStatusTransitionConflict } from "../lib/orderStatusPolicy";
 import { logger } from "../lib/logger";
 import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
+import { reserveStockForOrder } from "../lib/stockReservation";
 
 const router = Router();
 router.use(requireAuth);
@@ -202,10 +203,38 @@ router.post("/", requireRole("manager"), async (req, res) => {
       const count: number = (countRes as any).rows?.[0]?.c ?? 0;
       const orderNumber = `BT-${String(count + 1).padStart(5, "0")}`;
 
+      // Deduct stock for non-drop orders BEFORE inserting the order, so an
+      // oversold cart never creates an order row at all (a drop's stock is
+      // tracked separately — drop orders skip this). Same all-or-nothing,
+      // row-locked reservation the Stripe checkout webhook uses — see
+      // lib/stockReservation.ts.
+      if (!dropId) {
+        const reservation = await reserveStockForOrder(
+          tx,
+          resolvedItems
+            .filter((i) => i.variantId)
+            .map((i) => ({ variantId: i.variantId as string, quantity: i.quantity })),
+        );
+        if (!reservation.ok) {
+          // Race condition — another request grabbed the stock
+          throw Object.assign(new Error("Stock no longer available — please try again"), { status: 409 });
+        }
+      }
+
       // Insert order
-  const [order] = await db.select().from(orders)
-    .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
-    .limit(1);
+      const [order] = await tx.insert(orders).values({
+        ownerId,
+        customerId: customerId ?? null,
+        dropId: dropId ?? null,
+        orderNumber,
+        status: "pending",
+        totalCents,
+        subtotalCents,
+        shippingCents,
+        grossChargedCents: totalCents,
+        notes: notes?.trim() || null,
+        ...(shippingAddress ? { shippingAddress } : {}),
+      }).returning();
 
       // Insert items
       await tx.insert(orderItems).values(
@@ -218,23 +247,6 @@ router.post("/", requireRole("manager"), async (req, res) => {
           priceCents: i.priceCents,
         }))
       );
-
-      // Deduct stock for non-drop orders (within the same transaction)
-      if (!dropId) {
-        for (const item of resolvedItems) {
-          if (item.variantId) {
-            const deductResult = await tx.execute(sql`
-              UPDATE product_variants
-              SET stock = stock - ${item.quantity}
-              WHERE id = ${item.variantId} AND stock >= ${item.quantity}
-            `);
-            if ((deductResult as any).rowCount === 0) {
-              // Race condition — another request grabbed the stock
-              throw Object.assign(new Error("Stock no longer available — please try again"), { status: 409 });
-            }
-          }
-        }
-      }
 
       // Update customer totals
       if (customerId) {

@@ -17,6 +17,7 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getInventoryAnalytics, getFilterState } from '@/services/analyticsService';
 import { InventoryAnalytics, InventoryProductRow, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
   PillTabs, ProgressBar, SectionTitle,
@@ -84,6 +85,7 @@ export default function AnalyticsInventoryScreen() {
   const [data,       setData]       = useState<InventoryAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeList, setActiveList] = useState<'runout' | 'fastest' | 'slowest' | 'overstock'>('runout');
   const requestUser = useRef<string | null>(null);
@@ -99,9 +101,11 @@ export default function AnalyticsInventoryScreen() {
       const next = await getInventoryAnalytics(f);
       if (requestUser.current !== requestedUser) return;
       setData(next);
+      setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
-    } finally { setLoading(false); setRefreshing(false); }
+      setLoadError(true);
+        } finally { setLoading(false); setRefreshing(false); }
   }, [filter, authLoaded, userId]);
 
   useEffect(() => {
@@ -117,6 +121,13 @@ export default function AnalyticsInventoryScreen() {
 
   if (loading) {
     return <AnalyticsSkeleton topPad={topPad} kpiCount={3} listRows={4} />;
+  }
+  if (loadError && !data) {
+    return (
+      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
+        <ErrorState message="Couldn't load inventory analytics." onRetry={() => load()} />
+      </View>
+    );
   }
   return (
     <ScrollView
@@ -230,6 +241,7 @@ export default function AnalyticsInventoryScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
+  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
   alertRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.lg, flexWrap: 'wrap' },
   alertCard:{ flex: 1, minWidth: 90, backgroundColor: colors.card, borderRadius: RADIUS.md, padding: SP.sm + 2, borderWidth: 1, alignItems: 'center', gap: 4 },

@@ -75,7 +75,7 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       <StatusBar barStyle="light-content" />
 
       <KeyboardAvoidingView

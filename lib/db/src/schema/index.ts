@@ -102,6 +102,15 @@ export const users = pgTable('users', {
   // First-visit coach mark ("add a cover video") — shown exactly once per
   // account, server-side so it survives reinstalls and other devices.
   coverCoachmarkSeenAt:       timestamp('cover_coachmark_seen_at', { withTimezone: true }),
+  // Avatar video (moving profile picture) — separate from both the plain
+  // avatar photo (profileImageUrl) and the cover video above. Server-render
+  // a center-cropped square, always-muted, <=10s clip + poster frame, both
+  // public object paths served via /api/profile/avatar-media. `avatarUrl`/
+  // `profileImageUrl` still hold the poster-equivalent for every screen that
+  // only ever shows a static avatar.
+  avatarVideoUrl:       text('avatar_video_url'),
+  avatarPosterUrl:      text('avatar_poster_url'),
+  avatarVideoUpdatedAt: timestamp('avatar_video_updated_at', { withTimezone: true }),
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
   // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
   username: text('username').unique(),
@@ -1794,6 +1803,15 @@ export const liveStreams = pgTable('live_streams', {
   endedAt:          timestamp('ended_at', { withTimezone: true }),
   replayPostId:     uuid('replay_post_id').references(() => posts.id, { onDelete: 'set null' }),
   replayUrl:        text('replay_url'),
+  // Agora Cloud Recording bookkeeping (migration 106) — see that file for
+  // the recording_status state machine and idempotency notes.
+  recordingStatus:      text('recording_status').notNull().default('none'),
+  recordingResourceId:  text('recording_resource_id'),
+  recordingSid:         text('recording_sid'),
+  recordingUid:         integer('recording_uid'),
+  recordingStartedAt:   timestamp('recording_started_at', { withTimezone: true }),
+  recordingStoppedAt:   timestamp('recording_stopped_at', { withTimezone: true }),
+  recordingError:       text('recording_error'),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   statusViewerIdx: index('live_streams_status_viewer_idx')
@@ -1812,6 +1830,21 @@ export const liveComments = pgTable('live_comments', {
   createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   streamCreatedIdx: index('live_comments_stream_created_idx').on(table.streamId, table.createdAt),
+}));
+
+// Presence-based viewer tracking (migration 105) — see that file for why
+// this replaced the old increment/decrement counter on
+// live_streams.viewer_count. One row per (stream_id, viewer); refreshed by
+// a WebSocket heartbeat (preferred) or an HTTP heartbeat fallback every
+// ~15s. viewer_count/peak_viewer_count are derived from this table by
+// jobs/liveViewersPresence.ts, not written here directly.
+export const liveViewers = pgTable('live_viewers', {
+  streamId:           uuid('stream_id').notNull().references(() => liveStreams.id, { onDelete: 'cascade' }),
+  userIdOrSessionId:  text('user_id_or_session_id').notNull(),
+  lastSeen:           timestamp('last_seen', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.streamId, table.userIdOrSessionId] }),
+  streamLastSeenIdx: index('live_viewers_stream_last_seen_idx').on(table.streamId, table.lastSeen),
 }));
 
 // ─── Seller Tax Configuration ─────────────────────────────────────────────────

@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, Switch, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, Switch, StyleSheet, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -174,7 +174,7 @@ export default function InventoryLocationScreen() {
 
   if (mode === 'list') {
     return (
-      <View style={[ls.root, { paddingTop: insets.top }]}>
+      <View style={[ls.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         {/* Header */}
         <View style={ls.header}>
           <TouchableOpacity
