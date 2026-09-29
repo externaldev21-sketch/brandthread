@@ -94,11 +94,11 @@ describe('Products absorbed the entry points inventory used to own', () => {
   it('the Products list shows a Low Stock / Out of Stock filter row and search', () => {
     expect(productsSource).toContain("'Low Stock'");
     expect(productsSource).toContain("'Out of Stock'");
-    expect(productsSource).toContain('<SearchBar');
+    expect(productsSource).toContain('searchPlaceholder="Search products…"');
   });
 
-  it('the Products list uses the shared ScreenHeader, not a bespoke title row', () => {
-    expect(productsSource).toContain('<ScreenHeader');
+  it('the Products list uses the shared SellerListHeader, matching Orders\' own header exactly', () => {
+    expect(productsSource).toContain('<SellerListHeader');
     expect(productsSource).toContain('title="Products"');
   });
 

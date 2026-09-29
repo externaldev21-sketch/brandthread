@@ -11,6 +11,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { PressableScale, useUndoToast } from '@/components/BrandthreadUI';
@@ -50,6 +51,7 @@ function rowsFor(product: Product): Row[] {
 export function StockEditorSheet({ product, visible, onClose, onChanged }: StockEditorSheetProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();
   const { showUndo } = useUndoToast();
   const [rows, setRows] = useState<Row[]>([]);
 
@@ -124,7 +126,7 @@ export function StockEditorSheet({ product, visible, onClose, onChanged }: Stock
   return (
     <Modal visible={visible} transparent animationType="fade" presentationStyle="overFullScreen" onRequestClose={onClose}>
       <Pressable style={s.overlay} onPress={onClose} />
-      <SheetRise style={[s.sheet, { paddingBottom: SP.xl }]}>
+      <SheetRise style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.xl) }]}>
         <View style={s.handle} />
         <Text style={s.title} numberOfLines={1}>Edit stock · {product.name}</Text>
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
