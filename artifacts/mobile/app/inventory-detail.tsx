@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Alert, Switch, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +13,7 @@ import { formatCents } from '@/lib/money';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState, HapticSwitch} from '@/components/BrandthreadUI';
 import { getInventoryItem, getAdjustments, getEvents, getRestockRecommendations, updateThreshold, updateOversellPolicy } from '@/services/inventoryService';
 import { InventoryItem, InventoryAdjustment, InventoryEvent, RestockRecommendation, OversellPolicy } from '@/services/inventoryTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -341,7 +341,7 @@ export default function InventoryDetailScreen() {
       {/* Track inventory */}
       <View style={d.settingRowInline}>
         <Text style={d.settingLabel}>Track inventory</Text>
-        <Switch
+        <HapticSwitch
           value={item.trackInventory}
           onValueChange={() => {}}
           trackColor={{ false: BORDER, true: PURPLE_DIM }}

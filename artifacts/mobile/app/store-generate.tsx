@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Platform, Alert, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Platform, Alert, ActivityIndicator } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -19,7 +19,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard } from '@/components/BrandthreadUI';
+  EmptyState, StatCard, HapticSwitch} from '@/components/BrandthreadUI';
 import { saveDraftAnswers, loadDraftAnswers, clearDraftAnswers,
   generateStoreFromAnswers, applyGenerationResult } from '@/services/storeService';
 import { StoreGenerationAnswers, StoreColorPalette,
@@ -752,10 +752,9 @@ export default function StoreGenerateScreen() {
               <View style={st.featureTextWrap}>
                 <Text style={[st.featureLabel, isOn && st.featureLabelOn]}>{label}</Text>
               </View>
-              <Switch
+              <HapticSwitch
                 value={isOn}
                 onValueChange={(val) => {
-                  Haptics.selectionAsync();
                   updateAnswers({
                     features: val
                       ? [...features, value]

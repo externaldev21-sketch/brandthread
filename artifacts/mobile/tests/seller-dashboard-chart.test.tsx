@@ -123,6 +123,15 @@ describe('SellerDashboardChart', () => {
     panCalls.length = 0;
   });
 
+  // The axis row only lays out (and is scrubbable) once the chart area has
+  // a real measured width — mirrors onLayout firing on a real device/browser.
+  async function layoutChart(width = 350) {
+    const chartArea = renderer!.root.findByProps({ testID: 'seller-dashboard-chart' });
+    await act(async () => {
+      chartArea.props.onLayout({ nativeEvent: { layout: { width } } });
+    });
+  }
+
   it('lists exactly the five spec ranges, in order: Today, Week, Month, Year, All', () => {
     expect(DASHBOARD_RANGES.map((r) => r.id)).toEqual(['today', 'week', 'month', 'year', 'all']);
     expect(DASHBOARD_RANGES.map((r) => r.label)).toEqual(['Today', 'Week', 'Month', 'Year', 'All']);
@@ -162,12 +171,12 @@ describe('SellerDashboardChart', () => {
     expect(panCalls[panCalls.length - 1]).toEqual({ enabled: true });
   });
 
-  it('hides axis endpoint labels for the empty state (never implies real activity)', async () => {
+  it('still shows correctly-labeled axes for the empty/fresh state — only the curve flattens, not the labels', async () => {
     await act(async () => {
       renderer = create(
         <SellerDashboardChart
-          values={[0, 0]}
-          labels={['Sun', 'Sat']}
+          values={[0, 0, 0, 0, 0, 0, 0]}
+          labels={['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']}
           theme={theme}
           range="week"
           onRangeChange={vi.fn()}
@@ -176,9 +185,30 @@ describe('SellerDashboardChart', () => {
         />,
       );
     });
-    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
-    expect(texts).not.toContain('Sun');
-    expect(texts).not.toContain('Sat');
+    await layoutChart();
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    expect(texts).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  });
+
+  it('renders a visible (non-transparent-border) flat line color for the empty state, not an invisible one', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={[0, 0, 0]}
+          labels={['Mon', 'Tue', 'Wed']}
+          theme={theme}
+          range="week"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty
+        />,
+      );
+    });
+    await layoutChart();
+    const path = renderer!.root.findAllByType('Path' as React.ElementType).find((p) => p.props.fill === 'none');
+    expect(path?.props.stroke).toBe(theme.muted);
+    expect(path?.props.stroke).not.toBe(theme.borderSubtle);
   });
 
   it('calls onRangeChange with the tapped range id and marks it selected', async () => {
@@ -208,15 +238,6 @@ describe('SellerDashboardChart', () => {
     });
     expect(onRangeChange).toHaveBeenCalledWith('month');
   });
-
-  // The axis row only lays out (and is scrubbable) once the chart area has
-  // a real measured width — mirrors onLayout firing on a real device/browser.
-  async function layoutChart(width = 350) {
-    const chartArea = renderer!.root.findByProps({ testID: 'seller-dashboard-chart' });
-    await act(async () => {
-      chartArea.props.onLayout({ nativeEvent: { layout: { width } } });
-    });
-  }
 
   it('renders every x-axis label for Week — a calendar week only ever has 7, and all 7 fit (item 123)', async () => {
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -286,6 +307,63 @@ describe('SellerDashboardChart', () => {
     expect(visible.length).toBeLessThanOrEqual(6);
     expect(visible[0]).toBe('Day 1');
     expect(visible[visible.length - 1]).toBe('Day 30');
+  });
+
+  it('renders visible axis labels in perfectly even pixel columns, even when the underlying bucket indices are not evenly spaced (Year: 12 buckets / 6 labels)', async () => {
+    // 12 buckets into 6 labels rounds to index gaps of 2,2,3,2,2 (an
+    // unavoidable integer artifact — see selectEvenlySpacedIndices) — the
+    // RENDERED columns must still be exactly even regardless.
+    const labels = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'];
+    const width = 360;
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={labels.map((_, i) => 10 + i)}
+          labels={labels}
+          theme={theme}
+          range="year"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    await layoutChart(width);
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType);
+    const lefts = texts.map((t) => flattenStyle(t.props.style).left as number);
+    expect(texts.map((t) => t.props.children)).toEqual(['Oct', 'Dec', 'Feb', 'May', 'Jul', 'Sep']);
+    const gaps = lefts.slice(1).map((left, i) => left - lefts[i]);
+    // Every INTERIOR gap (not touching the clamped left/right screen edge)
+    // must be exactly even — this is the "large gap in the middle" bug:
+    // "Feb" → "May" (crossing the 2,2,3,2,2 index-gap artifact) must be the
+    // same width as every other interior gap, not visibly larger.
+    const interiorGaps = gaps.slice(1, -1);
+    const first = interiorGaps[0];
+    for (const gap of interiorGaps) expect(Math.abs(gap - first)).toBeLessThan(0.01);
+  });
+
+  it('places the axis labels directly under the chart, ABOVE the range-selector pills (Shopify/Robinhood order)', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={[10, 20, 15, 40, 30, 25, 50]}
+          labels={['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']}
+          theme={theme}
+          range="week"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    await layoutChart();
+    const root = renderer!.root.findAllByType('View' as React.ElementType);
+    const axisIndex = root.findIndex((v) => v.props.testID === 'seller-dashboard-chart-axis');
+    const pillsIndex = root.findIndex((v) => v.props.testID === 'seller-dashboard-range-pills');
+    expect(axisIndex).toBeGreaterThan(-1);
+    expect(pillsIndex).toBeGreaterThan(-1);
+    expect(axisIndex).toBeLessThan(pillsIndex);
   });
 
   it('renders a sliding glass range indicator behind the tabs (item 124)', async () => {

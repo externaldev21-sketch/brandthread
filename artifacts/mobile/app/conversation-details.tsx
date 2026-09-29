@@ -15,14 +15,14 @@
  * (see docs/dm-flows.md) rather than a real-time push-based one.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, HapticSwitch} from '@/components/BrandthreadUI';
 import { showActionSheet } from '@/components/ui/ActionSheet';
 import { CachedImage } from '@/components/CachedImage';
 import { SheetRise } from '@/components/motion/SheetRise';
@@ -312,7 +312,7 @@ export default function ConversationDetailsScreen() {
             title="Disappearing messages"
             subtitle={disappearing ? 'On' : 'Off'}
             right={(
-              <Switch
+              <HapticSwitch
                 value={disappearing}
                 onValueChange={toggleDisappearing}
                 trackColor={{ false: theme.border, true: theme.accent }}

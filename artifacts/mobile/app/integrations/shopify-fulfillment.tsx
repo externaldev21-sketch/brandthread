@@ -7,13 +7,13 @@
  * Shopify" on the Products page — this never touches the catalog.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Switch, Linking, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { Header } from '@/components/layout';
 import { useApi } from '@/hooks/useApi';
-import { BrandthreadCard, LoadingSkeleton, SkeletonText } from '@/components/BrandthreadUI';
+import { BrandthreadCard, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
 import { COMP } from '@/lib/theme';
 
 export default function ShopifyFulfillmentScreen() {
@@ -101,7 +101,7 @@ export default function ShopifyFulfillmentScreen() {
                 {status?.connected ? `Connected to ${status.shopDomain}` : 'Not connected'}
               </Text>
             </View>
-            <Switch
+            <HapticSwitch
               value={Boolean(status?.fulfillmentEnabled)}
               onValueChange={handleToggle}
               disabled={busy}

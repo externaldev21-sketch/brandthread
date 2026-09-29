@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
-  Switch, Platform,
+  Platform,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,8 +27,7 @@ import { useColors } from '@/hooks/useColors';
 
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  FilterChip, StatusBadge, SectionHeader, FormInput, EmptyState,
-} from '@/components/BrandthreadUI';
+  FilterChip, StatusBadge, SectionHeader, FormInput, EmptyState, HapticSwitch,} from '@/components/BrandthreadUI';
 
 import {
   getManufacturer, getRelationships, saveQuoteRequestDraft, submitQuoteRequest, getQuoteRequest,
@@ -90,7 +89,7 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
   return (
     <View style={tr.row}>
       <Text style={tr.label}>{label}</Text>
-      <Switch
+      <HapticSwitch
         value={value}
         onValueChange={onChange}
         trackColor={{ false: BORDER, true: colors.accent }}

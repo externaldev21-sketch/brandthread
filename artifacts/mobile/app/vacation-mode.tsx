@@ -6,7 +6,7 @@ import React, { useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, Switch } from 'react-native';
+  StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +20,7 @@ import {
   ORANGE, RED, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 
 export default function VacationModeScreen() {
   const { theme } = useAppTheme();
@@ -109,9 +110,9 @@ export default function VacationModeScreen() {
             <Text style={s.toggleLabel}>Enable Vacation Mode</Text>
             <Text style={s.toggleSub}>Pause new orders without hiding your listings</Text>
           </View>
-          <Switch
+          <HapticSwitch
             value={vacationMode}
-            onValueChange={(v) => { Haptics.selectionAsync(); setVacationMode(v); }}
+            onValueChange={setVacationMode}
             trackColor={{ false: BORDER, true: ORANGE }}
             thumbColor="#fff"
           />

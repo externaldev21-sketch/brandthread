@@ -4,8 +4,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, Switch,
-} from 'react-native';
+  StyleSheet, Alert, Modal, } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,8 +21,7 @@ import {
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
-  EmptyState, StatCard,
-} from '@/components/BrandthreadUI';
+  EmptyState, StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
 import { getMenus, updateMenu } from '@/services/storeService';
 import { StoreMenu, StoreMenuItem, MenuType, MenuItemTarget } from '@/services/storeTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
@@ -482,7 +480,7 @@ export default function StoreNavScreen() {
               {/* Visible toggle */}
               <View style={styles.visibleRow}>
                 <Text style={styles.fieldLabel}>Visible</Text>
-                <Switch
+                <HapticSwitch
                   value={itemForm.visible}
                   onValueChange={(v) => setItemForm((p) => ({ ...p, visible: v }))}
                   trackColor={{ false: BORDER, true: PURPLE }}

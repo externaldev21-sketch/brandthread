@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, Switch, StyleSheet, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { Header } from '@/components/layout';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState, HapticSwitch} from '@/components/BrandthreadUI';
 import { getLocations, addLocation, updateLocation, archiveLocation } from '@/services/inventoryService';
 import { InventoryLocation, LocationType, LOCATION_TYPES } from '@/services/inventoryTypes';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -343,7 +343,7 @@ export default function InventoryLocationScreen() {
             <Text style={ls.switchLabel}>Fulfillment Enabled</Text>
             <Text style={ls.switchDesc}>Enable this location for order fulfillment</Text>
           </View>
-          <Switch
+          <HapticSwitch
             value={form.fulfillmentEnabled}
             onValueChange={v => setForm(f => ({ ...f, fulfillmentEnabled: v }))}
             trackColor={{ false: BORDER, true: PURPLE }}
@@ -357,7 +357,7 @@ export default function InventoryLocationScreen() {
             <Text style={ls.switchLabel}>Set as Primary</Text>
             <Text style={ls.switchDesc}>Make this the primary location</Text>
           </View>
-          <Switch
+          <HapticSwitch
             value={form.isPrimary}
             onValueChange={v => setForm(f => ({ ...f, isPrimary: v }))}
             trackColor={{ false: BORDER, true: PURPLE }}

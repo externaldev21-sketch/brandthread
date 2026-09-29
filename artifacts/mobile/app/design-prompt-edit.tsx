@@ -7,7 +7,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Switch, Alert, ActivityIndicator, Image,
+  Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -19,8 +19,7 @@ import {
 } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
-  GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput,
-} from '@/components/BrandthreadUI';
+  GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput, HapticSwitch,} from '@/components/BrandthreadUI';
 import { applyPromptEdit } from '@/services/designService';
 import type { AIGenerationResult } from '@/services/designTypes';
 
@@ -239,7 +238,7 @@ function ToggleRow({ label, description, value, onChange }: {
         <Text style={s.toggleLabel}>{label}</Text>
         <Text style={s.toggleDesc}>{description}</Text>
       </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ false: theme.cardElevated, true: PURPLE }} thumbColor={value ? theme.onAccent : theme.muted} />
+      <HapticSwitch value={value} onValueChange={onChange} trackColor={{ false: theme.cardElevated, true: PURPLE }} thumbColor={value ? theme.onAccent : theme.muted} />
     </View>
   );
 }

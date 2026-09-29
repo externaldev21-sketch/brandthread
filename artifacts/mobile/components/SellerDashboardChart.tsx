@@ -194,7 +194,13 @@ export function SellerDashboardChart({
   });
 
   const gradientId = 'sellerDashboardChartFill';
-  const strokeColor = isEmpty ? (theme as any).borderSubtle ?? BORDER_SUBTLE : theme.accent;
+  // The empty/fresh-seller state must still draw a real, VISIBLE flat line
+  // at $0 (never blank space that reads as a broken/missing chart) — just
+  // muted rather than the full accent color, so it never implies real
+  // activity. theme.borderSubtle (~4% opacity) was invisible against the
+  // dark background; theme.muted is the same solid, monochrome tone the
+  // rest of the dashboard already uses for secondary/inactive content.
+  const strokeColor = isEmpty ? theme.muted ?? BORDER_SUBTLE : theme.accent;
 
   // Today's chart spreads its labels across even quarters of the day
   // (12am/6am/12pm/6pm, per Shopify's own Analytics "Yesterday"/"Today"
@@ -202,8 +208,17 @@ export function SellerDashboardChart({
   // range anchors its evenly-spaced marks to the first and last bucket.
   const wantAxisLabels = AXIS_LABEL_COUNT[range] ?? 5;
   const anchorAxisEnds = range !== 'today';
+  // Which real buckets get a label (their timestamps/text) — an ordered
+  // list, not a Set, because the *rendered* column position below is
+  // derived from each label's position WITHIN this list (evenly spaced by
+  // construction), not from its original bucket index. Splitting an uneven
+  // bucket count across `want` labels can't always land on perfectly
+  // even *index* gaps (e.g. 12 buckets / 6 labels rounds to gaps of
+  // 2,2,3,2,2 — one inevitably-larger integer gap), but the labels
+  // themselves must still render in perfectly even *pixel* columns, or
+  // that integer rounding shows up as a visibly uneven gap on screen.
   const visibleAxisIndices = useMemo(
-    () => new Set(selectEvenlySpacedIndices(labels.length, wantAxisLabels, anchorAxisEnds)),
+    () => selectEvenlySpacedIndices(labels.length, wantAxisLabels, anchorAxisEnds),
     [labels.length, wantAxisLabels, anchorAxisEnds],
   );
 
@@ -269,6 +284,38 @@ export function SellerDashboardChart({
         </View>
       </GestureDetector>
 
+      {/* Axis labels sit directly under the chart curve they describe —
+          Shopify/Robinhood-style chart → its own x-axis → range selector,
+          not chart → range selector → labels (which read as detached from
+          the chart entirely). Shown for the empty/fresh state too: a
+          zero-sales chart still has correctly-labeled ranges, just a flat
+          line instead of a real curve. */}
+      {labels.length > 0 && width > 0 && visibleAxisIndices.length > 0 && (
+        <View style={styles.axisRow} pointerEvents="none" testID="seller-dashboard-chart-axis">
+          {visibleAxisIndices.map((bucketIndex, i) => {
+            // Rendered in perfectly even PIXEL columns across the row,
+            // independent of the underlying bucket's own x — selecting
+            // `want` labels out of an uneven bucket count can't always land
+            // on perfectly even *index* gaps (12 buckets / 6 labels rounds
+            // to gaps of 2,2,3,2,2 — one integer gap is inevitably larger),
+            // but the rendered columns themselves must still be even, or
+            // that rounding artifact shows up as a visibly uneven gap.
+            const t = visibleAxisIndices.length > 1 ? i / (visibleAxisIndices.length - 1) : 0.5;
+            const x = t * width;
+            const left = Math.max(0, Math.min(width - AXIS_LABEL_WIDTH, x - AXIS_LABEL_WIDTH / 2));
+            return (
+              <Text
+                key={`${labels[bucketIndex]}-${bucketIndex}`}
+                style={[styles.axisLabel, { color: theme.subtle, left }]}
+                numberOfLines={1}
+              >
+                {labels[bucketIndex]}
+              </Text>
+            );
+          })}
+        </View>
+      )}
+
       <View style={styles.rangeRow} onLayout={onRangeRowLayout} testID="seller-dashboard-range-pills">
         {rangeSegmentWidth > 0 && (
           <Animated.View
@@ -298,31 +345,6 @@ export function SellerDashboardChart({
           );
         })}
       </View>
-
-      {labels.length > 0 && !isEmpty && width > 0 && (
-        <View style={styles.axisRow} pointerEvents="none" testID="seller-dashboard-chart-axis">
-          {labels.map((label, index) => {
-            if (!visibleAxisIndices.has(index)) return null;
-            // Positioned at the bucket's own x-coordinate (same layout the
-            // chart/tooltip use), not squeezed into an equal-width flex
-            // column shared with every hidden bucket — that was truncating
-            // "12 AM"/"6 PM"-style labels down to a couple of characters
-            // once the visible slot count was <<the bucket count.
-            const point = points[index];
-            const x = point ? point.x : labels.length > 1 ? (index / (labels.length - 1)) * width : width / 2;
-            const left = Math.max(0, Math.min(width - AXIS_LABEL_WIDTH, x - AXIS_LABEL_WIDTH / 2));
-            return (
-              <Text
-                key={`${label}-${index}`}
-                style={[styles.axisLabel, { color: theme.subtle, left }]}
-                numberOfLines={1}
-              >
-                {label}
-              </Text>
-            );
-          })}
-        </View>
-      )}
     </View>
   );
 }
