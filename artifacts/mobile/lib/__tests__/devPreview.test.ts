@@ -271,6 +271,84 @@ describe('isProductionPreviewHost — matching logic', () => {
   });
 });
 
+// ── Fresh vs. demo preview data mode ──────────────────────────────────────────
+// isPreviewFreshMode()/isPreviewDemoMode(): the default preview is a
+// brand-new, zero-everything account (FRESH). The populated demo dataset is
+// opt-in only, via `&demo=1`, and never the default — Dev's explicit call
+// ("I don't want it to act like it already has people on it").
+
+function demoModeFromSearch(search: string, inPreview: boolean, persistedDemo = false): PreviewResult {
+  if (!inPreview) return false;
+  const v = new URLSearchParams(search).get('demo');
+  if (v === '1') return true;
+  return persistedDemo;
+}
+
+function freshModeFromSearch(search: string, inPreview: boolean, persistedDemo = false): PreviewResult {
+  return inPreview && !demoModeFromSearch(search, inPreview, persistedDemo);
+}
+
+describe('isPreviewDemoMode / isPreviewFreshMode — data-mode logic', () => {
+  it('fresh mode (not demo) by default whenever a preview is active', () => {
+    expect(demoModeFromSearch('?bt_preview=seller', true)).toBe(false);
+    expect(freshModeFromSearch('?bt_preview=seller', true)).toBe(true);
+  });
+
+  it('demo mode only with the explicit &demo=1 opt-in', () => {
+    expect(demoModeFromSearch('?bt_preview=seller&demo=1', true)).toBe(true);
+    expect(freshModeFromSearch('?bt_preview=seller&demo=1', true)).toBe(false);
+  });
+
+  it('neither mode applies outside a preview context', () => {
+    expect(demoModeFromSearch('?demo=1', false)).toBe(false);
+    expect(freshModeFromSearch('?demo=1', false)).toBe(false);
+  });
+
+  it('demo=1 alone (no bt_preview) never activates the demo dataset', () => {
+    // demoModeFromSearch takes inPreview as a precondition, mirroring
+    // isPreviewDemoMode() itself requiring isSellerDevPreview() ||
+    // isBuyerDevPreview() before it even looks at the demo param.
+    expect(demoModeFromSearch('?demo=1', false)).toBe(false);
+  });
+
+  it('persisted demo flag survives a later navigation with no demo param, same as the role flag does', () => {
+    expect(demoModeFromSearch('?bt_preview=seller', true, true)).toBe(true);
+    expect(freshModeFromSearch('?bt_preview=seller', true, true)).toBe(false);
+  });
+
+  it('a fresh param explicitly overrides a stale persisted demo flag', () => {
+    // demo is only ever set to '1' by an explicit param in the real module;
+    // there is no way to un-set it via the URL, mirroring bt_preview's own
+    // "only the first load has to carry it" contract — this documents that
+    // the fresh/demo distinction is a one-way opt-in for the rest of the
+    // session, exactly like the seller/buyer role itself.
+    expect(demoModeFromSearch('?bt_preview=seller', true, true)).toBe(true);
+  });
+});
+
+describe('isPreviewFreshMode / isPreviewDemoMode real export (module path + source checks)', () => {
+  it('lib/devPreview.ts exports both functions', () => {
+    const { readFileSync } = require('fs');
+    const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
+    expect(src).toContain('export function isPreviewFreshMode');
+    expect(src).toContain('export function isPreviewDemoMode');
+  });
+
+  it('isPreviewFreshMode is defined as "in preview AND NOT demo mode" (source check)', () => {
+    const { readFileSync } = require('fs');
+    const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
+    expect(src).toContain('const inPreview = isSellerDevPreview(searchOverride) || isBuyerDevPreview(searchOverride);');
+    expect(src).toContain('return inPreview && !isPreviewDemoMode(searchOverride);');
+  });
+
+  it('isPreviewDemoMode requires the explicit demo=1 param (source check)', () => {
+    const { readFileSync } = require('fs');
+    const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
+    expect(src).toContain("const v = new URLSearchParams(search).get('demo');");
+    expect(src).toContain("if (v === '1') {");
+  });
+});
+
 describe('production-host hard gate is wired into the real module (source check)', () => {
   it('lib/devPreview.ts exports isProductionPreviewHost and both preview functions call it', () => {
     const { readFileSync } = require('fs');

@@ -16,7 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
+import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
+import { isSellerDevPreview } from '@/lib/devPreview';
+import { addPreviewDiscount, deletePreviewDiscount, getPreviewDiscounts, updatePreviewDiscount, type PreviewDiscount } from '@/lib/previewSellerFreshStore';
 import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -106,6 +109,13 @@ export default function DiscountsScreen() {
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { userId } = useAuth();
+  // ?bt_preview=seller with no real signed-in account: no token to fetch or
+  // save real discounts with. Reads/writes go through
+  // lib/previewSellerFreshStore.ts's in-session store instead of the API, so
+  // "Create discount" still genuinely works for the rest of the preview
+  // session (same convention as app/(tabs)/orders.tsx's isPreviewMode guard).
+  const [isPreviewMode] = useState(() => isSellerDevPreview());
 
   const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
   const [products, setProducts] = useState<Array<{ id: string; name: string; images?: string[] }>>([]);
@@ -132,6 +142,13 @@ export default function DiscountsScreen() {
   const [endDate, setEndDate] = useState('');
 
   const loadDiscounts = useCallback(async () => {
+    if (isPreviewMode && !userId) {
+      setDiscounts(getPreviewDiscounts().map(normalizeDiscount));
+      setProducts([]);
+      setLoadError(false);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [data, prods] = await Promise.all([
@@ -252,7 +269,32 @@ export default function DiscountsScreen() {
         startsAt: startDate ? new Date(startDate).toISOString() : null,
         expiresAt: hasEnd && endDate ? new Date(endDate).toISOString() : null,
       };
-      if (editingId) {
+      if (isPreviewMode && !userId) {
+        if (editingId) {
+          const updated = updatePreviewDiscount(editingId, payload);
+          if (updated) setDiscounts(prev => prev.map(d => d.id === editingId ? normalizeDiscount(updated) : d));
+        } else {
+          const created: PreviewDiscount = {
+            id: 'preview_discount_' + Math.random().toString(36).slice(2, 11),
+            code: (payload.code || randomCode()).toUpperCase(),
+            type: payload.type,
+            value: payload.value,
+            minOrderCents: payload.minOrderCents,
+            appliesTo: payload.appliesTo,
+            productIds: payload.productIds,
+            maxUses: payload.maxUses,
+            usesCount: 0,
+            oneUsePerCustomer: payload.oneUsePerCustomer,
+            startsAt: payload.startsAt,
+            expiresAt: payload.expiresAt,
+            active: true,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+          };
+          addPreviewDiscount(created);
+          setDiscounts(prev => [normalizeDiscount(created), ...prev]);
+        }
+      } else if (editingId) {
         const updated = await api.discountCodes.update(editingId, payload);
         setDiscounts(prev => prev.map(d => d.id === editingId ? normalizeDiscount(updated) : d));
       } else {
@@ -272,6 +314,10 @@ export default function DiscountsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const nextActive = !d.active;
     setDiscounts(prev => prev.map(x => x.id === d.id ? { ...x, active: nextActive, status: nextActive ? 'active' : 'paused' } : x));
+    if (isPreviewMode && !userId) {
+      updatePreviewDiscount(d.id, { active: nextActive, status: nextActive ? 'active' : 'paused' });
+      return;
+    }
     try {
       await api.discountCodes.update(d.id, { active: nextActive });
     } catch {
@@ -286,6 +332,10 @@ export default function DiscountsScreen() {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           setDiscounts(prev => prev.filter(x => x.id !== d.id));
+          if (isPreviewMode && !userId) {
+            deletePreviewDiscount(d.id);
+            return;
+          }
           try { await api.discountCodes.delete(d.id); }
           catch { loadDiscounts(); }
         },

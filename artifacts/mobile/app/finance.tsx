@@ -5,7 +5,9 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { FS } from '@/lib/theme';
@@ -13,6 +15,7 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
 import { FinanceMoneyFlow } from '@/components/FinanceMoneyFlow';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import { zeroFinanceSummary } from '@/lib/financeSummary';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { RetryRow } from '@/components/ui/RetryRow';
@@ -34,6 +37,12 @@ export default function FinanceScreen() {
   const colors = useColors();
   const router = useRouter();
   const api = useApi();
+  const { userId } = useAuth();
+  // ?bt_preview=seller with no real signed-in account: no token to fetch
+  // real finance data with — resolve straight to the honest $0.00/empty
+  // state instead of a "couldn't load" retry banner (same convention as
+  // app/(tabs)/orders.tsx's isPreviewMode guard).
+  const [isPreviewMode] = useState(() => isSellerDevPreview());
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -52,6 +61,15 @@ export default function FinanceScreen() {
   } | null>(null);
 
   const load = useCallback(async () => {
+    if (isPreviewMode && !userId) {
+      setBalance({ available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false });
+      setTransactions([]);
+      setSummary(zeroFinanceSummary());
+      setSummaryError(false);
+      setBalanceError(false);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setSummaryError(false);
     setBalanceError(false);
