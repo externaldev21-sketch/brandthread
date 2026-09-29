@@ -229,6 +229,56 @@ describe('SellerDashboardChart', () => {
     expect(texts).toEqual(labels);
   });
 
+  it('shows only 4 evenly-spaced quarter-of-day labels for Today, not all 24 hourly buckets', async () => {
+    const labels = Array.from({ length: 24 }, (_, h) => `${h}h`);
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={labels.map(() => 10)}
+          labels={labels}
+          theme={theme}
+          range="today"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    expect(texts).toHaveLength(24);
+    const visible = texts.filter(Boolean);
+    expect(visible).toHaveLength(4);
+    // Quarters of the day: hour 0, 6, 12, 18 (12am/6am/12pm/6pm), matching
+    // Shopify's own Today/Yesterday Analytics chart.
+    expect(visible).toEqual(['0h', '6h', '12h', '18h']);
+  });
+
+  it('shows a small evenly-spaced subset of labels for Month (not all ~30 daily buckets)', async () => {
+    const labels = Array.from({ length: 30 }, (_, i) => `Day ${i + 1}`);
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={labels.map(() => 10)}
+          labels={labels}
+          theme={theme}
+          range="month"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    expect(texts).toHaveLength(30);
+    const visible = texts.filter(Boolean);
+    expect(visible.length).toBeGreaterThanOrEqual(4);
+    expect(visible.length).toBeLessThanOrEqual(6);
+    expect(visible[0]).toBe('Day 1');
+    expect(visible[visible.length - 1]).toBe('Day 30');
+  });
+
   it('renders a sliding glass range indicator behind the tabs (item 124)', async () => {
     await act(async () => {
       renderer = create(

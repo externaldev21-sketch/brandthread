@@ -271,6 +271,62 @@ describe('isProductionPreviewHost — matching logic', () => {
   });
 });
 
+// ── Demo/fresh preview data flag ──────────────────────────────────────────
+// Companion to isSellerDevPreview: within the seller preview, the populated
+// "demo" dataset only shows behind an explicit ?demo=1 (default is the
+// fresh/zero-state account — see lib/previewSellerChartData.ts).
+
+function sellerPreviewDemoFromSearch(
+  search: string,
+  isSellerPreview: boolean,
+  persistedDemo = false,
+): PreviewResult {
+  if (!isSellerPreview) return false;
+  const v = new URLSearchParams(search).get('demo');
+  if (v === '1') return true;
+  if (v !== null) return false;
+  return persistedDemo;
+}
+
+describe('isSellerPreviewDemoMode — query-string logic', () => {
+  it('is false outside the seller preview regardless of ?demo=1', () => {
+    expect(sellerPreviewDemoFromSearch('?demo=1', false)).toBe(false);
+  });
+
+  it('defaults to false (fresh/zero-state) with no ?demo param', () => {
+    expect(sellerPreviewDemoFromSearch('', true)).toBe(false);
+    expect(sellerPreviewDemoFromSearch('?bt_preview=seller', true)).toBe(false);
+  });
+
+  it('is true only for explicit ?demo=1', () => {
+    expect(sellerPreviewDemoFromSearch('?bt_preview=seller&demo=1', true)).toBe(true);
+  });
+
+  it('is false for any other ?demo value', () => {
+    expect(sellerPreviewDemoFromSearch('?demo=true', true)).toBe(false);
+    expect(sellerPreviewDemoFromSearch('?demo=0', true)).toBe(false);
+  });
+
+  it('falls back to the persisted demo flag once the param is gone (in-app navigation)', () => {
+    expect(sellerPreviewDemoFromSearch('', true, true)).toBe(true);
+    expect(sellerPreviewDemoFromSearch('', true, false)).toBe(false);
+  });
+
+  it('an explicit non-1 value overrides a stale persisted demo flag', () => {
+    expect(sellerPreviewDemoFromSearch('?demo=0', true, true)).toBe(false);
+  });
+});
+
+describe('isSellerPreviewDemoMode real export (source check)', () => {
+  it('lib/devPreview.ts exports isSellerPreviewDemoMode and gates it behind isSellerDevPreview', () => {
+    const { readFileSync } = require('fs');
+    const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
+    expect(src).toContain('export function isSellerPreviewDemoMode');
+    expect(src).toContain('if (!isSellerDevPreview(searchOverride)) return false;');
+    expect(src).toContain("get('demo')");
+  });
+});
+
 describe('production-host hard gate is wired into the real module (source check)', () => {
   it('lib/devPreview.ts exports isProductionPreviewHost and both preview functions call it', () => {
     const { readFileSync } = require('fs');

@@ -110,6 +110,60 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
   return persistedPreviewRole() === 'seller';
 }
 
+function persistedPreviewDemo(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem('bt_preview_demo') === '1';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Returns true only inside the seller dev preview AND when the populated
+ * "demo" dataset was explicitly requested via `?demo=1` (this navigation or
+ * earlier this session) — e.g. `?bt_preview=seller&demo=1`.
+ *
+ * Mirrors isSellerDevPreview's persistence pattern (Expo Router drops query
+ * params on plain in-app navigation, so a param that only has to be present
+ * on the first load is mirrored into localStorage the same way `user_role`
+ * is in app/_layout.tsx) so switching tabs doesn't silently fall back to the
+ * default fresh/zero-state preview mid-session.
+ *
+ * Without `?demo=1`, the seller preview defaults to a brand-new, zero-sales
+ * account — never fabricated activity — matching isSellerDevPreview's own
+ * "no query param means the real thing" philosophy applied to the demo flag.
+ *
+ * NOTE: this is a narrowly-scoped companion to the chart fix in this PR. If
+ * `claude/seller-fresh-preview` lands first (or is merged onto this branch),
+ * prefer its `isPreviewFreshMode()`/`isPreviewDemoMode()` instead — the two
+ * concepts should not coexist long-term. See the PR description.
+ *
+ * @param searchOverride  Optional query string supplied by tests instead of
+ *   reading window.location.search.
+ */
+export function isSellerPreviewDemoMode(searchOverride?: string): boolean {
+  if (!isSellerDevPreview(searchOverride)) return false;
+
+  let search = searchOverride ?? '';
+  if (searchOverride === undefined) {
+    if (typeof window === 'undefined') return false;
+    search = window.location.search;
+  }
+
+  const v = new URLSearchParams(search).get('demo');
+  if (v === '1') {
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('bt_preview_demo', '1');
+    } catch {
+      // Persistence is best-effort only.
+    }
+    return true;
+  }
+  if (v !== null) return false; // an explicit non-'1' value always wins over the persisted flag
+
+  return persistedPreviewDemo();
+}
+
 /**
  * Convenience: returns true only in the dev-web buyer preview context.
  * Complements isSellerDevPreview for completeness; used in tests.

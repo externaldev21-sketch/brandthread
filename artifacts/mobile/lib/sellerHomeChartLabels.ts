@@ -65,3 +65,34 @@ export function bucketLabel(value: string, range: SellerHomeTimeRange): string {
   }
   return formatClockLabel(date, range === 'live');
 }
+
+/**
+ * Picks a small, evenly-spaced subset of bucket indices to actually show
+ * text for on the chart's x-axis, so a dense range (e.g. 30 daily buckets
+ * for "Month", or 24 hourly buckets for "Today") reads as a handful of
+ * clean, non-overlapping labels instead of every single bucket's label
+ * crammed edge-to-edge (Shopify's own Sales Report/Analytics charts do the
+ * same — see the Mobbin references in the PR description).
+ *
+ * `count` is left untouched by the caller (every bucket still lays out and
+ * is scrubbable) — only which indices get a *visible* label text changes.
+ *
+ * @param anchorEnds  true (default) spreads `want` marks from index 0 to
+ *   index `count - 1` inclusive (used for Month/Year/All, where the first
+ *   and last bucket are meaningful endpoints). false spreads `want` marks
+ *   at even quarter-points of the range instead (used for Today, where
+ *   Shopify's own chart shows 12am/6am/12pm/6pm — quarters of the day, not
+ *   "first bucket, last bucket").
+ */
+export function selectEvenlySpacedIndices(count: number, want: number, anchorEnds = true): number[] {
+  if (count <= 0 || want <= 0) return [];
+  if (count <= want) return Array.from({ length: count }, (_, i) => i);
+  const indices = new Set<number>();
+  for (let i = 0; i < want; i++) {
+    const idx = anchorEnds
+      ? Math.round((i * (count - 1)) / (want - 1))
+      : Math.min(count - 1, Math.round((i * count) / want));
+    indices.add(idx);
+  }
+  return Array.from(indices).sort((a, b) => a - b);
+}

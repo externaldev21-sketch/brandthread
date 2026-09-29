@@ -15,6 +15,7 @@ import { Glass } from '@/components/ui/Glass';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { TAB_INDICATOR_SPRING } from '@/constants/motion';
 import { layoutSeriesPoints, smoothPath } from '@/lib/svgSmoothPath';
+import { selectEvenlySpacedIndices } from '@/lib/sellerHomeChartLabels';
 import { BORDER_SUBTLE, FONT, FS, SP } from '@/lib/theme';
 
 export type SellerDashboardRange = 'today' | 'week' | 'month' | 'year' | 'all';
@@ -28,6 +29,19 @@ export const DASHBOARD_RANGES: Array<{ id: SellerDashboardRange; label: string }
 ];
 
 const CHART_HEIGHT = 168;
+
+// How many x-axis labels to actually show text for, per range — a handful
+// of evenly-spaced, non-overlapping labels (Shopify's own Sales Report/
+// Analytics charts do the same) rather than one per bucket, which for
+// Month's ~30 daily buckets or Today's 24 hourly buckets would overlap into
+// illegible smears. Every bucket still lays out and is scrubbable — only
+// which indices get *visible* label text changes. Week is a deliberate
+// exception: a calendar week only ever has 7 buckets, and showing all 7
+// ("Mon" through "Sun") is both natural and still non-overlapping at phone
+// width.
+const AXIS_LABEL_COUNT: Record<SellerDashboardRange, number> = {
+  today: 4, week: 7, month: 5, year: 6, all: 6,
+};
 
 export function SellerDashboardChart({
   values,
@@ -174,6 +188,17 @@ export function SellerDashboardChart({
   const gradientId = 'sellerDashboardChartFill';
   const strokeColor = isEmpty ? (theme as any).borderSubtle ?? BORDER_SUBTLE : theme.accent;
 
+  // Today's chart spreads its labels across even quarters of the day
+  // (12am/6am/12pm/6pm, per Shopify's own Analytics "Yesterday"/"Today"
+  // chart) rather than anchoring to the first/last bucket; every other
+  // range anchors its evenly-spaced marks to the first and last bucket.
+  const wantAxisLabels = AXIS_LABEL_COUNT[range] ?? 5;
+  const anchorAxisEnds = range !== 'today';
+  const visibleAxisIndices = useMemo(
+    () => new Set(selectEvenlySpacedIndices(labels.length, wantAxisLabels, anchorAxisEnds)),
+    [labels.length, wantAxisLabels, anchorAxisEnds],
+  );
+
   return (
     <View>
       <GestureDetector gesture={pan}>
@@ -218,11 +243,16 @@ export function SellerDashboardChart({
                 styles.tooltip,
                 {
                   left: Math.max(4, Math.min(width - 4, points[tooltipIndex].x)),
-                  top: Math.max(0, points[tooltipIndex].y - 34),
+                  top: Math.max(0, points[tooltipIndex].y - 46),
                 },
               ]}
             >
               <Glass variant="regular" radius={10} style={StyleSheet.absoluteFill} />
+              {labels[tooltipIndex] ? (
+                <Text style={[styles.tooltipLabel, { color: theme.muted }]} numberOfLines={1}>
+                  {labels[tooltipIndex]}
+                </Text>
+              ) : null}
               <Text style={[styles.tooltipText, { color: theme.text }]} numberOfLines={1}>
                 {(formatValue ?? String)(values[tooltipIndex] ?? 0)}
               </Text>
@@ -274,7 +304,7 @@ export function SellerDashboardChart({
               ]}
               numberOfLines={1}
             >
-              {label}
+              {visibleAxisIndices.has(index) ? label : ''}
             </Text>
           ))}
         </View>
@@ -310,6 +340,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ translateX: -32 }],
+  },
+  tooltipLabel: {
+    fontFamily: FONT.regular,
+    fontSize: 9,
   },
   tooltipText: {
     fontFamily: FONT.semibold,

@@ -4,7 +4,9 @@
 process.env.TZ = 'Pacific/Kiritimati'; // UTC+14, deliberately far from UTC
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { bucketLabel, formatClockLabel, MONTH_LABELS, parseBucketTimestamp, WEEKDAY_LABELS } from './sellerHomeChartLabels';
+import {
+  bucketLabel, formatClockLabel, MONTH_LABELS, parseBucketTimestamp, selectEvenlySpacedIndices, WEEKDAY_LABELS,
+} from './sellerHomeChartLabels';
 
 const TZ_OFFSET_MINUTES = 14 * 60; // matches process.env.TZ below (Pacific/Kiritimati)
 
@@ -90,5 +92,42 @@ describe('seller home chart labels', () => {
     const janBucket = localMonthStartIso(2024, 0);
     expect(bucketLabel(decBucket, 'year')).toBe('Dec');
     expect(bucketLabel(janBucket, 'year')).toBe('Jan');
+  });
+});
+
+describe('selectEvenlySpacedIndices', () => {
+  it('returns every index when count is at or below the target', () => {
+    expect(selectEvenlySpacedIndices(7, 7)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(selectEvenlySpacedIndices(3, 5)).toEqual([0, 1, 2]);
+  });
+
+  it('anchors the first and last index by default (Month/Year/All)', () => {
+    const indices = selectEvenlySpacedIndices(30, 5);
+    expect(indices[0]).toBe(0);
+    expect(indices[indices.length - 1]).toBe(29);
+    expect(indices.length).toBeLessThanOrEqual(5);
+    // Strictly increasing, no duplicates.
+    for (let i = 1; i < indices.length; i++) expect(indices[i]).toBeGreaterThan(indices[i - 1]);
+  });
+
+  it('spreads quarter-points across the full range without end-anchoring (Today)', () => {
+    // 24 hourly buckets, 4 marks: exactly the quarter-hours Shopify itself
+    // shows (12am/6am/12pm/6pm), not "first bucket, last bucket".
+    expect(selectEvenlySpacedIndices(24, 4, false)).toEqual([0, 6, 12, 18]);
+  });
+
+  it('never exceeds `want` indices and never repeats one', () => {
+    for (const [count, want] of [[24, 4], [30, 5], [12, 6], [365, 6]] as const) {
+      const indices = selectEvenlySpacedIndices(count, want);
+      expect(indices.length).toBeLessThanOrEqual(want);
+      expect(new Set(indices).size).toBe(indices.length);
+      indices.forEach((i) => expect(i).toBeGreaterThanOrEqual(0));
+      indices.forEach((i) => expect(i).toBeLessThan(count));
+    }
+  });
+
+  it('handles zero/negative inputs safely', () => {
+    expect(selectEvenlySpacedIndices(0, 5)).toEqual([]);
+    expect(selectEvenlySpacedIndices(10, 0)).toEqual([]);
   });
 });
