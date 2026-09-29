@@ -10,8 +10,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { createProblemReport } from '@/services/cartService';
@@ -24,7 +24,7 @@ import {
   SUCCESS, ON_DARK,
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  FONT, FS, SP, RADIUS, COMP,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch, PrimaryButton } from '@/components/BrandthreadUI';
@@ -38,7 +38,6 @@ export default function BuyerProblemReportScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
 
   const [order, setOrder] = useState<BuyerOrderView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,15 +111,11 @@ export default function BuyerProblemReportScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-      <View style={[s.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity style={s.backBtn} onPress={() => goBackOr(router)} activeOpacity={0.7}>
-          <Feather name="chevron-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <View>
-          <Text style={s.headerTitle}>Report a problem</Text>
-          {order && <Text style={s.headerSub}>{order.orderNumber} · {order.sellerName}</Text>}
-        </View>
-      </View>
+      <ScreenHeader
+        title="Report a problem"
+        subtitle={order ? `${order.orderNumber} · ${order.sellerName}` : undefined}
+        onBack={() => goBackOr(router)}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: insets.bottom + 100 }}>
         {/* Issue type */}
@@ -235,10 +230,6 @@ export default function BuyerProblemReportScreen() {
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  headerSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
   sectionTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

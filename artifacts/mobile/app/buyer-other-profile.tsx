@@ -32,6 +32,7 @@ import {
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
@@ -405,25 +406,27 @@ export default function BuyerOtherProfileScreen() {
 
       {/* ── More options sheet ── */}
       <Modal visible={moreSheetOpen} transparent animationType="slide" onRequestClose={() => setMoreSheetOpen(false)}>
-        <View style={styles.moreBackdrop}>
-          {/* Plain Pressable, not PressableScale: PressableScale only
-              forwards a plain-object `style` prop to its *inner*
-              Animated.View, never the outer Pressable that actually
-              receives touches — so this backdrop had no real hit area and
-              tapping it did nothing. */}
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setMoreSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close options" />
-          <View style={[styles.moreSheet, { paddingBottom: insets.bottom + SP.md }]}>
-            <View style={styles.moreHandle} />
-            <Text style={styles.moreTitle}>{displayName}</Text>
-            <MoreRow icon="volume-x" label="Mute" onPress={handleMute} />
-            <View style={styles.moreDivider} />
-            <MoreRow icon="user-x" label="Restrict" onPress={handleRestrict} />
-            <View style={styles.moreDivider} />
-            <MoreRow icon="flag" label="Report" onPress={handleReport} />
-            <View style={styles.moreDivider} />
-            <MoreRow icon="slash" label={iBlockedThem ? 'Unblock' : 'Block'} onPress={handleBlock} destructive />
+        <ModalSafeArea>
+          <View style={styles.moreBackdrop}>
+            {/* Plain Pressable, not PressableScale: PressableScale only
+                forwards a plain-object `style` prop to its *inner*
+                Animated.View, never the outer Pressable that actually
+                receives touches — so this backdrop had no real hit area and
+                tapping it did nothing. */}
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setMoreSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close options" />
+            <View style={[styles.moreSheet, { paddingBottom: insets.bottom + SP.md }]}>
+              <View style={styles.moreHandle} />
+              <Text style={styles.moreTitle}>{displayName}</Text>
+              <MoreRow icon="volume-x" label="Mute" onPress={handleMute} />
+              <View style={styles.moreDivider} />
+              <MoreRow icon="user-x" label="Restrict" onPress={handleRestrict} />
+              <View style={styles.moreDivider} />
+              <MoreRow icon="flag" label="Report" onPress={handleReport} />
+              <View style={styles.moreDivider} />
+              <MoreRow icon="slash" label={iBlockedThem ? 'Unblock' : 'Block'} onPress={handleBlock} destructive />
+            </View>
           </View>
-        </View>
+        </ModalSafeArea>
       </Modal>
     </>
   );
