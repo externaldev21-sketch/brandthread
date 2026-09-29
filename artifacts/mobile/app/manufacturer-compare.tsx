@@ -9,7 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
 import { getFavoriteManufacturerIds, getManufacturer } from '@/services/manufacturerService';
@@ -72,7 +72,7 @@ export default function ManufacturerCompareScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="Compare Suppliers" onBack={() => goBackOr(router)} />
+      <ScreenHeader title="Compare Suppliers" onBack={() => goBackOr(router)} />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>

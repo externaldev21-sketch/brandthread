@@ -9,7 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, PrimaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
 import { getManufacturerProduct, type ManufacturerProduct } from '@/services/manufacturerCatalog';
@@ -41,7 +41,7 @@ export default function ManufacturerProductScreen() {
 
   return (
     <View style={s.root}>
-      <Header title={product?.name ?? 'Product'} onBack={() => goBackOr(router)} />
+      <ScreenHeader title={product?.name ?? 'Product'} onBack={() => goBackOr(router)} />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
       ) : error || !product ? (
