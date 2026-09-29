@@ -20,7 +20,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadCard,
+  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   PrimaryButton, SecondaryButton,
 } from '@/components/BrandthreadUI';
 import { createProject } from '@/services/designService';
@@ -215,18 +215,7 @@ export default function DesignProjectScreen() {
 
   return (
     <BrandthreadScreen>
-      {/* Nav header */}
-      <View style={styles.navRow}>
-        <TouchableOpacity
-          onPress={goBack}
-          style={styles.backBtn}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>New Project</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <BrandthreadHeader title="New Project" onBack={goBack} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* ── Step 1: Choose type ── */}
@@ -574,26 +563,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   scroll: {
     paddingBottom: 40,
-  },
-  navRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.lg,
-    paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
-    color: FG,
   },
   typeGrid: {
     flexDirection: 'row',

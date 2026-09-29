@@ -16,7 +16,8 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Haptics from 'expo-haptics';
 import { File, Paths } from 'expo-file-system';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
@@ -280,13 +281,8 @@ export default function AiDesignChatScreen() {
 
       {/* ── Version history ── */}
       <Modal visible={showHistory} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setShowHistory(false)}>
-        <View style={s.historyRoot}>
-          <View style={s.historyHeader}>
-            <Text style={s.historyTitle}>Version history</Text>
-            <TouchableOpacity onPress={() => setShowHistory(false)}>
-              <Feather name="x" size={ICON.sm} color={colors.text} />
-            </TouchableOpacity>
-          </View>
+        <SafeAreaProvider style={s.historyRoot}>
+          <ScreenHeader title="Version history" variant="modal" onBack={() => setShowHistory(false)} />
           <FlatList
             data={[...versions].reverse()}
             keyExtractor={v => v.id}
@@ -303,7 +299,7 @@ export default function AiDesignChatScreen() {
               </TouchableOpacity>
             )}
           />
-        </View>
+        </SafeAreaProvider>
       </Modal>
     </BrandthreadScreen>
   );
@@ -454,19 +450,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   historyRoot: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  historyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  historyTitle: {
-    fontFamily: FONT.bold,
-    fontSize: FS.md,
-    color: colors.text,
   },
   historyCard: {
     flex: 1,
