@@ -11,15 +11,15 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getStoreAnalytics, getFilterState } from '@/services/analyticsService';
 import { StoreAnalytics, StoreFunnelStep, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
+  AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
   ProgressBar, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
 
@@ -51,7 +51,6 @@ export default function AnalyticsStoreScreen() {
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = useHeaderTopInset();
 
   const [data,       setData]       = useState<StoreAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
@@ -85,29 +84,26 @@ export default function AnalyticsStoreScreen() {
     if (authLoaded && userId) { setLoading(true); load(); }
   }, [authLoaded, userId]); // load reads the current filter
 
-  if (loading) {
-    return <AnalyticsSkeleton topPad={topPad} kpiCount={3} listRows={4} />;
-  }
-  if (loadError && !data) {
-    return (
-      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
-        <ErrorState message="Couldn't load store analytics." onRetry={() => load()} />
-      </View>
-    );
-  }
   return (
+    <View style={{ flex: 1 }}>
+      <ScreenHeader
+        title="Store Analytics"
+        subtitle={filter?.dateRange.label ?? '30 days'}
+        rightElement={<HeaderPillButton label="Edit Store" onPress={() => { Haptics.selectionAsync(); router.push('/store-builder' as never); }} />}
+      />
+      {loading ? (
+        <AnalyticsSkeleton kpiCount={3} listRows={4} />
+      ) : loadError && !data ? (
+        <View style={s.loadWrap}>
+          <ErrorState message="Couldn't load store analytics." onRetry={() => load()} />
+        </View>
+      ) : (
     <ScrollView
       style={s.scroll}
-      contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
+      contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <AnalyticsHeader
-        title="Store Analytics"
-        subtitle={filter?.dateRange.label ?? '30 days'}
-        right={<HeaderPillButton label="Edit Store" onPress={() => { Haptics.selectionAsync(); router.push('/store-builder' as never); }} />}
-      />
-
       {!data ? (
         <EmptyState
           icon="bar-chart-2"
@@ -189,6 +185,8 @@ export default function AnalyticsStoreScreen() {
 
       <View style={{ height: 120 }} />
     </ScrollView>
+      )}
+    </View>
   );
 }
 

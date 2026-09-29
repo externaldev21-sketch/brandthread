@@ -11,15 +11,15 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getInventoryAnalytics, getFilterState } from '@/services/analyticsService';
 import { InventoryAnalytics, InventoryProductRow, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
+  AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
   PillTabs, ProgressBar, SectionTitle,
 } from '@/components/analytics/AnalyticsKit';
 
@@ -79,7 +79,6 @@ export default function AnalyticsInventoryScreen() {
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = useHeaderTopInset();
 
   const [data,       setData]       = useState<InventoryAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
@@ -118,29 +117,26 @@ export default function AnalyticsInventoryScreen() {
     ? (activeList === 'fastest' ? data.fastestSelling : activeList === 'slowest' ? data.slowestSelling : activeList === 'overstock' ? data.mostOverstocked : data.likelyRunOut)
     : [];
 
-  if (loading) {
-    return <AnalyticsSkeleton topPad={topPad} kpiCount={3} listRows={4} />;
-  }
-  if (loadError && !data) {
-    return (
-      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
-        <ErrorState message="Couldn't load inventory analytics." onRetry={() => load()} />
-      </View>
-    );
-  }
   return (
+    <View style={{ flex: 1 }}>
+      <ScreenHeader
+        title="Inventory Analytics"
+        subtitle={filter?.dateRange.label ?? '30 days'}
+        rightElement={<HeaderPillButton label="Inventory" onPress={() => router.push('/inventory' as never)} />}
+      />
+      {loading ? (
+        <AnalyticsSkeleton kpiCount={3} listRows={4} />
+      ) : loadError && !data ? (
+        <View style={s.loadWrap}>
+          <ErrorState message="Couldn't load inventory analytics." onRetry={() => load()} />
+        </View>
+      ) : (
     <ScrollView
       style={s.scroll}
-      contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
+      contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <AnalyticsHeader
-        title="Inventory Analytics"
-        subtitle={filter?.dateRange.label ?? '30 days'}
-        right={<HeaderPillButton label="Inventory" onPress={() => router.push('/inventory' as never)} />}
-      />
-
       {!data ? (
         <EmptyState
           icon="archive"
@@ -235,6 +231,8 @@ export default function AnalyticsInventoryScreen() {
 
       <View style={{ height: 120 }} />
     </ScrollView>
+      )}
+    </View>
   );
 }
 

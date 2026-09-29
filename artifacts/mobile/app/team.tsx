@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator, Modal, Share, RefreshControl } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -71,6 +72,7 @@ const ACTIVITY_PAGE = 10;
 
 export default function TeamScreen() {
   const colors  = useColors();
+  const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
   const { currentRole } = useTeamRole();
@@ -437,7 +439,7 @@ export default function TeamScreen() {
     {/* Invite modal — email + shareable link options */}
     <Modal visible={inviteVisible} transparent animationType="fade" onRequestClose={() => setInviteVisible(false)}>
       <View style={styles.modalBackdrop}>
-        <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border, marginVertical: insets.top + insets.bottom }]}>
           {!inviteResult ? (
             <>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>Invite a team member</Text>

@@ -22,9 +22,10 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
+  BrandthreadScreen, BrandthreadCard,
   PrimaryButton, TertiaryButton, EmptyState,
 } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { buildMetaAdsReturnUrl } from '@/services/metaAdsService';
 import type { MetaAdsConnection, MetaBusiness, MetaAdAccount, MetaPage } from '@/lib/api';
 
@@ -206,8 +207,8 @@ export default function MetaAdsConnectScreen() {
   }
 
   return (
-    <BrandthreadScreen>
-      <BrandthreadHeader title="Connect Meta" onBack={() => goBackOr(router)} />
+    <BrandthreadScreen noSafeTop>
+      <ScreenHeader title="Connect Meta" onBack={() => goBackOr(router)} />
       <ScrollView contentContainerStyle={{ padding: SP.md, gap: SP.md }} keyboardShouldPersistTaps="handled">
         {step === 'loading' && (
           <View style={s.center}>
