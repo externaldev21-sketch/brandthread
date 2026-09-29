@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -421,7 +422,7 @@ export default function StoryComposer() {
   // (or a notch-simulating preview frame) actually occupies, which is what
   // let the X/flash/settings row render under the notch at ~28px. Floor it
   // at 54 on web only — native insets are already correct.
-  const topInset = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const topInset = useHeaderTopInset();
   const router = useRouter();
   const { user } = useUser();
   const { theme } = useAppTheme();
@@ -1225,7 +1226,7 @@ export default function StoryComposer() {
       </Modal>
 
       <Modal visible={alsoShareOpen} transparent animationType="slide" onRequestClose={finishAlsoShare}>
-        <View style={[styles.alsoShareSheet, { paddingTop: insets.top + SP.md, paddingBottom: insets.bottom + SP.md }]}>
+        <View style={[styles.alsoShareSheet, { paddingTop: topInset + SP.md, paddingBottom: insets.bottom + SP.md }]}>
           <View style={styles.textToolTop}>
             <Text style={styles.sheetTitle}>Also share to</Text>
             <TouchableOpacity onPress={finishAlsoShare} accessibilityRole="button" accessibilityLabel="Done">

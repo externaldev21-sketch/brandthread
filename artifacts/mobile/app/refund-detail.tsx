@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, StyleSheet, Alert, Switch, TouchableOpacity,
-} from 'react-native';
+  View, Text, ScrollView, StyleSheet, Alert, Switch, TouchableOpacity, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

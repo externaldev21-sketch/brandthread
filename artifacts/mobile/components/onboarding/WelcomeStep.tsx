@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Glow, ThreadDraw } from './ThreadLine';
 import { PillButton, Reveal, StepHeadline } from './OnboardingUI';
 import { MOTION, SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
@@ -38,6 +39,7 @@ export function WelcomeStep({
   const { theme } = useAppTheme();
   const { reduceMotion } = useOnboardingMotion();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const styles = createStyles(theme);
 
   // The mark resolves as the thread passes through its centre.
@@ -71,7 +73,7 @@ export function WelcomeStep({
         style={styles.topWash}
       />
 
-      <View style={[styles.content, { paddingTop: insets.top + SPACE.md, paddingBottom: insets.bottom + SPACE.lg }]}>
+      <View style={[styles.content, { paddingTop: headerTopInset + SPACE.md, paddingBottom: insets.bottom + SPACE.lg }]}>
         <Reveal>
           <Text style={[TYPE.eyebrow, { color: theme.muted }]}>BRANDTHREAD</Text>
         </Reveal>

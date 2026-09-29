@@ -8,12 +8,13 @@
  * (never theme-colored, never Instagram blue).
  */
 import React from 'react';
-import { View, Text, StyleSheet, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { Button } from '@/components/ui/Button';
 import type { ConversationTheme } from '@/lib/conversationThemes';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 export function ThemePreviewScreen({
   visible, theme, candidate, applying, onCancel, onApply,
@@ -26,7 +27,7 @@ export function ThemePreviewScreen({
   onApply: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const topPad = useHeaderTopInset();
   if (!candidate) return null;
 
   return (

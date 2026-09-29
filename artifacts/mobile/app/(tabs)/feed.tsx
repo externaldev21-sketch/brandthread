@@ -4,11 +4,12 @@ import { UploadProgressPill } from '@/components/feed/UploadProgressPill';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
-  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator,
+  AccessibilityInfo, ScrollView, RefreshControl, ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useIsFocused } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -2017,11 +2018,11 @@ export default function FeedScreen({
   // `insets.top` — which put the buyer top row (paddingTop:
   // previewTopInset + 4, below) flush against, and partly behind, a
   // simulated Dynamic Island in the 390x844 web preview.
-  // `Math.max(insets.top, 54)` (this polish pass's standard notch gate,
-  // was a flat 52) still uses a real, non-zero `insets.top` when the
-  // environment actually provides one (a real device, or a preview frame
-  // that does emulate the notch) instead of always overriding it on web.
-  const previewTopInset = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  // `useHeaderTopInset()` (this polish pass's standard notch gate, was a
+  // flat 52) still uses a real, non-zero `insets.top` when the environment
+  // actually provides one (a real device, or a preview frame that does
+  // emulate the notch) instead of always overriding it on web.
+  const previewTopInset = useHeaderTopInset();
   const previewBottomInset = insets.bottom;
   const isBuyerSurface = buyerMode || showFashionPreview;
   const isCreatorFeed = !!creatorFeed;

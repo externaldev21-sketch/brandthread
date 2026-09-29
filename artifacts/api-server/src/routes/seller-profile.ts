@@ -80,6 +80,8 @@ router.get("/profile", async (req, res): Promise<void> => {
         website:             users.website,
         coverVideoUrl:       users.coverVideoUrl,
         coverPosterUrl:      users.coverPosterUrl,
+        avatarVideoUrl:      users.avatarVideoUrl,
+        avatarPosterUrl:     users.avatarPosterUrl,
         username:            users.username,
         profileImageUrl:     users.profileImageUrl,
         avatarUrl:           users.avatarUrl,

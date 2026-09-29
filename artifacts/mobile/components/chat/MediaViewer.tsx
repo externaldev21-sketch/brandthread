@@ -4,8 +4,8 @@ import {
   Text, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 /**
  * Full-screen photo viewer: pinch-to-zoom (two-finger, same touch-distance
@@ -20,7 +20,7 @@ export default function MediaViewer({
   onClose: () => void;
 }) {
   const { width, height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const scale = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const backdropOpacity = useRef(new Animated.Value(1)).current;
@@ -121,7 +121,7 @@ export default function MediaViewer({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <Animated.View style={[s.backdrop, { opacity: backdropOpacity }]}>
-        <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        <View style={[s.topBar, { paddingTop: headerTopInset + 12 }]}>
           <TouchableOpacity style={s.iconBtn} onPress={handleClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Feather name="x" size={22} color="#fff" />
           </TouchableOpacity>

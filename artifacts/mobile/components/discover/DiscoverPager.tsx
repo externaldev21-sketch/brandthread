@@ -40,6 +40,7 @@ import Animated, {
 
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useCartBadgeBump } from '@/hooks/useCartBadgeBump';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
@@ -256,7 +257,7 @@ export function DiscoverPager() {
   return (
     <View style={{ flex: 1, backgroundColor: '#0A0A0B' }}>
       {loading ? (
-        <DiscoverSkeleton insets={insets} cardWidth={cardWidth} />
+        <DiscoverSkeleton cardWidth={cardWidth} />
       ) : showError ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <EmptyState icon="wifi-off" title="Couldn't load" description={error!} action={{ label: 'Retry', onPress: handleRetry }} compact />
@@ -380,9 +381,10 @@ export function DiscoverPager() {
 
 // ─── Skeleton (blurred placeholder + shimmering silhouette) ───────────────────
 
-function DiscoverSkeleton({ insets, cardWidth }: { insets: { top: number }; cardWidth: number }) {
+function DiscoverSkeleton({ cardWidth }: { cardWidth: number }) {
+  const topInset = useHeaderTopInset();
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: topInset }}>
       <CardSkeleton width={cardWidth * 0.72} />
     </View>
   );

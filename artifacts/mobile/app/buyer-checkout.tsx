@@ -77,7 +77,7 @@ import { PaymentCard, type SavedCard } from '@/components/checkout/PaymentCard';
 import { PromoCodeCard } from '@/components/checkout/PromoCodeCard';
 import { PriceBreakdownCard } from '@/components/checkout/PriceBreakdownCard';
 import { CheckoutTermsLine } from '@/components/checkout/CheckoutTermsLine';
-import { OrderConfirmation } from '@/components/checkout/OrderConfirmation';
+import { OrderConfirmation, OrderConfirmationActions } from '@/components/checkout/OrderConfirmation';
 import { COMP, FONT, FS, SP } from '@/lib/theme';
 
 // Maps known Stripe decline reason codes to plain-language copy. Falls back to a
@@ -632,7 +632,12 @@ export default function BuyerCheckoutScreen() {
   // (seller-conversation.tsx): never flush with the screen edge, even on web
   // or a device with no home indicator.
   const footerBottomPad = Math.max(insets.bottom, SP.sm) + SP.sm;
-  const headerTop = Platform.OS === 'web' ? Math.max(insets.top, SP.sm) : insets.top;
+  // react-native-safe-area-context reads 0 for insets.top on the plain web
+  // preview (no real notch/Dynamic Island to measure) — SP.sm (8) left the
+  // header title sitting right under where a real Dynamic Island would be;
+  // 54 actually clears it there, matching the same fix already used by
+  // components/thread-cash/CelebrationHost.tsx's own topInset() helper.
+  const headerTop = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
 
   const header = (title: string, onClose: () => void, closeLabel: string) => (
     <View style={[styles.header, { paddingTop: headerTop + SP.xs, borderBottomColor: theme.border }]}>
@@ -670,11 +675,12 @@ export default function BuyerCheckoutScreen() {
 
   if (isConfirmation) {
     const paidCents = Object.values(current.paidGroups ?? {}).reduce((sum, group) => sum + (group.amountTotalCents ?? 0), 0);
+    const confirmationFinalizing = pendingSessionIds.length > 0;
     return (
       <View style={[styles.root, { backgroundColor: theme.background }]}>
         {header('Order confirmation', () => router.replace('/(buyer)/discover' as never), 'Close')}
         <ScrollView
-          contentContainerStyle={{ padding: SP.md, paddingBottom: footerBottomPad + SP.lg }}
+          contentContainerStyle={{ padding: SP.md }}
           bounces={false}
           overScrollMode="never"
           showsVerticalScrollIndicator={false}
@@ -682,12 +688,19 @@ export default function BuyerCheckoutScreen() {
           <OrderConfirmation
             session={current}
             verifiedOrders={verifiedOrders}
-            finalizing={pendingSessionIds.length > 0}
-            onRefresh={refreshOrders}
-            refreshing={placing}
+            finalizing={confirmationFinalizing}
             totalPaidCents={paidCents > 0 ? paidCents : totals.totalCents}
           />
         </ScrollView>
+        {/* A sibling of the ScrollView above, never inside its scrollable
+            content — so it's genuinely pinned above the home indicator on
+            any screen height, never clipped or scrolled past. */}
+        <OrderConfirmationActions
+          verifiedOrders={verifiedOrders}
+          finalizing={confirmationFinalizing}
+          onRefresh={refreshOrders}
+          refreshing={placing}
+        />
       </View>
     );
   }

@@ -3,6 +3,7 @@ import { Stack, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +16,7 @@ export default function NotFoundScreen() {
   const { theme } = useAppTheme();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
 
   const goHome = () => {
@@ -28,7 +30,7 @@ export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Not found', headerShown: false }} />
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + SPACING.xxl, paddingBottom: insets.bottom + SPACING.xl }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: headerTopInset + SPACING.xxl, paddingBottom: insets.bottom + SPACING.xl }]}>
         <View style={[styles.iconCircle, { borderColor: theme.accent + '40' }]}>
           <Feather name="compass" size={26} color={colors.mutedForeground} />
         </View>

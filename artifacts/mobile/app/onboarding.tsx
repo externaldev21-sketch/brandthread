@@ -33,6 +33,7 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { useUsernameLiveCheck } from '@/lib/onboarding/useUsernameLiveCheck';
@@ -343,6 +344,7 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
   const { theme } = useAppTheme();
   const sl = createSl(theme);
   const insets  = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const [done, setDone]   = useState<boolean[]>(steps.map(() => false));
   const [active, setActive] = useState(0);
   const logoScale = useRef(new Animated.Value(0.7)).current;
@@ -377,7 +379,7 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
   const doneCount = done.filter(Boolean).length;
 
   return (
-    <View style={[sl.root, { paddingTop: insets.top + SPACE.xxl, paddingBottom: insets.bottom + SPACE.xxl }]}>
+    <View style={[sl.root, { paddingTop: headerTopInset + SPACE.xxl, paddingBottom: insets.bottom + SPACE.xxl }]}>
 
       {/* Logo */}
       <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], marginBottom: SPACE.xl, alignItems: 'center' }}>
@@ -454,6 +456,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
   const { theme } = useAppTheme();
   const sn = createSn(theme);
   const insets  = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   const desc = flow === 'buyer'
     ? Platform.OS === 'web'
@@ -468,7 +471,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
     : ['New orders', 'Production milestones', 'Payout confirmations', 'Customer messages'];
 
   return (
-    <View style={[sn.root, { paddingTop: insets.top + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
+    <View style={[sn.root, { paddingTop: headerTopInset + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
 
       <View style={sn.body}>
         {/* Hero: the thread passes through the bell */}
@@ -533,6 +536,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
   const { theme } = useAppTheme();
   const ss = createSs(theme);
   const insets  = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const copyDelay = Math.round(MOTION.finaleDrawMs * 0.7);
 
   const ctaLabel = flow === 'buyer' ? 'Start exploring' : 'Go to Dashboard';
@@ -541,7 +545,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
     : 'Your brand now has one home for design, production, selling and growth.';
 
   return (
-    <View style={[ss.root, { paddingTop: insets.top + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
+    <View style={[ss.root, { paddingTop: headerTopInset + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
       <LinearGradient
         pointerEvents="none"
         colors={theme.heroGradient}
@@ -1831,6 +1835,7 @@ export default function OnboardingScreen() {
     deviceProbe?: string;
   }>();
   const insets  = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const isAddAccount = addAccount === '1';
   const deviceProbeEnabled = __DEV__ && deviceProbe === '1';
   const deviceProbeFlow: Flow | null = __DEV__ && (deviceFlow === 'buyer' || deviceFlow === 'seller')
@@ -2755,7 +2760,7 @@ export default function OnboardingScreen() {
 
       {/* Standard header for form steps */}
       {!isFullScreen && (
-        <View style={[sm.header, { paddingTop: insets.top + 8 }]}>
+        <View style={[sm.header, { paddingTop: headerTopInset + 8 }]}>
           {!isAccountTypeStep && (
             <PressableScale
               style={sm.backBtn}
@@ -2780,7 +2785,7 @@ export default function OnboardingScreen() {
       {isFullScreen && showsProgressBar() && (
         <View
           pointerEvents="none"
-          style={[sm.progressOverlay, { paddingTop: insets.top + 8 }]}
+          style={[sm.progressOverlay, { paddingTop: headerTopInset + 8 }]}
         >
           <StepDots current={progressSteps().current} total={progressSteps().total} />
         </View>

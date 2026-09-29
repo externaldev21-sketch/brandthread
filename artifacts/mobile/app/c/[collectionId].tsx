@@ -10,6 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -60,6 +61,7 @@ async function fetchPublicCollection(collectionId: string): Promise<PublicCollec
 export default function PublicCollectionScreen() {
   const { collectionId } = useLocalSearchParams<{ collectionId: string }>();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
 
@@ -83,7 +85,7 @@ export default function PublicCollectionScreen() {
 
   if (state.kind === 'not_found' || state.kind === 'error') {
     return (
-      <View style={[styles.root, styles.center, { paddingTop: insets.top }]}>
+      <View style={[styles.root, styles.center, { paddingTop: headerTopInset }]}>
         <Feather name={state.kind === 'not_found' ? 'folder' : 'alert-circle'} size={40} color={MUTED} />
         <Text style={styles.messageTitle}>
           {state.kind === 'not_found' ? 'Collection not found' : 'Something went wrong'}
@@ -105,7 +107,7 @@ export default function PublicCollectionScreen() {
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={{ paddingTop: insets.top + SP.lg, paddingBottom: insets.bottom + SP.xxl }}
+      contentContainerStyle={{ paddingTop: headerTopInset + SP.lg, paddingBottom: insets.bottom + SP.xxl }}
       showsVerticalScrollIndicator={false}
     >
       <ResponsiveContainer maxWidth={CONTENT_MAX_WIDTH} style={{ paddingHorizontal: SP.md }}>

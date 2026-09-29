@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
-  TextInput, TouchableOpacity, View,
-} from 'react-native';
+  TextInput, TouchableOpacity, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';

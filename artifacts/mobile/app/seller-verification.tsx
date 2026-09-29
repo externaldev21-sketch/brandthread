@@ -193,7 +193,7 @@ export default function SellerVerificationScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
         <BrandthreadHeader title="Identity Verification" onBack={leaveSetupDestination} />
         <BrandedLoadingState message="Checking verification status…" />
       </View>

@@ -65,6 +65,7 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const params = useLocalSearchParams<{ id: string; tab?: string }>();
   const id = params.id;
 
@@ -127,7 +128,7 @@ export default function ProductDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root, { paddingTop: headerTopInset }]}>
         <View style={s.header}>
           <LoadingSkeleton height={36} style={{ width: 200 }} />
         </View>
@@ -142,7 +143,7 @@ export default function ProductDetailScreen() {
 
   if (!product) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root, { paddingTop: headerTopInset }]}>
         <View style={s.header}>
           <PressableScale
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
@@ -169,7 +170,7 @@ export default function ProductDetailScreen() {
   const coverImage = product.media.find(m => m.isCover) ?? product.media[0];
 
   return (
-    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
+    <View style={[s.root, { paddingTop: headerTopInset }]}>
       {/* ── Fixed Header ── */}
       <View style={s.header}>
         {/* Fix 3: back button uses goBackOr(router) */}

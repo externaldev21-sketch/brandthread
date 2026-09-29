@@ -17,7 +17,7 @@ import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { NavigationCard } from '@/components/BrandthreadUI';
-import { useImageSourceSheet } from '@/components/profile/ImageSourceSheet';
+import { useImageSourceSheet, AVATAR_VIDEO_MAX_SECONDS } from '@/components/profile/ImageSourceSheet';
 import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { SkeletonBlock, SkeletonLine } from '@/components/ui';
@@ -82,6 +82,9 @@ export default function EditProfileScreen() {
   const [fields, setFields] = useState<Fields>(EMPTY_FIELDS);
   const [initial, setInitial] = useState<Fields>(EMPTY_FIELDS);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  // A moving profile picture — set only when the avatar is a video; picking
+  // a plain photo always clears this back out (mutually exclusive).
+  const [avatarVideoUri, setAvatarVideoUri] = useState<string | null>(null);
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [bannerUri, setBannerUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState<Record<ImageSlotKey, boolean>>({ avatar: false, logo: false, banner: false });
@@ -126,7 +129,8 @@ export default function EditProfileScreen() {
     }
     api.seller.getProfile()
       .then((profile) => {
-        setAvatarUri(profile.profileImageUrl ?? null);
+        setAvatarUri((profile as any).avatarPosterUrl || profile.profileImageUrl || null);
+        setAvatarVideoUri((profile as any).avatarVideoUrl ?? null);
         setLogoUri(profile.logoUrl ?? null);
         setBannerUri(profile.bannerUrl ?? null);
         const loadedFields: Fields = {
@@ -252,7 +256,92 @@ export default function EditProfileScreen() {
     }
   }
 
-  const pickAvatar = () => uploadSlot('avatar', [1, 1], 'Update avatar', '/api/seller/profile/avatar/upload', setAvatarUri, 'profileImageUrl');
+  async function pickAvatar() {
+    const asset = await openImageSheet({ aspect: [1, 1], enableVideo: true });
+    if (!asset) return;
+    if (asset.type === 'video') { await pickAvatarVideo(asset); return; }
+
+    setUploadError(prev => ({ ...prev, avatar: null }));
+    setUploading(prev => ({ ...prev, avatar: true }));
+    setUploadProgress(prev => ({ ...prev, avatar: 0 }));
+    const previousUri = avatarUri;
+    const previousVideoUri = avatarVideoUri;
+    setAvatarUri(asset.uri);
+    setAvatarVideoUri(null); // a plain photo always replaces a moving avatar
+    try {
+      if (preview) {
+        for (const pct of [30, 65, 100]) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+          setUploadProgress(prev => ({ ...prev, avatar: pct }));
+        }
+      } else {
+        const token = await getToken();
+        const result = await uploadImageWithProgress<Record<string, string>>(
+          '/api/seller/profile/avatar/upload',
+          { uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' },
+          token,
+          (pct) => setUploadProgress(prev => ({ ...prev, avatar: pct })),
+        );
+        setAvatarUri(result.profileImageUrl);
+        // A photo replaces any existing moving avatar server-side too.
+        if (previousVideoUri) await api.avatarVideo.remove().catch(() => {});
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Avatar updated');
+    } catch {
+      setAvatarUri(previousUri);
+      setAvatarVideoUri(previousVideoUri);
+      setUploadError(prev => ({ ...prev, avatar: 'Upload failed. Check your connection and try again.' }));
+    } finally {
+      setUploading(prev => ({ ...prev, avatar: false }));
+    }
+  }
+
+  /**
+   * A moving profile picture. Checked client-side against the 10s limit
+   * first (immediate, friendlier rejection, no wasted upload) — the server
+   * re-validates the same limit on the actual rendered duration regardless.
+   */
+  async function pickAvatarVideo(asset: { uri: string; mimeType?: string | null; duration?: number | null }) {
+    const seconds = typeof asset.duration === 'number' ? asset.duration / 1000 : null;
+    if (seconds !== null && seconds > AVATAR_VIDEO_MAX_SECONDS + 0.25) {
+      Alert.alert('Video too long', `Avatar videos can be at most ${AVATAR_VIDEO_MAX_SECONDS} seconds. Pick a shorter clip and try again.`);
+      return;
+    }
+    setUploadError(prev => ({ ...prev, avatar: null }));
+    setUploading(prev => ({ ...prev, avatar: true }));
+    setUploadProgress(prev => ({ ...prev, avatar: 0 }));
+    const previousUri = avatarUri;
+    const previousVideoUri = avatarVideoUri;
+    setAvatarVideoUri(asset.uri); // optimistic local preview (loops immediately) while it uploads
+    try {
+      let finalVideoUri = asset.uri;
+      let finalPosterUri = avatarUri ?? '';
+      if (preview) {
+        for (const pct of [30, 65, 100]) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+          setUploadProgress(prev => ({ ...prev, avatar: pct }));
+        }
+      } else {
+        setUploadProgress(prev => ({ ...prev, avatar: 50 }));
+        const result = await api.avatarVideo.upload(asset.uri, asset.mimeType ?? 'video/mp4');
+        finalVideoUri = result.avatarVideoUrl;
+        finalPosterUri = result.avatarPosterUrl;
+        setUploadProgress(prev => ({ ...prev, avatar: 100 }));
+      }
+      setAvatarUri(finalPosterUri || null);
+      setAvatarVideoUri(finalVideoUri);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Profile video updated');
+    } catch {
+      setAvatarUri(previousUri);
+      setAvatarVideoUri(previousVideoUri);
+      setUploadError(prev => ({ ...prev, avatar: 'Upload failed. Check your connection and try again.' }));
+    } finally {
+      setUploading(prev => ({ ...prev, avatar: false }));
+    }
+  }
+
   const pickLogo = () => uploadSlot('logo', [1, 1], 'Update logo', '/api/seller/profile/logo/upload', setLogoUri, 'logoUrl', true);
   const pickBanner = () => uploadSlot('banner', [3, 1], 'Update banner', '/api/seller/profile/banner/upload', setBannerUri, 'bannerUrl', true);
 

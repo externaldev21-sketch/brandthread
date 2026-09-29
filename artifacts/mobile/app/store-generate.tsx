@@ -889,7 +889,7 @@ export default function StoreGenerateScreen() {
   return (
     <View style={[st.root, { backgroundColor: 'transparent' }]}>
       {/* Header */}
-      <View style={[st.header, { paddingTop: insets.top + SP.sm }]}>
+      <View style={[st.header, { paddingTop: headerTopInset + SP.sm }]}>
         <View style={st.headerTop}>
           <TouchableOpacity onPress={handleBack} style={st.backBtn} activeOpacity={0.7}>
             <Feather name="arrow-left" size={ICON.md} color={FG} />

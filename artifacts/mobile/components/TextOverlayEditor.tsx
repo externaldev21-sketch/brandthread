@@ -22,6 +22,7 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -105,6 +106,7 @@ export function TextOverlayEditor({
   visible, editingOverlay, onDone, onCancel,
 }: TextOverlayEditorProps) {
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const { theme } = useAppTheme();
   const es = createEditorStyles(theme);
 
@@ -211,7 +213,7 @@ export function TextOverlayEditor({
         />
 
         {/* Top bar: Done */}
-        <View style={[es.topBar, { paddingTop: insets.top + 6 }]}>
+        <View style={[es.topBar, { paddingTop: headerTopInset + 6 }]}>
           <View style={{ width: 60 }} />
           <TouchableOpacity
             onPress={handleDone}

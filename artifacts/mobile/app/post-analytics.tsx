@@ -8,8 +8,7 @@ import {
   ScrollView,
   Dimensions,
   Animated,
-  ActivityIndicator,
-} from 'react-native';
+  ActivityIndicator, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';

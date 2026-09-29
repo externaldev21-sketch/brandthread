@@ -141,7 +141,7 @@ export default function StoreGeneratingScreen() {
   };
 
   return (
-    <View style={[gen.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[gen.root, { paddingTop: headerTopInset, paddingBottom: insets.bottom }]}>
       <LinearGradient
         colors={[BG, SURFACE]}
         start={{ x: 0, y: 0 }}

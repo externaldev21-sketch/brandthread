@@ -6,8 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
-} from 'react-native';
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';

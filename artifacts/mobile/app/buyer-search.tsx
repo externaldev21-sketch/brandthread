@@ -20,9 +20,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
-  Platform, useWindowDimensions, ActivityIndicator,
+  useWindowDimensions, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -177,7 +178,7 @@ export default function BuyerSearchScreen() {
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [safetyMenuPost, setSafetyMenuPost] = useState<DiscoverPost | null>(null);
 
-  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const topPad = useHeaderTopInset();
 
   // Deliberately no auto-focus on mount — Instagram's own search tab opens
   // unfocused, showing its Explore grid, until the field is explicitly

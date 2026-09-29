@@ -167,7 +167,7 @@ function SellerGoLiveNativeScreen() {
   if (permissionsRequested && (!camGranted || !micGranted)) {
     const blocked = camBlocked || micBlocked;
     return (
-      <View style={[s.permRoot, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
+      <View style={[s.permRoot, { paddingTop: headerTopInset, paddingBottom: insets.bottom + 24 }]}>
         <TouchableOpacity onPress={() => goBackOr(router)} style={[s.closeBtn, { top: headerTopInset + 8 }]} accessibilityLabel="Close">
           <Feather name="x" size={22} color={FG} />
         </TouchableOpacity>

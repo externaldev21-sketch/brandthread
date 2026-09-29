@@ -87,6 +87,7 @@ export default function ProductStoreScreen() {
   const router = useRouter();
   const { id, variantId } = useLocalSearchParams<{ id: string; variantId?: string }>();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   const api = useApi();
   const [product, setProduct] = useState<Product | null>(null);
@@ -235,7 +236,7 @@ export default function ProductStoreScreen() {
 
   if (loading) {
     return (
-      <View style={[s.screen, { paddingTop: useHeaderTopInset() }]}>
+      <View style={[s.screen, { paddingTop: headerTopInset }]}>
         <Text style={s.loadingText}>Loading…</Text>
       </View>
     );
@@ -243,7 +244,7 @@ export default function ProductStoreScreen() {
 
   if (!product) {
     return (
-      <View style={[s.screen, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center', padding: SP.xl }]}>
+      <View style={[s.screen, { paddingTop: headerTopInset, alignItems: 'center', justifyContent: 'center', padding: SP.xl }]}>
         <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
         <Text style={[s.loadingText, { marginTop: SP.md, textAlign: 'center' }]}>
           Product not found or no longer available.

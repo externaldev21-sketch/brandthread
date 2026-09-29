@@ -16,7 +16,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image, Modal, FlatList,
-  Platform, Dimensions,
+  Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -757,7 +757,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
         presentationStyle="formSheet"
         onRequestClose={() => setShowProductPicker(false)}
       >
-        <View style={[s.pickerRoot, { paddingTop: insets.top + SP.md }]}>
+        <View style={[s.pickerRoot, { paddingTop: headerTopInset + SP.md }]}>
           <View style={s.pickerHeader}>
             <Text style={s.pickerTitle}>Choose a product</Text>
             <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>

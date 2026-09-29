@@ -6,8 +6,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
-  TextInput, StyleSheet, RefreshControl, ActivityIndicator, Alert, Share,
-} from 'react-native';
+  TextInput, StyleSheet, RefreshControl, ActivityIndicator, Alert, Share, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';

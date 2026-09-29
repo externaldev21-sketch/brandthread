@@ -188,7 +188,7 @@ export default function SignInScreen() {
   // ─── Active session screen ────────────────────────────────────────────────────
   if (isSignedIn && !isAddAccount) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
         <StatusBar barStyle="light-content" />
 
         <ScrollView
@@ -260,7 +260,7 @@ export default function SignInScreen() {
   // ─── Two-factor (TOTP) screen ─────────────────────────────────────────────────
   if (needsTotp) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
         <StatusBar barStyle="light-content" />
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
