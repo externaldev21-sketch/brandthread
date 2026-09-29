@@ -24,7 +24,8 @@ import type { CheckoutSession } from '@/services/cartTypes';
 import { FONT, FS, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
-import { CheckoutCard, Hairline } from './CheckoutPrimitives';
+import { CheckoutSection, Hairline } from './CheckoutPrimitives';
+import { groupDeliveryWindow } from './OrderSummarySection';
 
 export interface VerifiedOrderRef {
   id: string;
@@ -59,8 +60,8 @@ export function OrderConfirmation({
 
   const items = session.deliveryGroups.flatMap(group => group.items);
   const deliveryEstimates = session.deliveryGroups
-    .map(group => group.availableMethods.find(method => method.id === group.selectedMethodId)?.estimatedDelivery)
-    .filter((value): value is string => !!value);
+    .filter(group => group.availableMethods.some(method => method.id === group.selectedMethodId))
+    .map(group => groupDeliveryWindow(group));
   const preOrderEstimates = items.map(item => item.preOrderEstShipDate).filter((value): value is string => !!value);
   const estimates = [...new Set([...deliveryEstimates, ...preOrderEstimates])];
   const firstGroup = session.deliveryGroups[0];
@@ -117,7 +118,7 @@ export function OrderConfirmation({
         </Text>
       </View>
 
-      <CheckoutCard title="Order details">
+      <CheckoutSection title="Order details">
         <DetailRow label={verifiedOrders.length > 1 ? 'Order numbers' : 'Order number'}>
           {verifiedOrders.length > 0 ? verifiedOrders.map(order => (
             <Text key={order.id} style={[styles.detailStrong, { color: theme.text }]} testID="checkout-order-number">{order.number}</Text>
@@ -162,10 +163,10 @@ export function OrderConfirmation({
         <DetailRow label={(session.threadCashRedemption?.discountCents ?? 0) > 0 ? 'Charged to card' : 'Total'}>
           <Text style={[styles.detailStrong, { color: theme.text }, TABULAR_NUMS]}>{formatCents(totalPaidCents)}</Text>
         </DetailRow>
-      </CheckoutCard>
+      </CheckoutSection>
 
       {items.length > 0 ? (
-        <CheckoutCard title={`${items.length} ${items.length === 1 ? 'item' : 'items'}`}>
+        <CheckoutSection title={`${items.length} ${items.length === 1 ? 'item' : 'items'}`}>
           {items.map((item, index) => (
             <View key={item.id}>
               {index > 0 ? <Hairline /> : null}
@@ -186,7 +187,7 @@ export function OrderConfirmation({
               </View>
             </View>
           ))}
-        </CheckoutCard>
+        </CheckoutSection>
       ) : null}
 
       {finalizing ? (
@@ -210,7 +211,7 @@ export function OrderConfirmation({
       )}
 
       {firstGroup ? (
-        <CheckoutCard title="Need help?" style={{ marginTop: SP.md }}>
+        <CheckoutSection title="Need help?" style={{ marginTop: SP.md }}>
           <PressableScale
             onPress={messageSeller}
             style={styles.helpRow}
@@ -225,7 +226,7 @@ export function OrderConfirmation({
             </View>
             <Feather name="chevron-right" size={18} color={theme.muted} />
           </PressableScale>
-        </CheckoutCard>
+        </CheckoutSection>
       ) : null}
     </View>
   );

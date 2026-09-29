@@ -32,16 +32,18 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({ theme: { text: '#FAFAFA', background: '#281235', subtle: '#999', muted: '#aaa', border: '#333' } }),
 }));
 vi.mock('@/components/checkout/CheckoutPrimitives', () => ({
-  CheckoutCard: nativeComponent('CheckoutCard'),
-  Hairline: nativeComponent('Hairline'),
+  CK: { text: '#FFFFFF', bg: '#000000', muted: '#999', subtle: '#777', divider: '#111', fieldBorder: '#222' },
+  CheckoutSection: nativeComponent('CheckoutSection'),
+  OptionRow: nativeComponent('OptionRow'),
 }));
+vi.mock('@/components/checkout/StripePayment', () => ({ CardEntry: nativeComponent('CardEntry') }));
 
-import { PaymentCard, detectWebApplePay } from '@/components/checkout/PaymentCard';
+import { HostedExpressButton, detectWebApplePay } from '@/components/checkout/PaymentSection';
 
 function render() {
   let tree!: ReactTestRenderer;
   act(() => {
-    tree = create(<PaymentCard onExpressPay={vi.fn()} disabled={false} loading={false} savedCards={[]} sellerCount={1} />);
+    tree = create(<HostedExpressButton onPress={vi.fn()} disabled={false} loading={false} />);
   });
   return tree;
 }

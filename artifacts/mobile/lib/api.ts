@@ -16,6 +16,9 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import type {
+  CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
+} from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 
 const BASE =
@@ -1359,6 +1362,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             /** Plain-language decline reason from Stripe, when available. Never a raw Stripe string. */
             declineReason: string | null;
           }>(`/api/buyer/checkout/session/${encodeURIComponent(sessionId)}`),
+        /**
+         * One-page checkout: ONE PaymentIntent for the whole cart, confirmed
+         * in the app with Stripe's own fields (routes/checkout-intent.ts).
+         * Bodies come only from lib/checkoutPayment.ts's whitelisted builders,
+         * so no card data can ever be sent here.
+         */
+        paymentIntent: {
+          quote: (body: QuoteBody) => post<CartQuote>('/api/buyer/checkout/payment-intent/quote', body),
+          create: (body: CreatePaymentIntentBody) => post<PaymentIntentStart>('/api/buyer/checkout/payment-intent', body),
+          get: (paymentIntentId: string) =>
+            get<PaymentIntentStatus>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}`),
+          cancel: (paymentIntentId: string) =>
+            post<{ ok: boolean }>(`/api/buyer/checkout/payment-intent/${encodeURIComponent(paymentIntentId)}/cancel`, {}),
+        },
       },
       orders: {
         list:   () => get<any[]>('/api/buyer/orders'),

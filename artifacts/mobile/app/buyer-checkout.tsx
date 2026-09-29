@@ -1,33 +1,38 @@
 /**
- * Buyer checkout — single canonical route for every purchase path:
- *   - Buy Now from a product page / saved items (`?source=buynow`)
- *   - the cart's multi-item checkout (`/thread-checkout?source=cart`)
- *   - the Shop sheet's Buy now (`/thread-checkout`, a re-export of this file)
+ * Buyer checkout: ONE page for every purchase path (Buy Now, the cart's
+ * "Checkout from {Seller}", the Shop sheet), copied from the Shop app's
+ * Review & Pay screen (Mobbin 469375d4-5ee8-450a-80ca-30582b5e7b38) and
+ * reskinned for Brandthread. Top to bottom:
  *
- * Layout (rebuilt against Mobbin references, see the PR for the full list):
- *   PRIMARY  GOAT "Order Review" — real title, product row with photo,
- *            delivery options as bordered cards with price + ETA, a Payment
- *            section led by a black/white wallet button, ONE total block,
- *            and a plain terms line under the button (no checkbox).
- *   SUPPORT  SSENSE "Placing an order" (Contact/Shipping/Delivery/Payment/
- *            Promo as sections; empty "Add shipping address" state),
- *            Shop app (address autocomplete + saved addresses), HBX and
- *            lululemon (order complete / confirmation screens).
+ *   Express    Apple Pay / Google Pay. The sheet supplies the name, the
+ *              shipping address and the payment.
+ *   CONTACT    email, phone
+ *   SHIPPING   saved addresses as rows + "Use a new address", or the inline
+ *              form: full name, street (Google Places), apt, city, state,
+ *              ZIP, country
+ *   PAYMENT    saved cards as rows + Stripe's secure card field
+ *   PROMO / THREAD CASH / pre-order terms, when they apply
+ *   ORDER SUMMARY  items by seller (3:4 thumbnails), delivery window,
+ *              subtotal, shipping, tax, total
+ *   sticky     "Pay $X"
  *
- * Grouped Glass cards, monochrome, Inter, the shared Button. The sticky
- * footer holds "Place order · $total" (+ what's missing, + the terms line)
- * and, since item 110, the price breakdown itself: folded into a "Total $X ⌃"
- * row that expands the full breakdown above the button (Shop / Vestiaire
- * pattern). It still appears exactly once.
+ * Flat pure-black page: no card containers, small uppercase labels, 1px
+ * hairlines between sections, and an opaque black header bar fully below
+ * the notch that the content scrolls under.
  *
- * Logic is unchanged from the previous screen: session load/restore, saved
- * addresses, server cart validation, the per-seller Stripe-hosted Checkout
- * loop with verify retries, paidGroups persistence / multi-seller retry
- * without double-charging, reconciliation, address save, analytics.
- * Stripe Checkout is the sole payment entry point; card data is never
- * collected here.
+ * Payment (lib/checkoutPayment.ts choosePaymentPath):
+ *  - in-app (default): the server prices the cart, reserves stock and creates
+ *    ONE PaymentIntent for every seller (routes/checkout-intent.ts). The app
+ *    confirms it with Stripe's SDK, which handles 3DS. The paid webhook then
+ *    creates one order per seller. Card data only ever goes to Stripe.
+ *  - hosted fallback: the previous per-seller Stripe Checkout loop,
+ *    unchanged. Used for guests, preorders, Thread Cash, loyalty, a build
+ *    without Stripe's native module (Expo Go), or when the
+ *    hostedCheckoutFallback flag is on.
+ *  - preview: the dev-web preview's fake pay path (no Stripe), with the same
+ *    confirmation screen.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
@@ -39,10 +44,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@clerk/expo';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
-import { ThreadCashCard } from '@/components/checkout/ThreadCashCard';
 import { useCheckoutThreadCash } from '@/hooks/useCheckoutThreadCash';
 import { threadCashCeilingCents, withThreadCashRedemption } from '@/lib/threadCashCheckout';
 import { isPreviewCheckoutGroup, placePreviewOrder, withPreviewCheckoutDetails } from '@/lib/previewCheckout';
@@ -62,43 +65,39 @@ import {
   getFirstIncompleteCheckoutSection,
   mergeCheckoutFormState,
   withoutImplicitTermsAck,
+  type CheckoutDisplayTotals,
 } from '@/lib/checkoutReadiness';
+import {
+  buildCreatePaymentIntentBody, buildQuoteBody, canQuote, choosePaymentPath, paymentErrorMessage,
+  quoteKey, quoteTotals, recipientName, walletContactToCheckout,
+  type CartQuote, type PaymentIntentStart, type WalletContact,
+} from '@/lib/checkoutPayment';
+import { ApiError } from '@/lib/networkNotice';
 import { CheckoutSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { StickyFooter } from '@/components/layout';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { Button, ErrorState, IconButton } from '@/components/ui';
 import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
-import { CheckoutCard } from '@/components/checkout/CheckoutPrimitives';
-import { OrderSummaryCard } from '@/components/checkout/OrderSummaryCard';
-import { ContactCard } from '@/components/checkout/ContactCard';
-import { ShippingAddressCard, type CheckoutAddressDraft, type SavedAddress } from '@/components/checkout/ShippingAddressCard';
-import { DeliveryCard } from '@/components/checkout/DeliveryCard';
-import { PaymentCard, type SavedCard } from '@/components/checkout/PaymentCard';
-import { PromoCodeCard } from '@/components/checkout/PromoCodeCard';
-import { PriceBreakdownCard } from '@/components/checkout/PriceBreakdownCard';
+import { CK, CheckoutSection, GUTTER } from '@/components/checkout/CheckoutPrimitives';
+import { ContactSection } from '@/components/checkout/ContactSection';
+import { ShippingSection, type CheckoutAddressDraft, type SavedAddress } from '@/components/checkout/ShippingSection';
+import {
+  ExpressSection, HostedExpressButton, NEW_CARD, PaymentSection, type SavedCard,
+} from '@/components/checkout/PaymentSection';
+import { PromoCodeSection } from '@/components/checkout/PromoCodeSection';
+import { ThreadCashSection } from '@/components/checkout/ThreadCashSection';
+import { OrderSummarySection } from '@/components/checkout/OrderSummarySection';
 import { CheckoutTermsLine } from '@/components/checkout/CheckoutTermsLine';
 import { OrderConfirmation } from '@/components/checkout/OrderConfirmation';
-import { COMP, FONT, FS, SP } from '@/lib/theme';
-
-// Maps known Stripe decline reason codes to plain-language copy. Falls back to a
-// generic decline message when the code is unrecognized, and to a "still
-// confirming" message when there's no decline reason at all (e.g. a timeout).
-function humanDeclineReason(reason?: string | null): string {
-  if (!reason) return "We're still confirming your payment. This can take a minute — check your order status shortly.";
-  const known: Record<string, string> = {
-    card_declined: 'Your card was declined. Try another card or contact your bank.',
-    insufficient_funds: 'Your card was declined for insufficient funds. Try another card.',
-    expired_card: 'That card has expired. Try another card.',
-    incorrect_cvc: 'The security code didn’t match. Check it and try again.',
-    processing_error: 'Something went wrong processing your card. Try again.',
-    incorrect_number: 'That card number looks incorrect. Check it and try again.',
-  };
-  return known[reason] ?? 'Your card was declined. Try another card or contact your bank.';
-}
+import {
+  ExpressPay, PaymentController, StripePaymentProvider, stripePaymentAvailable,
+} from '@/components/checkout/StripePayment';
+import type { ConfirmOutcome, PaymentControllerApi } from '@/components/checkout/stripePaymentTypes';
+import { FONT, FS, SP } from '@/lib/theme';
 
 /**
- * A fully verified order reference returned from the server after Stripe payment.
- * `id`     — server-assigned UUID / numeric ID used for all API calls and navigation.
+ * A fully verified order reference returned from the server after payment.
+ * `id`     — server-assigned UUID used for all API calls and navigation.
  * `number` — human-readable display string shown to the buyer (e.g. "BT-1234").
  */
 export interface VerifiedOrder {
@@ -109,10 +108,18 @@ export interface VerifiedOrder {
 
 type CheckoutError = { title: string; message: string };
 
+/** Pending reconciliation entry for an in-app payment (vs a hosted Checkout Session id). */
+const PI_PREFIX = 'pi:';
+
+const HEADER_WEB_MIN_TOP = 54;
+
+function wait(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function BuyerCheckoutScreen() {
-  const { theme } = useAppTheme();
   const { source } = useLocalSearchParams<{ source?: string }>();
   const router = useRouter();
   const pathname = usePathname();
@@ -124,24 +131,27 @@ export default function BuyerCheckoutScreen() {
   const api = useApi();
   const { isSignedIn } = useAuth();
   const threadCashCheckoutEnabled = useFeatureFlag('threadCashCheckoutDiscount');
+  const hostedFallbackFlag = useFeatureFlag('hostedCheckoutFallback');
 
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [contact, setContact] = useState<Partial<CheckoutContact>>({ orderUpdates: 'email', marketingConsent: false });
   const [address, setAddress] = useState<CheckoutAddressDraft>({ country: 'US' });
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
+  const [selectedCard, setSelectedCard] = useState<string>(NEW_CARD);
+  const [cardComplete, setCardComplete] = useState(false);
+  const [walletAvailable, setWalletAvailable] = useState(false);
+  const [quote, setQuote] = useState<{ key: string; value: CartQuote } | null>(null);
+  const [serverSaidHosted, setServerSaidHosted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<CheckoutError | null>(null);
   const [canRetryPayment, setCanRetryPayment] = useState(false);
-  const [footerHeight, setFooterHeight] = useState(180);
-  // Item 110: the footer's price breakdown, folded by default. Scrolling the
-  // page away (more than a nudge) folds it again.
-  const [breakdownOpen, setBreakdownOpen] = useState(false);
-  const breakdownOpenedAtY = useRef(0);
-  const scrollY = useRef(0);
+  const [footerHeight, setFooterHeight] = useState(150);
   const scrollRef = useRef<ScrollView>(null);
+  const controllerRef = useRef<PaymentControllerApi>(null);
+  const startedRef = useRef<PaymentIntentStart | null>(null);
   /**
    * Fully verified orders — each entry has a real server `id` (used for navigation/API)
    * and a human-readable `number` (used for display only).
@@ -150,7 +160,7 @@ export default function BuyerCheckoutScreen() {
   const [pendingSessionIds, setPendingSessionIds] = useState<string[]>([]);
   /**
    * In-memory map: sellerId → verified server order ID.
-   * Populated as each Stripe session is verified so we can skip already-paid groups
+   * Populated as each payment is verified so we can skip already-paid groups
    * if pay() is called again (retry path) without double-charging.
    */
   const paidRef = useRef(new Map<string, string>());
@@ -176,15 +186,15 @@ export default function BuyerCheckoutScreen() {
       if (next.step === 'contact' || next.step === 'shipping' || next.step === 'discounts' || next.step === 'payment') {
         next.step = 'information';
       }
-      // The generic terms checkbox is now the plain line under Place order —
-      // drop it from sessions saved before that change (pre-order acks stay).
+      // The generic terms checkbox is now the plain line under Pay — drop it
+      // from sessions saved before that change (pre-order acks stay).
       next.acknowledgments = withoutImplicitTermsAck(next.acknowledgments ?? []);
       let restoredContact: Partial<CheckoutContact> = next.contact ?? { orderUpdates: 'email', marketingConsent: false };
       let restoredAddress: CheckoutAddressDraft = next.shippingAddress ?? { country: 'US', saveAddress: true };
       // Dev-web preview only: an all-preview order gets the preview buyer's
-      // demo contact and address, so Place order is one tap on the live
-      // preview. isPreviewCheckoutGroup is false for any real product or
-      // seller and in production builds, so real checkouts are unchanged.
+      // demo contact and address, so Pay is one tap on the live preview.
+      // isPreviewCheckoutGroup is false for any real product or seller and in
+      // production builds, so real checkouts are unchanged.
       if (next.deliveryGroups.length > 0 && next.deliveryGroups.every(isPreviewCheckoutGroup)) {
         ({ contact: restoredContact, address: restoredAddress } = withPreviewCheckoutDetails(restoredContact, restoredAddress));
       }
@@ -196,28 +206,25 @@ export default function BuyerCheckoutScreen() {
       setAddress(restoredAddress);
 
       // Restore paid state — only entries with a verified orderId are considered confirmed.
-      // Entries with only orderNumber (legacy sessions) are treated as pending until
-      // re-verification returns an orderId.
       const restoredVerified: VerifiedOrder[] = [];
-      const restoredPending: string[] = [];
+      const restoredPending = new Set<string>();
       for (const [sellerId, payment] of Object.entries(next.paidGroups ?? {})) {
-        if (payment.orderId && payment.orderNumber) {
-          // Both id and number present — fully verified.
-          restoredVerified.push({ id: payment.orderId, number: payment.orderNumber, sellerId });
+        if (payment.orderId) {
+          restoredVerified.push({ id: payment.orderId, number: payment.orderNumber ?? payment.orderId, sellerId });
           paidRef.current.set(sellerId, payment.orderId);
-        } else if (payment.orderId && !payment.orderNumber) {
-          // id but no display number (edge case) — still navigable, show id as fallback display.
-          restoredVerified.push({ id: payment.orderId, number: payment.orderId, sellerId });
-          paidRef.current.set(sellerId, payment.orderId);
-        } else {
-          // No orderId — needs re-verification against Stripe.
-          restoredPending.push(payment.guestAccessToken
+        } else if (payment.stripeSessionId.startsWith('pi_') && payment.stripeSessionId.includes(':')) {
+          // In-app payment: "<paymentIntentId>:<checkoutRowId>".
+          restoredPending.add(`${PI_PREFIX}${payment.stripeSessionId.split(':')[0]}`);
+        } else if (!payment.stripeSessionId.startsWith('preview_')) {
+          restoredPending.add(payment.guestAccessToken
             ? `${payment.stripeSessionId}|${payment.guestAccessToken}`
             : payment.stripeSessionId);
         }
       }
       setVerifiedOrders(restoredVerified);
-      setPendingSessionIds(restoredPending);
+      // A pending in-app payment only matters once it was confirmed (the
+      // confirmation step); before that it is simply retried with Pay.
+      setPendingSessionIds(next.step === 'confirmation' ? [...restoredPending] : [...restoredPending].filter(id => !id.startsWith(PI_PREFIX)));
 
       // Meta Pixel + Conversions API — fires once when checkout actually
       // starts (session freshly loaded/created), not on every re-render.
@@ -229,7 +236,7 @@ export default function BuyerCheckoutScreen() {
         );
       }
 
-      // Load saved addresses (and cards on file) for authenticated users
+      // Saved addresses and cards for signed-in buyers
       if (isSignedIn) {
         try {
           const [addresses, profile] = await Promise.all([
@@ -248,10 +255,14 @@ export default function BuyerCheckoutScreen() {
         } catch {
           // ignore
         }
-        // Stripe-backed saved cards (the same Customer the Checkout Session
-        // is created for). Display only — Stripe Checkout offers them.
+        // Cards on the buyer's Stripe customer (the one the PaymentIntent is created for).
         void api.reviews.paymentMethods()
-          .then((data: any) => setSavedCards(Array.isArray(data?.paymentMethods) ? data.paymentMethods : []))
+          .then((data: any) => {
+            const cards: SavedCard[] = Array.isArray(data?.paymentMethods) ? data.paymentMethods : [];
+            setSavedCards(cards);
+            const preferred = cards.find(card => card.isDefault) ?? cards[0];
+            if (preferred) setSelectedCard(preferred.id);
+          })
           .catch(() => setSavedCards([]));
       }
 
@@ -266,20 +277,18 @@ export default function BuyerCheckoutScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const handleSelectAddress = (addr: any) => {
+  const handleSelectAddress = (addr: SavedAddress) => {
     const parts = addr.recipientName ? addr.recipientName.split(' ') : [];
-    const firstName = parts[0] || '';
-    const lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
     setAddress({
       id: addr.id,
-      firstName,
-      lastName,
+      firstName: parts[0] || '',
+      lastName: parts.length > 1 ? parts.slice(1).join(' ') : '',
       line1: addr.street,
-      line2: addr.line2,
+      line2: addr.line2 ?? '',
       city: addr.city,
       state: addr.state,
       postalCode: addr.postalCode,
-      country: addr.country,
+      country: addr.country ?? 'US',
       saveAddress: false,
     });
     setContact(previous => ({
@@ -288,8 +297,11 @@ export default function BuyerCheckoutScreen() {
     }));
   };
 
-  const persist = async (next: CheckoutSession) => {
-    const snapshot = mergeCheckoutFormState(next, contact, address);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+
+  const persist = async (next: CheckoutSession, overrides?: { contact?: Partial<CheckoutContact>; address?: Partial<CheckoutAddress> }) => {
+    const snapshot = mergeCheckoutFormState(next, overrides?.contact ?? contact, overrides?.address ?? address);
     sessionRef.current = snapshot;
     setSession(snapshot);
     await saveCheckoutProgress(snapshot);
@@ -304,8 +316,6 @@ export default function BuyerCheckoutScreen() {
   // ── Thread Cash (item 109) ──────────────────────────────────────────────
   // Single-seller, signed-in orders only (a token discounts one Stripe
   // session), behind the OFF-by-default 'threadCashCheckoutDiscount' flag.
-  const sessionRef = useRef(session);
-  sessionRef.current = session;
   const threadCashEligible = !!session && !!isSignedIn && threadCashCheckoutEnabled
     && session.deliveryGroups.length === 1 && session.step !== 'confirmation'
     // Preview orders never reach the server, so there's no wallet to use.
@@ -327,6 +337,42 @@ export default function BuyerCheckoutScreen() {
       await persist(withThreadCashRedemption(sessionRef.current, redemption, `ck_${randomUUID()}`));
     },
   });
+
+  // ── Which way this order pays ───────────────────────────────────────────
+  const payment = useMemo(() => choosePaymentPath({
+    previewOnly,
+    signedIn: !!isSignedIn,
+    hostedFallbackFlag,
+    stripeAvailable: stripePaymentAvailable(),
+    hasPreOrder: !!session?.deliveryGroups.some(group => group.hasPreOrder || group.items.some(item => item.isPreOrder)),
+    threadCashApplied: (session?.threadCashRedemption?.discountCents ?? 0) > 0,
+    loyaltyApplied: (session?.loyaltyRedemption?.discountCents ?? 0) > 0,
+    serverSaidHosted,
+  }), [previewOnly, isSignedIn, hostedFallbackFlag, session, serverSaidHosted]);
+  const inApp = payment.path === 'in_app';
+
+  // ── Server quote: real shipping + tax for the address (in-app only) ─────
+  const quoteBody = session && inApp && canQuote(address) ? buildQuoteBody(session, address) : null;
+  const currentQuoteKey = quoteBody ? quoteKey(quoteBody) : null;
+  useEffect(() => {
+    if (!quoteBody || !currentQuoteKey || quote?.key === currentQuoteKey) return;
+    let active = true;
+    const timer = setTimeout(() => {
+      api.buyer.checkout.paymentIntent.quote(quoteBody)
+        .then(value => { if (active) setQuote({ key: currentQuoteKey, value }); })
+        .catch((err: unknown) => {
+          if (!active) return;
+          const apiError = err instanceof ApiError ? err : null;
+          if (apiError?.code === 'USE_HOSTED_CHECKOUT') setServerSaidHosted(true);
+          else if (apiError && apiError.status >= 400 && apiError.status < 500 && apiError.status !== 429) {
+            setError({ title: 'Some items in your order changed', message: apiError.message });
+          }
+        });
+    }, 450);
+    return () => { active = false; clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuoteKey]);
+  const activeQuote = quote && quote.key === currentQuoteKey ? quote.value : null;
 
   const validateServerCart = async () => {
     if (!isSignedIn || previewOnly) return true;
@@ -353,22 +399,232 @@ export default function BuyerCheckoutScreen() {
     }
   };
 
+  // ─── In-app payment (one PaymentIntent for the cart) ──────────────────────
+
+  /** A new pay attempt after a failure: the old intent is closed and its stock released. */
+  const startFreshAttempt = async (intent: PaymentIntentStart | null, base: CheckoutSession) => {
+    if (intent) {
+      await api.buyer.checkout.paymentIntent.cancel(intent.paymentIntentId).catch(() => {});
+    }
+    startedRef.current = null;
+    const paidGroups = { ...(base.paidGroups ?? {}) };
+    for (const group of base.deliveryGroups) {
+      if (paidGroups[group.sellerId] && !paidGroups[group.sellerId].orderId) delete paidGroups[group.sellerId];
+    }
+    await persist({ ...base, paidGroups, idempotencyKey: `ck_${randomUUID()}` });
+  };
+
+  /** Creates the cart's PaymentIntent for this address/contact. Null (and the reason shown) on failure. */
+  const startPaymentIntent = async (
+    base: CheckoutSession,
+    who: { contact: Partial<CheckoutContact>; address: Partial<CheckoutAddress> },
+  ): Promise<string | null> => {
+    try {
+      const started = await api.buyer.checkout.paymentIntent.create(buildCreatePaymentIntentBody({
+        session: base,
+        contact: who.contact,
+        address: who.address,
+        idempotencyKey: base.idempotencyKey,
+        saveCard: true,
+      }));
+      startedRef.current = started;
+      // Remember the intent so a restart can find the orders it produced.
+      const paidGroups = { ...(base.paidGroups ?? {}) };
+      for (const group of started.groups) {
+        paidGroups[group.sellerId] = { stripeSessionId: `${started.paymentIntentId}:${group.checkoutSessionId}` };
+      }
+      await persist({ ...base, paidGroups, step: 'review' }, who);
+      return started.clientSecret;
+    } catch (err) {
+      const apiError = err instanceof ApiError ? err : null;
+      if (apiError?.code === 'USE_HOSTED_CHECKOUT') {
+        setServerSaidHosted(true);
+        showError({ title: 'One more step', message: 'This order is paid on Stripe’s secure page. Tap Pay again to continue. You haven’t been charged.' });
+      } else if (apiError?.code === 'PAYMENT_CANCELED') {
+        await startFreshAttempt(null, base);
+        showError({ title: 'Payment closed', message: 'That payment attempt timed out. Tap Pay again to start a new one. You haven’t been charged.' });
+      } else if (apiError && apiError.status >= 400 && apiError.status < 500 && apiError.status !== 429) {
+        showError({ title: 'We couldn’t start your payment', message: apiError.message });
+      } else {
+        showError({ title: 'We couldn’t start your payment', message: 'Something went wrong reaching our payment service. Check your connection and try again. You haven’t been charged.' });
+      }
+      return null;
+    }
+  };
+
+  /** After Stripe answered: wait for the webhook's orders, then show the confirmation. */
+  const finishInApp = async (
+    outcome: ConfirmOutcome | null,
+    who: { contact: Partial<CheckoutContact>; address: Partial<CheckoutAddress> },
+  ) => {
+    const base = sessionRef.current ?? current;
+    const started = startedRef.current;
+    if (!outcome) { setPlacing(false); return; }
+    if (outcome.status === 'canceled' || outcome.status === 'failed') {
+      await startFreshAttempt(started, base);
+      if (outcome.status === 'failed') {
+        showError({ title: 'Payment declined', message: paymentErrorMessage(outcome.code, outcome.message) });
+      } else if (started) {
+        showError({ title: 'Payment cancelled', message: 'You weren’t charged. Your order is still here whenever you’re ready.' });
+      }
+      setPlacing(false);
+      return;
+    }
+    if (!started) { setPlacing(false); return; }
+
+    // Paid (or processing). The orders are created by Stripe's webhook, so
+    // wait for them briefly; the confirmation screen can finish the rest.
+    let status: Awaited<ReturnType<typeof api.buyer.checkout.paymentIntent.get>> | null = null;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      status = await api.buyer.checkout.paymentIntent.get(started.paymentIntentId).catch(() => null);
+      if (status?.complete) break;
+      await wait(1500);
+    }
+    const paidGroups = { ...(base.paidGroups ?? {}) };
+    const confirmed: VerifiedOrder[] = [...verifiedOrders];
+    for (const order of status?.orders ?? []) {
+      if (paidRef.current.has(order.sellerId)) continue;
+      confirmed.push({ id: order.orderId, number: order.orderNumber, sellerId: order.sellerId });
+      paidRef.current.set(order.sellerId, order.orderId);
+      paidGroups[order.sellerId] = {
+        ...(paidGroups[order.sellerId] ?? { stripeSessionId: started.paymentIntentId }),
+        orderId: order.orderId,
+        orderNumber: order.orderNumber,
+        amountTotalCents: order.amountTotalCents,
+      };
+    }
+    setVerifiedOrders(confirmed);
+    setPendingSessionIds(status?.complete ? [] : [`${PI_PREFIX}${started.paymentIntentId}`]);
+    void trackAndRelayConversionEvent(
+      'Purchase',
+      { value: started.amountCents / 100, currency: base.summary.currency, content_ids: base.deliveryGroups.flatMap(group => group.items.map(item => item.productId)) },
+      { valueCents: started.amountCents, currency: base.summary.currency },
+    );
+    await removeCartItems(base.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
+    await saveAddressIfAsked(who);
+    startedRef.current = null;
+    await persist({ ...base, paidGroups, step: 'confirmation' }, who);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setPlacing(false);
+  };
+
+  const payInApp = async () => {
+    const controller = controllerRef.current;
+    if (!controller) { setPlacing(false); return; }
+    const who = { contact, address };
+    // An earlier attempt may already have been paid (the app closed before
+    // the confirmation). Never confirm or charge that cart again.
+    const pendingIntent = Object.values(current.paidGroups ?? {})
+      .map(paid => paid.stripeSessionId)
+      .find(id => id.startsWith('pi_') && id.includes(':'))?.split(':')[0];
+    if (pendingIntent) {
+      const status = await api.buyer.checkout.paymentIntent.get(pendingIntent).catch(() => null);
+      if (status && status.paymentStatus !== 'unpaid') {
+        startedRef.current = { paymentIntentId: pendingIntent, clientSecret: '', status: status.status, amountCents: status.amountTotal, groups: [] };
+        await finishInApp({ status: 'succeeded' }, who);
+        return;
+      }
+    }
+    const billing = {
+      name: recipientName(address),
+      email: contact.email ?? '',
+      phone: contact.phone ?? '',
+      address: {
+        line1: address.line1 ?? '', line2: address.line2 || null, city: address.city ?? '',
+        state: address.state ?? '', postalCode: address.postalCode ?? '', country: address.country || 'US',
+      },
+    };
+    const getClientSecret = () => startPaymentIntent(current, who);
+    let outcome: ConfirmOutcome | null;
+    try {
+      outcome = selectedCard === NEW_CARD || !savedCards.some(card => card.id === selectedCard)
+        ? await controller.confirmCard(getClientSecret, billing)
+        : await controller.confirmSaved(getClientSecret, selectedCard);
+    } catch {
+      outcome = { status: 'failed', code: null, message: 'Something went wrong confirming your payment. Try again.' };
+    }
+    await finishInApp(outcome, who);
+  };
+
+  // Apple Pay / Google Pay (in-app): the sheet supplies the address and contact.
+  const walletCheckout = (wallet: WalletContact) => {
+    const mapped = walletContactToCheckout(wallet);
+    return {
+      contact: { ...contact, ...mapped.contact },
+      address: { ...mapped.address, saveAddress: false } as CheckoutAddressDraft,
+    };
+  };
+
+  const expressQuote = async (walletAddress: WalletContact['address']) => {
+    if (!session) return null;
+    try {
+      return await api.buyer.checkout.paymentIntent.quote(buildQuoteBody(session, {
+        city: walletAddress.city ?? '', state: walletAddress.state ?? '',
+        postalCode: walletAddress.postalCode ?? '', country: walletAddress.country ?? 'US',
+      }));
+    } catch {
+      return null;
+    }
+  };
+
+  const expressCreateIntent = async (wallet: WalletContact) => {
+    setError(null);
+    setPlacing(true);
+    const who = walletCheckout(wallet);
+    setContact(who.contact);
+    setAddress(who.address);
+    const clientSecret = await startPaymentIntent(current, who);
+    if (!clientSecret) setPlacing(false);
+    return clientSecret;
+  };
+
+  const expressOutcome = (outcome: ConfirmOutcome, wallet: WalletContact | null) => {
+    if (outcome.status === 'canceled' && !startedRef.current) return; // closed the sheet before paying
+    setPlacing(true);
+    void finishInApp(outcome, wallet ? walletCheckout(wallet) : { contact, address });
+  };
+
+  const saveAddressIfAsked = async (who: { address: CheckoutAddressDraft; contact: Partial<CheckoutContact> }) => {
+    if (!isSignedIn || who.address.saveAddress === false || who.address.id) return;
+    try {
+      await api.buyer.addresses.create({
+        label: who.address.label || 'Saved Address',
+        recipientName: recipientName(who.address),
+        street: who.address.line1,
+        line2: who.address.line2 || undefined,
+        city: who.address.city,
+        state: who.address.state,
+        postalCode: who.address.postalCode,
+        country: who.address.country || 'US',
+        phone: who.contact.phone || undefined,
+        isDefault: (who.address as any).isDefault || false,
+      });
+    } catch {
+      // ignore — address save is non-fatal
+    }
+  };
+
   /**
-   * Single "Place order" action (also behind the express wallet button).
-   * The button only enables once getCheckoutBlockingSection() is clear, so
-   * this re-checks defensively, validates the cart server-side, then pays.
-   * No payment logic below this point changes.
+   * The single "Pay" action (also behind the hosted/preview wallet button).
+   * The button only enables once the page is complete, so this re-checks
+   * defensively, then pays the way this order pays.
    */
   const handlePlaceOrder = async () => {
     if (placing) return;
     if (getCheckoutBlockingSection(contact, address, current) !== null) return;
     setError(null);
     setPlacing(true);
+    if (inApp) {
+      await payInApp();
+      return;
+    }
     const cartOk = await validateServerCart();
     if (!cartOk) { setPlacing(false); return; }
     await persist({ ...current, contact: contact as CheckoutContact, shippingAddress: address as CheckoutAddress, step: 'review' });
     await pay();
   };
+
+  // ─── Hosted fallback + preview (the previous per-seller loop) ─────────────
 
   const pay = async () => {
     setPlacing(true);
@@ -416,7 +672,7 @@ export default function BuyerCheckoutScreen() {
               contactEmail: contact.email!,
               contactPhone: contact.phone!,
               shippingAddress: {
-                recipientName: `${address.firstName} ${address.lastName}`.trim(),
+                recipientName: recipientName(address),
                 street: address.line1!,
                 line2: address.line2,
                 city: address.city!,
@@ -442,14 +698,14 @@ export default function BuyerCheckoutScreen() {
           );
         } else {
           // Guest checkout: signed-out buyers pay without an account; the
-          // Contact card's email is where the receipt and order updates go.
+          // Contact section's email is where the receipt and order updates go.
           result = await api.guest.checkout.createSession(
             group.items.map(item => ({ variantId: item.variantId, productId: item.productId, quantity: item.quantity })),
             {
               contactEmail: contact.email!,
               contactPhone: contact.phone!,
               shippingAddress: {
-                name: `${address.firstName} ${address.lastName}`.trim(),
+                name: recipientName(address),
                 street: address.line1!,
                 line2: address.line2,
                 city: address.city!,
@@ -477,7 +733,6 @@ export default function BuyerCheckoutScreen() {
         }
 
         // Verify with retries — webhook may be slightly behind.
-        // We poll for orderId specifically; orderNumber alone is insufficient for navigation.
         let verification: any;
         for (let attempt = 0; attempt < 6; attempt++) {
           if (isSignedIn) {
@@ -486,13 +741,15 @@ export default function BuyerCheckoutScreen() {
             verification = await api.guest.checkout.verifySession(result.sessionId, result.guestAccessToken);
           }
           if (verification.orderId || verification.paymentStatus === 'paid') break;
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await wait(2000);
         }
 
         if (verification?.paymentStatus !== 'paid') {
           showError({
             title: verification?.declineReason ? 'Payment declined' : 'Payment not confirmed yet',
-            message: humanDeclineReason(verification?.declineReason),
+            message: verification?.declineReason
+              ? paymentErrorMessage(verification.declineReason)
+              : 'We’re still confirming your payment. This can take a minute — check your order status shortly.',
           });
           setCanRetryPayment(true);
           setPlacing(false);
@@ -500,7 +757,6 @@ export default function BuyerCheckoutScreen() {
         }
 
         if (verification.orderId) {
-          // Both id (for API/routing) and number (for display) from the verify response.
           const vo: VerifiedOrder = {
             id: verification.orderId,
             number: verification.orderNumber ?? verification.orderId,
@@ -517,8 +773,7 @@ export default function BuyerCheckoutScreen() {
           await persist({ ...current, paidGroups });
 
           // Meta Pixel + Conversions API — fires exactly once per newly
-          // verified order (this branch only runs the first time a group's
-          // payment resolves to a real order id).
+          // verified order.
           const purchaseValueCents = verification.amountTotal ?? current.summary.totalCents;
           void trackAndRelayConversionEvent(
             'Purchase',
@@ -539,27 +794,7 @@ export default function BuyerCheckoutScreen() {
       if (!unresolved.length) {
         await removeCartItems(current.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
       }
-
-      // Save address if requested
-      if (isSignedIn && address.saveAddress !== false && !address.id) {
-        try {
-          await api.buyer.addresses.create({
-            label: address.label || 'Saved Address',
-            recipientName: `${address.firstName} ${address.lastName}`.trim(),
-            street: address.line1,
-            line2: address.line2 || undefined,
-            city: address.city,
-            state: address.state,
-            postalCode: address.postalCode,
-            country: address.country || 'US',
-            phone: contact.phone || undefined,
-            isDefault: (address as any).isDefault || false,
-          });
-        } catch {
-          // ignore — address save is non-fatal
-        }
-      }
-
+      await saveAddressIfAsked({ address, contact });
       await persist({ ...current, paidGroups, step: 'confirmation' });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
@@ -573,12 +808,27 @@ export default function BuyerCheckoutScreen() {
   const refreshOrders = useCallback(async () => {
     setPlacing(true);
     const remaining: string[] = [];
-    // Start from what we already have; append newly-reconciled orders.
     const found: VerifiedOrder[] = [...verifiedOrders];
     const paidGroups = { ...(current.paidGroups ?? {}) };
 
     for (const pending of pendingSessionIds) {
       try {
+        if (pending.startsWith(PI_PREFIX)) {
+          const status = await api.buyer.checkout.paymentIntent.get(pending.slice(PI_PREFIX.length));
+          for (const order of status.orders) {
+            if (paidRef.current.has(order.sellerId)) continue;
+            found.push({ id: order.orderId, number: order.orderNumber, sellerId: order.sellerId });
+            paidRef.current.set(order.sellerId, order.orderId);
+            paidGroups[order.sellerId] = {
+              ...(paidGroups[order.sellerId] ?? { stripeSessionId: pending.slice(PI_PREFIX.length) }),
+              orderId: order.orderId,
+              orderNumber: order.orderNumber,
+              amountTotalCents: order.amountTotalCents,
+            };
+          }
+          if (!status.complete) remaining.push(pending);
+          continue;
+        }
         let result: any;
         const sessionId = pending.includes('|') ? pending.split('|')[0] : pending;
         if (pending.includes('|')) {
@@ -587,11 +837,10 @@ export default function BuyerCheckoutScreen() {
         } else {
           result = await api.buyer.checkout.verifySession(pending);
         }
-
         // Only reconcile when the server returns a real orderId, not just an orderNumber.
         if (result.orderId) {
           const sellerId = Object.entries(paidGroups)
-            .find(([, payment]) => payment.stripeSessionId === sessionId)?.[0];
+            .find(([, paid]) => paid.stripeSessionId === sessionId)?.[0];
           const vo: VerifiedOrder = {
             id: result.orderId,
             number: result.orderNumber ?? result.orderId,
@@ -632,19 +881,21 @@ export default function BuyerCheckoutScreen() {
   // (seller-conversation.tsx): never flush with the screen edge, even on web
   // or a device with no home indicator.
   const footerBottomPad = Math.max(insets.bottom, SP.sm) + SP.sm;
-  const headerTop = Platform.OS === 'web' ? Math.max(insets.top, SP.sm) : insets.top;
+  // Fully below the notch / Dynamic Island. Web can't always read the inset,
+  // so it gets the ScreenHeader floor (54).
+  const headerTop = Platform.OS === 'web' ? Math.max(insets.top, HEADER_WEB_MIN_TOP) : insets.top;
 
   const header = (title: string, onClose: () => void, closeLabel: string) => (
-    <View style={[styles.header, { paddingTop: headerTop + SP.xs, borderBottomColor: theme.border }]}>
+    <View style={[styles.header, { paddingTop: headerTop }]} testID="checkout-header">
       <IconButton name="x" variant="plain" onPress={onClose} accessibilityLabel={closeLabel} testID="checkout-close" />
-      <Text style={[styles.headerTitle, { color: theme.text }]} accessibilityRole="header">{title}</Text>
+      <Text style={styles.headerTitle} accessibilityRole="header">{title}</Text>
       <View style={styles.headerSpacer} />
     </View>
   );
 
   if (loadFailed) {
     return (
-      <View style={[styles.root, { backgroundColor: theme.background }]}>
+      <View style={styles.root}>
         {header('Checkout', leaveCheckout, 'Close checkout')}
         <ErrorState
           message="We couldn't load checkout. Check your connection and try again."
@@ -659,22 +910,41 @@ export default function BuyerCheckoutScreen() {
   if (loading || !session) return <CheckoutSkeleton />;
 
   const isConfirmation = current.step === 'confirmation';
-  const totals = getCheckoutDisplayTotals(current);
+  const sessionTotals = getCheckoutDisplayTotals(current);
+  const quoted = inApp && activeQuote ? quoteTotals(activeQuote) : null;
+  const totals: CheckoutDisplayTotals = quoted
+    ? {
+        subtotalCents: quoted.subtotalCents,
+        shippingCents: quoted.shippingCents,
+        taxCents: quoted.taxCents,
+        promoCents: quoted.discountCents,
+        rewardsCents: 0,
+        threadCashCents: 0,
+        orderTotalCents: quoted.totalCents,
+        totalCents: quoted.totalCents,
+      }
+    : sessionTotals;
+  const taxNote = quoted || previewOnly
+    ? undefined
+    : inApp ? 'Added with your address' : 'Calculated at payment';
   const itemCount = current.deliveryGroups.reduce((sum, group) => sum + group.items.reduce((n, item) => n + item.quantity, 0), 0);
-  const ready = getCheckoutBlockingSection(contact, address, current) === null && !(threadCashEligible && threadCash.busy);
-  const nextStep = getCheckoutNextStepHint(contact, address, current);
+  const cardReady = !inApp || (savedCards.some(card => card.id === selectedCard) ? true : cardComplete);
+  const formReady = getCheckoutBlockingSection(contact, address, current) === null && !(threadCashEligible && threadCash.busy);
+  const ready = formReady && cardReady;
+  const nextStep = getCheckoutNextStepHint(contact, address, current)
+    ?? (!cardReady ? 'Enter your card details to continue' : null);
   const multiSeller = current.deliveryGroups.length > 1;
   const preorderAcks = current.acknowledgments;
-  const ctaLabel = `${canRetryPayment ? 'Try again' : 'Place order'} · ${formatCents(totals.totalCents)}`;
+  const ctaLabel = canRetryPayment ? `Try again · ${formatCents(totals.totalCents)}` : `Pay ${formatCents(totals.totalCents)}`;
   const onCta = () => void (canRetryPayment ? retryPayment() : handlePlaceOrder());
 
   if (isConfirmation) {
     const paidCents = Object.values(current.paidGroups ?? {}).reduce((sum, group) => sum + (group.amountTotalCents ?? 0), 0);
     return (
-      <View style={[styles.root, { backgroundColor: theme.background }]}>
+      <View style={styles.root}>
         {header('Order confirmation', () => router.replace('/(buyer)/discover' as never), 'Close')}
         <ScrollView
-          contentContainerStyle={{ padding: SP.md, paddingBottom: footerBottomPad + SP.lg }}
+          contentContainerStyle={{ paddingHorizontal: GUTTER, paddingTop: SP.md, paddingBottom: footerBottomPad + SP.lg }}
           bounces={false}
           overScrollMode="never"
           showsVerticalScrollIndicator={false}
@@ -692,212 +962,200 @@ export default function BuyerCheckoutScreen() {
     );
   }
 
+  const expressVisible = inApp ? walletAvailable : true;
+
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: theme.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      {header('Checkout', leaveCheckout, 'Close checkout')}
+    <StripePaymentProvider amountCents={totals.totalCents}>
+      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {header('Checkout', leaveCheckout, 'Close checkout')}
+        {inApp ? <PaymentController ref={controllerRef} /> : null}
 
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={{ padding: SP.md, paddingBottom: footerHeight + SP.lg }}
-        keyboardShouldPersistTaps="handled"
-        bounces={false}
-        overScrollMode="never"
-        showsVerticalScrollIndicator={false}
-        scrollEventThrottle={32}
-        onScroll={event => {
-          scrollY.current = event.nativeEvent.contentOffset.y;
-          if (breakdownOpen && Math.abs(scrollY.current - breakdownOpenedAtY.current) > 24) setBreakdownOpen(false);
-        }}
-        testID="checkout-scroll"
-      >
-        {error ? (
-          <View
-            style={[styles.errorBanner, { borderColor: theme.error, backgroundColor: theme.card }]}
-            accessibilityRole="alert"
-            accessibilityLiveRegion="assertive"
-            testID="checkout-error"
-          >
-            <Feather name="alert-circle" size={18} color={theme.error} style={{ marginTop: 1 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.errorTitle, { color: theme.text }]}>{error.title}</Text>
-              <Text style={[styles.errorText, { color: theme.muted }]}>{error.message}</Text>
-            </View>
-            <IconButton name="x" variant="plain" size={16} onPress={() => setError(null)} accessibilityLabel="Dismiss" />
-          </View>
-        ) : null}
-
-        <OrderSummaryCard session={current} />
-
-        <ContactCard contact={contact} onChange={setContact} showErrors={false} />
-
-        <ShippingAddressCard
-          address={address}
-          onChange={setAddress}
-          savedAddresses={isSignedIn ? savedAddresses : []}
-          onSelectSaved={handleSelectAddress}
-          canSaveAddresses={!!isSignedIn}
-        />
-
-        <DeliveryCard
-          session={current}
-          onSelect={(sellerId, methodId) =>
-            void persist({
-              ...current,
-              deliveryGroups: current.deliveryGroups.map(g =>
-                g.sellerId === sellerId ? { ...g, selectedMethodId: methodId } : g,
-              ),
-            })
-          }
-        />
-
-        <PaymentCard
-          onExpressPay={onCta}
-          disabled={!ready}
-          loading={placing}
-          savedCards={isSignedIn ? savedCards : []}
-          sellerCount={current.deliveryGroups.length}
-        />
-        {previewOnly ? (
-          // Dev-web preview only: said plainly, since no Stripe page opens.
-          <View style={styles.previewNote} testID="checkout-preview-note">
-            <Feather name="info" size={13} color={theme.muted} />
-            <Text style={[styles.previewNoteText, { color: theme.muted }]}>
-              Preview order: placing it won’t charge a card or reach Stripe.
-            </Text>
-          </View>
-        ) : null}
-
-        <PromoCodeCard
-          discounts={current.discounts}
-          unavailableReason={multiSeller ? 'Promo codes apply to single-seller orders. Check out each seller separately to use a code.' : undefined}
-          onApply={async (code): Promise<CheckoutDiscount> => {
-            const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts);
-            // Only a server-validated code is kept (the server takes one code per order).
-            // A new code is a new order total: start a new payment attempt so a
-            // payment opened earlier (with the old total) isn't reused.
-            if (discount.isValid) await persist({ ...current, discounts: [discount], idempotencyKey: `ck_${randomUUID()}` });
-            return discount;
-          }}
-          onRemove={code =>
-            void removeDiscount(code, current.discounts).then(discounts =>
-              persist({ ...current, discounts, idempotencyKey: `ck_${randomUUID()}` }),
-            )
-          }
-        />
-
-        {/* Thread Cash (item 109): one on/off row after the promo code. It
-            stacks after the code and follows the total live (see
-            hooks/useCheckoutThreadCash.ts). Hidden while the
-            'threadCashCheckoutDiscount' flag is off, for guests, and for
-            multi-seller orders. */}
-        {threadCashEligible && <ThreadCashCard state={threadCash} />}
-
-        {/* Pre-order disclosures stay explicit, required checkboxes. */}
-        {preorderAcks.length > 0 && (
-          <CheckoutCard title="Pre-order terms" testID="checkout-preorder-terms">
-            {preorderAcks.map(ack => (
-              <PressableScale
-                key={ack.key}
-                style={styles.ack}
-                onPress={() =>
-                  void persist({
-                    ...current,
-                    acknowledgments: current.acknowledgments.map(a =>
-                      a.key === ack.key ? { ...a, acknowledged: !a.acknowledged } : a,
-                    ),
-                  })
-                }
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: ack.acknowledged }}
-                accessibilityLabel={ack.label}
-                accessibilityHint={ack.required ? 'Required before payment' : undefined}
-                rippleEnabled={false}
-              >
-                <View style={[styles.checkbox, { borderColor: ack.acknowledged ? theme.text : theme.subtle, backgroundColor: ack.acknowledged ? theme.text : 'transparent' }]}>
-                  {ack.acknowledged ? <Feather name="check" size={13} color={theme.background} /> : null}
-                </View>
-                <Text style={[styles.ackText, { color: theme.muted }]}>{ack.label}</Text>
-              </PressableScale>
-            ))}
-          </CheckoutCard>
-        )}
-
-        {/* Purchase protection trust row — the app's existing copy (Terms-sourced). */}
-        <BuyerProtectionNote
-          flat
-          style={styles.trust}
-          preorder={current.deliveryGroups.some(group => group.items.some(item => item.isPreOrder))}
-        />
-      </ScrollView>
-
-      {/* Sticky footer: one primary action carrying the live total, what's
-          still missing (while disabled), and the terms line. */}
-      <StickyFooter style={{ paddingBottom: footerBottomPad, paddingTop: SP.sm + 4 }}>
-        <View onLayout={event => setFooterHeight(event.nativeEvent.layout.height + footerBottomPad + SP.sm + 4)} testID="checkout-footer">
-          {!ready && nextStep ? (
-            <View style={styles.hintRow} testID="checkout-next-step">
-              <Feather name="info" size={13} color={theme.muted} />
-              <Text style={[styles.hint, { color: theme.muted }]}>{nextStep}</Text>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scroll}
+          contentContainerStyle={{ paddingHorizontal: GUTTER, paddingBottom: footerHeight + SP.lg }}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+          overScrollMode="never"
+          showsVerticalScrollIndicator={false}
+          testID="checkout-scroll"
+        >
+          {error ? (
+            <View style={styles.errorBanner} accessibilityRole="alert" accessibilityLiveRegion="assertive" testID="checkout-error">
+              <Feather name="alert-circle" size={18} color={CK.text} style={{ marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.errorTitle}>{error.title}</Text>
+                <Text style={styles.errorText}>{error.message}</Text>
+              </View>
+              <IconButton name="x" variant="plain" size={16} onPress={() => setError(null)} accessibilityLabel="Dismiss" />
             </View>
           ) : null}
-          {/* Item 110: Total ⌃ expands the breakdown above it. A separate
-              control from Place order (siblings, never nested). */}
-          <PriceBreakdownCard
+
+          <ExpressSection visible={expressVisible}>
+            {inApp ? (
+              <ExpressPay
+                amountCents={totals.totalCents}
+                subtotalCents={totals.subtotalCents}
+                shippingCents={totals.shippingCents}
+                quote={expressQuote}
+                createIntent={expressCreateIntent}
+                onOutcome={expressOutcome}
+                onAvailability={setWalletAvailable}
+                disabled={placing || !cardReadyForWallet(current)}
+              />
+            ) : (
+              <HostedExpressButton onPress={onCta} disabled={!ready} loading={placing} />
+            )}
+          </ExpressSection>
+
+          <ContactSection contact={contact} onChange={setContact} showErrors={false} first={!expressVisible} />
+
+          <ShippingSection
+            address={address}
+            onChange={setAddress}
+            savedAddresses={isSignedIn ? savedAddresses : []}
+            onSelectSaved={handleSelectAddress}
+            canSaveAddresses={!!isSignedIn}
+            showErrors={false}
+          />
+
+          <PaymentSection
+            path={payment.path}
+            savedCards={isSignedIn ? savedCards : []}
+            selectedCard={selectedCard}
+            onSelectCard={setSelectedCard}
+            onCardComplete={setCardComplete}
+            sellerCount={current.deliveryGroups.length}
+          />
+
+          <PromoCodeSection
+            discounts={current.discounts}
+            unavailableReason={multiSeller ? 'Promo codes apply to single-seller orders. Check out each seller separately to use a code.' : undefined}
+            onApply={async (code): Promise<CheckoutDiscount> => {
+              const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts);
+              // Only a server-validated code is kept (the server takes one code per order).
+              // A new code is a new order total: start a new payment attempt so a
+              // payment opened earlier (with the old total) isn't reused.
+              if (discount.isValid) await persist({ ...current, discounts: [discount], idempotencyKey: `ck_${randomUUID()}` });
+              return discount;
+            }}
+            onRemove={code =>
+              void removeDiscount(code, current.discounts).then(discounts =>
+                persist({ ...current, discounts, idempotencyKey: `ck_${randomUUID()}` }),
+              )
+            }
+          />
+
+          {/* Thread Cash (item 109): hidden while the flag is off, for guests
+              and for multi-seller orders. */}
+          {threadCashEligible && <ThreadCashSection state={threadCash} />}
+
+          {/* Pre-order disclosures stay explicit, required checkboxes. */}
+          {preorderAcks.length > 0 && (
+            <CheckoutSection title="Pre-order terms" testID="checkout-preorder-terms">
+              {preorderAcks.map(ack => (
+                <PressableScale
+                  key={ack.key}
+                  style={styles.ack}
+                  onPress={() =>
+                    void persist({
+                      ...current,
+                      acknowledgments: current.acknowledgments.map(a =>
+                        a.key === ack.key ? { ...a, acknowledged: !a.acknowledged } : a,
+                      ),
+                    })
+                  }
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: ack.acknowledged }}
+                  accessibilityLabel={ack.label}
+                  accessibilityHint={ack.required ? 'Required before payment' : undefined}
+                  rippleEnabled={false}
+                >
+                  <View style={[styles.checkbox, { borderColor: ack.acknowledged ? CK.text : CK.subtle }]}>
+                    {ack.acknowledged ? <Feather name="check" size={13} color={CK.text} /> : null}
+                  </View>
+                  <Text style={styles.ackText}>{ack.label}</Text>
+                </PressableScale>
+              ))}
+            </CheckoutSection>
+          )}
+
+          <OrderSummarySection
+            session={current}
             totals={totals}
             itemCount={itemCount}
-            collapsible={{
-              expanded: breakdownOpen,
-              onToggle: () => {
-                breakdownOpenedAtY.current = scrollY.current;
-                setBreakdownOpen(open => !open);
-              },
-            }}
+            taxNote={taxNote}
+            quotedGroups={inApp ? activeQuote?.groups : undefined}
           />
-          <Button
-            label={ctaLabel}
-            icon="lock"
-            loading={placing}
-            disabled={!ready}
-            fullWidth
-            onPress={onCta}
-            accessibilityHint={ready ? 'Opens Stripe secure checkout' : nextStep ?? undefined}
-            testID="checkout-place-order"
+
+          {/* Purchase protection trust row — the app's existing copy (Terms-sourced). */}
+          <BuyerProtectionNote
+            flat
+            style={styles.trust}
+            preorder={current.deliveryGroups.some(group => group.items.some(item => item.isPreOrder))}
           />
-          <View style={{ marginTop: SP.sm + 2 }}>
-            <CheckoutTermsLine />
+        </ScrollView>
+
+        {/* Sticky footer: one primary action carrying the live total, what's
+            still missing (while disabled), and the terms line. */}
+        <StickyFooter style={{ paddingBottom: footerBottomPad, paddingTop: SP.sm + 4, backgroundColor: CK.bg, borderTopColor: CK.divider }}>
+          <View onLayout={event => setFooterHeight(event.nativeEvent.layout.height + footerBottomPad + SP.sm + 4)} testID="checkout-footer">
+            {!ready && nextStep ? (
+              <View style={styles.hintRow} testID="checkout-next-step">
+                <Feather name="info" size={13} color={CK.muted} />
+                <Text style={styles.hint}>{nextStep}</Text>
+              </View>
+            ) : null}
+            <Button
+              label={ctaLabel}
+              icon="lock"
+              loading={placing}
+              disabled={!ready}
+              fullWidth
+              onPress={onCta}
+              accessibilityHint={ready ? (inApp ? 'Pays now with the card you chose' : 'Opens Stripe secure checkout') : nextStep ?? undefined}
+              testID="checkout-place-order"
+            />
+            <View style={{ marginTop: SP.sm + 2 }}>
+              <CheckoutTermsLine />
+            </View>
           </View>
-        </View>
-      </StickyFooter>
-    </KeyboardAvoidingView>
+        </StickyFooter>
+      </KeyboardAvoidingView>
+    </StripePaymentProvider>
   );
+}
+
+/** The wallet sheet supplies contact and address itself; only pre-order terms must be accepted first. */
+function cardReadyForWallet(session: CheckoutSession): boolean {
+  return !session.acknowledgments.some(ack => ack.required && !ack.acknowledged);
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  previewNote: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -SP.xs, marginBottom: SP.sm + 4, paddingHorizontal: 2 },
-  previewNoteText: { flex: 1, fontFamily: FONT.medium, fontSize: FS.meta + 1, lineHeight: 17 },
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: CK.bg },
+  scroll: { flex: 1, backgroundColor: CK.bg },
+  // Opaque black bar, fully below the notch; the page scrolls under it.
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SP.sm, paddingBottom: SP.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SP.xs, paddingBottom: SP.xs,
+    backgroundColor: CK.bg, borderBottomWidth: 1, borderBottomColor: CK.divider,
+    zIndex: 2,
   },
-  headerTitle: { flex: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.md },
-  headerSpacer: { width: COMP.minTouchTarget, height: COMP.minTouchTarget },
+  headerTitle: { flex: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.md, color: CK.text },
+  headerSpacer: { width: 44, height: 44 },
   errorBanner: {
     flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm + 2,
-    borderWidth: 1, borderRadius: 16, padding: SP.md - 2, paddingRight: SP.xs, marginBottom: SP.sm + 4,
+    borderWidth: 1, borderColor: CK.fieldBorder, borderRadius: 12,
+    padding: SP.md - 2, paddingRight: SP.xs, marginTop: SP.md,
   },
-  errorTitle: { fontFamily: FONT.semibold, fontSize: FS.base },
-  errorText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 3 },
+  errorTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: CK.text },
+  errorText: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 3, color: CK.muted },
   ack: { flexDirection: 'row', gap: SP.sm + 4, alignItems: 'flex-start', paddingVertical: SP.xs },
   checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  ackText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
-  trust: { paddingVertical: SP.xs, paddingHorizontal: SP.xs },
+  ackText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, color: CK.muted },
+  trust: { paddingVertical: SP.md, paddingHorizontal: 0, borderTopWidth: 1, borderTopColor: CK.divider },
   hintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: SP.sm },
-  hint: { fontFamily: FONT.medium, fontSize: FS.sm },
+  hint: { fontFamily: FONT.medium, fontSize: FS.sm, color: CK.muted },
 });

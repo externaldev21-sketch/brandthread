@@ -411,7 +411,14 @@
         }
       ],
       "./plugins/with-sentry-upload-guard",
-      "./plugins/with-upload-live-activity"
+      "./plugins/with-upload-live-activity",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.brandthread.mobile",
+          "enableGooglePay": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
