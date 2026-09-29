@@ -145,7 +145,14 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    // 'flex-start', deliberately not 'flex-end': the title's own vertical
+    // position must never depend on whether a screen also passes a
+    // `subtitle` — with `flex-end`, a taller (title+subtitle) titleBlock
+    // pushed the title's own top several pixels higher than a title-only
+    // screen's, which is exactly the "titles don't line up" bug this fixes.
+    // Top-aligning means every screen's title starts at the same fixed Y
+    // (topPad) regardless of what renders below it.
+    alignItems: 'flex-start',
     minHeight: COMP.headerH,
     paddingHorizontal: SP.md,
     paddingBottom: SP.md,
