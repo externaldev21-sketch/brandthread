@@ -9,11 +9,8 @@
  *  - The UI only shows a temporary streaming indicator (not persisted).
  *  - This eliminates the duplicate-message defect.
  *
- * This screen is an immersive full-screen takeover (see the deny-list entry
- * in app/_layout.tsx) — the floating seller tab bar never renders underneath
- * it, so the composer, suggestions and messages never fight it for space or
- * the keyboard. All bottom spacing here answers only to the safe-area home
- * indicator inset, never the tab bar's own metrics.
+ * The seller tab bar stays mounted. Its shared metrics reserve space for the
+ * composer at rest; keyboard avoidance replaces that spacing while typing.
  */
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
@@ -24,6 +21,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  Keyboard,
   Platform,
   Pressable,
   Alert,
@@ -43,6 +41,8 @@ import { useReducedMotion } from 'react-native-reanimated';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import AuroraGlow from '@/components/ai/AuroraGlow';
 import AiComposer from '@/components/ai/AiComposer';
+import { useCookieConsent } from '@/contexts/CookieConsentContext';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import MarkdownLite from '@/components/ai/MarkdownLite';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -53,7 +53,6 @@ import {
   contextLabel,
 } from '@/services/aiTypes';
 import {
-  sendMessage,
   sendMessageStream,
   cancelGeneration,
   loadSession,
@@ -400,6 +399,8 @@ export default function AiBrainScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const sellerBar = useTabBarMetrics(2);
+  const { noticeClearance } = useCookieConsent();
   const { width } = useWindowDimensions();
   const isTablet = width >= BREAKPOINT.tablet;
   const { getToken, userId, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
@@ -418,6 +419,7 @@ export default function AiBrainScreen() {
   const [session, setSession] = useState<AISession | null>(null);
   const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   /**
    * When a request fails we keep the error alongside the preserved input
    * so the user can retry without retyping.
@@ -427,6 +429,12 @@ export default function AiBrainScreen() {
   const [streamingText, setStreamingText] = useState<string>('');
 
   const flatListRef = useRef<FlatList<AIMessage>>(null);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   // Track the last user/store context so we can reload on switch.
   const lastUserIdRef = useRef<string | null | undefined>(undefined);
@@ -460,7 +468,6 @@ export default function AiBrainScreen() {
     async (override?: string) => {
       const text = (override ?? inputText).trim();
       if (!text || isGenerating || !session) return;
-
       // Clerk hasn't finished hydrating the session yet — this is not the
       // same as "not signed in". Retrying getToken() here would sometimes
       // resolve to null for a genuinely signed-in user and wrongly show the
@@ -685,10 +692,10 @@ export default function AiBrainScreen() {
 
   const label = contextLabel(parsedContext);
   const canSend = inputText.trim().length > 0 && !isGenerating;
-  // Home-indicator-safe bottom padding. The tab bar never renders on this
-  // screen (see the full-screen deny-list in app/_layout.tsx), so this is
-  // the only bottom inset the composer needs to clear.
-  const composerBottomInset = Math.max(insets.bottom, 8);
+  // The bar is absolutely positioned outside this screen. Leave room for its
+  // whole footprint at rest; once the keyboard opens, KAV lifts the composer
+  // above the keyboard so it needs only a small gap.
+  const composerBottomInset = keyboardVisible ? 8 : Math.max(sellerBar.occupiedHeight, noticeClearance);
 
   return (
     <View style={styles.root}>

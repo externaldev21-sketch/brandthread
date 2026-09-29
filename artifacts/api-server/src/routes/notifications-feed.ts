@@ -13,7 +13,7 @@
  * POST   /api/internal/notifications            — publish a notification (server-to-user)
  */
 import { Router } from "express";
-import { db, notificationsFeed, users, blocks, activityMutes, follows } from "@workspace/db";
+import { db, notificationsFeed, conversationParticipants, users, blocks, activityMutes, follows } from "@workspace/db";
 import { eq, and, desc, inArray, notInArray, or, isNull, sql, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -385,6 +385,19 @@ export async function publishNotification(n: {
   if (!notification || isMuted) return;
 
   if (pushCategory) {
+    // Conversation mute only suppresses device delivery. The feed row above is
+    // still retained and unread state remains unchanged.
+    if (n.targetType === "conversation" && n.targetId) {
+      const [participant] = await db.select({ isMuted: conversationParticipants.isMuted })
+        .from(conversationParticipants)
+        .where(and(
+          eq(conversationParticipants.conversationId, n.targetId),
+          eq(conversationParticipants.userId, n.userId),
+        ))
+        .limit(1);
+      if (participant?.isMuted) return;
+    }
+
     await sendPushToUser(n.userId, {
       title: n.title,
       body: n.body ?? "",

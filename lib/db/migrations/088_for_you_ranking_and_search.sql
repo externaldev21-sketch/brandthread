@@ -88,9 +88,9 @@ ALTER TABLE posts ALTER COLUMN style_tags TYPE jsonb USING style_tags::jsonb;
 ALTER TABLE products ALTER COLUMN style_tags TYPE jsonb USING style_tags::jsonb;
 
 CREATE INDEX IF NOT EXISTS posts_style_tags_gin_idx
-  ON posts USING GIN (style_tags jsonb_path_ops);
+  ON posts USING GIN ((style_tags::jsonb) jsonb_path_ops);
 CREATE INDEX IF NOT EXISTS products_style_tags_gin_idx
-  ON products USING GIN (style_tags jsonb_path_ops);
+  ON products USING GIN ((style_tags::jsonb) jsonb_path_ops);
 
 -- ─── Buyer taste profile ─────────────────────────────────────────────────────
 -- Incrementally-updated per-user affinity vector, seeded from onboarding style

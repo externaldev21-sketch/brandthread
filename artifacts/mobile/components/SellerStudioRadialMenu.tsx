@@ -152,6 +152,8 @@ export default function SellerStudioRadialMenu({
       setSetupPercent(completionPercent(state));
     });
 
+    if (!userId) return () => { cancelled = true; };
+
     api.auth.me().then((profile: any) => {
       if (cancelled) return;
       setBrandName(profile?.brandName ?? profile?.displayName ?? profile?.name ?? null);

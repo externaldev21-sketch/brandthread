@@ -139,33 +139,9 @@ export function renderBrandthreadEmail(options: {
 }
 
 type ResendCredentials =
-  | { mode: "connector"; fromEmail?: string }
+  | { mode: "connector" }
   | { mode: "env"; apiKey: string }
   | { mode: "none" };
-
-/**
- * Best-effort extraction of a default sender configured on the Replit
- * connector. The connector's metadata shape isn't part of the SDK's typed
- * surface, so this probes the field names Replit connectors commonly use
- * instead of assuming one.
- */
-function connectionFromEmail(connection: Record<string, unknown>): string | undefined {
-  const metadata = (connection.metadata ?? {}) as Record<string, unknown>;
-  const integration = (connection.integration ?? {}) as Record<string, unknown>;
-  const settings = (integration.settings ?? {}) as Record<string, unknown>;
-  const candidates = [
-    metadata.from_email,
-    metadata.fromEmail,
-    integration.from_email,
-    integration.fromEmail,
-    settings.from_email,
-    settings.fromEmail,
-  ];
-  const found = candidates.find(
-    (value): value is string => typeof value === "string" && value.trim().length > 0,
-  );
-  return found?.trim();
-}
 
 /**
  * Resolved fresh on every send (not cached at module load) so a connector
@@ -177,7 +153,7 @@ async function resolveResendCredentials(): Promise<ResendCredentials> {
     const connections = await connectors.listConnections({ connector_names: RESEND_CONNECTOR_NAME });
     const connection = connections.find((c) => c.connector_name === RESEND_CONNECTOR_NAME) ?? connections[0];
     if (connection) {
-      return { mode: "connector", fromEmail: connectionFromEmail(connection) };
+      return { mode: "connector" };
     }
   } catch (err) {
     logger.warn({ err }, "Unable to check the Resend connector; falling back to RESEND_API_KEY");
@@ -211,9 +187,11 @@ export async function sendBrandthreadEmail({
     return false;
   }
 
-  const from = process.env.RESEND_FROM_EMAIL
-    ?? (credentials.mode === "connector" ? credentials.fromEmail : undefined)
-    ?? DEFAULT_FROM;
+  const mailFrom = process.env.MAIL_FROM?.trim();
+  const resendFrom = process.env.RESEND_FROM_EMAIL?.trim();
+  const senderSource = mailFrom ? "MAIL_FROM" : resendFrom ? "RESEND_FROM_EMAIL" : "default";
+  const from = mailFrom || resendFrom || DEFAULT_FROM;
+  logger.info({ senderSource }, "Brandthread email sender selected");
 
   const payload = {
     from,

@@ -1,11 +1,10 @@
 /**
  * Add Product — single-scroll product creation
  *
- * Essential sections (always open): Photos, Basic Information, Pricing, Inventory
- * Advanced sections (collapsible):  Variants, Sales Model
+ * Essential sections (always open): Photos, Details, Pricing, Stock, Shipping
+ * Optional sections (collapsible): Variants, Manufacturing, Storefront, Preview
  *
- * Seller can fill photo + title + price + stock and publish without clicking
- * through wizard steps.
+ * Sellers can complete and publish the whole listing in one scrollable screen.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -50,35 +49,15 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// ─── Section titles (kept for reference / draft compatibility) ────────────────
-
-const STEP_TITLES = [
-  'Basic Information',
-  'Media',
-  'Pricing',
-  'Variants',
-  'Inventory',
-  'Sales Model',
-  'Fulfillment',
-  'Manufacturing',
-  'Storefront',
-  'Review & Publish',
-];
-
-// ─── Stepper (the flow sellers actually navigate) ──────────────────────────
-// Six steps per the fast-listing flow spec. Advanced fields (manufacturing,
-// storefront/SEO) live as collapsible "Advanced" blocks inside the closest
-// relevant step so nothing from the original single-scroll form is lost.
-
 type FlowStep = 'photos' | 'details' | 'variants' | 'pricing' | 'shipping' | 'review';
 
 const FLOW_STEPS: { key: FlowStep; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { key: 'photos',   label: 'Photos',   icon: 'camera' },
-  { key: 'details',  label: 'Details',  icon: 'file-text' },
+  { key: 'photos', label: 'Photos', icon: 'camera' },
+  { key: 'details', label: 'Details', icon: 'file-text' },
   { key: 'variants', label: 'Variants', icon: 'layers' },
-  { key: 'pricing',  label: 'Pricing',  icon: 'dollar-sign' },
+  { key: 'pricing', label: 'Pricing', icon: 'dollar-sign' },
   { key: 'shipping', label: 'Shipping', icon: 'truck' },
-  { key: 'review',   label: 'Review',   icon: 'check-circle' },
+  { key: 'review', label: 'Review', icon: 'check-circle' },
 ];
 
 // ─── Collapsible section component ──────────────────────────────────────────
@@ -90,15 +69,16 @@ interface CollapsibleSectionProps {
   onToggle: () => void;
   children: React.ReactNode;
   hint?: string;   // shown in the header when collapsed
+  testID?: string;
 }
 
-function CollapsibleSection({ title, icon, expanded, onToggle, children, hint }: CollapsibleSectionProps) {
+function CollapsibleSection({ title, icon, expanded, onToggle, children, hint, testID }: CollapsibleSectionProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   const MUTED = theme.muted;
   return (
     <View style={s.collapsibleBlock}>
-      <TouchableOpacity style={s.collapsibleHeader} onPress={onToggle} activeOpacity={0.75}>
+      <TouchableOpacity style={s.collapsibleHeader} onPress={onToggle} activeOpacity={0.75} testID={testID}>
         <View style={s.collapsibleHeaderLeft}>
           <View style={[s.collapsibleIconWrap, { backgroundColor: theme.accentDim }]}>
             <Feather name={icon} size={15} color={theme.accentLight} />
@@ -228,6 +208,7 @@ export default function AddProductScreen() {
   const [featuredHome, setFeaturedHome] = useState(false);
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
@@ -244,15 +225,14 @@ export default function AddProductScreen() {
   const [collections, setCollections] = useState<ProductCollection[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // ── Stepper state ──
   const [stepIndex, setStepIndex] = useState(0);
   const currentStepKey = FLOW_STEPS[stepIndex].key;
   const [stepAttempted, setStepAttempted] = useState<Record<FlowStep, boolean>>({
     photos: false, details: false, variants: false, pricing: false, shipping: false, review: false,
   });
 
-  // ── Pre-order (Pricing & Stock step) ──
-  const [isPreOrder, setIsPreOrder] = useState(false);
+  // ── Pre-order ──
+  const [isPreOrder, setIsPreOrder] = useState(params.intent === 'drop');
 
   // ── Variants: bulk-edit selection ──
   const [bulkEditMode, setBulkEditMode] = useState(false);
@@ -266,10 +246,9 @@ export default function AddProductScreen() {
   // ── Collapsible section state — advanced sections start closed ──
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     variants:      false,
-    salesModel:    false,
-    fulfillment:   false,
     manufacturing: false,
     storefront:    false,
+    preview:       false,
   });
 
   const draftId = useRef('draft_' + uid());
@@ -567,9 +546,15 @@ export default function AddProductScreen() {
   }
 
   // ── Publish ──
+  function showPublishError(title: string, message: string) {
+    setPublishError(`${title}: ${message}`);
+    if (Platform.OS !== 'web') Alert.alert(title, message);
+  }
+
   async function handlePublish() {
+    setPublishError(null);
     if (photosUploading) {
-      Alert.alert('Still uploading', 'Wait for your photos to finish uploading before publishing.');
+      showPublishError('Still uploading', 'Wait for your photos to finish uploading before publishing.');
       return;
     }
     const decimalFields: Array<[string, string]> = [
@@ -583,7 +568,7 @@ export default function AddProductScreen() {
     ];
     const invalidField = decimalFields.find(([, value]) => value.trim() !== '' && parseDecimalToCents(value) === null);
     if (invalidField) {
-      Alert.alert('Invalid price', `${invalidField[0]} must be a non-negative amount with up to two decimal places.`);
+      showPublishError('Invalid price', `${invalidField[0]} must be a non-negative amount with up to two decimal places.`);
       return;
     }
 
@@ -619,10 +604,9 @@ export default function AddProductScreen() {
     };
     const warnings = validateForPublish(forValidation);
     if (warnings.length > 0) {
-      Alert.alert(
+      showPublishError(
         'Cannot publish',
-        'Please fix the following:\n\n' + warnings.map(w => '• ' + w).join('\n'),
-        [{ text: 'OK' }]
+        'Please fix the following:\n' + warnings.map(w => '• ' + w).join('\n')
       );
       return;
     }
@@ -632,13 +616,13 @@ export default function AddProductScreen() {
 
     const retailPriceCents = parseDecimalToCents(priceStr);
     if (retailPriceCents === null || retailPriceCents <= 0) {
-      Alert.alert('Invalid price', 'Enter a valid price with up to two decimal places.');
+      showPublishError('Invalid price', 'Enter a valid price with up to two decimal places.');
       setPublishing(false);
       return;
     }
     const compareAtCents = compareAtStr ? parseDecimalToCents(compareAtStr) : undefined;
     if (compareAtStr && (compareAtCents === null || compareAtCents === undefined || compareAtCents <= retailPriceCents)) {
-      Alert.alert('Compare-at price', 'Compare-at price should be higher than the retail price.');
+      showPublishError('Compare-at price', 'Compare-at price should be higher than the retail price.');
       setPublishing(false);
       return;
     }
@@ -646,7 +630,7 @@ export default function AddProductScreen() {
     const ps = draftData.preorderSettings;
     const salesModel = draftData.salesModel;
     if ((salesModel === 'pre-order' || salesModel === 'both') && ps && ps.openDate && ps.closeDate && ps.closeDate <= ps.openDate) {
-      Alert.alert('Invalid dates', 'Pre-order close date must be after the open date.');
+      showPublishError('Invalid dates', 'Pre-order close date must be after the open date.');
       setPublishing(false);
       return;
     }
@@ -654,7 +638,7 @@ export default function AddProductScreen() {
     const skus = productVariants.map(v => v.sku).filter(Boolean);
     const uniqueSkus = new Set(skus);
     if (skus.length !== uniqueSkus.size) {
-      Alert.alert('Duplicate SKU', 'Each variant must have a unique SKU.');
+      showPublishError('Duplicate SKU', 'Each variant must have a unique SKU.');
       setPublishing(false);
       return;
     }
@@ -744,15 +728,14 @@ export default function AddProductScreen() {
         setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
     } catch {
-      Alert.alert('Error', 'Could not publish. Please try again.');
+      showPublishError('Error', 'Could not publish. Please try again.');
     } finally {
       setPublishing(false);
     }
   }
 
   // ─── Section renderers ────────────────────────────────────────────
-  // Each is identical to the original step render, just without the outer
-  // <View style={s.stepContent}> wrapper (sections provide their own padding).
+  // The same fields render together in one scrollable form.
 
   // Uploads a locally-picked photo, tracking per-item status so the thumbnail
   // can show a progress overlay and Publish can be blocked until it's done.
@@ -1793,7 +1776,7 @@ export default function AddProductScreen() {
     );
   }
 
-  // ── Pricing & Stock step: pricing + preorder toggle + inventory, merged ──
+  // ── Pricing & stock: pricing + preorder toggle + inventory ──
   function renderPricingAndStock() {
     return (
       <>
@@ -1839,26 +1822,8 @@ export default function AddProductScreen() {
     );
   }
 
-  // ── Shipping step: fulfillment + advanced manufacturing ──
-  function renderShippingStep() {
-    return (
-      <>
-        {renderFulfillment()}
-        <CollapsibleSection
-          title="Manufacturing"
-          icon="tool"
-          expanded={expandedSections.manufacturing}
-          onToggle={() => toggleSection('manufacturing')}
-          hint={mfgMode === 'none' ? 'Not set up yet' : mfgMode === 'existing' ? mfgName || 'Existing manufacturer' : 'Quote requested'}
-        >
-          {renderManufacturing()}
-        </CollapsibleSection>
-      </>
-    );
-  }
-
-  // ── Review & Publish step: live preview + advanced storefront/SEO ──
-  function renderReviewStep() {
+  // ── Optional live preview ──
+  function renderLivePreview() {
     const media = draftData.media ?? [];
     const cover = media.find(m => m.isCover) ?? media[0];
     const coverUri = cover ? (cover.useCutout && cover.cutoutUri ? cover.cutoutUri : cover.uri) : undefined;
@@ -1869,7 +1834,6 @@ export default function AddProductScreen() {
 
     return (
       <>
-        <SectionHeader title="Live preview" style={s.sectionHdr} />
         <Text style={s.collapsibleHint}>Approximate render — actual layout on Discover and in the feed may vary slightly.</Text>
 
         {/* Discover-style card preview */}
@@ -1921,6 +1885,32 @@ export default function AddProductScreen() {
           </View>
         </BrandthreadCard>
 
+      </>
+    );
+  }
+
+  function renderShippingStep() {
+    return (
+      <>
+        {renderFulfillment()}
+        <CollapsibleSection
+          title="Manufacturing"
+          icon="tool"
+          expanded={expandedSections.manufacturing}
+          onToggle={() => toggleSection('manufacturing')}
+          hint={mfgMode === 'none' ? 'Not set up yet' : mfgMode === 'existing' ? mfgName || 'Existing manufacturer' : 'Quote requested'}
+        >
+          {renderManufacturing()}
+        </CollapsibleSection>
+      </>
+    );
+  }
+
+  function renderReviewStep() {
+    return (
+      <>
+        <SectionHeader title="Live preview" style={s.sectionHdr} />
+        {renderLivePreview()}
         <CollapsibleSection
           title="Storefront & SEO"
           icon="globe"
@@ -1934,13 +1924,12 @@ export default function AddProductScreen() {
     );
   }
 
-  // ── Step progression: validate before advancing, surface inline errors ──
-  function stepErrorsFor(step: FlowStep): { field: string; message: string }[] {
+  function stepErrorsFor(step: FlowStep) {
     switch (step) {
-      case 'photos':   return validatePhotosStep({ media: draftData.media ?? [] });
-      case 'details':  return validateDetailsStep({ name: draftData.name ?? '', category: draftData.category });
+      case 'photos': return validatePhotosStep({ media: draftData.media ?? [] });
+      case 'details': return validateDetailsStep({ name: draftData.name ?? '', category: draftData.category });
       case 'variants': return validateVariantsStep({ variants: localVariants.map(v => ({ title: v.title, sku: v.sku, price: v.price })) });
-      case 'pricing':  return validatePricingStep({
+      case 'pricing': return validatePricingStep({
         priceStr, compareAtStr, costStr, isPreOrder,
         preOrderOpenDate: undefined, preOrderCloseDate: draftData.preorderSettings?.closeDate,
       });
@@ -1950,15 +1939,9 @@ export default function AddProductScreen() {
 
   const currentErrors = stepErrorsFor(currentStepKey);
 
-  // Inline errors are shown as soon as a step is visited, but only the final
-  // Publish is hard-blocked (see handlePublish) — sellers can freely move
-  // between steps to fill things in whatever order suits them, and a step
-  // with unresolved issues is called out with a warning banner + haptic
-  // rather than trapping navigation.
   function goNext() {
     setStepAttempted(prev => ({ ...prev, [currentStepKey]: true }));
-    const errs = stepErrorsFor(currentStepKey);
-    if (errs.length > 0) hapticDestructiveConfirm();
+    if (currentErrors.length > 0) hapticDestructiveConfirm();
     else hapticPrimaryAction();
     setStepIndex(i => Math.min(i + 1, FLOW_STEPS.length - 1));
   }
@@ -1978,12 +1961,12 @@ export default function AddProductScreen() {
 
   function renderStepContent() {
     switch (currentStepKey) {
-      case 'photos':   return renderPhotos();
-      case 'details':  return renderBasicInfo();
+      case 'photos': return renderPhotos();
+      case 'details': return renderBasicInfo();
       case 'variants': return renderVariants();
-      case 'pricing':  return renderPricingAndStock();
+      case 'pricing': return renderPricingAndStock();
       case 'shipping': return renderShippingStep();
-      case 'review':   return renderReviewStep();
+      case 'review': return renderReviewStep();
     }
   }
 
@@ -2040,44 +2023,40 @@ export default function AddProductScreen() {
         })}
       </View>
 
-      {/* ── Current step form ── */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           style={s.scrollView}
-          contentContainerStyle={[s.scrollContent, { paddingBottom: 32 }]}
+          contentContainerStyle={[s.scrollContent, { paddingBottom: SP.md }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          testID="add-product-form"
         >
           <View style={s.essentialSection}>
             <Text style={s.essentialLabel}>{FLOW_STEPS[stepIndex].label}</Text>
             {renderStepContent()}
-
             {stepAttempted[currentStepKey] && currentErrors.length > 0 && (
               <View style={s.errorBanner}>
-                {currentErrors.map((e, i) => (
-                  <Text key={i} style={s.errorBannerText}>• {e.message}</Text>
+                {currentErrors.map((error, i) => (
+                  <Text key={i} style={s.errorBannerText}>• {error.message}</Text>
                 ))}
               </View>
             )}
+            {isLastStep && publishError ? (
+              <View style={s.publishError} testID="add-product-publish-error">
+                <Feather name="alert-circle" size={16} color={RED} />
+                <Text style={s.publishErrorText}>{publishError}</Text>
+              </View>
+            ) : null}
           </View>
         </ScrollView>
 
         {/* The action area is outside the scroll view so it's always
             available without losing the form's draft state or scroll position.
-            Each button sits in its own flex:1 wrapper — PressableScale only
-            forwards a plain object/array `style` to its INNER Animated.View,
-            not the outer Pressable (it only forwards to the outer Pressable
-            when `style` is a function-as-child style), so passing flex:1
-            straight into SecondaryButton/PrimaryButton's own `style` prop
-            never reaches the actual flex item in this row: the outer
-            Pressable stays unstyled and shrink-wraps to its label text,
-            reading as two tiny squished pills. Wrapping in an outer View
-            (the same fix ProfileButton already uses) puts flex:1 on the true
-            flex item; the column-default alignItems:'stretch' then stretches
-            the unstyled Pressable to fill it. */}
+             The outer wrappers carry flex:1 because button styles only reach
+             PressableScale's inner Animated.View, not the row's flex items. */}
         <View style={[s.stickyFooter, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
           <View style={s.publishButtons}>
             <View style={s.footerBtnWrap}>
@@ -2090,7 +2069,7 @@ export default function AddProductScreen() {
             <View style={s.footerBtnWrap}>
               {isLastStep ? (
                 <PrimaryButton
-                  label={photosUploading ? 'Uploading photos…' : publishing ? 'Publishing...' : 'Publish'}
+                  label={photosUploading ? 'Uploading photos…' : publishing ? 'Publishing…' : 'Publish'}
                   disabled={publishing || photosUploading}
                   onPress={handlePublish}
                   style={s.footerBtnFill}
@@ -2173,7 +2152,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.semibold,
   },
 
-  // Sticky step progress
   progressBar: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -2197,8 +2175,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'absolute', top: 10, right: '-50%', width: '100%', height: 1.5, backgroundColor: BORDER, zIndex: -1,
   },
   progressConnectorDone: { backgroundColor: theme.accent },
-
-  // Inline step validation
   errorBanner: {
     backgroundColor: 'rgba(248,113,113,0.12)', borderRadius: RADIUS.sm, borderWidth: 1, borderColor: RED,
     padding: SP.sm, gap: 4, marginTop: SP.xs,
@@ -2221,13 +2197,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: FG,
     letterSpacing: -0.2,
   },
-  divider: {
-    height: 1,
-    backgroundColor: BORDER,
-    marginHorizontal: SP.md,
-    marginBottom: SP.md,
-  },
-
   // Collapsible sections
   collapsibleBlock: {
     borderTopWidth: 1,
@@ -2269,7 +2238,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: SP.md,
   },
 
-  // Sticky actions stay above the safe area while the form scrolls behind it.
   stickyFooter: {
     paddingHorizontal: SP.md,
     paddingTop: SP.sm,
@@ -2284,6 +2252,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   footerBtnWrap: { flex: 1 },
   footerBtnFill: { height: 52, width: '100%' },
+  publishError: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
+    padding: SP.md, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: RED, backgroundColor: CARD,
+  },
+  publishErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: RED, lineHeight: 20 },
 
   // Shared field helpers
   sectionHdr: { paddingHorizontal: 0 },
@@ -2416,7 +2390,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
   },
 
-  // Review step: live preview cards
+   // Optional live preview cards
   previewCard: { padding: 0, overflow: 'hidden' },
   previewImageWrap: { width: '100%', aspectRatio: 1, backgroundColor: CARD },
   previewImage: { width: '100%', height: '100%' },

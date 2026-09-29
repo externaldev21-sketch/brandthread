@@ -14,6 +14,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, COMP, ICON, WEB_SAFE_AREA_TOP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, SearchBar, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
@@ -28,6 +29,7 @@ import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { FormInput } from '@/components/BrandthreadUI';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
@@ -47,6 +49,16 @@ interface Stats {
   preOrder: number;
   totalInventoryValueCents: number;
 }
+
+const EMPTY_STATS: Stats = {
+  active: 0,
+  draft: 0,
+  archived: 0,
+  lowStock: 0,
+  outOfStock: 0,
+  preOrder: 0,
+  totalInventoryValueCents: 0,
+};
 
 // ─── Action Sheet ─────────────────────────────────────────────────────────────
 
@@ -365,6 +377,13 @@ function SortModal({
 export default function ProductsScreen() {
   const scrollResetRef = useScrollReset<any>();
   const { theme } = useAppTheme();
+  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
+  const sellerPreview = isSellerDevPreview();
+  // Do not treat the dev-web design preview as a real seller session. While
+  // Clerk is resolving, keep the screen in its safe, empty preview state.
+  const previewOnly = sellerPreview && (!authLoaded || !isSignedIn || !userId);
+  const previewOnlyRef = React.useRef(previewOnly);
+  previewOnlyRef.current = previewOnly;
   const palette = theme as typeof theme & Record<string, string>;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const { background: SCREEN_BG, surface: SURFACE, card: CARD, border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE, accent: PURPLE, accentLight: PURPLE_LIGHT } = theme;
@@ -394,9 +413,21 @@ export default function ProductsScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const showPreviewOnlyFeedback = useCallback(() => {
+    Alert.alert('Preview only', 'Product management is unavailable in this signed-out preview.');
+  }, []);
+
   const loadStats = useCallback(async () => {
+    if (previewOnly || previewOnlyRef.current) {
+      setStats(EMPTY_STATS);
+      return;
+    }
     try {
       const s = await getProductStats();
+      if (previewOnlyRef.current) {
+        setStats(EMPTY_STATS);
+        return;
+      }
       setStats({
         active: s.active,
         draft: s.draft,
@@ -407,7 +438,7 @@ export default function ProductsScreen() {
         totalInventoryValueCents: s.totalInventoryValueCents,
       });
     } catch { /* use defaults */ }
-  }, []);
+  }, [previewOnly]);
 
   // Search runs 250 ms after typing stops instead of on every keystroke.
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -417,9 +448,20 @@ export default function ProductsScreen() {
   }, [searchQuery]);
 
   const loadProducts = useCallback(async () => {
+    if (previewOnly || previewOnlyRef.current) {
+      setProducts([]);
+      setStats(EMPTY_STATS);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const result = await getProducts({ filter, text: debouncedQuery || undefined });
+      if (previewOnlyRef.current) {
+        setProducts([]);
+        setStats(EMPTY_STATS);
+        return;
+      }
       setProducts(Array.isArray(result) ? result : []);
       await loadStats();
     } catch {
@@ -427,7 +469,7 @@ export default function ProductsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [filter, debouncedQuery, loadStats]);
+  }, [filter, debouncedQuery, loadStats, previewOnly]);
 
   // useFocusEffect also re-runs while focused whenever loadProducts changes
   // (filter or search), so a separate mount effect would load everything twice.
@@ -438,6 +480,10 @@ export default function ProductsScreen() {
   function refresh() { loadProducts(); }
 
   async function handleDuplicate(id: string) {
+    if (previewOnly) {
+      showPreviewOnlyFeedback();
+      return;
+    }
     await duplicateProduct(id);
     Alert.alert('Duplicated', 'Product duplicated as a draft.');
     refresh();
@@ -455,6 +501,10 @@ export default function ProductsScreen() {
   }
 
   async function handleDelete(product: Product) {
+    if (previewOnly) {
+      showPreviewOnlyFeedback();
+      return;
+    }
     Alert.alert(
       'Delete product?',
       'You can undo this for a short time.',
@@ -486,6 +536,10 @@ export default function ProductsScreen() {
 
   // Swipe quick-action: archives (or unarchives) without opening the sheet.
   async function handleQuickArchive(product: Product) {
+    if (previewOnly) {
+      showPreviewOnlyFeedback();
+      return;
+    }
     const wasArchived = product.status === 'archived';
     setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, status: wasArchived ? 'active' : 'archived' } : p)));
     try {
@@ -498,6 +552,10 @@ export default function ProductsScreen() {
   }
 
   async function handleRefresh() {
+    if (previewOnly) {
+      setProducts([]);
+      return;
+    }
     setRefreshing(true);
     try {
       await loadProducts();
@@ -524,6 +582,7 @@ export default function ProductsScreen() {
 
   // Sorted products
   const sortedProducts = useMemo(() => {
+    if (previewOnly) return [];
     const arr = [...products];
     switch (sort) {
       case 'name': return arr.sort((a, b) => a.name.localeCompare(b.name));
@@ -534,7 +593,7 @@ export default function ProductsScreen() {
       case 'newest':
       default: return arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     }
-  }, [products, sort]);
+  }, [products, sort, previewOnly]);
 
   // Status filter pills
   const filterPills: { label: string; value: ProductFilter }[] = [
@@ -548,14 +607,22 @@ export default function ProductsScreen() {
   const hasActiveFilter = filter !== 'all';
 
   const openProduct = useCallback((product: Product) => {
+    if (previewOnly) {
+      showPreviewOnlyFeedback();
+      return;
+    }
     router.push(('/product-detail?id=' + product.id) as never);
-  }, [router]);
+  }, [router, previewOnly, showPreviewOnlyFeedback]);
 
   const openActionSheet = useCallback((product: Product) => {
+    if (previewOnly) {
+      showPreviewOnlyFeedback();
+      return;
+    }
     hapticPrimaryAction();
     setActionProduct(product);
     setActionSheetVisible(true);
-  }, []);
+  }, [previewOnly, showPreviewOnlyFeedback]);
 
   const queryClient = useQueryClient();
   const onProductPressIn = useCallback((product: Product) => {
@@ -615,14 +682,14 @@ export default function ProductsScreen() {
       <View style={s.emptyWrap}>
         <EmptyState
           icon={copy.icon}
-          message={copy.message}
+          message={previewOnly && filter === 'all' ? 'Your product catalog is empty in this preview. Search and filters are ready to explore.' : copy.message}
           // Every filter's empty state gets a real next step, not just "all".
           actionLabel="Add your first product"
           onAction={() => router.push('/add-product' as never)}
         />
       </View>
     );
-  }, [router, filter]);
+  }, [router, filter, previewOnly]);
 
   return (
     <View style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
@@ -755,7 +822,7 @@ export default function ProductsScreen() {
 
       {/* Action sheet */}
       <ActionSheet
-        product={actionProduct}
+        product={previewOnly ? null : actionProduct}
         visible={actionSheetVisible}
         onClose={() => setActionSheetVisible(false)}
         onRefresh={refresh}

@@ -36,7 +36,12 @@ vi.mock('react-native', () => ({
       constructor(public v: number) {}
       setValue(v: number) { captured.values.push(v); }
     },
-    spring: (_value: unknown, config: { toValue: number }) => ({ start: () => { captured.springs.push(config.toValue); } }),
+    spring: (_value: unknown, config: { toValue: number }) => ({
+      start: (completion?: (result: { finished: boolean }) => void) => {
+        captured.springs.push(config.toValue);
+        completion?.({ finished: true });
+      },
+    }),
   },
 }));
 vi.mock('@expo/vector-icons', () => ({ Feather: nativeComponent('Feather') }));
@@ -111,6 +116,34 @@ describe('SwipeableActions', () => {
     config.onPanResponderGrant();
     config.onPanResponderRelease({}, g(1, 1));
     expect(captured.springs).toEqual([-REVEAL, 0]);
+  });
+
+  it('does not mount colored actions under a closed row, but reveals them on swipe', () => {
+    let tree!: ReturnType<typeof create>;
+    act(() => { tree = create(
+      <SwipeableActions actions={ACTIONS} backgroundColor="#0A0A0B"><></></SwipeableActions>,
+    ); });
+    const views = tree.root.findAll(node => String(node.type) === 'View');
+    const clip = views[0];
+    const front = tree.root.find(node => String(node.type) === 'Animated.View');
+    const clipStyle = Object.assign({}, ...(clip.props.style as object[]));
+    const frontStyle = Object.assign({}, ...(front.props.style as object[]));
+    expect(clipStyle).toMatchObject({ width: '100%', overflow: 'hidden', backgroundColor: '#0A0A0B' });
+    expect(frontStyle).toMatchObject({ width: '100%', zIndex: 1, backgroundColor: '#0A0A0B' });
+    const actions = () => tree.root.findAll(node => node.props.accessibilityLabel === 'Remove');
+    expect(actions()).toHaveLength(0);
+    act(() => {
+      captured.config!.onPanResponderGrant();
+      captured.config!.onPanResponderMove({}, g(-100, 0));
+      captured.config!.onPanResponderRelease({}, g(-100, 0));
+    });
+    expect(actions().length).toBeGreaterThan(0);
+    act(() => {
+      captured.config!.onPanResponderGrant();
+      captured.config!.onPanResponderRelease({}, g(1, 1));
+    });
+    expect(actions()).toHaveLength(0);
+    act(() => { tree.unmount(); });
   });
 
   it('takes the touch ahead of the row content only while open, so a tap closes it instead of opening the row', () => {

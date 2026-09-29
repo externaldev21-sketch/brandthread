@@ -21,6 +21,7 @@ import { appRateLimiter, rateLimit } from "./middlewares/rateLimit";
 import { validateMutationEnvelope } from "./middlewares/validateRequest";
 import { DESIGN_STUDIO_ASSET_MIME_TYPES } from "./lib/designStudioAssetTypes";
 import { requireAuth } from "./middlewares/requireAuth";
+import { profileLanding } from "./routes/profileLanding";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -160,6 +161,7 @@ app.use(
 );
 
 app.use(appRateLimiter);
+app.get("/u/:username", rateLimit("public-read"), profileLanding);
 app.use("/api/v1", (_req, res, next) => {
   res.setHeader("X-Brandthread-API-Version", "1");
   next();

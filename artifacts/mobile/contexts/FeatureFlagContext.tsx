@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
 import { useApi } from '@/lib/api';
+import { useAuth } from '@clerk/expo';
 
 export type FeatureFlagKey =
   | 'aiPhotoShoot'
@@ -56,9 +57,11 @@ const FeatureFlagContext = createContext<FeatureFlagContextValue>({
 
 export function FeatureFlagProvider({ children }: PropsWithChildren) {
   const api = useApi();
+  const { isSignedIn } = useAuth();
   const [flags, setFlags] = useState<Record<string, boolean>>(DEFAULT_FLAGS);
 
   const refresh = async () => {
+    if (!isSignedIn) return;
     const response = await api.config.featureFlags();
     const next = { ...DEFAULT_FLAGS, ...response.flags };
     setFlags(next);
@@ -66,6 +69,10 @@ export function FeatureFlagProvider({ children }: PropsWithChildren) {
   };
 
   useEffect(() => {
+    if (!isSignedIn) {
+      setFlags(DEFAULT_FLAGS);
+      return;
+    }
     let cancelled = false;
     void AsyncStorage.getItem(STORAGE_KEY)
       .then((stored) => {
@@ -78,7 +85,7 @@ export function FeatureFlagProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isSignedIn]);
 
   const value = useMemo<FeatureFlagContextValue>(
     () => ({

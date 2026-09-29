@@ -48,6 +48,11 @@ describe('profileVideosHref — video tile → full-screen feed player', () => {
     expect(params(profileVideosHref({ source: 'product', id: 'prod-1', startPostId: 'post-2' })))
       .toEqual({ source: 'product', id: 'prod-1', startPostId: 'post-2' });
   });
+
+  it('marks a history replay so an older or muted creator video opens by exact id', () => {
+    expect(params(profileVideosHref({ id: 'user_seller', startPostId: 'old-post', exactPost: true })))
+      .toEqual({ source: 'creator', id: 'user_seller', startPostId: 'old-post', exactPost: '1' });
+  });
 });
 
 describe('shop and product links', () => {

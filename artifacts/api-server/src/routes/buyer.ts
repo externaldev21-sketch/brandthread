@@ -40,7 +40,11 @@ import { validateDiscountCode, DiscountValidationError } from "../lib/discounts"
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
-import { buyerCancellationEligibility } from "../lib/buyerCancellationPolicy";
+import {
+  BUYER_CANCELLABLE_ORDER_STATUSES,
+  buyerCancellationEligibility,
+} from "../lib/buyerCancellationPolicy";
+import { consumeBuyerAddressListFailure } from "./release-test-control";
 
 const router = Router();
 router.use(requireAuth);
@@ -139,6 +143,10 @@ async function lockBuyerAddressBook(tx: any, buyerId: string) {
 // ─── Address book ────────────────────────────────────────────────────────────
 router.get("/addresses", async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
+  if (await consumeBuyerAddressListFailure(buyerId)) {
+    res.status(503).json({ error: "Release-check one-shot address failure" });
+    return;
+  }
   const rows = await db.select().from(buyerAddresses)
     .where(eq(buyerAddresses.buyerId, buyerId))
     .orderBy(desc(buyerAddresses.isDefault), desc(buyerAddresses.updatedAt));

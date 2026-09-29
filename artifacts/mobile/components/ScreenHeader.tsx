@@ -18,6 +18,8 @@ export interface ScreenHeaderAction {
 
 interface ScreenHeaderProps {
   title: string;
+  /** Top-level tab screens have no back destination. */
+  showBack?: boolean;
   subtitle?: string;
   rightElement?: React.ReactNode;
   /** Extra icon-button actions rendered right of `rightElement` (back/action slots). */
@@ -32,6 +34,8 @@ interface ScreenHeaderProps {
   /** Scroll distance over which the large title fully collapses. */
   collapseDistance?: number;
   onBack?: () => void;
+  /** Override the spoken back label when the route changes between a list and an inline form. */
+  backAccessibilityLabel?: string;
   /** Optional testID forwarded to the back/close button, for screens whose tests target it directly. */
   backTestID?: string;
   /**
@@ -48,7 +52,7 @@ interface ScreenHeaderProps {
 const MAX_HEADER_ACTIONS = 2;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, variant = 'push',
+  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push', showBack = true,
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -82,16 +86,16 @@ export function ScreenHeader({
   return (
     <View style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }]}>
       <View style={styles.container}>
-        <PressableScale
+        {showBack ? <PressableScale
           onPress={() => (onBack ? onBack() : goBackOr(router))}
           style={[styles.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
           accessibilityRole="button"
-          accessibilityLabel={variant === 'modal' ? `Close ${title}` : `Go back from ${title}`}
+          accessibilityLabel={backAccessibilityLabel ?? (variant === 'modal' ? `Close ${title}` : `Go back from ${title}`)}
           accessibilityHint={variant === 'modal' ? `Dismisses ${title}` : `Returns from ${title}`}
           testID={backTestID}
         >
           <Feather name={variant === 'modal' ? 'x' : 'arrow-left'} size={ICON.md} color={colors.foreground} />
-        </PressableScale>
+        </PressableScale> : <View style={{ width: COMP.iconBtn }} />}
 
         <View style={styles.titleBlock}>
           {scrollY ? (

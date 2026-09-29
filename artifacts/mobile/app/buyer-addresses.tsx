@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -29,7 +30,7 @@ export default function BuyerAddressesScreen() {
 
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [loadError, setLoadError] = useState('');
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -50,14 +51,16 @@ export default function BuyerAddressesScreen() {
   const load = async () => {
     if (!userId) {
       setAddresses([]);
+      setLoadError('');
       setLoading(false);
       return;
     }
     try {
       const data = await api.buyer.addresses.list();
-      setAddresses(data);
-    } catch {
-      setAddresses([]);
+      setAddresses(Array.isArray(data) ? data : []);
+      setLoadError('');
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Could not load your saved addresses.');
     } finally {
       setLoading(false);
     }
@@ -174,6 +177,7 @@ export default function BuyerAddressesScreen() {
       <ScreenHeader
         title={showForm ? (isCreating ? 'Add address' : 'Edit address') : 'Shipping addresses'}
         onBack={() => { if (showForm) handleCancel(); else goBackOr(router); }}
+        backAccessibilityLabel={showForm ? 'Close address form' : 'Go back'}
         variant={showForm ? 'modal' : 'push'}
       />
 
@@ -223,21 +227,43 @@ export default function BuyerAddressesScreen() {
                 <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Phone number" placeholderTextColor={palette.mutedForeground} textContentType="telephoneNumber" autoComplete="tel" returnKeyType="done" />
               </View>
 
-              {!isDefault && (
-                <Button
-                  label="Set as default address"
-                  onPress={() => setIsDefault(!isDefault)}
-                  variant="secondary"
-                  icon="check"
-                  style={styles.defaultToggle}
-                />
-              )}
+              <TouchableOpacity
+                style={styles.defaultToggle}
+                onPress={() => setIsDefault(true)}
+                disabled={isDefault}
+                activeOpacity={0.7}
+                accessibilityRole="checkbox"
+                accessibilityLabel="Set as default address"
+                accessibilityState={{ checked: isDefault, disabled: isDefault }}
+              >
+                <View style={[styles.checkbox, isDefault && styles.checkboxActive]}>
+                  {isDefault && <Feather name="check" size={14} color={theme.onAccent} />}
+                </View>
+                <Text style={styles.defaultToggleText}>Set as default address</Text>
+              </TouchableOpacity>
 
               <Button label="Save Address" onPress={handleSave} loading={saving} style={{ marginTop: SPACING.lg }} />
             </View>
           ) : (
             <>
-              {addresses.length === 0 ? (
+              {loadError ? (
+                <View style={styles.errorWrap} accessibilityRole="alert">
+                  <EmptyState
+                    icon="alert-circle"
+                    title="Addresses unavailable"
+                    description="We couldn't load your saved addresses. Check your connection and try again."
+                    compact
+                  />
+                  <Button
+                    label="Try again"
+                    accessibilityLabel="Retry loading saved addresses"
+                    onPress={() => {
+                      setLoading(true);
+                      void load();
+                    }}
+                  />
+                </View>
+              ) : addresses.length === 0 ? (
                 <EmptyState
                   icon="map-pin"
                   title="No saved addresses"
@@ -254,8 +280,8 @@ export default function BuyerAddressesScreen() {
                           {addr.isDefault && <View style={styles.defaultBadge}><Text style={styles.defaultBadgeText}>Default</Text></View>}
                         </View>
                         <View style={styles.actions}>
-                          <IconButton name="edit-2" accessibilityLabel={`Edit ${addr.label}`} onPress={() => handleEdit(addr)} variant="plain" size={16} color={theme.muted} />
-                          <IconButton name="trash-2" accessibilityLabel={`Delete ${addr.label}`} onPress={() => handleDelete(addr.id)} variant="plain" size={16} color={theme.error} />
+                          <IconButton name="edit-2" accessibilityLabel={`Edit ${addr.label} address`} onPress={() => handleEdit(addr)} variant="plain" size={16} color={theme.muted} />
+                          <IconButton name="trash-2" accessibilityLabel={`Delete ${addr.label} address`} onPress={() => handleDelete(addr.id)} variant="plain" size={16} color={theme.error} />
                         </View>
                       </View>
 
@@ -271,9 +297,9 @@ export default function BuyerAddressesScreen() {
                       {!addr.isDefault && (
                         <Button
                           label="Set as default"
+                          accessibilityLabel={`Set ${addr.label} as default address`}
                           onPress={() => handleSetDefault(addr.id)}
                           variant="tertiary"
-                          size="small"
                           style={styles.makeDefaultBtn}
                         />
                       )}
@@ -294,6 +320,7 @@ export default function BuyerAddressesScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorWrap: { alignItems: 'center', gap: SPACING.md, marginTop: SPACING.lg },
 
   list: { gap: SPACING.md, marginBottom: SPACING.xl },
   card: { padding: 0, overflow: 'hidden' },
@@ -305,7 +332,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   actions: { flexDirection: 'row', gap: SPACING.xs },
   cardBody: { padding: SPACING.md },
   addressText: { ...TYPE_SCALE.callout, color: theme.muted, lineHeight: 20 },
-  makeDefaultBtn: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, borderRadius: 0, marginTop: 0 },
+  makeDefaultBtn: { minHeight: 44, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, borderRadius: 0, marginTop: 0 },
 
   addBtn: { borderStyle: 'dashed', borderColor: theme.accent },
 
@@ -314,5 +341,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: Ret
   label: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: theme.muted },
   input: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, borderRadius: RADII.input, paddingHorizontal: SPACING.md, height: COMP.inputH, color: theme.text, ...TYPE_SCALE.body },
 
-  defaultToggle: { marginTop: SPACING.xxs, alignSelf: 'flex-start' },
+  defaultToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SPACING.xxs },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1, borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
+  checkboxActive: { backgroundColor: theme.accent, borderColor: theme.accent },
+  defaultToggleText: { ...TYPE_SCALE.body, fontFamily: FONT.medium, color: theme.text },
 });

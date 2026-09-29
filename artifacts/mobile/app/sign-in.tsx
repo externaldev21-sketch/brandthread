@@ -80,6 +80,7 @@ export default function SignInScreen() {
   const canSubmit    = email.includes('@') && password.length >= 1;
   const canVerifyTotp = totpCode.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+  const showPreviewUser = __DEV__ && Platform.OS === 'web' && !isAddAccount;
 
   function finalizeSignIn() {
     return signIn.finalize({
@@ -416,6 +417,8 @@ export default function SignInScreen() {
             <Text style={s.label}>Email address</Text>
             <TextInput
               style={s.input}
+              testID="release-check-email"
+              accessibilityLabel="Email address"
               placeholder="you@yourbrand.com"
               placeholderTextColor={theme.subtle}
               value={email}
@@ -447,6 +450,8 @@ export default function SignInScreen() {
               <TextInput
                 ref={passwordRef}
                 style={[s.input, s.pwInput]}
+                testID="release-check-password"
+                accessibilityLabel="Password"
                 placeholder="••••••••"
                 placeholderTextColor={theme.subtle}
                 value={password}
@@ -486,6 +491,20 @@ export default function SignInScreen() {
             fullWidth
             style={s.primaryWrap}
           />
+
+          {showPreviewUser && (
+            <Button
+              label="Continue as preview user"
+              variant="secondary"
+              testID="continue-as-preview-user"
+              onPress={() => {
+                hapticToggle();
+                router.replace('/onboarding?previewUser=1' as never);
+              }}
+              fullWidth
+              style={s.primaryWrap}
+            />
+          )}
 
           {/* ── Create account ─────────────────────────────────────────────────── */}
           <Button

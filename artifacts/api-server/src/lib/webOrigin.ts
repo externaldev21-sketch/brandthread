@@ -37,6 +37,11 @@ export function allowedWebOrigins(): string[] {
   if (internalDomain) origins.add(`https://${internalDomain}`);
 
   if (process.env.NODE_ENV !== "production") {
+    // Expo web preview is served on a separate host from the API proxy.
+    // Admit only this workspace's exact Expo host for credentialed requests.
+    const expoDomain = process.env.REPLIT_EXPO_DEV_DOMAIN?.trim();
+    if (expoDomain) origins.add(`https://${expoDomain}`);
+
     // Local dev servers (vite/next) proxy to the API on the same machine.
     origins.add("http://localhost:5000");
     origins.add("http://127.0.0.1:5000");

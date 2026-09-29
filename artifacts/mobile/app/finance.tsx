@@ -6,7 +6,9 @@ import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
+import { useAuth } from '@clerk/expo';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { FS } from '@/lib/theme';
 import { useTeamRole } from '@/hooks/useTeamRole';
@@ -34,11 +36,15 @@ export default function FinanceScreen() {
   const colors = useColors();
   const router = useRouter();
   const api = useApi();
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const isDevSellerPreview = isSellerDevPreview();
+  const isSignedOutSellerPreview = isDevSellerPreview && (!isAuthLoaded || !isSignedIn);
+  const skipProtectedReads = isSignedOutSellerPreview;
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [balance,      setBalance]      = useState<any>(null);
-  const [loading,      setLoading]      = useState(true);
+  const [loading,      setLoading]      = useState(!skipProtectedReads);
   // Held vs on-the-way vs available vs paid out (owner only on the server).
   const [summary,      setSummary]      = useState<FinanceSummary | null>(null);
   const [summaryError, setSummaryError] = useState(false);
@@ -52,6 +58,16 @@ export default function FinanceScreen() {
   } | null>(null);
 
   const load = useCallback(async () => {
+    if (skipProtectedReads) {
+      setTransactions([]);
+      setBalance(null);
+      setSummary(null);
+      setSummaryError(false);
+      setSubStatus(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setSummaryError(false);
     setBalanceError(false);
@@ -76,7 +92,7 @@ export default function FinanceScreen() {
     }
     await summaryRequest;
     setLoading(false);
-  }, []);
+  }, [api, skipProtectedReads]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -114,11 +130,11 @@ export default function FinanceScreen() {
   ];
 
   const documents = [
-    ...(!isReadOnly ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
-    { label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
+    ...(!isReadOnly && !isSignedOutSellerPreview ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
+    ...(!isSignedOutSellerPreview ? [{ label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) }] : []),
   ];
 
-  if (isLoadingRole) {
+  if (isLoadingRole && !isSignedOutSellerPreview) {
     return (
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
@@ -129,7 +145,7 @@ export default function FinanceScreen() {
     );
   }
 
-  if (!hasPayoutsAccess(currentRole) && !isReadOnly) {
+  if (!isSignedOutSellerPreview && !hasPayoutsAccess(currentRole) && !isReadOnly) {
     return (
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
@@ -195,12 +211,12 @@ export default function FinanceScreen() {
 
       {/* Where the money is — from the money ledger + live Stripe balance.
           Managers cannot read owner balances, so they keep the overview. */}
-      {!isReadOnly && (
+      {!isReadOnly && !isSignedOutSellerPreview && (
         <FinanceMoneyFlow summary={summary} loading={loading} error={summaryError} onRetry={load} />
       )}
 
       {/* Overview (Stripe balance) — shown when the ledger summary is unavailable */}
-      {(isReadOnly || (!summary && summaryError)) && (
+      {(isReadOnly || isSignedOutSellerPreview || (!summary && summaryError)) && (
       <View style={styles.overviewRow}>
         {!loading && balanceError ? (
           <View style={[styles.overviewCard, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, alignItems: 'flex-start' }]}>
@@ -278,18 +294,22 @@ export default function FinanceScreen() {
       </View>
 
       {/* Documents */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Documents</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {documents.map((item, i) => (
-          <TouchableOpacity key={item.label} onPress={() => { hapticPrimaryAction(); item.onPress(); }} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={[styles.docIcon, { backgroundColor: colors.secondary }]}>
-              <Feather name={item.icon} size={15} color={colors.mutedForeground} />
-            </View>
-            <Text style={[styles.docLabel, { color: colors.foreground }]}>{item.label}</Text>
-            <Feather name="download" size={15} color={colors.mutedForeground} />
-          </TouchableOpacity>
-        ))}
-      </View>
+      {documents.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Documents</Text>
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {documents.map((item, i) => (
+              <TouchableOpacity key={item.label} onPress={() => { hapticPrimaryAction(); item.onPress(); }} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                <View style={[styles.docIcon, { backgroundColor: colors.secondary }]}>
+                  <Feather name={item.icon} size={15} color={colors.mutedForeground} />
+                </View>
+                <Text style={[styles.docLabel, { color: colors.foreground }]}>{item.label}</Text>
+                <Feather name="download" size={15} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
     </ScrollView>
     </View>
   );

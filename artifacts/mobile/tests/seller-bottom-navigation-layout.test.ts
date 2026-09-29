@@ -184,6 +184,10 @@ describe('seller bar full-screen deny-list', () => {
     });
   }
 
+  it('keeps the seller bar visible on the AI chat route', () => {
+    expect(setBlock()![1]).not.toContain("'ai-brain'");
+  });
+
   // Normal pushed seller management screens — the bar must show on all of
   // these, so none of them may appear in the deny-list.
   const mustShowBar = [
@@ -353,6 +357,15 @@ describe('PREVIEW_ROLE seller bypass', () => {
     // Must check for seller specifically
     expect(rootLayout).toContain("PREVIEW_ROLE === 'seller'");
     expect(rootLayout).toContain('isPreviewSeller');
+  });
+
+  it('SellerBarGate does not treat signed-out native development as a seller', () => {
+    const barGateBlock = rootLayout.match(
+      /function SellerBarGate\(\)([\s\S]*?)^}/m,
+    );
+    expect(barGateBlock).toBeTruthy();
+    expect(barGateBlock![1]).not.toContain('DEV_BYPASS_ROLE');
+    expect(barGateBlock![1]).toContain("PREVIEW_ROLE === 'seller'");
   });
 
   it('showBar is true when either isActiveSeller or isPreviewSeller', () => {

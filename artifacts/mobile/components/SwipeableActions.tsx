@@ -9,7 +9,7 @@
  * this is the shared, general version for anything (now or later) that needs
  * more than one revealed button.
  */
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { hapticLight } from '@/lib/haptics';
@@ -29,18 +29,26 @@ export default function SwipeableActions({
   children,
   actions,
   disabled = false,
+  backgroundColor,
 }: {
   children: React.ReactNode;
   actions: SwipeAction[];
   disabled?: boolean;
+  /** Match the row surface so the action colors cannot bleed through subpixel seams. */
+  backgroundColor?: string;
 }) {
   const revealWidth = actions.length * ACTION_WIDTH;
   const translateX = useRef(new Animated.Value(0)).current;
   const openRef = useRef(false);
+  // Do not mount the colored action layer while closed. Even a correctly
+  // stacked front can leave a subpixel strip under a row on some renderers.
+  const [actionsVisible, setActionsVisible] = useState(false);
 
   const animateTo = (toValue: number) => {
-    Animated.spring(translateX, { toValue, useNativeDriver: true, damping: 22, stiffness: 240 }).start();
     openRef.current = toValue !== 0;
+    Animated.spring(translateX, { toValue, useNativeDriver: true, damping: 22, stiffness: 240 }).start(({ finished }) => {
+      if (finished && !openRef.current) setActionsVisible(false);
+    });
   };
 
   // True once this gesture is a horizontal swipe (vs a tap or a vertical scroll).
@@ -80,6 +88,7 @@ export default function SwipeableActions({
       if (!swipingRef.current) {
         if (!isHorizontal(gesture.dx, gesture.dy)) return;
         swipingRef.current = true;
+        setActionsVisible(true);
       }
       holdClicks();
       const base = openRef.current ? -revealWidth : 0;
@@ -144,21 +153,23 @@ export default function SwipeableActions({
   }, [isWeb]);
 
   return (
-    <View style={styles.clip}>
-      <View style={[styles.actionsRow, { width: revealWidth }]}>
-        {actions.map((action) => (
-          <Pressable
-            key={action.key}
-            style={[styles.action, { backgroundColor: action.color, width: ACTION_WIDTH }]}
-            onPress={() => { close(); action.onPress(); }}
-            accessibilityRole="button"
-            accessibilityLabel={action.accessibilityLabel}
-          >
-            <Feather name={action.icon} size={18} color={action.iconColor} />
-          </Pressable>
-        ))}
-      </View>
-      <Animated.View ref={isWeb ? frontRef : undefined} style={[styles.front, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
+    <View style={[styles.clip, backgroundColor ? { backgroundColor } : null]}>
+      {actionsVisible && (
+        <View style={[styles.actionsRow, { width: revealWidth }]}>
+          {actions.map((action) => (
+            <Pressable
+              key={action.key}
+              style={[styles.action, { backgroundColor: action.color, width: ACTION_WIDTH }]}
+              onPress={() => { close(); action.onPress(); }}
+              accessibilityRole="button"
+              accessibilityLabel={action.accessibilityLabel}
+            >
+              <Feather name={action.icon} size={18} color={action.iconColor} />
+            </Pressable>
+          ))}
+        </View>
+      )}
+      <Animated.View ref={isWeb ? frontRef : undefined} style={[styles.front, backgroundColor ? { backgroundColor } : null, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
         {children}
       </Animated.View>
     </View>
@@ -172,7 +183,9 @@ const styles = StyleSheet.create({
   // trailing edge that let the absolutely-positioned action buttons behind
   // it show through even at rest (translateX: 0).
   clip: { overflow: 'hidden', position: 'relative', width: '100%' },
-  front: { width: '100%' },
-  actionsRow: { position: 'absolute', top: 0, right: 0, bottom: 0, flexDirection: 'row' },
+  // Explicit stacking order on web and native: at rest the opaque front
+  // fully covers the colored actions, even at fractional-pixel row edges.
+  front: { width: '100%', zIndex: 1 },
+  actionsRow: { position: 'absolute', top: 0, right: 0, bottom: 0, flexDirection: 'row', zIndex: 0 },
   action: { alignItems: 'center', justifyContent: 'center' },
 });
