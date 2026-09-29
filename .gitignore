@@ -56,3 +56,4 @@ Thumbs.db
 
 # Local environment overrides
 .env
+artifacts/mobile/.audit/
