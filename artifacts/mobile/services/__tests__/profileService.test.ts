@@ -8,7 +8,6 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import {
-  formatProfileCount,
   getCreatorVideosPage,
   getSellerShopPage,
   loadVideoFeedThrough,
@@ -139,14 +138,10 @@ describe('seller shop list', () => {
 });
 
 describe('formatting helpers', () => {
-  it('formats compact counts', () => {
-    expect(formatProfileCount(0)).toBe('0');
-    expect(formatProfileCount(999)).toBe('999');
-    expect(formatProfileCount(1234)).toBe('1.2K');
-    expect(formatProfileCount(12_400)).toBe('12K');
-    expect(formatProfileCount(2_500_000)).toBe('2.5M');
-    expect(formatProfileCount(undefined)).toBe('0');
-  });
+  // Compact-count formatting itself moved to lib/compactFormat.ts
+  // (formatCompactCount) — see tests/compactFormat.test.ts. Every profile
+  // screen now imports it directly instead of this module's old
+  // formatProfileCount wrapper.
 
   it('picks a poster: video thumbnail, else a photo, never a raw video file', () => {
     expect(posterForPost({ contentType: 'video', thumbnailUri: 'thumb.jpg', mediaUris: ['clip.mp4'] })).toBe('thumb.jpg');

@@ -18,6 +18,7 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getContentAnalytics, getFilterState } from '@/services/analyticsService';
 import { ContentAnalytics, ContentPostRow, VideoRetentionPoint, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { formatCompactCount } from '@/lib/compactFormat';
 import { ErrorState } from '@/components/ui/ErrorState';
 import {
   AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, StatTileRow,
@@ -43,9 +44,9 @@ function PostCard({ p }: { p: ContentPostRow }) {
         <Text style={s.postCaption} numberOfLines={1}>{p.caption}</Text>
         <View style={s.postMetaRow}>
           <Feather name="eye" size={10} color={colors.mutedForeground} />
-          <Text style={s.postMeta}>{(p.views / 1000).toFixed(1)}K</Text>
+          <Text style={s.postMeta}>{formatCompactCount(p.views)}</Text>
           <Feather name="heart" size={10} color={colors.mutedForeground} />
-          <Text style={s.postMeta}>{p.likes.toLocaleString()}</Text>
+          <Text style={s.postMeta}>{formatCompactCount(p.likes)}</Text>
           <Feather name="shopping-bag" size={10} color={colors.mutedForeground} />
           <Text style={s.postMeta}>{p.productClicks}</Text>
         </View>
