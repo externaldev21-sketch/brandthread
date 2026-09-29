@@ -378,7 +378,7 @@ export default function SellerStudioRadialMenu({
     );
   };
 
-  const renderItemRow = (item: ControlCenterItem, opts?: { showSection?: string }) => {
+  const renderItemRow = (item: ControlCenterItem, opts?: { showSection?: string; isLast?: boolean }) => {
     const badge = badgeCountFor(item);
     const locked = isLocked(item);
     return (
@@ -388,7 +388,7 @@ export default function SellerStudioRadialMenu({
         accessibilityRole="button"
         accessibilityLabel={item.label}
         testID={`seller-control-center-item-${item.id}`}
-        style={styles.row}
+        style={[styles.row, !opts?.isLast && styles.rowDivider]}
       >
         <View style={styles.rowIcon}>
           <Feather name={item.icon as any} size={19} color={theme.accentLight} />
@@ -515,56 +515,68 @@ export default function SellerStudioRadialMenu({
                 <Text style={styles.sectionHeading}>
                   {results.length > 0 ? `${results.length} result${results.length === 1 ? '' : 's'}` : 'No matches'}
                 </Text>
-                {results.map((item) => {
-                  const section = SECTIONS.find((s) => s.items.some((i) => i.id === item.id));
-                  return renderItemRow(item, { showSection: section?.title });
-                })}
+                {results.length > 0 && (
+                  <View style={styles.sectionCard}>
+                    {results.map((item, i) => {
+                      const section = SECTIONS.find((s) => s.items.some((i2) => i2.id === item.id));
+                      return renderItemRow(item, { showSection: section?.title, isLast: i === results.length - 1 });
+                    })}
+                  </View>
+                )}
               </View>
             ) : (
               <>
-                {/* ── Pinned row ── */}
-                <View style={styles.pinnedHeaderRow}>
-                  <Text style={styles.sectionHeading}>Pinned</Text>
-                  <Pressable
-                    testID="seller-control-center-edit-pins"
-                    accessibilityRole="button"
-                    accessibilityLabel={editMode ? 'Done editing pinned shortcuts' : 'Edit pinned shortcuts'}
-                    onPress={() => setEditMode((v) => !v)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={styles.editLink}>{editMode ? 'Done' : 'Edit'}</Text>
-                  </Pressable>
-                </View>
-
-                {saveFailed && (
-                  <Text style={styles.saveFailedNote}>Couldn't save — check your connection</Text>
-                )}
-
-                <ScrollView
-                  horizontal
-                  nestedScrollEnabled
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.pinnedRow}
-                  testID="seller-control-center-pinned-row"
-                >
-                  {pinnedItems.map((item, i) => renderPinTile(item, i))}
-
-                  {editMode && pinnedItems.length < MAX_PINNED && (
+                {/* ── Pinned panel — its own elevated card so the quick-action
+                    tiles read as a distinct "shortcuts" surface instead of
+                    floating loose on the same plane as the list below. ── */}
+                <View style={styles.pinnedPanel}>
+                  <View style={styles.pinnedHeaderRow}>
+                    <Text style={styles.pinnedHeading}>Pinned shortcuts</Text>
                     <Pressable
-                      testID="seller-control-center-add-pin"
+                      testID="seller-control-center-edit-pins"
                       accessibilityRole="button"
-                      accessibilityLabel="Add a pinned shortcut"
-                      onPress={() => setAddPickerOpen(true)}
-                      style={[styles.pinTile, styles.pinTileAdd, { width: PIN_TILE_SIZE, height: PIN_TILE_SIZE }]}
+                      accessibilityLabel={editMode ? 'Done editing pinned shortcuts' : 'Edit pinned shortcuts'}
+                      onPress={() => setEditMode((v) => !v)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Feather name="plus" size={22} color={theme.muted} />
+                      <Text style={styles.editLink}>{editMode ? 'Done' : 'Edit'}</Text>
                     </Pressable>
+                  </View>
+
+                  {saveFailed && (
+                    <Text style={styles.saveFailedNote}>Couldn't save — check your connection</Text>
                   )}
-                </ScrollView>
+
+                  <ScrollView
+                    horizontal
+                    nestedScrollEnabled
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.pinnedRow}
+                    testID="seller-control-center-pinned-row"
+                  >
+                    {pinnedItems.map((item, i) => renderPinTile(item, i))}
+
+                    {editMode && pinnedItems.length < MAX_PINNED && (
+                      <Pressable
+                        testID="seller-control-center-add-pin"
+                        accessibilityRole="button"
+                        accessibilityLabel="Add a pinned shortcut"
+                        onPress={() => setAddPickerOpen(true)}
+                        style={[styles.pinTile, styles.pinTileAdd, { width: PIN_TILE_SIZE, height: PIN_TILE_SIZE }]}
+                      >
+                        <Feather name="plus" size={22} color={theme.muted} />
+                      </Pressable>
+                    )}
+                  </ScrollView>
+                </View>
 
                 <View style={styles.sectionSpacer} />
 
                 {/* ── Grouped sections ──
+                    Rendered as one grouped card per section (hairline
+                    dividers between rows, no per-row border) instead of a
+                    stack of identical bordered boxes — the previous layout
+                    read as one long repeating list with no hierarchy.
                     An item already shown as a Pinned tile above is left out
                     of its section's list here — otherwise "Add product" /
                     "Orders" / etc. render twice on the same screen, once
@@ -578,7 +590,9 @@ export default function SellerStudioRadialMenu({
                         <Feather name={section.icon as any} size={12} color={theme.subtle} />
                         <Text style={styles.sectionHeading}>{section.title.toUpperCase()}</Text>
                       </View>
-                      {listItems.map((item) => renderItemRow(item))}
+                      <View style={styles.sectionCard}>
+                        {listItems.map((item, i) => renderItemRow(item, { isLast: i === listItems.length - 1 }))}
+                      </View>
                     </View>
                   );
                 })}
@@ -745,7 +759,18 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
 
   searchWrap: { paddingHorizontal: SP.md, paddingBottom: SP.sm },
 
-  scrollContent: { paddingHorizontal: SP.md, paddingBottom: SP.xxl, gap: 2 },
+  scrollContent: { paddingHorizontal: SP.md, paddingBottom: SP.xxl, gap: SP.sm },
+
+  // Elevated panel that frames the pinned row as its own "quick actions"
+  // surface, distinct from the plain list sections below it.
+  pinnedPanel: {
+    backgroundColor: theme.cardElevated,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: SP.md,
+  },
+  pinnedHeading: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.sm, letterSpacing: -0.1 },
 
   pinnedHeaderRow: {
     flexDirection: 'row',
@@ -759,13 +784,16 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
 
   // paddingRight gives the last tile (e.g. Payouts) full clearance from the
   // sheet edge instead of sitting flush against it once scrolled all the way.
-  pinnedRow: { gap: PIN_TILE_GAP, paddingBottom: SP.sm, paddingRight: SP.lg },
+  pinnedRow: { gap: PIN_TILE_GAP, paddingRight: SP.lg },
 
   pinTile: {
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: theme.border,
-    backgroundColor: theme.cardElevated,
+    // Sits on the pinnedPanel's cardElevated surface, so the tile itself
+    // uses the base card color to stay visually distinct rather than
+    // blending into its own container.
+    backgroundColor: theme.card,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
@@ -820,10 +848,10 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
   },
   reorderBtnDisabled: { opacity: 0.35 },
 
-  sectionSpacer: { height: SP.md },
+  sectionSpacer: { height: SP.sm },
 
-  section: { marginBottom: SP.md },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  section: { marginBottom: SP.lg },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SP.sm, paddingHorizontal: 2 },
   sectionHeading: {
     color: theme.subtle,
     fontFamily: FONT.bold,
@@ -831,17 +859,27 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
     letterSpacing: 1,
   },
 
+  // One grouped card per section — hairline dividers between rows instead of
+  // a stack of individually-bordered boxes, so sections read as cohesive
+  // groups rather than a long repeating list that all looks the same.
+  sectionCard: {
+    backgroundColor: theme.card,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    overflow: 'hidden',
+  },
+
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
-    paddingVertical: 11,
+    paddingVertical: 12,
     paddingHorizontal: SP.sm,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.card,
-    marginBottom: 6,
+  },
+  rowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
   rowIcon: {
     width: 36,
