@@ -15,7 +15,7 @@ import {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PrimaryButton } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type InviteData = {
   code: string;
@@ -94,7 +94,7 @@ export default function BuyerInviteScreen() {
 
   return (
     <View style={styles.root}>
-      <Header title="Invite Friends" />
+      <ScreenHeader title="Invite Friends" />
 
       {loading ? (
         <View style={styles.loadingState}>
