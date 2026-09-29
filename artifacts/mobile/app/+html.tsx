@@ -94,6 +94,19 @@ const responsiveBackground = `
 // :focus-visible semantics — this stylesheet is what turns that hookup into
 // visible feedback instead of doing nothing.
 const webPolishCss = `
+  /* Mobile Safari/Chrome draw their own translucent tap-highlight rectangle
+     on every pressed element unless told not to — on a pill/circle control
+     (tab bar buttons, profile tabs, segmented controls/chips) that browser
+     default doesn't share the element's own border-radius, and any sibling
+     overflow:hidden decoration (e.g. the tab bar capsule's glass layer)
+     clips it unevenly, reading as "the press highlight is cut off flat on
+     the sides." Every pressable already draws its own custom press feedback
+     below (filter dimming) or via InteractionLayer/PressableScale, so the
+     platform default is pure redundant chrome — removed globally rather
+     than patched per-component. */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
   [role="button"]:not([aria-disabled="true"]) {
     transition: filter 120ms ease-out;
   }

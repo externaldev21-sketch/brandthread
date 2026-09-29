@@ -341,7 +341,10 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
 
             const onPress = () => {
               if (!isFocused) hapticTabChange();
-              router.replace(tabDef.destination as never);
+              // navigate() (not replace()) so the (tabs) navigator sees a
+              // real focus change and runs its transitionSpec — replace()
+              // swaps the route with no transition at all.
+              router.navigate(tabDef.destination as never);
             };
 
             return (
@@ -350,6 +353,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
                 focused={isFocused}
                 width={metrics.itemWidth}
                 height={metrics.capsuleHeight}
+                theme={theme}
                 accessibilityLabel={
                   showOrderBadge
                     ? `${tabDef.label} tab, ${newOrderCount} new orders`
