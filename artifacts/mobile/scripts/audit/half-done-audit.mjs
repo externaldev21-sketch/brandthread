@@ -703,10 +703,11 @@ function writeMarkdown(summary, flat) {
   lines.push('');
   lines.push('## Notes on this run');
   lines.push('');
-  lines.push('This is a time-budgeted initial pass, not full coverage — see `routesAudited` vs `routesDiscovered` above. Two caveats found while producing it:');
+  lines.push('This is a time-budgeted pass, not full coverage — see `routesAudited` vs `routesDiscovered` above. One caveat found while producing it:');
   lines.push('');
   lines.push('- **Group-root layouts under the "wrong" role are expected unreachable, not bugs**: `/(tabs)` is the seller tab root and `/(buyer)` is the buyer tab root — a `/(tabs)` load under `?bt_preview=buyer` (or vice versa) correctly renders nothing, the same way a signed-in buyer account would never land on the seller shell. Do not treat those specific role/route pairings in the Unreachable table below as findings.');
-  lines.push('- **Some group-root unreachables under the *matching* role look like run-to-run timing flakiness, not real bugs**: `/(tabs)` under `seller` rendered correctly (47 real findings) in an isolated single-route smoke test during development, but showed as unreachable in this batch run — most likely first-paint/hydration taking longer than the fixed settle window when many browser contexts are opened back-to-back under constrained CPU. A route/role pair that shows unreachable here is worth a quick isolated re-run (`--only <route> --roles <role>`) before assuming it is actually broken.');
+  lines.push('');
+  lines.push('An earlier version of this script flagged the *matching*-role case (e.g. `/(tabs)` under `seller`) as unreachable too, flakily — the fast client-side `history.pushState`/`popstate` navigation used between routes was occasionally still mid-render when the reachability check ran. The script now retries once with a real full-page reload before giving up, which fixed that: unreachable dropped from 72% of routes in the initial sample to a small handful in a full run. A route/role pair that still shows unreachable below reflects a real full-navigation blank body — either a genuine redirect-only route with no rendered content, or worth a closer look.');
   lines.push('');
   lines.push('## Known, being rebuilt separately');
   lines.push('');
