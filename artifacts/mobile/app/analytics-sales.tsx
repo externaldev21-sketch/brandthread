@@ -10,13 +10,13 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, SP } from '@/lib/theme';
 import { getSalesAnalytics, getFilterState } from '@/services/analyticsService';
 import { SalesAnalytics, AnalyticsPoint, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, StatRow,
+  AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, StatRow,
 } from '@/components/analytics/AnalyticsKit';
 
 const CHART_TAB_LABELS: Record<'sales' | 'orders' | 'units' | 'aov' | 'refunds', string> = {
@@ -31,7 +31,6 @@ export default function AnalyticsSalesScreen() {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = useHeaderTopInset();
 
   const [data,       setData]       = useState<SalesAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
@@ -77,26 +76,23 @@ export default function AnalyticsSalesScreen() {
     }
   };
 
-  if (loading) {
-    return <AnalyticsSkeleton topPad={topPad} kpiCount={0} listRows={3} />;
-  }
-  if (loadError && !data) {
-    return (
-      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
-        <ErrorState message="Couldn't load sales analytics." onRetry={() => load()} />
-      </View>
-    );
-  }
   const points = chartData();
   return (
+    <View style={{ flex: 1 }}>
+      <ScreenHeader title="Sales Analytics" subtitle={filter?.dateRange.label ?? '30 days'} />
+      {loading ? (
+        <AnalyticsSkeleton kpiCount={0} listRows={3} />
+      ) : loadError && !data ? (
+        <View style={s.loadWrap}>
+          <ErrorState message="Couldn't load sales analytics." onRetry={() => load()} />
+        </View>
+      ) : (
     <ScrollView
       style={s.scroll}
-      contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
+      contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <AnalyticsHeader title="Sales Analytics" subtitle={filter?.dateRange.label ?? '30 days'} />
-
       {/* Chart */}
       <Card padded>
         <PillTabs
@@ -147,6 +143,8 @@ export default function AnalyticsSalesScreen() {
 
       <View style={{ height: 120 }} />
     </ScrollView>
+      )}
+    </View>
   );
 }
 

@@ -12,7 +12,6 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getContentAnalytics, getFilterState } from '@/services/analyticsService';
@@ -20,8 +19,9 @@ import { ContentAnalytics, ContentPostRow, VideoRetentionPoint, AnalyticsFilterS
 import { EmptyState } from '@/components/BrandthreadUI';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
-  AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, StatTileRow,
+  AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, StatTileRow,
 } from '@/components/analytics/AnalyticsKit';
 
 function PostCard({ p }: { p: ContentPostRow }) {
@@ -90,7 +90,6 @@ export default function AnalyticsContentScreen() {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = useHeaderTopInset();
 
   const [data,       setData]       = useState<ContentAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
@@ -129,25 +128,22 @@ export default function AnalyticsContentScreen() {
     ? (tab === 'videos' ? data.topVideos : tab === 'slideshows' ? data.topSlideshows : data.highestRevenuePosts)
     : [];
 
-  if (loading) {
-    return <AnalyticsSkeleton topPad={topPad} kpiCount={3} listRows={3} />;
-  }
-  if (loadError && !data) {
-    return (
-      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
-        <ErrorState message="Couldn't load content analytics." onRetry={() => load()} />
-      </View>
-    );
-  }
   return (
+    <View style={{ flex: 1 }}>
+      <ScreenHeader title="Content Analytics" subtitle={filter?.dateRange.label ?? '30 days'} />
+      {loading ? (
+        <AnalyticsSkeleton kpiCount={3} listRows={3} />
+      ) : loadError && !data ? (
+        <View style={s.loadWrap}>
+          <ErrorState message="Couldn't load content analytics." onRetry={() => load()} />
+        </View>
+      ) : (
     <ScrollView
       style={s.scroll}
-      contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
+      contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <AnalyticsHeader title="Content Analytics" subtitle={filter?.dateRange.label ?? '30 days'} />
-
       {!data ? (
         <EmptyState
           icon="video"
@@ -218,6 +214,8 @@ export default function AnalyticsContentScreen() {
 
       <View style={{ height: 120 }} />
     </ScrollView>
+      )}
+    </View>
   );
 }
 
