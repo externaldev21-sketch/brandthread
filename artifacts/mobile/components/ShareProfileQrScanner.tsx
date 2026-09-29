@@ -71,7 +71,7 @@ export function ShareProfileQrScanner({ onClose }: ShareProfileQrScannerProps) {
           <Text style={styles.permissionTitle}>Camera unavailable</Text>
           <Text style={styles.permissionBody}>
             {Platform.OS === 'web'
-              ? "Scanning isn't available in this preview. Try it on a phone."
+              ? "Scanning isn't available on web. Try it on a phone."
               : 'Allow camera access to scan a Brandthread profile code.'}
           </Text>
           {Platform.OS !== 'web' && (

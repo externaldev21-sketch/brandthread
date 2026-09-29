@@ -12,9 +12,9 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, ANIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { FilterChip, SearchBar } from '@/components/BrandthreadUI';
+import { SellerListHeader, sellerListCountRowStyles } from '@/components/SellerListHeader';
 import { Button } from '@/components/ui/Button';
 import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
 import { RetryRow } from '@/components/ui/RetryRow';
@@ -1149,8 +1149,8 @@ export default function OrdersScreen() {
         </View>
       )}
       {/* Results count */}
-      <View style={s.resultsRow}>
-        <Text style={s.resultsText}>
+      <View style={[sellerListCountRowStyles.row, { paddingTop: 0 }]}>
+        <Text style={[sellerListCountRowStyles.text, { color: SUBTLE }]}>
           {filtered.length} {filtered.length === 1 ? 'order' : 'orders'}
           {activeFilter !== 'all'
             ? ` · ${FILTERS.find(f => f.key === activeFilter)?.label ?? ALL_FILTERS.find(f => f.key === activeFilter)?.label}`
@@ -1187,94 +1187,32 @@ export default function OrdersScreen() {
   return (
     <View style={[s.root, { paddingTop: topInset + 12, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
       {/* ── Fixed header ── */}
-      <View style={s.header}>
-        {/* Title row */}
-        <View style={s.titleRow}>
-          <TouchableOpacity
-            style={s.titleBtn}
-            onPress={() => Alert.alert('Order view', 'Choose a view', [
-              { text: 'All orders', onPress: () => setActiveFilter('all') },
-              { text: 'Open orders', onPress: () => setActiveFilter('open') },
-              { text: 'Archived orders', onPress: () => setActiveFilter('archived') },
-              { text: 'Cancel', style: 'cancel' },
-            ])}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Choose order view"
-          >
-            <Text style={s.titleText}>Orders</Text>
-            <Feather name="chevron-down" size={18} color={MUTED} />
-          </TouchableOpacity>
-          <View style={s.titleActions}>
-            <TouchableOpacity
-              style={s.headerIconBtn}
-              onPress={handleMoreMenu}
-              accessibilityRole="button"
-              accessibilityLabel="More order actions"
-            >
-              <Feather name="more-horizontal" size={ICON.md} color={FG} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Persistent search row */}
-        <View style={s.searchRow}>
-          {/* Overnight batch item 37: SearchBar is the box now (no border, at
-              rest or focus) — the outer `searchBox` wrapper used to draw a
-              second bordered card around it, which is exactly the doubled-up
-              "rectangle bar" the owner flagged. Multi-location is gone from
-              the product, so there's no location pin and no "All locations"
-              prefix here anymore. */}
-          <View style={s.searchBoxRow}>
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search orders"
-              style={s.searchBarFlex}
-            />
-          </View>
-          <TouchableOpacity
-            style={[s.controlBtn, hasActiveFilter && s.controlBtnActive]}
-            onPress={() => setFilterSheetVisible(true)}
-            accessibilityRole="button"
-            accessibilityLabel={hasActiveFilter ? `Filter: ${activeFilter}` : 'Filter orders'}
-          >
-            <Feather name="sliders" size={14} color={hasActiveFilter ? PURPLE_LIGHT : MUTED} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.controlBtn}
-            onPress={() => setSortModalVisible(true)}
-            accessibilityRole="button"
-            accessibilityLabel={`Sort: ${currentSortLabel}`}
-          >
-            <Feather name="chevrons-down" size={14} color={MUTED} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Status pills — horizontal scroll, edge-to-edge. `pillsRow`'s own
-            horizontal padding is what lets the last chip clip naturally at
-            the screen edge as a scroll affordance — no gradient overlay on
-            top of the chips (the previous `GRAD_DARK_FADE` scrim here went
-            fully opaque at its own edge, painting a solid black block over
-            the last chip — e.g. "Open 0" — instead of fading it; same
-            antipattern the tab-bar glass zone replaced for Activity, see
-            app/activity-center.tsx's history). */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.pillsRow}
-        >
-          {FILTERS.map(({ key, label }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              active={activeFilter === key}
-              onPress={() => setActiveFilter(key)}
-              count={key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined}
-            />
-          ))}
-        </ScrollView>
-      </View>
+      <SellerListHeader
+        title="Orders"
+        onTitlePress={() => Alert.alert('Order view', 'Choose a view', [
+          { text: 'All orders', onPress: () => setActiveFilter('all') },
+          { text: 'Open orders', onPress: () => setActiveFilter('open') },
+          { text: 'Archived orders', onPress: () => setActiveFilter('archived') },
+          { text: 'Cancel', style: 'cancel' },
+        ])}
+        titleAccessibilityLabel="Choose order view"
+        actions={[{ icon: 'more-horizontal', onPress: handleMoreMenu, accessibilityLabel: 'More order actions' }]}
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search orders"
+        onFilterPress={() => setFilterSheetVisible(true)}
+        hasActiveFilter={hasActiveFilter}
+        filterAccessibilityLabel={hasActiveFilter ? `Filter: ${activeFilter}` : 'Filter orders'}
+        onSortPress={() => setSortModalVisible(true)}
+        sortAccessibilityLabel={`Sort: ${currentSortLabel}`}
+        chips={FILTERS.map(({ key, label }) => ({
+          key,
+          label,
+          active: activeFilter === key,
+          onPress: () => setActiveFilter(key),
+          count: key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined,
+        }))}
+      />
 
       {/* ── Order list (section list for date groups) ── */}
       {loading && orders.length === 0 ? (
@@ -1374,76 +1312,6 @@ const createStyles = (theme: any) => {
     flex: 1,
     backgroundColor: SCREEN_BG,
   },
-  // Header
-  header: {
-    backgroundColor: BG,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    minHeight: 44,
-  },
-  titleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  titleText: {
-    fontSize: 20,
-    fontFamily: FONT.bold,
-    color: FG,
-    letterSpacing: -0.4,
-  },
-  titleActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerIconBtn: {
-    width: COMP.iconBtn,
-    height: COMP.iconBtn,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Search row
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-  },
-  searchBoxRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-  },
-  searchBarFlex: { flex: 1, height: 36 },
-  controlBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: CARD,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  controlBtnActive: {
-    borderColor: BORDER_ACTIVE,
-    backgroundColor: PURPLE_DIM,
-  },
-
-  // Status pills
-  pillsRow: {
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    paddingTop: 2,
-    gap: SP.xs,
-  },
   // List header
   listHeader: {
     paddingTop: SP.sm,
@@ -1451,18 +1319,6 @@ const createStyles = (theme: any) => {
   retryBannerWrap: {
     marginHorizontal: SP.md,
     marginBottom: SP.sm,
-  },
-  resultsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-  },
-  resultsText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: SUBTLE,
   },
   emptyStateContainer: {
     marginHorizontal: SP.md,

@@ -261,7 +261,7 @@ export default function PostAnalyticsScreen() {
           <View style={styles.availabilityNote}>
             <Feather name="info" size={18} color={colors.primary} />
             <Text style={styles.unavailableText}>
-              Unavailable metrics are labeled “Not tracked.” Brandthread never estimates post performance from demo data.
+              Unavailable metrics are labeled “Not tracked.” Brandthread never estimates post performance.
             </Text>
           </View>
         )}

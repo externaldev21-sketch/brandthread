@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
+import { useWindowDimensions } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 
 import { useColors } from '@/hooks/useColors';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
@@ -9,6 +11,17 @@ import { getConversations, getNotifications, subscribeSocial } from '@/services/
 import { ThreadCashActiveTimeTracker } from '@/components/thread-cash/ThreadCashActiveTimeTracker';
 import { isBuyerDevPreview } from '@/lib/devPreview';
 import { getPreviewConversations, getPreviewNotifications } from '@/lib/previewInbox';
+// Instagram/TikTok-style directional slide — shared with the seller tab
+// layout (app/(tabs)/_layout.tsx) so both sides use the same duration/
+// easing. `current.progress` (from React Navigation's bottom-tabs) is
+// -1/0/1 based on the tapped screen's REGISTRATION index relative to the
+// active one — see the Tabs.Screen order below, which is deliberately kept
+// in the same left-to-right order as the capsule (Home, Discover, Inbox,
+// Activity, Profile) so that order, not just tab-bar visual position, is
+// what decides slide direction.
+import {
+  SLIDE_TRANSITION_SPEC, REDUCED_MOTION_TRANSITION_SPEC, forDirectionalSlide, forReducedMotionCrossfade,
+} from '@/lib/tabSlideTransition';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
 // Floating capsule: Home · Discover · Inbox · Search, plus a separate Profile
@@ -20,6 +33,8 @@ import { getPreviewConversations, getPreviewNotifications } from '@/lib/previewI
 function BuyerTabLayout() {
   const colors = useColors();
   const [inboxBadgeCount, setInboxBadgeCount] = useState(0);
+  const { width } = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
 
   const loadBadgeCount = useCallback(async () => {
     try {
@@ -72,10 +87,8 @@ function BuyerTabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
-        // Switch scenes immediately so rapid taps never stack full-width
-        // slides over each other. The persistent tab bar still glides between
-        // its compact and regular shapes on the UI thread.
-        animation: 'none',
+        transitionSpec: reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC,
+        sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width),
         sceneStyle: { backgroundColor: colors.background },
       }}
     >

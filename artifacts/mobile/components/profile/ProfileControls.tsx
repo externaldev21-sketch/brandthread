@@ -274,9 +274,13 @@ const ICON_TAB_INDICATOR_WIDTH = 26;
  * Mobbin): icons only (the label stays as the accessibility label), evenly
  * spaced, with a short ~26pt, 2pt, rounded bar centered under the active
  * icon — not a full-cell-width underline — and no divider line below the
- * row (TikTok's own profile tab row has none). The default `labeled` look
- * (full-cell underline + hairline divider) is unchanged for every other
- * caller.
+ * row (TikTok's own profile tab row has none). Selection and press are
+ * marked ONLY by that underline and the icon's own opacity/scale dimming
+ * (PressableScale's built-in press feedback, ripple disabled) — no
+ * translucent background/pill/circle behind the icon at all, on press or
+ * selected. The default `labeled` look (full-cell underline + hairline
+ * divider + InteractionLayer press/hover wash) is unchanged for every
+ * other caller.
  */
 export function ProfileTabs({
   tabs,
@@ -322,10 +326,16 @@ export function ProfileTabs({
               accessibilityState={{ selected }}
               accessibilityLabel={`${tab.label} tab`}
               testID={`profile-tab-${tab.key.toLowerCase()}`}
+              // Icon-only own-profile tabs (TikTok-style): no press/active
+              // background at all, only the underline below marks selection
+              // — PressableScale's own built-in opacity/scale dimming is the
+              // only press feedback here, and its ripple is disabled since
+              // that's a background fill too.
+              rippleEnabled={!iconOnly}
             >
               {(state) => (
                 <>
-                  <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
+                  {iconOnly ? null : <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />}
                   <Feather name={tab.icon} size={iconOnly ? 24 : 22} color={color} />
                   {iconOnly ? null : (
                     <Text style={[styles.tabLabel, { color }, selected && styles.tabLabelActive]} numberOfLines={1}>

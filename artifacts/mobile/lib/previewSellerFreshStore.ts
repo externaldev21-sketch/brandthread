@@ -78,11 +78,13 @@ function persist(): void {
   AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => { /* non-fatal — stays in memory for this session */ });
 }
 
-// Best-effort hydrate from a previous session on this device. Fire-and-forget
-// at module load; every call site already reads the synchronous in-memory
-// `state`, so this only matters for whichever renders happen to occur after
-// it resolves (typically well before the user reaches a preview screen).
-AsyncStorage.getItem(STORAGE_KEY)
+// Best-effort hydrate from a previous session on this device. Every call
+// site already reads the synchronous in-memory `state`, so most renders
+// don't need to await this — but it's also exposed as a promise (see
+// `whenPreviewSellerFreshStoreReady` below) for the one spot that reads
+// state on first load (discounts.tsx), so a saved session isn't briefly
+// shadowed by the empty initial state on a slow device.
+const hydration: Promise<void> = AsyncStorage.getItem(STORAGE_KEY)
   .then((raw) => {
     if (!raw) return;
     const parsed = JSON.parse(raw) as Partial<PreviewSellerFreshState>;
@@ -94,6 +96,11 @@ AsyncStorage.getItem(STORAGE_KEY)
     notify();
   })
   .catch(() => { /* non-fatal — starts from initialState() */ });
+
+/** Resolves once a previous session's saved state (if any) has loaded into `state`. */
+export function whenPreviewSellerFreshStoreReady(): Promise<void> {
+  return hydration;
+}
 
 type Listener = () => void;
 const listeners = new Set<Listener>();

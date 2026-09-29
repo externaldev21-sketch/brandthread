@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
@@ -19,13 +19,11 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard, LoadingSkeleton, EmptyState, FilterChip, PressableScale } from '@/components/BrandthreadUI';
+import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard, LoadingSkeleton, EmptyState, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 
-import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory, duplicateProduct, deleteProduct } from '@/services/productService';
+import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory, adjustVariantStock, setVariantStock, duplicateProduct, deleteProduct } from '@/services/productService';
 import { useApi } from '@/lib/api';
 import { Product, ProductVariant, ProductStatus } from '@/services/productTypes';
-import { getItemsByProduct, adjustStock } from '@/services/inventoryService';
-import { InventoryItem } from '@/services/inventoryTypes';
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -660,158 +658,124 @@ const makeVtStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 };
 
 // ─── Inventory Tab ────────────────────────────────────────────────────────────
+//
+// Folded entirely into Products now: no more services/inventoryService /
+// inventoryTypes (the separate multi-warehouse system, removed), no more
+// links out to /inventory or /inventory-adjust (both routes removed too).
+// Stock lives on the product itself — ProductVariant.inventoryQuantity and
+// Product.inventory — and is edited right here with the same quick
+// stepper + direct-entry + undo-toast pattern as the Products list's stock
+// editor (components/products/StockEditorSheet.tsx), saving instantly via
+// productService.adjustVariantStock / adjustInventory.
 
 function InventoryTab({ product, setProduct, id }: { product: Product; setProduct: (p: Product) => void; id: string }) {
-  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
+  const { theme, SUCCESS, ORANGE, RED, BLUE } = useThemeAliases();
   const invS = React.useMemo(() => makeInvStyles(theme), [theme]);
-  const router = useRouter();
+  const { showUndo } = useUndoToast();
   const inv = product.inventory;
-  const [invItems, setInvItems] = useState<InventoryItem[]>([]);
-  const [invLoading, setInvLoading] = useState(true);
-  const [invError, setInvError] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
 
-  const loadInventoryItems = useCallback(async () => {
-    setInvLoading(true);
+  const draftFor = (key: string, qty: number) => drafts[key] ?? String(qty);
+
+  async function applyVariantDelta(variant: Product['variants'][number], delta: number) {
+    const previousQty = variant.inventoryQuantity;
     try {
-      setInvItems(await getItemsByProduct(product.id));
-      setInvError(false);
-    } catch (error) {
-      setInvError(true);
-    } finally {
-      setInvLoading(false);
-    }
-  }, [product.id]);
-
-  useEffect(() => { void loadInventoryItems(); }, [loadInventoryItems]);
-
-  const totalOnHand   = invItems.reduce((s, i) => s + i.onHand, 0);
-  const totalAvail    = invItems.reduce((s, i) => s + i.available, 0);
-  const totalReserved = invItems.reduce((s, i) => s + i.reserved, 0);
-
-  // Fix 1: doAdjust calls adjustInventory then reloads product
-  const doAdjust = async (delta: number, reason: string) => {
-    try {
-      await adjustInventory(product.id, undefined, delta, reason);
+      const adj = await adjustVariantStock(product.id, variant.id, delta, delta > 0 ? `Increase ${variant.title}` : `Decrease ${variant.title}`);
+      if (!adj) throw new Error('not found');
       const refreshed = await getProduct(id);
       if (refreshed) setProduct(refreshed);
-      await loadInventoryItems();
-      Alert.alert('Stock updated');
+      const newQty = Math.max(0, previousQty + delta);
+      setDrafts(d => ({ ...d, [variant.id]: String(newQty) }));
+      showUndo({
+        message: `${variant.title} set to ${newQty}`,
+        undo: async () => {
+          await adjustVariantStock(product.id, variant.id, -adj.delta, 'Undo');
+          const reverted = await getProduct(id);
+          if (reverted) setProduct(reverted);
+        },
+      });
     } catch (error) {
-      reportNetworkError(error, () => doAdjust(delta, reason));
+      reportNetworkError(error, () => applyVariantDelta(variant, delta));
       Alert.alert('Could not update stock', 'Check your connection and try again.');
     }
-  };
-
-  // Fix 1: Adjust Stock button with Alert options
-  const handleAdjustStock = () => {
-    Alert.alert('Adjust stock', 'Enter adjustment (+/- units)', [
-      { text: 'Add 5', onPress: () => doAdjust(5, 'Manual add') },
-      { text: 'Remove 5', onPress: () => doAdjust(-5, 'Manual remove') },
-      { text: 'Set to 0', onPress: () => doAdjust(-product.inventory.totalStock, 'Reset to zero') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  const invOnHand   = invItems.length > 0 ? totalOnHand   : inv.totalStock;
-  const invAvail    = invItems.length > 0 ? totalAvail    : inv.availableStock;
-  const invReserved = invItems.length > 0 ? totalReserved : inv.reservedStock;
-
-  function invItemStatusVariant(item: InventoryItem): 'success' | 'warning' | 'error' | 'neutral' {
-    if (item.status === 'available') return 'success';
-    if (item.status === 'low_stock') return 'warning';
-    if (item.status === 'out_of_stock') return 'error';
-    return 'neutral';
   }
 
-  function invItemStatusLabel(item: InventoryItem): string {
-    switch (item.status) {
-      case 'available':    return 'In Stock';
-      case 'low_stock':    return 'Low Stock';
-      case 'out_of_stock': return 'Out of Stock';
-      case 'reserved':     return 'Reserved';
-      case 'incoming':     return 'Incoming';
-      case 'pre_order':    return 'Pre-Order';
-      default:             return item.status;
+  async function applyVariantDirectEntry(variant: Product['variants'][number]) {
+    const parsed = parseInt(draftFor(variant.id, variant.inventoryQuantity), 10);
+    const nextQty = Number.isFinite(parsed) ? Math.max(0, parsed) : variant.inventoryQuantity;
+    if (nextQty === variant.inventoryQuantity) {
+      setDrafts(d => ({ ...d, [variant.id]: String(variant.inventoryQuantity) }));
+      return;
     }
+    try {
+      const adj = await setVariantStock(product.id, variant.id, nextQty, 'Set exact quantity');
+      if (!adj) throw new Error('not found');
+      const refreshed = await getProduct(id);
+      if (refreshed) setProduct(refreshed);
+      showUndo({
+        message: `${variant.title} set to ${nextQty}`,
+        undo: async () => {
+          await adjustVariantStock(product.id, variant.id, -adj.delta, 'Undo');
+          const reverted = await getProduct(id);
+          if (reverted) setProduct(reverted);
+        },
+      });
+    } catch (error) {
+      reportNetworkError(error, () => applyVariantDirectEntry(variant));
+      Alert.alert('Could not update stock', 'Check your connection and try again.');
+    }
+  }
+
+  // No variants: a single product-level stock count (adjustInventory, same
+  // aggregate fields adjustVariantStock keeps in sync for variant products).
+  async function applyProductDelta(delta: number) {
+    try {
+      const adj = await adjustInventory(product.id, undefined, delta, delta > 0 ? 'Increase stock' : 'Decrease stock');
+      if (!adj) throw new Error('not found');
+      const refreshed = await getProduct(id);
+      if (refreshed) setProduct(refreshed);
+      const newQty = Math.max(0, product.inventory.totalStock + delta);
+      setDrafts(d => ({ ...d, total: String(newQty) }));
+      showUndo({
+        message: `Stock set to ${newQty}`,
+        undo: async () => {
+          await adjustInventory(product.id, undefined, -adj.delta, 'Undo');
+          const reverted = await getProduct(id);
+          if (reverted) setProduct(reverted);
+        },
+      });
+    } catch (error) {
+      reportNetworkError(error, () => applyProductDelta(delta));
+      Alert.alert('Could not update stock', 'Check your connection and try again.');
+    }
+  }
+
+  async function applyProductDirectEntry() {
+    const parsed = parseInt(draftFor('total', product.inventory.totalStock), 10);
+    const nextQty = Number.isFinite(parsed) ? Math.max(0, parsed) : product.inventory.totalStock;
+    if (nextQty === product.inventory.totalStock) {
+      setDrafts(d => ({ ...d, total: String(product.inventory.totalStock) }));
+      return;
+    }
+    await applyProductDelta(nextQty - product.inventory.totalStock);
   }
 
   return (
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
       <SectionHeader title="Inventory Summary" />
 
-      {/* Stat strip */}
+      {/* Stat strip — straight from Product.inventory, the same aggregate
+          fields the Products list and its stats read. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}>
-        <StatCard label="On Hand"   value={String(invOnHand)}        icon="layers"       accent={theme.secondary}    style={{ minWidth: 100 }} />
-        <StatCard label="Available" value={String(invAvail)}          icon="check-circle" accent={SUCCESS} style={{ minWidth: 100 }} />
-        <StatCard label="Reserved"  value={String(invReserved)}       icon="lock"         accent={ORANGE}  style={{ minWidth: 100 }} />
-        <StatCard label="Incoming"  value={String(inv.incomingStock)} icon="truck"        accent={BLUE}    style={{ minWidth: 100 }} />
+        <StatCard label="On Hand"   value={String(inv.totalStock)}     icon="layers"       accent={theme.secondary} style={{ minWidth: 100 }} />
+        <StatCard label="Available" value={String(inv.availableStock)} icon="check-circle" accent={SUCCESS}         style={{ minWidth: 100 }} />
+        <StatCard label="Reserved"  value={String(inv.reservedStock)}  icon="lock"         accent={ORANGE}          style={{ minWidth: 100 }} />
+        <StatCard label="Incoming"  value={String(inv.incomingStock)}  icon="truck"        accent={BLUE}            style={{ minWidth: 100 }} />
       </ScrollView>
 
-      {/* Actions */}
-      <View style={{ paddingHorizontal: SP.md, flexDirection: 'row', gap: SP.sm }}>
-        <PrimaryButton
-          label="Adjust Stock"
-          icon="plus-circle"
-          onPress={handleAdjustStock}
-          style={{ flex: 1 }}
-        />
-        <SecondaryButton
-          label="View Full Inventory"
-          onPress={() => router.push('/inventory' as never)}
-          style={{ flex: 1 }}
-        />
-      </View>
-
-      {invLoading && <View style={{ paddingHorizontal: SP.md }}><LoadingSkeleton height={72} /></View>}
-      {/* Inventory items from inventoryService */}
-      {invItems.length > 0 && (
+      {product.variants.length > 0 ? (
         <View style={{ paddingHorizontal: SP.md }}>
-          <SectionHeader title="Inventory by Variant" style={{ paddingHorizontal: 0 }} />
-          <BrandthreadCard>
-            {invItems.map((item, idx) => (
-              <View key={item.id}>
-                {idx > 0 && <View style={invS.divider} />}
-                <View style={invS.variantRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={invS.variantName}>{item.variantLabel}</Text>
-                    <Text style={invS.variantSku}>SKU: {item.sku}</Text>
-                  </View>
-                  <StatusBadge label={invItemStatusLabel(item)} variant={invItemStatusVariant(item)} small />
-                  <PressableScale
-                    style={[invS.adjBtn, { marginLeft: SP.sm }]}
-                    onPress={() => router.push(('/inventory-adjust?itemId=' + item.id) as never)}
-                    accessibilityLabel="Adjust inventory"
-                  >
-                    <Feather name="sliders" size={12} color={theme.accent} />
-                  </PressableScale>
-                </View>
-                <View style={invS.itemStatsRow}>
-                  <Text style={invS.itemStat}>{item.available} avail</Text>
-                  <Text style={invS.itemStatDot}>·</Text>
-                  <Text style={invS.itemStat}>{item.onHand} on hand</Text>
-                  {item.reserved > 0 && (
-                    <>
-                      <Text style={invS.itemStatDot}>·</Text>
-                      <Text style={invS.itemStat}>{item.reserved} reserved</Text>
-                    </>
-                  )}
-                  {item.incoming > 0 && (
-                    <>
-                      <Text style={invS.itemStatDot}>·</Text>
-                      <Text style={[invS.itemStat, { color: BLUE }]}>{item.incoming} incoming</Text>
-                    </>
-                  )}
-                </View>
-              </View>
-            ))}
-          </BrandthreadCard>
-        </View>
-      )}
-
-      {/* Fallback: by product variant when no inventory items */}
-      {invItems.length === 0 && product.variants.length > 0 && (
-        <View style={{ paddingHorizontal: SP.md }}>
-          <SectionHeader title="Inventory by Variant" style={{ paddingHorizontal: 0 }} />
+          <SectionHeader title="Stock by variant" style={{ paddingHorizontal: 0 }} />
           <BrandthreadCard>
             {product.variants.map((variant, idx) => (
               <View key={variant.id}>
@@ -823,16 +787,26 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
                   </View>
                   <PressableScale
                     style={invS.adjBtn}
-                    onPress={() => doAdjust(-1, `Decrease ${variant.title}`)}
-                    accessibilityLabel={`Decrease ${variant.title} inventory`}
+                    onPress={() => applyVariantDelta(variant, -1)}
+                    disabled={variant.inventoryQuantity <= 0}
+                    accessibilityLabel={`Decrease ${variant.title} stock`}
                   >
-                    <Feather name="minus" size={12} color={RED} />
+                    <Feather name="minus" size={12} color={variant.inventoryQuantity <= 0 ? theme.subtle : RED} />
                   </PressableScale>
-                  <Text style={invS.qty}>{variant.inventoryQuantity}</Text>
+                  <TextInput
+                    value={draftFor(variant.id, variant.inventoryQuantity)}
+                    onChangeText={(text) => setDrafts(d => ({ ...d, [variant.id]: text.replace(/[^0-9]/g, '') }))}
+                    onSubmitEditing={() => applyVariantDirectEntry(variant)}
+                    onBlur={() => applyVariantDirectEntry(variant)}
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    style={[invS.qtyInput, { color: theme.text, borderColor: theme.border }]}
+                    accessibilityLabel={`${variant.title} quantity`}
+                  />
                   <PressableScale
                     style={invS.adjBtn}
-                    onPress={() => doAdjust(1, `Increase ${variant.title}`)}
-                    accessibilityLabel={`Increase ${variant.title} inventory`}
+                    onPress={() => applyVariantDelta(variant, 1)}
+                    accessibilityLabel={`Increase ${variant.title} stock`}
                   >
                     <Feather name="plus" size={12} color={SUCCESS} />
                   </PressableScale>
@@ -841,13 +815,47 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
             ))}
           </BrandthreadCard>
         </View>
+      ) : (
+        <View style={{ paddingHorizontal: SP.md }}>
+          <SectionHeader title="Total stock" style={{ paddingHorizontal: 0 }} />
+          <BrandthreadCard>
+            <View style={invS.variantRow}>
+              <Text style={[invS.variantName, { flex: 1 }]}>This product</Text>
+              <PressableScale
+                style={invS.adjBtn}
+                onPress={() => applyProductDelta(-1)}
+                disabled={product.inventory.totalStock <= 0}
+                accessibilityLabel="Decrease stock"
+              >
+                <Feather name="minus" size={12} color={product.inventory.totalStock <= 0 ? theme.subtle : RED} />
+              </PressableScale>
+              <TextInput
+                value={draftFor('total', product.inventory.totalStock)}
+                onChangeText={(text) => setDrafts(d => ({ ...d, total: text.replace(/[^0-9]/g, '') }))}
+                onSubmitEditing={applyProductDirectEntry}
+                onBlur={applyProductDirectEntry}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                style={[invS.qtyInput, { color: theme.text, borderColor: theme.border }]}
+                accessibilityLabel="Stock quantity"
+              />
+              <PressableScale
+                style={invS.adjBtn}
+                onPress={() => applyProductDelta(1)}
+                accessibilityLabel="Increase stock"
+              >
+                <Feather name="plus" size={12} color={SUCCESS} />
+              </PressableScale>
+            </View>
+          </BrandthreadCard>
+        </View>
       )}
     </View>
   );
 }
 
 const makeInvStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const { cardElevated: CARD_ELEVATED, border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE } = theme;
+  const { cardElevated: CARD_ELEVATED, border: BORDER, text: FG, muted: MUTED } = theme;
   return StyleSheet.create({
   variantRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
   variantName:   { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
@@ -855,14 +863,8 @@ const makeInvStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   adjBtn:        { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED,
                    borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   qty:           { fontSize: FS.base, fontFamily: FONT.bold, color: FG, minWidth: 32, textAlign: 'center' },
+  qtyInput:      { width: 52, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, borderWidth: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.semibold },
   divider:       { height: 1, backgroundColor: BORDER },
-  historyRow:    { flexDirection: 'row', alignItems: 'center' },
-  historyReason: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-  historyDate:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  historyDelta:  { fontSize: FS.lg, fontFamily: FONT.bold },
-  itemStatsRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingBottom: SP.sm, flexWrap: 'wrap' },
-  itemStat:      { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE },
-  itemStatDot:   { fontSize: FS.xs, color: SUBTLE },
   });
 };
 

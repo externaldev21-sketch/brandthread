@@ -19,7 +19,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { isSellerDevPreview } from '@/lib/devPreview';
-import { addPreviewDiscount, deletePreviewDiscount, getPreviewDiscounts, updatePreviewDiscount, type PreviewDiscount } from '@/lib/previewSellerFreshStore';
+import { addPreviewDiscount, deletePreviewDiscount, getPreviewDiscounts, updatePreviewDiscount, whenPreviewSellerFreshStoreReady, type PreviewDiscount } from '@/lib/previewSellerFreshStore';
 import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -144,6 +144,7 @@ export default function DiscountsScreen() {
 
   const loadDiscounts = useCallback(async () => {
     if (previewOnly) {
+      await whenPreviewSellerFreshStoreReady();
       setDiscounts(getPreviewDiscounts().map(normalizeDiscount));
       setProducts([]);
       setLoadError(false);

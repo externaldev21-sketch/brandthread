@@ -227,7 +227,6 @@ describe('seller bar full-screen deny-list', () => {
     'seller-verification',
     'seller-data-export',
     'discounts',
-    'inventory',
     'locations',
     'admin-reports',
     'manufacturer-hub',
@@ -277,7 +276,6 @@ describe('seller root route inclusion in route-to-tab map', () => {
 
   it('products routes map correctly', () => {
     expect(tabBarSource).toContain("'product-editor': 'products'");
-    expect(tabBarSource).toContain("'inventory': 'products'");
     expect(tabBarSource).toContain("'drafts': 'products'");
   });
 

@@ -20,7 +20,7 @@ const ROWS: ActionRowConfig[] = [
   // unfiltered "All orders" — orders.tsx reads ?filter= on focus.
   { key: 'toShip', icon: 'package', title: (n) => `${n} ${n === 1 ? 'order' : 'orders'} to ship`, subtitle: 'Paid orders awaiting shipment', route: '/(tabs)/orders?filter=unfulfilled' },
   { key: 'toAnswer', icon: 'message-circle', title: (n) => `${n} ${n === 1 ? 'message' : 'messages'} to answer`, subtitle: 'Buyers and manufacturers waiting on you', route: '/seller-inbox' },
-  { key: 'lowStock', icon: 'trending-down', title: (n) => `${n} ${n === 1 ? 'item' : 'items'} low on stock`, subtitle: 'Restock before you sell out', route: '/inventory' },
+  { key: 'lowStock', icon: 'trending-down', title: (n) => `${n} ${n === 1 ? 'item' : 'items'} low on stock`, subtitle: 'Restock before you sell out', route: '/(tabs)/products?filter=low-stock' },
   { key: 'returns', icon: 'corner-up-left', title: (n) => `${n} ${n === 1 ? 'return' : 'returns'} to review`, subtitle: 'Buyer-initiated returns awaiting a decision', route: '/(tabs)/orders?filter=all' },
 ];
 

@@ -608,7 +608,10 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       if (!id) return null;
       return role === 'seller' ? `/seller-conversation?id=${q(id)}` : `/buyer-conversation?id=${q(id)}`;
     case 'variant':
-      return '/inventory';
+      // Inventory folded into Products (no more standalone /inventory) —
+      // the low-stock filter is the closest equivalent destination without
+      // a product id to deep-link straight to one variant's stock editor.
+      return '/(tabs)/products?filter=low-stock';
     case 'payout':
       return '/payouts';
     case 'subscription_invoice':
