@@ -209,7 +209,16 @@ describe('SellerDashboardChart', () => {
     expect(onRangeChange).toHaveBeenCalledWith('month');
   });
 
-  it('renders every x-axis label, not just the first/last (item 123)', async () => {
+  // The axis row only lays out (and is scrubbable) once the chart area has
+  // a real measured width — mirrors onLayout firing on a real device/browser.
+  async function layoutChart(width = 350) {
+    const chartArea = renderer!.root.findByProps({ testID: 'seller-dashboard-chart' });
+    await act(async () => {
+      chartArea.props.onLayout({ nativeEvent: { layout: { width } } });
+    });
+  }
+
+  it('renders every x-axis label for Week — a calendar week only ever has 7, and all 7 fit (item 123)', async () => {
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     await act(async () => {
       renderer = create(
@@ -224,9 +233,59 @@ describe('SellerDashboardChart', () => {
         />,
       );
     });
+    await layoutChart();
     const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
     const texts = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
     expect(texts).toEqual(labels);
+  });
+
+  it('shows only 4 evenly-spaced quarter-of-day labels for Today, not all 24 hourly buckets', async () => {
+    const labels = Array.from({ length: 24 }, (_, h) => `${h}h`);
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={labels.map(() => 10)}
+          labels={labels}
+          theme={theme}
+          range="today"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    await layoutChart();
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    // Quarters of the day: hour 0, 6, 12, 18 (12am/6am/12pm/6pm), matching
+    // Shopify's own Today/Yesterday Analytics chart. Only these 4 render —
+    // the other 20 hourly buckets get no Text node at all (not a blank one
+    // squeezed into a shared flex column, which truncated longer labels).
+    expect(texts).toEqual(['0h', '6h', '12h', '18h']);
+  });
+
+  it('shows a small evenly-spaced subset of labels for Month (not all ~30 daily buckets)', async () => {
+    const labels = Array.from({ length: 30 }, (_, i) => `Day ${i + 1}`);
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={labels.map(() => 10)}
+          labels={labels}
+          theme={theme}
+          range="month"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    await layoutChart();
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const visible = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    expect(visible.length).toBeGreaterThanOrEqual(4);
+    expect(visible.length).toBeLessThanOrEqual(6);
+    expect(visible[0]).toBe('Day 1');
+    expect(visible[visible.length - 1]).toBe('Day 30');
   });
 
   it('renders a sliding glass range indicator behind the tabs (item 124)', async () => {
