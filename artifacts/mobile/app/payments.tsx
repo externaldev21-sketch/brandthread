@@ -16,6 +16,7 @@ import {
 } from '@/lib/dropBroadcastState';
 import { FS } from '@/lib/theme';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { RetryRow } from '@/components/ui/RetryRow';
 import { useRouter } from 'expo-router';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -47,10 +48,6 @@ function dropStatusFromApiStatus(status: string): DropStatus {
   if (status === 'ended')     return 'paid';
   return 'held';
 }
-
-// Drops start empty — a seller with no real drops sees an EmptyState, never
-// fabricated financial data (§11a).
-const DROPS_FALLBACK: Drop[] = [];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -296,8 +293,12 @@ export default function PaymentsScreen() {
   const colors = useColors();
   const api    = useApi();
   const router = useRouter();
-  const [drops,   setDrops]   = useState<Drop[]>(DROPS_FALLBACK);
+  const [drops,   setDrops]   = useState<Drop[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed fetch must never silently masquerade as "no drops yet" — track
+  // it separately so the screen can render a retry affordance instead of a
+  // fabricated empty financial state.
+  const [loadError, setLoadError] = useState(false);
 
   // Broadcast state per drop id
   const [broadcastStates, setBroadcastStates] = useState<Record<string, BroadcastState>>({});
@@ -348,12 +349,13 @@ export default function PaymentsScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     setBroadcastPreviews({});
     try {
       // Load drops from the drops API and map to our Drop shape
       const raw = (await api.drops.list()) as any[];
       const usingDemoFallback = raw.length === 0;
-      let mapped: Drop[] = DROPS_FALLBACK;
+      let mapped: Drop[] = [];
       if (raw.length > 0) {
         const initialBroadcastStates: Record<string, BroadcastState> =
           getInitialDropBroadcastStates(raw);
@@ -378,6 +380,7 @@ export default function PaymentsScreen() {
           return states;
         }, initialBroadcastStates));
       } else {
+        setDrops([]);
         setBroadcastStates({});
       }
       const activeDrops = mapped.filter((drop) => drop.status === 'processing');
@@ -391,7 +394,12 @@ export default function PaymentsScreen() {
         }
       }));
       setBroadcastPreviews(Object.fromEntries(previewEntries));
-    } catch { /* stay with fallback mock data */ }
+    } catch {
+      // A failed fetch must render a retry affordance, never a silent
+      // "No drops yet" — that would misrepresent an outage as a genuine
+      // empty state on a money screen.
+      setLoadError(true);
+    }
     setLoading(false);
   }, [api]);
 
@@ -460,7 +468,11 @@ export default function PaymentsScreen() {
           </TouchableOpacity>
         </View>
 
-        {!loading && drops.length === 0 ? (
+        {!loading && loadError ? (
+          <View style={styles.retryWrap}>
+            <RetryRow label="Couldn't load drops" onRetry={load} />
+          </View>
+        ) : !loading && drops.length === 0 ? (
           <EmptyState
             icon="package"
             title="No drops yet"
@@ -532,6 +544,7 @@ export default function PaymentsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  retryWrap: { alignItems: 'center', paddingVertical: 24 },
 
   // Banner
   banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 20 },

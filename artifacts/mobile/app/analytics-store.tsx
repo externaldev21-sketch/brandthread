@@ -17,6 +17,7 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getStoreAnalytics, getFilterState } from '@/services/analyticsService';
 import { StoreAnalytics, StoreFunnelStep, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, HeaderPillButton,
   ProgressBar, SectionTitle, StatTileRow,
@@ -56,6 +57,7 @@ export default function AnalyticsStoreScreen() {
   const [data,       setData]       = useState<StoreAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const requestUser = useRef<string | null>(null);
 
@@ -70,9 +72,11 @@ export default function AnalyticsStoreScreen() {
       const next = await getStoreAnalytics(f);
       if (requestUser.current !== requestedUser) return;
       setData(next);
+      setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
-    } finally { setLoading(false); setRefreshing(false); }
+      setLoadError(true);
+        } finally { setLoading(false); setRefreshing(false); }
   }, [filter, authLoaded, userId]);
 
   useEffect(() => {
@@ -84,6 +88,13 @@ export default function AnalyticsStoreScreen() {
 
   if (loading) {
     return <AnalyticsSkeleton topPad={topPad} kpiCount={3} listRows={4} />;
+  }
+  if (loadError && !data) {
+    return (
+      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
+        <ErrorState message="Couldn't load store analytics." onRetry={() => load()} />
+      </View>
+    );
   }
   return (
     <ScrollView
@@ -184,6 +195,7 @@ export default function AnalyticsStoreScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
+  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
   funnelStep:{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm + 3, minHeight: COMP.minTouchTarget },
   funnelLeft:{ flex: 1, gap: 6 },

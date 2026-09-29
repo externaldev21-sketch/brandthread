@@ -86,6 +86,7 @@ vi.mock('@/lib/devPreview', () => ({
 vi.mock('@/components/BrandthreadUI', () => ({
   FilterChip: nativeComponent('FilterChip'),
   SearchBar: nativeComponent('SearchBar'),
+  PressableScale: nativeComponent('PressableScale'),
 }));
 
 vi.mock('@/components/layout', () => ({

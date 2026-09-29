@@ -24,6 +24,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { Header, SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import { RetryRow } from '@/components/ui/RetryRow';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -384,15 +385,8 @@ export default function BuyerOrdersScreen() {
       ) : (
         <>
           {loadError && orders.length > 0 && (
-            <View style={[screenStyles.loadErrorBanner, { borderColor: theme.warning, backgroundColor: `${theme.warning}1F` }]}>
-              <Feather name="alert-triangle" size={16} color={theme.warning} />
-              <View style={screenStyles.loadErrorCopy}>
-                <Text style={[screenStyles.loadErrorBannerTitle, { color: theme.text }]}>Couldn't load your orders</Text>
-                <Text style={[screenStyles.loadErrorBannerText, { color: theme.muted }]}>Showing your last saved orders. Pull to refresh.</Text>
-              </View>
-              <TouchableOpacity onPress={retry} accessibilityRole="button" accessibilityLabel="Retry">
-                <Text style={[screenStyles.bannerRetryText, { color: theme.warning }]}>Retry</Text>
-              </TouchableOpacity>
+            <View style={screenStyles.loadErrorRow}>
+              <RetryRow label="Couldn't refresh — showing your last saved orders" onRetry={retry} />
             </View>
           )}
           {filtered.length === 0 ? (
@@ -601,33 +595,8 @@ function cardStyles(theme: AppThemePreset) {
 }
 
 const screenStyles = StyleSheet.create({
-  loadErrorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
+  loadErrorRow: {
     marginHorizontal: SP.md,
     marginBottom: SP.sm,
-    paddingHorizontal: SP.sm,
-    paddingVertical: SP.sm,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-  },
-  loadErrorCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  loadErrorBannerTitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-  },
-  loadErrorBannerText: {
-    marginTop: 2,
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    lineHeight: 16,
-  },
-  bannerRetryText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
   },
 });

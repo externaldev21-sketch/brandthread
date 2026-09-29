@@ -116,9 +116,11 @@ vi.mock('@/lib/theme', () => ({
   BG: '#07070F',
   SCREEN_BG: 'transparent',
   CARD: '#12121F',
+  CARD_GLASS: 'rgba(18,18,31,0.72)',
   CARD_ELEVATED: '#18182E',
   BORDER: '#303044',
   FG: '#F4F4FF',
+  ACCENT: '#F7F7FA',
   MUTED: '#AAAABC',
   SUBTLE: '#77778A',
   SUCCESS: '#10B981',
@@ -127,6 +129,7 @@ vi.mock('@/lib/theme', () => ({
   BLUE_DIM: '#172554',
   ORANGE: '#F97316',
   ORANGE_DIM: '#3F2A00',
+  GOLD: '#F59E0B',
   RED: '#F87171',
   RED_DIM: '#3F2020',
   GRAD_DARK_FADE: ['rgba(10,10,11,0)', 'rgba(10,10,11,1)'],
@@ -172,6 +175,7 @@ vi.mock('@/components/BrandthreadUI', () => {
     EmptyState: native('EmptyState'),
     PrimaryButton: native('PrimaryButton'),
     BrandedLoader: native('BrandedLoader'),
+    PressableScale: native('PressableScale'),
   };
 });
 

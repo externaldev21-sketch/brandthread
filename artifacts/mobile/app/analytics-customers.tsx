@@ -19,6 +19,7 @@ import { formatCents } from '@/lib/money';
 import { getCustomerAnalytics, getFilterState } from '@/services/analyticsService';
 import { CustomerAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, SectionTitle, StatRow, ProgressBar,
 } from '@/components/analytics/AnalyticsKit';
@@ -54,6 +55,7 @@ export default function AnalyticsCustomersScreen() {
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const requestUser = useRef<string | null>(null);
 
@@ -71,9 +73,11 @@ export default function AnalyticsCustomersScreen() {
       if (requestUser.current !== requestedUser) return;
       setData(analytics);
       setTopCustomers(customerResponse ? (customerResponse.topCustomers ?? []) : []);
+      setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
       setData(null); setTopCustomers([]);
+      setLoadError(true);
     } finally { setLoading(false); setRefreshing(false); }
   }, [api, filter, authLoaded, userId]);
 
@@ -86,6 +90,13 @@ export default function AnalyticsCustomersScreen() {
 
   if (loading) {
     return <AnalyticsSkeleton topPad={topPad} kpiCount={0} listRows={4} />;
+  }
+  if (loadError && !data) {
+    return (
+      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
+        <ErrorState message="Couldn't load customer analytics." onRetry={() => load()} />
+      </View>
+    );
   }
   return (
     <ScrollView
@@ -213,6 +224,7 @@ export default function AnalyticsCustomersScreen() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
+  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   content:  { paddingHorizontal: SP.md },
   cohortHeaderRow:{ flexDirection: 'row', backgroundColor: colors.elevated, borderRadius: RADIUS.sm, marginBottom: 4, padding: 4 },
   cohortRow:{ flexDirection: 'row', backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border, padding: 4 },
