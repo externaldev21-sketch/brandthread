@@ -9,7 +9,9 @@ describe('seller Profile tab navigation', () => {
     const tabBar = readFileSync(resolve(process.cwd(), 'components/SellerGlobalTabBar.tsx'), 'utf8');
 
     expect(tabBar).toContain("'/(tabs)/profile'");
-    expect(tabBar).toContain("router.replace(tabDef.destination as never)");
+    // navigate() (not replace()) so the (tabs) navigator's transitionSpec
+    // actually runs on a tab switch — see seller-tab-switch-transition.test.ts.
+    expect(tabBar).toContain("router.navigate(tabDef.destination as never)");
   });
 
   it('lets buyers switch profiles from their name in the profile header', () => {
