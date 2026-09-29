@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -28,6 +29,7 @@ export type ErrorFallbackProps = {
 export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -62,7 +64,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
           onPress={() => setIsModalVisible(true)}
           accessibilityLabel="View error details"
           color={colors.foreground}
-          style={[styles.topButton, { top: insets.top + SPACING.md }]}
+          style={[styles.topButton, { top: headerTopInset + SPACING.md }]}
         />
       ) : null}
 

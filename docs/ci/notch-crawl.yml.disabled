@@ -1,0 +1,73 @@
+name: Notch safe-area crawl
+
+# Runs the app-wide notch/Dynamic-Island + home-indicator crawl
+# (artifacts/mobile/e2e/notch-crawl.spec.ts) on every PR into dev, so a
+# screen with a header, close button, or sticky footer hidden behind the
+# notch (or clipped by the home indicator) never lands again — see that
+# spec file's header comment for what it checks and how.
+#
+# Fast mode (the default here) checks every route at depth 0 (does it load
+# clean), and only spends the slower depth-1 button-tapping pass on routes
+# whose screen file the PR actually touched — full depth-1 coverage of
+# every route runs on a schedule instead (see the nightly job below), so PR
+# turnaround stays fast without losing the exhaustive sweep entirely.
+
+on:
+  pull_request:
+    branches: [dev]
+  schedule:
+    # Full depth-1 crawl (every route, not just changed ones), nightly.
+    - cron: '17 9 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  notch-crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Determine changed screen routes (PR runs only)
+        if: github.event_name == 'pull_request'
+        id: changed
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          changed_files=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- 'artifacts/mobile/app/**/*.tsx' 'artifacts/mobile/components/**/*.tsx')
+          routes=$(node artifacts/mobile/scripts/notch-crawl-changed-routes.mjs <<< "$changed_files")
+          echo "routes=$routes" >> "$GITHUB_OUTPUT"
+          echo "Changed-file depth-1 route allowlist: $routes"
+
+      - name: Run notch crawl (fast mode — depth 0 everywhere, depth 1 on changed routes)
+        if: github.event_name == 'pull_request'
+        working-directory: artifacts/mobile
+        env:
+          NOTCH_CRAWL_FAST: '1'
+          NOTCH_CRAWL_ROUTES: ${{ steps.changed.outputs.routes }}
+        run: pnpm exec playwright test e2e/notch-crawl.spec.ts --config e2e/playwright.config.ts --reporter=list
+
+      - name: Run notch crawl (full — every route, depth 0 and depth 1)
+        if: github.event_name != 'pull_request'
+        working-directory: artifacts/mobile
+        run: pnpm exec playwright test e2e/notch-crawl.spec.ts --config e2e/playwright.config.ts --reporter=list
+
+      - name: Upload failure report and screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notch-crawl-report
+          path: artifacts/mobile/.notch-crawl/
+          retention-days: 14

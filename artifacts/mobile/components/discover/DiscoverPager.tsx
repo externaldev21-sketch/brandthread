@@ -104,6 +104,7 @@ const PRELOAD_RADIUS = 2;
 
 export function DiscoverPager() {
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const { theme } = useAppTheme();
   const { push, back } = useThreadPull();
   const api = useApi();
@@ -314,7 +315,7 @@ export function DiscoverPager() {
 
           {/* ─ Top chrome: back, brand handled per-card, cart icon ─ */}
           <View
-            style={[styles.topBar, { top: insets.top + 8, left: SP.md + insets.left, right: SP.md + insets.right }]}
+            style={[styles.topBar, { top: headerTopInset + 8, left: SP.md + insets.left, right: SP.md + insets.right }]}
             pointerEvents="box-none"
           >
             <IconButton
