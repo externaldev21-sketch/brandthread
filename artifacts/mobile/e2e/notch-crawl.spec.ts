@@ -5,28 +5,40 @@
  * uses for real screenshots — signed-in demo account, seeded local storage,
  * a fake API), serves it statically, then visits every static route under
  * app/ (dynamic routes get one real seeded id each — see ROUTE_OVERRIDES)
- * for both the buyer and seller preview roles at 393x852 (an iPhone-class
- * viewport — see CLAUDE.md's device matrix).
+ * for both the buyer and seller preview roles, and both a fully-populated
+ * demo account and a brand-new "fresh" one (some chrome — an onboarding
+ * checklist banner, an empty-cart state — only ever renders in one of the
+ * two), at 393x852 (an iPhone-class viewport — see CLAUDE.md's device
+ * matrix).
  *
- * At each screen (depth 0) and after tapping up to CLICK_DEPTH_LIMIT visible,
- * tappable elements one level deep (depth 1 — buttons/rows/tabs that open a
- * new screen, modal, or bottom sheet), it asserts that no visible text,
- * icon, image-button or input sits with its top edge above TOP_SAFE_LINE
- * (an iPhone 14/15-class Dynamic Island's clearance) or its bottom edge
- * below BOTTOM_SAFE_LINE (the home-indicator strip) — unless the element is
+ * At each screen (depth 0) and after tapping up to CLICK_DEPTH_LIMIT visible
+ * tappable elements — buttons, rows, tabs, segmented controls — up to
+ * CLICK_DEPTH levels deep (opening in-screen `<Modal>`s, bottom sheets, and
+ * whatever they open in turn), it asserts that no visible text, icon,
+ * image-button or input sits with its top edge above TOP_SAFE_LINE (an
+ * iPhone 14/15-class Dynamic Island's clearance) or its bottom edge below
+ * BOTTOM_SAFE_LINE (the home-indicator strip) — unless the element is
  * explicitly marked full-bleed background/media via `data-notch-exempt`.
  *
+ * It also asserts every screen's `ScreenHeader`-rendered title
+ * (`testID="screen-header-title"`) sits at the identical top/left position
+ * and font-size/weight as the first one seen (within 1px) — Dev's exact
+ * complaint was two screens' titles visibly differing in size.
+ *
  * Every failure is written to notch-crawl-report.json (route, depth, role,
- * element description, its bounding box) with a screenshot alongside it, so
- * a failing CI run tells you exactly what to open and where to look.
+ * data state, element description, its bounding box) with a screenshot
+ * alongside it, so a failing CI run tells you exactly what to open and
+ * where to look.
  *
  * Local run:
  *   pnpm exec playwright test e2e/notch-crawl.spec.ts --config e2e/playwright.config.ts
  * (needs nothing else running — it builds and serves its own web export)
  *
  * CI (fast mode — depth 0 everywhere, depth 1 only for routes touched by the
- * PR diff) is wired in .github/workflows/notch-crawl.yml via NOTCH_CRAWL_FAST
- * and NOTCH_CRAWL_ROUTES (a comma-separated route allowlist for depth 1).
+ * PR diff, demo data state only) is wired in docs/ci/notch-crawl.yml.disabled
+ * via NOTCH_CRAWL_FAST and NOTCH_CRAWL_ROUTES (a comma-separated route
+ * allowlist for the deeper pass). The full crawl (every route, depth 3, both
+ * data states) runs nightly and needs no env vars.
  */
 import { test, expect } from '@playwright/test';
 import { mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -63,8 +75,13 @@ const IPHONE_USER_AGENT =
 const VIEWPORT = { width: 393, height: 852 };
 const TOP_SAFE_LINE = 59; // iPhone 14/15-class Dynamic Island clearance
 const BOTTOM_SAFE_LINE = VIEWPORT.height - 34; // home-indicator strip
-const CLICK_DEPTH_LIMIT = 6; // tappable elements probed one level deep, per screen
+// Tappable elements probed per screen at each depth level — fewer at deeper
+// levels since the branching factor compounds fast (6 * 4 * 3 = 72 taps per
+// route/role/data-state at full depth already).
+const CLICK_BREADTH = [6, 4, 3];
 const ROLES = ['buyer', 'seller'] as const;
+const DATA_STATES = ['demo', 'fresh'] as const;
+const CLICKABLE_SELECTOR = '[role="button"], [role="tab"], [role="radio"], [role="switch"], button, a[href]';
 
 const ROUTE_OVERRIDES: Record<string, string> = {
   '/c/[collectionId]': '/c/col_demo',
@@ -102,15 +119,33 @@ const FAST = process.env.NOTCH_CRAWL_FAST === '1';
 const ROUTE_ALLOWLIST = process.env.NOTCH_CRAWL_ROUTES
   ? new Set(process.env.NOTCH_CRAWL_ROUTES.split(',').map((r) => r.trim()).filter(Boolean))
   : null;
+// Fast mode only spends its deeper-tap budget on the PR's changed routes,
+// and never on the fresh-account pass (nightly's job) — depth 0 across
+// every route on the default demo account is still checked every time.
+const DATA_STATES_TO_RUN: readonly (typeof DATA_STATES)[number][] = FAST ? ['demo'] : DATA_STATES;
+const MAX_DEPTH = FAST ? 1 : CLICK_BREADTH.length;
 
 interface Failure {
+  kind: 'clearance';
   route: string;
   role: string;
-  depth: 0 | 1;
-  via?: string; // which element was tapped to reach this depth-1 screen
+  dataState: string;
+  depth: number;
+  via?: string[]; // the chain of elements tapped to reach this depth
   element: string;
   edge: 'top' | 'bottom';
   box: { x: number; y: number; width: number; height: number };
+  screenshot: string;
+}
+
+interface ConsistencyFailure {
+  kind: 'consistency';
+  route: string;
+  role: string;
+  dataState: string;
+  mismatch: string;
+  expected: unknown;
+  actual: unknown;
   screenshot: string;
 }
 
@@ -170,21 +205,47 @@ const VIOLATION_SCRIPT = `(() => {
   return results;
 })()`;
 
+/** Reads the ScreenHeader-rendered title's geometry + font, if this screen
+ * has one, for the cross-screen consistency assertion below. Returns null
+ * when there's no `screen-header-title` node currently on screen (e.g. a
+ * screen without a header, or a modal/sheet with no title of its own) —
+ * absence is not a failure, only a mismatched *presence* is. */
+const HEADER_GEOMETRY_SCRIPT = `(() => {
+  const el = document.querySelector('[data-testid="screen-header-title"]');
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
+  const style = window.getComputedStyle(el);
+  return {
+    top: Math.round(rect.top), left: Math.round(rect.left),
+    fontSize: parseFloat(style.fontSize), fontWeight: style.fontWeight,
+  };
+})()`;
+
 test.setTimeout(0);
 
 /** Light client-side navigation — same pushState trick openScreen uses for
  * its own in-app navigation, without redoing the full app boot + Clerk wait
  * every time. Reusing one context/page per role and navigating this way
  * turns 500+ page loads into 2 app boots, which is the difference between a
- * crawl that finishes and one that doesn't. */
+ * crawl that finishes and one that doesn't. Also the recovery step after
+ * exploring a click's subtree: it resets straight to a known route by URL
+ * rather than `goBack()`, which would need to unwind exactly as many history
+ * entries as the recursion went deep — easy to get wrong once a click three
+ * levels down changes the URL itself. */
 async function navigateTo(page: any, target: string, role: string) {
+  await page.keyboard.press('Escape').catch(() => {});
   await page.evaluate((url: string) => {
     history.pushState(history.state, '', url);
     window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
   }, `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`);
 }
 
-test('every screen clears the notch and the home indicator', async () => {
+const BREADTH = process.env.NOTCH_CRAWL_BREADTH
+  ? process.env.NOTCH_CRAWL_BREADTH.split(',').map(Number)
+  : CLICK_BREADTH;
+const DEPTH = process.env.NOTCH_CRAWL_DEPTH ? Number(process.env.NOTCH_CRAWL_DEPTH) : MAX_DEPTH;
+
+test('every screen clears the notch, the home indicator, and matches every other screen\'s header', async () => {
   const {
     buildPreviewWeb, DEFAULT_BUILD_DIR, MOBILE_ROOT, launchBrowser,
     openContext, openScreen, serveBuild, waitForImages, waitForQuietNetwork,
@@ -209,65 +270,95 @@ test('every screen clears the notch and the home indicator', async () => {
     routes = routes.slice(0, Number(process.env.NOTCH_CRAWL_LIMIT));
   }
   const failures: Failure[] = [];
+  const consistencyFailures: ConsistencyFailure[] = [];
   let checked = 0;
   const device = { viewport: VIEWPORT, scale: 3, isMobile: true, userAgent: IPHONE_USER_AGENT };
+  // The first screen-header-title geometry seen becomes the baseline every
+  // other screen's title is compared against — recorded once, globally
+  // (not per role/data-state), since the whole point is that it must never
+  // differ anywhere in the app.
+  let headerBaseline: { top: number; left: number; fontSize: number; fontWeight: string } | null = null;
+
+  async function checkScreen(page: any, route: string, role: string, dataState: string, depth: number, via: string[]) {
+    checked += 1;
+    const violations: any[] = await page.evaluate(VIOLATION_SCRIPT).catch(() => []);
+    for (const v of violations) {
+      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length}.png`);
+      await page.screenshot({ path: shot }).catch(() => {});
+      failures.push({
+        kind: 'clearance', route, role, dataState, depth, via: via.length ? via : undefined,
+        element: v.element, edge: v.edge, box: v.box, screenshot: shot,
+      });
+    }
+
+    const geo = await page.evaluate(HEADER_GEOMETRY_SCRIPT).catch(() => null);
+    if (geo) {
+      if (!headerBaseline) {
+        headerBaseline = geo;
+      } else {
+        const mismatches: string[] = [];
+        if (Math.abs(geo.top - headerBaseline.top) > 1) mismatches.push(`top ${geo.top} vs baseline ${headerBaseline.top}`);
+        if (Math.abs(geo.left - headerBaseline.left) > 1) mismatches.push(`left ${geo.left} vs baseline ${headerBaseline.left}`);
+        if (Math.abs(geo.fontSize - headerBaseline.fontSize) > 1) mismatches.push(`fontSize ${geo.fontSize} vs baseline ${headerBaseline.fontSize}`);
+        if (geo.fontWeight !== headerBaseline.fontWeight) mismatches.push(`fontWeight ${geo.fontWeight} vs baseline ${headerBaseline.fontWeight}`);
+        if (mismatches.length) {
+          const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length}.png`);
+          await page.screenshot({ path: shot }).catch(() => {});
+          consistencyFailures.push({
+            kind: 'consistency', route, role, dataState, mismatch: mismatches.join('; '),
+            expected: headerBaseline, actual: geo, screenshot: shot,
+          });
+        }
+      }
+    }
+
+    if (depth >= DEPTH) return;
+    const breadth = BREADTH[depth] ?? BREADTH[BREADTH.length - 1];
+    const handles = await page.$$(CLICKABLE_SELECTOR);
+    for (const handle of handles.slice(0, breadth)) {
+      const box = await handle.boundingBox().catch(() => null);
+      if (!box || box.y < 0 || box.y > VIEWPORT.height) continue;
+      const label = await handle.evaluate((el: Element) => (el.textContent || el.getAttribute('aria-label') || el.tagName).slice(0, 40)).catch(() => 'unknown');
+      await handle.click({ timeout: 2000, force: true }).catch(() => {});
+      await page.waitForTimeout(300);
+      await waitForImages(page, 2500);
+
+      await checkScreen(page, route, role, dataState, depth + 1, [...via, label]);
+
+      // Reset to this level's screen before trying the next sibling handle,
+      // regardless of how deep the recursive exploration above went.
+      await navigateTo(page, route, role);
+      await waitForImages(page, 2500);
+    }
+  }
 
   try {
     for (const role of ROLES) {
-      const activity = { lastApiAt: Date.now() };
-      const { context, page } = await openContext(browser, { device, role, origin, images, onUnseeded: () => {} });
-      try {
-        // One full app boot per role; every route after this is a light
-        // client-side navigation on the same page.
-        await openScreen(page, activity, origin, role, routes[0] ?? '/');
-        await waitForImages(page, 6000);
-        await waitForQuietNetwork(activity, 500, 6000);
+      for (const dataState of DATA_STATES_TO_RUN) {
+        const activity = { lastApiAt: Date.now() };
+        const contextOpts: Record<string, unknown> = dataState === 'fresh'
+          ? { seedOptions: { fresh: true }, apiOptions: { fresh: true } }
+          : {};
+        const { context, page } = await openContext(browser, {
+          device, role, origin, images, onUnseeded: () => {}, ...contextOpts,
+        });
+        try {
+          // One full app boot per (role, data-state); every route after
+          // this is a light client-side navigation on the same page.
+          await openScreen(page, activity, origin, role, routes[0] ?? '/');
+          await waitForImages(page, 6000);
+          await waitForQuietNetwork(activity, 500, 6000);
 
-        for (const route of routes) {
-          await navigateTo(page, route, role);
-          await waitForImages(page, 4000);
-          await waitForQuietNetwork(activity, 400, 4000);
-          checked += 1;
-
-          const violations: any[] = await page.evaluate(VIOLATION_SCRIPT).catch(() => []);
-          for (const v of violations) {
-            const shot = path.join(outDir, `fail-${failures.length}-depth0.png`);
-            await page.screenshot({ path: shot }).catch(() => {});
-            failures.push({ route, role, depth: 0, element: v.element, edge: v.edge, box: v.box, screenshot: shot });
+          for (const route of routes) {
+            const deepen = !FAST || (ROUTE_ALLOWLIST && ROUTE_ALLOWLIST.has(route));
+            await navigateTo(page, route, role);
+            await waitForImages(page, 4000);
+            await waitForQuietNetwork(activity, 400, 4000);
+            await checkScreen(page, route, role, dataState, deepen ? 0 : DEPTH, []);
           }
-
-          if (!FAST || (ROUTE_ALLOWLIST && ROUTE_ALLOWLIST.has(route))) {
-            const handles = await page.$$('[role="button"], button, a[href]');
-            for (const handle of handles.slice(0, CLICK_DEPTH_LIMIT)) {
-              const box = await handle.boundingBox().catch(() => null);
-              if (!box || box.y < 0 || box.y > VIEWPORT.height) continue;
-              const before = page.url();
-              await handle.click({ timeout: 2000, force: true }).catch(() => {});
-              await page.waitForTimeout(300);
-              await waitForImages(page, 2500);
-              const after = page.url();
-              const label = await handle.evaluate((el: Element) => (el.textContent || el.getAttribute('aria-label') || el.tagName).slice(0, 40)).catch(() => 'unknown');
-
-              const depth1Violations: any[] = await page.evaluate(VIOLATION_SCRIPT).catch(() => []);
-              for (const v of depth1Violations) {
-                const shot = path.join(outDir, `fail-${failures.length}-depth1.png`);
-                await page.screenshot({ path: shot }).catch(() => {});
-                failures.push({ route, role, depth: 1, via: label, element: v.element, edge: v.edge, box: v.box, screenshot: shot });
-              }
-
-              if (after !== before) {
-                await page.goBack({ timeout: 2500 }).catch(async () => navigateTo(page, route, role));
-              } else {
-                // A modal/sheet may have opened without a URL change.
-                await page.keyboard.press('Escape').catch(() => {});
-                await navigateTo(page, route, role);
-              }
-              await waitForImages(page, 2500);
-            }
-          }
+        } finally {
+          await context.close();
         }
-      } finally {
-        await context.close();
       }
     }
   } finally {
@@ -277,14 +368,24 @@ test('every screen clears the notch and the home indicator', async () => {
 
   writeFileSync(
     path.join(outDir, 'notch-crawl-report.json'),
-    JSON.stringify({ checked, routeCount: routes.length, failureCount: failures.length, failures }, null, 2),
+    JSON.stringify({
+      checked, routeCount: routes.length,
+      failureCount: failures.length, failures,
+      consistencyFailureCount: consistencyFailures.length, consistencyFailures,
+      headerBaseline,
+    }, null, 2),
   );
 
-  if (failures.length > 0) {
-    const summary = failures
-      .slice(0, 30)
-      .map((f) => `  [${f.role}] ${f.route}${f.via ? ` → ${f.via}` : ''} (depth ${f.depth}): ${f.element} ${f.edge} edge at ${f.edge === 'top' ? f.box.y.toFixed(0) : (f.box.y + f.box.height).toFixed(0)}`)
+  const total = failures.length + consistencyFailures.length;
+  if (total > 0) {
+    const clearanceSummary = failures
+      .slice(0, 20)
+      .map((f) => `  [${f.role}/${f.dataState}] ${f.route}${f.via ? ` → ${f.via.join(' → ')}` : ''} (depth ${f.depth}): ${f.element} ${f.edge} edge at ${f.edge === 'top' ? f.box.y.toFixed(0) : (f.box.y + f.box.height).toFixed(0)}`)
       .join('\n');
-    expect(failures.length, `${failures.length} notch/home-indicator clearance failures (see ${outDir}/notch-crawl-report.json for all of them):\n${summary}`).toBe(0);
+    const consistencySummary = consistencyFailures
+      .slice(0, 20)
+      .map((f) => `  [${f.role}/${f.dataState}] ${f.route}: header ${f.mismatch}`)
+      .join('\n');
+    expect(total, `${failures.length} clearance + ${consistencyFailures.length} header-consistency failures (see ${outDir}/notch-crawl-report.json for all of them):\n${clearanceSummary}\n${consistencySummary}`).toBe(0);
   }
 });
