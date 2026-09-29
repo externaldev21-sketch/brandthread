@@ -14,7 +14,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput, Pressable,
+  View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Platform, TextInput,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
@@ -35,7 +35,8 @@ import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { ListRow } from '@/components/ui/ListRow';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, productDetailHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
-import { formatProfileCount, getSellerShopPage, type ShopProduct } from '@/services/profileService';
+import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
+import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
   ProfileButton, ProfileChip, ProfileGlassButton, ShopPill, type ProfileStat, type ProfileTab,
@@ -82,24 +83,47 @@ interface SocialCounts {
 
 const CONTENT_TABS = ['Posts', 'Shop', 'Tagged'] as const;
 type ContentTab = typeof CONTENT_TABS[number];
+// Label (and accessibility name, since these render icon-only) is "Products"
+// — the tab shows the seller's live catalog — while the internal key stays
+// 'Shop' so every existing activeTab === 'Shop' branch below is untouched.
 const CONTENT_TAB_ITEMS: ProfileTab[] = [
   { key: 'Posts', label: 'Posts', icon: 'grid' },
-  { key: 'Shop', label: 'Shop', icon: 'shopping-bag' },
+  { key: 'Shop', label: 'Products', icon: 'shopping-bag' },
   { key: 'Tagged', label: 'Tagged', icon: 'tag' },
 ];
 
-/**
- * Sub-filter under Posts — keeps the seller's drafts one tap away, and (per
- * request) surfaces the seller's live catalog right here as "Products"
- * instead of a standalone "Scheduled" filter — a scheduled-but-not-yet-live
- * post still shows up, just folded into "Drafts" (it isn't public yet
- * either) rather than losing its own place entirely.
- */
-const POST_FILTERS = ['Published', 'Drafts', 'Products'] as const;
-type PostFilter = typeof POST_FILTERS[number];
-
 function shopTile(product: ShopProduct): ProfileGridItem {
   return { id: product.id, kind: 'photo', posterUri: product.imageUri, caption: product.name, productCount: 0 };
+}
+
+// Grid cell union — an Instagram-style folder tile (first cell, only when
+// there's at least one draft/scheduled post) alongside the normal post/
+// product tiles, so the Posts grid can show it without a second filter row.
+type GridRow =
+  | { kind: 'draftsTile'; count: number }
+  | { kind: 'item'; item: ProfileGridItem };
+
+function DraftsFolderTile({
+  count, width, height, onPress,
+}: {
+  count: number; width: number; height: number; onPress: () => void;
+}) {
+  return (
+    <View style={{ width, marginBottom: 1 }}>
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={`Drafts, ${count} saved`}
+        testID="seller-profile-drafts-tile"
+        style={[s.draftsTile, { width, height }]}
+      >
+        <Feather name="file-text" size={22} color={MUTED} />
+        <Text style={s.draftsTileTitle}>Drafts</Text>
+        <Text style={s.draftsTileCount}>{count}</Text>
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 // ─── Screen ─────────────────────────────────────────────────────────────────
@@ -114,7 +138,6 @@ export default function ProfileScreen() {
   const sellerBarInset = useTabBarMetrics(2).occupiedHeight;
   const { isLoaded: authLoaded, userId } = useAuth();
   const [activeTab, setActiveTab] = useState<ContentTab>('Posts');
-  const [postFilter, setPostFilter] = useState<PostFilter>('Published');
   const [shopProducts, setShopProducts] = useState<ShopProduct[]>([]);
   const [shopLoading, setShopLoading] = useState(false);
   const [shopError, setShopError] = useState(false);
@@ -304,8 +327,8 @@ export default function ProfileScreen() {
   }, [authLoaded, userId]);
 
   useEffect(() => {
-    if (activeTab === 'Shop' || (activeTab === 'Posts' && postFilter === 'Products')) void loadShopProducts();
-  }, [activeTab, postFilter, loadShopProducts]);
+    if (activeTab === 'Shop') void loadShopProducts();
+  }, [activeTab, loadShopProducts]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -382,12 +405,8 @@ export default function ProfileScreen() {
     .toUpperCase();
 
   const isFutureScheduled = (p: SellerThreadPost) => !!p.scheduledAt && new Date(p.scheduledAt).getTime() > Date.now();
-  const filteredPosts = sellerPosts.filter(p => {
-    if (postFilter === 'Published') return !p.isDraft && !p.isArchived && !isFutureScheduled(p);
-    if (postFilter === 'Drafts') return !p.isArchived && (p.isDraft || isFutureScheduled(p));
-    return false; // 'Products' renders the shop grid instead — see gridData below.
-  });
-  const publishedCount = sellerPosts.filter(p => !p.isDraft && !p.isArchived && !isFutureScheduled(p)).length;
+  const publishedPosts = sellerPosts.filter(p => !p.isDraft && !p.isArchived && !isFutureScheduled(p));
+  const draftPosts = sellerPosts.filter(p => !p.isArchived && (p.isDraft || isFutureScheduled(p)));
 
   const handleTilePress = useCallback((item: ProfileGridItem) => {
     const post = sellerPosts.find(candidate => candidate.id === item.id);
@@ -407,23 +426,45 @@ export default function ProfileScreen() {
     router.push(productDetailHref(item.id, { isOwner: true }) as never);
   }, [router]);
 
-  const showingProductsGrid = activeTab === 'Shop' || (activeTab === 'Posts' && postFilter === 'Products');
-  const renderTile = useCallback(({ item, index }: { item: ProfileGridItem; index: number }) => (
-    <ProfileVideoTile
-      item={item}
-      index={index}
-      width={layout.tileWidth}
-      height={layout.tileHeight}
-      onPress={showingProductsGrid ? handleShopTilePress : handleTilePress}
-    />
-  ), [showingProductsGrid, handleShopTilePress, handleTilePress, layout.tileHeight, layout.tileWidth]);
+  // The seller's existing full drafts/scheduled list (already supports
+  // ?tab=draft) is the destination behind the Instagram-style Drafts tile —
+  // no need for a second, in-page filter control.
+  const handleDraftsTilePress = useCallback(() => {
+    Haptics.selectionAsync();
+    router.push('/content?tab=draft' as never);
+  }, [router]);
 
-  // Instagram order: Posts · Followers · Following (Likes kept as the seller's fourth stat).
+  const showingProductsGrid = activeTab === 'Shop';
+  const renderTile = useCallback(({ item, index }: { item: GridRow; index: number }) => {
+    if (item.kind === 'draftsTile') {
+      return (
+        <DraftsFolderTile
+          count={item.count}
+          width={layout.tileWidth}
+          height={layout.tileHeight}
+          onPress={handleDraftsTilePress}
+        />
+      );
+    }
+    return (
+      <ProfileVideoTile
+        item={item.item}
+        index={index}
+        width={layout.tileWidth}
+        height={layout.tileHeight}
+        onPress={showingProductsGrid ? handleShopTilePress : handleTilePress}
+      />
+    );
+  }, [showingProductsGrid, handleShopTilePress, handleTilePress, handleDraftsTilePress, layout.tileHeight, layout.tileWidth]);
+
+  // Followers · Following · Likes — Posts was dropped (dev: a seller with a
+  // high count of any of these was getting cut off; three columns instead of
+  // four gives each one enough room, and formatCompactCount keeps any of
+  // them from overflowing regardless of magnitude).
   const stats: ProfileStat[] = [
-    { key: 'videos', label: 'Posts', value: formatProfileCount(publishedCount) },
-    { key: 'followers', label: 'Followers', value: formatProfileCount(socialCounts.followers), onPress: () => nav(connectionsHref('followers')) },
-    { key: 'following', label: 'Following', value: formatProfileCount(socialCounts.following), onPress: () => nav(connectionsHref('following')) },
-    { key: 'likes', label: 'Likes', value: formatProfileCount(socialCounts.likes) },
+    { key: 'followers', label: 'Followers', value: formatCompactCount(socialCounts.followers), onPress: () => nav(connectionsHref('followers')) },
+    { key: 'following', label: 'Following', value: formatCompactCount(socialCounts.following), onPress: () => nav(connectionsHref('following')) },
+    { key: 'likes', label: 'Likes', value: formatCompactCount(socialCounts.likes) },
   ];
 
   const planLabel = profile?.subscriptionPlanId
@@ -451,19 +492,17 @@ export default function ProfileScreen() {
   );
 
   // One table decides every tab's empty copy; each CTA opens the real flow.
-  // "Products" (under Posts) shares the Shop tab's own empty state/copy —
-  // it's the exact same live-catalog grid, just reachable from one tap
-  // further up the screen.
   const emptyKey = showingProductsGrid
     ? 'shop' as const
     : activeTab === 'Tagged'
       ? 'seller:tagged' as const
-      : ({ Published: 'seller:post', Drafts: 'seller:draft', Products: 'shop' } as const)[postFilter];
+      : 'seller:post' as const;
   const empty = profileEmptyState(emptyKey, true);
-  const gridData = showingProductsGrid
-    ? (shopLoading ? [] : shopProducts.map(shopTile))
+  const postsGridData: GridRow[] = postsLoading ? [] : publishedPosts.map(p => ({ kind: 'item' as const, item: gridItemFromThreadPost(p) }));
+  const gridData: GridRow[] = showingProductsGrid
+    ? (shopLoading ? [] : shopProducts.map(p => ({ kind: 'item' as const, item: shopTile(p) })))
     : activeTab === 'Posts'
-      ? (postsLoading ? [] : filteredPosts.map(gridItemFromThreadPost))
+      ? (draftPosts.length > 0 ? [{ kind: 'draftsTile' as const, count: draftPosts.length }, ...postsGridData] : postsGridData)
       : [];
   const gridLoading = showingProductsGrid ? shopLoading && shopProducts.length === 0 : activeTab === 'Posts' ? postsLoading : false;
   const gridError = showingProductsGrid ? shopError : activeTab === 'Posts' ? postsError : false;
@@ -608,30 +647,7 @@ export default function ProfileScreen() {
             setActiveTab((CONTENT_TABS as readonly string[]).includes(key) ? key as ContentTab : 'Posts');
           },
         }}
-        belowTabs={activeTab === 'Posts' ? (
-          <View style={s.filterRow} accessibilityRole="tablist" testID="seller-post-filters">
-            {POST_FILTERS.map((filter) => {
-              const selected = filter === postFilter;
-              return (
-                <Pressable
-                  key={filter}
-                  onPress={() => { Haptics.selectionAsync(); setPostFilter(filter); }}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`${filter} posts`}
-                  testID={`seller-post-filter-${filter.toLowerCase()}`}
-                  style={({ pressed }) => [
-                    s.filterChip,
-                    { backgroundColor: selected ? theme.text : theme.cardElevated },
-                    pressed && s.filterChipPressed,
-                  ]}
-                >
-                  <Text style={[s.filterText, { color: selected ? theme.background : theme.muted }]}>{filter}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : activeTab === 'Shop' && userId && shopProducts.length > 0 ? (
+        belowTabs={activeTab === 'Shop' && userId && shopProducts.length > 0 ? (
           <View style={s.shopPillWrap}>
             <ShopPill
               label={shopLabel}
@@ -642,7 +658,7 @@ export default function ProfileScreen() {
         ) : null}
         data={gridData}
         renderItem={renderTile}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(row) => row.kind === 'draftsTile' ? 'drafts-tile' : row.item.id}
         numColumns={layout.gridColumns}
         listKey={`seller-own-${layout.gridColumns}`}
         ListEmptyComponent={(
@@ -658,9 +674,9 @@ export default function ProfileScreen() {
             title={empty.title}
             description={empty.message}
             action={empty.cta ? { label: empty.cta.label, onPress: () => nav(empty.cta!.route) } : undefined}
-            testID={`seller-own-empty-${activeTab === 'Posts' ? postFilter.toLowerCase() : activeTab.toLowerCase()}`}
+            testID={`seller-own-empty-${activeTab.toLowerCase()}`}
             actionStyle="text"
-            showGridPreview={activeTab === 'Posts' && postFilter !== 'Products'}
+            showGridPreview={activeTab === 'Posts'}
           />
         )}
         refreshing={refreshing}
@@ -792,15 +808,13 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.md, marginBottom: SP.sm,
   },
   actionRow: { flexDirection: 'row', gap: SP.sm },
-  // Equal-width segmented control spanning the 16px content gutters, each
-  // third the same width, 36pt tall, 8pt gaps — matches the buyer
-  // own-profile's Published/Drafts/Orders row (see app/(buyer)/profile.tsx)
-  // instead of the old auto-width, cramped-looking chips.
-  filterRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xs },
-  filterChip: { flex: 1, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  filterChipPressed: { opacity: 0.7 },
-  filterText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   shopPillWrap: { paddingTop: SP.sm, paddingBottom: SP.sm },
+  draftsTile: {
+    borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
+    alignItems: 'center', justifyContent: 'center', gap: 4,
+  },
+  draftsTileTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
+  draftsTileCount: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
 
   // Profile editor sheet
   sheetModal:       { flex: 1, justifyContent: 'flex-end' },

@@ -4,6 +4,7 @@ const { serviceRequest } = vi.hoisted(() => ({ serviceRequest: vi.fn() }));
 
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: {} }));
 vi.mock('@/lib/serviceConfig', () => ({ serviceRequest }));
+vi.mock('@/lib/devPreview', () => ({ isBuyerDevPreview: () => false, isPreviewDemoMode: () => false }));
 
 import { getSellerFollowState, setSellerFollowing } from './socialService';
 

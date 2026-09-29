@@ -6,7 +6,9 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { serviceRequest } from '@/lib/serviceConfig';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { FS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { EmptyState } from '@/components/BrandthreadUI';
@@ -43,6 +45,12 @@ function getInitials(name: string): string {
 export default function CustomersScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { userId } = useAuth();
+  // ?bt_preview=seller with no real signed-in account (app/_layout.tsx's
+  // PREVIEW_ROLE bypass): there is no token to fetch real customers with, so
+  // this resolves straight to the honest "no customers yet" empty state
+  // instead of the "couldn't load" retry banner a real fetch failure shows.
+  const [isPreviewMode] = useState(() => isSellerDevPreview());
   const [search, setSearch] = useState('');
   const [customers, setCustomers] = useState<ApiCustomer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +59,13 @@ export default function CustomersScreen() {
   const hasDataRef = useRef(false);
 
   const fetchCustomers = useCallback(async (searchText: string) => {
+    if (isPreviewMode && !userId) {
+      setCustomers([]);
+      hasDataRef.current = false;
+      setError(false);
+      setLoading(false);
+      return;
+    }
     try {
       const url = searchText.trim()
         ? `/api/customers?search=${encodeURIComponent(searchText.trim())}`
@@ -195,11 +210,11 @@ export default function CustomersScreen() {
                 ? 'Try a different name, email or tag.'
                 : 'Once someone buys from your store, they will show up here.'
             }
-            action={
-              search.trim()
-                ? undefined
-                : { label: 'View your store', onPress: () => router.push('/store-preview' as never), icon: 'external-link' }
-            }
+            // Dev's explicit call: Customers gets no action button, ever —
+            // there's nothing a seller can "do" from an empty customer list
+            // (see the fresh-preview empty-state action audit in this PR's
+            // description).
+            action={undefined}
             compact
           />
         ) : (

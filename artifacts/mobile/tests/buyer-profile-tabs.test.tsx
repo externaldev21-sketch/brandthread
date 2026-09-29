@@ -320,9 +320,8 @@ vi.mock('@/contexts/FeatureFlagContext', async (importOriginal) => ({
 // isPreviewThreadCashEnabled() (a bare `__DEV__` check) would never fire in
 // this suite — mocked here with its own on/off switch so the "no user" /
 // "empty streak data" fallback tests can actually exercise it.
-const { previewThreadCashEnabled } = vi.hoisted(() => ({ previewThreadCashEnabled: { on: false } }));
-vi.mock('@/lib/previewThreadCash', () => ({
-  isPreviewThreadCashEnabled: () => previewThreadCashEnabled.on,
+const { previewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } = vi.hoisted(() => ({
+  previewThreadCashEnabled: { on: false },
   PREVIEW_THREAD_CASH_STATUS: {
     balanceCents: 480,
     config: { dailyAmountCents: 10, streakBonusCents: 100, streakBonusDays: 7, graceHours: 0, expiryDays: null, maxRedemptionPerOrderCents: null },
@@ -331,6 +330,11 @@ vi.mock('@/lib/previewThreadCash', () => ({
       timezone: 'UTC', alreadyCheckedInToday: true, dayInCycle: 3, streakBonusDays: 7,
     },
   },
+}));
+vi.mock('@/lib/previewThreadCash', () => ({
+  isPreviewThreadCashEnabled: () => previewThreadCashEnabled.on,
+  PREVIEW_THREAD_CASH_STATUS,
+  getPreviewThreadCashStatus: () => PREVIEW_THREAD_CASH_STATUS,
 }));
 
 vi.mock('@/components/BrandthreadUI', () => {
@@ -402,19 +406,6 @@ function pressTab(renderer: ReactTestRenderer, tab: string) {
   });
 }
 
-// Orders lives inside the Posts tab's own Published / Drafts / Orders
-// segmented control (folded in from its old, separate top-level tab).
-function pressPostFilter(renderer: ReactTestRenderer, filter: 'Published' | 'Drafts' | 'Orders') {
-  const matches = renderer.root.findAll(
-    node => node.props.accessibilityLabel === `${filter} posts` && typeof node.props.onPress === 'function',
-  );
-  expect(matches.length).toBeGreaterThan(0);
-  return act(async () => {
-    matches[0].props.onPress();
-    await flushPromises();
-  });
-}
-
 const baseProfile = {
   name: 'Ava Buyer',
   username: 'ava',
@@ -459,13 +450,12 @@ describe('buyer profile tabs', () => {
     }
   });
 
-  it('renders all three tabs, each selectable', async () => {
+  it('renders all four tabs, each selectable', async () => {
     renderer = await renderScreen();
 
-    // Orders is no longer a top-level tab — it moved into the Posts tab's
-    // own Published / Drafts / Orders segmented control (see the "shows the
-    // buyer's orders" test below).
-    for (const tab of ['Posts', 'Saved', 'Liked']) {
+    // Posts / Saved / Liked / Orders — Orders is a top-level icon tab again,
+    // the Published/Drafts/Orders segmented control was removed.
+    for (const tab of ['Posts', 'Saved', 'Liked', 'Orders']) {
       const matches = renderer.root.findAll(
         node => node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === `${tab} tab`,
       );
@@ -517,7 +507,7 @@ describe('buyer profile tabs', () => {
     });
 
     renderer = await renderScreen();
-    await pressPostFilter(renderer, 'Orders');
+    await pressTab(renderer, 'Orders');
 
     expect(renderer.root.findAll(
       node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('BT-2001'),
@@ -696,12 +686,12 @@ describe('buyer profile — Instagram layout', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-story-create');
   });
 
-  it('orders the stats Posts · Followers · Following', async () => {
+  it('orders the stats Followers · Following · Likes (Posts was dropped — dev: high counts were getting cut off)', async () => {
     renderer = await renderScreen();
     const row = renderer.root.findByProps({ testID: 'profile-stats-row' });
     const keys = row.findAll((node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('profile-stat-') && typeof node.type === 'string')
       .map((node) => node.props.testID);
-    expect([...new Set(keys)]).toEqual(['profile-stat-posts', 'profile-stat-followers', 'profile-stat-following']);
+    expect([...new Set(keys)]).toEqual(['profile-stat-followers', 'profile-stat-following', 'profile-stat-likes']);
   });
 
   it('puts the avatar and stats on the same row (Instagram order), with name/@handle/bio below it', async () => {

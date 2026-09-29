@@ -17,7 +17,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { IconButton } from '@/components/ui/IconButton';
 import FollowButton from '@/components/social/FollowButton';
 import { formatCents } from '@/lib/money';
-import { formatProfileCount } from '@/services/profileService';
+import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, ON_DARK } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { hapticLight, hapticPrimaryAction } from '@/lib/haptics';
@@ -118,10 +118,10 @@ function ViewerPage({
         <ActionButton
           icon={liked ? 'heart' : 'heart'}
           active={liked}
-          label={formatProfileCount(likesCount)}
+          label={formatCompactCount(likesCount)}
           onPress={() => { hapticLight(); setLiked(!liked); setLikesCount((c) => c + (liked ? -1 : 1)); }}
         />
-        <ActionButton icon="message-circle" label={formatProfileCount(post.commentsCount)} onPress={() => hapticLight()} />
+        <ActionButton icon="message-circle" label={formatCompactCount(post.commentsCount)} onPress={() => hapticLight()} />
         <ActionButton icon="send" label="Share" onPress={() => hapticLight()} />
         <ActionButton
           icon="bookmark"

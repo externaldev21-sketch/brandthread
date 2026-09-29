@@ -15,6 +15,7 @@
  * signed-in account.
  */
 import type { Note } from '@/services/socialTypes';
+import { isPreviewDemoMode } from './devPreview';
 
 // Deliberately duplicates previewCatalog.ts's `isPreviewCatalogEnabled()`
 // check (rather than importing it) so this module never pulls in
@@ -58,8 +59,10 @@ let myPreviewNote: Note | null = null;
 
 /** Active notes from followed people, for the stories tray — does not
  *  include "me" (app/(buyer)/inbox.tsx renders "Your note" as its own
- *  always-first slot, same as "Your story"). */
+ *  always-first slot, same as "Your story"). Fresh install by default: a
+ *  brand-new account follows nobody, so this is empty unless `demo=1`. */
 export function getPreviewNotesForTray(): Note[] {
+  if (!isPreviewDemoMode()) return [];
   return SEEDED_NOTES.filter(n => n.expiresAt > Date.now());
 }
 

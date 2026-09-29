@@ -1,6 +1,14 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// getPreviewNotesForTray() is demo-gated (fresh-install preview default is
+// zero-state; the seeded "followed people have notes" cast only shows under
+// ?bt_preview=buyer&demo=1 — see lib/devPreview.ts's isPreviewDemoMode()).
+// Mocked true here so this file's existing "seeds a few followed people"
+// coverage keeps exercising the demo-populated path; a separate describe
+// block below covers the fresh (demo=false) default directly.
+vi.mock('@/lib/devPreview', () => ({ isPreviewDemoMode: () => true }));
 
 import {
   getPreviewMyNote, getPreviewNotesForTray, postPreviewNote, isPreviewNotesEnabled,
@@ -60,6 +68,15 @@ describe('preview notes tray data', () => {
 
   it('is gated behind the same preview flag as the story tray', () => {
     expect(typeof isPreviewNotesEnabled()).toBe('boolean');
+  });
+});
+
+// ─── Fresh-install default (demo=0) ─────────────────────────────────────────
+
+describe('preview notes tray data — fresh install (no demo=1)', () => {
+  it('other people\'s notes are gated on isPreviewDemoMode (source check)', () => {
+    const s = read('lib/previewNotes.ts');
+    expect(s).toMatch(/export function getPreviewNotesForTray[\s\S]{0,80}if \(!isPreviewDemoMode\(\)\) return \[\];/);
   });
 });
 

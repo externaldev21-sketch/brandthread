@@ -49,7 +49,7 @@ import type {
 } from '@/services/socialTypes';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
-import { formatProfileCount } from '@/services/profileService';
+import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileMeta } from '@/components/profile/ProfileShell';
 import { InteractionLayer, ProfileChip, ProfileTabs, type ProfileStat, type ProfileTab } from '@/components/profile/ProfileControls';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
@@ -69,7 +69,7 @@ import { profileEmptyState, computeEmptyArea, type ProfileEmptyTab } from '@/com
 import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
 import { ThreadCashStreakRow } from '@/components/thread-cash/ThreadCashStreakRow';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
-import { isPreviewThreadCashEnabled, PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
+import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 
 // Realistic identity shown only when there is truly no signed-in user at all
@@ -80,16 +80,14 @@ import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 const PREVIEW_NAME = 'Ava Buyer';
 const PREVIEW_HANDLE = '@ava';
 
-// Orders used to be its own top-level tab (package icon) alongside Posts /
-// Saved / Liked — now folded into the Posts tab's own Published / Drafts /
-// Orders segmented control below, so there is exactly one path to it.
-const TABS = ['Posts', 'Saved', 'Liked'] as const;
+const TABS = ['Posts', 'Saved', 'Liked', 'Orders'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_ITEMS: ProfileTab[] = [
   { key: 'Posts', label: 'Posts', icon: 'grid' },
   { key: 'Saved', label: 'Saved', icon: 'bookmark' },
   { key: 'Liked', label: 'Liked', icon: 'heart' },
+  { key: 'Orders', label: 'Orders', icon: 'package' },
 ];
 
 function savedTypeIcon(type: string): keyof typeof Feather.glyphMap {
@@ -279,10 +277,37 @@ const OrderRow = React.memo(function OrderRow({ order, theme, onPress }: {
   );
 });
 
+const DraftsFolderTile = React.memo(function DraftsFolderTile({
+  count, width, height, theme, onPress,
+}: {
+  count: number; width: number; height: number; theme: AppThemePreset; onPress: () => void;
+}) {
+  return (
+    <View style={{ width, marginBottom: 1 }}>
+      <PressableScale
+        onPress={onPress}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={`Drafts, ${count} saved`}
+        testID="buyer-profile-drafts-tile"
+        style={[cellStyles.draftsTile, { width, height, backgroundColor: theme.cardElevated, borderColor: theme.border }]}
+      >
+        <Feather name="file-text" size={ICON.md} color={theme.muted} />
+        <Text style={[cellStyles.draftsTitle, { color: theme.text }]}>Drafts</Text>
+        <Text style={[cellStyles.draftsCount, { color: theme.muted }]}>{count}</Text>
+      </PressableScale>
+    </View>
+  );
+});
+
 type ListRow =
   | { kind: 'post'; item: ProfileGridItem; post: BuyerPost }
   | { kind: 'saved'; saved: SavedItem }
-  | { kind: 'order'; order: BuyerOrderView };
+  | { kind: 'order'; order: BuyerOrderView }
+  // Instagram-style folder tile — first cell of the Posts grid, only when
+  // there's at least one draft. Opens the drafts list; does not filter the
+  // grid in place (there is no second tab/pill row on this screen anymore).
+  | { kind: 'draftsTile'; count: number };
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
@@ -333,7 +358,6 @@ export default function ProfileScreen() {
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Posts');
-  const [postFilter, setPostFilter] = useState<'Published' | 'Drafts' | 'Orders'>('Published');
   const [refreshing, setRefreshing] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   // Set only when the buyer has a moving profile picture — the poster frame
@@ -470,8 +494,9 @@ export default function ProfileScreen() {
     // `__DEV__`-gated, so none of this ever fires in a production build.
     const applyPreviewFallback = () => {
       if (!active || !isPreviewThreadCashEnabled()) return;
-      setThreadCashBalanceCents(Math.max(0, PREVIEW_THREAD_CASH_STATUS.balanceCents));
-      setThreadCashStreak(PREVIEW_THREAD_CASH_STATUS.streak);
+      const status = getPreviewThreadCashStatus();
+      setThreadCashBalanceCents(Math.max(0, status.balanceCents));
+      setThreadCashStreak(status.streak);
     };
 
     if (!user?.id) {
@@ -605,17 +630,16 @@ export default function ProfileScreen() {
   const handlePostTap = useCallback((item: ProfileGridItem) => {
     if (!user?.id) return;
     hapticSelection();
-    // A draft has no published media to view — resume it in the composer,
-    // same as the seller profile's Drafts filter does.
-    if (postFilter === 'Drafts' && activeTab === 'Posts') {
-      router.push((`/create-post?accountType=buyer&editId=` + encodeURIComponent(item.id)) as never);
-      return;
-    }
     router.push(profileVideosHref({ source: 'creator', id: user.id, startPostId: item.id, title: displayName }) as never);
-  }, [activeTab, displayName, postFilter, router, user?.id]);
+  }, [displayName, router, user?.id]);
 
   const handleSavedTap = useCallback(() => {
     router.push('/buyer-saved' as any);
+  }, [router]);
+
+  const handleDraftsTilePress = useCallback(() => {
+    hapticSelection();
+    router.push('/buyer-drafts' as never);
   }, [router]);
 
   const avatarInitials = profile?.avatarInitials
@@ -625,21 +649,19 @@ export default function ProfileScreen() {
   // ── Per-tab rows ──
   const rows: ListRow[] = useMemo(() => {
     if (activeTab === 'Posts') {
-      // Orders now lives inside the Posts tab's own segmented control
-      // (Published / Drafts / Orders) rather than a separate top-level tab.
-      if (postFilter === 'Orders') return myOrders.map((order) => ({ kind: 'order' as const, order }));
-      const filtered = posts.filter(p => postFilter === 'Drafts' ? p.isDraft : !p.isDraft);
-      return filtered.map((post) => ({ kind: 'post' as const, post, item: gridItemFromBuyerPost(post) }));
+      const published = posts.filter(p => !p.isDraft);
+      const draftsCount = posts.filter(p => p.isDraft).length;
+      const publishedRows: ListRow[] = published.map((post) => ({ kind: 'post' as const, post, item: gridItemFromBuyerPost(post) }));
+      return draftsCount > 0 ? [{ kind: 'draftsTile' as const, count: draftsCount }, ...publishedRows] : publishedRows;
     }
     if (activeTab === 'Saved') return savedItems.map((saved) => ({ kind: 'saved' as const, saved }));
+    if (activeTab === 'Orders') return myOrders.map((order) => ({ kind: 'order' as const, order }));
     // Liked has no backing data yet — a clean empty slot rather than
     // inventing engagement history.
     return [];
-  }, [activeTab, postFilter, posts, savedItems, myOrders]);
+  }, [activeTab, posts, savedItems, myOrders]);
 
-  const numColumns = activeTab === 'Posts'
-    ? (postFilter === 'Orders' ? 1 : layout.gridColumns)
-    : activeTab === 'Saved' ? savedColumns : 1;
+  const numColumns = activeTab === 'Posts' ? layout.gridColumns : activeTab === 'Saved' ? savedColumns : 1;
 
   // Posts/Saved force the FlatList above to remount (new `key`, since a
   // live FlatList can't change numColumns) — restore the offset it had
@@ -657,6 +679,17 @@ export default function ProfileScreen() {
   }, [numColumns]);
 
   const renderRow = useCallback(({ item, index }: { item: ListRow; index: number }) => {
+    if (item.kind === 'draftsTile') {
+      return (
+        <DraftsFolderTile
+          count={item.count}
+          width={layout.tileWidth}
+          height={layout.tileHeight}
+          theme={theme}
+          onPress={handleDraftsTilePress}
+        />
+      );
+    }
     if (item.kind === 'post') {
       return (
         <ProfileVideoTile
@@ -671,16 +704,14 @@ export default function ProfileScreen() {
     }
     if (item.kind === 'order') return <OrderRow order={item.order} theme={theme} onPress={handleOrdersPress} />;
     return <SavedCell item={item.saved} size={savedCellSize} theme={theme} onPress={handleSavedTap} />;
-  }, [handleOrdersPress, handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, savedCellSize, theme]);
+  }, [handleDraftsTilePress, handleOrdersPress, handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, savedCellSize, theme]);
 
   const keyForRow = useCallback((row: ListRow) => (
-    row.kind === 'post' ? row.post.id : row.kind === 'order' ? row.order.id : row.saved.id
+    row.kind === 'draftsTile' ? 'drafts-tile' : row.kind === 'post' ? row.post.id : row.kind === 'order' ? row.order.id : row.saved.id
   ), []);
 
   // One table decides every tab's empty copy + CTA (own profile → CTA).
-  const emptyTabKey = activeTab === 'Posts'
-    ? (postFilter === 'Drafts' ? 'buyer:draft' : postFilter === 'Orders' ? 'buyer:orders' : 'buyer:posts')
-    : `buyer:${activeTab.toLowerCase()}`;
+  const emptyTabKey = activeTab === 'Posts' ? 'buyer:posts' : `buyer:${activeTab.toLowerCase()}`;
   const empty = profileEmptyState(emptyTabKey as ProfileEmptyTab, true);
   const emptyIcon = empty.icon as keyof typeof Feather.glyphMap;
   const emptyIllustration = empty.illustration;
@@ -707,21 +738,26 @@ export default function ProfileScreen() {
   const hasActiveStory = myStoryIds.length > 0;
   const heroActive = focused && heroOnScreen && !heroPosterOnly;
 
-  // Instagram order: Posts · Followers · Following. Drafts never count toward
-  // the public "Posts" stat (they aren't published).
+  // Drafts never count toward "published" (they aren't public); still used
+  // below for the share sheet's topPosts.
   const publishedPosts = posts.filter(p => !p.isDraft);
+  // Followers · Following · Likes — Posts was dropped (dev: a high count in
+  // any column was getting cut off; three columns gives each enough room).
+  // Likes is a real total summed from this buyer's own posts (never
+  // paginated — getMyPosts() always returns the full list), not fabricated.
+  const totalLikes = publishedPosts.reduce((sum, p) => sum + (p.likesCount || 0), 0);
   const stats: ProfileStat[] = [
-    { key: 'posts', label: 'Posts', value: formatProfileCount(publishedPosts.length) },
     {
       key: 'followers', label: 'Followers',
-      value: formatProfileCount(socialCounts?.followers ?? profile?.friendsCount ?? 0),
+      value: formatCompactCount(socialCounts?.followers ?? profile?.friendsCount ?? 0),
       onPress: () => router.push(connectionsHref('followers') as any),
     },
     {
       key: 'following', label: 'Following',
-      value: formatProfileCount(socialCounts?.following ?? profile?.followingBrandsCount ?? 0),
+      value: formatCompactCount(socialCounts?.following ?? profile?.followingBrandsCount ?? 0),
       onPress: () => router.push(connectionsHref('following') as any),
     },
+    { key: 'likes', label: 'Likes', value: formatCompactCount(totalLikes) },
   ];
 
   const highlightItems: ProfileStoryItem[] = highlights.map((h) => ({
@@ -870,35 +906,6 @@ export default function ProfileScreen() {
       <View style={styles.tabsBlock}>
         <ProfileTabs tabs={TAB_ITEMS} active={activeTab} onChange={handleTabPress} variant="iconOnly" />
       </View>
-
-      {/* Posts sub-filter: Published / Drafts / Orders — an equal-width
-          segmented control spanning the grid's content width (Orders used to
-          be its own top-level tab; folding it in here leaves exactly one
-          path to it). */}
-      {activeTab === 'Posts' && (
-        <View style={styles.filterRow} accessibilityRole="tablist" testID="buyer-post-filters">
-          {(['Published', 'Drafts', 'Orders'] as const).map((filter) => {
-            const selected = filter === postFilter;
-            return (
-              <Pressable
-                key={filter}
-                onPress={() => { hapticSelection(); setPostFilter(filter); }}
-                accessibilityRole="tab"
-                accessibilityState={{ selected }}
-                accessibilityLabel={`${filter} posts`}
-                testID={`buyer-post-filter-${filter.toLowerCase()}`}
-                style={({ pressed }) => [
-                  styles.filterChip,
-                  { backgroundColor: selected ? theme.text : theme.cardElevated },
-                  pressed && styles.filterChipPressed,
-                ]}
-              >
-                <Text style={[styles.filterText, { color: selected ? theme.background : theme.muted }]}>{filter}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
     </View>
   );
 
@@ -932,7 +939,7 @@ export default function ProfileScreen() {
             description={emptyDescription}
             action={emptyAction}
             actionStyle="text"
-            showGridPreview={activeTab === 'Posts' && postFilter !== 'Orders'}
+            showGridPreview={activeTab === 'Posts'}
           />
         )}
         showsVerticalScrollIndicator={false}
@@ -1006,14 +1013,6 @@ function makeStyles(theme: AppThemePreset) {
     // Streak card (or highlights) → tabs: 16pt above; tabs → grid: 1pt
     // (Instagram's grid starts right under the underline).
     tabsBlock: { paddingTop: 16, paddingBottom: 1 },
-
-    // Posts sub-filter: Published / Drafts / Orders — an equal-width
-    // segmented control spanning the 16px content gutters, each third the
-    // same width, 36pt tall, 8pt gaps between segments.
-    filterRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xs },
-    filterChip: { flex: 1, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-    filterChipPressed: { opacity: 0.7 },
-    filterText: { fontFamily: FONT.semibold, fontSize: FS.xs },
   });
 }
 
@@ -1031,6 +1030,9 @@ const cellStyles = StyleSheet.create({
   savedTile: { aspectRatio: 1, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, justifyContent: 'space-between' },
   savedTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: SP.xs },
   savedSubtitle: { fontFamily: FONT.regular, fontSize: FS.xs },
+  draftsTile: { borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  draftsTitle: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  draftsCount: { fontFamily: FONT.regular, fontSize: FS.xs },
   orderCard: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm,

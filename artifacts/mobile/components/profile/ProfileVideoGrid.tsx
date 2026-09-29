@@ -11,7 +11,8 @@ import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/layout';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
-import { formatProfileCount, posterForPost } from '@/services/profileService';
+import { formatCompactCount } from '@/lib/compactFormat';
+import { posterForPost } from '@/services/profileService';
 import type { SellerThreadPost } from '@/services/socialService';
 import type { BuyerPost } from '@/services/socialTypes';
 import { InteractionLayer } from './ProfileControls';
@@ -69,7 +70,7 @@ export function gridItemFromBuyerPost(post: BuyerPost): ProfileGridItem {
 function tileLabel(item: ProfileGridItem): string {
   const noun = item.kind === 'video' ? 'video' : item.kind === 'slideshow' ? 'slideshow' : 'photo';
   const parts = [`Play ${noun}`];
-  if (typeof item.viewsCount === 'number') parts.push(`${formatProfileCount(item.viewsCount)} views`);
+  if (typeof item.viewsCount === 'number') parts.push(`${formatCompactCount(item.viewsCount)} views`);
   if (item.productCount > 0) parts.push(`${item.productCount} product${item.productCount === 1 ? '' : 's'} tagged`);
   if (item.statusLabel) parts.push(item.statusLabel);
   if (item.caption) parts.push(item.caption.slice(0, 80));
@@ -95,9 +96,9 @@ export const ProfileVideoTile = React.memo(function ProfileVideoTile({
   const handlePress = useCallback(() => onPress(item, index), [onPress, item, index]);
   const handleLongPress = useCallback(() => onLongPress?.(item, index), [onLongPress, item, index]);
   const metric = typeof item.viewsCount === 'number'
-    ? { icon: 'play' as const, value: formatProfileCount(item.viewsCount) }
+    ? { icon: 'play' as const, value: formatCompactCount(item.viewsCount) }
     : typeof item.likesCount === 'number' && item.likesCount > 0
-      ? { icon: 'heart' as const, value: formatProfileCount(item.likesCount) }
+      ? { icon: 'heart' as const, value: formatCompactCount(item.likesCount) }
       : null;
 
   return (

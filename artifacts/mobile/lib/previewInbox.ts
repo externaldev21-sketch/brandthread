@@ -19,6 +19,7 @@
  */
 import { Asset } from 'expo-asset';
 import { isPreviewCatalogEnabled } from './previewCatalog';
+import { isPreviewDemoMode } from './devPreview';
 import {
   BRANDTHREAD_AGENT_SEED, PREVIEW_CONVERSATION_SEEDS, PREVIEW_FOLLOWER_SEEDS,
   SELLER_PREVIEW_CONVERSATION_SEEDS,
@@ -145,9 +146,16 @@ const runtimeConversations = new Map<string, Conversation>();
  *  ordinary threads), plus any runtime ones from `upsertPreviewConversation`
  *  — runtime threads first (most-recently-replied), matching how a real
  *  inbox sorts by `updatedAt`. Callers must still gate on
- *  `isPreviewInboxEnabled()` and prefer real API data. */
+ *  `isPreviewInboxEnabled()` and prefer real API data.
+ *
+ *  Fresh install by default: the seeded cast only appears with the explicit
+ *  `?bt_preview=buyer&demo=1` opt-in (isPreviewDemoMode()). A brand-new
+ *  preview account starts with zero conversations — but any thread actually
+ *  started this session (via getOrCreatePreviewConversationForAuthor, e.g.
+ *  messaging a seller from their profile) still shows, exactly like a real
+ *  new account's first real conversation would. */
 export function getPreviewConversations(): Conversation[] {
-  if (!cachedConversations) cachedConversations = allSeeds().map(toConversation);
+  if (!cachedConversations) cachedConversations = isPreviewDemoMode() ? allSeeds().map(toConversation) : [];
   const runtime = [...runtimeConversations.values()].sort((a, b) => (b.lastMessageTs ?? 0) - (a.lastMessageTs ?? 0));
   return [...runtime, ...cachedConversations];
 }
@@ -270,10 +278,11 @@ export function setPreviewConversationPinned(id: string, pinned: boolean): void 
 let cachedNotifications: Notification[] | null = null;
 
 /** Seeded "new follower" notifications for the redesigned inbox's Follows
- *  tab/rail. */
+ *  tab/rail. Fresh install by default — only populated under `demo=1` (see
+ *  getPreviewConversations' doc comment). */
 export function getPreviewNotifications(): Notification[] {
   if (!cachedNotifications) {
-    cachedNotifications = PREVIEW_FOLLOWER_SEEDS.map((f): Notification => ({
+    cachedNotifications = !isPreviewDemoMode() ? [] : PREVIEW_FOLLOWER_SEEDS.map((f): Notification => ({
       id: f.id,
       category: 'social',
       type: 'new_follower',
