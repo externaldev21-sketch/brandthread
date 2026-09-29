@@ -20,6 +20,7 @@ import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
 import { isPreviewInboxEnabled, getSellerPreviewConversations } from '@/lib/previewInbox';
+import { isPreviewDemoMode } from '@/lib/devPreview';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -96,8 +97,15 @@ export default function SellerInboxScreen() {
       // preview (see app/(buyer)/inbox.tsx's identical buyer-side guard,
       // which this mirrors). Real accounts always have a myId and never hit
       // this branch.
-      if (isPreviewInboxEnabled()) {
+      // The seeded seller inbox is a populated DEMO dataset — never the
+      // default. Fresh preview (the default) shows the honest, genuinely
+      // empty "0 conversations" state; only the explicit ?bt_preview=
+      // seller&demo=1 opt-in renders it (isPreviewDemoMode(), lib/devPreview.ts).
+      if (isPreviewInboxEnabled() && isPreviewDemoMode()) {
         setConvs(getSellerPreviewConversations() as unknown as ConvView[]);
+        setLoadError(false);
+      } else {
+        setConvs([]);
         setLoadError(false);
       }
       setIsLoading(false);
