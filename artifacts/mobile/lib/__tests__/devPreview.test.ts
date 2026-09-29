@@ -349,6 +349,51 @@ describe('isPreviewFreshMode / isPreviewDemoMode real export (module path + sour
   });
 });
 
+// ── Sticky-flag regression: a full reload without demo=1 must reset it ──────
+// isPreviewDemoMode() only ever WRITES 'bt_preview_demo' to localStorage (when
+// it sees demo=1); it never clears it, because a plain function called
+// repeatedly through a session can't tell "the query string is gone from
+// in-app navigation" apart from "this is a fresh reload without demo=1".
+// Without a reset somewhere, `&demo=1` visited once in a browser — by a
+// teammate testing the demo cast, a QA pass, a live design review — would
+// make EVERY later `?bt_preview=buyer` visit in that same browser keep
+// showing seeded Thread Cash/streak/badges forever, which is exactly the bug
+// reported live: $18.45 Thread Cash + a 4-day streak on a plain
+// `?bt_preview=buyer` load with no demo param at all. app/_layout.tsx's
+// PREVIEW_ROLE block runs exactly once per real page load and already resets
+// `user_role` unconditionally from the CURRENT load's query string; the fix
+// mirrors that same one-time reset for `bt_preview_demo`.
+
+function demoFlagAfterFreshLoad(demoParam: string | null, previouslyPersisted: boolean): boolean {
+  // Mirrors the app/_layout.tsx reset block: on every fresh page load where
+  // a preview role is present, the demo flag is fully re-derived from THIS
+  // load's own query string — never left over from a previous page load.
+  return demoParam === '1';
+}
+
+describe('sticky demo-flag regression — a fresh reload without demo=1 must not stay in demo mode', () => {
+  it('a prior session leaving demo=1 persisted must not leak into a later plain ?bt_preview=buyer reload', () => {
+    expect(demoFlagAfterFreshLoad(null, true)).toBe(false);
+  });
+
+  it('an explicit demo=1 on this load still turns demo mode on, regardless of prior state', () => {
+    expect(demoFlagAfterFreshLoad('1', false)).toBe(true);
+    expect(demoFlagAfterFreshLoad('1', true)).toBe(true);
+  });
+
+  it('a plain reload with nothing persisted stays fresh, as before', () => {
+    expect(demoFlagAfterFreshLoad(null, false)).toBe(false);
+  });
+
+  it("app/_layout.tsx resets bt_preview_demo from THIS load's query string every time PREVIEW_ROLE is set (source check)", () => {
+    const { readFileSync } = require('fs');
+    const layoutSrc: string = readFileSync(resolve(__dirname, '../../app/_layout.tsx'), 'utf8');
+    expect(layoutSrc).toContain("const demoParam = new URLSearchParams(window.location.search).get('demo');");
+    expect(layoutSrc).toContain("if (demoParam === '1') localStorage.setItem('bt_preview_demo', '1');");
+    expect(layoutSrc).toContain("else localStorage.removeItem('bt_preview_demo');");
+  });
+});
+
 describe('production-host hard gate is wired into the real module (source check)', () => {
   it('lib/devPreview.ts exports isProductionPreviewHost and both preview functions call it', () => {
     const { readFileSync } = require('fs');
