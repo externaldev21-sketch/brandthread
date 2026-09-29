@@ -9,7 +9,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import {
   FONT, FS, SP, RADIUS, ICON,
@@ -164,7 +164,7 @@ export default function StorePublishScreen() {
 
   return (
     <View style={pub.root}>
-      <Header title="Publish Store" onBack={leaveSetupDestination} />
+      <ScreenHeader title="Publish Store" onBack={leaveSetupDestination} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={pub.scroll}>
 

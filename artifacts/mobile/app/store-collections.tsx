@@ -10,7 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -254,7 +254,7 @@ export default function StoreCollectionsScreen() {
   if (mode === 'list') {
     return (
       <View style={styles.root}>
-        <Header
+        <ScreenHeader
           title="Collections"
           actions={[{ icon: 'plus', onPress: openNew, accessibilityLabel: 'Create collection' }]}
         />
@@ -312,7 +312,7 @@ export default function StoreCollectionsScreen() {
 
   return (
     <View style={styles.root}>
-      <Header
+      <ScreenHeader
         title={mode === 'new' ? 'New Collection' : 'Edit Collection'}
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('list'); }}
       />
