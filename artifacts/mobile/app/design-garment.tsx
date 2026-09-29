@@ -9,6 +9,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -71,6 +72,7 @@ export default function DesignGarmentScreen() {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const gs = createStyles(theme);
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const params = useLocalSearchParams<{ projectId?: string; garmentType?: string; garmentColor?: string }>();
 
@@ -118,7 +120,7 @@ export default function DesignGarmentScreen() {
   return (
     <View style={gs.root}>
       {/* ── TOP BAR ── */}
-      <View style={[gs.topBar, { paddingTop: insets.top + 4 }]}>
+      <View style={[gs.topBar, { paddingTop: headerTopInset + 4 }]}>
         <TouchableOpacity style={gs.backBtn} onPress={() => goBackOr(router)}>
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>

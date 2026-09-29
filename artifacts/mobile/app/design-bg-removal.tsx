@@ -27,6 +27,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
@@ -95,6 +96,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
   const router = useRouter();
   const { getToken } = useAuth();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [phase, setPhase] = useState<Phase>('pick');
@@ -539,7 +541,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
+      <View style={[s.header, { paddingTop: headerTopInset + SP.sm }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => goBackOr(router)} activeOpacity={0.7}>
           <Feather name="arrow-left" size={ICON.sm} color={FG} />
         </TouchableOpacity>

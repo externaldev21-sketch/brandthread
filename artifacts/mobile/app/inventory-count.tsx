@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, FlatList, ActivityIndicator, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -402,7 +403,7 @@ export default function InventoryCountScreen() {
   const discrepancyItems = cnt.items.filter(i => i.discrepancy !== null && i.discrepancy !== 0);
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => setMode('list')} style={s.backBtn}>

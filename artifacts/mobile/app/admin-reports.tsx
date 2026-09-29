@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -129,7 +130,7 @@ export default function ReviewQueueScreen() {
   const items = queue?.items ?? [];
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
       <View style={s.header}>
         <PressableScale onPress={() => goBackOr(router)} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={ICON.lg} color={theme.text} />

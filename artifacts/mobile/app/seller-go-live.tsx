@@ -20,6 +20,7 @@ import { useApi } from '@/lib/api';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 const LIVE_RED = '#FF3B30';
 const FG = '#FFFFFF';
@@ -43,6 +44,7 @@ function SellerGoLiveNativeScreen() {
   const s = makeStyles(theme);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -166,7 +168,7 @@ function SellerGoLiveNativeScreen() {
     const blocked = camBlocked || micBlocked;
     return (
       <View style={[s.permRoot, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
-        <TouchableOpacity onPress={() => goBackOr(router)} style={[s.closeBtn, { top: insets.top + 8 }]} accessibilityLabel="Close">
+        <TouchableOpacity onPress={() => goBackOr(router)} style={[s.closeBtn, { top: headerTopInset + 8 }]} accessibilityLabel="Close">
           <Feather name="x" size={22} color={FG} />
         </TouchableOpacity>
         <View style={s.permBox}>
@@ -219,7 +221,7 @@ function SellerGoLiveNativeScreen() {
       </Animated.View>
 
       {/* Top bar */}
-      <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
+      <View style={[s.topBar, { paddingTop: headerTopInset + 8 }]}>
         <TouchableOpacity onPress={() => goBackOr(router)} style={s.iconBtn} accessibilityLabel="Close">
           <Feather name="x" size={20} color={FG} />
         </TouchableOpacity>

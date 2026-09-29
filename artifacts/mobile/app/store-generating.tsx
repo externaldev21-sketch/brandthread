@@ -14,6 +14,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, SUBTLE_WASH } from '@/lib/theme';
 import { loadDraftAnswers, generateStoreFromAnswers, applyGenerationResult, clearDraftAnswers } from '@/services/storeService';
 import { StoreGenerationAnswers } from '@/services/storeTypes';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 const GEN_STEPS = [
   { icon: 'eye',          label: 'Reading your brand identity',   duration: 800 },
@@ -33,6 +34,7 @@ export default function StoreGeneratingScreen() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
@@ -151,7 +153,7 @@ export default function StoreGeneratingScreen() {
         onPress={() => goBackOr(router)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         activeOpacity={0.75}
-        style={{ position: 'absolute', top: insets.top + 12, left: SP.md, width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
+        style={{ position: 'absolute', top: headerTopInset + 12, left: SP.md, width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
       >
         <Feather name="arrow-left" size={ICON.sm} color={FG} />
       </TouchableOpacity>

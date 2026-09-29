@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -632,7 +633,7 @@ export default function IncomingInventoryScreen() {
   const currentStepIndex = STATUS_TIMELINE.indexOf(rec.status === 'partially_received' ? 'in_transit' : rec.status as IncomingStatus);
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => setMode('list')} style={s.backBtn}>

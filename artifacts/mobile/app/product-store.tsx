@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
@@ -234,7 +235,7 @@ export default function ProductStoreScreen() {
 
   if (loading) {
     return (
-      <View style={[s.screen, { paddingTop: insets.top }]}>
+      <View style={[s.screen, { paddingTop: useHeaderTopInset() }]}>
         <Text style={s.loadingText}>Loading…</Text>
       </View>
     );

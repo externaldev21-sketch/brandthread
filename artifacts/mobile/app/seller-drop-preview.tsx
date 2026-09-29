@@ -16,6 +16,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ON_DARK, ON_DARK_MUTED, RADIUS, SP } from '@/lib/theme';
 import { computeCountdownParts } from '@/lib/dropCountdown';
@@ -48,6 +49,7 @@ export default function SellerDropPreview() {
   const api = useApi();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const { theme } = useAppTheme();
   const { dropId } = useLocalSearchParams<{ dropId: string }>();
 
@@ -110,7 +112,7 @@ export default function SellerDropPreview() {
           )}
           <LinearGradient colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.92)']} style={StyleSheet.absoluteFill} />
 
-          <View style={[styles.header, { paddingTop: insets.top + SP.sm }]}>
+          <View style={[styles.header, { paddingTop: headerTopInset + SP.sm }]}>
             <TouchableOpacity style={styles.roundBtn} onPress={() => goBackOr(router)}>
               <Feather name="arrow-left" size={20} color={ON_DARK} />
             </TouchableOpacity>

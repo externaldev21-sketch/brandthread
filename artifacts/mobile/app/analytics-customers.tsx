@@ -11,7 +11,7 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { fmtDate } from '@/lib/format';
@@ -44,11 +44,10 @@ function retColor(colors: ReturnType<typeof useColors>, pct: number): string {
 export default function AnalyticsCustomersScreen() {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = insets.top;
+  const topPad = useHeaderTopInset();
 
   const [data,       setData]       = useState<CustomerAnalytics | null>(null);
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);

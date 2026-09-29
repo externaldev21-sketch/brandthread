@@ -19,6 +19,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 
 import {
@@ -105,6 +106,7 @@ export default function DraftsScreen() {
   const styles = createStyles(colors);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const [drafts, setDrafts] = useState<ProductDraft[]>([]);
   const [sort, setSort] = useState<DraftSort>('lastSaved');
   const [filterQuery, setFilterQuery] = useState('');
@@ -170,7 +172,7 @@ export default function DraftsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + SP.sm }]}>
+      <View style={[styles.header, { paddingTop: headerTopInset + SP.sm }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => goBackOr(router)}

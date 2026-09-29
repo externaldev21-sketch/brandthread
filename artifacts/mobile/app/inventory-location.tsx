@@ -7,6 +7,7 @@ import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, Switch, 
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -174,7 +175,7 @@ export default function InventoryLocationScreen() {
 
   if (mode === 'list') {
     return (
-      <View style={[ls.root, { paddingTop: insets.top }]}>
+      <View style={[ls.root, { paddingTop: useHeaderTopInset() }]}>
         {/* Header */}
         <View style={ls.header}>
           <TouchableOpacity

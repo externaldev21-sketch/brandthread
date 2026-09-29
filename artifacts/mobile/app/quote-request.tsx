@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 
@@ -660,7 +661,7 @@ export default function QuoteRequestScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[sc.root, { paddingTop: insets.top }]}
+      style={[sc.root, { paddingTop: useHeaderTopInset() }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Header */}

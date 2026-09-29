@@ -16,6 +16,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
@@ -324,7 +325,7 @@ export default function SignInScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
       <StatusBar barStyle="light-content" />
 
       <KeyboardAvoidingView

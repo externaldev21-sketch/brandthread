@@ -34,6 +34,7 @@ import { File, Paths, EncodingType } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -261,6 +262,7 @@ export default function DesignCanvasScreen() {
   } = theme;
 
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; addAssetId?: string }>();
   const projectId = params.id ?? '';
@@ -2974,7 +2976,7 @@ export default function DesignCanvasScreen() {
     <View style={styles.root}>
 
       {/* ── TOP BAR ── */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 2 }]}>
+      <View style={[styles.topBar, { paddingTop: headerTopInset + 2 }]}>
         <View style={styles.topGroup}>
           <TouchableOpacity style={styles.topBtn} onPress={handleBack} testID="btn-back">
             <Feather name="chevron-left" size={ICON.md} color={FG} />

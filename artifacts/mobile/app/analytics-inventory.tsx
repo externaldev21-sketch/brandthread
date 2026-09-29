@@ -11,7 +11,7 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getInventoryAnalytics, getFilterState } from '@/services/analyticsService';
@@ -76,10 +76,9 @@ function InventoryRow({ p }: { p: InventoryProductRow }) {
 export default function AnalyticsInventoryScreen() {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = insets.top;
+  const topPad = useHeaderTopInset();
 
   const [data,       setData]       = useState<InventoryAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);

@@ -27,6 +27,7 @@ import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
 import { InteractionLayer, ProfileButton, ProfileGlassButton } from '@/components/profile/ProfileControls';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 const GAP = SP.sm;
 
@@ -42,6 +43,7 @@ export default function ProfileProductsScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const topInset = useHeaderTopInset();
   const layout = useProfileLayout();
   const params = useLocalSearchParams<{ sellerId?: string; sellerName?: string; isOwner?: string }>();
   const sellerId = typeof params.sellerId === 'string' ? params.sellerId : '';
@@ -150,7 +152,7 @@ export default function ProfileProductsScreen() {
 
   const header = (
     <View
-      style={[styles.header, { paddingTop: insets.top + SP.sm }]}
+      style={[styles.header, { paddingTop: topInset + SP.sm }]}
       onLayout={(event) => setHeaderHeight(Math.round(event.nativeEvent.layout.height))}
     >
       <View style={styles.headerRow}>

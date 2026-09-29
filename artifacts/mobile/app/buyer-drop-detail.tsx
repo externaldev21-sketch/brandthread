@@ -12,6 +12,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
@@ -308,6 +309,7 @@ export default function BuyerDropDetail() {
   const { dropId, dropName } = useLocalSearchParams<{ dropId: string; dropName?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const scrollRef = useRef<ScrollView>(null);
   const entrance = useRef(new Animated.Value(0)).current;
@@ -486,7 +488,7 @@ export default function BuyerDropDetail() {
             />
           )}
 
-          <View style={[styles.heroHeader, { paddingTop: insets.top + SP.sm }]}>
+          <View style={[styles.heroHeader, { paddingTop: headerTopInset + SP.sm }]}>
             <TouchableOpacity style={styles.roundButton} onPress={() => goBackOr(router)} hitSlop={4} accessibilityLabel="Go back">
               <Feather name="arrow-left" size={21} color={ON_DARK} />
             </TouchableOpacity>

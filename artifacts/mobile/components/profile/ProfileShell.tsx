@@ -31,7 +31,7 @@
  */
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  AccessibilityInfo, Animated, FlatList, Platform, RefreshControl, StyleSheet, Text, View,
+  AccessibilityInfo, Animated, FlatList, RefreshControl, StyleSheet, Text, View,
   type ListRenderItem,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,6 +43,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, ON_DARK, RADIUS, SP } from '@/lib/theme';
 import { useScrollReset } from '@/hooks/useScrollReset';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { TYPE_SCALE } from '@/constants/typography';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import {
@@ -354,7 +355,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     ? `${identity.name} is live. Watch now`
     : avatar?.accessibilityLabel ?? `${identity.name} avatar`;
 
-  const topPad = Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top;
+  const topPad = useHeaderTopInset();
   const videoAvatarSize = avatarGeometry().outer;
   const videoHeader = isVideoHeader ? (
     <ProfileVideoHeader
@@ -528,7 +529,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         {isVideoHeader ? null : (<>
         <Animated.View
           pointerEvents="none"
-          style={[styles.compact, { height: insets.top + 64, paddingTop: insets.top, opacity: compactOpacity, transform: [{ translateY: compactSlide }] }]}
+          style={[styles.compact, { height: topPad + 64, paddingTop: topPad, opacity: compactOpacity, transform: [{ translateY: compactSlide }] }]}
         >
           <View style={[styles.compactInner, { paddingLeft: compactLeft, paddingRight: compactRight }]}>
             {compactRoom >= 140 ? (
@@ -548,7 +549,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         </Animated.View>
 
         {/* Floating controls — always reachable, above the compact header */}
-        <View pointerEvents="box-none" style={[styles.controls, { top: insets.top + SP.sm }]}>
+        <View pointerEvents="box-none" style={[styles.controls, { top: topPad + SP.sm }]}>
           <View
             style={styles.controlGroup}
             onLayout={(event) => setLeftWidth(Math.round(event.nativeEvent.layout.width))}

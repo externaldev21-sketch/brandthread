@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -131,7 +132,7 @@ export default function ThreadExplainerScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: theme.background, paddingTop: useHeaderTopInset() }]}>
       <StatusBar barStyle="light-content" />
 
       {/* Background gradient */}

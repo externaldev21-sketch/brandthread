@@ -1,11 +1,11 @@
 import React, { useRef } from 'react';
-import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS, GUTTER, ICON, SP, WEB_SAFE_AREA_TOP } from '@/lib/theme';
+import { FONT, FS, GUTTER, ICON, SP } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 export type HeaderAction = {
   icon: keyof typeof Feather.glyphMap;
@@ -29,22 +29,7 @@ const COLLAPSE_DISTANCE = LARGE_TITLE_HEIGHT - COMPACT_HEIGHT;
 const ROOT_TITLE_SIZE = 20;
 const ROOT_TITLE_LETTER_SPACING = -0.4;
 const ROOT_TOP_GAP = 12;
-// Overnight batch item 40: shared stand-in (lib/theme.ts) for a real
-// device's status-bar inset on web preview — was its own hardcoded 67,
-// higher than a real device's actual inset at this preview size.
-const ROOT_WEB_SAFE_TOP = WEB_SAFE_AREA_TOP;
 const ROOT_ROW_HEIGHT = 44;
-
-/**
- * Web never fills in a non-zero `env(safe-area-inset-top)` outside a real
- * device (or a preview frame that emulates one), so react-native-safe-area-
- * context's web implementation reads insets.top as 0 — which put the
- * pushed-screen (showBack) header's back chevron/title flush against, and
- * partly behind, a simulated notch/Dynamic Island in the web preview. This
- * mirrors the root header's own ROOT_WEB_SAFE_TOP fallback for the compact
- * header.
- */
-const COMPACT_WEB_SAFE_TOP = 54;
 
 /**
  * One header used on every stack screen: consistent back button + right-side
@@ -103,14 +88,14 @@ export function Header({
   dividerVariant?: 'default' | 'subtle' | 'none';
 }) {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const { theme } = useAppTheme();
   const fallbackScrollY = useRef(new Animated.Value(0)).current;
 
   const isRoot = !showBack && largeTitle;
 
   if (isRoot) {
-    const topPad = (Platform.OS === 'web' ? ROOT_WEB_SAFE_TOP : insets.top) + ROOT_TOP_GAP;
+    const topPad = headerTopInset + ROOT_TOP_GAP;
     return (
       <View style={[rootStyles.wrap, { paddingTop: topPad, backgroundColor: transparent ? 'transparent' : theme.background }]}>
         <View style={rootStyles.row}>
@@ -155,7 +140,7 @@ export function Header({
     : 1;
 
   const handleBack = onBack ?? (() => goBackOr(router));
-  const compactTopPad = Platform.OS === 'web' ? Math.max(insets.top, COMPACT_WEB_SAFE_TOP) : insets.top;
+  const compactTopPad = headerTopInset;
 
   return (
     <View

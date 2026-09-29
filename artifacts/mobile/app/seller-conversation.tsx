@@ -9,6 +9,7 @@ import { View, Text, FlatList, TextInput, Alert, Platform, StyleSheet, Dimension
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
@@ -221,6 +222,7 @@ export default function SellerConversationScreen() {
   const RED = theme.error;
   const ON_DARK = theme.onAccent;
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
@@ -1372,7 +1374,7 @@ export default function SellerConversationScreen() {
       )}
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm, paddingRight: SP.md + insets.right }]}>
+      <View style={[s.header, { paddingTop: headerTopInset + SP.sm, paddingRight: SP.md + insets.right }]}>
         <View style={s.headerLeftGroup}>
           <PressableScale
             onPress={() => { hapticPrimaryAction(); goBackOr(router); }}

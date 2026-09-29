@@ -16,6 +16,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 
 const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
@@ -57,6 +58,7 @@ function SellerLiveNativeScreen() {
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const { user } = useUser();
 
@@ -265,7 +267,7 @@ function SellerLiveNativeScreen() {
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
 
       {/* Top bar */}
-      <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
+      <View style={[s.topBar, { paddingTop: headerTopInset + 8 }]}>
         <View style={s.topLeft}>
           <View style={[s.livePill, { backgroundColor: LIVE_RED }]}>
             <View style={s.liveDot} />
@@ -279,7 +281,7 @@ function SellerLiveNativeScreen() {
       </View>
 
       {/* Viewer count */}
-      <View style={[s.viewerRow, { paddingTop: insets.top + 48 }]}>
+      <View style={[s.viewerRow, { paddingTop: headerTopInset + 48 }]}>
         <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
           <Feather name="eye" size={13} color="#fff" />
           <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
@@ -287,7 +289,7 @@ function SellerLiveNativeScreen() {
       </View>
 
       {/* Right action rail */}
-      <View style={[s.rightRail, { paddingTop: insets.top + 80 }]}>
+      <View style={[s.rightRail, { paddingTop: headerTopInset + 80 }]}>
         {/* Products */}
         <TouchableOpacity onPress={() => setShowProductPicker(true)} style={s.railBtn} activeOpacity={0.7}>
           <Feather name="shopping-bag" size={22} color="#fff" />

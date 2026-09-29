@@ -20,6 +20,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { centsAtBasisPoints, parseDecimalToCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PLATFORM_FEE_BASIS_POINTS = 500; // display only — server computes the real fee
 
@@ -29,6 +30,7 @@ export default function FreelancerProfileScreen() {
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const api = useApi();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [freelancer, setFreelancer] = useState<Freelancer | null>(null);
@@ -333,7 +335,7 @@ export default function FreelancerProfileScreen() {
 
       {/* Hire footer (other users only) */}
       {!isOwn && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: SP.lg + 8 + insets.bottom }]}>
           {freelancer.hasConnectedAccount ? (
             <TouchableOpacity
               activeOpacity={0.9}

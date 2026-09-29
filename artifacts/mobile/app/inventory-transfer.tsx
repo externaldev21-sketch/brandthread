@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Modal, FlatList, Alert, Platform } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -253,7 +254,7 @@ export default function InventoryTransferScreen() {
     const stepIdx = timelineIndex(transfer.status);
 
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={[styles.root, { paddingTop: useHeaderTopInset() }]}>
         {/* HEADER */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => goBackOr(router)} style={styles.backBtn}>

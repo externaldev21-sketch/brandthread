@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PostAnalyticsResponse, useApi } from '@/lib/api';
@@ -133,7 +133,7 @@ function CountryBar({ country, pct }: CountryBarProps) {
 export default function PostAnalyticsScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
 
@@ -177,7 +177,7 @@ export default function PostAnalyticsScreen() {
   if (!analytics) {
     return (
       <View style={styles.root}>
-        <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={[styles.header, { paddingTop: headerTopInset }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
             <Feather name="arrow-left" size={20} color={colors.text} />
           </TouchableOpacity>
@@ -199,7 +199,7 @@ export default function PostAnalyticsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={[styles.header, { paddingTop: headerTopInset }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
           <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
@@ -297,7 +297,7 @@ export default function PostAnalyticsScreen() {
   return (
     <View style={styles.root}>
       {/* ─── Fixed Header ──────────────────────────────────────────────────── * /}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={[styles.header, { paddingTop: headerTopInset }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
           <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>

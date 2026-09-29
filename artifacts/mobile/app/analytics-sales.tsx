@@ -10,7 +10,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { FONT, FS, SP } from '@/lib/theme';
 import { getSalesAnalytics, getFilterState } from '@/services/analyticsService';
 import { SalesAnalytics, AnalyticsPoint, AnalyticsFilterState } from '@/services/analyticsTypes';
@@ -30,9 +30,8 @@ const CHART_TAB_LABELS: Record<'sales' | 'orders' | 'units' | 'aov' | 'refunds',
 export default function AnalyticsSalesScreen() {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = insets.top;
+  const topPad = useHeaderTopInset();
 
   const [data,       setData]       = useState<SalesAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);

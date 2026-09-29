@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
@@ -168,7 +169,7 @@ export default function ProductDetailScreen() {
   const coverImage = product.media.find(m => m.isCover) ?? product.media[0];
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: useHeaderTopInset() }]}>
       {/* ── Fixed Header ── */}
       <View style={s.header}>
         {/* Fix 3: back button uses goBackOr(router) */}

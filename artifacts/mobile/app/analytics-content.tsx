@@ -12,7 +12,7 @@ import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getContentAnalytics, getFilterState } from '@/services/analyticsService';
@@ -87,9 +87,8 @@ function RetentionGraph({ points }: { points: VideoRetentionPoint[] }) {
 export default function AnalyticsContentScreen() {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
   const { isLoaded: authLoaded, userId } = useAuth();
-  const topPad = insets.top;
+  const topPad = useHeaderTopInset();
 
   const [data,       setData]       = useState<ContentAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);

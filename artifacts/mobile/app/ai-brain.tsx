@@ -37,6 +37,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -400,6 +401,7 @@ export default function AiBrainScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const headerTopInset = useHeaderTopInset();
   const { width } = useWindowDimensions();
   const isTablet = width >= BREAKPOINT.tablet;
   const { getToken, userId, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
@@ -700,7 +702,7 @@ export default function AiBrainScreen() {
         keyboardVerticalOffset={0}
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={[styles.header, { paddingTop: headerTopInset }]}>
           <TouchableOpacity
             style={styles.headerBtn}
             onPress={() => goBackOr(router)}

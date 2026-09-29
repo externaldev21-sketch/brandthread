@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -320,7 +321,7 @@ export default function EditProfileScreen() {
     showToast('Link copied');
   }
 
-  const topPad = insets.top;
+  const topPad = useHeaderTopInset();
   const username = fields.username.replace(/^@/, '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
 
   return (
