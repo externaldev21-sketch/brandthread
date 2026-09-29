@@ -97,7 +97,7 @@ vi.mock('react-native-svg', () => {
   return { default: el('Svg'), Svg: el('Svg'), Defs: el('Defs'), LinearGradient: el('LinearGradient'), Stop: el('Stop'), Path: el('Path') };
 });
 
-import { DASHBOARD_RANGES, SellerDashboardChart } from '@/components/SellerDashboardChart';
+import { AXIS_LABEL_WIDTH, DASHBOARD_RANGES, SellerDashboardChart } from '@/components/SellerDashboardChart';
 
 const theme = {
   accent: '#F7F7FA',
@@ -122,6 +122,15 @@ describe('SellerDashboardChart', () => {
     renderer = null;
     panCalls.length = 0;
   });
+
+  // The axis row only lays out (and is scrubbable) once the chart area has
+  // a real measured width — mirrors onLayout firing on a real device/browser.
+  async function layoutChart(width = 350) {
+    const chartArea = renderer!.root.findByProps({ testID: 'seller-dashboard-chart' });
+    await act(async () => {
+      chartArea.props.onLayout({ nativeEvent: { layout: { width } } });
+    });
+  }
 
   it('lists exactly the five spec ranges, in order: Today, Week, Month, Year, All', () => {
     expect(DASHBOARD_RANGES.map((r) => r.id)).toEqual(['today', 'week', 'month', 'year', 'all']);
@@ -162,12 +171,12 @@ describe('SellerDashboardChart', () => {
     expect(panCalls[panCalls.length - 1]).toEqual({ enabled: true });
   });
 
-  it('hides axis endpoint labels for the empty state (never implies real activity)', async () => {
+  it('still shows correctly-labeled axes for the empty/fresh state — only the curve flattens, not the labels', async () => {
     await act(async () => {
       renderer = create(
         <SellerDashboardChart
-          values={[0, 0]}
-          labels={['Sun', 'Sat']}
+          values={[0, 0, 0, 0, 0, 0, 0]}
+          labels={['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']}
           theme={theme}
           range="week"
           onRangeChange={vi.fn()}
@@ -176,9 +185,30 @@ describe('SellerDashboardChart', () => {
         />,
       );
     });
-    const texts = renderer!.root.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
-    expect(texts).not.toContain('Sun');
-    expect(texts).not.toContain('Sat');
+    await layoutChart();
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    expect(texts).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  });
+
+  it('renders a visible (non-transparent-border) flat line color for the empty state, not an invisible one', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={[0, 0, 0]}
+          labels={['Mon', 'Tue', 'Wed']}
+          theme={theme}
+          range="week"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty
+        />,
+      );
+    });
+    await layoutChart();
+    const path = renderer!.root.findAllByType('Path' as React.ElementType).find((p) => p.props.fill === 'none');
+    expect(path?.props.stroke).toBe(theme.muted);
+    expect(path?.props.stroke).not.toBe(theme.borderSubtle);
   });
 
   it('calls onRangeChange with the tapped range id and marks it selected', async () => {
@@ -209,7 +239,7 @@ describe('SellerDashboardChart', () => {
     expect(onRangeChange).toHaveBeenCalledWith('month');
   });
 
-  it('renders every x-axis label, not just the first/last (item 123)', async () => {
+  it('renders every x-axis label for Week — a calendar week only ever has 7, and all 7 fit (item 123)', async () => {
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     await act(async () => {
       renderer = create(
@@ -224,9 +254,154 @@ describe('SellerDashboardChart', () => {
         />,
       );
     });
+    await layoutChart();
     const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
     const texts = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
     expect(texts).toEqual(labels);
+  });
+
+  it('shows only 4 evenly-spaced quarter-of-day labels for Today, not all 24 hourly buckets', async () => {
+    const labels = Array.from({ length: 24 }, (_, h) => `${h}h`);
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={labels.map(() => 10)}
+          labels={labels}
+          theme={theme}
+          range="today"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    await layoutChart();
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    // Quarters of the day: hour 0, 6, 12, 18 (12am/6am/12pm/6pm), matching
+    // Shopify's own Today/Yesterday Analytics chart. Only these 4 render —
+    // the other 20 hourly buckets get no Text node at all (not a blank one
+    // squeezed into a shared flex column, which truncated longer labels).
+    expect(texts).toEqual(['0h', '6h', '12h', '18h']);
+  });
+
+  it('shows a small evenly-spaced subset of labels for Month (not all ~30 daily buckets)', async () => {
+    const labels = Array.from({ length: 30 }, (_, i) => `Day ${i + 1}`);
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={labels.map(() => 10)}
+          labels={labels}
+          theme={theme}
+          range="month"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    await layoutChart();
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const visible = axisRow.findAllByType('Text' as React.ElementType).map((t) => t.props.children);
+    expect(visible.length).toBeGreaterThanOrEqual(4);
+    expect(visible.length).toBeLessThanOrEqual(6);
+    expect(visible[0]).toBe('Day 1');
+    expect(visible[visible.length - 1]).toBe('Day 30');
+  });
+
+  it('renders visible axis labels in perfectly even pixel columns, even when the underlying bucket indices are not evenly spaced (Year: 12 buckets / 6 labels)', async () => {
+    // 12 buckets into 6 labels rounds to index gaps of 2,2,3,2,2 (an
+    // unavoidable integer artifact — see selectEvenlySpacedIndices) — the
+    // RENDERED columns must still be exactly even regardless.
+    const labels = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'];
+    const width = 360;
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={labels.map((_, i) => 10 + i)}
+          labels={labels}
+          theme={theme}
+          range="year"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    await layoutChart(width);
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType);
+    expect(texts.map((t) => t.props.children)).toEqual(['Oct', 'Dec', 'Feb', 'May', 'Jul', 'Sep']);
+    // Middle labels (everything but the first/last) are centered in a
+    // fixed-width box on their evenly-spaced x — react-test-renderer has no
+    // real text layout to measure the edge labels' auto-sized box against
+    // (see the Playwright live-measurement verification in the PR
+    // description for that), so this checks what IS decidable here: the
+    // middle labels' *centers* land in perfectly even columns, i.e. the
+    // integer bucket-index rounding artifact (2,2,3,2,2) never leaks into
+    // the rendered pixel spacing.
+    const middleCenters = texts.slice(1, -1).map((t) => {
+      const style = flattenStyle(t.props.style);
+      return (style.left as number) + AXIS_LABEL_WIDTH / 2;
+    });
+    const gaps = middleCenters.slice(1).map((c, i) => c - middleCenters[i]);
+    const first = gaps[0];
+    for (const gap of gaps) expect(Math.abs(gap - first)).toBeLessThan(0.01);
+  });
+
+  it('anchors the first label to the true left edge and the last label to the true right edge, auto-sized to their own text (no fixed-width box to shrink the end gaps)', async () => {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const width = 355;
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={labels.map(() => 10)}
+          labels={labels}
+          theme={theme}
+          range="week"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    await layoutChart(width);
+    const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
+    const texts = axisRow.findAllByType('Text' as React.ElementType);
+    const first = flattenStyle(texts[0].props.style);
+    const last = flattenStyle(texts[texts.length - 1].props.style);
+    // No fixed AXIS_LABEL_WIDTH box (that was the bug: a same-width box
+    // anchored at the true edge still measures/renders as if centered,
+    // since CSS textAlign never changes a box's own bounding rect) —
+    // instead the box auto-sizes to its own text, pinned via `left`/`right`
+    // (not a computed offset) so its true edge sits exactly at x=0/x=width.
+    expect(first.left).toBe(0);
+    expect(first.width).toBeUndefined();
+    expect(last.right).toBe(0);
+    expect(last.width).toBeUndefined();
+  });
+
+  it('places the axis labels directly under the chart, ABOVE the range-selector pills (Shopify/Robinhood order)', async () => {
+    await act(async () => {
+      renderer = create(
+        <SellerDashboardChart
+          values={[10, 20, 15, 40, 30, 25, 50]}
+          labels={['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']}
+          theme={theme}
+          range="week"
+          onRangeChange={vi.fn()}
+          onScrub={vi.fn()}
+          isEmpty={false}
+        />,
+      );
+    });
+    await layoutChart();
+    const root = renderer!.root.findAllByType('View' as React.ElementType);
+    const axisIndex = root.findIndex((v) => v.props.testID === 'seller-dashboard-chart-axis');
+    const pillsIndex = root.findIndex((v) => v.props.testID === 'seller-dashboard-range-pills');
+    expect(axisIndex).toBeGreaterThan(-1);
+    expect(pillsIndex).toBeGreaterThan(-1);
+    expect(axisIndex).toBeLessThan(pillsIndex);
   });
 
   it('renders a sliding glass range indicator behind the tabs (item 124)', async () => {

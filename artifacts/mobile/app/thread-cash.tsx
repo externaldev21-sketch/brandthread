@@ -21,8 +21,8 @@ import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard, EmptyState } fro
 import { SkeletonBlock } from '@/components/ui';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { TABULAR_NUMS, tabularType } from '@/constants/typography';
-import { isBuyerDevPreview } from '@/lib/devPreview';
-import { PREVIEW_THREAD_CASH_STATUS } from '@/lib/previewThreadCash';
+import { isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
 import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import { ThreadCashBill, ThreadCashBillStack, ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost';
@@ -74,7 +74,9 @@ function historyGlyph(
 // __DEV__ web preview. Mirrors the existing pattern in app/boost.tsx.
 // The status itself is the one shared fixture in lib/previewThreadCash.ts —
 // the buyer profile's top-bar chip and streak card read the same values.
-const PREVIEW_STATUS: ThreadCashStatus = PREVIEW_THREAD_CASH_STATUS;
+// Fresh install by default: $0.00, no streak, no history — the seeded
+// $18.45/4-day-streak/transaction-history demo only appears under the
+// explicit ?bt_preview=buyer&demo=1 opt-in.
 const PREVIEW_HISTORY: ThreadCashEntry[] = [
   { id: 'p1', buyerId: 'preview', amountCents: 10, source: 'daily_checkin', referenceId: null, note: null, createdAt: new Date().toISOString() },
   { id: 'p2', buyerId: 'preview', amountCents: 500, source: 'send_received', referenceId: null, note: 'For the drop', createdAt: new Date(Date.now() - 864e5).toISOString() },
@@ -164,8 +166,8 @@ export default function ThreadCashScreen() {
       setLoading(true);
       setLoadError(false);
       await Promise.resolve();
-      setStatus(PREVIEW_STATUS);
-      setHistory(PREVIEW_HISTORY);
+      setStatus(getPreviewThreadCashStatus());
+      setHistory(isPreviewDemoMode() ? PREVIEW_HISTORY : []);
       setLoading(false);
       return;
     }

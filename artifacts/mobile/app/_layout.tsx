@@ -58,6 +58,7 @@ import { initAnalyticsService } from '@/services/analyticsService';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
 import { WebAppShell } from '@/components/web/WebAppShell';
+import { PhoneFrameSafeArea } from '@/components/web/PhoneFrameSafeArea';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
@@ -434,6 +435,21 @@ if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
   localStorage.setItem('splash_seen', 'true');
   localStorage.setItem('onboarding_complete', 'true');
   localStorage.setItem('user_role', PREVIEW_ROLE);
+  // Reset (or set) the demo-data flag from THIS load's own query string,
+  // exactly like user_role just above — otherwise a `&demo=1` visited once,
+  // in any earlier session, in this same browser, would stick forever:
+  // lib/devPreview.ts's isPreviewDemoMode() only WRITES 'bt_preview_demo'
+  // when it sees demo=1 (so later in-app navigation, which drops the query
+  // string, can still recall it) — it never clears the flag, since a plain
+  // function called repeatedly through a session has no way to tell "the
+  // query string is gone because of in-app navigation" apart from "the user
+  // did a fresh reload without demo=1". This one-time, module-load-only
+  // block can tell the difference (it runs exactly once per real page load,
+  // the same reasoning user_role's own reset above relies on), so a plain
+  // `?bt_preview=buyer` reload always lands back on fresh, zero-state data.
+  const demoParam = new URLSearchParams(window.location.search).get('demo');
+  if (demoParam === '1') localStorage.setItem('bt_preview_demo', '1');
+  else localStorage.removeItem('bt_preview_demo');
 }
 if (DEV_BYPASS_ROLE && Platform.OS !== 'web') {
   AsyncStorage.multiSet([
@@ -1310,6 +1326,7 @@ export default function RootLayout() {
 
   const appTree = (
     <SafeAreaProvider>
+      <PhoneFrameSafeArea>
       <ErrorBoundary>
         <PersistQueryClientProvider
           client={queryClient}
@@ -1347,6 +1364,7 @@ export default function RootLayout() {
           </GestureHandlerRootView>
         </PersistQueryClientProvider>
       </ErrorBoundary>
+      </PhoneFrameSafeArea>
     </SafeAreaProvider>
   );
 

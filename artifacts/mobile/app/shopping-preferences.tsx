@@ -5,8 +5,7 @@
 import React, { useCallback, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch,
-} from 'react-native';
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,6 +18,7 @@ import {
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Header } from '@/components/layout';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
 
@@ -195,9 +195,9 @@ export default function ShoppingPreferences() {
                   <Text style={s.alertLabel}>{item.label}</Text>
                   <Text style={s.alertSub}>{item.sub}</Text>
                 </View>
-                <Switch
+                <HapticSwitch
                   value={Boolean(settings[item.key])}
-                  onValueChange={v => { Haptics.selectionAsync(); patch({ [item.key]: v }); }}
+                  onValueChange={v => patch({ [item.key]: v })}
                   trackColor={{ false: '#333344', true: colors.primary }}
                   thumbColor="#fff"
                 />
@@ -215,9 +215,9 @@ export default function ShoppingPreferences() {
               <Text style={s.alertLabel}>Shopping activity</Text>
               <Text style={s.alertSub}>Let brands see what you've viewed and saved</Text>
             </View>
-            <Switch
+            <HapticSwitch
               value={Boolean(settings.showShoppingActivity)}
-              onValueChange={v => { Haptics.selectionAsync(); patch({ showShoppingActivity: v }); }}
+              onValueChange={v => patch({ showShoppingActivity: v })}
               trackColor={{ false: '#333344', true: colors.primary }}
               thumbColor="#fff"
             />
@@ -229,9 +229,9 @@ export default function ShoppingPreferences() {
               <Text style={s.alertLabel}>Personalized recommendations</Text>
               <Text style={s.alertSub}>Use your activity to surface relevant products</Text>
             </View>
-            <Switch
+            <HapticSwitch
               value={Boolean(settings.personalizedRecommendations)}
-              onValueChange={v => { Haptics.selectionAsync(); patch({ personalizedRecommendations: v }); }}
+              onValueChange={v => patch({ personalizedRecommendations: v })}
               trackColor={{ false: '#333344', true: colors.primary }}
               thumbColor="#fff"
             />

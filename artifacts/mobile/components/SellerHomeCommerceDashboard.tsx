@@ -37,6 +37,8 @@ import { ResponsiveContainer, SkeletonBlock, useBreakpoint } from '@/components/
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { bucketLabel, type SellerHomeTimeRange } from '@/lib/sellerHomeChartLabels';
+import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { formatCents } from '@/lib/money';
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
 import { computeMetricChange } from '@/lib/sellerMetricChange';
@@ -243,6 +245,25 @@ export default function SellerHomeCommerceDashboard({
     let active = true;
     const requestKey = sellerHomeAnalyticsKey(userId, range);
     setLoading(true);
+
+    // The dev web seller preview (?bt_preview=seller) has no real backend to
+    // call — previously this fell through to api.analytics.home() against an
+    // unreachable/placeholder host, which is exactly what produced the
+    // reported bug (every range showing the same stale bucket data, "Year"
+    // relabeling the current month 8x instead of 12 distinct trailing
+    // months). Generate deterministic local chart data instead: a flat $0
+    // baseline in fresh mode (a brand-new seller, never fake activity), or a
+    // realistic, range-varying curve in demo mode (isPreviewDemoMode() —
+    // explicit ?demo=1 opt-in). See lib/previewSellerChartData.ts and
+    // lib/devPreview.ts.
+    if (isSellerDevPreview()) {
+      const next = buildPreviewSellerAnalytics(range, isPreviewDemoMode() ? 'demo' : 'fresh');
+      setAnalyticsError(false);
+      setSnapshot({ key: requestKey, data: next });
+      setLoading(false);
+      return () => { active = false; };
+    }
+
     api.analytics.home(range as SellerHomeTimeRange)
       .then((next) => {
         if (!active) return;
@@ -633,7 +654,12 @@ export default function SellerHomeCommerceDashboard({
                 >
                   {formatMetricValue(metric, heroDisplay)}
                 </Text>
-                {deltaLine && scrubIndex === null ? (
+                {isEmptyChart && scrubIndex === null ? (
+                  // Never a fabricated "+31.1%"-style comparison for a
+                  // brand-new/zero-sales account — matches Shopify's own
+                  // zero-state chart ("$0.00 —", no percent).
+                  <Text style={[styles.heroDelta, { color: theme.muted }]}>No sales yet</Text>
+                ) : deltaLine && scrubIndex === null ? (
                   <Text
                     style={[
                       styles.heroDelta,

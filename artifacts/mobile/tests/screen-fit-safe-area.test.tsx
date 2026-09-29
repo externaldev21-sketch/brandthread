@@ -289,3 +289,91 @@ describe('no file introduces a too-low web top-inset floor (the useHeaderTopInse
     expect(offenders).toEqual([]);
   });
 });
+
+/**
+ * A stricter follow-on rule, added after PR #367 independently reintroduced
+ * the same bug on 77 more screens via its own copy of the inline expression
+ * (fixed by consolidating everything onto useHeaderTopInset — see that
+ * merge's history) and Dev asked for a test that fails outright the moment
+ * ANY screen renders a header/top-bar padded straight off `insets.top`
+ * instead of the shared hook, rather than only catching a too-low floor
+ * value the way the rule above does.
+ *
+ * This scans for the two textual shapes a header wires its top clearance
+ * with in this codebase: a `const someTopVar = insets.top...` declaration,
+ * or `insets.top` used directly inline as a `paddingTop`/`top` style value
+ * — where the variable/style name reads as header-shaped (top/header/bar)
+ * — and requires every match to either go through `useHeaderTopInset()` or
+ * be in ALLOWED_RAW_TOP_INSET_USES below with a one-line reason. Anything
+ * else fails the build immediately; there is no silent floor to fall back
+ * on here.
+ *
+ * ALLOWED_RAW_TOP_INSET_USES is for real, reviewed exceptions only — a
+ * full-bleed camera viewfinder's own chrome, a security lock gate that only
+ * ever renders on native (where insets.top is already correct with no web
+ * fallback needed), or scroll/parallax geometry that isn't a header at all.
+ * Adding a file here without one of those reasons defeats the point of this
+ * test — don't.
+ */
+const ALLOWED_RAW_TOP_INSET_USES: Record<string, string> = {
+  'app/buyer-checkout.tsx': 'out of scope — a separate effort owns the checkout flow',
+  'app/camera-capture.tsx': 'full-bleed native camera chrome; its one header row already floors via Math.max(insets.top, 54)',
+  'app/live.tsx': "TabPageHeader's own documented 67pt web fallback for the LIVE tab header, not a stack-screen header",
+  'components/security/AppLockGate.tsx': 'native-only past its own early return — the file never renders on web, so insets.top is always the real device value',
+  'app/onboarding.tsx': "the decorative ThreadWeave background animation's position, not a header",
+};
+
+describe('no screen header/top-bar bypasses the shared useHeaderTopInset hook', () => {
+  it('every header-shaped `insets.top` use outside the allowlist goes through useHeaderTopInset()', async () => {
+    const { readFileSync, readdirSync, statSync } = await import('node:fs');
+    const path = await import('node:path');
+    const root = path.resolve(import.meta.dirname, '..');
+    const scanDirs = ['app', 'components'].map((d) => path.join(root, d));
+    const hookFile = path.join(root, 'hooks', 'useHeaderTopInset.ts');
+    const offenders: string[] = [];
+
+    // `const topPad = insets.top` / `const headerTop = insets.top + N` / etc.
+    const declPattern = /const\s+(\w*(?:top|header|bar)\w*)\s*[:=][^=][^;\n]*\binsets\.top\b/gi;
+    // `paddingTop: insets.top` / `top: insets.top` used directly (no Math.max
+    // floor, no hook) as a JSX style value.
+    const inlinePattern = /(?<![.\w])(paddingTop|top)\s*:\s*\(?\s*insets\.top\b(?!\s*,)/g;
+
+    function relevant(name: string) {
+      return /top|header|bar/i.test(name);
+    }
+
+    function walk(dir: string) {
+      for (const entry of readdirSync(dir)) {
+        const full = path.join(dir, entry);
+        if (full === hookFile) continue;
+        const stat = statSync(full);
+        if (stat.isDirectory()) {
+          if (entry === 'node_modules') continue;
+          walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry) || entry.endsWith('.test.tsx') || entry.endsWith('.test.ts')) continue;
+        const rel = path.relative(root, full).split(path.sep).join('/');
+        if (ALLOWED_RAW_TOP_INSET_USES[rel]) continue;
+        const source = readFileSync(full, 'utf8');
+
+        for (const match of source.matchAll(declPattern)) {
+          if (relevant(match[1])) offenders.push(`${rel}: const ${match[1]} = ...insets.top... (not useHeaderTopInset())`);
+        }
+        for (const match of source.matchAll(inlinePattern)) {
+          offenders.push(`${rel}: ${match[1]}: insets.top used inline (not useHeaderTopInset())`);
+        }
+      }
+    }
+    for (const dir of scanDirs) walk(dir);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('every ALLOWED_RAW_TOP_INSET_USES entry still exists and has a reason', () => {
+    for (const [file, reason] of Object.entries(ALLOWED_RAW_TOP_INSET_USES)) {
+      expect(reason.length).toBeGreaterThan(0);
+      expect(typeof file).toBe('string');
+    }
+  });
+});

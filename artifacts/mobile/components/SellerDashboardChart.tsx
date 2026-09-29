@@ -15,6 +15,7 @@ import { Glass } from '@/components/ui/Glass';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { TAB_INDICATOR_SPRING } from '@/constants/motion';
 import { layoutSeriesPoints, smoothPath } from '@/lib/svgSmoothPath';
+import { selectEvenlySpacedIndices } from '@/lib/sellerHomeChartLabels';
 import { BORDER_SUBTLE, FONT, FS, SP } from '@/lib/theme';
 
 export type SellerDashboardRange = 'today' | 'week' | 'month' | 'year' | 'all';
@@ -28,6 +29,27 @@ export const DASHBOARD_RANGES: Array<{ id: SellerDashboardRange; label: string }
 ];
 
 const CHART_HEIGHT = 168;
+
+// Each visible axis label is positioned absolutely at its bucket's own x
+// (see the axisRow render below), in a fixed-width box centered on that
+// point — not squeezed into an equal flex column shared with every hidden
+// bucket, which was truncating "12 AM"/"6 PM"-style text down to a couple
+// of characters once the visible count was much smaller than the bucket
+// count (e.g. 4 visible of 24 hourly buckets for Today).
+export const AXIS_LABEL_WIDTH = 44;
+
+// How many x-axis labels to actually show text for, per range — a handful
+// of evenly-spaced, non-overlapping labels (Shopify's own Sales Report/
+// Analytics charts do the same) rather than one per bucket, which for
+// Month's ~30 daily buckets or Today's 24 hourly buckets would overlap into
+// illegible smears. Every bucket still lays out and is scrubbable — only
+// which indices get *visible* label text changes. Week is a deliberate
+// exception: a calendar week only ever has 7 buckets, and showing all 7
+// ("Mon" through "Sun") is both natural and still non-overlapping at phone
+// width.
+const AXIS_LABEL_COUNT: Record<SellerDashboardRange, number> = {
+  today: 4, week: 7, month: 5, year: 6, all: 6,
+};
 
 export function SellerDashboardChart({
   values,
@@ -172,7 +194,33 @@ export function SellerDashboardChart({
   });
 
   const gradientId = 'sellerDashboardChartFill';
-  const strokeColor = isEmpty ? (theme as any).borderSubtle ?? BORDER_SUBTLE : theme.accent;
+  // The empty/fresh-seller state must still draw a real, VISIBLE flat line
+  // at $0 (never blank space that reads as a broken/missing chart) — just
+  // muted rather than the full accent color, so it never implies real
+  // activity. theme.borderSubtle (~4% opacity) was invisible against the
+  // dark background; theme.muted is the same solid, monochrome tone the
+  // rest of the dashboard already uses for secondary/inactive content.
+  const strokeColor = isEmpty ? theme.muted ?? BORDER_SUBTLE : theme.accent;
+
+  // Today's chart spreads its labels across even quarters of the day
+  // (12am/6am/12pm/6pm, per Shopify's own Analytics "Yesterday"/"Today"
+  // chart) rather than anchoring to the first/last bucket; every other
+  // range anchors its evenly-spaced marks to the first and last bucket.
+  const wantAxisLabels = AXIS_LABEL_COUNT[range] ?? 5;
+  const anchorAxisEnds = range !== 'today';
+  // Which real buckets get a label (their timestamps/text) — an ordered
+  // list, not a Set, because the *rendered* column position below is
+  // derived from each label's position WITHIN this list (evenly spaced by
+  // construction), not from its original bucket index. Splitting an uneven
+  // bucket count across `want` labels can't always land on perfectly
+  // even *index* gaps (e.g. 12 buckets / 6 labels rounds to gaps of
+  // 2,2,3,2,2 — one inevitably-larger integer gap), but the labels
+  // themselves must still render in perfectly even *pixel* columns, or
+  // that integer rounding shows up as a visibly uneven gap on screen.
+  const visibleAxisIndices = useMemo(
+    () => selectEvenlySpacedIndices(labels.length, wantAxisLabels, anchorAxisEnds),
+    [labels.length, wantAxisLabels, anchorAxisEnds],
+  );
 
   return (
     <View>
@@ -218,11 +266,16 @@ export function SellerDashboardChart({
                 styles.tooltip,
                 {
                   left: Math.max(4, Math.min(width - 4, points[tooltipIndex].x)),
-                  top: Math.max(0, points[tooltipIndex].y - 34),
+                  top: Math.max(0, points[tooltipIndex].y - 46),
                 },
               ]}
             >
               <Glass variant="regular" radius={10} style={StyleSheet.absoluteFill} />
+              {labels[tooltipIndex] ? (
+                <Text style={[styles.tooltipLabel, { color: theme.muted }]} numberOfLines={1}>
+                  {labels[tooltipIndex]}
+                </Text>
+              ) : null}
               <Text style={[styles.tooltipText, { color: theme.text }]} numberOfLines={1}>
                 {(formatValue ?? String)(values[tooltipIndex] ?? 0)}
               </Text>
@@ -230,6 +283,78 @@ export function SellerDashboardChart({
           )}
         </View>
       </GestureDetector>
+
+      {/* Axis labels sit directly under the chart curve they describe —
+          Shopify/Robinhood-style chart → its own x-axis → range selector,
+          not chart → range selector → labels (which read as detached from
+          the chart entirely). Shown for the empty/fresh state too: a
+          zero-sales chart still has correctly-labeled ranges, just a flat
+          line instead of a real curve. */}
+      {labels.length > 0 && width > 0 && visibleAxisIndices.length > 0 && (
+        <View style={styles.axisRow} pointerEvents="none" testID="seller-dashboard-chart-axis">
+          {visibleAxisIndices.map((bucketIndex, i) => {
+            const n = visibleAxisIndices.length;
+            const isFirst = n > 1 && i === 0;
+            const isLast = n > 1 && i === n - 1;
+            // Rendered in perfectly even PIXEL columns across the row,
+            // independent of the underlying bucket's own x — selecting
+            // `want` labels out of an uneven bucket count can't always land
+            // on perfectly even *index* gaps (12 buckets / 6 labels rounds
+            // to gaps of 2,2,3,2,2 — one integer gap is inevitably larger),
+            // but the rendered columns themselves must still be even, or
+            // that rounding artifact shows up as a visibly uneven gap.
+            const t = n > 1 ? i / (n - 1) : 0.5;
+            const x = t * width;
+            // The first/last label anchor exactly to the chart's true
+            // edges (x=0 / x=width) instead of being centered-then-clamped
+            // like the middle labels — centering + clamping shifted the
+            // whole FIXED-WIDTH box inward by half a label-width, shrinking
+            // its gap to the next label relative to every other
+            // (evenly-spaced) gap. A fixed-width box with only its inner
+            // textAlign flipped does NOT fix this: the box itself (what
+            // "where is this label" actually measures) stays the same
+            // width and position, just the glyphs shift inside it — so the
+            // edge boxes must drop the fixed AXIS_LABEL_WIDTH and size to
+            // their own text instead, anchored with `left`/`right` (not a
+            // computed `left` + textAlign) so the box's true edge sits
+            // exactly at x=0 / x=width. Middle labels stay centered in a
+            // fixed-width box on their evenly-spaced x — they never
+            // approach either edge, so no clamping is needed there.
+            if (isFirst) {
+              return (
+                <Text
+                  key={`${labels[bucketIndex]}-${bucketIndex}`}
+                  style={[styles.axisLabelBase, styles.axisLabelEdge, { color: theme.subtle, left: 0 }]}
+                  numberOfLines={1}
+                >
+                  {labels[bucketIndex]}
+                </Text>
+              );
+            }
+            if (isLast) {
+              return (
+                <Text
+                  key={`${labels[bucketIndex]}-${bucketIndex}`}
+                  style={[styles.axisLabelBase, styles.axisLabelEdge, { color: theme.subtle, right: 0 }]}
+                  numberOfLines={1}
+                >
+                  {labels[bucketIndex]}
+                </Text>
+              );
+            }
+            const left = Math.max(0, Math.min(width - AXIS_LABEL_WIDTH, x - AXIS_LABEL_WIDTH / 2));
+            return (
+              <Text
+                key={`${labels[bucketIndex]}-${bucketIndex}`}
+                style={[styles.axisLabelBase, styles.axisLabel, { color: theme.subtle, left }]}
+                numberOfLines={1}
+              >
+                {labels[bucketIndex]}
+              </Text>
+            );
+          })}
+        </View>
+      )}
 
       <View style={styles.rangeRow} onLayout={onRangeRowLayout} testID="seller-dashboard-range-pills">
         {rangeSegmentWidth > 0 && (
@@ -260,25 +385,6 @@ export function SellerDashboardChart({
           );
         })}
       </View>
-
-      {labels.length > 0 && !isEmpty && (
-        <View style={styles.axisRow} pointerEvents="none" testID="seller-dashboard-chart-axis">
-          {labels.map((label, index) => (
-            <Text
-              key={`${label}-${index}`}
-              style={[
-                styles.axisLabel,
-                { color: theme.subtle },
-                index === 0 && styles.axisLabelFirst,
-                index === labels.length - 1 && styles.axisLabelLast,
-              ]}
-              numberOfLines={1}
-            >
-              {label}
-            </Text>
-          ))}
-        </View>
-      )}
     </View>
   );
 }
@@ -311,6 +417,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     transform: [{ translateX: -32 }],
   },
+  tooltipLabel: {
+    fontFamily: FONT.regular,
+    fontSize: 9,
+  },
   tooltipText: {
     fontFamily: FONT.semibold,
     fontSize: FS.xs,
@@ -342,20 +452,30 @@ const styles = StyleSheet.create({
     fontSize: FS.xs,
   },
   axisRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    height: 14,
     marginTop: SP.xs,
   },
-  axisLabel: {
-    flex: 1,
+  // Shared base — deliberately has no `width`. RN's style-array flattening
+  // does NOT let a later `width: undefined` unset an earlier numeric
+  // `width` (the key is simply skipped, not applied as "auto"), so the
+  // fixed-width middle-label style and the auto-width edge-label style
+  // must each independently opt in to a `width`, rather than one trying to
+  // cancel the other's.
+  axisLabelBase: {
+    position: 'absolute',
+    top: 0,
     fontFamily: FONT.regular,
     fontSize: 9,
+  },
+  // Middle labels: fixed-width box, centered on their evenly-spaced x.
+  axisLabel: {
+    width: AXIS_LABEL_WIDTH,
     textAlign: 'center',
   },
-  axisLabelFirst: {
-    textAlign: 'left',
-  },
-  axisLabelLast: {
-    textAlign: 'right',
+  // Edge labels (first/last): no fixed width at all, so the rendered box
+  // shrinks to the text itself and its true left/right edge lands exactly
+  // at the chart's x=0 / x=width — see the render-time comment above.
+  axisLabelEdge: {
+    maxWidth: AXIS_LABEL_WIDTH * 1.5,
   },
 });
