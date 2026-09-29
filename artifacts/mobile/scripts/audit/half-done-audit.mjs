@@ -89,6 +89,19 @@ const FS_SCALE = extractFsScale(THEME_SRC); // e.g. [11,12,13,15,17,19,22,26,30,
 
 const PLACEHOLDER_RE = /coming soon|TODO\b|lorem ipsum|placeholder|^Label$|^Title$|\bundefined\b|\bNaN\b|\$NaN|Invalid Date/i;
 
+// Dev's explicit rule: no visible preview/demo tell anywhere, ever — a fresh
+// (empty) real install must read exactly like this text, never like a demo
+// harness announcing itself. Matches the same wording purged app-wide (see
+// the "Purge preview wording" PRs). Deliberately NOT included: bare "sample"
+// (this app has a real, permanent manufacturing "request a sample" /
+// "AI logo sample" feature — see app/request-sample.tsx, app/sample-detail.tsx
+// — unrelated to preview/demo mode) and bare "read-only" (a real, permanent
+// team-role permission label — see app/team.tsx's "Viewer" role — also
+// unrelated). Those two stay judgement calls for a human reviewer rather
+// than a blanket word match; the higher-risk "read-only preview" combination
+// that actually leaked live is still caught below.
+const PREVIEW_DEMO_WORDING_RE = /\bpreview\b|\bdemo\b|\bmock\b|placeholder data|test mode|read-only preview|read only preview|until you reload|not load live/i;
+
 // ─── param synthesis for dynamic routes ───────────────────────────────────────
 const PARAM_VALUES = {
   id: 'prod_nl_jacket_rust',
@@ -376,6 +389,13 @@ async function auditRoute({ browser, origin, role, route, images, budgetMs, maxT
     for (const t of scan.texts) {
       if (PLACEHOLDER_RE.test(t.text)) {
         findings.push({ type: 'placeholder-copy', severity: 'hard', detail: `Text matches placeholder pattern: "${t.text}"`, text: t.text });
+      }
+    }
+    // preview/demo wording visible to the user — see PREVIEW_DEMO_WORDING_RE's
+    // comment for what's deliberately excluded and why.
+    for (const t of scan.texts) {
+      if (PREVIEW_DEMO_WORDING_RE.test(t.text)) {
+        findings.push({ type: 'preview-demo-wording', severity: 'hard', detail: `Visible text announces preview/demo mode: "${t.text}"`, text: t.text });
       }
     }
     // repeated/garbage labels: 3+ adjacent identical short text nodes in a row (chart ticks / list labels)

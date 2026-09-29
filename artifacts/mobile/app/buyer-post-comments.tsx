@@ -1221,7 +1221,7 @@ export default function BuyerPostCommentsScreen() {
           {composerLocked ? (
             <View style={s.lockedComposer}>
               {isPreviewPost ? (
-                <Text style={s.lockedText}>Comments aren’t available on preview posts.</Text>
+                <Text style={s.lockedText}>Comments aren’t available on this post.</Text>
               ) : meta.commentsDisabled ? (
                 <Text style={s.lockedText}>Comments are turned off for this post.</Text>
               ) : (

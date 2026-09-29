@@ -44,8 +44,9 @@ safe they are to gate hard immediately:
 
 - **Hard tier** (blocks CI on any *new* instance): console errors, dead
   controls, placeholder/stub copy, broken images, repeated/garbage labels,
-  and error-boundary fallback screens. These are unambiguous bugs — no
-  legitimate design reason for any of them — and a `docs/audit/half-done-baseline.json`
+  visible preview/demo wording (see below), and error-boundary fallback
+  screens. These are unambiguous bugs — no legitimate design reason for any
+  of them — and a `docs/audit/half-done-baseline.json`
   ratchet is used just for this tier: `--ci` fails only on a hard finding
   that isn't already in the baseline. Existing hard findings are tracked (see
   the report) but don't block; *new* ones do.
@@ -91,6 +92,27 @@ node -e "
 
 (`findingKey()` in the audit script is the source of truth for the key
 format — keep this in sync with it.)
+
+## Preview/demo wording (hard tier)
+
+Dev's explicit rule: **no visible preview/demo label anywhere, ever** — a
+fresh (empty) real install must read exactly like this text, no matter which
+screen. `PREVIEW_DEMO_WORDING_RE` in the script flags any rendered text
+containing "preview", "demo", "mock", "placeholder data", "test mode", or the
+"read-only preview" / "until you reload" / "not load live" phrasings that
+were found live (Payouts, Products, Discounts — see the "Purge preview
+wording" PRs). It's hard-tier so this class of thing can't quietly reappear.
+
+Deliberately excluded from the bare-word match, as a judgement call rather
+than a blanket ban: bare "sample" (this app has a real, permanent
+manufacturing "request a sample" / "AI logo sample" feature — unrelated to
+demo data) and bare "read-only" (a real, permanent team-role permission
+label — unrelated to preview mode). A screen that genuinely has a legitimate,
+permanent "Preview" feature (e.g. previewing a drop or a storefront theme
+before it's live, which real sellers use in production) will still show up
+as a hard finding the first time this check runs — add it to the baseline
+after confirming by eye that it's a real feature label and not a preview/demo
+mode tell, the same way any other hard-tier finding is baselined.
 
 ## Known exception: the seller dashboard revenue chart
 
