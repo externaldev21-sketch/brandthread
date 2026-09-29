@@ -332,26 +332,24 @@ describe('SellerDashboardChart', () => {
     const axisRow = renderer!.root.findByProps({ testID: 'seller-dashboard-chart-axis' });
     const texts = axisRow.findAllByType('Text' as React.ElementType);
     expect(texts.map((t) => t.props.children)).toEqual(['Oct', 'Dec', 'Feb', 'May', 'Jul', 'Sep']);
-    // Each label's own anchor point: the first is left-aligned at its box's
-    // left edge, the last is right-aligned at its box's right edge, and
-    // every middle label is centered in its box — so the *anchor* (not the
-    // raw box `left`, which differs in meaning at the edges vs the middle)
-    // is what must land in perfectly even columns.
-    const anchors = texts.map((t) => {
+    // Middle labels (everything but the first/last) are centered in a
+    // fixed-width box on their evenly-spaced x — react-test-renderer has no
+    // real text layout to measure the edge labels' auto-sized box against
+    // (see the Playwright live-measurement verification in the PR
+    // description for that), so this checks what IS decidable here: the
+    // middle labels' *centers* land in perfectly even columns, i.e. the
+    // integer bucket-index rounding artifact (2,2,3,2,2) never leaks into
+    // the rendered pixel spacing.
+    const middleCenters = texts.slice(1, -1).map((t) => {
       const style = flattenStyle(t.props.style);
-      const left = style.left as number;
-      if (style.textAlign === 'left') return left;
-      if (style.textAlign === 'right') return left + AXIS_LABEL_WIDTH;
-      return left + AXIS_LABEL_WIDTH / 2;
+      return (style.left as number) + AXIS_LABEL_WIDTH / 2;
     });
-    const gaps = anchors.slice(1).map((a, i) => a - anchors[i]);
-    // Every gap — including the two end gaps, previously shrunk by the
-    // center-then-clamp approach — must be exactly even now.
+    const gaps = middleCenters.slice(1).map((c, i) => c - middleCenters[i]);
     const first = gaps[0];
     for (const gap of gaps) expect(Math.abs(gap - first)).toBeLessThan(0.01);
   });
 
-  it('anchors the first label to the true left edge and the last label to the true right edge (no inward clamp shrinking the end gaps)', async () => {
+  it('anchors the first label to the true left edge and the last label to the true right edge, auto-sized to their own text (no fixed-width box to shrink the end gaps)', async () => {
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const width = 355;
     await act(async () => {
@@ -372,10 +370,15 @@ describe('SellerDashboardChart', () => {
     const texts = axisRow.findAllByType('Text' as React.ElementType);
     const first = flattenStyle(texts[0].props.style);
     const last = flattenStyle(texts[texts.length - 1].props.style);
+    // No fixed AXIS_LABEL_WIDTH box (that was the bug: a same-width box
+    // anchored at the true edge still measures/renders as if centered,
+    // since CSS textAlign never changes a box's own bounding rect) —
+    // instead the box auto-sizes to its own text, pinned via `left`/`right`
+    // (not a computed offset) so its true edge sits exactly at x=0/x=width.
     expect(first.left).toBe(0);
-    expect(first.textAlign).toBe('left');
-    expect(last.left).toBe(width - AXIS_LABEL_WIDTH);
-    expect(last.textAlign).toBe('right');
+    expect(first.width).toBeUndefined();
+    expect(last.right).toBe(0);
+    expect(last.width).toBeUndefined();
   });
 
   it('places the axis labels directly under the chart, ABOVE the range-selector pills (Shopify/Robinhood order)', async () => {
