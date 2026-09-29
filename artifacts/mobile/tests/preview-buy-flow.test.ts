@@ -13,6 +13,8 @@ vi.mock('@/lib/previewCatalog', () => ({
   getPreviewCatalogProduct: () => null,
 }));
 
+vi.mock('@/lib/devPreview', () => ({ isBuyerDevPreview: () => false, isPreviewDemoMode: () => false }));
+
 import {
   getPreviewBuyerProduct, getPreviewRelatedProducts, previewBuyerProductFromCatalog, rankPreviewRelated,
 } from '@/lib/previewProducts';
