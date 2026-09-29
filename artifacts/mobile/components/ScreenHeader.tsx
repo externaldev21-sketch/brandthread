@@ -47,6 +47,17 @@ interface ScreenHeaderProps {
 /** Design-system rule: at most 2 action icons on the right, primary rightmost. */
 const MAX_HEADER_ACTIONS = 2;
 
+/**
+ * THE one screen-header title size, app-wide — every screen's title sits at
+ * this exact size, weight (Inter 700 / FONT.bold), and vertical position
+ * (`topPad` below), so titles never visibly differ from one screen to the
+ * next. Previously `FS.xl` (22) here, while most hand-rolled headers
+ * elsewhere in the app clustered closer to 17-19 — this is a dedicated
+ * constant (not a reused `FS.*` token) specifically so nothing else in the
+ * app can nudge it by changing an unrelated token's meaning.
+ */
+const TITLE_SIZE = 20;
+
 export function ScreenHeader({
   title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, variant = 'push',
 }: ScreenHeaderProps) {
@@ -69,7 +80,7 @@ export function ScreenHeader({
     : 1;
 
   return (
-    <View style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }]}>
+    <View testID="screen-header" style={[styles.wrap, { paddingTop: topPad, borderBottomColor: colors.border }]}>
       <View style={styles.container}>
         <PressableScale
           onPress={() => (onBack ? onBack() : goBackOr(router))}
@@ -77,7 +88,7 @@ export function ScreenHeader({
           accessibilityRole="button"
           accessibilityLabel={variant === 'modal' ? `Close ${title}` : `Go back from ${title}`}
           accessibilityHint={variant === 'modal' ? `Dismisses ${title}` : `Returns from ${title}`}
-          testID={backTestID}
+          testID={backTestID ?? 'screen-header-back'}
         >
           <Feather name={variant === 'modal' ? 'x' : 'arrow-left'} size={ICON.md} color={colors.foreground} />
         </PressableScale>
@@ -85,13 +96,14 @@ export function ScreenHeader({
         <View style={styles.titleBlock}>
           {scrollY ? (
             <Animated.Text
+              testID="screen-header-title"
               style={[styles.title, { color: colors.foreground, opacity: compactTitleOpacity }]}
               numberOfLines={1}
             >
               {title}
             </Animated.Text>
           ) : (
-            <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{title}</Text>
+            <Text testID="screen-header-title" style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{title}</Text>
           )}
           {subtitle && !scrollY && (
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]} numberOfLines={1}>{subtitle}</Text>
@@ -133,7 +145,14 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    // 'flex-start', deliberately not 'flex-end': the title's own vertical
+    // position must never depend on whether a screen also passes a
+    // `subtitle` — with `flex-end`, a taller (title+subtitle) titleBlock
+    // pushed the title's own top several pixels higher than a title-only
+    // screen's, which is exactly the "titles don't line up" bug this fixes.
+    // Top-aligning means every screen's title starts at the same fixed Y
+    // (topPad) regardless of what renders below it.
+    alignItems: 'flex-start',
     minHeight: COMP.headerH,
     paddingHorizontal: SP.md,
     paddingBottom: SP.md,
@@ -168,7 +187,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: FS.xl,
+    fontSize: TITLE_SIZE,
     fontFamily: FONT.bold,
     letterSpacing: -0.3,
   },

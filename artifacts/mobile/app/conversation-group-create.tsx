@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'reac
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, ICON } from '@/lib/theme';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -26,7 +26,6 @@ export default function ConversationGroupCreateScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(), []);
   const insets = useSafeAreaInsets();
-  const headerTopPad = useHeaderTopInset();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{ role?: string }>();
@@ -80,19 +79,11 @@ export default function ConversationGroupCreateScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: theme.background }]}>
-      <View style={[s.header, { paddingTop: headerTopPad + SP.xs }]}>
-        <PressableScale rippleEnabled={false}
-          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
-          style={s.roundBtn}
-          testID="group-create-back"
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-        </PressableScale>
-        <Text style={[s.headerTitle, { color: theme.text }]}>New group</Text>
-        <View style={s.roundBtn} />
-      </View>
+      <ScreenHeader
+        title="New group"
+        onBack={() => { hapticPrimaryAction(); goBackOr(router); }}
+        backTestID="group-create-back"
+      />
 
       <Text style={[s.subtitle, { color: theme.muted }]}>Choose at least 2 people you follow</Text>
 
@@ -137,9 +128,6 @@ export default function ConversationGroupCreateScreen() {
 
 const makeStyles = () => StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm },
-  roundBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: FONT.semibold, fontSize: FS.md },
   subtitle: { fontFamily: FONT.regular, fontSize: FS.sm, paddingHorizontal: SP.md, marginBottom: SP.sm },
   empty: { textAlign: 'center', marginTop: SP.xl, fontFamily: FONT.regular, fontSize: FS.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: StyleSheet.hairlineWidth },

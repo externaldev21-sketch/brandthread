@@ -71,13 +71,25 @@ describe('seller home chart labels', () => {
     expect(formatClockLabel(parseBucketTimestamp(utcMidnight), false)).toBe('2 PM');
   });
 
-  it('buckets "Month" by local day-of-month, 30 daily bars', () => {
+  it('buckets "Month" as "Mon D" (month name + local day-of-month), not a bare day number', () => {
     const start = Date.UTC(2024, 5, 1); // Jun 1 UTC
     const buckets = Array.from({ length: 30 }, (_, i) => new Date(start + i * 24 * 60 * 60 * 1000).toISOString());
     const labels = buckets.map((bucket) => bucketLabel(bucket, 'month'));
     // Local day-of-month for a UTC day-1 instant at +14h is still day 1 (no
-    // day-boundary crossing), climbing 1..30 in order.
-    expect(labels).toEqual(Array.from({ length: 30 }, (_, i) => String(i + 1)));
+    // day-boundary crossing), climbing 1..30 in order — June has exactly 30
+    // days, so every label stays "Jun D" here (the month-spanning case is
+    // covered separately below).
+    expect(labels).toEqual(Array.from({ length: 30 }, (_, i) => `Jun ${i + 1}`));
+  });
+
+  it('"Month" labels use each bucket\'s OWN month when the 30-day window spans a calendar-month boundary', () => {
+    // A window starting a few days before month-end: the tail buckets must
+    // read the NEXT month, not silently stay labeled with the start month
+    // or wrap the day number past 28/29/30/31.
+    const start = Date.UTC(2024, 0, 29); // Jan 29 UTC (January has 31 days)
+    const buckets = Array.from({ length: 6 }, (_, i) => new Date(start + i * 24 * 60 * 60 * 1000).toISOString());
+    const labels = buckets.map((bucket) => bucketLabel(bucket, 'month'));
+    expect(labels).toEqual(['Jan 29', 'Jan 30', 'Jan 31', 'Feb 1', 'Feb 2', 'Feb 3']);
   });
 
   it('buckets "Year" by local month, 12 correctly-ordered, unique labels', () => {
