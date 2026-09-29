@@ -11,7 +11,9 @@ import { Header } from '@/components/layout';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { RetryRow } from '@/components/ui/RetryRow';
 import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
+import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
@@ -62,6 +64,11 @@ export default function PayoutsScreen() {
   const params = useLocalSearchParams();
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const api    = useApi();
+  const { userId } = useAuth();
+  // ?bt_preview=seller with no real signed-in account: no token to fetch
+  // real payout data with — resolve straight to the honest empty/no-history
+  // state (same convention as app/(tabs)/orders.tsx's isPreviewMode guard).
+  const [isPreviewMode] = useState(() => isSellerDevPreview());
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
@@ -84,6 +91,11 @@ export default function PayoutsScreen() {
   }
 
   const refreshConnectStatus = useCallback(async () => {
+    if (isPreviewMode && !userId) {
+      setConnectStatus(null);
+      setConnectLoading(false);
+      return;
+    }
     if (connectRequestRef.current) return;
     connectRequestRef.current = true;
     try {
@@ -103,6 +115,14 @@ export default function PayoutsScreen() {
   }, [api]);
 
   const load = useCallback(async () => {
+    if (isPreviewMode && !userId) {
+      setBalance({ available: { amount: 0, currency: 'usd', formatted: '$0.00' }, pending: { amount: 0, currency: 'usd', formatted: '$0.00' }, connected: false });
+      setPayouts([]);
+      setLoadError(false);
+      setLoading(false);
+      void refreshConnectStatus();
+      return;
+    }
     setLoading(true);
     setLoadError(false);
     try {
