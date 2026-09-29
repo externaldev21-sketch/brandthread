@@ -9,7 +9,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -23,6 +22,7 @@ import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard, HapticSwitch,} from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   getStorefront, updateSection, toggleSection, deleteSection,
   duplicateSection, reorderSections, undoLastAction, redoLastAction,
@@ -339,12 +339,6 @@ export default function StoreEditor() {
   async function handleThemeUpdate(partial: Partial<StoreThemeSettings>) {
     const s = await updateThemeSettings(partial);
     setStore(s);
-  }
-
-  function saveStatusColor() {
-    if (savingStatus === 'saved') return SUCCESS;
-    if (savingStatus === 'failed') return RED;
-    return MUTED;
   }
 
   function saveStatusText() {
@@ -1139,21 +1133,12 @@ export default function StoreEditor() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: useHeaderTopInset() }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerRow1}>
-          <TouchableOpacity
-            onPress={() => goBackOr(router)}
-            style={styles.backBtn}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Store</Text>
-          {savingStatus !== 'idle' && (
-            <Text style={[styles.saveStatus, { color: saveStatusColor() }]}>{saveStatusText()}</Text>
-          )}
+    <View style={styles.root}>
+      <ScreenHeader
+        title="Edit Store"
+        subtitle={savingStatus !== 'idle' ? saveStatusText() : undefined}
+        onBack={() => goBackOr(router)}
+        rightElement={
           <View style={styles.headerRight}>
             <TouchableOpacity
               onPress={handleUndo}
@@ -1189,8 +1174,8 @@ export default function StoreEditor() {
               <Text style={[styles.headerBtnText, { color: theme.onAccent }]}>Publish</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </View>
+        }
+      />
 
       {/* Tab Bar */}
       <ScrollView
@@ -1233,16 +1218,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const MUTED = theme.muted;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: { paddingHorizontal: SP.md, paddingVertical: SP.xs },
-  headerRow1: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
-  saveStatus: { fontSize: FS.xs, fontFamily: FONT.medium },
-  headerRight: { marginLeft: 'auto' as any, flexDirection: 'row', alignItems: 'center', gap: SP.xs },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
   undoBtn: {
     width: 32, height: 32, borderRadius: RADIUS.sm,
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
