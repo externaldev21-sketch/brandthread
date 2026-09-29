@@ -33,7 +33,8 @@ import { getPreviewActivityPost } from '@/lib/previewActivity';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 
 function PostVideo({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
@@ -219,8 +220,9 @@ export default function BuyerPostViewer() {
 
   return (
     <View style={s.page}>
-      <Header
+      <ScreenHeader
         title={authorName}
+        onBack={() => goBackOr(router)}
         actions={[{ icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' }]}
       />
       {tileExpandOverlay}
@@ -375,40 +377,44 @@ export default function BuyerPostViewer() {
 
       {/* Edit caption modal */}
       <Modal visible={editOpen} transparent animationType="fade" onRequestClose={() => setEditOpen(false)}>
-        <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setEditOpen(false)}>
-          <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
-            <View style={s.modalHandle} />
-            <Text style={s.modalTitle}>Edit Caption</Text>
-            <TextInput
-              style={s.captionInput}
-              value={editCaption}
-              onChangeText={setEditCaption}
-              placeholder="Write a caption…"
-              placeholderTextColor={SUBTLE}
-              multiline
-              autoFocus
-            />
-            <View style={s.modalActions}>
-              <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setEditOpen(false)} />
-              <Button label="Save" variant="primary" style={s.modalActionBtn} onPress={handleSaveCaption} />
-            </View>
+        <ModalSafeArea>
+          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setEditOpen(false)}>
+            <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
+              <View style={s.modalHandle} />
+              <Text style={s.modalTitle}>Edit Caption</Text>
+              <TextInput
+                style={s.captionInput}
+                value={editCaption}
+                onChangeText={setEditCaption}
+                placeholder="Write a caption…"
+                placeholderTextColor={SUBTLE}
+                multiline
+                autoFocus
+              />
+              <View style={s.modalActions}>
+                <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setEditOpen(false)} />
+                <Button label="Save" variant="primary" style={s.modalActionBtn} onPress={handleSaveCaption} />
+              </View>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
+        </ModalSafeArea>
       </Modal>
 
       {/* Delete confirm modal */}
       <Modal visible={deleteConfirm} transparent animationType="fade" onRequestClose={() => setDeleteConfirm(false)}>
-        <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setDeleteConfirm(false)}>
-          <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
-            <View style={s.modalHandle} />
-            <Text style={s.modalTitle}>Delete post?</Text>
-            <Text style={s.modalDesc}>This will permanently remove the post from your profile. This cannot be undone.</Text>
-            <View style={s.modalActions}>
-              <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setDeleteConfirm(false)} />
-              <Button label="Delete" variant="destructive" style={s.modalActionBtn} onPress={handleDelete} />
-            </View>
+        <ModalSafeArea>
+          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setDeleteConfirm(false)}>
+            <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
+              <View style={s.modalHandle} />
+              <Text style={s.modalTitle}>Delete post?</Text>
+              <Text style={s.modalDesc}>This will permanently remove the post from your profile. This cannot be undone.</Text>
+              <View style={s.modalActions}>
+                <Button label="Cancel" variant="secondary" style={s.modalActionBtn} onPress={() => setDeleteConfirm(false)} />
+                <Button label="Delete" variant="destructive" style={s.modalActionBtn} onPress={handleDelete} />
+              </View>
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
+        </ModalSafeArea>
       </Modal>
     </View>
   );

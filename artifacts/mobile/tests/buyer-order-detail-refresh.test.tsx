@@ -95,6 +95,7 @@ vi.mock('expo-router', () => ({
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 vi.mock('@/hooks/useApi', () => ({
@@ -129,15 +130,21 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   }),
 }));
 
+vi.mock('@/components/ScreenHeader', () => {
+  const native = (name: string) => (props: Record<string, unknown>) =>
+    React.createElement(name, props, props.children as React.ReactNode);
+  return { ScreenHeader: native('ScreenHeader') };
+});
+
 vi.mock('@/components/BrandthreadUI', () => {
   const native = (name: string) => (props: Record<string, unknown>) =>
     React.createElement(name, props, props.children as React.ReactNode);
 
   return {
     BrandthreadCard: native('BrandthreadCard'),
-    BrandthreadHeader: native('BrandthreadHeader'),
     BrandthreadScreen: native('BrandthreadScreen'),
     GradientCard: native('GradientCard'),
+    PressableScale: native('PressableScale'),
     PrimaryButton: native('PrimaryButton'),
     SecondaryButton: native('SecondaryButton'),
     StatusBadge: native('StatusBadge'),
@@ -255,7 +262,7 @@ function renderedText(renderer: ReactTestRenderer): string {
 }
 
 function orderHeader(renderer: ReactTestRenderer) {
-  return renderer.root.find(node => (node.type as unknown) === 'BrandthreadHeader');
+  return renderer.root.find(node => (node.type as unknown) === 'ScreenHeader');
 }
 
 function statusBadge(renderer: ReactTestRenderer) {
@@ -379,7 +386,10 @@ describe('buyer order detail refresh lifecycle', () => {
 
     expect(renderedText(renderer)).not.toContain('Buyer A Private Tee');
     expect(renderedText(renderer)).not.toContain('Seller A');
-    expect(renderer.root.findAll(node => (node.type as unknown) === 'BrandthreadHeader')).toHaveLength(0);
+    // The loading state still renders a ScreenHeader (title "Order Details",
+    // not the specific order's number/subtitle) — every screen keeps a
+    // consistently-placed header, even mid-fetch.
+    expect(renderer.root.findAll(node => (node.type as unknown) === 'ScreenHeader')).toHaveLength(1);
 
     outdatedBuyerA.resolve(orderRow({
       orderNumber: 'BT-A',
