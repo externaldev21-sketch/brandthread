@@ -152,7 +152,14 @@ export type PaidOrderInput = {
   orderId: string;
   sellerId: string;
   dropId: string | null;
-  chargeModel: "destination" | "held";
+  /**
+   * "transfer" (one-page checkout): charged to Brandthread as one cart-wide
+   * PaymentIntent, then transferred to the seller right after the order is
+   * created (lib/money/cartTransfers.ts). Until that transfer lands the
+   * seller's share sits in seller_held for this order, like a held order
+   * but with no drop.
+   */
+  chargeModel: "destination" | "held" | "transfer";
   split: OrderSplit;
   /**
    * Destination charges: the processing-fee estimate that was included in
@@ -175,14 +182,16 @@ export async function recordOrderPaid(executor: DbExecutor, input: PaidOrderInpu
   const { split } = input;
   const actualProcessing = input.charge.processingFeeCents;
   const held = input.chargeModel === "held";
+  const transfer = input.chargeModel === "transfer";
   if (held && !input.dropId) throw new Error("A held order must belong to a drop");
 
   let sellerNet: number;
   let processingCharged: number;
   let processingActual: number;
-  if (held) {
-    // Held charges land on Brandthread's balance, so the seller bears
-    // exactly what Stripe charged (split was built with the real fee).
+  if (held || transfer) {
+    // Held and transfer charges land on Brandthread's balance, so the seller
+    // bears exactly what Stripe charged (split was built with the real fee;
+    // for a cart-wide transfer charge, this order's pro-rata share of it).
     sellerNet = split.sellerNetCents;
     processingCharged = split.processingFeeCents;
     processingActual = split.processingFeeCents;
@@ -199,7 +208,7 @@ export async function recordOrderPaid(executor: DbExecutor, input: PaidOrderInpu
 
   const [claimed] = await executor.update(orders).set({
     chargeModel: input.chargeModel,
-    fundsState: held ? "held" : "settled_direct",
+    fundsState: held || transfer ? "held" : "settled_direct",
     platformFeeCents: split.platformFeeCents,
     processingFeeCents: processingActual,
     processingFeeChargedCents: processingCharged,
@@ -213,7 +222,24 @@ export async function recordOrderPaid(executor: DbExecutor, input: PaidOrderInpu
   if (!claimed) return;
 
   const common = { orderId: input.orderId, dropId: input.dropId };
-  if (held) {
+  if (transfer) {
+    await postLedgerTransaction(executor, {
+      idempotencyKey: `order-paid/${input.orderId}`,
+      kind: "order_paid_transfer",
+      sellerId: input.sellerId,
+      orderId: input.orderId,
+      dropId: null,
+      stripeObjectId: input.paymentIntentId,
+      occurredAt: input.occurredAt,
+      memo: "In-app checkout payment; the seller's share is transferred right after the order is created",
+      postings: [
+        { account: "buyer_payments", amountCents: -split.grossCents },
+        { account: "seller_held", partyId: input.sellerId, amountCents: sellerNet },
+        { account: "platform_revenue", amountCents: split.platformFeeCents },
+        { account: "stripe_processing_fees", amountCents: processingActual },
+      ],
+    });
+  } else if (held) {
     await postLedgerTransaction(executor, {
       idempotencyKey: `order-paid/${input.orderId}`,
       kind: "order_paid_held",
@@ -635,7 +661,9 @@ export async function recordLabelPurchased(executor: DbExecutor, input: {
     if (posted) await adjustWallet(executor, input.dropId, { reserved: -input.priceCents, released: input.priceCents });
     return;
   }
-  if (input.chargeModel === "destination") {
+  // "transfer" orders (one-page checkout) were also already paid out to the
+  // seller, by our own transfer instead of a destination charge.
+  if (input.chargeModel === "destination" || input.chargeModel === "transfer") {
     await postLedgerTransaction(executor, {
       idempotencyKey: `label/${input.labelId}`,
       kind: "label_advanced",
@@ -707,7 +735,7 @@ export async function recoverLabelCost(
     FROM shipping_labels l JOIN orders o ON o.id = l.order_id
     WHERE l.id = ${labelId}::uuid
   `));
-  if (!label || label.charge_model !== "destination" || label.status !== "active") return "skipped";
+  if (!label || (label.charge_model !== "destination" && label.charge_model !== "transfer") || label.status !== "active") return "skipped";
   const done = rows(await db.execute(sql`
     SELECT 1 FROM ledger_transactions WHERE idempotency_key = ${`label-recovery/${labelId}`}
   `));
