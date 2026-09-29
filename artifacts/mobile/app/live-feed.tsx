@@ -34,6 +34,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { FeedToastProvider, useFeedToast } from '@/components/EngagementButton';
 import { hapticLight } from '@/lib/haptics';
 import { formatCents } from '@/lib/money';
+import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, RADIUS } from '@/lib/theme';
 import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
@@ -444,7 +445,7 @@ function LiveRoomPage({
                 </View>
                 <Feather name="eye" size={11} color="rgba(255,255,255,0.85)" />
                 <Text style={styles.viewerText}>
-                  {room.viewerCount >= 1000 ? `${(room.viewerCount / 1000).toFixed(1)}K` : room.viewerCount}
+                  {formatCompactCount(room.viewerCount)}
                 </Text>
               </View>
             </View>

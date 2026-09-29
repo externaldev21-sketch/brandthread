@@ -682,12 +682,12 @@ describe('buyer profile — Instagram layout', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-story-create');
   });
 
-  it('orders the stats Posts · Followers · Following', async () => {
+  it('orders the stats Followers · Following · Likes (Posts was dropped — dev: high counts were getting cut off)', async () => {
     renderer = await renderScreen();
     const row = renderer.root.findByProps({ testID: 'profile-stats-row' });
     const keys = row.findAll((node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('profile-stat-') && typeof node.type === 'string')
       .map((node) => node.props.testID);
-    expect([...new Set(keys)]).toEqual(['profile-stat-posts', 'profile-stat-followers', 'profile-stat-following']);
+    expect([...new Set(keys)]).toEqual(['profile-stat-followers', 'profile-stat-following', 'profile-stat-likes']);
   });
 
   it('puts the avatar and stats on the same row (Instagram order), with name/@handle/bio below it', async () => {

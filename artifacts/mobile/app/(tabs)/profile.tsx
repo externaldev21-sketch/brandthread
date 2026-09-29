@@ -35,7 +35,8 @@ import { AccountSwitcherSheet } from '@/components/AccountSwitcherSheet';
 import { ListRow } from '@/components/ui/ListRow';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, productDetailHref, profileProductsHref, profileVideosHref } from '@/lib/profileNavigation';
-import { formatProfileCount, getSellerShopPage, type ShopProduct } from '@/services/profileService';
+import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
+import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
   ProfileButton, ProfileChip, ProfileGlassButton, ShopPill, type ProfileStat, type ProfileTab,
@@ -406,7 +407,6 @@ export default function ProfileScreen() {
   const isFutureScheduled = (p: SellerThreadPost) => !!p.scheduledAt && new Date(p.scheduledAt).getTime() > Date.now();
   const publishedPosts = sellerPosts.filter(p => !p.isDraft && !p.isArchived && !isFutureScheduled(p));
   const draftPosts = sellerPosts.filter(p => !p.isArchived && (p.isDraft || isFutureScheduled(p)));
-  const publishedCount = publishedPosts.length;
 
   const handleTilePress = useCallback((item: ProfileGridItem) => {
     const post = sellerPosts.find(candidate => candidate.id === item.id);
@@ -457,12 +457,14 @@ export default function ProfileScreen() {
     );
   }, [showingProductsGrid, handleShopTilePress, handleTilePress, handleDraftsTilePress, layout.tileHeight, layout.tileWidth]);
 
-  // Instagram order: Posts · Followers · Following (Likes kept as the seller's fourth stat).
+  // Followers · Following · Likes — Posts was dropped (dev: a seller with a
+  // high count of any of these was getting cut off; three columns instead of
+  // four gives each one enough room, and formatCompactCount keeps any of
+  // them from overflowing regardless of magnitude).
   const stats: ProfileStat[] = [
-    { key: 'videos', label: 'Posts', value: formatProfileCount(publishedCount) },
-    { key: 'followers', label: 'Followers', value: formatProfileCount(socialCounts.followers), onPress: () => nav(connectionsHref('followers')) },
-    { key: 'following', label: 'Following', value: formatProfileCount(socialCounts.following), onPress: () => nav(connectionsHref('following')) },
-    { key: 'likes', label: 'Likes', value: formatProfileCount(socialCounts.likes) },
+    { key: 'followers', label: 'Followers', value: formatCompactCount(socialCounts.followers), onPress: () => nav(connectionsHref('followers')) },
+    { key: 'following', label: 'Following', value: formatCompactCount(socialCounts.following), onPress: () => nav(connectionsHref('following')) },
+    { key: 'likes', label: 'Likes', value: formatCompactCount(socialCounts.likes) },
   ];
 
   const planLabel = profile?.subscriptionPlanId

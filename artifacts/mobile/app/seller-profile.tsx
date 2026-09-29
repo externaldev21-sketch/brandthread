@@ -20,7 +20,7 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
-import { formatProfileCount } from '@/services/profileService';
+import { formatCompactCount } from '@/lib/compactFormat';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
@@ -411,14 +411,17 @@ export default function SellerProfileScreen() {
   const videosCount = Math.max(videos.total, seller?.videosCount ?? 0);
   const productsCount = seller?.productsCount ?? 0;
 
+  // Followers · Following · Rating — Videos/Posts was dropped (dev: a high
+  // count in any column was getting cut off; three columns gives each
+  // enough room). The grid's own "Videos" section header above still shows
+  // the count.
   const stats: ProfileStat[] = [
-    { key: 'videos', label: 'Videos', value: formatProfileCount(videosCount) },
     {
-      key: 'followers', label: 'Followers', value: followers == null ? '–' : formatProfileCount(followers),
+      key: 'followers', label: 'Followers', value: followers == null ? '–' : formatCompactCount(followers),
       onPress: canonicalSellerId ? () => router.push(connectionsHref('followers', isOwner ? null : canonicalSellerId) as never) : undefined,
     },
     {
-      key: 'following', label: 'Following', value: following == null ? '–' : formatProfileCount(following),
+      key: 'following', label: 'Following', value: following == null ? '–' : formatCompactCount(following),
       onPress: canonicalSellerId ? () => router.push(connectionsHref('following', isOwner ? null : canonicalSellerId) as never) : undefined,
     },
     { key: 'rating', label: 'Rating', value: rating && rating.totalCount > 0 ? rating.avgRating.toFixed(1) : '–' },
