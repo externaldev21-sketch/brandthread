@@ -36,6 +36,9 @@ import {
   releaseThreadCashRedemption,
 } from "../lib/threadCash/wallet";
 import { applyThreadCashSellerTopup } from "../lib/threadCash/checkoutTopup";
+import { settleTransferOrder } from "../lib/money/cartTransfers";
+import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
+import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {
   isOrderConfirmationEligibleStatus,
   sendOrderConfirmationEmail,
@@ -291,18 +294,21 @@ router.post("/stripe", async (req: Request, res: Response) => {
 
       // ── Ad Campaign PaymentIntent lifecycle (no-ops — ad campaigns use Checkout Sessions) ──
       // Kept in the switch so old PI events don't fall through to unexpected handlers.
+      // One-page checkout (routes/checkout-intent.ts): one PaymentIntent for
+      // the whole cart. Hosted-Checkout PIs don't carry this kind and are
+      // handled by the checkout.session.* events above.
       case "payment_intent.succeeded": {
         const pi = event.data.object as any;
-        if (pi.metadata?.kind !== "ad_campaign") {
-          // Not an ad campaign PI — no other PI handler currently needed
+        if (pi.metadata?.kind === CART_CHECKOUT_KIND) {
+          await handleCartPaymentSucceeded(pi, event.id, new Date(event.created * 1000));
         }
         break;
       }
       case "payment_intent.payment_failed":
       case "payment_intent.canceled": {
         const pi = event.data.object as any;
-        if (pi.metadata?.kind !== "ad_campaign") {
-          // Not an ad campaign PI — no other PI handler currently needed
+        if (pi.metadata?.kind === CART_CHECKOUT_KIND) {
+          await handleCartPaymentEnded(pi, event.type === "payment_intent.payment_failed");
         }
         break;
       }
@@ -541,6 +547,91 @@ async function releaseCheckoutLoyaltyRedemption(session: any) {
  * The unique index on stripe_checkout_session_id plus the early-exit guard
  * ensure at-most-once order creation even on webhook retries.
  */
+/** This order's share of Stripe's fee on a cart-wide charge (null → estimated by splitOrder). */
+function cartProcessingShareCents(feeCents: number | null, orderGrossCents: number, cartGrossCents: unknown): number | undefined {
+  if (feeCents === null || !Number.isInteger(cartGrossCents) || (cartGrossCents as number) <= 0) return undefined;
+  return Math.round(feeCents * (orderGrossCents / (cartGrossCents as number)));
+}
+
+/**
+ * The cart's PaymentIntent succeeded: one order per seller group. Each group
+ * goes through the same order pipeline as a hosted Checkout Session
+ * (handleCheckoutPaid) with a session-shaped view of that group's share,
+ * which was fixed server-side when the intent was created. Idempotent per
+ * group (the order's stripe_checkout_session_id is unique).
+ */
+export async function handleCartPaymentSucceeded(pi: any, providerEventId: string, paidAt: Date): Promise<void> {
+  const groups = await db.select().from(checkoutSessions)
+    .where(eq(checkoutSessions.stripePaymentIntentId, pi.id));
+  if (groups.length === 0) {
+    logger.error({ paymentIntentId: pi.id }, "Cart payment succeeded without checkout records");
+    return;
+  }
+  const cartTotal = groups.reduce((sum, group) => sum + (group.amountTotalCents ?? 0), 0);
+  if (Number.isInteger(pi.amount_received) && pi.amount_received !== cartTotal) {
+    // Never happens unless the intent was edited outside Brandthread.
+    logger.error({ paymentIntentId: pi.id, received: pi.amount_received, cartTotal }, "Cart payment amount does not match its checkout records");
+  }
+  const shipping = pi.shipping?.address
+    ? { name: pi.shipping.name ?? undefined, address: pi.shipping.address }
+    : undefined;
+  for (const group of groups) {
+    if (!group.stripeSessionId) continue;
+    const subtotal = (group.items ?? []).reduce((sum, item) => sum + item.priceCents * item.quantity, 0);
+    const amountTotal = group.amountTotalCents ?? 0;
+    const tax = group.taxCents ?? 0;
+    const shippingCents = group.shippingCents ?? 0;
+    await handleCheckoutPaid({
+      id: group.stripeSessionId,
+      payment_intent: pi.id,
+      amount_total: amountTotal,
+      cart_amount_total: cartTotal,
+      total_details: {
+        amount_tax: tax,
+        amount_shipping: shippingCents,
+        amount_discount: Math.max(0, subtotal + shippingCents + tax - amountTotal),
+      },
+      shipping_details: shipping,
+      metadata: { csRef: group.id },
+    }, providerEventId, paidAt);
+    await recordCartTaxTransaction(group).catch((err) => {
+      logger.error({ err, checkoutSessionId: group.id }, "Stripe Tax transaction record failed");
+    });
+  }
+}
+
+/** Records the group's Stripe Tax calculation as a transaction on the seller's account (their filing). */
+async function recordCartTaxTransaction(group: typeof checkoutSessions.$inferSelect): Promise<void> {
+  if (!group.stripeTaxCalculationId || !stripe) return;
+  const [order] = await db.select({ id: orders.id }).from(orders)
+    .where(eq(orders.stripeCheckoutSessionId, group.stripeSessionId!)).limit(1);
+  const [seller] = await db.select({ stripeAccountId: users.stripeAccountId })
+    .from(users).where(eq(users.clerkId, group.sellerId)).limit(1);
+  if (!order || !seller?.stripeAccountId) return;
+  await stripe.tax.transactions.createFromCalculation(
+    { calculation: group.stripeTaxCalculationId, reference: order.id },
+    { stripeAccount: seller.stripeAccountId, idempotencyKey: `tax-transaction/${order.id}` },
+  );
+}
+
+/** The cart's payment failed or was cancelled: give back the reserved stock (and cancel a failed intent so it can't succeed later). */
+export async function handleCartPaymentEnded(pi: any, failed: boolean): Promise<void> {
+  if (failed && stripe && pi.status !== "canceled" && pi.status !== "succeeded") {
+    try {
+      await stripe.paymentIntents.cancel(pi.id, { cancellation_reason: "abandoned" });
+    } catch (err) {
+      // Already cancelled or succeeded in the meantime; the release below is
+      // still safe (a succeeded intent's reservations are committed, not held).
+      logger.warn({ err, paymentIntentId: pi.id }, "Could not cancel a failed cart PaymentIntent");
+    }
+  }
+  const groups = await db.select({ id: checkoutSessions.id }).from(checkoutSessions)
+    .where(eq(checkoutSessions.stripePaymentIntentId, pi.id));
+  for (const group of groups) {
+    await db.transaction((tx) => releaseStockReservation(tx, group.id));
+  }
+}
+
 export async function handleCheckoutPaid(
   session: any,
   providerEventId?: string,
@@ -603,6 +694,11 @@ export async function handleCheckoutPaid(
     } catch (err) {
       logger.error({ err, orderId: existing.id }, "Thread Cash seller top-up failed");
     }
+    try {
+      await settleTransferOrder(existing.id);
+    } catch (err) {
+      logger.error({ err, orderId: existing.id }, "Cart order transfer failed");
+    }
     logger.info({ stripeSessionId: sessionId, orderId: existing.id }, "Order already exists for checkout session; skipping");
     return;
   }
@@ -655,10 +751,13 @@ export async function handleCheckoutPaid(
   // How this checkout was charged was decided (server-side) when the session
   // was created. Sessions created before that existed are inferred from the
   // metadata they carried.
-  const chargeModel: "destination" | "held" = csRecord.chargeModel === "held"
-    || (!csRecord.chargeModel && Boolean(metadata["dropId"]))
-    ? "held"
-    : "destination";
+  // "transfer": the one-page checkout's cart-wide PaymentIntent
+  // (routes/checkout-intent.ts), paid out by our own transfer afterwards.
+  const chargeModel: "destination" | "held" | "transfer" = csRecord.chargeModel === "transfer"
+    ? "transfer"
+    : csRecord.chargeModel === "held" || (!csRecord.chargeModel && Boolean(metadata["dropId"]))
+      ? "held"
+      : "destination";
   const orderDropId: string | null = csRecord.dropId ?? metadata["dropId"] ?? null;
   // The exact Stripe fee and charge ids. If Stripe cannot be reached the
   // webhook fails and Stripe retries, rather than recording a guess.
@@ -737,20 +836,34 @@ export async function handleCheckoutPaid(
   let createdOrderId: string | null = null;
 
   await db.transaction(async (tx) => {
+    // One-page checkout reserved these units when the buyer tapped Pay
+    // (lib/money/stockReservation.ts — a hold on top of the shared seam
+    // below, needed because that reservation happens before this order
+    // exists, while the PaymentIntent is still in flight). A still-held
+    // reservation becomes this order's stock: no second check or decrement.
+    // An expired (released) one falls through to the normal path below.
+    const stockAlreadyReserved = chargeModel === "transfer"
+      ? (await commitStockReservation(tx, csRecord.id)) > 0
+      : false;
+
     // Step 1-2: Atomically reserve stock for every line, all-or-nothing —
     // see lib/stockReservation.ts for the lock/check/decrement guarantees.
     // This also performs the decrement (was Step 6, decrement-after-insert)
     // since it's the same DB transaction either way; doing it here lets this
     // handler and routes/orders.ts (POST /) share one implementation instead
-    // of each hand-rolling the lock dance.
-    const reservation = await reserveStockForOrder(
-      tx,
-      cartItems.map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
-    );
-    if (!reservation.ok) {
-      const oversoldSet = new Set(reservation.oversoldVariantIds);
-      for (const item of cartItems) {
-        if (oversoldSet.has(item.variantId)) oversoldItems.push(item.productName);
+    // of each hand-rolling the lock dance. Skipped when the one-page
+    // checkout's own reservation above already took (and will keep) these
+    // units.
+    if (!stockAlreadyReserved) {
+      const reservation = await reserveStockForOrder(
+        tx,
+        cartItems.map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
+      );
+      if (!reservation.ok) {
+        const oversoldSet = new Set(reservation.oversoldVariantIds);
+        for (const item of cartItems) {
+          if (oversoldSet.has(item.variantId)) oversoldItems.push(item.productName);
+        }
       }
     }
 
@@ -798,9 +911,13 @@ export async function handleCheckoutPaid(
       shippingCents,
       taxCents,
       grossCents: totalCents,
-      processingFeeCents: chargeModel === "held" ? chargeDetails.processingFeeCents : undefined,
+      processingFeeCents: chargeModel === "held"
+        ? chargeDetails.processingFeeCents
+        : chargeModel === "transfer"
+          ? cartProcessingShareCents(chargeDetails.processingFeeCents, totalCents, session.cart_amount_total)
+          : undefined,
     });
-    const decidedPlatformFee = chargeModel === "destination" && csRecord.platformFeeCents != null
+    const decidedPlatformFee = (chargeModel === "destination" || chargeModel === "transfer") && csRecord.platformFeeCents != null
       ? Math.min(csRecord.platformFeeCents, totalCents)
       : split.platformFeeCents;
     await recordOrderPaid(tx, {
@@ -906,10 +1023,12 @@ export async function handleCheckoutPaid(
       })),
     );
 
-    // Stock was already reserved (decremented) or left untouched above by
-    // reserveStockForOrder, in the same transaction as this order/items
-    // insert. If oversold: zero decrements were committed — inventory stays
-    // intact. Stripe refund is issued outside this transaction.
+    // Step 6: stock was already reserved (decremented) above — either by the
+    // one-page checkout's own hold (stockAlreadyReserved, committed via
+    // commitStockReservation) or by reserveStockForOrder — in the same
+    // transaction as this order/items insert. If oversold: zero decrements
+    // were committed — inventory stays intact. Stripe refund is issued
+    // outside this transaction.
 
     // ── Low-stock notifications ───────────────────────────────────────────────────
     // For each decremented variant, check if stock fell below threshold.
@@ -1079,6 +1198,17 @@ export async function handleCheckoutPaid(
         await applyThreadCashSellerTopup(stripe, createdOrderId);
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Thread Cash seller top-up failed");
+      }
+
+      // One-page checkout: pay the seller their share now (separate charges
+      // and transfers). A failure is retried by webhook redelivery and the
+      // money sweep; the money stays in seller_held until then.
+      if (chargeModel === "transfer") {
+        try {
+          await settleTransferOrder(createdOrderId);
+        } catch (err) {
+          logger.error({ err, orderId: createdOrderId }, "Cart order transfer failed");
+        }
       }
     }
 

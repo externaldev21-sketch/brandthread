@@ -38,6 +38,7 @@ import { FONT, FS, SP } from '@/lib/theme';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
 import { Hairline } from './CheckoutPrimitives';
+import { groupDeliveryWindow } from './OrderSummarySection';
 import { OrderConfetti } from './OrderConfetti';
 
 export interface VerifiedOrderRef {
@@ -132,8 +133,8 @@ export function OrderConfirmation({
 
   const items = session.deliveryGroups.flatMap(group => group.items);
   const deliveryEstimates = session.deliveryGroups
-    .map(group => group.availableMethods.find(method => method.id === group.selectedMethodId)?.estimatedDelivery)
-    .filter((value): value is string => !!value);
+    .filter(group => group.availableMethods.some(method => method.id === group.selectedMethodId))
+    .map(group => groupDeliveryWindow(group));
   const preOrderEstimates = items.map(item => item.preOrderEstShipDate).filter((value): value is string => !!value);
   const estimates = [...new Set([...deliveryEstimates, ...preOrderEstimates])];
   const firstGroup = session.deliveryGroups[0];

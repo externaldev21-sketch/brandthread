@@ -1,0 +1,120 @@
+{
+  "header": {
+    "headerTop": 0,
+    "headerBottom": 103,
+    "headerBg": "rgb(0, 0, 0)",
+    "scrollTop": 103,
+    "closeTop": 54
+  },
+  "expressVisible": true,
+  "payLabel": "\nPay $507.00",
+  "payEnabled": true,
+  "deliveryWindows": [
+    "\nStandard shipping · $12.00\nShips in 2 business days",
+    "\nStandard shipping · $12.00\nShips in 3–5 business days"
+  ],
+  "summaryText": "ORDER SUMMARY From Northline Studio Heavyweight Hoodie — Ember M · Qty 1 $98.00 Field Shell Jacket — Rust L · Qty 1 $220.00  Standard shipping · $12.00 Ships in 2 business days From Field Office Trail Runner 02 — Clay 10 · Qty 1 $165.00  Standard shipping · $12.00 Ships in 3–5 business days Subtotal (3 items) $483.00 Shipping $24.00 Tax $0.00 Total $507.00",
+  "headerScrolled": {
+    "headerTop": 0,
+    "headerBottom": 103,
+    "headerBg": "rgb(0, 0, 0)",
+    "scrollTop": 103,
+    "closeTop": 54
+  },
+  "createBodies": [
+    {
+      "groups": [
+        {
+          "items": [
+            {
+              "variantId": "prod_nl_hoodie_ember_m",
+              "productId": "prod_nl_hoodie_ember",
+              "quantity": 1
+            },
+            {
+              "variantId": "prod_nl_jacket_rust_l",
+              "productId": "prod_nl_jacket_rust",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "items": [
+            {
+              "variantId": "prod_fo_runner_rust_10",
+              "productId": "prod_fo_runner_rust",
+              "quantity": 1
+            }
+          ]
+        }
+      ],
+      "contactEmail": "jordan@example.com",
+      "contactPhone": "+1 (503) 555-0142",
+      "shippingAddress": {
+        "recipientName": "Jordan Reyes",
+        "street": "1120 NW Everett Street",
+        "line2": "Apt 5C",
+        "city": "Portland",
+        "state": "OR",
+        "postalCode": "97209",
+        "country": "US"
+      },
+      "clientIdempotencyKey": "checkout_demo_key",
+      "saveCard": true
+    }
+  ],
+  "cardDataInRequests": false,
+  "confirms": 1,
+  "hostedCalls": 0,
+  "newBuyer": {
+    "shippingText": "SHIPPING ADDRESS Full name Street address   Suggestions aren’t loading You can still enter your address in the fields below. Try again Apt, suite, etc. (optional) City State Oregon  ZIP code Country United States  Save to my addresses Use it again next time",
+    "payEnabled": true,
+    "hint": null,
+    "quotes": 2,
+    "createBody": {
+      "groups": [
+        {
+          "items": [
+            {
+              "variantId": "prod_nl_hoodie_ember_m",
+              "productId": "prod_nl_hoodie_ember",
+              "quantity": 1
+            },
+            {
+              "variantId": "prod_nl_jacket_rust_l",
+              "productId": "prod_nl_jacket_rust",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "items": [
+            {
+              "variantId": "prod_fo_runner_rust_10",
+              "productId": "prod_fo_runner_rust",
+              "quantity": 1
+            }
+          ]
+        }
+      ],
+      "contactEmail": "jordan@example.com",
+      "contactPhone": "+1 503 555 0142",
+      "shippingAddress": {
+        "recipientName": "Jordan Reyes",
+        "street": "1120 NW Everett Street",
+        "line2": null,
+        "city": "Portland",
+        "state": "OR",
+        "postalCode": "97209",
+        "country": "US"
+      },
+      "clientIdempotencyKey": "checkout_demo_key",
+      "saveCard": true
+    },
+    "cardDataInRequests": false,
+    "lastConfirmParams": "{\"return_url\":\"http://localhost:8111/buyer-checkout?bt_preview=buyer\",\"payment_method_data\":{\"billing_details\":{\"name\":\"Jordan Reyes\",\"email\":\"jordan@example.com\",\"phone\":\"+1 503 555 0142\"}}}"
+  },
+  "hosted": {
+    "payment": "PAYMENT  Card, Apple Pay or Google Pay Entered on Stripe’s secure page after you tap Pay  Secured by Stripe. Items from 2 sellers are paid in 2 separate secure payments."
+  }
+}

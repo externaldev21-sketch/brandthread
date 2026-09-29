@@ -112,7 +112,7 @@ async function run() {
   await page.getByText('Added to your bag').waitFor({ timeout: 10_000 });
   await page.waitForTimeout(900);
   await page.getByRole('button', { name: 'View bag' }).click();
-  await page.getByRole('button', { name: 'Checkout' }).waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Checkout', exact: true }).waitFor({ timeout: 30_000 });
   await page.waitForTimeout(1200);
   // 3. Remove is grey.
   results.rowRemove = await page.getByText('Remove', { exact: true }).first().evaluate((el) => getComputedStyle(el).color);
@@ -130,7 +130,7 @@ async function run() {
   await page.waitForTimeout(500);
 
   // 1. Checkout: filled, enabled, no typing.
-  await page.getByRole('button', { name: 'Checkout' }).click();
+  await page.getByRole('button', { name: 'Checkout', exact: true }).click();
   await page.getByTestId('checkout-place-order').waitFor({ timeout: 30_000 });
   await page.waitForTimeout(1500);
   results.placeOrderEnabled = await page.getByTestId('checkout-place-order').isEnabled();
@@ -140,7 +140,7 @@ async function run() {
   results.shipping = (await page.getByTestId('checkout-shipping').innerText()).replace(/\s+/g, ' ').trim();
   results.nextStepHint = await page.getByTestId('checkout-next-step').count();
   await shot('05-checkout-prefilled-place-order-enabled');
-  await page.getByTestId('checkout-delivery').scrollIntoViewIfNeeded();
+  await page.getByTestId('checkout-order-summary').scrollIntoViewIfNeeded();
   await shot('06-checkout-delivery-and-payment');
 
   // One tap.

@@ -18,11 +18,14 @@ export function isValidCheckoutPostalCode(postalCode?: string | null): boolean {
   return (postalCode ?? '').trim().length >= 3;
 }
 
-/** Every shipping-address field `getCheckoutBlockingSection` requires, name included. */
+/**
+ * Every shipping-address field `getCheckoutBlockingSection` requires. The
+ * name is one "Full name" field (split into first/last for storage), so a
+ * single-word name is accepted.
+ */
 export function isCompleteCheckoutAddress(address: Partial<CheckoutAddress>): boolean {
   return !!(
-    address.firstName
-    && address.lastName
+    address.firstName?.trim()
     && address.line1
     && address.city
     && address.state
@@ -93,8 +96,7 @@ export type CheckoutAddressField = 'firstName' | 'lastName' | 'line1' | 'city' |
 /** Inline, per-field messages for the shipping address editor. */
 export function getCheckoutAddressErrors(address: Partial<CheckoutAddress>): Partial<Record<CheckoutAddressField, string>> {
   const errors: Partial<Record<CheckoutAddressField, string>> = {};
-  if (!address.firstName?.trim()) errors.firstName = 'Required';
-  if (!address.lastName?.trim()) errors.lastName = 'Required';
+  if (!address.firstName?.trim()) errors.firstName = 'Enter the recipient’s full name';
   if (!address.line1?.trim()) errors.line1 = 'Enter a street address';
   if (!address.city?.trim()) errors.city = 'Required';
   if (!address.state?.trim()) errors.state = 'Required';

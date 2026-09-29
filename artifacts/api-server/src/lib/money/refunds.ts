@@ -20,6 +20,10 @@
  *    balance (reverse_transfer). Held orders: it comes out of the held funds;
  *    if those were already spent (bulk order, label) the drop shows a
  *    shortfall the seller owes.
+ *  - One-page checkout orders (charge_model "transfer", lib/money/
+ *    cartTransfers.ts): the cart's PaymentIntent is partially refunded for
+ *    this order only. The seller's share is reversed from this order's own
+ *    transfer, or taken from its held funds if the transfer hasn't gone out.
  */
 import { and, eq, sql } from "drizzle-orm";
 import type Stripe from "stripe";
@@ -28,7 +32,7 @@ import { stripe as defaultStripe } from "../stripe";
 import { logger } from "../logger";
 import { platformFeeRefundCents } from "./fees";
 import { adjustDropWalletForRefund, maybeCompleteDrop } from "./escrow";
-import { orderHeldCents, postLedgerTransaction, type DbExecutor, type LedgerPosting } from "./ledger";
+import { accountBalanceCents, orderHeldCents, postLedgerTransaction, type DbExecutor, type LedgerPosting } from "./ledger";
 import { refundThreadCashSpend } from "../threadCash/wallet";
 import {
   orderFundsMachine, orderStatusMachine, refundMachine, releaseMachine,
@@ -97,6 +101,7 @@ export type LockedOrder = {
   stripe_thread_cash_transfer_id: string | null;
   stripe_payment_intent_id: string | null;
   stripe_application_fee_id: string | null;
+  stripe_transfer_id: string | null;
   created_at: Date;
 };
 
@@ -109,7 +114,7 @@ async function lockOrder(executor: DbExecutor, orderId: string): Promise<LockedO
     SELECT id, owner_id, buyer_id, order_number, status, drop_id, charge_model, funds_state,
            total_cents, gross_charged_cents, refunded_cents, platform_fee_cents,
            platform_fee_refunded_cents, thread_cash_applied_cents, stripe_thread_cash_transfer_id,
-           stripe_payment_intent_id, stripe_application_fee_id, created_at
+           stripe_payment_intent_id, stripe_application_fee_id, stripe_transfer_id, created_at
     FROM orders WHERE id = ${orderId}::uuid FOR UPDATE
   `));
   return order;
@@ -211,6 +216,11 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
           id: r.id, amount: r.amountCents, reversed: r.reversedCents, transferId: r.stripeTransferId, state: r.state,
         };
       }
+    } else if (order.charge_model === "transfer" && order.funds_state === "released" && order.stripe_transfer_id) {
+      // The order's own transfer; what the seller still holds from it is its
+      // paid-out balance (net of label recoveries and earlier reversals).
+      const stillPaidOut = await accountBalanceCents(tx, { account: "seller_paid_out", partyId: order.owner_id, orderId: order.id });
+      release = { id: "", amount: Math.max(0, stillPaidOut), reversed: 0, transferId: order.stripe_transfer_id, state: "paid" };
     }
     return { kind: "go" as const, refund: refund!, order, release };
   });
@@ -233,7 +243,7 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
   }
 
   // ── Phase B ──────────────────────────────────────────────────────────────
-  const destination = order.charge_model !== "held";
+  const destination = order.charge_model !== "held" && order.charge_model !== "transfer";
   let stripeRefund: Stripe.Refund;
   try {
     stripeRefund = await stripeClient.refunds.create({
@@ -363,7 +373,7 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
     if (!destination && locked.drop_id) {
       await adjustDropWalletForRefund(tx, locked.drop_id, sellerShare - reversalCents);
     }
-    if (release && reversalCents > 0) {
+    if (release?.id && reversalCents > 0) {
       const newReversed = release.reversed + reversalCents;
       const fully = newReversed >= release.amount;
       if (fully) releaseMachine.assert("paid", "reversed");
@@ -509,7 +519,7 @@ export async function recordExternalRefunds(input: {
 
     const sellerId = order.owner_id;
     const postings: LedgerPosting[] = [{ account: "buyer_payments", amountCents: delta }];
-    if (order.charge_model === "held" && order.funds_state !== "released") {
+    if ((order.charge_model === "held" || order.charge_model === "transfer") && order.funds_state !== "released") {
       const held = Math.max(0, await orderHeldCents(tx, order.id, sellerId));
       const fromOrder = Math.min(delta, held);
       postings.push({ account: "seller_held", partyId: sellerId, amountCents: -fromOrder });
@@ -588,7 +598,7 @@ export async function recordRefundFailedLater(stripeRefundId: string): Promise<b
         await adjustDropWalletForRefund(tx, order.drop_id, -(refund.amountCents - refund.platformFeeRefundCents - refund.transferReversalCents));
       }
     }
-    const priorState: OrderFundsState = order.charge_model === "held"
+    const priorState: OrderFundsState = order.charge_model === "held" || order.charge_model === "transfer"
       ? (refund.transferReversalCents > 0 || order.funds_state === "released" ? "released" : "held")
       : "settled_direct";
     await tx.update(orders).set({
