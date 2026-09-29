@@ -531,7 +531,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         {isVideoHeader ? null : (<>
         <Animated.View
           pointerEvents="none"
-          style={[styles.compact, { height: insets.top + 64, paddingTop: insets.top, opacity: compactOpacity, transform: [{ translateY: compactSlide }] }]}
+          style={[styles.compact, { height: topPad + 64, paddingTop: topPad, opacity: compactOpacity, transform: [{ translateY: compactSlide }] }]}
         >
           <View style={[styles.compactInner, { paddingLeft: compactLeft, paddingRight: compactRight }]}>
             {compactRoom >= 140 ? (

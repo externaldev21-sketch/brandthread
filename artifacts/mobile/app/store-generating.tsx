@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -139,7 +139,7 @@ export default function StoreGeneratingScreen() {
   };
 
   return (
-    <View style={[gen.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[gen.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), paddingBottom: insets.bottom }]}>
       <LinearGradient
         colors={[BG, SURFACE]}
         start={{ x: 0, y: 0 }}

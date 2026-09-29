@@ -8,8 +8,7 @@ import {
   ScrollView,
   Dimensions,
   Animated,
-  ActivityIndicator,
-} from 'react-native';
+  ActivityIndicator, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -177,7 +176,7 @@ export default function PostAnalyticsScreen() {
   if (!analytics) {
     return (
       <View style={styles.root}>
-        <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={[styles.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
             <Feather name="arrow-left" size={20} color={colors.text} />
           </TouchableOpacity>
@@ -199,7 +198,7 @@ export default function PostAnalyticsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={[styles.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
           <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
@@ -297,7 +296,7 @@ export default function PostAnalyticsScreen() {
   return (
     <View style={styles.root}>
       {/* ─── Fixed Header ──────────────────────────────────────────────────── * /}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={[styles.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => goBackOr(router)}>
           <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>

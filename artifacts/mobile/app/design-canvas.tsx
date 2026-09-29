@@ -2974,7 +2974,7 @@ export default function DesignCanvasScreen() {
     <View style={styles.root}>
 
       {/* ── TOP BAR ── */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 2 }]}>
+      <View style={[styles.topBar, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 2 }]}>
         <View style={styles.topGroup}>
           <TouchableOpacity style={styles.topBtn} onPress={handleBack} testID="btn-back">
             <Feather name="chevron-left" size={ICON.md} color={FG} />

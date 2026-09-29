@@ -1225,7 +1225,7 @@ export default function StoryComposer() {
       </Modal>
 
       <Modal visible={alsoShareOpen} transparent animationType="slide" onRequestClose={finishAlsoShare}>
-        <View style={[styles.alsoShareSheet, { paddingTop: insets.top + SP.md, paddingBottom: insets.bottom + SP.md }]}>
+        <View style={[styles.alsoShareSheet, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.md, paddingBottom: insets.bottom + SP.md }]}>
           <View style={styles.textToolTop}>
             <Text style={styles.sheetTitle}>Also share to</Text>
             <TouchableOpacity onPress={finishAlsoShare} accessibilityRole="button" accessibilityLabel="Done">

@@ -10,8 +10,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator,
-} from 'react-native';
+  TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -178,14 +177,14 @@ export default function ProductSizeChartScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator color={theme.accentLight} />
       </View>
     );
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       <BrandthreadHeader
         title="Size Chart"
         subtitle={productName ?? undefined}

@@ -387,7 +387,7 @@ export default function SellerProfileScreen() {
   // ── Error: the profile itself couldn't load ────────────────────────────────
   if (profileError && !seller) {
     return (
-      <View style={[styles.errorRoot, { paddingTop: insets.top + SP.sm }]}>
+      <View style={[styles.errorRoot, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
         <View style={styles.errorBar}>
           <ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />
         </View>

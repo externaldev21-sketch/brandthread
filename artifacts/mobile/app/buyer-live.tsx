@@ -411,7 +411,7 @@ function BuyerLiveNativeScreen() {
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
 
       {/* Top bar */}
-      <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
+      <View style={[s.topBar, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 8 }]}>
         <View style={s.topLeft}>
           <View style={[s.livePill, { backgroundColor: LIVE_RED }]}>
             <View style={s.liveDot} />
@@ -451,7 +451,7 @@ function BuyerLiveNativeScreen() {
       </View>
 
       {/* Stream title */}
-      <View style={[s.titleRow, { paddingTop: insets.top + 48 }]}>
+      <View style={[s.titleRow, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 48 }]}>
         <Text style={s.streamTitle} numberOfLines={2}>{stream?.title}</Text>
       </View>
 

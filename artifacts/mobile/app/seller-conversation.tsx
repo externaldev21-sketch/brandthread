@@ -1372,7 +1372,7 @@ export default function SellerConversationScreen() {
       )}
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm, paddingRight: SP.md + insets.right }]}>
+      <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm, paddingRight: SP.md + insets.right }]}>
         <View style={s.headerLeftGroup}>
           <PressableScale
             onPress={() => { hapticPrimaryAction(); goBackOr(router); }}

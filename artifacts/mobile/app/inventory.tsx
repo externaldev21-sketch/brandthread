@@ -6,8 +6,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
-  TextInput, StyleSheet, RefreshControl, ActivityIndicator, Alert, Share,
-} from 'react-native';
+  TextInput, StyleSheet, RefreshControl, ActivityIndicator, Alert, Share, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -286,7 +285,7 @@ export default function InventoryScreen() {
   // ─── Header ────────────────────────────────────────────────────────────────
 
   const renderHeader = () => (
-    <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
+    <View style={[s.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
       <TouchableOpacity
         onPress={() => goBackOr(router)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

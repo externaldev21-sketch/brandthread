@@ -141,7 +141,7 @@ export default function ReportScreen() {
 
   if (!params.targetId) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         {header}
         <View style={s.centerState}>
           <Feather name="alert-circle" size={36} color={theme.muted} />
@@ -155,7 +155,7 @@ export default function ReportScreen() {
 
   if (step === 'done') {
     return (
-      <View style={[s.root, { paddingTop: insets.top, paddingBottom: insets.bottom + SP.md }]}>
+      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), paddingBottom: insets.bottom + SP.md }]}>
         <ScrollView contentContainerStyle={s.doneScroll} showsVerticalScrollIndicator={false}>
           <AnimatedEntrance>
             <View style={s.doneIcon}>
@@ -220,7 +220,7 @@ export default function ReportScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[s.root, { paddingTop: insets.top }]}
+      style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {header}

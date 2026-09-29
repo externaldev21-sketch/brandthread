@@ -10,7 +10,7 @@
  * this against buyer-drop-detail.tsx's rendering.
  */
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -110,7 +110,7 @@ export default function SellerDropPreview() {
           )}
           <LinearGradient colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.92)']} style={StyleSheet.absoluteFill} />
 
-          <View style={[styles.header, { paddingTop: insets.top + SP.sm }]}>
+          <View style={[styles.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.sm }]}>
             <TouchableOpacity style={styles.roundBtn} onPress={() => goBackOr(router)}>
               <Feather name="arrow-left" size={20} color={ON_DARK} />
             </TouchableOpacity>

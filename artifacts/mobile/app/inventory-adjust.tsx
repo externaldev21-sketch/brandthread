@@ -129,7 +129,7 @@ export default function InventoryAdjustScreen() {
 
   if (resultAdj) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <ScrollView contentContainerStyle={styles.successContainer}>
           <GradientCard colors={['rgba(16,185,129,0.18)', 'rgba(16,185,129,0.06)']} glow style={styles.successCard}>
             <View style={styles.successIcon}>

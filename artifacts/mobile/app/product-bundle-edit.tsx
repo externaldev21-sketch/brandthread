@@ -14,8 +14,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator, Switch,
-} from 'react-native';
+  TextInput, Alert, ActivityIndicator, Switch, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -188,7 +187,7 @@ export default function ProductBundleEditScreen() {
   if (loading) return <BrandedLoadingState message="Loading bundle…" />;
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       <BrandthreadHeader
         title={isNew ? 'New Bundle' : 'Edit Bundle'}
         onBack={() => goBackOr(router)}

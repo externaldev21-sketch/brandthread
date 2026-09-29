@@ -283,6 +283,8 @@ export default function CameraCapture() {
 
   // ─── Permissions gate ──────────────────────────────────────────────────────
   if (!cameraPermission?.granted || !micPermission?.granted) {
+    // Native-only past this point (line 282 already returns the web
+    // component above) — insets.top is real here, no web fallback needed.
     return (
       <View style={[s.root, { backgroundColor: CHROME, paddingTop: insets.top }]}>
         <View style={s.permBox}>

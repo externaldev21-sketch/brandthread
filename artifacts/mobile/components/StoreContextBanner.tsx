@@ -6,8 +6,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-} from 'react-native';
+  View, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useSegments, useGlobalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -156,7 +155,7 @@ export default function StoreContextBanner() {
   const activeStoreName = activeMembership?.ownerName?.trim() || 'My store';
 
   return (
-    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
+    <View style={[styles.safeArea, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       <View style={styles.root} accessibilityRole="summary">
         <View style={styles.message}>
           <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>

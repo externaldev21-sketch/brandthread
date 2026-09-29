@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -234,7 +234,7 @@ export default function ProductStoreScreen() {
 
   if (loading) {
     return (
-      <View style={[s.screen, { paddingTop: insets.top }]}>
+      <View style={[s.screen, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <Text style={s.loadingText}>Loading…</Text>
       </View>
     );
@@ -242,7 +242,7 @@ export default function ProductStoreScreen() {
 
   if (!product) {
     return (
-      <View style={[s.screen, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center', padding: SP.xl }]}>
+      <View style={[s.screen, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), alignItems: 'center', justifyContent: 'center', padding: SP.xl }]}>
         <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
         <Text style={[s.loadingText, { marginTop: SP.md, textAlign: 'center' }]}>
           Product not found or no longer available.

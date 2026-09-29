@@ -31,7 +31,7 @@ export default function NativeOnlyFeature({
         styles.root,
         {
           backgroundColor: colors.background,
-          paddingTop: insets.top + 24,
+          paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 24,
           paddingBottom: insets.bottom + 24,
         },
       ]}

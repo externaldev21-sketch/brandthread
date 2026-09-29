@@ -1,6 +1,6 @@
 import React from 'react';
 import { Stack, useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -28,7 +28,7 @@ export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Not found', headerShown: false }} />
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + SPACING.xxl, paddingBottom: insets.bottom + SPACING.xl }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SPACING.xxl, paddingBottom: insets.bottom + SPACING.xl }]}>
         <View style={[styles.iconCircle, { borderColor: theme.accent + '40' }]}>
           <Feather name="compass" size={26} color={colors.mutedForeground} />
         </View>

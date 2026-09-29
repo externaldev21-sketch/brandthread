@@ -10,8 +10,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, FlatList, ScrollView, StyleSheet, RefreshControl, ActivityIndicator,
-  Modal, Pressable, TextInput,
-} from 'react-native';
+  Modal, Pressable, TextInput, Platform } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -129,7 +128,7 @@ export default function ReviewQueueScreen() {
   const items = queue?.items ?? [];
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       <View style={s.header}>
         <PressableScale onPress={() => goBackOr(router)} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
