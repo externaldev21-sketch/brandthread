@@ -1,0 +1,54 @@
+{
+  "cartGreyBoxes": [
+    {
+      "bg": "rgb(10, 10, 11)",
+      "w": 390,
+      "h": 844,
+      "testid": null
+    },
+    {
+      "bg": "rgb(10, 10, 11)",
+      "w": 390,
+      "h": 844,
+      "testid": null
+    },
+    {
+      "bg": "rgb(10, 10, 11)",
+      "w": 390,
+      "h": 844,
+      "testid": null
+    }
+  ],
+  "confirmation": {
+    "fullWidthButtons": [
+      {
+        "label": "Message Northline Studio",
+        "top": 917,
+        "h": 56
+      },
+      {
+        "label": "View receipt",
+        "top": 990,
+        "h": 44
+      },
+      {
+        "label": "Continue shopping",
+        "top": 1035,
+        "h": 44
+      },
+      {
+        "label": "Track order",
+        "top": 776,
+        "h": 52
+      }
+    ],
+    "pinnedAreaHeight": 68,
+    "labels": [
+      "Close",
+      "Message Northline Studio",
+      "View receipt",
+      "Continue shopping",
+      "Track order"
+    ]
+  }
+}

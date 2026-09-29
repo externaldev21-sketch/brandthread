@@ -69,7 +69,7 @@ import {
 } from '@/lib/checkoutReadiness';
 import {
   buildCreatePaymentIntentBody, buildQuoteBody, canQuote, choosePaymentPath, paymentErrorMessage,
-  quoteKey, quoteTotals, recipientName, walletContactToCheckout,
+  isCartQuote, quoteKey, quoteTotals, recipientName, walletContactToCheckout,
   type CartQuote, type PaymentIntentStart, type WalletContact,
 } from '@/lib/checkoutPayment';
 import { ApiError } from '@/lib/networkNotice';
@@ -360,7 +360,9 @@ export default function BuyerCheckoutScreen() {
     let active = true;
     const timer = setTimeout(() => {
       api.buyer.checkout.paymentIntent.quote(quoteBody)
-        .then(value => { if (active) setQuote({ key: currentQuoteKey, value }); })
+        // Only a well-formed quote replaces the session's estimate; anything
+        // else (an old server, a proxy page) leaves the page on the estimate.
+        .then(value => { if (active && isCartQuote(value)) setQuote({ key: currentQuoteKey, value }); })
         .catch((err: unknown) => {
           if (!active) return;
           const apiError = err instanceof ApiError ? err : null;
@@ -559,10 +561,11 @@ export default function BuyerCheckoutScreen() {
   const expressQuote = async (walletAddress: WalletContact['address']) => {
     if (!session) return null;
     try {
-      return await api.buyer.checkout.paymentIntent.quote(buildQuoteBody(session, {
+      const value = await api.buyer.checkout.paymentIntent.quote(buildQuoteBody(session, {
         city: walletAddress.city ?? '', state: walletAddress.state ?? '',
         postalCode: walletAddress.postalCode ?? '', country: walletAddress.country ?? 'US',
       }));
+      return isCartQuote(value) ? value : null;
     } catch {
       return null;
     }

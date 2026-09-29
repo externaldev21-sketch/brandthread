@@ -182,6 +182,13 @@ export type PaymentIntentStatus = {
   complete: boolean;
 };
 
+/** A quote response the page can trust (amount + one numeric entry per seller group). */
+export function isCartQuote(value: unknown): value is CartQuote {
+  const quote = value as CartQuote | null;
+  return !!quote && Number.isFinite(quote.amountCents) && Array.isArray(quote.groups)
+    && quote.groups.every(group => !!group && Number.isFinite(group.totalCents) && Number.isFinite(group.taxCents) && Number.isFinite(group.shippingCents));
+}
+
 /** Totals for the page and the Pay button once the server has priced the cart. */
 export function quoteTotals(quote: CartQuote) {
   return quote.groups.reduce((sum, group) => ({

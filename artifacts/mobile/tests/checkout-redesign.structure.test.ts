@@ -168,3 +168,38 @@ describe('checkout screen structure', () => {
     expect(confirmation).toContain('disabled={!firstVerified?.id}');
   });
 });
+
+describe('order confirmation actions', () => {
+  const confirmation = read('components/checkout/OrderConfirmation.tsx');
+  const actions = confirmation.slice(confirmation.indexOf('export function OrderConfirmationActions'), confirmation.indexOf('const styles = StyleSheet.create'));
+
+  it('pins ONE primary button (Track order, or Check order status while finalizing)', () => {
+    expect(actions.match(/<Button\b/g)).toHaveLength(2); // the finalizing and the confirmed branch, one each
+    expect(actions).toContain('label="Track order"');
+    expect(actions).not.toContain('View receipt');
+    expect(actions).not.toContain('Continue shopping');
+    expect(actions).not.toContain('Create an account');
+  });
+
+  it('moves View receipt, Continue shopping and Create an account into the scroll content as text rows', () => {
+    const content = confirmation.slice(0, confirmation.indexOf('export function OrderConfirmationActions'));
+    expect(content).toContain('label="View receipt"');
+    expect(content).toContain('label="Continue shopping"');
+    expect(content).toMatch(/label="Create an account[^"]*"\s+onPress=\{[^}]+\}\s+subtle/);
+    expect(content).not.toMatch(/<Button[^>]*View receipt/);
+  });
+});
+
+describe('cart matches the flat checkout', () => {
+  const cart = read('app/(buyer)/cart.tsx');
+
+  it('has no card containers, only checkout sections and hairlines', () => {
+    expect(cart).not.toMatch(/<Card\b/);
+    expect(cart).toContain("import { CK, CheckoutSection } from '@/components/checkout/CheckoutPrimitives'");
+    expect(cart).toContain('<CheckoutSection first={first}');
+    expect(cart).toContain('<CheckoutSection title="Order summary"');
+    expect(cart).not.toMatch(/cardGlass|cardElevatedGlass, borderBottomWidth/);
+    expect(cart).toContain('backgroundColor: CK.bg');
+    expect(cart).not.toContain('opacity: 0.06');
+  });
+});
