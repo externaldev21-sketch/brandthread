@@ -7,7 +7,7 @@
  * so it renders instantly and correctly across all 12 themes.
  */
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Platform } from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -71,7 +71,7 @@ export function WelcomeStep({
         style={styles.topWash}
       />
 
-      <View style={[styles.content, { paddingTop: insets.top + SPACE.md, paddingBottom: insets.bottom + SPACE.lg }]}>
+      <View style={[styles.content, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SPACE.md, paddingBottom: insets.bottom + SPACE.lg }]}>
         <Reveal>
           <Text style={[TYPE.eyebrow, { color: theme.muted }]}>BRANDTHREAD</Text>
         </Reveal>

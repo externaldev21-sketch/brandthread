@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
@@ -126,7 +126,7 @@ export default function ProductDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <View style={s.header}>
           <LoadingSkeleton height={36} style={{ width: 200 }} />
         </View>
@@ -141,7 +141,7 @@ export default function ProductDetailScreen() {
 
   if (!product) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <View style={s.header}>
           <PressableScale
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
@@ -168,7 +168,7 @@ export default function ProductDetailScreen() {
   const coverImage = product.media.find(m => m.isCover) ?? product.media[0];
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       {/* ── Fixed Header ── */}
       <View style={s.header}>
         {/* Fix 3: back button uses goBackOr(router) */}

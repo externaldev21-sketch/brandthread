@@ -7,8 +7,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, Dimensions, ActivityIndicator,
-} from 'react-native';
+  Alert, Dimensions, ActivityIndicator, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -138,7 +137,7 @@ export default function DesignMockupPreviewScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator color={PURPLE} />
       </View>
     );

@@ -6,8 +6,7 @@ import React, { useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, Switch,
-} from 'react-native';
+  StyleSheet, Alert, ActivityIndicator, Switch, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -75,7 +74,7 @@ export default function VacationModeScreen() {
 
   if (loading) {
     return (
-      <View style={[s.root, { alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }]}>
+      <View style={[s.root, { alignItems: 'center', justifyContent: 'center', paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <ActivityIndicator color={PURPLE} />
       </View>
     );

@@ -412,7 +412,7 @@ export default function BuyerStoryViewer() {
 
   if (!currentStory || !currentSlide) {
     return (
-      <View style={[styles.container, styles.loadState, { paddingTop: insets.top }]}>
+      <View style={[styles.container, styles.loadState, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <StatusBar style="light" />
         {loading ? (
           // A thin progress-bar-shaped skeleton instead of a bare "Loading…" line,

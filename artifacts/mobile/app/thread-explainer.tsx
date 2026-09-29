@@ -131,7 +131,7 @@ export default function ThreadExplainerScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: theme.background, paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       <StatusBar barStyle="light-content" />
 
       {/* Background gradient */}

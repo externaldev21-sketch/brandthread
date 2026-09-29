@@ -700,7 +700,7 @@ export default function AiBrainScreen() {
         keyboardVerticalOffset={0}
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={[styles.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
           <TouchableOpacity
             style={styles.headerBtn}
             onPress={() => goBackOr(router)}

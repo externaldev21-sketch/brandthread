@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, ImageSourcePropType } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, ImageSourcePropType, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,7 +77,7 @@ export default function AppThemeScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: theme.background }]}>
+    <View style={[styles.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => goBackOr(router)} style={[styles.back, { borderColor: theme.border, backgroundColor: theme.card }]} accessibilityRole="button" accessibilityLabel="Back to settings">
           <Feather name="arrow-left" size={20} color={theme.text} />

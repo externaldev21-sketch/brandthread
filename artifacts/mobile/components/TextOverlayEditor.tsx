@@ -211,7 +211,7 @@ export function TextOverlayEditor({
         />
 
         {/* Top bar: Done */}
-        <View style={[es.topBar, { paddingTop: insets.top + 6 }]}>
+        <View style={[es.topBar, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 6 }]}>
           <View style={{ width: 60 }} />
           <TouchableOpacity
             onPress={handleDone}

@@ -229,7 +229,7 @@ export default function StoreBuilderScreen() {
 
   if (loading) {
     return (
-      <View style={[s.loadingContainer, { paddingTop: insets.top }]}>
+      <View style={[s.loadingContainer, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
         <ActivityIndicator color={PURPLE} size="large" />
       </View>
     );
@@ -247,7 +247,7 @@ export default function StoreBuilderScreen() {
           colors={[...theme.primaryGradient]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[s.header, { paddingTop: insets.top + SP.md }]}
+          style={[s.header, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + SP.md }]}
         >
           <TouchableOpacity
             onPress={leaveSetupDestination}

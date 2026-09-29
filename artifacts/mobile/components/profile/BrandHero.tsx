@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -88,7 +88,7 @@ export function BrandHero({
   return (
     <View testID={testID}>
       {/* Floating top bar — sits above the gradient, fixed height regardless of scroll */}
-      <View style={[heroStyles.topBar, { paddingTop: insets.top + 8 }]}>
+      <View style={[heroStyles.topBar, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 8 }]}>
         <View style={heroStyles.topBarSide}>{topBarLeft}</View>
         <Animated.View pointerEvents="none" style={[heroStyles.compactIdentity, { opacity: compactOpacity }]}>
           <View style={[heroStyles.compactAvatar, { borderColor: theme.border, backgroundColor: theme.card }]}>
@@ -119,7 +119,7 @@ export function BrandHero({
         />
       </Animated.View>
 
-      <View style={[heroStyles.body, { paddingTop: insets.top + 64 }]}>
+      <View style={[heroStyles.body, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 64 }]}>
         <AvatarTouchable onPress={onAvatarPress} accessibilityLabel={avatarAccessibilityLabel ?? `${brandName} avatar`} style={heroStyles.avatarWrap}>
           {verified ? (
             <View style={[heroStyles.verifiedRing, { borderColor: theme.accent }]}>

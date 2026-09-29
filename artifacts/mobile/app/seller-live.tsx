@@ -265,7 +265,7 @@ function SellerLiveNativeScreen() {
       <View style={[StyleSheet.absoluteFill, s.overlay]} pointerEvents="none" />
 
       {/* Top bar */}
-      <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
+      <View style={[s.topBar, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 8 }]}>
         <View style={s.topLeft}>
           <View style={[s.livePill, { backgroundColor: LIVE_RED }]}>
             <View style={s.liveDot} />
@@ -279,7 +279,7 @@ function SellerLiveNativeScreen() {
       </View>
 
       {/* Viewer count */}
-      <View style={[s.viewerRow, { paddingTop: insets.top + 48 }]}>
+      <View style={[s.viewerRow, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 48 }]}>
         <View style={[s.viewerBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
           <Feather name="eye" size={13} color="#fff" />
           <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
@@ -287,7 +287,7 @@ function SellerLiveNativeScreen() {
       </View>
 
       {/* Right action rail */}
-      <View style={[s.rightRail, { paddingTop: insets.top + 80 }]}>
+      <View style={[s.rightRail, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 80 }]}>
         {/* Products */}
         <TouchableOpacity onPress={() => setShowProductPicker(true)} style={s.railBtn} activeOpacity={0.7}>
           <Feather name="shopping-bag" size={22} color="#fff" />

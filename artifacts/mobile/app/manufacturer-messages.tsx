@@ -320,7 +320,7 @@ export default function ManufacturerMessagesScreen() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const header = (
-    <View style={{ paddingTop: insets.top, backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+    <View style={{ paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border }}>
       <BrandthreadHeader
         title={mfrName}
         subtitle={localTime ? `${localTime} for them` : 'Manufacturer conversation'}

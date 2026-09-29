@@ -6,8 +6,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert,
-} from 'react-native';
+  View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -161,7 +160,7 @@ export default function LoginActivity() {
   );
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }]}>
       <ScreenHeader title="Login activity" onBack={() => goBackOr(router)} />
 
       {loading ? (

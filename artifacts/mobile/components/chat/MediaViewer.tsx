@@ -121,7 +121,7 @@ export default function MediaViewer({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <Animated.View style={[s.backdrop, { opacity: backdropOpacity }]}>
-        <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
+        <View style={[s.topBar, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) + 12 }]}>
           <TouchableOpacity style={s.iconBtn} onPress={handleClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Feather name="x" size={22} color="#fff" />
           </TouchableOpacity>

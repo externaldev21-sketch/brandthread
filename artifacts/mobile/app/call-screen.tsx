@@ -401,7 +401,7 @@ function NativeCallScreen() {
                               'Call ended';
 
   return (
-    <View style={[s.root, { paddingTop: insets.top, paddingBottom: insets.bottom + SP.lg }]}>
+    <View style={[s.root, { paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top), paddingBottom: insets.bottom + SP.lg }]}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <View style={s.header}>

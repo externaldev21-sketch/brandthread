@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, ScrollView, StyleSheet, Alert, Switch, TouchableOpacity,
-} from 'react-native';
+  View, Text, ScrollView, StyleSheet, Alert, Switch, TouchableOpacity, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -177,7 +176,7 @@ export default function RefundDetailScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: (Platform.OS === 'web' ? Math.max(insets.top, 54) : insets.top) }}>
       <BrandthreadHeader title="Issue Refund" onBack={() => goBackOr(router)} />
 
       <ScrollView
