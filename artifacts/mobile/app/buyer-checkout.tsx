@@ -88,7 +88,7 @@ import { PromoCodeSection } from '@/components/checkout/PromoCodeSection';
 import { ThreadCashSection } from '@/components/checkout/ThreadCashSection';
 import { OrderSummarySection } from '@/components/checkout/OrderSummarySection';
 import { CheckoutTermsLine } from '@/components/checkout/CheckoutTermsLine';
-import { OrderConfirmation } from '@/components/checkout/OrderConfirmation';
+import { OrderConfirmation, OrderConfirmationActions } from '@/components/checkout/OrderConfirmation';
 import {
   ExpressPay, PaymentController, StripePaymentProvider, stripePaymentAvailable,
 } from '@/components/checkout/StripePayment';
@@ -944,7 +944,7 @@ export default function BuyerCheckoutScreen() {
       <View style={styles.root}>
         {header('Order confirmation', () => router.replace('/(buyer)/discover' as never), 'Close')}
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: GUTTER, paddingTop: SP.md, paddingBottom: footerBottomPad + SP.lg }}
+          contentContainerStyle={{ padding: GUTTER }}
           bounces={false}
           overScrollMode="never"
           showsVerticalScrollIndicator={false}
@@ -953,11 +953,18 @@ export default function BuyerCheckoutScreen() {
             session={current}
             verifiedOrders={verifiedOrders}
             finalizing={pendingSessionIds.length > 0}
-            onRefresh={refreshOrders}
-            refreshing={placing}
             totalPaidCents={paidCents > 0 ? paidCents : totals.totalCents}
           />
         </ScrollView>
+        {/* A sibling of the ScrollView above, never inside its scrollable
+            content — so it's genuinely pinned above the home indicator on
+            any screen height, never clipped or scrolled past. */}
+        <OrderConfirmationActions
+          verifiedOrders={verifiedOrders}
+          finalizing={pendingSessionIds.length > 0}
+          onRefresh={refreshOrders}
+          refreshing={placing}
+        />
       </View>
     );
   }
