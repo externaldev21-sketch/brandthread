@@ -18,6 +18,7 @@
  */
 import { posterUri } from './previewInbox';
 import { isPreviewCatalogEnabled } from './previewCatalog';
+import { isPreviewDemoMode } from './devPreview';
 import type { Story, StoryMedia } from '@/services/socialTypes';
 
 export function isPreviewStoriesEnabled(): boolean {
@@ -159,8 +160,12 @@ export function markPreviewStorySeen(authorId: string): void {
 }
 
 /** All non-live, non-"me" tray rows (unseen first, newest first, then seen),
- *  reflecting any stories viewed this session. */
+ *  reflecting any stories viewed this session. Fresh install by default: a
+ *  brand-new account follows nobody, so the tray is empty (real "your story"
+ *  after posting one still comes back through the real API/socialService,
+ *  not this module). The full seeded cast only appears under `demo=1`. */
 export function getPreviewStoryTrayRows(): PreviewStoryTrayRow[] {
+  if (!isPreviewDemoMode()) return [];
   const unseen = UNSEEN_PEOPLE.map(p => rowFor(p, runtimeSeen.has(p.authorId)));
   const seen = SEEN_PEOPLE.map(p => rowFor(p, true));
   return [...PREVIEW_LIVE_TRAY_ROWS, ...unseen, ...seen];
@@ -168,6 +173,7 @@ export function getPreviewStoryTrayRows(): PreviewStoryTrayRow[] {
 
 /** The full `Story` (with real media) for a preview tray authorId, or null. */
 export function getPreviewStoryFor(authorId: string): Story | null {
+  if (!isPreviewDemoMode()) return null;
   if (authorId === 'me') return PREVIEW_MY_STORY;
   return [...PREVIEW_UNSEEN_STORIES, ...PREVIEW_SEEN_STORIES].find(s => s.authorId === authorId) ?? null;
 }

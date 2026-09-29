@@ -15,6 +15,7 @@
  * request fails, never over real API data.
  */
 import type { PreviewCatalogProduct } from './previewCatalog';
+import { isPreviewDemoMode } from './devPreview';
 
 // previewCatalog pulls in bundled image assets (expo-asset). It's required
 // lazily, only once a preview order is actually requested in a dev build, so
@@ -67,7 +68,11 @@ export function getPreviewBuyerOrder(id: string | null | undefined): Record<stri
   readPlaced();
   const placedOrder = placed.get(id!);
   if (placedOrder) return placedOrder;
-  if (id !== 'preview-order-01') return null;
+  // The one hard-seeded order (the Activity feed's "Your order shipped" row)
+  // is part of the demo cast, not a fresh account's real history — only
+  // shown under the explicit demo=1 opt-in. An order actually PLACED this
+  // session (the `placed` map above) always shows regardless.
+  if (!isPreviewDemoMode() || id !== 'preview-order-01') return null;
   const product = previewCatalogProduct('preview-product-01');
   if (!product) return null;
   const now = Date.now();

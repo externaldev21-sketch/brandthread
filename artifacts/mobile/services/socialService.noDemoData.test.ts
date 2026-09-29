@@ -24,6 +24,7 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 }));
 
 vi.mock("@/lib/serviceConfig", () => ({ serviceRequest }));
+vi.mock("@/lib/devPreview", () => ({ isBuyerDevPreview: () => false, isPreviewDemoMode: () => false }));
 
 import {
   getMyProfile,

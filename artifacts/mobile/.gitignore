@@ -8,6 +8,9 @@ node_modules/
 dist/
 web-build/
 static-build/
+
+# audit script's generated demo-image cache (scripts/audit/half-done-audit.mjs)
+.audit/
 expo-env.d.ts
 
 # Native (top-level only — a local Expo module's own <module>/ios|android/

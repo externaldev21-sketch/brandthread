@@ -23,6 +23,7 @@
  * call fails outright, never for a real signed-in production account.
  */
 import type { ThreadCashStatus } from './threadCashTypes';
+import { isPreviewDemoMode } from './devPreview';
 
 export function isPreviewThreadCashEnabled(): boolean {
   return __DEV__;
@@ -48,3 +49,25 @@ export const PREVIEW_THREAD_CASH_STATUS: ThreadCashStatus = {
     streakBonusDays: 7,
   },
 };
+
+/** A brand-new account's Thread Cash: $0.00, no streak, not checked in yet —
+ *  same config (the program's real terms), zero balance/history. */
+export const FRESH_THREAD_CASH_STATUS: ThreadCashStatus = {
+  balanceCents: 0,
+  config: PREVIEW_THREAD_CASH_STATUS.config,
+  streak: {
+    currentStreak: 0,
+    longestStreak: 0,
+    lastCheckInDate: null,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    alreadyCheckedInToday: false,
+    dayInCycle: 0,
+    streakBonusDays: 7,
+  },
+};
+
+/** Fresh install by default ($0.00, no streak) — the seeded $18.45/4-day
+ *  streak only appears under the explicit `demo=1` opt-in. */
+export function getPreviewThreadCashStatus(): ThreadCashStatus {
+  return isPreviewDemoMode() ? PREVIEW_THREAD_CASH_STATUS : FRESH_THREAD_CASH_STATUS;
+}

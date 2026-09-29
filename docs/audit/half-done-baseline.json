@@ -1,0 +1,16 @@
+{
+  "hardKeys": [
+    "console-error::/(buyer)/edit-profile::seller::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/(buyer)/feed::seller::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/(buyer)/feed::buyer::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/(buyer)/friends::buyer::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/(buyer)::seller::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/(tabs)/profile::buyer::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/account-type-settings::seller::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/account-type-settings::buyer::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/account-type::seller::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/account-type::buyer::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/activity-center::seller::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/activity-center::buyer::Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}
