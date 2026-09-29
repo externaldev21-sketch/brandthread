@@ -143,6 +143,22 @@ const server = http.createServer(async (req, res) => {
   const acceptEncoding = String(req.headers['accept-encoding'] || '');
   if (serveFile(safeFilePath(requestedPath), res, acceptEncoding)) return;
 
+  // This server only ever serves the exported browser app — real /api/*
+  // traffic is handled by api-server, a separate process/origin (see this
+  // file's own top doc comment). But if anything shaped like an API path
+  // ever reaches HERE (a proxy misconfiguration, a typo'd path like
+  // /api-server/* that a reverse proxy didn't route to the real API, or a
+  // client hitting this origin directly), it must never fall through to the
+  // "browser navigation → SPA shell, 200" branch below just because the
+  // request happened to send `Accept: text/html` — that would silently
+  // return an HTML page with a 200 status for a broken/unmatched API call
+  // instead of a real 404, which client error handling that checks
+  // `res.ok`/status code would misread as success.
+  if (/^\/api(\/|-|$)/i.test(requestedPath)) {
+    send(res, 404, JSON.stringify({ code: 'NOT_FOUND', message: `No route exists for ${requestedPath}.` }), 'application/json; charset=utf-8');
+    return;
+  }
+
   // Only browser navigations get the SPA shell. Missing JS/image requests
   // should remain a real 404 instead of returning HTML with status 200.
   const acceptsHtml = String(req.headers.accept || '').includes('text/html');
