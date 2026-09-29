@@ -60,8 +60,15 @@ export function bucketLabel(value: string, range: SellerHomeTimeRange): string {
   if (range === 'month') {
     return String(date.getDate());
   }
-  if (range === 'year' || range === 'all') {
+  if (range === 'year') {
     return MONTH_LABELS[date.getMonth()];
+  }
+  if (range === 'all') {
+    // "All" spans multiple years, so the axis needs the year itself — a
+    // month name alone (e.g. "Jan") is ambiguous/repeats across every
+    // bucket's Jan-1 anchor once there's more than one year of data, which
+    // is the same class of bug this fix addresses for "Year".
+    return String(date.getFullYear());
   }
   return formatClockLabel(date, range === 'live');
 }

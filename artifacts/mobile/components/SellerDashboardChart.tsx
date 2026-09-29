@@ -30,6 +30,14 @@ export const DASHBOARD_RANGES: Array<{ id: SellerDashboardRange; label: string }
 
 const CHART_HEIGHT = 168;
 
+// Each visible axis label is positioned absolutely at its bucket's own x
+// (see the axisRow render below), in a fixed-width box centered on that
+// point — not squeezed into an equal flex column shared with every hidden
+// bucket, which was truncating "12 AM"/"6 PM"-style text down to a couple
+// of characters once the visible count was much smaller than the bucket
+// count (e.g. 4 visible of 24 hourly buckets for Today).
+const AXIS_LABEL_WIDTH = 44;
+
 // How many x-axis labels to actually show text for, per range — a handful
 // of evenly-spaced, non-overlapping labels (Shopify's own Sales Report/
 // Analytics charts do the same) rather than one per bucket, which for
@@ -291,22 +299,28 @@ export function SellerDashboardChart({
         })}
       </View>
 
-      {labels.length > 0 && !isEmpty && (
+      {labels.length > 0 && !isEmpty && width > 0 && (
         <View style={styles.axisRow} pointerEvents="none" testID="seller-dashboard-chart-axis">
-          {labels.map((label, index) => (
-            <Text
-              key={`${label}-${index}`}
-              style={[
-                styles.axisLabel,
-                { color: theme.subtle },
-                index === 0 && styles.axisLabelFirst,
-                index === labels.length - 1 && styles.axisLabelLast,
-              ]}
-              numberOfLines={1}
-            >
-              {visibleAxisIndices.has(index) ? label : ''}
-            </Text>
-          ))}
+          {labels.map((label, index) => {
+            if (!visibleAxisIndices.has(index)) return null;
+            // Positioned at the bucket's own x-coordinate (same layout the
+            // chart/tooltip use), not squeezed into an equal-width flex
+            // column shared with every hidden bucket — that was truncating
+            // "12 AM"/"6 PM"-style labels down to a couple of characters
+            // once the visible slot count was <<the bucket count.
+            const point = points[index];
+            const x = point ? point.x : labels.length > 1 ? (index / (labels.length - 1)) * width : width / 2;
+            const left = Math.max(0, Math.min(width - AXIS_LABEL_WIDTH, x - AXIS_LABEL_WIDTH / 2));
+            return (
+              <Text
+                key={`${label}-${index}`}
+                style={[styles.axisLabel, { color: theme.subtle, left }]}
+                numberOfLines={1}
+              >
+                {label}
+              </Text>
+            );
+          })}
         </View>
       )}
     </View>
@@ -376,20 +390,15 @@ const styles = StyleSheet.create({
     fontSize: FS.xs,
   },
   axisRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    height: 14,
     marginTop: SP.xs,
   },
   axisLabel: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    width: AXIS_LABEL_WIDTH,
     fontFamily: FONT.regular,
     fontSize: 9,
     textAlign: 'center',
-  },
-  axisLabelFirst: {
-    textAlign: 'left',
-  },
-  axisLabelLast: {
-    textAlign: 'right',
   },
 });

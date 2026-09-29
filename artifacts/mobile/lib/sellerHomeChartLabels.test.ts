@@ -80,18 +80,27 @@ describe('seller home chart labels', () => {
     expect(labels).toEqual(Array.from({ length: 30 }, (_, i) => String(i + 1)));
   });
 
-  it('buckets "Year" and "All" by local month, 12 correctly-ordered, unique labels', () => {
+  it('buckets "Year" by local month, 12 correctly-ordered, unique labels', () => {
     const buckets = Array.from({ length: 12 }, (_, i) => localMonthStartIso(2024, i));
     expect(buckets.map((bucket) => bucketLabel(bucket, 'year'))).toEqual([...MONTH_LABELS]);
-    expect(buckets.map((bucket) => bucketLabel(bucket, 'all'))).toEqual([...MONTH_LABELS]);
     expect(new Set(buckets.map((bucket) => bucketLabel(bucket, 'year'))).size).toBe(12);
   });
 
-  it('"Year"/"All" month buckets are correct across a year boundary', () => {
+  it('"Year" month buckets are correct across a year boundary', () => {
     const decBucket = localMonthStartIso(2023, 11);
     const janBucket = localMonthStartIso(2024, 0);
     expect(bucketLabel(decBucket, 'year')).toBe('Dec');
     expect(bucketLabel(janBucket, 'year')).toBe('Jan');
+  });
+
+  it('buckets "All" by local YEAR, not month — a month name alone is ambiguous across multiple years (the reported bug)', () => {
+    const buckets = [
+      localMonthStartIso(2022, 0), localMonthStartIso(2023, 0),
+      localMonthStartIso(2024, 0), localMonthStartIso(2025, 0),
+    ];
+    const labels = buckets.map((bucket) => bucketLabel(bucket, 'all'));
+    expect(labels).toEqual(['2022', '2023', '2024', '2025']);
+    expect(new Set(labels).size).toBe(4); // never the same year repeated
   });
 });
 
