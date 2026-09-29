@@ -8,6 +8,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { isProductionPreviewHost } from '@/lib/devPreview';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -419,6 +420,10 @@ const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_T
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  // Hard gate: never activate on the real production host, even if
+  // NAVIGATION_ISOLATION_TEST somehow reached a production build — see
+  // lib/devPreview.ts's isProductionPreviewHost doc comment.
+  if (isProductionPreviewHost()) return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
   if (v !== 'buyer' && v !== 'seller') return null;
   return v;
