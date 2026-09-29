@@ -1,0 +1,334 @@
+{
+  "fresh-today": [
+    {
+      "text": "12 AM",
+      "left": 0,
+      "right": 26,
+      "center": 13
+    },
+    {
+      "text": "6 AM",
+      "left": 98,
+      "right": 142,
+      "center": 120
+    },
+    {
+      "text": "12 PM",
+      "left": 219,
+      "right": 263,
+      "center": 241
+    },
+    {
+      "text": "6 PM",
+      "left": 338,
+      "right": 361,
+      "center": 350
+    }
+  ],
+  "fresh-week": [
+    {
+      "text": "Mon",
+      "left": 0,
+      "right": 18,
+      "center": 9
+    },
+    {
+      "text": "Tue",
+      "left": 38,
+      "right": 82,
+      "center": 60
+    },
+    {
+      "text": "Wed",
+      "left": 98,
+      "right": 142,
+      "center": 120
+    },
+    {
+      "text": "Thu",
+      "left": 159,
+      "right": 203,
+      "center": 181
+    },
+    {
+      "text": "Fri",
+      "left": 219,
+      "right": 263,
+      "center": 241
+    },
+    {
+      "text": "Sat",
+      "left": 279,
+      "right": 323,
+      "center": 301
+    },
+    {
+      "text": "Sun",
+      "left": 345,
+      "right": 361,
+      "center": 353
+    }
+  ],
+  "fresh-month": [
+    {
+      "text": "Sep 1",
+      "left": 0,
+      "right": 24,
+      "center": 12
+    },
+    {
+      "text": "Sep 8",
+      "left": 68,
+      "right": 112,
+      "center": 90
+    },
+    {
+      "text": "Sep 16",
+      "left": 159,
+      "right": 203,
+      "center": 181
+    },
+    {
+      "text": "Sep 23",
+      "left": 249,
+      "right": 293,
+      "center": 271
+    },
+    {
+      "text": "Sep 30",
+      "left": 329,
+      "right": 361,
+      "center": 345
+    }
+  ],
+  "fresh-year": [
+    {
+      "text": "Oct",
+      "left": 0,
+      "right": 15,
+      "center": 8
+    },
+    {
+      "text": "Dec",
+      "left": 50,
+      "right": 94,
+      "center": 72
+    },
+    {
+      "text": "Feb",
+      "left": 122,
+      "right": 166,
+      "center": 144
+    },
+    {
+      "text": "May",
+      "left": 195,
+      "right": 239,
+      "center": 217
+    },
+    {
+      "text": "Jul",
+      "left": 267,
+      "right": 311,
+      "center": 289
+    },
+    {
+      "text": "Sep",
+      "left": 344,
+      "right": 361,
+      "center": 353
+    }
+  ],
+  "fresh-all": [
+    {
+      "text": "2023",
+      "left": 0,
+      "right": 22,
+      "center": 11
+    },
+    {
+      "text": "2024",
+      "left": 98,
+      "right": 142,
+      "center": 120
+    },
+    {
+      "text": "2025",
+      "left": 219,
+      "right": 263,
+      "center": 241
+    },
+    {
+      "text": "2026",
+      "left": 339,
+      "right": 361,
+      "center": 350
+    }
+  ],
+  "demo-today": [
+    {
+      "text": "12 AM",
+      "left": 0,
+      "right": 26,
+      "center": 13
+    },
+    {
+      "text": "6 AM",
+      "left": 98,
+      "right": 142,
+      "center": 120
+    },
+    {
+      "text": "12 PM",
+      "left": 219,
+      "right": 263,
+      "center": 241
+    },
+    {
+      "text": "6 PM",
+      "left": 338,
+      "right": 361,
+      "center": 350
+    }
+  ],
+  "demo-week": [
+    {
+      "text": "Mon",
+      "left": 0,
+      "right": 18,
+      "center": 9
+    },
+    {
+      "text": "Tue",
+      "left": 38,
+      "right": 82,
+      "center": 60
+    },
+    {
+      "text": "Wed",
+      "left": 98,
+      "right": 142,
+      "center": 120
+    },
+    {
+      "text": "Thu",
+      "left": 159,
+      "right": 203,
+      "center": 181
+    },
+    {
+      "text": "Fri",
+      "left": 219,
+      "right": 263,
+      "center": 241
+    },
+    {
+      "text": "Sat",
+      "left": 279,
+      "right": 323,
+      "center": 301
+    },
+    {
+      "text": "Sun",
+      "left": 345,
+      "right": 361,
+      "center": 353
+    }
+  ],
+  "demo-month": [
+    {
+      "text": "Sep 1",
+      "left": 0,
+      "right": 24,
+      "center": 12
+    },
+    {
+      "text": "Sep 8",
+      "left": 68,
+      "right": 112,
+      "center": 90
+    },
+    {
+      "text": "Sep 16",
+      "left": 159,
+      "right": 203,
+      "center": 181
+    },
+    {
+      "text": "Sep 23",
+      "left": 249,
+      "right": 293,
+      "center": 271
+    },
+    {
+      "text": "Sep 30",
+      "left": 329,
+      "right": 361,
+      "center": 345
+    }
+  ],
+  "demo-year": [
+    {
+      "text": "Oct",
+      "left": 0,
+      "right": 15,
+      "center": 8
+    },
+    {
+      "text": "Dec",
+      "left": 50,
+      "right": 94,
+      "center": 72
+    },
+    {
+      "text": "Feb",
+      "left": 122,
+      "right": 166,
+      "center": 144
+    },
+    {
+      "text": "May",
+      "left": 195,
+      "right": 239,
+      "center": 217
+    },
+    {
+      "text": "Jul",
+      "left": 267,
+      "right": 311,
+      "center": 289
+    },
+    {
+      "text": "Sep",
+      "left": 344,
+      "right": 361,
+      "center": 353
+    }
+  ],
+  "demo-all": [
+    {
+      "text": "2023",
+      "left": 0,
+      "right": 22,
+      "center": 11
+    },
+    {
+      "text": "2024",
+      "left": 98,
+      "right": 142,
+      "center": 120
+    },
+    {
+      "text": "2025",
+      "left": 219,
+      "right": 263,
+      "center": 241
+    },
+    {
+      "text": "2026",
+      "left": 339,
+      "right": 361,
+      "center": 350
+    }
+  ]
+}
