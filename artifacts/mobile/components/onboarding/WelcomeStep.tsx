@@ -7,7 +7,7 @@
  * so it renders instantly and correctly across all 12 themes.
  */
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -27,7 +27,7 @@ import { MOTION, SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
 
 const THREAD_DELAY = 250;
 const HERO_HEIGHT = 200;
-const LOGO_SIZE = 92;
+const PHONE_LOGO_SIZE = 148;
 
 export function WelcomeStep({
   onGetStarted,
@@ -40,7 +40,10 @@ export function WelcomeStep({
   const { reduceMotion } = useOnboardingMotion();
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
-  const styles = createStyles(theme);
+  const { width, height } = useWindowDimensions();
+  // Grow with wider screens, but leave room for the copy and CTAs on short phones/windows.
+  const logoSize = Math.min(248, Math.max(PHONE_LOGO_SIZE, Math.round(width * 0.3)), Math.round(height * 0.28));
+  const styles = createStyles(theme, logoSize);
 
   // The mark resolves as the thread passes through its centre.
   const logo = useSharedValue(reduceMotion ? 1 : 0);
@@ -87,10 +90,10 @@ export function WelcomeStep({
             style={styles.heroThread}
           />
           <Animated.View pointerEvents="none" style={[styles.heroGlow, glowStyle]}>
-            <Glow size={LOGO_SIZE * 3} color={theme.text} intensity={0.13} />
+            <Glow size={logoSize * 3} color={theme.text} intensity={0.13} />
           </Animated.View>
           <Animated.View style={logoStyle}>
-            <BrandthreadLogo size={LOGO_SIZE} />
+            <BrandthreadLogo size={logoSize} />
           </Animated.View>
         </View>
 
@@ -122,14 +125,14 @@ export function WelcomeStep({
   );
 }
 
-const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme'], logoSize: number) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background, overflow: 'hidden' },
   topWash: { position: 'absolute', top: 0, left: 0, right: 0, height: '60%', opacity: 0.9 },
   content: { flex: 1, paddingHorizontal: SPACE.lg },
   hero: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: HERO_HEIGHT },
   // Full-bleed: cancel the content gutter so the thread runs edge to edge.
   heroThread: { position: 'absolute', left: -SPACE.lg, right: -SPACE.lg, top: '50%', marginTop: -HERO_HEIGHT / 2 },
-  heroGlow: { position: 'absolute', width: LOGO_SIZE * 3, height: LOGO_SIZE * 3 },
+  heroGlow: { position: 'absolute', width: logoSize * 3, height: logoSize * 3 },
   copy: { marginBottom: SPACE.xl },
   ctas: { width: '100%', gap: SPACE.sm },
 });

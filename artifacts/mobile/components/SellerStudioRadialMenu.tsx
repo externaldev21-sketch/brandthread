@@ -308,6 +308,8 @@ export default function SellerStudioRadialMenu({
       setSetupDone(completedRequiredTaskCount(state));
       setSetupTotal(requiredTaskCount(state));
     });
+    if (!userId) return () => { cancelled = true; };
+
     api.seller.getProfile().then((profile) => {
       if (cancelled) return;
       // Real store name only here — NOT merged with the account's own
