@@ -3,23 +3,29 @@
  * Reads GET /api/conversations (auth = current Clerk seller user).
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, RefreshControl } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { View, Text, StyleSheet, RefreshControl, Alert } from 'react-native';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, SearchBar } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState, ListSkeleton } from '@/components/layout';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { hapticPrimaryAction } from '@/lib/haptics';
+import { showActionSheet } from '@/components/ui/ActionSheet';
+import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
-import { isPreviewInboxEnabled, getSellerPreviewConversations } from '@/lib/previewInbox';
+import { markConversationRead, archiveConversation, muteUser, setConversationPinned } from '@/services/socialService';
+import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
+import {
+  isPreviewInboxEnabled, getSellerPreviewConversations,
+  isSellerPreviewConversationId, setPreviewConversationPinned,
+} from '@/lib/previewInbox';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 
 interface Participant {
@@ -33,6 +39,8 @@ interface ConvView {
   unreadCount: number;
   contextOrderNumber?: string; contextProductName?: string;
   updatedAt: string;
+  isPinned?: boolean;
+  isArchived?: boolean;
 }
 
 function timeAgo(ts?: number): string {
@@ -70,6 +78,8 @@ export default function SellerInboxScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const consecutiveFailuresRef = useRef(0);
   const generationRef = useRef(0);
@@ -240,58 +250,190 @@ export default function SellerInboxScreen() {
     router.push(('/seller-conversation?id=' + encodeURIComponent(conversationId)) as never);
   }
 
+  function longPressConversation(c: ConvView) {
+    hapticDestructiveConfirm();
+    showActionSheet('Options', undefined, [
+      { text: 'Archive', onPress: () => swipeArchiveConversation(c), style: 'destructive' },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  // Swipe actions mirror app/(buyer)/inbox.tsx's InboxSwipeRow set (mark
+  // read, pin, mute, delete/archive) — same shared component, same
+  // services/socialService.ts mutations, so a seeded preview conversation
+  // (no real backend record) is handled the same way there too: update
+  // local state only, never a network call.
+  async function swipeMarkReadConversation(c: ConvView) {
+    if (c.unreadCount <= 0) return;
+    setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, unreadCount: 0 } : row)));
+    if (isSellerPreviewConversationId(c.id)) return;
+    try {
+      await markConversationRead(c.id);
+    } catch {
+      Alert.alert('Couldn’t mark as read', 'Please try again.');
+    }
+  }
+
+  async function swipePinConversation(c: ConvView) {
+    const nextPinned = !c.isPinned;
+    setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isPinned: nextPinned } : row)));
+    try {
+      if (isSellerPreviewConversationId(c.id)) {
+        setPreviewConversationPinned(c.id, nextPinned);
+      } else {
+        await setConversationPinned(c.id, nextPinned);
+      }
+    } catch {
+      setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isPinned: c.isPinned } : row)));
+      Alert.alert(nextPinned ? 'Couldn’t pin' : 'Couldn’t unpin', 'Please try again.');
+    }
+  }
+
+  async function swipeMuteConversation(c: ConvView) {
+    const other = otherParticipant(c);
+    if (!other) return;
+    try {
+      await muteUser({
+        userId: other.userId, name: other.name, handle: other.handle,
+        initials: other.initials, color: other.color,
+      });
+    } catch {
+      Alert.alert('Couldn’t mute', 'Please try again.');
+    }
+  }
+
+  async function swipeArchiveConversation(c: ConvView) {
+    setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isArchived: true } : row)));
+    if (isSellerPreviewConversationId(c.id)) return;
+    try {
+      await archiveConversation(c.id);
+    } catch {
+      setConvs((current) => current.map((row) => (row.id === c.id ? { ...row, isArchived: false } : row)));
+      Alert.alert('Couldn’t archive', 'Please try again.');
+    }
+  }
+
   function renderItem({ item }: ListRenderItemInfo<ConvView>) {
     const other = otherParticipant(item);
     if (!other) return null;
     const hasUnread = item.unreadCount > 0;
+
+    const swipeActions: InboxSwipeAction[] = [
+      {
+        key: 'read',
+        label: 'Read',
+        icon: 'check-circle',
+        color: theme.accentDim,
+        textColor: theme.accentLight,
+        onPress: () => swipeMarkReadConversation(item),
+        accessibilityLabel: `Mark conversation with ${other.name || other.handle || 'buyer'} as read`,
+      },
+      {
+        key: 'pin',
+        label: item.isPinned ? 'Unpin' : 'Pin',
+        icon: 'bookmark',
+        color: theme.cardElevated,
+        textColor: theme.muted,
+        onPress: () => swipePinConversation(item),
+        accessibilityLabel: item.isPinned
+          ? `Unpin conversation with ${other.name || other.handle || 'buyer'}`
+          : `Pin conversation with ${other.name || other.handle || 'buyer'}`,
+      },
+      {
+        key: 'mute',
+        label: 'Mute',
+        icon: 'bell-off',
+        color: theme.cardElevated,
+        textColor: theme.muted,
+        onPress: () => swipeMuteConversation(item),
+        accessibilityLabel: `Mute ${other.name || other.handle || 'buyer'}`,
+      },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        color: theme.cardElevated,
+        textColor: theme.error,
+        onPress: () => swipeArchiveConversation(item),
+        accessibilityLabel: `Delete conversation with ${other.name || other.handle || 'buyer'}`,
+      },
+    ];
+
     return (
-      <PressableScale
-        testID={`seller-conversation-${item.id}`}
-        style={s.row}
-        activeOpacity={0.7}
-        onPress={() => openConversation(item.id)}
-        accessibilityRole="button"
-        accessibilityLabel={`Open conversation with ${other.name || other.handle || 'buyer'}`}
-      >
-        <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
-          <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
-        </View>
-        <View style={s.rowCenter}>
-          <View style={s.rowTop}>
-            <Text style={[s.name, { fontFamily: hasUnread ? FONT.bold : FONT.regular }]} numberOfLines={1}>
-              {other.name || other.handle || 'Buyer'}
-            </Text>
-            <Text style={s.time}>{timeAgo(item.lastMessageTs)}</Text>
+      <InboxSwipeRow rowId={item.id} actions={swipeActions}>
+        <PressableScale
+          testID={`seller-conversation-${item.id}`}
+          style={[s.row, { backgroundColor: theme.background }]}
+          activeOpacity={0.7}
+          onPress={() => openConversation(item.id)}
+          onLongPress={() => longPressConversation(item)}
+          accessibilityRole="button"
+          accessibilityLabel={`Open conversation with ${other.name || other.handle || 'buyer'}`}
+        >
+          <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
+            <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
           </View>
-          {item.contextOrderNumber ? (
-            <Text style={s.context} numberOfLines={1}>
-              Order {item.contextOrderNumber}{item.contextProductName ? ` · ${item.contextProductName}` : ''}
-            </Text>
-          ) : null}
-          <View style={s.rowBottom}>
-            <Text
-              style={[s.preview, hasUnread && { color: theme.text, fontFamily: FONT.bold }]}
-              numberOfLines={1}
-            >
-              {previewText(item.lastMessage)}
-            </Text>
-            {hasUnread && (
-              <View testID={`seller-unread-badge-${item.id}`} style={[s.unreadDot, { backgroundColor: theme.accent }]} />
-            )}
+          <View style={s.rowCenter}>
+            <View style={s.rowTop}>
+              <Text style={[s.name, { fontFamily: hasUnread ? FONT.bold : FONT.regular }]} numberOfLines={1}>
+                {other.name || other.handle || 'Buyer'}
+              </Text>
+              <Text style={s.time}>{timeAgo(item.lastMessageTs)}</Text>
+            </View>
+            {item.contextOrderNumber ? (
+              <Text style={s.context} numberOfLines={1}>
+                Order {item.contextOrderNumber}{item.contextProductName ? ` · ${item.contextProductName}` : ''}
+              </Text>
+            ) : null}
+            <View style={s.rowBottom}>
+              <Text
+                style={[s.preview, hasUnread && { color: theme.text, fontFamily: FONT.bold }]}
+                numberOfLines={1}
+              >
+                {previewText(item.lastMessage)}
+              </Text>
+              {hasUnread && (
+                <View testID={`seller-unread-badge-${item.id}`} style={[s.unreadDot, { backgroundColor: theme.accent }]} />
+              )}
+            </View>
           </View>
-        </View>
-      </PressableScale>
+        </PressableScale>
+      </InboxSwipeRow>
     );
   }
 
   const totalUnread = convs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+
+  const queryLower = query.trim().toLowerCase();
+  const visibleConvs = useMemo(() => convs
+    .filter((c) => {
+      if (c.isArchived) return false;
+      if (!queryLower) return true;
+      const other = otherParticipant(c);
+      const haystack = [other?.name, other?.handle, c.lastMessage, c.contextOrderNumber, c.contextProductName]
+        .filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(queryLower);
+    })
+    .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),
+  [convs, queryLower]);
 
   return (
     <View style={s.root}>
       <ScreenHeader
         title="Messages"
         subtitle={totalUnread > 0 ? `${totalUnread} unread` : undefined}
+        actions={[{
+          icon: 'search',
+          onPress: () => setSearchOpen((open) => !open),
+          accessibilityLabel: searchOpen ? 'Close search' : 'Search messages',
+        }]}
       />
+
+      {searchOpen && (
+        <View style={s.searchWrap}>
+          <SearchBar value={query} onChange={setQuery} placeholder="Search messages…" />
+        </View>
+      )}
 
       {isLoading ? (
         <View style={[s.listPad, { paddingTop: SP.md }]}>
@@ -312,9 +454,17 @@ export default function SellerInboxScreen() {
             message="When buyers message you about products or orders, their conversations will appear here."
           />
         </View>
+      ) : visibleConvs.length === 0 ? (
+        <View style={s.centerFill}>
+          <EmptyState
+            icon="search"
+            title="No matches"
+            message="Try a different name, handle, or order number."
+          />
+        </View>
       ) : (
         <FlashList
-          data={convs}
+          data={visibleConvs}
           keyExtractor={(c) => c.id}
           renderItem={renderItem}
           refreshControl={
@@ -332,6 +482,7 @@ const createStyles = (theme: AppThemePreset) => {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   listPad: { paddingHorizontal: SP.md },
+  searchWrap: { paddingHorizontal: SP.md, paddingBottom: SP.sm },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
 
   // Row — flat, roomy list row (Bumble-style spacing, no card chrome)
