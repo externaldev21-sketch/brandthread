@@ -36,6 +36,7 @@ import { MODEL_STYLES, SCENE_STYLES, ImageRatioKind, ModelStyleKind, SceneStyleK
 import { generatePhotoshootShot, createBrandAsset } from '@/services/designService';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
 
 const MAX_REFS = 6; // seller-facing cap. NOTE: combined with product photos,
@@ -53,6 +54,7 @@ const RATIOS: { value: ImageRatioKind; label: string }[] = [
 ];
 
 export default function AIPhotoshootScreen() {
+  useHideTabBar();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 

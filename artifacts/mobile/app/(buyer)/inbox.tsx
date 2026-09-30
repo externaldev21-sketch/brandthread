@@ -33,6 +33,10 @@ import { getCachedTabData, setCachedTabData } from '@/lib/tabDataCache';
 import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
+import { CommunityInboxRow } from '@/components/community-inbox/CommunityInboxRow';
+import { openInboxComposeMenu } from '@/components/community-inbox/InboxComposeMenu';
+import { mergeInboxRows, communityMatchesQuery, type InboxMergedRow } from '@/lib/communities/inboxModel';
+import { useInboxCommunities } from '@/lib/communities/useCommunityInbox';
 import { LiveHostRing } from '@/components/live/LiveAvatarRing';
 import { getLiveDirectory } from '@/lib/live/useLiveDirectory';
 import { Snackbar } from '@/components/ui/Snackbar';
@@ -600,6 +604,15 @@ export default function InboxScreen() {
       return true;
     })
     .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+
+  // Joined community group chats live beside DMs (joining is consent), so
+  // they are merged in by recency here and never counted as requests.
+  const { communities: joinedCommunities, toggleMute: toggleCommunityMute } = useInboxCommunities();
+  const inboxRows = mergeInboxRows(
+    filteredConvs,
+    joinedCommunities.filter(c => communityMatchesQuery(c, messagesSearchLower)),
+    { getKey: c => c.id, getTs: c => c.lastMessageTs, isPinned: c => !!c.isPinned },
+  );
 
   const requestConvs = conversations.filter(conv =>
     conv.isRequest === true && !conv.isArchived && !pendingDeleteIds.has(conv.id)
@@ -1228,6 +1241,19 @@ export default function InboxScreen() {
     );
   }
 
+  function renderInboxRow({ item, index }: { item: InboxMergedRow<Conversation>; index: number }) {
+    if (item.kind === 'dm') return renderConvRow({ item: item.dm, index });
+    return (
+      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
+        <CommunityInboxRow
+          community={item.community}
+          onPress={() => { hapticPrimaryAction(); router.push(`/community-chat?id=${encodeURIComponent(item.community.id)}` as never); }}
+          onToggleMute={() => toggleCommunityMute(item.community)}
+        />
+      </AnimatedEntrance>
+    );
+  }
+
   // Requests-tab row — deliberately styled IDENTICAL to an Inbox row
   // (renderConvRow above: same avatarContainer/avatar48 sizing, same left
   // inset, same name/preview/time typography, same trailing unread dot).
@@ -1512,7 +1538,7 @@ export default function InboxScreen() {
           gutter={gutter}
           actions={[
             { name: 'search', onPress: openMessagesSearch, accessibilityLabel: 'Search messages', testID: 'inbox-header-search' },
-            { name: 'edit-3', onPress: openCompose, accessibilityLabel: 'New message', testID: 'inbox-header-compose' },
+            { name: 'plus', onPress: () => openInboxComposeMenu(router, openCompose), accessibilityLabel: 'New message or group', testID: 'inbox-header-compose' },
           ]}
         />
       )}
@@ -1698,7 +1724,7 @@ export default function InboxScreen() {
         </View>
       ) : activeTab === 'requests' ? (
         requestsTabContent
-      ) : filteredConvs.length === 0 ? (
+      ) : inboxRows.length === 0 ? (
         <ScrollView
           ref={scrollResetRef}
           style={s.listSurface}
@@ -1714,9 +1740,9 @@ export default function InboxScreen() {
         <View style={s.listSurface}>
           <FlashList
             ref={scrollResetRef}
-            data={filteredConvs}
-            keyExtractor={item => item.id}
-            renderItem={renderConvRow}
+            data={inboxRows}
+            keyExtractor={item => item.key}
+            renderItem={renderInboxRow}
             contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.lg, paddingHorizontal: gutter }])}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"

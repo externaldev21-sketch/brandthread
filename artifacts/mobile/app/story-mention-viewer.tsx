@@ -19,7 +19,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert, Animated, Dimensions, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, TextInput, View,
+  Alert, Animated, Dimensions, Easing, PanResponder, Platform, Pressable, StyleSheet, Text, View,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { StatusBar } from 'expo-status-bar';
@@ -36,6 +36,8 @@ import { IconButton } from '@/components/ui';
 import { MentionStickerView, ReshareCard } from '@/components/StoryMentionSticker';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useStoryMentions } from '@/hooks/useStoryMentions';
+import Composer from '@/components/ui/Composer';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, ON_DARK, RADIUS, SP, ICON } from '@/lib/theme';
 import { RADII, radius } from '@/constants/radii';
 import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
@@ -145,6 +147,7 @@ export default function StoryMentionViewerScreen() {
   const router = useRouter();
   const api = useApi();
   const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
   const topInset = useHeaderTopInset();
   const { storyId } = useLocalSearchParams<{ storyId?: string }>();
   const { items, loading } = useStoryMentions();
@@ -503,41 +506,26 @@ export default function StoryMentionViewerScreen() {
               </PressableScale>
             </View>
           ) : null}
-          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
-            <View style={styles.replyPill}>
-              <TextInput
-                style={styles.replyInput}
-                value={text}
-                onChangeText={setText}
-                placeholder={`Reply to ${tagger.name || atHandle(tagger.handle)}…`}
-                placeholderTextColor="rgba(255,255,255,0.8)"
-                onFocus={() => {
-                  if (blurTimer.current) { clearTimeout(blurTimer.current); blurTimer.current = null; }
-                  setReplyFocused(true);
-                }}
-                onBlur={() => {
-                  // Delayed so a tap on Send still lands before the bar re-lays out.
-                  blurTimer.current = setTimeout(() => setReplyFocused(false), 200);
-                }}
-                onSubmitEditing={() => { void sendReply(); }}
-                returnKeyType="send"
-                editable={!sending && !currentUnavailable}
-                accessibilityLabel="Reply"
-                testID="story-mention-reply-input"
-              />
-            </View>
-            {hasText ? (
-              <PressableScale
-                onPress={() => { void sendReply(); }}
-                style={styles.sendBtn}
-                disabled={sending}
-                accessibilityRole="button"
-                accessibilityLabel="Send reply"
-                testID="story-mention-send"
-              >
-                <Text style={styles.sendLabel}>{sending ? 'Sending…' : 'Send'}</Text>
-              </PressableScale>
-            ) : (
+          <Composer
+          overMedia
+            value={text}
+            onChangeText={setText}
+            onSend={() => { void sendReply(); }}
+            canSend={hasText && !sending}
+            editable={!sending && !currentUnavailable}
+            placeholder={`Reply to ${tagger.name || atHandle(tagger.handle)}…`}
+            accessibilityLabel="Reply"
+            testID="story-mention-reply"
+            hideTabBar={false}
+            onFocus={() => {
+              if (blurTimer.current) { clearTimeout(blurTimer.current); blurTimer.current = null; }
+              setReplyFocused(true);
+            }}
+            onBlur={() => {
+              // Delayed so a tap on Send still lands before the bar re-lays out.
+              blurTimer.current = setTimeout(() => setReplyFocused(false), 200);
+            }}
+            rightAccessory={(
               <PressableScale
                 onPress={() => { void handleLike(); }}
                 style={styles.heartBtn}
@@ -547,12 +535,12 @@ export default function StoryMentionViewerScreen() {
               >
                 <Animated.View style={{ transform: [{ scale: heartPop }] }}>
                   {isLiked
-                    ? <FontAwesome name="heart" size={ICON.lg} color={ON_DARK} />
-                    : <Feather name="heart" size={ICON.lg} color={ON_DARK} />}
+                    ? <FontAwesome name="heart" size={ICON.lg} color={theme.text} />
+                    : <Feather name="heart" size={ICON.lg} color={theme.text} />}
                 </Animated.View>
               </PressableScale>
             )}
-          </View>
+          />
         </KeyboardAvoidingView>
       </Animated.View>
     </View>
@@ -595,13 +583,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: 'rgba(0,0,0,0.45)',
   },
   addLabel: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.base },
-  bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.xs, flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  replyPill: {
-    flex: 1, height: 44, borderRadius: RADII.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
-    backgroundColor: 'transparent', justifyContent: 'center',
-  },
-  replyInput: { height: 44, paddingHorizontal: SP.md, fontSize: 15, fontFamily: FONT.regular, color: ON_DARK },
-  heartBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  sendBtn: { paddingHorizontal: SP.sm, height: 44, justifyContent: 'center' },
-  sendLabel: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
+  heartBtn: { width: 32, height: 40, alignItems: 'center', justifyContent: 'center' },
 });

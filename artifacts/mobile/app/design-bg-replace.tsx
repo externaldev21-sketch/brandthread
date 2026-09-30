@@ -33,6 +33,7 @@ import {
 import { replaceBackground } from '@/services/designService';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product, ProductMedia } from '@/services/productTypes';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
 
 type BgTab = 'color' | 'gradient' | 'upload' | 'ai';
@@ -75,6 +76,7 @@ export default function DesignBgReplaceScreen({
   embedded?: boolean;
   onSelectRemove?: () => void;
 } = {}) {
+  useHideTabBar(!embedded);
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const s = createStyles(theme);

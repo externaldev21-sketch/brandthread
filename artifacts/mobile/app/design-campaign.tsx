@@ -81,6 +81,7 @@ import type {
 import { isSellerDevPreview } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { InlineSlider } from '@/components/InlineSlider';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 import { radius } from '@/constants/radii';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -239,6 +240,7 @@ const sec = StyleSheet.create({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function CreateAdScreen() {
+  useHideTabBar();
   const router    = useRouter();
   const params    = useLocalSearchParams<{ id?: string; paymentReturn?: string }>();
   const insets    = useSafeAreaInsets();
