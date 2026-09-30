@@ -3,12 +3,24 @@ import { withRetry } from "./retry";
 
 const connectors = new ReplitConnectors();
 
+const SHIPPO_API_BASE = "https://api.goshippo.com";
+
+/** Shippo API key from the environment; when unset the Replit connector is used. */
+export function shippoApiKey(): string | null {
+  return process.env.SHIPPO_API_KEY?.trim() || null;
+}
+
 async function shippoRequest<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
-  const response = await connectors.proxy("shippo", path, {
-    method: init.method ?? "GET",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
-  });
+  const apiKey = shippoApiKey();
+  const headers = { "Content-Type": "application/json", Accept: "application/json" };
+  const body = init.body === undefined ? undefined : JSON.stringify(init.body);
+  const response = apiKey
+    ? await fetch(`${SHIPPO_API_BASE}${path}`, {
+      method: init.method ?? "GET",
+      headers: { ...headers, Authorization: `ShippoToken ${apiKey}` },
+      body,
+    })
+    : await connectors.proxy("shippo", path, { method: init.method ?? "GET", headers, body });
   const text = await response.text();
   if (!response.ok) {
     throw Object.assign(new Error(`Shipping provider request failed (${response.status})`), {
@@ -45,11 +57,13 @@ export async function createShipment(body: {
   );
 }
 
+export type ShippoLabelFileType = "PDF" | "PDF_4x6" | "PNG" | "ZPLII";
+
 // Purchasing a label spends the seller's Shippo balance and Shippo does not
 // document a client-supplied idempotency key for this endpoint, so it is NOT
 // retried automatically — see src/lib/retry.ts's doc comment. A failed
 // purchase must be resolved (or explicitly resubmitted) by the caller.
-export async function purchaseTransaction(rateId: string, reference: string) {
+export async function purchaseTransaction(rateId: string, reference: string, labelFileType: ShippoLabelFileType = "PDF_4x6") {
   return shippoRequest<{
     object_id: string;
     status: string;
@@ -59,7 +73,7 @@ export async function purchaseTransaction(rateId: string, reference: string) {
     messages?: Array<{ text?: string }>;
   }>("/transactions", {
     method: "POST",
-    body: { rate: rateId, label_file_type: "PDF", metadata: reference, async: false },
+    body: { rate: rateId, label_file_type: labelFileType, metadata: reference, async: false },
   });
 }
 

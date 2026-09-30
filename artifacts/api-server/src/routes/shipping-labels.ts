@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import {
-  db, orders, shippingLabelQuotes, shippingLabels, orderFundReservations, dropWallets, sellerCashoutAttempts,
+  db, orders, orderItems, productVariants, shippingLabelQuotes, shippingLabels, orderFundReservations, dropWallets, sellerCashoutAttempts,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
-import { createShipment, findTransaction, purchaseTransaction, refundTransaction } from "../lib/shippo";
+import { activeShippingProvider, createShipment, findTransaction, purchaseTransaction, refundTransaction } from "../lib/shippingProvider";
+import { parcelInputError, suggestParcel } from "../lib/parcelSuggestion";
 import { isPendingProviderPurchase } from "../lib/shippingOperationPolicy";
 import {
   executeOrderRelease, lockDrop, recordLabelPurchased, recordLabelVoided, recoverLabelCost, requestOrderRelease,
@@ -38,8 +39,24 @@ function address(value: any) {
   };
 }
 
+// Suggested parcel weight for an order, from its variants' stored weights.
+router.get("/:orderId/parcel-suggestion", requireRole("staff"), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const [order] = await db.select({ id: orders.id }).from(orders).where(and(
+    eq(orders.id, req.params.orderId), eq(orders.ownerId, ownerId),
+  )).limit(1);
+  if (!order) return void res.status(404).json({ error: "Order not found" });
+  const lines = await db.select({ quantity: orderItems.quantity, weightGrams: productVariants.weightGrams })
+    .from(orderItems)
+    .leftJoin(productVariants, eq(productVariants.id, orderItems.variantId))
+    .where(eq(orderItems.orderId, order.id));
+  res.json(suggestParcel(lines));
+});
+
 router.post("/:orderId/rates", requireRole("staff"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  const parcelError = parcelInputError(req.body ?? {});
+  if (parcelError) return void res.status(400).json({ error: parcelError });
   const [order] = await db.select().from(orders).where(and(
     eq(orders.id, req.params.orderId), eq(orders.ownerId, ownerId),
   )).limit(1);
@@ -187,7 +204,7 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
       }
 
       [label] = await tx.insert(shippingLabels).values({
-        orderId: order.id, ownerId, idempotencyKey, providerRateId: rateId,
+        orderId: order.id, ownerId, idempotencyKey, providerRateId: rateId, provider: activeShippingProvider(),
         providerShipmentId: quote.providerShipmentId,
         carrier: quote.carrier, service: quote.service,
         priceCents, status: "purchasing", previousOrderStatus: order.status,
