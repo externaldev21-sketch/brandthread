@@ -109,7 +109,7 @@ import {
 } from '@/lib/sellerControlCenter';
 
 export { ALL_ITEMS, SECTIONS, DEFAULT_PINNED_IDS } from '@/lib/sellerControlCenter';
-import { STUDIO_PAYOUTS_ORIGIN, subscribeStudioMenuReturn } from '@/lib/navigation/studioMenuReturn';
+import { STUDIO_MENU_ORIGIN, subscribeStudioMenuReturn } from '@/lib/navigation/studioMenuReturn';
 
 // ─── Menu contents ────────────────────────────────────────────────────────────
 // Dev's consolidation pass: the menu should only hold destinations with NO
@@ -371,7 +371,7 @@ export default function SellerStudioRadialMenu({
   const lastStepAtRef = useRef(0);
 
   useEffect(() => {
-    // Fresh opens start at the first card; returning from Payouts resumes
+    // Fresh opens start at the first card; returning from a Studio tool resumes
     // the previous selection without rearming its auto-enter timer.
     if (open) {
       if (!resumeCardOnOpenRef.current) {
@@ -515,7 +515,9 @@ export default function SellerStudioRadialMenu({
     }
     setNextPushAnimationNone();
     if (item.id === 'payouts') {
-      router.push({ pathname: '/payouts', params: { from: STUDIO_PAYOUTS_ORIGIN } });
+      router.push({ pathname: '/payouts', params: { from: STUDIO_MENU_ORIGIN } });
+    } else if (item.id === 'analytics') {
+      router.push({ pathname: '/(tabs)/analytics', params: { from: STUDIO_MENU_ORIGIN } });
     } else {
       router.push(item.route as never);
     }

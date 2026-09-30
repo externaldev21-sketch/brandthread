@@ -1,6 +1,6 @@
 import { goBackOr, type BackCapableRouter } from './goBackOr';
 
-export const STUDIO_PAYOUTS_ORIGIN = 'seller-studio';
+export const STUDIO_MENU_ORIGIN = 'seller-studio';
 
 const listeners = new Set<() => void>();
 

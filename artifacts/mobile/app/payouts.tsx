@@ -23,7 +23,7 @@ import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { scheduleLabel, requirementLabel, taxInfoConfig } from '@/lib/payoutSetup';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { STUDIO_PAYOUTS_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
+import { STUDIO_MENU_ORIGIN, returnToStudioMenu } from '@/lib/navigation/studioMenuReturn';
 import { SellerThreadCashCard } from '@/components/thread-cash/SellerThreadCashCard';
 import { CashOutSheet } from '@/components/thread-cash/CashOutSheet';
 import { useSellerThreadCashBalance } from '@/hooks/useSellerThreadCash';
@@ -92,7 +92,7 @@ export default function PayoutsScreen() {
   const [cashOutVisible, setCashOutVisible] = useState(false);
 
   function leaveSetupDestination() {
-    if (params.from === STUDIO_PAYOUTS_ORIGIN) {
+    if (params.from === STUDIO_MENU_ORIGIN) {
       returnToStudioMenu(router);
       return;
     }

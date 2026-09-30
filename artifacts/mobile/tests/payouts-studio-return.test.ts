@@ -43,17 +43,30 @@ describe('Payouts return to Studio', () => {
     expect(reopen).not.toHaveBeenCalled();
   });
 
-  it('marks only the Studio Payouts launch and restores the selection without auto-entering', () => {
+  it('marks the Studio Payouts launch and restores the selection without auto-entering', () => {
     const root = path.resolve(__dirname, '..');
     const menu = fs.readFileSync(path.join(root, 'components/SellerStudioRadialMenu.tsx'), 'utf8');
     const payouts = fs.readFileSync(path.join(root, 'app/payouts.tsx'), 'utf8');
     expect(menu).toContain("if (item.id === 'payouts')");
-    expect(menu).toContain("pathname: '/payouts', params: { from: STUDIO_PAYOUTS_ORIGIN }");
+    expect(menu).toContain("pathname: '/payouts', params: { from: STUDIO_MENU_ORIGIN }");
     expect(menu).toContain('resumeCardOnOpenRef.current = true');
     expect(menu).toContain('if (!resumeCardOnOpenRef.current)');
     expect(menu).toContain("setEnterState('hidden')");
-    expect(payouts).toContain('params.from === STUDIO_PAYOUTS_ORIGIN');
+    expect(payouts).toContain('params.from === STUDIO_MENU_ORIGIN');
     expect(payouts).toContain('returnToStudioMenu(router)');
     expect(payouts).toContain("goBackOr(router, '/(tabs)/more')");
+  });
+
+  it('returns Analytics to Studio in both loaded and loading states, without changing ordinary visits', () => {
+    const root = path.resolve(__dirname, '..');
+    const menu = fs.readFileSync(path.join(root, 'components/SellerStudioRadialMenu.tsx'), 'utf8');
+    const analytics = fs.readFileSync(path.join(root, 'app/(tabs)/analytics.tsx'), 'utf8');
+    expect(menu).toContain("item.id === 'analytics'");
+    expect(menu).toContain("pathname: '/(tabs)/analytics', params: { from: STUDIO_MENU_ORIGIN }");
+    expect(analytics).toContain('params.from === STUDIO_MENU_ORIGIN ?');
+    expect(analytics).toContain('returnToStudioMenu(router)');
+    expect(analytics).toContain('router.setParams({ from: undefined })');
+    expect(analytics.match(/<ScreenHeader title="Analytics" subtitle="Last 7 days" onBack=\{onBack\}/g)).toHaveLength(2);
+    expect(analytics).toContain('} : undefined');
   });
 });
