@@ -31,7 +31,7 @@ test('batch 1 screens @ 393x852', async ({ browser }) => {
   await shot(page, '/activity-people?bt_preview=buyer&type=followers&ids=', '05-activity-people');
   await shot(page, '/admin-reports?bt_preview=seller', '06-admin-reports');
   await shot(page, '/ai-brain?bt_preview=seller', '07-ai-brain');
-  await shot(page, '/app-theme?bt_preview=seller', '08-app-theme');
+  await shot(page, '/appearance?bt_preview=seller', '08-appearance');
   await shot(page, '/biometric-unlock?bt_preview=buyer', '09-biometric-unlock');
   await shot(page, '/analytics-content?bt_preview=seller&demo=1', '10-analytics-content');
   await shot(page, '/analytics-customers?bt_preview=seller&demo=1', '11-analytics-customers');

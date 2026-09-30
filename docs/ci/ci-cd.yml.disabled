@@ -63,15 +63,20 @@ jobs:
     # dead controls, placeholder copy, console errors, broken images and the
     # "clarity standard" (font/contrast/hit-target/color-rule) checks.
     #
-    # Ratchet policy: hard-tier findings (console errors, dead controls,
-    # placeholder copy, broken images, repeated/garbage labels, error-boundary
-    # screens — things that should never regress) fail the build unless
-    # already present in docs/audit/half-done-baseline.json. Warn-tier
-    # findings (color/type-scale/contrast/hit-target/clipped/overlap/button-
-    # consistency — pervasive pre-existing debt across ~275 routes, out of
-    # scope to fix in one PR) are reported but never block. See
-    # docs/audit/README.md for how to refresh the baseline once a follow-up
-    # PR fixes a tracked area.
+    # Gate policy (artifacts/mobile/scripts/audit/audit-gate.mjs):
+    #   - Hard-tier findings (console errors, dead controls, placeholder
+    #     copy, broken images, repeated/garbage labels, error-boundary
+    #     screens) are zero-tolerance: ANY hard-tier finding fails the
+    #     build, full stop — not just a *new* one. (half-done-audit.mjs's
+    #     own `--ci` baseline-exemption mode still exists and is used
+    #     nowhere in this pipeline; audit-gate.mjs replaces it here.)
+    #   - Warn-tier findings (color/type-scale/contrast/hit-target/clipped/
+    #     overlap/button-consistency — pervasive pre-existing debt across
+    #     ~275 routes) are gated by a ratchet: the run's warn-tier count
+    #     must be strictly below docs/audit/warn-baseline.json's recorded
+    #     count, every single PR. It can only go down.
+    # See docs/audit/README.md for full policy and how to update the
+    # warn-tier baseline after a genuine improvement lands.
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -95,8 +100,8 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter @workspace/mobile exec playwright install --with-deps chromium
 
-      - name: Run half-done audit (CI gate)
-        run: pnpm --filter @workspace/mobile run audit:half-done -- --ci
+      - name: Run half-done audit gate (zero-tolerance hard + warn ratchet)
+        run: pnpm --filter @workspace/mobile run audit:gate
 
       - name: Upload audit report and screenshots
         if: always()
