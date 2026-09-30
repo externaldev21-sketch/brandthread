@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import type { Tabs } from 'expo-router';
+import { useSegments, type Tabs } from 'expo-router';
 import Animated, {
   Easing,
   useAnimatedReaction,
@@ -20,6 +20,8 @@ import {
 import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
 import { COMPACT_ICON_SCALE, COMPACT_ICON_STROKE_SCALE, useBuyerTabBarMetrics } from './buyerTabBarMetrics';
 import { TabBarGlassZone } from './TabBarGlassZone';
+import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
+import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
 
 // Smooth ease-out, no bounce/overshoot — this round's explicit spec for the
 // compact <-> regular capsule transition (superseding the earlier SHEET_EASING/
@@ -83,6 +85,34 @@ export const BUYER_ROUTE_SLOT: Record<string, Slot> = {
  */
 const BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile', 'cart']);
 
+// ─── Full-screen creation/story/video/live routes ──────────────────────────
+// `BUYER_TAB_BAR_HIDDEN_ROUTES` above only covers routes registered INSIDE
+// this Tabs navigator (`state.routes`) — it can't see a root-Stack sibling
+// like buyer-story-create or camera-capture, which `detachInactiveScreens={
+// false}` (app/(buyer)/_layout.tsx) keeps this whole Tabs navigator (and
+// this bar) mounted underneath, just visually covered by. That covering
+// screen is opaque (`contentStyle: OPAQUE_SCREEN_CONTENT`, app/_layout.tsx),
+// so the bar was never actually visible through it — but it also never slid
+// away, unlike the seller tab bar (SellerGlobalTabBar's `hidden` prop, same
+// TAB_BAR_SLIDE_MS/tabBarSlideTargetY used below), which both looks
+// inconsistent between the two shells and leaves no margin if that opacity
+// assumption is ever wrong (a gesture-driven dismiss, a platform quirk).
+// `useSegments()` reads the true current app-wide route regardless of
+// whether this Tabs navigator is the one currently on top, same technique
+// app/_layout.tsx's SellerBarGate uses.
+//
+// Regression guard: tests/tab-bar-full-screen-slide.test.ts asserts every
+// buyer-reachable creation/story/video/live route below is covered.
+const BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
+  'camera-capture',
+  'create-post',
+  'buyer-story-create',
+  'buyer-story-viewer',
+  'buyer-live',
+  'live-feed',
+  'live',
+]);
+
 export function BuyerTabBar({
   state,
   navigation,
@@ -106,6 +136,13 @@ export function BuyerTabBar({
   // Home is the only full-bleed video tab — every other buyer screen keeps
   // the regular capsule exactly as shipped.
   const isCompact = activeSlot === 'index';
+
+  // True whenever a root-Stack full-screen creation/story/video/live route
+  // is the one actually on top — see BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS'
+  // doc above for why this can't be read from `state`/`activeRoute`.
+  const segments = useSegments();
+  const firstSegment = (segments[0] as string | undefined) ?? '';
+  const isFullScreenRoute = BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment);
 
   // Owns the pill's position so a tab press can kick the glide immediately,
   // before the tabPress event and the screen swap — see the hook's doc.
@@ -254,6 +291,25 @@ export function BuyerTabBar({
 
   const profileFocused = activeSlot === 'profile';
 
+  // ── Slide off/on screen for full-screen creation/story/video/live routes
+  // (`isFullScreenRoute`) — same TAB_BAR_SLIDE_MS/TAB_BAR_SLIDE_EASING/
+  // tabBarSlideTargetY the seller tab bar uses (SellerGlobalTabBar.tsx),
+  // including the onLayout-measured (not guessed) offscreen distance and
+  // the guaranteed-end-state discipline documented in lib/tabBarSlide.ts.
+  // This must run before BUYER_TAB_BAR_HIDDEN_ROUTES's early return below so
+  // hook order stays stable.
+  const [barHeight, setBarHeight] = useState(96);
+  const offscreenY = barHeight + metrics.bottomOffset;
+  const translateY = useSharedValue(isFullScreenRoute ? offscreenY : 0);
+  useEffect(() => {
+    translateY.set(withTiming(tabBarSlideTargetY(isFullScreenRoute, offscreenY), {
+      duration: TAB_BAR_SLIDE_MS,
+      easing: TAB_BAR_SLIDE_EASING,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullScreenRoute, offscreenY]);
+  const slideStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+
   // Pushed, modal-style screens (Edit profile) never show the floating bar.
   // This check runs after every hook above so hook order stays stable while
   // the bar itself mounts/unmounts as the user navigates in and out.
@@ -262,9 +318,12 @@ export function BuyerTabBar({
   return (
     <Animated.View
       testID="buyer-bottom-tab-bar"
+      onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
+      pointerEvents={isFullScreenRoute ? 'none' : 'box-none'}
       style={[
         styles.bar,
         { bottom: metrics.bottomOffset, gap: metrics.gap },
+        slideStyle,
       ]}
     >
       {/* Frosted glass over whatever's actually rendered behind the bar —
@@ -395,7 +454,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    pointerEvents: 'box-none',
   },
   // Shadow lives on an unclipped wrapper; the glass inside clips to the radius.
   shadow: TAB_BAR_SHADOW,
