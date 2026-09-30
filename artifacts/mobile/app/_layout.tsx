@@ -68,6 +68,7 @@ import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
 import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CallSessionProvider } from '@/lib/calls/CallSessionContext';
+import { FirstRunTipsProvider } from '@/contexts/FirstRunTipsContext';
 import { GlobalCallOverlay } from '@/components/calls/GlobalCallOverlay';
 import { CelebrationHost } from '@/components/thread-cash/CelebrationHost';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
@@ -1492,8 +1493,10 @@ export default function RootLayout() {
                             <RuntimeThemeShell>
                               <ThreadPullProvider>
                                 <CallSessionProvider>
-                                  <RootLayoutNav />
-                                  <GlobalCallOverlay />
+                                  <FirstRunTipsProvider>
+                                    <RootLayoutNav />
+                                    <GlobalCallOverlay />
+                                  </FirstRunTipsProvider>
                                 </CallSessionProvider>
                               </ThreadPullProvider>
                             </RuntimeThemeShell>

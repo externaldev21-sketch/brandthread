@@ -32,6 +32,8 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { SELLER_PRODUCTS_GESTURE } from '@/lib/firstRunTips/content';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -780,6 +782,12 @@ export default function ProductsScreen() {
         visible={stockEditVisible}
         onClose={() => setStockEditVisible(false)}
         onChanged={handleStockChanged}
+      />
+      <FirstRunTip
+        id="seller-products"
+        variant="gesture"
+        contentReady={!loading}
+        gesture={SELLER_PRODUCTS_GESTURE}
       />
     </View>
   );

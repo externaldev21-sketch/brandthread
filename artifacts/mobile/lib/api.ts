@@ -2290,6 +2290,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       markSeen: (version: number) =>
         patch<{ seenVersion: number }>('/api/auth/feed-gestures-tip', { version }),
     },
+    /**
+     * Server-side "seen" state for the reusable <FirstRunTip> system (every
+     * screen's first-run gesture hint / spotlight / anchored card /
+     * full-screen guide) — source of truth across reinstalls/devices. See
+     * lib/firstRunTips/storage.ts for the local cache + reconcile logic.
+     */
+    firstRunTips: {
+      get: () => get<{ seenTipIds: string[]; skipAll: boolean }>('/api/first-run-tips/seen'),
+      markSeen: (tipId: string) => post<void>(`/api/first-run-tips/${encodeURIComponent(tipId)}/seen`, {}),
+      skipAll: () => post<void>('/api/first-run-tips/skip-all', {}),
+      reset: () => post<void>('/api/first-run-tips/reset', {}),
+    },
     /** Public seller storefront — profile + products + posts */
     publicSellers: {
       get: (sellerId: string) =>
