@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AffiliateRefCapture } from '@/components/AffiliateRefCapture';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
@@ -1446,6 +1447,7 @@ function RootLayoutNav() {
       <AuthGate />
       <ServiceConfigurer />
       <PushRegistrar />
+      <AffiliateRefCapture />
       <MarketingPixelTracker />
       <LegalAcceptanceGate />
       <AppLockGate />

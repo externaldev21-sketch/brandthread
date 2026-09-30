@@ -77,6 +77,7 @@ const GROWTH_ITEMS: NavItem[] = [
   { icon: 'bar-chart-2', label: 'Analytics', desc: 'Sales, traffic and insights', accent: 'accentLight', route: '/(tabs)/analytics' },
   { icon: 'video', label: 'Content', desc: 'Posts, drafts and scheduled', accent: 'secondary', route: '/content' },
   { icon: 'users', label: 'Community', desc: 'Join topic group chats', accent: 'secondary', route: '/community' },
+  { icon: 'link', label: 'Creator program', desc: 'Affiliate codes and commissions', accent: 'accent', route: '/seller-creator-program' },
 ];
 
 const MONEY_ITEMS: NavItem[] = [

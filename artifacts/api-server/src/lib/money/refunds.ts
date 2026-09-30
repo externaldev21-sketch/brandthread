@@ -40,6 +40,7 @@ import {
 } from "./stateMachines";
 import { isDefinitiveStripeRejection, safeErrorMessage, stripeErrorCode } from "./stripeMoney";
 import { restoreStockForOrder } from "../stockReservation";
+import { reverseCommissionForOrder } from "../affiliate/service";
 
 export type RefundReason =
   | "buyer_cancelled" | "seller_cancelled" | "return_approved" | "drop_failed" | "oversold"
@@ -419,6 +420,14 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
       );
     }
     await options.onSucceeded?.(tx, { order: locked, amountCents: amount, refundId: refund.id });
+    // Affiliate program: claw back the creator's commission on the refunded
+    // part (full on cancellation). Savepoint-isolated; a no-op for orders
+    // without an affiliate, and the payout sweep re-checks anyway.
+    try {
+      await tx.transaction((sp) => reverseCommissionForOrder(sp as any, locked.id));
+    } catch (affiliateError) {
+      logger.error({ err: affiliateError, orderId: locked.id }, "Affiliate commission reversal failed; the sweep will retry");
+    }
     // A full refund/cancellation returns any Thread Cash the buyer spent on
     // this order, exactly once (idempotent on `refund:<orderId>`), for every
     // refund path (buyer/seller cancellation, return, oversold, drop

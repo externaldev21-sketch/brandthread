@@ -62,6 +62,7 @@ import {
 } from "../lib/stripeWebhookLedger";
 import { sellerPlanFromStripeLookupKey } from "../lib/stripePlanMapping";
 import { recordDiscountCodeUse } from "../lib/discounts";
+import { attributeOrder as attributeAffiliateOrder } from "../lib/affiliate/service";
 import { splitOrder } from "../lib/money/fees";
 import { fetchChargeDetails, type ChargeDetails } from "../lib/money/stripeMoney";
 import {
@@ -1010,6 +1011,27 @@ export async function handleCheckoutPaid(
         orderId: order.id,
         appliedAmountCents: csRecord.discountCodeAmountCents ?? 0,
       });
+    }
+
+    // Affiliate program: if the buyer used a creator's code or arrived through
+    // a creator's link, record the commission (lib/affiliate). Additive and
+    // isolated in a savepoint: no affiliate, or any failure here, leaves the
+    // order and payment exactly as they were.
+    if (oversoldItems.length === 0) {
+      try {
+        await tx.transaction((sp) => attributeAffiliateOrder(sp as any, {
+          orderId: order.id,
+          sellerId: ownerId,
+          buyerId: buyerId ?? null,
+          guestEmail: guestEmail ?? null,
+          subtotalCents,
+          sellerDiscountCents: Math.min(Math.max(0, stripeDiscountCents - threadCashAppliedCents), subtotalCents),
+          discountCodeId: csRecord.discountCodeId ?? null,
+          paidAt: successfulPaymentAt,
+        }));
+      } catch (affiliateError) {
+        logger.error({ err: affiliateError, orderId: order.id }, "Affiliate attribution failed; order unaffected");
+      }
     }
 
     // Record the purchase reward in the same transaction as the confirmed
