@@ -329,6 +329,8 @@ const ORDER_TYPES = new Set(['low_stock', 'out_of_stock']);
 const BUYER_ORDER_TYPES = new Set([
   'order_confirmed', 'order_shipped', 'order_out_for_delivery', 'order_delivered',
   'order_cancelled', 'order_exception', 'order_returned_to_sender',
+  // Delivery guarantee (docs/payments/delivery-guarantee.md)
+  'order_preparing', 'order_auto_refunded', 'order_refund_warning',
 ]);
 
 export function isBuyerOrderNotification(type: string | undefined | null): boolean {
@@ -460,6 +462,9 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'order_shipped':
     case 'order_out_for_delivery': return 'truck';
     case 'order_delivered': return 'package';
+    case 'order_preparing': return 'box';
+    case 'order_auto_refunded': return 'rotate-ccw';
+    case 'order_refund_warning': return 'clock';
     case 'order_cancelled':
     case 'order_cancelled_by_buyer': return 'x-circle';
     case 'order_confirmed': return 'check-circle';

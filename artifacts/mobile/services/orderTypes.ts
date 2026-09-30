@@ -605,6 +605,8 @@ export function cancellationReasonLabel(reason: string | null | undefined): stri
   // buyer_requested is the server's legacy value for a buyer-initiated
   // cancellation; the shared list contains the seller-facing equivalent.
   if (reason === 'buyer_requested') return 'You requested the cancellation';
+  // Set by the delivery-guarantee auto-refund job.
+  if (reason === 'not_delivered_in_time') return 'Not delivered in time';
   return CANCELLATION_REASONS.find(item => item.key === reason)?.label
     ?? reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
