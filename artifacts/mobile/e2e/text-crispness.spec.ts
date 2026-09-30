@@ -146,6 +146,90 @@ const SCREENS: Array<{ name: string; path: string; role: 'buyer' | 'seller' }> =
 /** Devices worth checking: 390x844 (the reported viewport) at 2x and 3x DPR. */
 const DPRS = [2, 3];
 
+/**
+ * Walks the FULL ancestor chain of every text node (not just the nearest
+ * element, unlike check 1 in the sweep below) looking for a non-`none`
+ * `transform` anywhere above it — the shape of bug this exists for lives
+ * several levels up from the text itself (a whole-screen wrapper, not the
+ * text's own parent), so a nearest-element-only check would miss it.
+ */
+async function findTransformAncestors(page: Page): Promise<Array<{ text: string; transform: string }>> {
+  return page.evaluate(() => {
+    const bad: Array<{ text: string; transform: string }> = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        return (node.textContent ?? '').trim().length > 0
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_REJECT;
+      },
+    });
+    let node: Node | null;
+    // eslint-disable-next-line no-cond-assign
+    while ((node = walker.nextNode())) {
+      let el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+      while (el && el !== document.body) {
+        const t = getComputedStyle(el).transform;
+        if (t && t !== 'none') {
+          bad.push({ text: (node.textContent ?? '').trim().slice(0, 60), transform: t });
+          break;
+        }
+        el = el.parentElement;
+      }
+    }
+    return bad;
+  });
+}
+
+/**
+ * Tab-switch follow-up (#404's slide transition, fixed after #415 merged):
+ * lib/tabSlideTransition.ts's `forDirectionalSlide` used to leave a
+ * permanent identity `transform: matrix(1,0,0,1,0,0)` on the focused
+ * screen's full-screen wrapper once a tab-switch settled — invisible to
+ * check 1 below (which only looks at a text node's *nearest* element
+ * ancestor; the wrapper here sits many levels above the actual text), so it
+ * gets its own dedicated check with the full-ancestor-chain walk above, run
+ * specifically *after* a tab switch (not just on initial load) so the
+ * settled/no-longer-animating state is what's actually under test. Covers
+ * both seller and buyer, since both tab layouts share the same module.
+ */
+const TAB_SWITCH_CHECKS: Array<{ name: string; role: 'buyer' | 'seller'; entryPath: string; tabTestId: string; backTestId: string }> = [
+  { name: 'seller dashboard <-> products', role: 'seller', entryPath: '/(tabs)', tabTestId: 'seller-tab-products', backTestId: 'seller-tab-index' },
+  { name: 'buyer home <-> discover', role: 'buyer', entryPath: '/(buyer)', tabTestId: 'buyer-tab-discover', backTestId: 'buyer-tab-index' },
+];
+
+for (const check of TAB_SWITCH_CHECKS) {
+  test(`${check.name}: no ancestor of screen text keeps a non-none transform at rest after a tab switch`, async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 2 });
+    const page = await context.newPage();
+    try {
+      await page.addInitScript(clerkStubScript());
+      await page.goto(`${check.entryPath}?bt_preview=${check.role}`, { waitUntil: 'networkidle', timeout: 30_000 }).catch(() => undefined);
+      await hideDevErrorOverlay(page);
+      await waitForAnimationsToSettle(page);
+
+      // Switch tabs, wait past the ~280ms slide (see lib/tabSlideTransition.ts's
+      // SLIDE_DURATION) plus a settle margin, then check.
+      await page.getByTestId(check.tabTestId).click();
+      await page.waitForTimeout(500);
+      await hideDevErrorOverlay(page);
+      await waitForAnimationsToSettle(page);
+      const afterSwitch = await findTransformAncestors(page);
+      expect(afterSwitch, `after switching to ${check.tabTestId}: ${JSON.stringify(afterSwitch, null, 2)}`).toEqual([]);
+
+      // And back the other direction — the screen that slides in from the
+      // opposite side must settle to `transform: none` too.
+      await page.getByTestId(check.backTestId).click();
+      await page.waitForTimeout(500);
+      await hideDevErrorOverlay(page);
+      await waitForAnimationsToSettle(page);
+      const afterSwitchBack = await findTransformAncestors(page);
+      expect(afterSwitchBack, `after switching back to ${check.backTestId}: ${JSON.stringify(afterSwitchBack, null, 2)}`).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 for (const screen of SCREENS) {
   for (const dpr of DPRS) {
     test(`${screen.name} @ 390x844 x${dpr} — no blurry text at rest`, async ({ browser }) => {

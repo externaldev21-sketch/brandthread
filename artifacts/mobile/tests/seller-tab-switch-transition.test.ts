@@ -29,7 +29,7 @@ describe('seller tab switch transition', () => {
   it('drives the seller tab layout with the shared directional-slide transitionSpec', () => {
     expect(sellerLayout).toContain("from '@/lib/tabSlideTransition'");
     expect(sellerLayout).toContain('transitionSpec: reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC');
-    expect(sellerLayout).toContain('sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width)');
+    expect(sellerLayout).toContain('sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width, settled.value)');
   });
 
   it('buyer and seller tab layouts share the exact same transition module (can’t drift apart)', () => {
@@ -109,4 +109,53 @@ describe('profile content tabs have no press/active background', () => {
   it('disables PressableScale\'s ripple on icon-only tabs (a ripple is a background fill too)', () => {
     expect(controls).toContain('rippleEnabled={!iconOnly}');
   });
+});
+
+/**
+ * Follow-up from the blurry-text sweep (#415): the tab-slide's own
+ * full-screen wrapper (this file's `forDirectionalSlide`) left a permanent
+ * identity `transform: matrix(1,0,0,1,0,0)` on the resting, focused screen
+ * once a tab switch finished — the same class of bug #415 fixed for
+ * PressableScale, just for this screen-level wrapper instead of a button.
+ * Fixed with the same `useSettled` convention from lib/animationUtils.ts:
+ * the tab layouts unsettle synchronously (during render, not in an effect —
+ * see the layout files' own comments for why) on every route change, then
+ * settle again once the known transition duration elapses, at which point
+ * `forDirectionalSlide`'s `settled` branch drops the `transform` key
+ * entirely for the identity (focused, on-screen) case.
+ */
+describe('tab-slide transform drops to none once settled (blurry-text follow-up)', () => {
+  const sellerLayout = read('app/(tabs)/_layout.tsx');
+  const buyerLayout = read('app/(buyer)/_layout.tsx');
+  const shared = read('lib/tabSlideTransition.ts');
+
+  it('forDirectionalSlide accepts a settled flag and drops the transform key at identity', () => {
+    expect(shared).toContain('export function forDirectionalSlide(width: number, settled = false)');
+    expect(shared).toContain("import { isIdentityTransform } from '@/lib/animationUtils'");
+    expect(shared).toContain('isIdentityTransform([{ translateX }])');
+    expect(shared).toContain('return { sceneStyle: transform ? { transform } : {} };');
+  });
+
+  it('exports the slide durations so the layouts can time their own settle timeout exactly', () => {
+    expect(shared).toContain('export const SLIDE_DURATION = 280');
+    expect(shared).toContain('export const REDUCED_MOTION_SLIDE_DURATION = 150');
+  });
+
+  for (const [name, layout] of [['seller', sellerLayout], ['buyer', buyerLayout]] as const) {
+    it(`${name} tab layout drives forDirectionalSlide with useSettled's settled.value`, () => {
+      expect(layout).toContain("from '@/lib/animationUtils'");
+      expect(layout).toContain('useSettled(true)');
+      expect(layout).toContain('forDirectionalSlide(width, settled.value)');
+    });
+
+    it(`${name} tab layout unsettles synchronously during render on a route change, not in an effect`, () => {
+      expect(layout).toContain('if (prevPathnameRef.current !== pathname) {');
+      expect(layout).toContain('settled.unsettle();');
+    });
+
+    it(`${name} tab layout re-settles after the known transition duration`, () => {
+      expect(layout).toContain('settled.settleImmediately()');
+      expect(layout).toContain('reduceMotion ? REDUCED_MOTION_SLIDE_DURATION : SLIDE_DURATION');
+    });
+  }
 });
