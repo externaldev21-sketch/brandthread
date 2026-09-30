@@ -1,68 +1,92 @@
 /**
- * Regression guard for the account-switch race: the shared TanStack
- * queryClient (lib/queryClient.ts) has never been userId-scoped — its
- * query keys (queryKeys.tabData/orderList/productList) carry no userId of
- * their own, and nothing anywhere in the app called queryClient.clear() /
- * removeQueries() / resetQueries() on sign-out or account switch (grep
- * confirmed zero matches before this fix). Any data an account A screen
- * cached via useQuery would still be readable — for up to gcTime (24h) —
- * after switching straight to account B, with nothing re-scoping it. The
- * fix (app/_layout.tsx's ServiceConfigurer account-switch effect) is a real
- * app/_layout.tsx wiring, so it can't be unit-tested by importing that huge
- * screen file directly — verified here two ways: (1) the queryClient's own
- * .clear() behavior actually empties the cache (the primitive the fix
- * relies on), and (2) a source check confirming the switch effect in
- * app/_layout.tsx actually calls it, in the same block as the other
- * userId-scoped cache clears (clearSocialCache/clearCartCache/
- * clearApiCache), not a separate, possibly-skippable path.
+ * Regression guard for the account-switch data-bleed risk, and for the
+ * "instant switching" requirement added on top of the original fix.
+ *
+ * History: the shared TanStack queryClient (lib/queryClient.ts) was
+ * originally not userId-scoped at all, so app/_layout.tsx's ServiceConfigurer
+ * account-switch effect called queryClient.clear() on every switch (same
+ * block as clearSocialCache/clearCartCache/clearApiCache) to stop account A's
+ * cached data leaking into account B. That closed the bleed, but at the cost
+ * of a full clear()+refetch flicker every time — including switching BACK to
+ * an account already visited this session.
+ *
+ * The current fix instead namespaces every relevant cache by userId —
+ * lib/queryClient.ts's queryKeys.* (via setQueryKeyScope), and the two
+ * instant-first-paint caches lib/tabDataCache.ts / lib/feedPostsCache.ts (via
+ * initTabDataCache/initFeedPostsCache) — the same "init*(userId)" pattern
+ * services/productService.ts and services/cartService.ts already used.
+ * Re-scoping (not clearing) means account A's entries are never evicted,
+ * just filed under a key account B can't read — so switching back to A is
+ * instant, not a refetch, while still closing the exact same bleed.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { queryClient } from '../queryClient';
+import { queryClient, queryKeys, setQueryKeyScope } from '../queryClient';
 
-const ROOT = resolve(__dirname, '../..');
-
-function listSourceFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((entry) => {
-    const full = resolve(dir, entry);
-    if (statSync(full).isDirectory()) return listSourceFiles(full);
-    return full.endsWith('.tsx') || full.endsWith('.ts') ? [full] : [];
-  });
-}
-
-describe('queryClient.clear() — the primitive the account-switch fix relies on', () => {
+describe('queryKeys.* are namespaced by the scope set via setQueryKeyScope', () => {
   beforeEach(() => {
     queryClient.clear();
+    setQueryKeyScope(null);
   });
 
-  it('removes data cached under a previous account before the next account can read it', () => {
-    // Simulate account A caching a list under an unscoped query key.
-    queryClient.setQueryData(['orderList', 'all'], { orders: [{ id: 'order-a-1' }] });
-    expect(queryClient.getQueryData(['orderList', 'all'])).toBeDefined();
+  it('gives the same key shape different identities for different accounts', () => {
+    setQueryKeyScope('user-a');
+    const keyForA = queryKeys.orderList('all');
+    setQueryKeyScope('user-b');
+    const keyForB = queryKeys.orderList('all');
 
-    // Account switch: the fix clears the whole client.
-    queryClient.clear();
-
-    // Account B must never see account A's cached data at the same key.
-    expect(queryClient.getQueryData(['orderList', 'all'])).toBeUndefined();
+    expect(keyForA).not.toEqual(keyForB);
   });
 
-  it('clears every query key, not just one', () => {
-    queryClient.setQueryData(['orderList', 'all'], { orders: [] });
-    queryClient.setQueryData(['productList', 'all'], { products: [] });
-    queryClient.setQueryData(['tabData', 'home'], { widgets: [] });
+  it('account B can never read data cached under account A\'s scope at the "same" key', () => {
+    setQueryKeyScope('user-a');
+    queryClient.setQueryData(queryKeys.orderList('all'), { orders: [{ id: 'order-a-1' }] });
+    expect(queryClient.getQueryData(queryKeys.orderList('all'))).toBeDefined();
 
-    queryClient.clear();
+    setQueryKeyScope('user-b');
+    expect(queryClient.getQueryData(queryKeys.orderList('all'))).toBeUndefined();
+  });
 
-    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+  it('switching back to account A instantly sees its own data again — nothing was evicted', () => {
+    setQueryKeyScope('user-a');
+    queryClient.setQueryData(queryKeys.tabData('seller-dashboard'), { widgets: ['real-data'] });
+
+    setQueryKeyScope('user-b');
+    expect(queryClient.getQueryData(queryKeys.tabData('seller-dashboard'))).toBeUndefined();
+
+    setQueryKeyScope('user-a');
+    expect(queryClient.getQueryData(queryKeys.tabData('seller-dashboard'))).toEqual({ widgets: ['real-data'] });
+  });
+
+  it('a signed-out/guest scope (null) is its own distinct namespace, not merged with any account', () => {
+    setQueryKeyScope('user-a');
+    queryClient.setQueryData(queryKeys.productList('mine'), { products: ['a-product'] });
+
+    setQueryKeyScope(null);
+    expect(queryClient.getQueryData(queryKeys.productList('mine'))).toBeUndefined();
   });
 });
 
-describe('the account-switch effect actually calls queryClient.clear() (source check)', () => {
-  it("app/_layout.tsx's ServiceConfigurer clears queryClient in the same block as the other userId-scoped cache clears", () => {
+describe('the account-switch effect wires up every per-account cache scope (source check)', () => {
+  it("app/_layout.tsx's ServiceConfigurer calls setQueryKeyScope/initTabDataCache/initFeedPostsCache on every switch, unconditionally (not just inside the changed-user guard)", () => {
     const src = readFileSync(resolve(__dirname, '../../app/_layout.tsx'), 'utf8');
 
+    // Unconditional (outside the `if (oldUserId !== newUserId)` guard, same
+    // as initSocialService/initCartService/initProductService) — a cold
+    // start's very first render still needs the scope set before anything
+    // reads a cache, not only on an actual change.
+    expect(src).toContain('setQueryKeyScope(newUserId)');
+    expect(src).toContain('initTabDataCache(newUserId)');
+    expect(src).toContain('initFeedPostsCache(newUserId)');
+
+    // The old blanket clear() must actually be gone — its presence would
+    // mean this is still a clear()+refetch flow, not instant switching.
+    expect(src).not.toContain('queryClient.clear()');
+  });
+
+  it('still clears the OLD user\'s social/cart/api caches on a real change (data bleed still impossible, not merely slower to appear)', () => {
+    const src = readFileSync(resolve(__dirname, '../../app/_layout.tsx'), 'utf8');
     const switchBlockMatch = src.match(
       /if \(oldUserId !== null && oldUserId !== newUserId\) \{[\s\S]*?\n {4}\}/,
     );
@@ -72,28 +96,26 @@ describe('the account-switch effect actually calls queryClient.clear() (source c
     expect(block).toContain('clearSocialCache(oldUserId)');
     expect(block).toContain('clearCartCache(oldUserId)');
     expect(block).toContain('clearApiCache(oldUserId)');
-    // The actual assertion this test exists for: queryClient must be
-    // cleared in the SAME guarded block as the other per-user caches, not
-    // omitted or left to a separate, possibly-skipped code path.
-    expect(block).toContain('queryClient.clear()');
   });
 });
 
 describe('unscoped list query keys are never read via useQuery from app screens (lint-style guard)', () => {
-  // queryKeys.tabData/orderList/productList carry no userId of their own
-  // (unlike queryKeys.profile(userId), which is already scoped). Today
-  // nothing reads them via useQuery — every real screen goes through the
-  // userId-scoped service singletons (services/*.ts's init*Service/K()
-  // pattern) instead; these keys exist only for lib/appStartPrefetch.ts's
-  // warmers. If a future screen starts reading queryKeys.tabData(...) /
-  // orderList(...) / productList(...) directly via useQuery, it would
-  // silently reintroduce the exact leak queryClient.clear() on switch
-  // doesn't fully close on its own (a query issued moments before the
-  // clear can still repopulate the cache under the OLD account's data if
-  // its response lands after the clear but is keyed identically for the
-  // new account) — so this is intentionally strict: flag it here and make
-  // a human confirm it's userId-scoped before adding the usage, rather
-  // than let it slip in silently.
+  // queryKeys.tabData/orderList/productList are namespaced (see above), but
+  // nothing in the app reads them via useQuery today — every real screen
+  // goes through the userId-scoped service singletons (services/*.ts's
+  // init*Service/keys() pattern) instead; these factories exist only for
+  // lib/appStartPrefetch.ts's warmers. Kept as a guard so a future screen
+  // adding direct useQuery(queryKeys.tabData(...)) usage gets a human to
+  // confirm it's still correctly scoped, rather than slipping in silently.
+  const ROOT = resolve(__dirname, '../..');
+  function listSourceFiles(dir: string): string[] {
+    return readdirSync(dir).flatMap((entry: string) => {
+      const full = resolve(dir, entry);
+      if (statSync(full).isDirectory()) return listSourceFiles(full);
+      return full.endsWith('.tsx') || full.endsWith('.ts') ? [full] : [];
+    });
+  }
+
   it('no app/ or components/ file calls useQuery(queryKeys.tabData|orderList|productList(...))', () => {
     const offenders: string[] = [];
     for (const dir of ['app', 'components']) {
@@ -105,6 +127,6 @@ describe('unscoped list query keys are never read via useQuery from app screens 
         }
       }
     }
-    expect(offenders, `found unscoped list-key useQuery usage in: ${offenders.join(', ')} — scope it by userId (e.g. queryKeys.profile-style) before adding, or clear/invalidate it explicitly on account switch`).toEqual([]);
+    expect(offenders, `found unscoped list-key useQuery usage in: ${offenders.join(', ')} — confirm it stays userId-scoped before adding, or clear/invalidate it explicitly on account switch`).toEqual([]);
   });
 });

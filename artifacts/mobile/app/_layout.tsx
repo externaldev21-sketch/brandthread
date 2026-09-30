@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { queryClient, queryPersister } from '@/lib/queryClient';
+import { queryClient, queryPersister, setQueryKeyScope } from '@/lib/queryClient';
 import { warmBuyerTabs, warmSellerTabs } from '@/lib/appStartPrefetch';
 import { recordNavigationStart } from '@/lib/perf';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -54,6 +54,8 @@ import { initDesignService } from '@/services/designService';
 import { initProductService } from '@/services/productService';
 import { initOrderService } from '@/services/orderService';
 import { initAnalyticsService } from '@/services/analyticsService';
+import { initTabDataCache } from '@/lib/tabDataCache';
+import { initFeedPostsCache } from '@/lib/feedPostsCache';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
 import { WebAppShell } from '@/components/web/WebAppShell';
@@ -884,18 +886,20 @@ function ServiceConfigurer() {
       // must be dropped explicitly or the previous account's plan tier would
       // gate features for the next signed-in account.
       invalidatePlanCache();
-      // The shared TanStack queryClient (lib/queryClient.ts) is NOT scoped
-      // by userId — its query keys (queryKeys.tabData/orderList/productList/
-      // profile) carry no userId of their own, so without this, a query
-      // cached under account A's session (gcTime is 24h) would still be
-      // readable — and, worse, is persisted to AsyncStorage and rehydrated
-      // on a cold launch — after switching straight to account B, with
-      // nothing re-scoping it. Clearing it here matches the same
-      // "wipe the previous user's cache before init'ing the next" pattern
-      // clearSocialCache/clearCartCache already use.
-      queryClient.clear();
     }
     prevUserIdRef.current = newUserId;
+    // The shared TanStack queryClient (lib/queryClient.ts) and the two
+    // instant-first-paint caches (tabDataCache/feedPostsCache) are now
+    // namespaced by userId — same pattern as initSocialService/
+    // initCartService/initProductService below — instead of being wiped on
+    // every switch. Re-scoping (not clearing) is what makes switching BACK
+    // to an already-visited account on this device instant: its entries
+    // were never evicted, just filed under its own userId, so this multi-
+    // account device gets true instant switching with zero bleed, not a
+    // full clear()+refetch flicker every time.
+    setQueryKeyScope(newUserId);
+    initTabDataCache(newUserId);
+    initFeedPostsCache(newUserId);
     initSocialService(newUserId);
     initCartService(newUserId);
     initDesignService(newUserId);
