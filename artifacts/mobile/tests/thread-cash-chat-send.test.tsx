@@ -182,6 +182,43 @@ describe('ThreadCashAttachButton — send confirmation (item 72)', () => {
     expect(onSent).toHaveBeenCalledWith({ transferId: 'transfer-abc', amountCents: 1000, note: null });
   });
 
+  it('disables Continue and shows an inline warning once the typed amount exceeds the fetched balance (real balance check, either role)', async () => {
+    const onSent = vi.fn();
+    const tree = render(
+      <ThreadCashAttachButton
+        recipientId="buyer-1"
+        recipientName="Maya Torres"
+        recipientHandle="mayatorres"
+        conversationId="real-conversation-2"
+        onSent={onSent}
+      />,
+    );
+    const opener = tree.root.findAllByType('TouchableOpacity' as never)[0];
+    await act(async () => { (opener.props as { onPress: () => void }).onPress(); });
+
+    // Balance is mocked at $50.00 (5000 cents, see the @/lib/api mock above).
+    // Go to the custom keypad and type $100 — well over the balance.
+    const customChip = tree.root.findByProps({ testID: 'thread-cash-chip-custom' });
+    await act(async () => { (customChip.props as { onPress: () => void }).onPress(); });
+    for (const digit of ['1', '0', '0', '0', '0']) {
+      const key = tree.root.findByProps({ accessibilityLabel: `Digit ${digit}` });
+      await act(async () => { (key.props as { onPress: () => void }).onPress(); });
+    }
+
+    const amount = tree.root.findByProps({ testID: 'thread-cash-amount' });
+    expect([amount.props.children].flat().join('')).toBe('$100.00');
+    expect(tree.root.findByProps({ testID: 'thread-cash-insufficient' })).toBeTruthy();
+
+    const continueBtn = tree.root.findByProps({ testID: 'thread-cash-continue' });
+    expect((continueBtn.props as { disabled: boolean }).disabled).toBe(true);
+
+    // Defense in depth: even if something forced past the disabled button
+    // (e.g. a stale render), the send handler itself refuses too.
+    await act(async () => { (continueBtn.props as { onPress: () => void }).onPress(); });
+    expect(tree.root.findAllByProps({ testID: 'thread-cash-confirm-send' }).length).toBe(0);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
   it('mocks the send locally (never hits the real API) for a seller-preview conversation id, so the seller side is clickable end-to-end too', async () => {
     const onSent = vi.fn();
     const tree = render(
