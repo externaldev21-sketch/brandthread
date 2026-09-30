@@ -678,14 +678,14 @@ function makeStyles(theme: AppThemePreset) {
     width: '100%',
     height: COMP.buttonH,
     borderRadius: RADIUS.pill,
-    backgroundColor: theme.text,
+    backgroundColor: theme.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryBtnText: {
     fontFamily: FONT.semibold,
     fontSize: FS.base,
-    color: theme.background,
+    color: theme.onAccent,
   },
   secondaryBtn: {
     width: '100%',

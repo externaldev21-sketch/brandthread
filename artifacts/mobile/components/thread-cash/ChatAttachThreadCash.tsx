@@ -431,7 +431,7 @@ export function ThreadCashAttachButton({
                       style={[
                         styles.chip,
                         isSelected
-                          ? { backgroundColor: theme.text, borderColor: theme.text }
+                          ? { backgroundColor: theme.accent, borderColor: theme.accent }
                           : { backgroundColor: 'transparent', borderColor: theme.border },
                       ]}
                       accessibilityRole="button"
@@ -439,7 +439,7 @@ export function ThreadCashAttachButton({
                       accessibilityLabel={`$${dollars}`}
                       testID={`thread-cash-chip-${dollars}`}
                     >
-                      <Text style={[styles.chipText, { color: isSelected ? theme.background : theme.text }]}>${dollars}</Text>
+                      <Text style={[styles.chipText, { color: isSelected ? theme.onAccent : theme.text }]}>${dollars}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -448,14 +448,14 @@ export function ThreadCashAttachButton({
                   style={[
                     styles.chip,
                     selectedChip === 'custom'
-                      ? { backgroundColor: theme.text, borderColor: theme.text }
+                      ? { backgroundColor: theme.accent, borderColor: theme.accent }
                       : { backgroundColor: 'transparent', borderColor: theme.border },
                   ]}
                   accessibilityRole="button"
                   accessibilityLabel="Custom amount"
                   testID="thread-cash-chip-custom"
                 >
-                  <Text style={[styles.chipText, { color: selectedChip === 'custom' ? theme.background : theme.text }]}>Custom</Text>
+                  <Text style={[styles.chipText, { color: selectedChip === 'custom' ? theme.onAccent : theme.text }]}>Custom</Text>
                 </TouchableOpacity>
               </View>
             </>

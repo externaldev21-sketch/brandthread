@@ -2988,7 +2988,7 @@ function RequestActionPanel({
         </PressableScale>
         <PressableScale
           rippleEnabled={false}
-          style={[rs.actionBtn, rs.acceptBtn, { backgroundColor: theme.text }]}
+          style={[rs.actionBtn, rs.acceptBtn, { backgroundColor: theme.accent }]}
           onPress={onAccept}
           disabled={loading}
           accessibilityRole="button"
@@ -2996,9 +2996,9 @@ function RequestActionPanel({
           testID="conversation-request-accept"
         >
           {loading ? (
-            <ActivityIndicator color={theme.background} size="small" />
+            <ActivityIndicator color={theme.onAccent} size="small" />
           ) : (
-            <Text style={[rs.actionText, rs.acceptText, { color: theme.background }]}>Accept</Text>
+            <Text style={[rs.actionText, rs.acceptText, { color: theme.onAccent }]}>Accept</Text>
           )}
         </PressableScale>
       </View>
