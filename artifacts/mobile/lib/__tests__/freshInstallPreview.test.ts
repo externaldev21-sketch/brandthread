@@ -63,14 +63,18 @@ describe("fresh-install: personal preview modules gate their seeded cast on isPr
     expect(s).toMatch(/alreadyCheckedInToday: false,/);
   });
 
-  it("previewOrders.ts: the seeded preview-order-01 row is demo-gated, session-placed orders are not", () => {
+  it("previewOrders.ts: the seeded demo orders (incl. the delivery-guarantee cast) are demo-gated, session-placed orders are not", () => {
     const s = src("../previewOrders.ts");
     expect(s).toContain("import { isPreviewDemoMode } from './devPreview';");
-    expect(s).toMatch(/if \(!isPreviewDemoMode\(\) \|\| id !== 'preview-order-01'\) return null;/);
+    expect(s).toMatch(/if \(!isPreviewDemoMode\(\)\) return null;\s*return demoBuyerOrders\(\)/);
+    // Every list/detail builder of the seeded cast is behind the same gate.
+    expect(s).toMatch(/getPreviewBuyerOrders[\s\S]{0,120}!isPreviewDemoMode\(\)\) return \[\];/);
+    expect(s).toMatch(/getPreviewSellerOrders[\s\S]{0,120}!isPreviewDemoMode\(\)\) return \[\];/);
+    expect(s).toMatch(/getPreviewSellerOrder\([\s\S]{0,160}!isPreviewDemoMode\(\)\) return null;/);
     // The write-through `placed` map lookup must run BEFORE the demo check,
     // so a real session checkout always shows regardless of demo=1.
     const placedLookupIndex = s.indexOf("const placedOrder = placed.get(id!);");
-    const demoGateIndex = s.indexOf("if (!isPreviewDemoMode() || id !== 'preview-order-01') return null;");
+    const demoGateIndex = s.indexOf("if (!isPreviewDemoMode()) return null;\n  return demoBuyerOrders()");
     expect(placedLookupIndex).toBeGreaterThan(0);
     expect(demoGateIndex).toBeGreaterThan(placedLookupIndex);
   });

@@ -38,6 +38,8 @@ import {
 import { applyThreadCashSellerTopup } from "../lib/threadCash/checkoutTopup";
 import { qualifyReferralForOrderSafe } from "../lib/referrals/rewards";
 import { settleTransferOrder } from "../lib/money/cartTransfers";
+import { stampDeliveryDeadlines } from "../lib/delivery/deliveryState";
+import { applyDisputePause, applyDisputePauseByDisputeId } from "../lib/delivery/disputePause";
 import { commitStockReservation, releaseStockReservation } from "../lib/money/stockReservation";
 import { CART_CHECKOUT_KIND } from "../lib/money/cartCheckout";
 import {
@@ -917,7 +919,11 @@ export async function handleCheckoutPaid(
       processingFeeCents: chargeModel === "held"
         ? chargeDetails.processingFeeCents
         : chargeModel === "transfer"
-          ? cartProcessingShareCents(chargeDetails.processingFeeCents, totalCents, session.cart_amount_total)
+          // A cart-wide charge carries this order's pro-rata share; a hosted
+          // Checkout Session charged on the platform balance is one order.
+          ? (session.cart_amount_total == null
+            ? chargeDetails.processingFeeCents ?? undefined
+            : cartProcessingShareCents(chargeDetails.processingFeeCents, totalCents, session.cart_amount_total))
           : undefined,
     });
     const decidedPlatformFee = (chargeModel === "destination" || chargeModel === "transfer") && csRecord.platformFeeCents != null
@@ -1025,6 +1031,12 @@ export async function handleCheckoutPaid(
         priceCents:   item.priceCents,
       })),
     );
+
+    // Delivery guarantee: stamp the 15-day / 60-day deadlines now, in the same
+    // transaction as the order and its items.
+    if (oversoldItems.length === 0) {
+      await stampDeliveryDeadlines(tx, order.id, successfulPaymentAt);
+    }
 
     // Step 6: stock was already reserved (decremented) above — either by the
     // one-page checkout's own hold (stockAlreadyReserved, committed via
@@ -1676,6 +1688,7 @@ async function handleDisputeCreated(dispute: any) {
     })
     .onConflictDoNothing();
 
+  await applyDisputePause(orderId, dispute.status);
   logger.info({ disputeId: dispute.id, sellerId, orderId, reason: dispute.reason }, "Dispute created");
 }
 
@@ -1693,6 +1706,7 @@ async function handleDisputeUpdated(stripeDispute: any) {
       updatedAt:             new Date(),
     })
     .where(eq(disputes.stripeDisputeId, stripeDispute.id));
+  await applyDisputePauseByDisputeId(stripeDispute.id, stripeDispute.status);
 
   logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute updated");
 }
@@ -1705,6 +1719,7 @@ async function handleDisputeClosed(stripeDispute: any) {
       updatedAt: new Date(),
     })
     .where(eq(disputes.stripeDisputeId, stripeDispute.id));
+  await applyDisputePauseByDisputeId(stripeDispute.id, stripeDispute.status);
 
   logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute closed");
 }
