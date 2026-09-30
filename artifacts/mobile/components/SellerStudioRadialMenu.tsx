@@ -21,17 +21,25 @@
  *    step is a quick ~90ms slide (never a bounce/spring). One strong haptic
  *    tick fires per card change, rate-limited so a very fast scrub still
  *    reads as a clean buzz rather than mush.
- *  - Lifting the finger (or a plain tap on the card) opens whatever card is
- *    currently shown, instantly: the sheet vanishes with no closing
- *    animation of its own, and the destination's own push animation is
- *    suppressed for this one navigation (see lib/navigationAnimationOverride.ts
- *    — Expo Router has no native per-call "animation: none", so the
- *    destination's own Stack.Screen reads a one-shot override instead).
- *  - A vertical drag (either direction on the card area, or the handle/
+ *  - Lifting the finger after a horizontal scrub does NOT navigate anymore
+ *    (Dev's own live-testing feedback on the first cut: "too fast /
+ *    accident-prone"). It LOCKS on whatever card is currently centered — a
+ *    quick snap-to-center, a single firmer "landed" haptic, and a subtle
+ *    white ring + scale-up on that card so it clearly reads as selected.
+ *    Scrubbing again afterward just continues from the locked card.
+ *  - Opening a destination now takes a deliberate second action on the
+ *    already-locked (or freshly-scrubbed-to) card: a plain TAP on the card
+ *    or its name, or a quick UPWARD flick on the card — either opens
+ *    instantly, no closing animation of its own, and the destination's own
+ *    push animation is suppressed for this one navigation (see
+ *    lib/navigationAnimationOverride.ts — Expo Router has no native
+ *    per-call "animation: none", so the destination's own Stack.Screen
+ *    reads a one-shot override instead).
+ *  - A downward drag (either direction on the card area, or the handle/
  *    header's own drag surface) dismisses the sheet without navigating,
- *    with the same rubber-band/velocity-flick feel as before. Horizontal vs.
- *    vertical is decided from the very first ~10px of movement (RNGH
- *    activeOffset/failOffset), so the two gestures never fight mid-drag.
+ *    with the same rubber-band/velocity-flick feel as before. Horizontal
+ *    vs. vertical is decided from the very first ~10px of movement, so
+ *    scrub/dismiss/open never fight mid-drag.
  *  - Tapping the dimmed area above the sheet also dismisses without
  *    navigating.
  */
@@ -249,6 +257,12 @@ export default function SellerStudioRadialMenu({
   const lastHapticIndexRef = useSharedValue(0);
   const lastHapticAtRef = useRef(0);
   const [cardIndexJS, setCardIndexJS] = useState(0);
+  // 0 = no card currently "landed" (still scrubbing, or fresh open); ramps
+  // to 1 the moment a horizontal release locks a card, driving that card's
+  // white ring + scale-up in CarouselCard below. Reset to 0 the instant a
+  // new gesture begins on the card area (see cardAreaPan.onBegin), whether
+  // that's a fresh scrub or the tap/flick that opens the locked card.
+  const landedPulse = useSharedValue(0);
 
   useEffect(() => {
     // Reset to the first card every time the sheet opens fresh, so it never
@@ -257,6 +271,7 @@ export default function SellerStudioRadialMenu({
       cardIndex.value = 0;
       gestureStartIndex.value = 0;
       lastHapticIndexRef.value = 0;
+      landedPulse.value = 0;
       setCardIndexJS(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -267,6 +282,12 @@ export default function SellerStudioRadialMenu({
     if (now - lastHapticAtRef.current < MIN_HAPTIC_INTERVAL_MS) return;
     lastHapticAtRef.current = now;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+  }, []);
+
+  /** The firmer, distinct-from-scrub-ticks haptic that fires once when a
+   *  card locks on release — Dev's "landed" feel. */
+  const fireLandedHaptic = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
   }, []);
 
   useAnimatedReaction(
@@ -376,6 +397,14 @@ export default function SellerStudioRadialMenu({
    *  axis locks in — matches the "decide within the first ~10px" spec. */
   const AXIS_LOCK_PX = 10;
   const cardGestureAxis = useSharedValue<'none' | 'horizontal' | 'vertical'>('none');
+  /** How quick/far an upward flick on the card area must be to count as the
+   *  "power move" that opens instantly, rather than an ordinary slow drag up
+   *  (which just rubber-bands and snaps back, same as before). Symmetric
+   *  with the downward dismiss-flick threshold below. */
+  const OPEN_FLICK_VELOCITY = 800;
+  /** How fast the locked card snaps to dead-center on release, and how long
+   *  its ring/scale "landed" pulse takes to ramp in. */
+  const CARD_LOCK_MS = 100;
 
   const runDismissEnd = useCallback((e: { translationY: number; velocityY: number }) => {
     'worklet';
@@ -415,6 +444,10 @@ export default function SellerStudioRadialMenu({
       cardGestureAxis.value = 'none';
       gestureStartIndex.value = Math.round(cardIndex.value);
       dragStartY.value = translateY.value;
+      // Any new touch on the card area — a fresh scrub, or the tap/flick
+      // that's about to open the locked card — clears the "landed" ring so
+      // it never lingers on a card that's no longer the settled one.
+      landedPulse.value = 0;
     })
     .onUpdate((e) => {
       if (cardGestureAxis.value === 'none') {
@@ -432,15 +465,34 @@ export default function SellerStudioRadialMenu({
     })
     .onEnd((e) => {
       if (cardGestureAxis.value === 'vertical') {
+        // A quick, primarily-upward flick is the "power move" that opens
+        // the current card instantly — same as a tap, just from a flick
+        // instead. Anything else vertical (a slow drag up, or a real
+        // downward swipe/flick) goes through the normal dismiss logic,
+        // which itself decides close-vs-snap-back.
+        const isUpwardFlick = e.velocityY < -OPEN_FLICK_VELOCITY;
+        if (isUpwardFlick) {
+          runOnJS(openCurrentItem)();
+          return;
+        }
         runDismissEnd(e);
       } else if (cardGestureAxis.value === 'horizontal') {
-        runOnJS(openCurrentItem)();
+        // Release no longer opens the card (Dev's live-testing feedback:
+        // too fast/accident-prone) — it LOCKS on whichever card is nearest
+        // to center: a firm snap to dead-center plus a single "landed"
+        // haptic distinct from the per-card scrub ticks, and landedPulse
+        // drives that card's ring/scale-up in CarouselCard below. Opening
+        // it now takes a separate tap or upward flick.
+        const target = Math.round(cardIndex.value);
+        cardIndex.value = withTiming(target, { duration: CARD_LOCK_MS, easing: CARD_STEP_EASING });
+        landedPulse.value = withTiming(1, { duration: CARD_LOCK_MS, easing: CARD_STEP_EASING });
+        runOnJS(fireLandedHaptic)();
       }
       // axis === 'none' here means the Pan never crossed AXIS_LOCK_PX at
       // all before release — too small a movement for this Pan to have
       // even activated (see constraint 2), so it never reaches onEnd for
       // that case; the Race'd tapGesture below handles it instead.
-    }), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, runDismissEnd, openCurrentItem]);
+    }), [cardIndex, gestureStartIndex, translateY, dragStartY, cardGestureAxis, landedPulse, runDismissEnd, openCurrentItem, fireLandedHaptic]);
 
   // A genuine tap (near-zero movement) — see constraint 2 above for why
   // this can't just be "the Pan's onEnd when its axis never locked".
@@ -481,12 +533,31 @@ export default function SellerStudioRadialMenu({
     const cardStyle = useAnimatedStyle(() => {
       const distance = itemIndex - cardIndex.value;
       const absDistance = Math.abs(distance);
+      // landedPulse only ever applies to whichever card is actually
+      // dead-center (absDistance ~0) — a neighbor mid-scrub never gets the
+      // scale-up, even while landedPulse is still ramping in from the
+      // previous card's release.
+      const landedBoost = absDistance < 0.01 ? landedPulse.value * 0.08 : 0;
       return {
         transform: [
           { translateX: distance * cardSpacing },
-          { scale: interpolate(absDistance, [0, 1, 2], [1, 0.62, 0.48], Extrapolation.CLAMP) },
+          { scale: interpolate(absDistance, [0, 1, 2], [1, 0.62, 0.48], Extrapolation.CLAMP) + landedBoost },
         ],
         opacity: interpolate(absDistance, [0, 0.999, 1, 2], [1, 1, 0.4, 0], Extrapolation.CLAMP),
+      };
+    });
+    // The "landed" ring — a plain white outline that fades/scales in around
+    // the icon only for the currently-centered card, once landedPulse ramps
+    // up on release. Kept as its own animated style (rather than baked into
+    // cardIconWrap's static StyleSheet entry) since its opacity/scale must
+    // react to landedPulse frame-by-frame on the UI thread.
+    const ringStyle = useAnimatedStyle(() => {
+      const distance = itemIndex - cardIndex.value;
+      const isCentered = Math.abs(distance) < 0.01;
+      const pulse = isCentered ? landedPulse.value : 0;
+      return {
+        opacity: pulse,
+        transform: [{ scale: interpolate(pulse, [0, 1], [0.9, 1], Extrapolation.CLAMP) }],
       };
     });
     // pointerEvents="none": the whole card area's gesture (scrub/dismiss/
@@ -507,6 +578,11 @@ export default function SellerStudioRadialMenu({
         testID={`seller-control-center-item-${item.id}`}
       >
         <View style={styles.cardIconWrap}>
+          <Animated.View
+            style={[styles.cardLandedRing, ringStyle]}
+            pointerEvents="none"
+            testID={`seller-studio-card-landed-ring-${item.id}`}
+          />
           <Feather name={item.icon as any} size={72} color={theme.text} />
           {locked && (
             <View style={styles.cardLock}>
@@ -762,7 +838,22 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
     gap: SP.md,
     paddingHorizontal: SP.xl,
   },
-  cardIconWrap: { alignItems: 'center', justifyContent: 'center' },
+  cardIconWrap: { width: 96, height: 96, alignItems: 'center', justifyContent: 'center' },
+  // The "landed" ring — sized/positioned to sit just outside the 72pt icon
+  // within cardIconWrap's fixed 96pt box. Purely decorative (pointerEvents
+  // "none"); its opacity/scale are driven entirely by CarouselCard's
+  // ringStyle (landedPulse), never toggled via conditional JSX, so it can
+  // fade/scale in smoothly instead of popping.
+  cardLandedRing: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    right: 4,
+    bottom: 4,
+    borderRadius: 44,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
   cardLabel: {
     fontSize: 28,
     fontFamily: FONT.bold,

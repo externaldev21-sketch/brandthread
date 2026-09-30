@@ -236,10 +236,12 @@ try {
   }
   await absent('Design Studio');
 
-  // Release-on-card = instant go: scrub to a card and tap it, same as
-  // lifting the finger there would do.
+  // Scrubbing to a card and lifting the finger only LOCKS it (snap + haptic
+  // + ring) — it does not navigate on its own anymore (too accident-prone).
+  // Opening it takes a real second tap.
   await tap('Open Studio tools');
   await scrubStudioCardsTo('Design Studio');
+  await waitFor('Design Studio'); // still on the Studio sheet — release did not navigate
   await tap('Design Studio');
   await absent('Design Studio');
 
