@@ -483,6 +483,14 @@ export default function OrderDetailScreen() {
   const hasLoadedRef = useRef(!!cachedOrder);
 
   const load = useCallback(async (generation: number) => {
+    // No order id at all (e.g. a bad/incomplete deep link) — nothing to
+    // fetch. Show the "not found" state below instead of firing requests
+    // that can only ever 404.
+    if (!id) {
+      setLoading(false);
+      hasLoadedRef.current = true;
+      return;
+    }
     // Keep one request in flight per focus cycle. Without this guard, a slow
     // poll can overlap the next tick and an older success can clear the
     // paused state after a later failure has already stopped the timer.

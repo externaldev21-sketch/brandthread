@@ -455,9 +455,12 @@ function sellerOrders(count = 9) {
 // the rest are guest checkouts (buyerId: null), same as production data
 // where not every order has a linked Brandthread account.
 function sellerOrderDetail(id, count = 9) {
-  const rows = sellerOrders(count);
-  const row = rows.find((r) => r.id === id);
-  if (!row) return undefined;
+  const rows = sellerOrders(Math.max(count, 1));
+  // Falls back to the first row for an id this fixture doesn't know about
+  // (e.g. a caller navigating with a real-looking id like "so-1") instead
+  // of 404ing — every other field below is keyed off the matched row, so
+  // the response stays internally consistent either way.
+  const row = rows.find((r) => r.id === id) ?? rows[0];
   const index = rows.indexOf(row);
   return {
     id: row.id,
@@ -1181,6 +1184,47 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/finance/payouts') return { payouts: options.fresh ? [] : [
     { id: 'po_demo_1', arrivalDate: DEMO_NOW, formatted: '$412.30', status: 'paid', destination: { last4: '4242' } },
   ] };
+  if (p === '/finance/summary') {
+    const zero = { amount: 0, formatted: '$0.00' };
+    return {
+      currency: 'usd', connected: !options.fresh, stripeError: false,
+      held: { ...zero, drops: [] }, releasing: { ...zero, count: 0 },
+      available: zero, pending: zero, paidOut: { ...zero, toBank: zero },
+      owed: zero, credit: zero,
+      lifetime: { grossSales: zero, refunded: zero, platformFees: zero, processingFees: zero },
+      activity: [],
+    };
+  }
+  if (p === '/finance/transactions') return { transactions: [] };
+  // Seeded honest-empty: none of these have sample/list content built for
+  // the demo persona yet, so every one below is a real (not fabricated)
+  // empty list/zero state — unseeded before, these were only 404ing because
+  // no screen calling them was ever exercised by the screenshot scripts,
+  // unlike every route the half-done audit newly started crawling.
+  if (p === '/customers') return [];
+  if ((match = p.match(/^\/customers\/([^/]+)$/))) return { id: match[1], name: 'Sample Customer', email: 'customer@example.com', totalSpentCents: 0, orderCount: 0, createdAt: iso(30 * DAY) };
+  if ((match = p.match(/^\/customers\/([^/]+)\/orders$/))) return [];
+  if (p === '/drops') return [];
+  if (p === '/bundles') return [];
+  if (p === '/shipping-zones') return [];
+  if (p === '/shipping-zones/settings') return { shipFromCountry: 'US' };
+  if (p === '/package-presets') return { presets: [] };
+  if (p === '/shipping-rates') return [];
+  if (p === '/returns') return [];
+  // A single return/dispute/product this fixture doesn't have a real row
+  // for still answers 200 with `null` ("not found", the screens' own
+  // honest empty state) rather than a bare 404 — same reasoning as
+  // sellerOrderDetail's fallback below, just without fabricating content
+  // for surfaces this fixture doesn't model yet.
+  if ((match = p.match(/^\/returns\/([^/]+)$/))) return null;
+  if ((match = p.match(/^\/disputes\/([^/]+)$/))) return null;
+  if ((match = p.match(/^\/products\/([^/]+)$/))) return byId(SELLER_PRODUCTS)(match[1]) ?? null;
+  if (p === '/taxes/status') return {
+    stripeTaxEnabled: false, provider: 'stripe', providerConfigured: true, providerStatus: 'not_enabled',
+    automaticTaxAtCheckout: false, complianceNote: '', chargeShippingTax: false, chargeVat: false,
+  };
+  if (p === '/taxes/1099') return null;
+  if (p === '/seller/metafields') return { counts: {} };
   // Rendered on every seller screen (StripeConnectWarning); unseeded, it
   // 404s on every single dashboard load, not just this route's own fetches.
   if (p === '/seller/connect/status') return { connected: true, stripeAccountId: 'acct_demo', chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, status: 'active', verified: true, bankLast4: '4242', providerConfigured: true };
