@@ -1,27 +1,38 @@
 /**
  * Seller Settings Hub — its own screen, separate from Buyer Settings.
- * Profile card + search + compact grouped iOS-Settings-style sections.
+ *
+ * Rebuilt 1:1 on Instagram's "Settings and activity" screen (Mobbin:
+ * https://mobbin.com/flows/7e2af19b-f042-4697-a0f8-6eaf8f3b6a15), reskinned
+ * in Brandthread's black/white/silver palette: a real search field, a flat
+ * (unboxed) grouped list with sentence-case section headers, single-line
+ * rows with no per-row subtitle, and an account row that opens straight
+ * into Edit profile. This intentionally does NOT touch
+ * components/settings/SettingsKit.tsx (shared with app/buyer-settings.tsx)
+ * — the rebuild lives entirely in this file's own local components so the
+ * buyer settings screen is unaffected.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { FONT, FS, SP } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getInitials } from '@/lib/format';
 import { hapticLight, hapticSuccess } from '@/lib/haptics';
 import { useApi } from '@/hooks/useApi';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
-import { SettingsProfileCard, SettingsSearchBar, SettingsSection, SettingsRow, ConfirmSheet } from '@/components/settings/SettingsKit';
+import { ConfirmSheet } from '@/components/settings/SettingsKit';
+import { PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { WEB_INPUT_RESET } from '@/lib/inputReset';
 
 export default function SellerSettingsScreen() {
   const colors = useColors();
@@ -139,28 +150,25 @@ export default function SellerSettingsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <SettingsProfileCard
-          eyebrow="Seller account"
+        <AccountRow
           name={profileName}
-          subtitle={user?.primaryEmailAddress?.emailAddress}
           initials={profileInitials}
           onPress={() => router.push('/edit-profile' as never)}
         />
 
-        <SettingsSearchBar value={query} onChangeText={setQuery} />
+        <SearchField value={query} onChangeText={setQuery} />
 
         <View style={{ marginBottom: 18 }}>
           <StripeConnectWarning />
         </View>
 
         {groups.map((group) => (
-          <SettingsSection key={group.title} title={group.title}>
+          <SettingsGroup key={group.title} title={group.title}>
             {group.items.map((item, i) => (
               <SettingsRow
                 key={item.label}
                 icon={item.icon}
                 label={item.label}
-                subtitle={item.description}
                 destructive={item.destructive}
                 soon={item.soon}
                 badge={item.requiresGrowth && GROWTH_PLAN_ENFORCEMENT_ENABLED && !planLoading && !hasPlan('growth') ? 'Growth' : undefined}
@@ -168,7 +176,7 @@ export default function SellerSettingsScreen() {
                 onPress={() => handleItem(item)}
               />
             ))}
-          </SettingsSection>
+          </SettingsGroup>
         ))}
 
         <Text style={s.version}>Brandthread v1.0.0</Text>
@@ -201,6 +209,119 @@ export default function SellerSettingsScreen() {
         onClose={() => { if (!scopeSaving) setScopeVisible(false); }}
       />
     </View>
+  );
+}
+
+// ─── Account row ────────────────────────────────────────────────────────────
+// Avatar + store name (bold, allowed to wrap rather than truncate) + a fixed
+// "Seller account" line underneath, the whole row opening Edit profile — no
+// separate Edit pill.
+
+function AccountRow({ name, initials, onPress }: { name: string; initials: string; onPress: () => void }) {
+  const colors = useColors();
+  const s = useMemo(() => makeListStyles(colors), [colors]);
+  return (
+    <PressableScale style={s.accountRow} onPress={() => { hapticLight(); onPress(); }} accessibilityRole="button" accessibilityLabel="Edit profile">
+      <View style={[s.accountAvatar, { backgroundColor: colors.primary }]}>
+        <Text style={[s.accountAvatarText, { color: colors.primaryForeground }]}>{initials}</Text>
+      </View>
+      <View style={s.accountCopy}>
+        <Text style={s.accountName}>{name}</Text>
+        <Text style={s.accountEyebrow}>Seller account</Text>
+      </View>
+      <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+    </PressableScale>
+  );
+}
+
+// ─── Search ─────────────────────────────────────────────────────────────────
+// A real field: black fill, thin silver outline, silver placeholder — not
+// the borderless grey-pill "looks like plain text" search row this replaces.
+
+function SearchField({ value, onChangeText }: { value: string; onChangeText: (v: string) => void }) {
+  const colors = useColors();
+  const s = useMemo(() => makeListStyles(colors), [colors]);
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={[s.searchField, { borderColor: focused ? colors.mutedForeground : colors.border }]}>
+      <Feather name="search" size={16} color={colors.mutedForeground} />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder="Search"
+        placeholderTextColor={colors.mutedForeground}
+        style={[s.searchInput, WEB_INPUT_RESET]}
+        autoCorrect={false}
+        returnKeyType="search"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+      {value.length > 0 && (
+        <TouchableOpacity onPress={() => onChangeText('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Clear search">
+          <Feather name="x-circle" size={15} color={colors.mutedForeground} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// ─── Group / row ────────────────────────────────────────────────────────────
+// Flat, unboxed list — sentence-case silver section headers, generous gap
+// between sections, hairline dividers only between rows inside a group (not
+// a bordered card around it).
+
+function SettingsGroup({ title, children }: { title?: string; children: React.ReactNode }) {
+  const colors = useColors();
+  const s = useMemo(() => makeListStyles(colors), [colors]);
+  return (
+    <View style={s.group}>
+      {title ? <Text style={s.groupTitle}>{title}</Text> : null}
+      {children}
+    </View>
+  );
+}
+
+interface SettingsRowProps {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  onPress?: () => void;
+  destructive?: boolean;
+  soon?: boolean;
+  badge?: string;
+  last?: boolean;
+}
+
+function SettingsRow({ icon, label, onPress, destructive, soon, badge, last }: SettingsRowProps) {
+  const colors = useColors();
+  const s = useMemo(() => makeListStyles(colors), [colors]);
+  const inert = !!soon;
+  const labelColor = destructive ? colors.destructive : inert ? colors.mutedForeground : colors.foreground;
+  const iconTint = inert ? colors.mutedForeground : destructive ? colors.destructive : colors.foreground;
+
+  const content = (
+    <View style={[s.row, !last && s.rowDivider]}>
+      <Feather name={icon} size={22} color={iconTint} style={s.rowIcon} />
+      <Text style={[s.rowLabel, { color: labelColor }]} numberOfLines={1}>{label}</Text>
+      {badge ? (
+        <View style={s.rowBadge}>
+          <Text style={s.rowBadgeText}>{badge}</Text>
+        </View>
+      ) : null}
+      {soon ? (
+        <View style={s.rowSoonBadge}>
+          <Text style={s.rowSoonBadgeText}>Soon</Text>
+        </View>
+      ) : null}
+      {onPress && !inert ? <Feather name="chevron-right" size={17} color={colors.mutedForeground} /> : null}
+    </View>
+  );
+
+  if (!onPress || inert) return <View>{content}</View>;
+
+  return (
+    <TouchableOpacity activeOpacity={0.65} onPress={() => { hapticLight(); onPress(); }} accessibilityRole="button" accessibilityLabel={label}>
+      {content}
+    </TouchableOpacity>
   );
 }
 
@@ -280,6 +401,40 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     page: { flex: 1, backgroundColor: colors.background },
     version: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 4 },
+  });
+}
+
+function makeListStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
+    // Account row
+    accountRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, marginBottom: 18 },
+    accountAvatar: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    accountAvatarText: { fontSize: 18, fontFamily: FONT.bold },
+    accountCopy: { flex: 1, minWidth: 0 },
+    accountName: { fontSize: 17, fontFamily: FONT.bold, color: colors.foreground },
+    accountEyebrow: { fontSize: 13, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
+
+    // Search field — a real field, not a borderless pill.
+    searchField: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      height: 40, borderRadius: RADIUS.md, borderWidth: 1,
+      backgroundColor: colors.background, paddingHorizontal: 12, marginBottom: 20,
+    },
+    searchInput: { flex: 1, height: '100%', fontSize: FS.sm, fontFamily: FONT.regular, color: colors.foreground },
+
+    // Group / section header
+    group: { marginBottom: 28 },
+    groupTitle: { fontSize: 13, fontFamily: FONT.semibold, color: colors.mutedForeground, marginBottom: 4, marginLeft: 2 },
+
+    // Row — flat, unboxed, single line
+    row: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, paddingVertical: 8 },
+    rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    rowIcon: { width: 22, flexShrink: 0 },
+    rowLabel: { flex: 1, minWidth: 0, fontSize: 16, fontFamily: FONT.regular },
+    rowBadge: { backgroundColor: colors.destructive, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 2, minWidth: 18, alignItems: 'center' },
+    rowBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: '#FFFFFF' },
+    rowSoonBadge: { borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.border },
+    rowSoonBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: colors.mutedForeground, letterSpacing: 0.3 },
   });
 }
 
