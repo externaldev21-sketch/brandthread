@@ -281,6 +281,11 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // rendered underneath the bar. Deny-listing it here removes the overlap
   // outright and matches the other full-bleed screens above.
   'ai-brain',
+  // Same full-screen chat takeover as ai-brain above — its own composer is
+  // pinned to the safe-area bottom inset only, so the floating tab bar
+  // (this screen wasn't deny-listed against it) rendered on top of the
+  // input bar and photo tray.
+  'ai-photography-chat',
   // Boost flow — sticky "Boost post · $X" CTA + payment-note footer pinned to
   // the bottom; the bar previously floated on top of the payment note (it
   // only pads for the safe-area inset, not the bar's own height), covering it.
