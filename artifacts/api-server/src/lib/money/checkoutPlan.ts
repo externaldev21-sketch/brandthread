@@ -15,6 +15,7 @@ import { db, drops, follows, products } from "@workspace/db";
 import { destinationApplicationFeeCents } from "./fees";
 import { isDropLive } from "./dropLaunch";
 import type { DbExecutor } from "./ledger";
+import { payoutMode } from "../delivery/policy";
 
 export class CheckoutPlanError extends Error {
   constructor(message: string, readonly status: number, readonly code: string) {
@@ -135,6 +136,8 @@ export function paymentIntentMoney(input: {
   preTaxTotalCents: number;
 }): {
   paymentIntentData: Record<string, unknown>;
+  /** The charge model to persist on the checkout (and then the order). */
+  chargeModel: "destination" | "held" | "transfer";
   platformFeeCents: number;
   processingFeeEstimateCents: number;
 } {
@@ -148,6 +151,21 @@ export function paymentIntentMoney(input: {
         transfer_group: `drop_${input.plan.dropId}`,
         metadata: { chargeModel: "held", dropId: input.plan.dropId },
       },
+      chargeModel: "held",
+      platformFeeCents: fee.platformFeeCents,
+      processingFeeEstimateCents: fee.processingFeeEstimateCents,
+    };
+  }
+  // Hold-until-delivered (lib/delivery/policy.ts): an in-stock order is
+  // charged on Brandthread's own balance ("separate charges and transfers")
+  // and the seller is paid by a later transfer, after delivery + the buffer.
+  // A destination charge would pay the seller at checkout, before anything
+  // shipped, leaving an automatic non-delivery refund to come out of the
+  // platform's pocket. PAYOUT_MODE=immediate restores the old behaviour.
+  if (payoutMode() === "hold") {
+    return {
+      paymentIntentData: { metadata: { chargeModel: "transfer" } },
+      chargeModel: "transfer",
       platformFeeCents: fee.platformFeeCents,
       processingFeeEstimateCents: fee.processingFeeEstimateCents,
     };
@@ -158,6 +176,7 @@ export function paymentIntentMoney(input: {
       application_fee_amount: fee.applicationFeeCents,
       metadata: { chargeModel: "destination" },
     },
+    chargeModel: "destination",
     platformFeeCents: fee.platformFeeCents,
     processingFeeEstimateCents: fee.processingFeeEstimateCents,
   };

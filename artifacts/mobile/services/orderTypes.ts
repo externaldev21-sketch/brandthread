@@ -114,6 +114,12 @@ export interface OrderLineItem {
   productionStatus?: string;
   contentTagSource?: string;
   isPreOrder: boolean;
+  /** Delivery guarantee (seller detail): this item's own deadline, ISO. */
+  deliverBy?: string | null;
+  deliveredAt?: string | null;
+  trackingNumber?: string | null;
+  carrier?: string | null;
+  refundedAt?: string | null;
 }
 
 // ─── Shipping ─────────────────────────────────────────────────────────────────
@@ -445,12 +451,61 @@ export interface Order {
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  /**
+   * Delivery guarantee (docs/payments/delivery-guarantee.md), seller side.
+   * All ISO instants or null; null `deliverBy` = an order from before the
+   * guarantee existed (no countdown, no auto-refund).
+   */
+  deliverBy?: string | null;
+  promisedShipDate?: string | null;
+  deliveredAt?: string | null;
+  autoRefundedAt?: string | null;
+  disputePausedAt?: string | null;
   /** Present only when this order contains a product linked to the seller's Shopify store (fulfillment via Shopify). */
   shopifyFulfillment?: {
     sentToShopify: boolean;
     shopifyOrderName: string | null;
     fulfilledByPartner: boolean;
   } | null;
+}
+
+// ─── Delivery guarantee (buyer) ───────────────────────────────────────────────
+
+export type DeliveryStepKey = 'ordered' | 'preparing' | 'shipped' | 'out_for_delivery' | 'delivered';
+
+export interface DeliveryStep {
+  key: DeliveryStepKey;
+  label: string;
+  state: 'done' | 'current' | 'upcoming';
+  at: string | null;
+}
+
+export interface DeliveryEvent {
+  status: string;
+  description: string;
+  location: string | null;
+  at: string;
+}
+
+/** `delivery` on GET /api/buyer/orders[/:id]. */
+export interface BuyerDelivery {
+  /** ISO instant the order must be delivered by, or null for pre-guarantee orders. */
+  deliverBy: string | null;
+  isPreorder: boolean;
+  promisedShipDate: string | null;
+  estimatedDelivery: string | null;
+  deliveredAt: string | null;
+  deliveryConfirmedBy: 'carrier' | 'buyer' | null;
+  steps: DeliveryStep[];
+  /** Newest first. */
+  events: DeliveryEvent[];
+  carrier: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  canConfirmReceipt: boolean;
+  disputePaused: boolean;
+  autoRefund: null | { refundedCents: number; refundedAt: string; partial: boolean; label: string };
+  shipments: { trackingNumber: string; carrier: string | null; trackingStatus: string | null; deliveredAt: string | null; itemIds: string[] }[];
 }
 
 // ─── Buyer view ───────────────────────────────────────────────────────────────
@@ -494,6 +549,8 @@ export interface BuyerOrderView {
   cancellationReason?: string | null;
   cancellationNotes?: string | null;
   isCustomerVisible?: boolean;
+  /** Delivery guarantee block; absent on responses from before the guarantee shipped. */
+  delivery?: BuyerDelivery;
   createdAt: string;
 }
 
@@ -550,6 +607,8 @@ export function cancellationReasonLabel(reason: string | null | undefined): stri
   // buyer_requested is the server's legacy value for a buyer-initiated
   // cancellation; the shared list contains the seller-facing equivalent.
   if (reason === 'buyer_requested') return 'You requested the cancellation';
+  // Set by the delivery-guarantee auto-refund job.
+  if (reason === 'not_delivered_in_time') return 'Not delivered in time';
   return CANCELLATION_REASONS.find(item => item.key === reason)?.label
     ?? reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
