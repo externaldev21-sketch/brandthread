@@ -848,6 +848,29 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{ available: boolean; error?: string }>(
           `/api/public/username-check?username=${encodeURIComponent(username)}`
         ),
+      /** Case-insensitive email-availability check, usable before sign-up
+       *  completes (no session yet) — same "Add account" scenario as
+       *  checkUsernamePublic above. */
+      checkEmailPublic: (email: string) =>
+        get<{ available: boolean; error?: string; code?: string }>(
+          `/api/public/email-check?email=${encodeURIComponent(email)}`
+        ),
+      /** Authenticated case-insensitive email-availability check. */
+      checkEmail: (email: string) =>
+        get<{ available: boolean; error?: string; code?: string }>(
+          `/api/auth/email/check?email=${encodeURIComponent(email)}`
+        ),
+      /** Bulk accountType (+ username/avatar/displayName) lookup by Clerk user
+       *  id, for the account switcher — Clerk's own session object carries no
+       *  buyer/seller signal for accounts other than the active one. */
+      accountTypes: (clerkIds: string[]) =>
+        get<{ accountTypes: Record<string, {
+          accountType: 'buyer' | 'seller' | null;
+          username: string | null;
+          avatarUrl: string | null;
+          displayName: string | null;
+          name: string;
+        }> }>(`/api/auth/account-types?clerkIds=${encodeURIComponent(clerkIds.join(','))}`),
       /** Update editable profile fields. username must be letters/numbers/underscores, 3-30 chars. */
       updateProfile: (body: {
         displayName?: string;

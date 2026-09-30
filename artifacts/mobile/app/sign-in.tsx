@@ -5,13 +5,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  View, Text, TextInput, StyleSheet, Platform, ActivityIndicator,
+  Alert, View, Text, TextInput, StyleSheet, Platform, ActivityIndicator,
   ScrollView, StatusBar,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import GoogleGlyph from '@/components/branding/GoogleGlyph';
-import { useSignIn, useSSO, useAuth, useUser } from '@clerk/expo';
+import { useSignIn, useSSO, useAuth, useUser, useClerk } from '@clerk/expo';
+import { wasPreviousSessionDropped, MULTI_SESSION_OFF_MESSAGE } from '@/lib/multiSessionMode';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
@@ -40,9 +41,10 @@ WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
   const { signIn, fetchStatus } = useSignIn();
-  const { isSignedIn, signOut } = useAuth();
+  const { isSignedIn, signOut, sessionId: preAddAccountSessionId } = useAuth();
   const { user }                = useUser();
   const { startSSOFlow } = useSSO();
+  const clerk = useClerk();
 
   const router = useRouter();
   const { addAccount } = useLocalSearchParams<{ addAccount?: string }>();
@@ -82,6 +84,18 @@ export default function SignInScreen() {
   const canVerifyTotp = totpCode.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
 
+  // Clerk is external and gives this app no way to read its Dashboard
+  // "multi-session" setting directly. If it's off, activating the new
+  // session below will have silently signed the previous account out — the
+  // only way to know is to check whether that previous session is still in
+  // the client's session list right after.
+  function checkMultiSessionDrop() {
+    if (!isAddAccount || !preAddAccountSessionId) return;
+    if (wasPreviousSessionDropped(preAddAccountSessionId, clerk.client?.sessions)) {
+      Alert.alert('Heads up', MULTI_SESSION_OFF_MESSAGE);
+    }
+  }
+
   function finalizeSignIn() {
     return signIn.finalize({
       navigate: ({ decorateUrl }) => {
@@ -89,6 +103,7 @@ export default function SignInScreen() {
         // components/AccountSwitcherSheet.tsx), not its own route — landing
         // on '/' after an add-account sign-in shows the newly-active
         // account's profile, where the switcher can be reopened at any time.
+        checkMultiSessionDrop();
         const destination = '/';
         const url = decorateUrl(destination);
         if (url.startsWith('http') && typeof window !== 'undefined') {
@@ -166,10 +181,10 @@ export default function SignInScreen() {
       if (createdSessionId && setActive) {
         // Existing user — activate the session; AuthGate will route by user_role
         await setActive({ session: createdSessionId });
-        if (isAddAccount) router.replace('/' as never);
+        if (isAddAccount) { checkMultiSessionDrop(); router.replace('/' as never); }
       } else if (ssoSignIn?.status === 'complete' || ssoSignUp?.status === 'complete') {
         // Session was created by Clerk automatically — AuthGate picks it up
-        if (isAddAccount) router.replace('/' as never);
+        if (isAddAccount) { checkMultiSessionDrop(); router.replace('/' as never); }
       } else if (ssoSignUp) {
         // Brand-new user with no account yet — send them through onboarding
         router.replace('/onboarding' as never);
