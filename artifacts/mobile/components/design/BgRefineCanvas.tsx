@@ -11,10 +11,11 @@
  * this component and is deliberately NOT part of the exported PNG.
  */
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { PanResponder, View } from 'react-native';
+import { PanResponder, Platform, View } from 'react-native';
 import Svg, { Defs, Image as SvgImage, Mask, Path, Rect } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 import * as Haptics from 'expo-haptics';
+import { BG, FG } from '@/lib/theme';
 
 export type RefineTool = 'erase' | 'restore';
 export interface RefineStroke { tool: RefineTool; d: string }
@@ -36,6 +37,55 @@ interface Props {
 
 const BRUSH_RATIO = 0.085;
 
+function loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const i = new window.Image();
+    i.crossOrigin = 'anonymous';
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error('decode failed'));
+    i.src = src;
+  });
+}
+
+function tracePath(ctx: CanvasRenderingContext2D, d: string, k: number) {
+  ctx.beginPath();
+  for (const seg of d.split(' ')) {
+    const [x, y] = seg.slice(1).split(',').map(Number);
+    if (seg[0] === 'M') ctx.moveTo(x * k, y * k); else ctx.lineTo(x * k, y * k);
+  }
+}
+
+/**
+ * Web export. react-native-view-shot's web path paints an opaque white
+ * background, so the PNG is composited on a canvas instead, mirroring the
+ * on-screen masks: original where restore painted, under the cutout minus the
+ * erase strokes.
+ */
+async function exportOnWeb(originalUri: string, cutoutUri: string, strokes: RefineStroke[], frameW: number, brush: number) {
+  const [orig, cut] = await Promise.all([loadImg(originalUri), loadImg(cutoutUri)]);
+  const W = cut.naturalWidth, H = cut.naturalHeight;
+  const k = W / frameW;
+  const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
+  const out = mk(); const octx = out.getContext('2d')!;
+
+  const restore = mk(); const rctx = restore.getContext('2d')!;
+  rctx.drawImage(orig, 0, 0, W, H);
+  const rmask = mk(); const rm = rmask.getContext('2d')!;
+  rm.lineWidth = brush * k; rm.lineCap = 'round'; rm.lineJoin = 'round'; rm.strokeStyle = FG;
+  for (const st of strokes.filter(x => x.tool === 'restore')) { tracePath(rm, st.d, k); rm.stroke(); }
+  rctx.globalCompositeOperation = 'destination-in';
+  rctx.drawImage(rmask, 0, 0);
+  octx.drawImage(restore, 0, 0);
+
+  const cutLayer = mk(); const cctx = cutLayer.getContext('2d')!;
+  cctx.drawImage(cut, 0, 0, W, H);
+  cctx.globalCompositeOperation = 'destination-out';
+  cctx.lineWidth = brush * k; cctx.lineCap = 'round'; cctx.lineJoin = 'round'; cctx.strokeStyle = BG;
+  for (const st of strokes.filter(x => x.tool === 'erase')) { tracePath(cctx, st.d, k); cctx.stroke(); }
+  octx.drawImage(cutLayer, 0, 0);
+  return out.toDataURL('image/png');
+}
+
 const BgRefineCanvas = forwardRef<BgRefineHandle, Props>(function BgRefineCanvas(
   { originalUri, cutoutUri, width, height, tool, strokes, onCommitStroke }, ref,
 ) {
@@ -48,10 +98,11 @@ const BgRefineCanvas = forwardRef<BgRefineHandle, Props>(function BgRefineCanvas
 
   useImperativeHandle(ref, () => ({
     exportPng: async () => {
+      if (Platform.OS === 'web') return exportOnWeb(originalUri, cutoutUri, strokes, width, brush);
       const uri = await captureRef(shotRef, { format: 'png', quality: 1, result: 'data-uri' });
       return uri.startsWith('data:') ? uri : `data:image/png;base64,${uri}`;
     },
-  }), []);
+  }), [originalUri, cutoutUri, strokes, width, brush]);
 
   const commit = useCallback((d: string) => {
     onCommitStroke({ tool: toolRef.current, d });
@@ -92,9 +143,9 @@ const BgRefineCanvas = forwardRef<BgRefineHandle, Props>(function BgRefineCanvas
         <Svg width={width} height={height} style={{ position: 'absolute' }} pointerEvents="none">
           <Defs>
             <Mask id="bgRestoreMask">
-              <Rect x={0} y={0} width={width} height={height} fill="black" />
-              {restore.map((s, i) => <Path key={i} d={s.d} stroke="white" {...strokeProps} />)}
-              {live && tool === 'restore' ? <Path d={live} stroke="white" {...strokeProps} /> : null}
+              <Rect x={0} y={0} width={width} height={height} fill={BG} />
+              {restore.map((s, i) => <Path key={i} d={s.d} stroke={FG} {...strokeProps} />)}
+              {live && tool === 'restore' ? <Path d={live} stroke={FG} {...strokeProps} /> : null}
             </Mask>
           </Defs>
           <SvgImage href={originalUri} x={0} y={0} width={width} height={height} preserveAspectRatio="xMidYMid slice" mask="url(#bgRestoreMask)" />
@@ -103,9 +154,9 @@ const BgRefineCanvas = forwardRef<BgRefineHandle, Props>(function BgRefineCanvas
         <Svg width={width} height={height} style={{ position: 'absolute' }} pointerEvents="none">
           <Defs>
             <Mask id="bgEraseMask">
-              <Rect x={0} y={0} width={width} height={height} fill="white" />
-              {erase.map((s, i) => <Path key={i} d={s.d} stroke="black" {...strokeProps} />)}
-              {live && tool === 'erase' ? <Path d={live} stroke="black" {...strokeProps} /> : null}
+              <Rect x={0} y={0} width={width} height={height} fill={FG} />
+              {erase.map((s, i) => <Path key={i} d={s.d} stroke={BG} {...strokeProps} />)}
+              {live && tool === 'erase' ? <Path d={live} stroke={BG} {...strokeProps} /> : null}
             </Mask>
           </Defs>
           <SvgImage href={cutoutUri} x={0} y={0} width={width} height={height} preserveAspectRatio="xMidYMid slice" mask="url(#bgEraseMask)" />

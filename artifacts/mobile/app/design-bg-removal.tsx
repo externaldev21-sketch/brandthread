@@ -14,7 +14,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Image, FlatList, Platform, Alert, LayoutChangeEvent,
+  View, Text, StyleSheet, Pressable, Image, FlatList, Platform, Alert, LayoutChangeEvent,
 } from 'react-native';
 import Animated, {
   Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming,
@@ -51,6 +51,7 @@ const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '')
 const MAX_BYTES = 8 * 1024 * 1024;
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/heic', 'image/heif', 'image/webp'];
 const STAGE_PAD = 14;
+const CORNER_RESERVE = 44; // room above the photo for the undo/redo icons
 const SILVER = '#C0C0C0';
 
 type Phase = 'empty' | 'loaded' | 'processing' | 'done';
@@ -91,7 +92,7 @@ function DropZone({ onPress }: { onPress: () => void }) {
   const t2 = useAnimatedStyle(() => ({ opacity: 1 - twinkle.value * 0.75, transform: [{ scale: 1.1 - twinkle.value * 0.5 }] }));
 
   return (
-    <PressableScale onPress={onPress} style={s.fill} activeScale={0.99} accessibilityRole="button" accessibilityLabel="Upload from library" testID="bg-removal-dropzone">
+    <Pressable onPress={onPress} style={s.fill} accessibilityRole="button" accessibilityLabel="Upload from library" testID="bg-removal-dropzone">
       <View style={s.dropInner}>
         <LinearGradient colors={['#141416', '#050506', '#101012']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         <Animated.View pointerEvents="none" style={[s.sheen, sheenStyle]}>
@@ -109,7 +110,7 @@ function DropZone({ onPress }: { onPress: () => void }) {
           </View>
         </View>
       </View>
-    </PressableScale>
+    </Pressable>
   );
 }
 
@@ -168,7 +169,7 @@ export default function DesignBgRemovalScreen() {
   const cutout = history[hIndex] ?? cutoutUri;
   const photoRect = useMemo(() => {
     const aw = Math.max(0, stage.w - STAGE_PAD * 2);
-    const ah = Math.max(0, stage.h - STAGE_PAD * 2);
+    const ah = Math.max(0, stage.h - STAGE_PAD * 2 - CORNER_RESERVE);
     if (!source || aw <= 0 || ah <= 0) return { w: 0, h: 0 };
     const k = Math.min(aw / source.w, ah / source.h);
     return { w: Math.round(source.w * k), h: Math.round(source.h * k) };
@@ -224,7 +225,7 @@ export default function DesignBgRemovalScreen() {
   }, [loadPhoto]);
 
   const pickRecent = useCallback(async (item: RecentPhoto) => {
-    if (phase === 'processing') return;
+    if (phase === 'processing' || refining) return;
     if (Platform.OS === 'web' || !item.assetId) {
       // Session photo on web: re-read the stored data URI.
       const base64 = item.uri.slice(item.uri.indexOf(',') + 1);
@@ -241,7 +242,7 @@ export default function DesignBgRemovalScreen() {
     } catch {
       Alert.alert('Cannot use this image', 'Could not read image data. Please try a different photo.');
     }
-  }, [loadPhoto, phase]);
+  }, [loadPhoto, phase, refining]);
 
   const handleRemove = useCallback(async () => {
     if (!source || phase !== 'loaded') return;
@@ -370,7 +371,8 @@ export default function DesignBgRemovalScreen() {
   }
 
   const bottomPad = COMP.tabBarH + insets.bottom + SP.md;
-  const showStrip = phase === 'empty' || phase === 'loaded' || phase === 'processing';
+  const showStrip = true;
+  const stripLocked = phase === 'processing' || refining;
   const editing = phase === 'done';
 
   // ── Stage content ──
@@ -436,9 +438,9 @@ export default function DesignBgRemovalScreen() {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <View style={s.frameInner} onLayout={onStageLayout}>
+          <View style={[s.frameInner, phase !== 'empty' && { paddingTop: CORNER_RESERVE }]} onLayout={onStageLayout}>
             {stageBody}
-            {editing && !refining || refining ? (
+            {editing ? (
               <View style={s.corner}>
                 <CornerBtn icon="corner-up-left" label="Undo" disabled={!canUndo} onPress={undo} />
                 <CornerBtn icon="corner-up-right" label="Redo" disabled={!canRedo} onPress={redoFn} />
@@ -459,12 +461,12 @@ export default function DesignBgRemovalScreen() {
             style={s.stripList}
             contentContainerStyle={s.strip}
             ListHeaderComponent={
-              <PressableScale onPress={pickPhoto} style={[s.tile, s.tilePlus]} accessibilityRole="button" accessibilityLabel="Add photo" testID="bg-removal-add-photo" disabled={phase === 'processing'}>
+              <PressableScale onPress={pickPhoto} style={[s.tile, s.tilePlus]} accessibilityRole="button" accessibilityLabel="Add photo" testID="bg-removal-add-photo" disabled={stripLocked}>
                 <Feather name="plus" size={ICON.lg} color={FG} />
               </PressableScale>
             }
             renderItem={({ item }) => (
-              <PressableScale onPress={() => pickRecent(item)} style={[s.tile, source?.uri === item.uri && s.tileActive]} accessibilityRole="button" accessibilityLabel="Use this photo" disabled={phase === 'processing'}>
+              <PressableScale onPress={() => pickRecent(item)} style={[s.tile, source?.uri === item.uri && s.tileActive]} accessibilityRole="button" accessibilityLabel="Use this photo" disabled={stripLocked}>
                 <Image source={{ uri: item.uri }} style={s.tileImg} resizeMode="cover" />
               </PressableScale>
             )}
@@ -613,17 +615,17 @@ const s = StyleSheet.create({
   pill: { height: COMP.buttonH, borderRadius: RADIUS.pill, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' },
   pillDisabled: { opacity: 0.4 },
   pillText: { fontFamily: FONT.semibold, fontSize: FS.md, color: BG },
-  swatches: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
-  swatchRing: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
+  swatches: { flexDirection: 'row', alignItems: 'center', gap: 2, flex: 1 },
+  swatchRing: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
   swatchRingActive: { borderColor: FG },
-  swatch: { width: 26, height: 26, borderRadius: 13, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  swatch: { width: 22, height: 22, borderRadius: 11, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   swatchIcon: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   ghostPill: {
-    height: 44, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', gap: 6,
+    height: 44, borderRadius: RADIUS.pill, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 5,
     borderWidth: 1, borderColor: BORDER, backgroundColor: BG,
   },
   ghostText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
-  savePill: { height: 44, borderRadius: RADIUS.pill, paddingHorizontal: SP.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: FG },
+  savePill: { height: 44, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: FG },
   saveText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: BG },
   dim: { opacity: 0.6 },
   toolBtn: {
