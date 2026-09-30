@@ -11,7 +11,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { EmptyState } from '@/components/BrandthreadUI';
-import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { isSellerDevPreview, isBuyerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
 import { isAuthError } from '@/lib/networkNotice';
 
 /**
@@ -88,9 +88,16 @@ export default function StorePreview() {
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Fresh preview never has a real store to fetch — see the file doc
-  // comment. Demo preview (&demo=1) and real signed-in accounts both load
-  // the real endpoint, same as production.
-  const freshPreview = useMemo(() => isSellerDevPreview() && !isPreviewDemoMode(), []);
+  // comment. This screen is seller-only, but the dev/web preview bypass can
+  // still land here under `?bt_preview=buyer` (e.g. a route crawl testing
+  // every screen under both roles) with no real session either — checking
+  // only isSellerDevPreview() missed that case and let the real endpoint
+  // 404 every time. Demo preview (&demo=1) and real signed-in accounts both
+  // load the real endpoint, same as production.
+  const freshPreview = useMemo(
+    () => (isSellerDevPreview() || isBuyerDevPreview()) && !isPreviewDemoMode(),
+    [],
+  );
 
   const load = useCallback(async () => {
     if (freshPreview) { setLoading(false); setError(false); setAuthRequired(false); setHtml(null); return; }

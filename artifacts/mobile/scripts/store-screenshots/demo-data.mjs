@@ -775,6 +775,14 @@ export function respond({ method, path, query, role, options = {} }) {
   // connected yet' is the real starting state for a seller who hasn't set
   // up the bridge, matching serializeConnection()'s disconnected shape.
   if (p === '/shopify/status') return { connected: false, fulfillmentEnabled: false, linkedProductsCount: 0 };
+  // /store-domain merges this with the local BT subdomain — unseeded, it
+  // 404'd before that merge could even run. No custom domain yet is the
+  // real starting state for a seller who hasn't connected one.
+  if (p === '/store/domains') return [];
+  // /store-policies reads the seller's saved shipping/returns/privacy
+  // policies — unseeded, it 404'd before the screen's own "Add policies…"
+  // empty state could render. No policies yet is the real starting state.
+  if (p === '/seller/settings/policies') return { policies: [] };
 
   // Public / buyer
   if (p === '/public/products/high-demand') return PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? 6));
