@@ -346,7 +346,14 @@ function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
       <Text style={styles.emptySubtitle}>
         Ask about your brand, products, content, store, or performance.
       </Text>
-      <View style={styles.pillGrid}>
+      {/* One column, not a 2×2 grid — a grid produced uneven heights once
+          text wrapped to 2 or 3 lines (audit: grey-filled, ragged tiles).
+          Every chip spans the same width and reads left-aligned, so all 4
+          stay the same height regardless of how long each prompt is.
+          Monochrome only: thin silver outline, white text, no fill —
+          never colors.mutedForeground/a tinted background. Tapping sends
+          immediately (Dev's call) instead of only populating the composer. */}
+      <View style={styles.pillList}>
         {pills.map((prompt, i) => (
           <TouchableOpacity
             key={i}
@@ -354,7 +361,7 @@ function EmptyState({ context, onPillPress, isTablet }: EmptyStateProps) {
             onPress={() => onPillPress(prompt)}
             activeOpacity={0.75}
           >
-            <Text style={styles.pillText}>{prompt}</Text>
+            <Text style={styles.pillText} numberOfLines={2}>{prompt}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -389,14 +396,6 @@ function TypingIndicator({ accentColor, streamingText }: { accentColor: string; 
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-
-/** One greeting shown on every fresh session open. Never auto-sends. */
-const GREETING: AIMessage = {
-  id: '__greeting__',
-  role: 'assistant',
-  content: 'Hi — how can I help?',
-  ts: 0,
-};
 
 // Stable reference for "no session yet" — `session?.messages ?? []` would
 // otherwise hand a brand-new array to a useMemo dependency on every render,
@@ -569,13 +568,16 @@ export default function AiBrainScreen() {
     [inputText, isGenerating, session, getToken, userId, storeContext, isAuthLoaded, isSignedIn],
   );
 
-  // ─── Pill tap (populates composer only — user taps send) ────────────────────
+  // ─── Pill tap (sends immediately, matching the reference apps) ──────────────
+  // Previously only populated the composer, leaving a dead intermediate
+  // state the person had to notice and tap Send from — Dev's explicit call
+  // this round is to send right away, same as tapping a ChatGPT/Claude
+  // suggestion chip.
 
   const handlePillPress = useCallback((text: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setInputText(text);
-    // Intentionally NOT auto-sending. User reviews and sends.
-  }, []);
+    handleSend(text);
+  }, [handleSend]);
 
   // ─── Stop generation ────────────────────────────────────────────────────────
 
@@ -686,15 +688,16 @@ export default function AiBrainScreen() {
   // ─── Build display list ─────────────────────────────────────────────────────
 
   /**
-   * The display list is:
-   *   [greeting, ...session.messages]
-   *
-   * The greeting is a synthetic message that never appears in the persisted
-   * session. It is always shown so the screen never opens blank.
-   * FlatList is inverted, so items are reversed for rendering.
+   * The display list is just session.messages — no canned greeting bubble.
+   * A brand-new session opens on the EmptyState (logo + one greeting
+   * headline) instead; a second, separate "Hi — how can I help?" chat
+   * bubble on top of that was the reported "double greeting" (and, since
+   * it was a real assistant message, it picked up a Copy/Regenerate row
+   * underneath it — a system greeting should never have one). FlatList is
+   * inverted, so items are reversed for rendering.
    */
   const sessionMessages = session?.messages ?? EMPTY_MESSAGES;
-  const allMessages: AIMessage[] = [GREETING, ...sessionMessages];
+  const allMessages: AIMessage[] = sessionMessages;
 
   // Build a map from assistant-message id → preceding user text for retry.
   const precedingUserTextMap = useMemo(() => {
@@ -798,6 +801,7 @@ export default function AiBrainScreen() {
           {/* ── Message list ────────────────────────────────────────────── */}
           <FlatList
               ref={flatListRef}
+              style={styles.messageList}
               data={[...allMessages].reverse()}
               keyExtractor={m => m.id}
               renderItem={renderMessage}
@@ -805,6 +809,10 @@ export default function AiBrainScreen() {
               contentContainerStyle={[
                 styles.listContent,
                 isTablet && styles.listContentTablet,
+                // Centers the empty state in the full available height
+                // instead of it hugging the bottom (an inverted list's
+                // default anchor point) right above the composer.
+                sessionMessages.length === 0 && styles.listContentEmpty,
               ]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
@@ -901,6 +909,15 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
 
   // ── Message list
+  // Without an explicit flex:1 here, the FlatList sized itself to its own
+  // (short) content instead of filling the space between the header and
+  // the composer, leaving a real empty gap at the bottom of the screen —
+  // easy to mistake for space reserved for a tab bar (there isn't one:
+  // this route is deny-listed in app/_layout.tsx), but it was actually
+  // just unclaimed flex space below the composer.
+  messageList: {
+    flex: 1,
+  },
   listContent: {
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
@@ -912,6 +929,15 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     alignSelf: 'center',
     width: '100%',
   },
+  // Only applied when the list has zero real messages — flexGrow stretches
+  // the (otherwise short) content container to the full list height so the
+  // centered empty state actually centers in the available space, instead
+  // of sitting at an inverted list's default anchor point right above the
+  // composer.
+  listContentEmpty: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
 
   // ── Empty state
   emptyWrapper: {
@@ -920,9 +946,13 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     paddingHorizontal: SP.lg,
     paddingVertical: SP.xl,
   },
+  // gap (not per-element margins) so logo → title → subtitle → suggestions
+  // read as one group with even spacing throughout, not ad hoc per-element
+  // top/bottom margins that drift out of rhythm with each other.
   emptyState: {
     alignItems: 'center',
     width: '100%',
+    gap: SP.md,
   },
   emptyStateTablet: {
     maxWidth: 480,
@@ -932,8 +962,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     fontSize: FS.xl,
     fontFamily: FONT.semibold,
     textAlign: 'center',
-    marginTop: SP.md,
-    marginBottom: SP.xs,
   },
   emptySubtitle: {
     color: colors.mutedForeground,
@@ -941,29 +969,27 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     fontFamily: FONT.regular,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: SP.lg,
   },
-  pillGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  pillList: {
     gap: SP.sm,
-    justifyContent: 'center',
     width: '100%',
   },
+  // Outline chip: thin silver border, no fill, white text — was a
+  // translucent-white-on-black fill (read as grey) with grey text.
   pill: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    maxWidth: '47%',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    width: '100%',
   },
   pillText: {
-    color: colors.mutedForeground,
+    color: colors.foreground,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    textAlign: 'center',
+    textAlign: 'left',
   },
 
   // ── User bubble
