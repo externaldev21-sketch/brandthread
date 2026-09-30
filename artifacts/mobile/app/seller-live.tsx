@@ -4,7 +4,7 @@
  * Agora SDK is unavailable (Expo Go / web preview).
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ScrollView, Platform, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, ActivityIndicator, Dimensions } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import { formatCents } from '@/lib/money';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { useLiveSocket, type LiveSocketEvent } from '@/lib/live/useLiveSocket';
+import Composer from '@/components/ui/Composer';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
 import { useLiveModeration } from '@/lib/live/useLiveModeration';
 import { PinnedCommentBar, CohostTiles } from '@/components/live/LiveModerationOverlays';
@@ -442,20 +443,15 @@ function SellerLiveNativeScreen() {
         </ScrollView>
 
         {/* Comment input */}
-        <View style={[s.inputRow, { paddingBottom: insets.bottom + 8 }]}>
-          <TextInput
-            value={commentText}
-            onChangeText={setCommentText}
-            onSubmitEditing={sendComment}
-            placeholder="Say something…"
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            returnKeyType="send"
-            style={s.commentInput}
-          />
-          <TouchableOpacity onPress={sendComment} style={s.sendBtn} activeOpacity={0.7}>
-            <Feather name="send" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
+        <Composer
+          overMedia
+          value={commentText}
+          onChangeText={setCommentText}
+          onSend={sendComment}
+          placeholder="Say something…"
+          hideTabBar={false}
+          testID="seller-live-composer"
+        />
       </KeyboardAvoidingView>
 
       <LiveCommentActionsSheet
@@ -546,9 +542,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   commentBubble:    { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, paddingVertical: 4 },
   commentAuthor:    { color: '#fff', fontFamily: FONT.bold, fontSize: 12 },
   commentText:      { color: 'rgba(255,255,255,0.9)', fontFamily: FONT.regular, fontSize: 12 },
-  inputRow:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingTop: 8 },
-  commentInput:     { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: RADIUS.pill, paddingHorizontal: 16, paddingVertical: 9, color: '#fff', fontFamily: FONT.regular, fontSize: FS.sm },
-  sendBtn:          { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   // Product picker
   pickerModal:      { backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 20, justifyContent: 'flex-end' },
   pickerSheet:      { backgroundColor: BG, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
