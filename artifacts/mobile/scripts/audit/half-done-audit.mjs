@@ -149,8 +149,19 @@ const PARAM_VALUES = {
   filter: 'all',
   step: '1',
 };
+// Generic fallback for a dynamic-route param with no dedicated
+// PARAM_VALUES entry (e.g. buyer-other-profile's userId/name/handle
+// /initials/color). Deliberately does NOT contain "preview"/"demo"/"mock":
+// several routes render this fallback directly as visible text (a
+// profile's name/handle), and an earlier 'preview-1' fallback was
+// tripping PREVIEW_DEMO_WORDING_RE — a false "preview/demo wording" hard
+// finding caused entirely by the audit harness's own synthesized param
+// value, not by real app text. This is separate from the *intentionally*
+// preview-prefixed fixture IDs in PARAM_VALUES above (e.g.
+// 'preview-conversation-01', matched in lib/previewInboxData.ts) — those
+// are real seed keys the app defines and must stay as-is.
 function paramValueFor(name) {
-  return PARAM_VALUES[name.toLowerCase()] ?? 'preview-1';
+  return PARAM_VALUES[name.toLowerCase()] ?? 'sample-1';
 }
 
 // ─── route discovery ───────────────────────────────────────────────────────────

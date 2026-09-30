@@ -273,9 +273,41 @@ pick them up; check with that session first.
   required query params are filled from a fixed dictionary of seeded preview
   IDs (see `PARAM_VALUES` in the script) sourced from
   `scripts/store-screenshots/demo-data.mjs`. A route whose required param
-  isn't in that dictionary gets a generic fallback and may show as
-  "unreachable" — check the report's Unreachable table before assuming a
-  route is broken.
+  isn't in that dictionary gets a generic fallback (`sample-1` — was
+  `preview-1` until the full fresh+demo re-run below, which found it
+  leaking into visible profile name/handle/initials text on a handful of
+  routes and tripping the `preview-demo-wording` hard-tier check as a false
+  positive; renamed to something that can't match that pattern) and may
+  show as "unreachable" — check the report's Unreachable table before
+  assuming a route is broken. Some `PARAM_VALUES` entries *do* legitimately
+  contain "preview" (`preview-conversation-01`, `preview-order-01`) — those
+  are real seed-fixture IDs the app itself defines
+  (`lib/previewInboxData.ts`, `lib/previewOrders.ts`), not synthesis
+  artifacts, and were deliberately left alone.
+- **Two systemic patterns worth knowing about before triaging the full-run
+  report** (docs/audit/half-done-audit-report.md), found while producing it:
+  - **`console-error` (hard tier) is ~76% one repeated message**: "Failed to
+    load resource: the server responded with a status of 404 (Not Found)"
+    accounts for 750 of the run's 787 console-error findings, spread across
+    nearly every route/role/data-state combo. Headless Chromium's
+    `console.error` text for a failed resource load doesn't include the
+    URL, so this audit can't yet tell you *which* resource 404s — but the
+    near-universal spread strongly suggests one shared missing asset (a
+    favicon, a manifest, an analytics/font request, …) hit on every page
+    load, not 750 independent per-route bugs. Worth a quick manual check
+    (open any route's web build in a real browser with devtools Network
+    open) before an owning session budgets time as if this were hundreds of
+    separate issues — it's most likely one fix that clears ~76% of the
+    hard-tier count app-wide. This audit script doesn't attempt that
+    diagnosis itself (finding the specific 404'ing URL needs Playwright's
+    `page.on('requestfailed')`/`response` events wired in, not just
+    `console` message text) — a good next improvement for whoever picks
+    this up.
+  - **Every one of the 266 routes shows at least one hard-tier finding** in
+    the full run (every area's "zero-finding routes" column reads 0). The
+    console-error pattern above is most of why. Don't read "0 zero-finding
+    routes" as "every route is equally broken" — check the per-area detail
+    tables for what's actually driving each area's count.
 - **Empty-data / fresh-install check — resolved**: earlier revisions of this
   doc said the preview data layer had no "render this route with zero seeded
   items" switch and that this audit didn't attempt one. That's no longer
