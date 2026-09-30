@@ -165,6 +165,18 @@ describe("seller profile — what a visitor can read", () => {
   });
 });
 
+describe("public product reads", () => {
+  it("list and detail variants carry no sku or restock threshold", async () => {
+    const list = await get(`/api/public/products?ownerId=${seller}`).then((r) => r.json()) as any[];
+    expect(list).toHaveLength(1);
+    expect(list[0].variants[0]).toMatchObject({ priceCents: 2500, stock: 4 });
+    expectPublicOnly(list);
+    const detail = await get(`/api/public/products/${productId}`).then((r) => r.json()) as any;
+    expect(detail.variants[0]).toMatchObject({ priceCents: 2500 });
+    expectPublicOnly(detail);
+  });
+});
+
 describe("View as visitor", () => {
   const captions = async (path: string, as: string) =>
     ((await get(path, as).then((r) => r.json())) as any).videos.map((v: any) => v.caption).sort();

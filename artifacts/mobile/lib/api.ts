@@ -2138,6 +2138,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
+      /** Posts where someone tagged this profile (the profile "Tagged" tab). */
+      tagged: (userId: string, limit = 30, offset = 0) =>
+        get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/tagged?limit=${limit}&offset=${offset}`),
       profilePosts: (userId: string, limit = 30, offset = 0) =>
         get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/posts?limit=${limit}&offset=${offset}`),
       friendActivity: (limit = 30, offset = 0) =>

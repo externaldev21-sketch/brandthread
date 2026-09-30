@@ -55,13 +55,44 @@ export async function getCreatorVideosPage(
   userId: string,
   offset = 0,
   limit = PROFILE_VIDEOS_PAGE_SIZE,
-  opts: { fresh?: boolean } = {},
+  opts: { fresh?: boolean; asVisitor?: boolean } = {},
 ): Promise<CreatorVideosPage> {
+  // `as=visitor`: the owner's "View as visitor" preview — the server drops
+  // owner-only access (private posts) for this request.
   const raw = await serviceRequest<RawVideosResponse>(
-    `/api/public/users/${encodeURIComponent(userId)}/videos?limit=${limit}&offset=${offset}`,
+    `/api/public/users/${encodeURIComponent(userId)}/videos?limit=${limit}&offset=${offset}${opts.asVisitor ? '&as=visitor' : ''}`,
     opts.fresh ? { cache: 'no-store' } : {},
   );
   return toPage(raw, offset);
+}
+
+// ─── Tagged tab ───────────────────────────────────────────────────────────────
+
+/** A post where someone tagged this profile. `source` leaves room for story tags. */
+export interface TaggedItem {
+  id: string;
+  authorId: string;
+  authorName: string | null;
+  authorUsername: string | null;
+  posterUri: string | null;
+  mediaType: string;
+  caption: string | null;
+  source: 'post' | 'story';
+}
+
+/** Adapts GET /api/social/profile/:id/tagged rows to grid items. */
+export function toTaggedItem(row: any): TaggedItem {
+  const uri = [row?.thumbnailUrl, row?.mediaUrl].find((u) => typeof u === 'string' && u.startsWith('http')) ?? null;
+  return {
+    id: String(row?.id ?? ''),
+    authorId: String(row?.authorId ?? ''),
+    authorName: row?.authorName ?? null,
+    authorUsername: row?.authorUsername ?? null,
+    posterUri: uri,
+    mediaType: typeof row?.mediaType === 'string' ? row.mediaType : 'photo',
+    caption: row?.caption ?? null,
+    source: row?.source === 'story' ? 'story' : 'post',
+  };
 }
 
 /** Public videos that tag a product — what the product-scoped feed player swipes through. */

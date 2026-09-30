@@ -73,6 +73,9 @@ import { useCelebrateThreadCash } from '@/components/thread-cash/CelebrationHost
 import { isPreviewThreadCashEnabled, getPreviewThreadCashStatus } from '@/lib/previewThreadCash';
 import type { ThreadCashStreakState } from '@/lib/threadCashTypes';
 import { isBuyerDevPreview } from '@/lib/devPreview';
+import { profileCapabilities, viewAsVisitorHref } from '@/lib/profileAccess';
+import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 
 // Realistic identity shown only when there is truly no signed-in user at all
 // (the dev `?bt_preview=buyer` bypass skips Clerk entirely) — a real,
@@ -82,11 +85,12 @@ import { isBuyerDevPreview } from '@/lib/devPreview';
 const PREVIEW_NAME = 'Ava Buyer';
 const PREVIEW_HANDLE = '@ava';
 
-const TABS = ['Posts', 'Saved', 'Liked', 'Orders'] as const;
+const TABS = ['Posts', 'Tagged', 'Saved', 'Liked', 'Orders'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_ITEMS: ProfileTab[] = [
   { key: 'Posts', label: 'Posts', icon: 'grid' },
+  { key: 'Tagged', label: 'Tagged', icon: 'tag' },
   { key: 'Saved', label: 'Saved', icon: 'bookmark' },
   { key: 'Liked', label: 'Liked', icon: 'heart' },
   { key: 'Orders', label: 'Orders', icon: 'package' },
@@ -287,6 +291,7 @@ const DraftsFolderTile = React.memo(function DraftsFolderTile({
 
 type ListRow =
   | { kind: 'post'; item: ProfileGridItem; post: BuyerPost }
+  | { kind: 'tagged'; item: ProfileGridItem; authorId: string; authorName: string | null }
   | { kind: 'saved'; saved: SavedItem }
   | { kind: 'order'; order: BuyerOrderView }
   // Instagram-style folder tile — first cell of the Posts grid, only when
@@ -370,6 +375,10 @@ export default function ProfileScreen() {
 
   // Sheets
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Owner mode: private saved / liked / orders / Thread Cash are this screen's alone.
+  const caps = profileCapabilities('buyer', 'owner');
+  const tagged = useTaggedPosts(user?.id, activeTab === 'Tagged' && !!user?.id && !isBuyerDevPreview());
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
 
@@ -659,14 +668,28 @@ export default function ProfileScreen() {
       const publishedRows: ListRow[] = published.map((post) => ({ kind: 'post' as const, post, item: gridItemFromBuyerPost(post) }));
       return draftsCount > 0 ? [{ kind: 'draftsTile' as const, count: draftsCount }, ...publishedRows] : publishedRows;
     }
+    if (activeTab === 'Tagged') {
+      return tagged.items.map((entry) => ({
+        kind: 'tagged' as const,
+        authorId: entry.authorId,
+        authorName: entry.authorName,
+        item: {
+          id: entry.id,
+          kind: entry.mediaType === 'video' ? 'video' as const : entry.mediaType === 'slideshow' ? 'slideshow' as const : 'photo' as const,
+          posterUri: entry.posterUri,
+          caption: entry.caption ?? '',
+          productCount: 0,
+        },
+      }));
+    }
     if (activeTab === 'Saved') return savedItems.map((saved) => ({ kind: 'saved' as const, saved }));
     if (activeTab === 'Orders') return myOrders.map((order) => ({ kind: 'order' as const, order }));
     // Liked has no backing data yet — a clean empty slot rather than
     // inventing engagement history.
     return [];
-  }, [activeTab, posts, savedItems, myOrders]);
+  }, [activeTab, posts, savedItems, myOrders, tagged.items]);
 
-  const numColumns = activeTab === 'Posts' ? layout.gridColumns : activeTab === 'Saved' ? savedColumns : 1;
+  const numColumns = activeTab === 'Posts' || activeTab === 'Tagged' ? layout.gridColumns : activeTab === 'Saved' ? savedColumns : 1;
 
   // Posts/Saved force the FlatList above to remount (new `key`, since a
   // live FlatList can't change numColumns) — restore the offset it had
@@ -707,12 +730,26 @@ export default function ProfileScreen() {
         />
       );
     }
+    if (item.kind === 'tagged') {
+      return (
+        <ProfileVideoTile
+          item={item.item}
+          index={index}
+          width={layout.tileWidth}
+          height={layout.tileHeight}
+          onPress={() => {
+            hapticSelection();
+            router.push(profileVideosHref({ source: 'creator', id: item.authorId, startPostId: item.item.id, title: item.authorName ?? undefined }) as never);
+          }}
+        />
+      );
+    }
     if (item.kind === 'order') return <OrderRow order={item.order} theme={theme} onPress={handleOrdersPress} />;
     return <SavedCell item={item.saved} size={savedCellSize} theme={theme} onPress={handleSavedTap} />;
   }, [handleDraftsTilePress, handleOrdersPress, handlePostLongPress, handlePostTap, handleSavedTap, layout.tileHeight, layout.tileWidth, savedCellSize, theme]);
 
   const keyForRow = useCallback((row: ListRow) => (
-    row.kind === 'draftsTile' ? 'drafts-tile' : row.kind === 'post' ? row.post.id : row.kind === 'order' ? row.order.id : row.saved.id
+    row.kind === 'draftsTile' ? 'drafts-tile' : row.kind === 'post' ? row.post.id : row.kind === 'tagged' ? `t-${row.item.id}` : row.kind === 'order' ? row.order.id : row.saved.id
   ), []);
 
   // One table decides every tab's empty copy + CTA (own profile → CTA).
@@ -788,6 +825,12 @@ export default function ProfileScreen() {
           />
         ) : null}
         <ProfileTopBarIcon name="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />
+        <ProfileTopBarIcon
+          name="more-horizontal"
+          onPress={() => { hapticLight(); setMenuOpen(true); }}
+          accessibilityLabel="Profile options"
+          testID="buyer-profile-more"
+        />
         <ProfileTopBarIcon name="menu" onPress={handleMenu} accessibilityLabel="More options" />
       </ProfileTopBarIconRow>
     </>
@@ -951,6 +994,19 @@ export default function ProfileScreen() {
       />
       <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
       <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
+
+      <ProfileMenuSheet
+        visible={menuOpen}
+        title={displayName}
+        onClose={() => setMenuOpen(false)}
+        items={[
+          caps.showShare && { key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShareProfile },
+          caps.showViewAsVisitor && user?.id && {
+            key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
+            onPress: () => router.push(viewAsVisitorHref('buyer', user.id) as never),
+          },
+        ].filter(Boolean) as ProfileMenuItem[]}
+      />
 
       <ShareProfileSheet
         visible={shareSheetOpen}

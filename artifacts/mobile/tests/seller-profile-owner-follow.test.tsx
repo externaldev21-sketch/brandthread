@@ -19,19 +19,21 @@ const {
   searchParamsMock,
   creatorVideosMock,
   authMock,
+  shopPageMock,
 } = vi.hoisted(() => ({
   routerMock: { push: vi.fn(), back: vi.fn(), canGoBack: vi.fn(() => true), replace: vi.fn() },
   apiMock: {
     seller: { getProfile: vi.fn() },
     publicSellers: { get: vi.fn(), recordVisit: vi.fn(), recordStoreVisit: vi.fn() },
     reviews: { forSeller: vi.fn() },
-    social: { block: vi.fn(), profile: vi.fn() },
+    social: { block: vi.fn(), profile: vi.fn(), tagged: vi.fn() },
   },
   followStateMock: vi.fn(),
   setFollowingMock: vi.fn(),
-  searchParamsMock: vi.fn(() => ({ id: "seller-9" })),
+  searchParamsMock: vi.fn((): Record<string, string> => ({ id: "seller-9" })),
   creatorVideosMock: vi.fn(),
   authMock: vi.fn(() => ({ isLoaded: true, userId: "buyer-1" })),
+  shopPageMock: vi.fn(),
 }));
 
 vi.mock("@/components/profile/ProfileCover", async () =>
@@ -69,6 +71,7 @@ vi.mock("react-native", () => {
       ScrollView: nativeComponent("Animated.ScrollView"),
       event: () => () => {},
       spring: () => ({ start: () => {} }),
+      timing: () => ({ start: () => {} }),
     },
     Dimensions: { get: () => ({ width: 375, height: 800 }) },
     Image: nativeComponent("Image"),
@@ -196,6 +199,7 @@ vi.mock("@/services/socialService", () => ({
 vi.mock("@/services/profileService", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/profileService")>()),
   getCreatorVideosPage: creatorVideosMock,
+  getSellerShopPage: shopPageMock,
 }));
 
 vi.mock("@/lib/shareProfile", () => ({
@@ -208,6 +212,11 @@ vi.mock("@/lib/safety", () => ({
 }));
 
 import SellerProfileScreen from "@/app/seller-profile";
+
+async function switchTab(renderer: ReactTestRenderer, label: string) {
+  const tab = renderer.root.findAll((n) => n.props.testID === `profile-tab-${label}` && typeof n.props.onPress === "function")[0];
+  await act(async () => { tab.props.onPress(); await flush(); });
+}
 
 async function flush() {
   for (let i = 0; i < 8; i += 1) await Promise.resolve();
@@ -261,6 +270,12 @@ beforeEach(() => {
   apiMock.publicSellers.recordStoreVisit.mockReset().mockResolvedValue(undefined);
   apiMock.reviews.forSeller.mockReset().mockResolvedValue({ avgRating: 4.8, totalCount: 10 });
   apiMock.social.profile.mockReset().mockResolvedValue({ followersCount: 12, followingCount: 3 });
+  apiMock.social.tagged.mockReset().mockResolvedValue([]);
+  apiMock.seller.getProfile.mockResolvedValue({ clerkId: "seller-9", subscriptionPlanId: "pro", subscriptionStatus: "active" });
+  shopPageMock.mockReset().mockResolvedValue({
+    products: [{ id: "prod-1", name: "Tee", imageUri: "https://cdn.example.com/t.jpg", priceCents: 2500, totalStock: 4, inStock: true, isPreOrder: false, category: "apparel" }],
+    hasMore: false, nextOffset: 1,
+  });
   followStateMock.mockReset().mockResolvedValue({ isFollowing: false, followersCount: 12 });
   setFollowingMock.mockReset().mockResolvedValue({ isFollowing: true, followersCount: 13 });
   creatorVideosMock.mockReset().mockResolvedValue({
@@ -287,6 +302,85 @@ describe("seller-profile.tsx owner vs. non-owner action branch", () => {
     const allText = textContent(renderer.toJSON());
     expect(allText).toContain("Edit profile");
     expect(renderer.root.findAllByProps({ testID: "seller-profile-follow-btn" })).toHaveLength(0);
+  });
+});
+
+const OWNER_ONLY_TEST_IDS = ["seller-profile-dashboard", "seller-profile-edit", "seller-profile-visitor-preview"];
+
+describe("seller-profile.tsx owner vs visitor privacy (Instagram own-profile vs other-profile)", () => {
+  let renderer!: ReactTestRenderer;
+  afterEach(async () => { await act(async () => { renderer?.unmount(); }); });
+
+  it("a visitor sees no plan chip, dashboard, edit, inbox or View-as-visitor — and never fetches the owner profile", async () => {
+    renderer = await renderScreen();
+    const text = textContent(renderer.toJSON());
+    for (const plan of ["Free Plan", "Pro Plan", "Active Plan", "Professional dashboard", "Edit profile", "Inbox"]) {
+      expect(text).not.toContain(plan);
+    }
+    for (const id of OWNER_ONLY_TEST_IDS) expect(renderer.root.findAllByProps({ testID: id })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ accessibilityLabel: "Inbox" })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: "profile-menu-sheet-view-as-visitor" })).toHaveLength(0);
+    expect(apiMock.seller.getProfile).not.toHaveBeenCalled();
+    // Visitor actions: Follow, Message and a ... menu with Share / Report / Block.
+    expect(renderer.root.findAllByProps({ testID: "seller-profile-follow-btn" }).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: "seller-profile-message" }).length).toBeGreaterThan(0);
+    for (const key of ["share", "report", "block"]) {
+      expect(renderer.root.findAllByProps({ testID: `profile-menu-sheet-${key}` }).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("?isOwner=true from a non-owner cannot unlock owner controls", async () => {
+    searchParamsMock.mockReturnValue({ id: "seller-9", isOwner: "true" });
+    renderer = await renderScreen();
+    expect(textContent(renderer.toJSON())).not.toContain("Edit profile");
+    expect(renderer.root.findAllByProps({ testID: "seller-profile-dashboard" })).toHaveLength(0);
+    expect(apiMock.seller.getProfile).not.toHaveBeenCalled();
+  });
+
+  it("the owner sees the plan chip, dashboard, edit, inbox and View as visitor — and edit badges, not Buy, on products", async () => {
+    authMock.mockReturnValue({ isLoaded: true, userId: "seller-9" });
+    renderer = await renderScreen();
+    const text = textContent(renderer.toJSON());
+    expect(text).toContain("Pro Plan");
+    expect(text).toContain("Edit profile");
+    expect(renderer.root.findAllByProps({ testID: "seller-profile-dashboard" }).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ accessibilityLabel: "Inbox" }).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: "profile-menu-sheet-view-as-visitor" }).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: "profile-menu-sheet-report" })).toHaveLength(0);
+    await switchTab(renderer, "shop");
+    expect(renderer.root.findAllByProps({ testID: "profile-product-edit-prod-1" }).length).toBeGreaterThan(0);
+    const tile = renderer.root.findAll((n) => n.props.testID === "profile-product-tile-prod-1" && typeof n.props.onPress === "function")[0];
+    await act(async () => { tile.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith("/product-detail?id=prod-1");
+  });
+
+  it("View as visitor opens the visitor preview route", async () => {
+    authMock.mockReturnValue({ isLoaded: true, userId: "seller-9" });
+    renderer = await renderScreen();
+    const row = renderer.root.findAll((n) => n.props.testID === "profile-menu-sheet-view-as-visitor" && typeof n.props.onPress === "function")[0];
+    await act(async () => { row.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith("/seller-profile?id=seller-9&asVisitor=1");
+  });
+
+  it("the owner's visitor preview hides every owner control and never fetches the plan", async () => {
+    authMock.mockReturnValue({ isLoaded: true, userId: "seller-9" });
+    searchParamsMock.mockReturnValue({ id: "seller-9", asVisitor: "1" });
+    renderer = await renderScreen();
+    const text = textContent(renderer.toJSON());
+    for (const hidden of ["Pro Plan", "Free Plan", "Professional dashboard", "Edit profile"]) expect(text).not.toContain(hidden);
+    expect(renderer.root.findAllByProps({ testID: "seller-profile-visitor-preview" }).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ accessibilityLabel: "Inbox" })).toHaveLength(0);
+    expect(apiMock.seller.getProfile).not.toHaveBeenCalled();
+    // Posts are requested the way a stranger would get them.
+    expect(creatorVideosMock.mock.calls[0][3]).toMatchObject({ asVisitor: true });
+    await switchTab(renderer, "shop");
+    expect(renderer.root.findAllByProps({ testID: "profile-product-edit-prod-1" })).toHaveLength(0);
+  });
+
+  it("?asVisitor=1 is ignored for mode when the viewer is not the owner (still just a visitor)", async () => {
+    searchParamsMock.mockReturnValue({ id: "seller-9", asVisitor: "1" });
+    renderer = await renderScreen();
+    expect(textContent(renderer.toJSON())).not.toContain("Edit profile");
   });
 });
 
@@ -331,18 +425,30 @@ describe("seller-profile.tsx videos grid and shop", () => {
     );
   });
 
-  it("opens the seller's product list from the Shop pill", async () => {
+  it("has Posts | Products | Tagged tabs, and the Products tab lists the live listings", async () => {
     renderer = await renderScreen();
-    const pill = renderer.root.findAll((node) => node.props.testID === "profile-shop-pill" && typeof node.props.onPress === "function")[0];
-    expect(textContent(renderer.toJSON())).toContain("Shop 12 products");
-    await act(async () => { pill.props.onPress(); });
-    expect(routerMock.push).toHaveBeenCalledWith("/profile-products?sellerId=seller-9&sellerName=Acme%20Co");
+    const labels = renderer.root.findAll((n) => typeof n.props.accessibilityLabel === "string").map((n) => n.props.accessibilityLabel);
+    for (const label of ["Posts", "Products", "Tagged"]) expect(labels.join("|")).toContain(label);
+    await switchTab(renderer, "shop");
+    expect(shopPageMock).toHaveBeenCalledWith("seller-9", 0);
+    expect(renderer.root.findAllByProps({ testID: "profile-product-tile-prod-1" }).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: "profile-product-edit-prod-1" })).toHaveLength(0);
   });
 
-  it("hides the Shop pill from visitors when the seller has no live products", async () => {
-    apiMock.publicSellers.get.mockResolvedValue({ profile: { ...sellerProfile, productsCount: 0 }, products: [] });
+  it("a visitor tapping a product opens the buyer product page (Buy now / Add to cart live there)", async () => {
     renderer = await renderScreen();
-    expect(renderer.root.findAllByProps({ testID: "profile-shop-pill" })).toHaveLength(0);
+    await switchTab(renderer, "shop");
+    const tile = renderer.root.findAll((n) => n.props.testID === "profile-product-tile-prod-1" && typeof n.props.onPress === "function")[0];
+    await act(async () => { tile.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith("/buyer-product-detail?productId=prod-1&src=profile");
+  });
+
+  it("the Tagged tab reads posts that tagged this seller", async () => {
+    apiMock.social.tagged.mockResolvedValue([{ id: "t1", authorId: "buyer-5", authorName: "Pat", mediaUrl: "https://cdn.example.com/t1.jpg", mediaType: "photo", source: "post" }]);
+    renderer = await renderScreen();
+    await switchTab(renderer, "tagged");
+    expect(apiMock.social.tagged).toHaveBeenCalledWith("seller-9");
+    expect(renderer.root.findAllByProps({ testID: "profile-video-tile-t1" }).length).toBeGreaterThan(0);
   });
 
   it("links follower / following counts to this seller's own lists", async () => {
