@@ -33,6 +33,27 @@ describe('seller home dashboard data contract', () => {
     expect(source).toContain("range !== 'all' && periodLabel");
   });
 
+  it('never shows the delta line before the animated hero number has caught up to it', () => {
+    // Reported bug: the hero read $0.00 while the delta line (computed
+    // instantly from metricAggregate, not animated) already showed a real
+    // "+$162.57 (16.4%)" — they can only ever disagree while the hero's
+    // count-up animation is still catching up to the same metricAggregate
+    // value the delta was computed from.
+    expect(source).toContain('const heroSettled = heroDisplay === Math.round(activeValue)');
+    expect(source).toContain('deltaLine && scrubIndex === null && heroSettled');
+  });
+
+  it('the hero, delta and chart all read the same range-scoped data — no separate period source', () => {
+    // metricAggregate (hero + delta), the chart's series/labels, and the
+    // stat tiles all derive from the same `data`/`buckets`, which is itself
+    // gated to the currently selected `range` by selectSellerHomeAnalytics
+    // — there is no second, independently-fetched period anywhere here.
+    expect(source).toContain('const buckets = data?.buckets ?? []');
+    expect(source).toContain('metricSeries(metric, buckets)');
+    expect(source).toContain('bucketLabel(b.bucket, range as SellerHomeTimeRange)');
+    expect(source).toMatch(/case 'sales': return \{ current: data\.totalCents, previous: previous\.totalCents \}/);
+  });
+
   it('renders a scrubbable chart wired to haptic feedback, not a static bar chart', () => {
     expect(source).toContain('<SellerDashboardChart');
     expect(source).toContain('onScrub={setScrubIndex}');
