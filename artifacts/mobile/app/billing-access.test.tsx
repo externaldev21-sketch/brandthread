@@ -155,6 +155,10 @@ vi.mock('@/hooks/useApi', () => ({
   useApi: () => apiMock,
 }));
 
+vi.mock('@clerk/expo', () => ({
+  useAuth: () => ({ isLoaded: true, isSignedIn: true, userId: 'user_test' }),
+}));
+
 vi.mock('@/hooks/useTeamRole', () => ({
   useTeamRole: () => ({ currentRole: roleState.currentRole, isLoadingRole: false }),
 }));

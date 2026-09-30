@@ -15,6 +15,7 @@ export function useTeamRole() {
 
   useEffect(() => {
     let active = true;
+    // Never call the protected team-context API without a loaded, signed-in session.
     if (!isLoaded || !isSignedIn) {
       setCurrentRole(null);
       setIsLoadingRole(false);

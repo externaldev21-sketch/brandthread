@@ -70,6 +70,7 @@ export function useSubscriptionPlan() {
   // Rebuild fetchPlan whenever `api` changes (it wraps Clerk tokens).
   useEffect(() => {
     fetchRef.current = function fetchPlan() {
+      // Never call the protected subscription API without a signed-in session.
       if (!isSignedIn || !userId) {
         setPlan(null);
         setLoading(false);

@@ -43,6 +43,8 @@ router.use(requireAuth);
 // stored as-is once their shape passes the lighter checks further down.
 const MESSAGE_ATTACHMENT_TYPES = [
   "product", "order", "post", "profile", "image", "video", "voice",
+  // Card shown above a reply to someone's story / a story that mentioned you.
+  "story_reply",
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

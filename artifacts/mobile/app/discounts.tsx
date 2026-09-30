@@ -276,7 +276,7 @@ export default function DiscountsScreen() {
         startsAt: startDate ? new Date(startDate).toISOString() : null,
         expiresAt: hasEnd && endDate ? new Date(endDate).toISOString() : null,
       };
-      if (isPreviewMode && !userId) {
+      if (previewOnly) {
         if (editingId) {
           const updated = updatePreviewDiscount(editingId, payload);
           if (updated) setDiscounts(prev => prev.map(d => d.id === editingId ? normalizeDiscount(updated) : d));

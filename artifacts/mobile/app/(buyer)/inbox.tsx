@@ -58,6 +58,8 @@ import {
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { TabPageHeader } from '@/components/layout/TabPageHeader';
 import { Glass } from '@/components/ui/Glass';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { BUYER_INBOX_GESTURE } from '@/lib/firstRunTips/content';
 
 // This screen's Pressables opt out of the shared android_ripple treatment
 // (see rippleEnabled on PressableScale/IconButton) — the translucent ripple
@@ -1871,6 +1873,12 @@ export default function InboxScreen() {
         visible={!!snackbarMessage}
         message={snackbarMessage ?? ''}
         onDismiss={() => setSnackbarMessage(null)}
+      />
+      <FirstRunTip
+        id="buyer-inbox"
+        variant="gesture"
+        contentReady={!loading}
+        gesture={BUYER_INBOX_GESTURE}
       />
     </View>
   );

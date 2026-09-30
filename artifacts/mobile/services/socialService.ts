@@ -1386,7 +1386,11 @@ export async function cacheStoriesForViewer(stories: Story[], k: SocialKeys = K(
   const now = Date.now();
   await save(k.stories, Array.from(byId.values()).filter(s => s.expiresAt > now));
 }
-export async function createStory(params: { media: StoryMedia[]; privacy: StoryPrivacySettings; repliesDisabled: boolean; }): Promise<Story> {
+export async function createStory(params: {
+  media: StoryMedia[]; privacy: StoryPrivacySettings; repliesDisabled: boolean;
+  /** Reshare of a story that tagged me; the server sets the credit. */
+  originalStoryId?: string;
+}): Promise<Story> {
   const k = K();
   const profile = await getMyProfile(k);
   const story = await serviceRequest<Story>('/api/social/stories', {
@@ -1400,6 +1404,7 @@ export async function createStory(params: { media: StoryMedia[]; privacy: StoryP
       media: params.media,
       privacy: params.privacy,
       repliesDisabled: params.repliesDisabled,
+      ...(params.originalStoryId ? { originalStoryId: params.originalStoryId } : {}),
     }),
   });
   notify();

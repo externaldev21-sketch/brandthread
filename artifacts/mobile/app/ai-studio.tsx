@@ -12,6 +12,8 @@ import { getProjects } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { DESIGN_STUDIO_ROWS } from '@/lib/firstRunTips/content';
 
 const STUDIO_TOOLS = [
   { label: 'AI Clothing Mockups', icon: 'image' as const, desc: 'Generate photorealistic product mockups', badge: 'Popular' },
@@ -291,6 +293,12 @@ export default function AIStudioScreen() {
           </View>
         </ModalSafeArea>
       </Modal>
+      <FirstRunTip
+        id="design-studio"
+        variant="fullscreen"
+        contentReady={projects !== null}
+        fullscreen={{ title: 'Design Studio', subtitle: 'A few gestures to get you moving', rows: DESIGN_STUDIO_ROWS }}
+      />
     </View>
   );
 }

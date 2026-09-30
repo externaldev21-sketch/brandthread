@@ -35,6 +35,7 @@ export default function MutedWordsScreen() {
   const api = useApi();
   const inputRef = useRef<TextInput>(null);
   const loadGeneration = useRef(0);
+  const loadedFor = useRef<string | null>(null);
   const guestMode = authLoaded && !isSignedIn;
   const canEdit = authLoaded;
 
@@ -50,6 +51,14 @@ export default function MutedWordsScreen() {
     if (!authLoaded) return;
     const generation = ++loadGeneration.current;
     setError(null);
+    // Signing in/out swaps the source of truth; never show the other
+    // identity's list while the new one loads.
+    const owner = guestMode ? 'guest' : 'account';
+    if (loadedFor.current !== owner) {
+      loadedFor.current = owner;
+      setWords([]);
+      setLoading(true);
+    }
     try {
       if (guestMode) {
         const saved = await readGuestMutedWords();

@@ -2272,7 +2272,7 @@ export default function FeedScreen({
         else setFeedRefreshing(false);
       }
     }
-  }, [feedTab, creatorSource, creatorId, creatorStartPostId, creatorExactPost, api]);
+  }, [feedTab, creatorSource, creatorId, creatorStartPostId, creatorExactPost]);
 
   const loadMoreFeed = useCallback(async () => {
     if (feedLoadingMoreRef.current || !feedHasMoreRef.current || feedLoading || feedRefreshing) return;

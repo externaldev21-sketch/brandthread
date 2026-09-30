@@ -12,26 +12,42 @@ import { StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
-/** Diagonal black-to-charcoal gradient plus a soft silver radial glow —
- *  the "deep black with soft silver light" every cover shares. */
+/** Diagonal near-black sheen plus a very soft silver radial glow — the
+ *  "deep black with soft silver light" every cover shares.
+ *
+ *  Fixed: a visible hard-edged rectangle used to show around the glow
+ *  (Dev's screenshot, "a lighter rounded box... with a visible bottom/left
+ *  boundary"). Explicit width="100%" height="100%" on both `<Svg>`s below
+ *  fixes a real (separate) react-native-svg-on-web sizing gap, but the
+ *  actual box Dev saw turned out to be the OLD 3-stop LinearGradient's own
+ *  lighter middle band (#000000 → #161616 → #000000): with only 3 stops and
+ *  that much contrast between near-black shades, the transition rendered
+ *  with visible 8-bit banding — a "step" that reads as a hard edge rather
+ *  than a smooth sheen. Fixed by lowering the peak brightness a lot (to a
+ *  value close enough to black that any residual banding is imperceptible)
+ *  and adding two more stops so the ramp in and out of it is more gradual.
+ *  The radial glow's own peak opacity is lowered to match, since it
+ *  overlaps the same upper-middle area and was compounding the effect. */
 export function StudioCoverBackdrop() {
   return (
     <>
       <LinearGradient
-        colors={['#050505', '#161616', '#000000']}
+        colors={['#000000', '#020202', '#050505', '#020202', '#000000']}
+        locations={[0, 0.3, 0.5, 0.7, 1]}
         start={{ x: 0.15, y: 0 }}
         end={{ x: 0.9, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <Svg style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
         <Defs>
-          <RadialGradient id="coverGlow" cx="50%" cy="34%" r="60%">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity={0.18} />
-            <Stop offset="55%" stopColor="#ffffff" stopOpacity={0.05} />
+          <RadialGradient id="coverGlow" cx="50%" cy="34%" r="75%">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity={0.09} />
+            <Stop offset="35%" stopColor="#ffffff" stopOpacity={0.05} />
+            <Stop offset="70%" stopColor="#ffffff" stopOpacity={0.015} />
             <Stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
           </RadialGradient>
         </Defs>
-        <Circle cx="50%" cy="34%" r="60%" fill="url(#coverGlow)" />
+        <Circle cx="50%" cy="34%" r="75%" fill="url(#coverGlow)" />
       </Svg>
     </>
   );
@@ -65,7 +81,7 @@ const GRAIN_DOTS = (() => {
  *  running through every cover, reinforcing the "one series" feel. */
 export function StudioCoverGrain() {
   return (
-    <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+    <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
       {GRAIN_DOTS.map((d, i) => (
         <Circle key={i} cx={`${d.x}%`} cy={`${d.y}%`} r={d.r} fill="#ffffff" opacity={d.o} />
       ))}

@@ -117,6 +117,7 @@ export default function BuyerYourActivity() {
               ))}
             </View>
 
+
           </>
         )}
         <Text style={s.groupLabel}>Viewing history</Text>
@@ -130,6 +131,7 @@ export default function BuyerYourActivity() {
             onPress={() => router.push('/buyer-recently-watched' as never)}
           />
         </Card>
+        {/* Archive lists archived posts; reachable even if the stats fail to load. */}
         <Text style={s.groupLabel}>Manage</Text>
         <Card style={s.card}>
           <ListRow

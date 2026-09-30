@@ -109,6 +109,7 @@ const BUYER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   'create-post',
   'buyer-story-create',
   'buyer-story-viewer',
+  'story-mention-viewer',
   'buyer-live',
   'live-feed',
   'live',

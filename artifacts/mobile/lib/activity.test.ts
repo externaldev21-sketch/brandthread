@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ACTIVITY_CHIPS,
   activityCategory,
+  activityDetail,
   activityChipEmpty,
   matchesActivityChip,
   activityHref,
@@ -355,7 +356,28 @@ describe('classification and routing', () => {
     expect(activityIcon({ type: 'return_refunded', category: 'returns' })).toBe('rotate-ccw');
   });
 
+  it('routes story mention rows to the mention viewer and reshares to the story viewer', () => {
+    expect(activityHref(item({ type: 'story_mention', targetType: 'story', targetId: 's 1' })))
+      .toBe('/story-mention-viewer?storyId=s%201');
+    expect(activityHref(item({ type: 'story_reshare', targetType: 'story', targetId: 's1' })))
+      .toBe('/buyer-story-viewer?storyId=s1&allStoryIds=s1');
+    expect(activityHref(item({ type: 'story_mention', targetType: 'story' }))).toBeNull();
+  });
+
+  it('never merges story mention / reshare rows and shows no secondary line', () => {
+    const rows = aggregateActivity([
+      item({ id: 'a', type: 'story_mention', targetType: 'story', targetId: 's1', actorId: 'u1', actorName: 'Jay', title: 'Jay mentioned you in their story', body: 'x' }),
+      item({ id: 'b', type: 'story_mention', targetType: 'story', targetId: 's1', actorId: 'u2', actorName: 'Mina', title: 'Mina mentioned you in their story', body: 'x' }),
+      item({ id: 'c', type: 'story_reshare', targetType: 'story', targetId: 's2', actorId: 'u2', actorName: 'Mina', title: 'Mina shared your story', body: 'x' }),
+    ]);
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => activityDetail(row))).toEqual([null, null, null]);
+    expect(rows.every((row) => !isGroupedRow(row))).toBe(true);
+  });
+
   it('icons the new event types', () => {
+    expect(activityIcon({ type: 'story_mention', category: 'social' })).toBe('at-sign');
+    expect(activityIcon({ type: 'story_reshare', category: 'social' })).toBe('repeat');
     expect(activityIcon({ type: 'story_like', category: 'social' })).toBe('heart');
     expect(activityIcon({ type: 'repost', category: 'social' })).toBe('repeat');
     expect(activityIcon({ type: 'thread_cash_received', category: 'social' })).toBe('dollar-sign');
@@ -376,6 +398,8 @@ describe('filter chips', () => {
     expect(activityCategory(of('post_comment'))).toBe('comments');
     expect(activityCategory(of('comment_reply'))).toBe('comments');
     expect(activityCategory(of('mention'))).toBe('comments');
+    expect(activityCategory(of('story_mention'))).toBe('comments');
+    expect(activityCategory(of('story_reshare'))).toBe('other');
     expect(activityCategory(of('thread_cash_received'))).toBe('thread_cash');
     expect(activityCategory(of('order_shipped', 'orders'))).toBe('orders');
     expect(activityCategory(of('order_delivered', 'orders'))).toBe('orders');

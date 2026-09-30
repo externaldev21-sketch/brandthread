@@ -192,6 +192,8 @@
     { "match": "/connections", "owner": "profilesSocial" },
     { "match": "/activity-center", "owner": "profilesSocial" },
     { "match": "/activity-people", "owner": "profilesSocial" },
+    { "match": "/story-mentions", "owner": "profilesSocial" },
+    { "match": "/story-mention-viewer", "owner": "profilesSocial" },
     { "match": "/edit-profile", "owner": "profilesSocial" },
     { "match": "/seller-profile", "owner": "profilesSocial" },
     { "match": "/seller-reviews", "owner": "profilesSocial" },

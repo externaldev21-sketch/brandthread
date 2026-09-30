@@ -38,4 +38,11 @@ describe('unsigned muted words', () => {
     expect(matchesGuestMutedWords('Café #fyp @someone', ['#fyp'])).toBe(true);
     expect(matchesGuestMutedWords('Café #fyp @someone', ['@someone'])).toBe(true);
   });
+
+  it('reports an unreadable saved list instead of silently dropping it', async () => {
+    store['@brandthread:guest-muted-words:v1'] = '{not json';
+    await expect(readGuestMutedWords()).rejects.toThrow();
+    store['@brandthread:guest-muted-words:v1'] = JSON.stringify([{ phrase: 1 }]);
+    await expect(readGuestMutedWords()).rejects.toThrow('Could not read');
+  });
 });

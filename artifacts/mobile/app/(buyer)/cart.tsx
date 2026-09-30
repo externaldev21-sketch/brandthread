@@ -55,6 +55,8 @@ import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { BUYER_CART_STEPS } from '@/lib/firstRunTips/content';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1287,6 +1289,12 @@ export default function CartScreen() {
           )}
         </>
       )}
+      <FirstRunTip
+        id="buyer-cart"
+        variant="anchored"
+        contentReady={!loading}
+        anchored={{ steps: BUYER_CART_STEPS }}
+      />
     </View>
   );
 }

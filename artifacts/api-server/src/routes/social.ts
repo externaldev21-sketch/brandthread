@@ -13,7 +13,7 @@
  */
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, stories, storyLikes, storyViews, notes, blocks, posts, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
+import { db, users, follows, stories, storyMentions, storyLikes, storyViews, notes, blocks, posts, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -29,7 +29,8 @@ import {
   profilesById,
   publishingRestriction,
 } from "../lib/safety";
-import { actorFieldsFromProfile, notifyStoryLike } from "../lib/activityEvents";
+import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStoryReshare } from "../lib/activityEvents";
+import { sanitizeStoryMentions, recordStoryMentions, withOriginalInfo } from "../lib/storyMentions";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { followingSortDirection } from "../lib/followingSort";
@@ -908,6 +909,8 @@ function buildStoryView(row: typeof stories.$inferSelect, likedByMe: boolean) {
     likesCount: row.likesCount,
     viewsCount: row.viewsCount,
     likedByMe,
+    originalStoryId:  row.originalStoryId  ?? null,
+    originalAuthorId: row.originalAuthorId ?? null,
     createdAt: new Date(row.createdAt).getTime(),
     expiresAt: new Date(row.expiresAt).getTime(),
   };
@@ -932,13 +935,14 @@ async function loadActiveStory(storyId: string) {
 // ─── POST /api/social/stories — create a story ───────────────────────────────
 router.post("/stories", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const { media, repliesDisabled, privacy } = req.body as {
+  const { media: rawMedia, repliesDisabled, privacy, originalStoryId } = req.body as {
     media:              any[];
+    originalStoryId?:   string;
     repliesDisabled?:   boolean;
     privacy?: { visibility?: string; replyPermission?: string; };
   };
 
-  if (!Array.isArray(media) || media.length === 0) {
+  if (!Array.isArray(rawMedia) || rawMedia.length === 0) {
     res.status(400).json({ error: "media[] required" }); return;
   }
 
@@ -956,7 +960,7 @@ router.post("/stories", async (req, res) => {
   const myName = me.displayName || me.name || "Brandthread member";
 
   // Slurs and threats are filtered everywhere, including story text.
-  const storyText = media
+  const storyText = rawMedia
     .flatMap((item: any) => [item?.caption, item?.text, ...(Array.isArray(item?.textOverlays) ? item.textOverlays.map((o: any) => o?.text) : [])])
     .filter((value: unknown): value is string => typeof value === "string")
     .join(" ");
@@ -964,6 +968,29 @@ router.post("/stories", async (req, res) => {
   if (storyDecision.action === "reject" && (storyDecision.category === "hate_speech" || storyDecision.category === "harassment")) {
     res.status(422).json({ error: storyDecision.reason, category: storyDecision.category, code: "CONTENT_REJECTED" }); return;
   }
+
+  // Reshare ("Add to your story"): only someone the original story tagged may
+  // reshare it, and only while the original is still live.
+  let reshareOf: typeof stories.$inferSelect | null = null;
+  if (originalStoryId !== undefined && originalStoryId !== null) {
+    if (typeof originalStoryId !== "string" || !/^[0-9a-f-]{36}$/i.test(originalStoryId)) {
+      res.status(400).json({ error: "Invalid originalStoryId", code: "VALIDATION_ERROR" }); return;
+    }
+    const original = await loadActiveStory(originalStoryId);
+    if (!original || (await blockRelation(myId, original.authorId)) !== "none") {
+      res.status(410).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" }); return;
+    }
+    const [tagged] = await db.select({ storyId: storyMentions.storyId }).from(storyMentions)
+      .where(and(eq(storyMentions.storyId, originalStoryId), eq(storyMentions.mentionedUserId, myId))).limit(1);
+    if (!tagged) {
+      res.status(403).json({ error: "Only people tagged in a story can share it", code: "NOT_TAGGED" }); return;
+    }
+    reshareOf = original;
+  }
+
+  // Mention stickers (and "@name" typed into text) are verified server-side:
+  // untaggable people (self, blocked either way, deleted/suspended) are dropped silently.
+  const { media, mentions } = await sanitizeStoryMentions(rawMedia, myId);
 
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const visibility = privacy?.visibility === "friends" ? "friends" : "public";
@@ -979,10 +1006,29 @@ router.post("/stories", async (req, res) => {
     repliesDisabled:    repliesDisabled ?? false,
     privacyVisibility:  visibility,
     privacyReplyPerm:   privacy?.replyPermission ?? "everyone",
+    originalStoryId:    reshareOf?.id ?? null,
+    originalAuthorId:   reshareOf?.authorId ?? null,
     expiresAt,
   }).returning();
 
-  res.status(201).json(buildStoryView(row, false));
+  await recordStoryMentions(row.id, myId, mentions);
+  for (const mention of mentions) {
+    void notifyStoryMention({
+      storyId: row.id, taggerId: myId, mentionedUserId: mention.userId, media, slide: mention.sticker.slide,
+    });
+  }
+  if (reshareOf) {
+    // Resharing handles the tag (same as "Not now", but it was acted on).
+    await db.update(storyMentions)
+      .set({ handledAt: new Date(), handledAction: "reshared" })
+      .where(and(eq(storyMentions.storyId, reshareOf.id), eq(storyMentions.mentionedUserId, myId)));
+    void notifyStoryReshare({
+      reshareStoryId: row.id, resharerId: myId, originalAuthorId: reshareOf.authorId, media: reshareOf.media,
+    });
+  }
+
+  const [view] = await withOriginalInfo([buildStoryView(row, false)]);
+  res.status(201).json(view);
 });
 
 // ─── GET /api/social/stories/me — my active stories ─────────────────────────
@@ -1001,7 +1047,7 @@ router.get("/stories/me", async (req, res) => {
       )
     : new Set<string>();
 
-  res.json(rows.map(r => buildStoryView(r, likedSet.has(r.id))));
+  res.json(await withOriginalInfo(rows.map(r => buildStoryView(r, likedSet.has(r.id)))));
 });
 
 // ─── GET /api/social/stories/user/:userId — another user's active stories ────
@@ -1040,7 +1086,7 @@ router.get("/stories/user/:userId", async (req, res) => {
     .map(r => r.storyId)
   );
 
-  res.json(finalRows.map(r => buildStoryView(r, likedSet.has(r.id))));
+  res.json(await withOriginalInfo(finalRows.map(r => buildStoryView(r, likedSet.has(r.id)))));
 });
 
 // ─── GET /api/social/stories/following — stories tray ────────────────────────

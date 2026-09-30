@@ -46,9 +46,12 @@ describe('Seller Studio page: search bar, pinned shortcuts and grouped sections 
 describe('Seller Studio sheet: menu consolidation — only destinations with no other entry point', () => {
   it('excludes every item that has a real entry point elsewhere', () => {
     const excluded = [
-      'orders', 'discounts', 'products', 'post-video', 'messages', 'boost',
+      'orders', 'discounts', 'products', 'messages', 'boost',
       'store-preview', 'subscription', 'store-builder', 'shipping', 'team',
       'settings', 'help',
+      // Dev, later round: "I want taxes and duties removed... Content can
+      // be removed. Finance can be removed" — from this menu only.
+      'taxes', 'content', 'finance',
     ];
     excluded.forEach((id) => {
       expect(studio, `${id} should be in MENU_EXCLUDED_IDS`).toContain(`'${id}'`);
@@ -56,16 +59,19 @@ describe('Seller Studio sheet: menu consolidation — only destinations with no 
     expect(studio).toContain('const MENU_EXCLUDED_IDS = [');
   });
 
-  it('keeps the Dev-named-no-matter-what items plus everything with no other entry point', () => {
+  it('keeps the Dev-named-no-matter-what items plus everything with no other entry point, with Create post (post-video) leading', () => {
     const kept = [
-      'add-product', 'go-live', 'analytics', 'payouts', 'community', 'taxes',
-      'content', 'finance', 'manufacturer', 'customers',
-      'design-studio', 'mockup-to-model', 'remove-bg', 'ai-design', 'campaign-gen', 'ai-photoshoot',
+      'post-video', 'add-product', 'go-live', 'analytics', 'payouts', 'customers', 'community',
+      'manufacturer', 'design-studio', 'mockup-to-model', 'remove-bg', 'ai-design', 'campaign-gen', 'ai-photoshoot',
     ];
     kept.forEach((id) => {
       expect(studio, `${id} should be in CARD_ORDER`).toContain(`'${id}'`);
     });
     expect(studio).toContain('const CARD_ORDER = [');
+    // "Make the create post one the first one" — the menu opens on
+    // CARD_ORDER[0], so post-video must lead the list, not just appear in it.
+    const orderBlock = studio.slice(studio.indexOf('const CARD_ORDER = ['), studio.indexOf('];', studio.indexOf('const CARD_ORDER = [')));
+    expect(orderBlock.indexOf("'post-video'")).toBeLessThan(orderBlock.indexOf("'add-product'"));
   });
 
   it('warns in dev if an item is ever left out of both lists (never silently unreachable)', () => {
