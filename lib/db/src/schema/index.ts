@@ -1042,6 +1042,31 @@ export const savedItems = pgTable('saved_items', {
   userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
 }));
 
+// ─── First-run tips (per-account "seen" tracking) ─────────────────────────────
+// One row per (user, tip) once that tip has been shown and dismissed — source
+// of truth so reinstalling the app or switching devices never replays a tip
+// the account already saw. See artifacts/mobile/lib/firstRunTips for the
+// client-side local cache + reconcile logic and
+// artifacts/api-server/src/routes/first-run-tips.ts for the API surface.
+export const firstRunTipsSeen = pgTable('first_run_tips_seen', {
+  id:      uuid('id').primaryKey().defaultRandom(),
+  userId:  text('user_id').notNull(),
+  tipId:   text('tip_id').notNull(),
+  seenAt:  timestamp('seen_at').defaultNow().notNull(),
+}, (table) => ({
+  userTipUnique: uniqueIndex('first_run_tips_seen_user_tip_unique').on(table.userId, table.tipId),
+  userIdIdx:     index('first_run_tips_seen_user_id_idx').on(table.userId),
+}));
+
+// "Skip all tips" — a single global per-account setting that suppresses
+// every future first-run tip once set. A separate one-row-per-user table
+// (rather than a column on `users`) keeps this additive and self-contained.
+export const firstRunTipsSettings = pgTable('first_run_tips_settings', {
+  userId:    text('user_id').primaryKey(),
+  skipAll:   boolean('skip_all').notNull().default(false),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // ─── Recently viewed products ──────────────────────────────────────────────────
 // One row per (buyer, product); viewing again bumps viewedAt via upsert
 // rather than creating a duplicate.
@@ -1114,6 +1139,9 @@ export const notificationsFeed = pgTable('notifications_feed', {
   newProductUnique: uniqueIndex('notifications_feed_new_product_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'new_product' AND ${table.targetId} IS NOT NULL`),
+  storyMentionUnique: uniqueIndex('notifications_feed_story_mention_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} IN ('story_mention', 'story_reshare') AND ${table.targetId} IS NOT NULL`),
   dropLiveUnique: uniqueIndex('notifications_feed_drop_live_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'drop_live' AND ${table.targetId} IS NOT NULL`),
@@ -1211,11 +1239,36 @@ export const stories = pgTable('stories', {
   moderatedAt:       timestamp('moderated_at'),
   likesCount:        integer('likes_count').notNull().default(0),
   viewsCount:        integer('views_count').notNull().default(0),
+  // Reshare ("Add to your story") of a story that tagged the resharer. Plain
+  // columns, no FK: when the original expires or is deleted the reshare keeps
+  // its credit and renders "Story unavailable" (migration 110).
+  originalStoryId:   uuid('original_story_id'),
+  originalAuthorId:  text('original_author_id'),
   createdAt:         timestamp('created_at').defaultNow().notNull(),
   expiresAt:         timestamp('expires_at').notNull(),
 }, (t) => ({
   expiresAtIdx: index('stories_expires_at_idx').on(t.expiresAt),
   authorIdx:    index('stories_author_idx').on(t.authorId),
+}));
+
+/**
+ * One row per (story, tagged person): the @mention sticker's placement plus
+ * the tagged person's handling state. `sticker` holds
+ * { overlayId, slide, x, y, scale, rotation, style } so a future product-tag
+ * sticker can share the same shape. `handledAt` is set when the tagged person
+ * reshares or taps "Not now" (migration 110).
+ */
+export const storyMentions = pgTable('story_mentions', {
+  storyId:         uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }),
+  mentionedUserId: text('mentioned_user_id').notNull(),
+  taggerId:        text('tagger_id').notNull(),
+  sticker:         jsonb('sticker').$type<Record<string, unknown>>().notNull().default({}),
+  handledAt:       timestamp('handled_at'),
+  handledAction:   text('handled_action'), // 'reshared' | 'dismissed'
+  createdAt:       timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk:           primaryKey({ columns: [t.storyId, t.mentionedUserId] }),
+  mentionedIdx: index('story_mentions_mentioned_idx').on(t.mentionedUserId, t.createdAt),
 }));
 
 export const storyLikes = pgTable('story_likes', {

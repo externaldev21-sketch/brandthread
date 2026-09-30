@@ -45,11 +45,14 @@ import {
 } from '@/services/designService';
 import { getProducts, updateProduct } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { MOCKUP_TO_MODEL_STEPS } from '@/lib/firstRunTips/content';
 
 /**
- * Hook-in point for the app-wide first-run tutorial system (built by a
- * different session). We don't build the tutorial UI here — just tag this
- * screen with a stable id so that system can target it once it exists.
+ * `TUTORIAL_ID` also doubles as the app-wide first-run tutorial system's
+ * `<FirstRunTip id="mockup-to-model" .../>` id below — that system (built
+ * by a different session) landed on dev mid-PR; kept the testID tag too
+ * since it's a harmless, stable hook for tests/tooling.
  */
 const TUTORIAL_ID = 'mockup-to-model';
 
@@ -556,6 +559,17 @@ export default function MockupToModelScreen() {
           // body instead of fabricating a number here.
         />
       </AiButtonDock>
+      {/* App-wide first-run tutorial system (built by a different session,
+          landed on dev while this PR was in flight) — wired in for real
+          here rather than just tagged, since it turned out to need no
+          screen-specific anchors (MOCKUP_TO_MODEL_STEPS has no `targets`,
+          so both steps render as centered cards). */}
+      <FirstRunTip
+        id="mockup-to-model"
+        variant="anchored"
+        contentReady
+        anchored={{ steps: MOCKUP_TO_MODEL_STEPS }}
+      />
     </View>
   );
 }

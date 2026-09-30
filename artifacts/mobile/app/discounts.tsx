@@ -109,18 +109,19 @@ export default function DiscountsScreen() {
   const { muted: MUTED, border: BORDER } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
   const api = useApi();
-  const { userId } = useAuth();
   // ?bt_preview=seller with no real signed-in account: no token to fetch or
   // save real discounts with. Reads/writes go through
   // lib/previewSellerFreshStore.ts's in-session store instead of the API, so
   // "Create discount" still genuinely works for the rest of the preview
   // session (same convention as app/(tabs)/orders.tsx's isPreviewMode guard).
   const [isPreviewMode] = useState(() => isSellerDevPreview());
+  const previewOnly = isPreviewMode && (!authLoaded || !isSignedIn || !userId);
 
   const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
   const [products, setProducts] = useState<Array<{ id: string; name: string; images?: string[] }>>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!previewOnly);
   const [loadError, setLoadError] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -143,7 +144,7 @@ export default function DiscountsScreen() {
   const [endDate, setEndDate] = useState('');
 
   const loadDiscounts = useCallback(async () => {
-    if (isPreviewMode && !userId) {
+    if (previewOnly) {
       await whenPreviewSellerFreshStoreReady();
       setDiscounts(getPreviewDiscounts().map(normalizeDiscount));
       setProducts([]);
@@ -166,7 +167,7 @@ export default function DiscountsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, previewOnly]);
 
   useFocusEffect(useCallback(() => { loadDiscounts(); }, [loadDiscounts]));
 
@@ -229,6 +230,10 @@ export default function DiscountsScreen() {
     : `${startDate ? `Starts ${startDate}` : 'Starts immediately'}${hasEnd && endDate ? ` · Ends ${endDate}` : hasEnd ? '' : ' · No end date'}`;
 
   async function handleSave() {
+    if (previewOnly && userId) {
+      Alert.alert('Sign in required', 'Wait for your account to finish loading before saving.');
+      return;
+    }
     if (discType !== 'free_shipping' && discType !== 'free_item') {
       if (discType === 'percentage' && (percent < 1 || percent > 100)) {
         Alert.alert('Invalid percentage', 'Choose between 1% and 100%.');
@@ -271,7 +276,7 @@ export default function DiscountsScreen() {
         startsAt: startDate ? new Date(startDate).toISOString() : null,
         expiresAt: hasEnd && endDate ? new Date(endDate).toISOString() : null,
       };
-      if (isPreviewMode && !userId) {
+      if (previewOnly) {
         if (editingId) {
           const updated = updatePreviewDiscount(editingId, payload);
           if (updated) setDiscounts(prev => prev.map(d => d.id === editingId ? normalizeDiscount(updated) : d));
@@ -316,7 +321,7 @@ export default function DiscountsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const nextActive = !d.active;
     setDiscounts(prev => prev.map(x => x.id === d.id ? { ...x, active: nextActive, status: nextActive ? 'active' : 'paused' } : x));
-    if (isPreviewMode && !userId) {
+    if (previewOnly) {
       updatePreviewDiscount(d.id, { active: nextActive, status: nextActive ? 'active' : 'paused' });
       return;
     }
@@ -334,7 +339,7 @@ export default function DiscountsScreen() {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           setDiscounts(prev => prev.filter(x => x.id !== d.id));
-          if (isPreviewMode && !userId) {
+          if (previewOnly) {
             deletePreviewDiscount(d.id);
             return;
           }

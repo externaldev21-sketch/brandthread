@@ -253,6 +253,68 @@ export async function notifyStoryLike(input: { storyId: string; likerId: string 
   }
 }
 
+// ─── Story mentions + reshares ────────────────────────────────────────────────
+
+function firstStoryImage(media: unknown, slide = 0): string | null {
+  const items = Array.isArray(media) ? media : [];
+  const pick = (m: any) => (typeof m?.imageUri === "string" ? m.imageUri : typeof m?.url === "string" ? m.url : null);
+  return pick(items[slide]) ?? items.map(pick).find((u) => !!u) ?? null;
+}
+
+/**
+ * "@name mentioned you in their story" — a push plus an Activity row with the
+ * story thumbnail. Mentions are Activity notifications, never DMs. Idempotent
+ * per (recipient, story); blocked pairs are skipped.
+ */
+export async function notifyStoryMention(input: {
+  storyId: string; taggerId: string; mentionedUserId: string; media: unknown; slide?: number;
+}): Promise<void> {
+  try {
+    if (input.mentionedUserId === input.taggerId) return;
+    if ((await blockedUserIds(input.mentionedUserId)).has(input.taggerId)) return;
+    const actor = await actorFields(input.taggerId);
+    if (!actor) return;
+    const handle = actor.actorHandle ?? actor.actorName;
+    await publishNotification({
+      userId: input.mentionedUserId,
+      category: "social",
+      type: "story_mention",
+      title: `${handle.startsWith("@") ? handle : `@${handle}`} mentioned you in their story`,
+      ...actor,
+      targetId: input.storyId,
+      targetType: "story",
+      targetImageUrl: firstStoryImage(input.media, input.slide ?? 0),
+    });
+  } catch (err) {
+    logger.warn({ err, storyId: input.storyId }, "Story mention notification failed");
+  }
+}
+
+/** "@name shared your story" — sent to the original author when a tagged person reshares. */
+export async function notifyStoryReshare(input: {
+  reshareStoryId: string; resharerId: string; originalAuthorId: string; media: unknown;
+}): Promise<void> {
+  try {
+    if (input.originalAuthorId === input.resharerId) return;
+    if ((await blockedUserIds(input.originalAuthorId)).has(input.resharerId)) return;
+    const actor = await actorFields(input.resharerId);
+    if (!actor) return;
+    const handle = actor.actorHandle ?? actor.actorName;
+    await publishNotification({
+      userId: input.originalAuthorId,
+      category: "social",
+      type: "story_reshare",
+      title: `${handle.startsWith("@") ? handle : `@${handle}`} shared your story`,
+      ...actor,
+      targetId: input.reshareStoryId,
+      targetType: "story",
+      targetImageUrl: firstStoryImage(input.media),
+    });
+  } catch (err) {
+    logger.warn({ err, storyId: input.reshareStoryId }, "Story reshare notification failed");
+  }
+}
+
 // ─── Thread Cash ──────────────────────────────────────────────────────────────
 
 /** Tell the recipient someone sent them Thread Cash. Idempotent per transfer. */

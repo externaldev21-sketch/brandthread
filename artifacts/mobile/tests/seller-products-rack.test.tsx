@@ -88,6 +88,10 @@ vi.mock('@shopify/flash-list', () => {
   };
 });
 
+vi.mock('@clerk/expo', () => ({
+  useAuth: () => ({ isLoaded: true, isSignedIn: true, userId: 'user_test' }),
+}));
+
 vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name, color }: { name: string; color?: string }) =>
     React.createElement('Feather', { name, color }),

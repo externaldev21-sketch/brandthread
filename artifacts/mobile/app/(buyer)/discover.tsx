@@ -51,6 +51,8 @@ import { DiscoverPersonCard } from '@/components/discover/DiscoverPersonCard';
 import { DiscoverDropRow } from '@/components/discover/DiscoverDropRow';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { getFriendSuggestions, muteUser } from '@/services/socialService';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { BUYER_DISCOVER_GESTURE } from '@/lib/firstRunTips/content';
 import {
   composeDiscoverPosts, composeDiscoverBrands, composeDiscoverPeople, composeDiscoverDrops,
   type DiscoverPost, type DiscoverBrandCard as BrandCardData, type DiscoverPersonSuggestion, type DiscoverDrop,
@@ -441,6 +443,12 @@ export default function DiscoverScreen() {
           onClose={() => setSafetyMenuPost(null)}
         />
       )}
+      <FirstRunTip
+        id="buyer-discover"
+        variant="gesture"
+        contentReady
+        gesture={BUYER_DISCOVER_GESTURE}
+      />
     </View>
   );
 }
