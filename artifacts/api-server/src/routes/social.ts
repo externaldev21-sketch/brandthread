@@ -13,14 +13,14 @@
  */
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, stories, storyMentions, storyLikes, storyViews, notes, blocks, posts, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
+import { db, users, follows, stories, storyMentions, storyLikes, storyViews, notes, blocks, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
 import { resolveToClerkId } from "./public";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
-import { publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
+import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
 import {
   authorInGoodStanding,
   blockRelation,
@@ -582,6 +582,100 @@ router.get("/profile/:userId/posts", async (req, res) => {
     }
   }
   res.json(await buildBuyerPosts(myId, [other], limit, offset));
+});
+
+// ─── GET /api/social/profile/:userId/tagged ──────────────────────────────────
+// The profile "Tagged" tab: public posts (and live story mentions) where someone tagged this account.
+// Public for any signed-in viewer (like Instagram) and returns only the
+// tagged post's own public card — never anything about the tagged account's
+// private data. Block-aware in both directions (the profile and each author).
+router.get("/profile/:userId/tagged", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 30 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const other = await resolveToClerkId(req.params.userId);
+  if (!other) { res.status(404).json({ error: "User not found" }); return; }
+  if (other !== myId && (await blockRelation(myId, other)) !== "none") {
+    res.status(404).json({ error: "User not found" }); return;
+  }
+  const { limit, offset } = page.data;
+  const window = limit + offset;
+  const rows = await db.select({
+    id: posts.id,
+    userId: posts.userId,
+    mediaUrl: posts.mediaUrl,
+    thumbnailUrl: posts.thumbnailUrl,
+    mediaType: posts.mediaType,
+    caption: posts.caption,
+    createdAt: posts.createdAt,
+    authorName: users.displayName,
+    authorUsername: users.username,
+  }).from(postUserTags)
+    .innerJoin(posts, eq(posts.id, postUserTags.postId))
+    .innerJoin(users, eq(users.clerkId, posts.userId))
+    .where(and(
+      eq(postUserTags.taggedUserId, other),
+      publicPostCondition(),
+      notBlockedWith(myId, posts.userId),
+    ))
+    .orderBy(desc(postUserTags.createdAt))
+    .limit(window);
+
+  // Story mentions (#544): live, non-removed stories that tagged this account.
+  // Only stories a stranger could open anyway — not friends-only, author not
+  // blocked either way, author still in good standing, and (as for any story)
+  // the viewer follows the author unless they are the author or the tagged account.
+  const storyRows = await db
+    .select({ story: stories })
+    .from(storyMentions)
+    .innerJoin(stories, eq(stories.id, storyMentions.storyId))
+    .where(and(
+      eq(storyMentions.mentionedUserId, other),
+      gt(stories.expiresAt, new Date()),
+      ne(stories.moderationStatus, "removed"),
+      ne(stories.privacyVisibility, "friends"),
+      notBlockedWith(myId, stories.authorId),
+      authorInGoodStanding(stories.authorId),
+    ))
+    .orderBy(desc(stories.createdAt))
+    .limit(window);
+  const followed = await viewerFollowsSet(myId, [...new Set(storyRows.map((r) => r.story.authorId))]);
+  const storyItems = storyRows
+    .filter((r) => r.story.authorId === myId || other === myId || followed.has(r.story.authorId))
+    .map((r) => {
+      const media = Array.isArray(r.story.media) ? (r.story.media as any[]) : [];
+      const pick = (m: any) => (typeof m?.imageUri === "string" ? m.imageUri : typeof m?.url === "string" ? m.url : null);
+      return {
+        id: r.story.id,
+        authorId: r.story.authorId,
+        authorName: r.story.authorName ?? null,
+        authorUsername: (r.story.authorHandle ?? "").replace(/^@/, "") || null,
+        mediaUrl: media.map(pick).find((u) => !!u) ?? "",
+        thumbnailUrl: media.map(pick).find((u) => !!u) ?? null,
+        mediaType: "story",
+        caption: null as string | null,
+        createdAt: r.story.createdAt,
+        source: "story" as const,
+      };
+    });
+
+  const postItems = rows.map((r) => ({
+    id: r.id,
+    authorId: r.userId,
+    authorName: r.authorName ?? null,
+    authorUsername: r.authorUsername ?? null,
+    mediaUrl: r.mediaUrl,
+    thumbnailUrl: r.thumbnailUrl ?? null,
+    mediaType: r.mediaType,
+    caption: r.caption ?? null,
+    createdAt: r.createdAt,
+    source: "post" as const,
+  }));
+  const merged = [...postItems, ...storyItems]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(offset, offset + limit);
+  setPaginationHeaders(res, page.data, merged.length);
+  res.json(merged);
 });
 
 router.get("/friends/activity", async (req, res) => {
