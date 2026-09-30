@@ -9,7 +9,8 @@ import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { ListRow, ChipGroup } from '@/components/ui';
+import { ListRow } from '@/components/ui/ListRow';
+import { QuietHoursRow, type QuietHoursPreset } from '@/components/notifications/QuietHoursRow';
 import { Card } from '@/components/ui/Card';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { hapticToggle } from '@/lib/haptics';
@@ -20,13 +21,6 @@ import { FONT } from '@/lib/theme';
 
 type Channel = 'inApp' | 'email';
 type ChannelState = Record<Channel, Record<string, boolean>>;
-
-const QUIET_HOURS_OPTIONS = [
-  { id: 'off', label: 'Off', start: null, end: null },
-  { id: 'preset-22-07', label: '10 PM – 7 AM', start: '22:00', end: '07:00' },
-  { id: 'preset-23-08', label: '11 PM – 8 AM', start: '23:00', end: '08:00' },
-  { id: 'preset-21-06', label: '9 PM – 6 AM', start: '21:00', end: '06:00' },
-];
 
 const SECTIONS: { channel: Channel; title: string }[] = [
   { channel: 'inApp', title: 'In-app' },
@@ -63,9 +57,7 @@ export default function NotificationChannelsScreen() {
     }
   }, [api, channels]);
 
-  const changeQuietHours = useCallback(async (ids: string[]) => {
-    const preset = QUIET_HOURS_OPTIONS.find((p) => p.id === ids[0]);
-    if (!preset) return;
+  const changeQuietHours = useCallback(async (preset: QuietHoursPreset) => {
     const prior = quietHours;
     setQuietHours({ start: preset.start, end: preset.end });
     try {
@@ -76,13 +68,12 @@ export default function NotificationChannelsScreen() {
       setQuietHours(prior);
     }
   }, [api, quietHours]);
-  const selectedQuietId = QUIET_HOURS_OPTIONS.find((p) => p.start === quietHours.start && p.end === quietHours.end)?.id ?? 'off';
 
   const rows = role === 'seller' ? SELLER_NOTIFICATION_TYPES : BUYER_NOTIFICATION_TYPES;
 
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Email & in-app" onBack={() => goBackOr(router, '/notifications-settings')} />
+      <ScreenHeader title="Email & in-app" divider={false} onBack={() => goBackOr(router, '/notifications-settings')} />
       <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
         {SECTIONS.map(({ channel, title }) => (
           <View key={channel} style={s.section}>
@@ -106,12 +97,7 @@ export default function NotificationChannelsScreen() {
           </View>
         ))}
         <View style={s.section}>
-          <Text style={[TYPE_SCALE.footnote, s.sectionTitle, { color: colors.foreground }]}>Quiet hours</Text>
-          <ChipGroup
-            options={QUIET_HOURS_OPTIONS.map(({ id, label }) => ({ id, label }))}
-            selectedIds={[selectedQuietId]}
-            onChange={changeQuietHours}
-          />
+          <QuietHoursRow start={quietHours.start} end={quietHours.end} onChange={changeQuietHours} />
         </View>
       </ScrollView>
     </View>
