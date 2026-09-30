@@ -27,6 +27,10 @@ import {
   isSellerPreviewConversationId, setPreviewConversationPinned,
 } from '@/lib/previewInbox';
 import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
+import { CommunityInboxRow } from '@/components/community-inbox/CommunityInboxRow';
+import { openInboxComposeMenu } from '@/components/community-inbox/InboxComposeMenu';
+import { mergeInboxRows, communityMatchesQuery, type InboxMergedRow } from '@/lib/communities/inboxModel';
+import { useInboxCommunities } from '@/lib/communities/useCommunityInbox';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -74,6 +78,8 @@ export default function SellerInboxScreen() {
   const { userId } = useAuth();
   const myId = userId ?? '';
 
+  // Joined community group chats sit beside buyer DMs, merged by recency.
+  const { communities: joinedCommunities, toggleMute: toggleCommunityMute } = useInboxCommunities();
   const [convs, setConvs] = useState<ConvView[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -313,7 +319,25 @@ export default function SellerInboxScreen() {
     }
   }
 
-  function renderItem({ item }: ListRenderItemInfo<ConvView>) {
+  function renderRow({ item: row }: ListRenderItemInfo<InboxMergedRow<ConvView>>) {
+    if (row.kind === 'community') {
+      return (
+        <CommunityInboxRow
+          community={row.community}
+          horizontalPad={SP.md}
+          minHeight={88}
+          onPress={() => {
+            hapticPrimaryAction();
+            router.push(('/community-chat?id=' + encodeURIComponent(row.community.id)) as never);
+          }}
+          onToggleMute={() => toggleCommunityMute(row.community)}
+        />
+      );
+    }
+    return renderItem(row.dm);
+  }
+
+  function renderItem(item: ConvView) {
     const other = otherParticipant(item);
     if (!other) return null;
     const hasUnread = item.unreadCount > 0;
@@ -402,8 +426,6 @@ export default function SellerInboxScreen() {
     );
   }
 
-  const totalUnread = convs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-
   const queryLower = query.trim().toLowerCase();
   const visibleConvs = useMemo(() => convs
     .filter((c) => {
@@ -417,16 +439,28 @@ export default function SellerInboxScreen() {
     .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)),
   [convs, queryLower]);
 
+  const inboxRows = useMemo(() => mergeInboxRows(
+    visibleConvs,
+    joinedCommunities.filter((c) => communityMatchesQuery(c, queryLower)),
+    { getKey: (c) => c.id, getTs: (c) => c.lastMessageTs, isPinned: (c) => !!c.isPinned },
+  ), [visibleConvs, joinedCommunities, queryLower]);
+
   return (
     <View style={s.root}>
       <ScreenHeader
         title="Messages"
-        subtitle={totalUnread > 0 ? `${totalUnread} unread` : undefined}
-        actions={[{
-          icon: 'search',
-          onPress: () => setSearchOpen((open) => !open),
-          accessibilityLabel: searchOpen ? 'Close search' : 'Search messages',
-        }]}
+        actions={[
+          {
+            icon: 'search',
+            onPress: () => setSearchOpen((open) => !open),
+            accessibilityLabel: searchOpen ? 'Close search' : 'Search messages',
+          },
+          {
+            icon: 'plus',
+            onPress: () => openInboxComposeMenu(router),
+            accessibilityLabel: 'Create or join a group',
+          },
+        ]}
       />
 
       {searchOpen && (
@@ -446,7 +480,7 @@ export default function SellerInboxScreen() {
             onRetry={onRefresh}
           />
         </View>
-      ) : convs.length === 0 ? (
+      ) : convs.length === 0 && joinedCommunities.length === 0 ? (
         <View style={s.centerFill}>
           <EmptyState
             icon="message-circle"
@@ -454,7 +488,7 @@ export default function SellerInboxScreen() {
             message="When buyers message you about products or orders, their conversations will appear here."
           />
         </View>
-      ) : visibleConvs.length === 0 ? (
+      ) : inboxRows.length === 0 ? (
         <View style={s.centerFill}>
           <EmptyState
             icon="search"
@@ -464,9 +498,9 @@ export default function SellerInboxScreen() {
         </View>
       ) : (
         <FlashList
-          data={visibleConvs}
-          keyExtractor={(c) => c.id}
-          renderItem={renderItem}
+          data={inboxRows}
+          keyExtractor={(row) => row.key}
+          renderItem={renderRow}
           refreshControl={
             <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} />
           }
