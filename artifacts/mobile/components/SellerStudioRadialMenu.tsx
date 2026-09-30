@@ -44,7 +44,7 @@
  *    accident-prone"). It LOCKS on whatever card is currently centered — a
  *    quick snap-to-center, a single firmer "landed" haptic, a subtle white
  *    ring + scale-up, and the "Entering page" button appears and fills
- *    left-to-right over EXACTLY AUTO_ENTER_MS (1s), opening the card the
+ *    left-to-right over EXACTLY AUTO_ENTER_MS (1.5s), opening the card the
  *    instant it completes. A plain "Cancel" text link shows just above the
  *    pill while it counts down; tapping it stops the fill and swaps the
  *    pill to a static "Continue" (tap it any time to still open). Touching/
@@ -549,11 +549,13 @@ export default function SellerStudioRadialMenu({
   const CARD_LOCK_MS = 100;
   /** Exactly how long the "Entering page" button takes to fill left-to-right
    *  and auto-open the locked card — a plain linear fill (no easing curve to
-   *  imply acceleration/deceleration, no countdown number). Lowered from
-   *  1.5s per Dev's live-testing feedback ("the timer is like half a second
-   *  too long") — one named constant drives both the fill animation and the
-   *  auto-navigate timing, so they can never drift apart. */
-  const AUTO_ENTER_MS = 1000;
+   *  imply acceleration/deceleration, no countdown number). Briefly lowered
+   *  to 1000ms per earlier live-testing feedback, then moved back to 1500ms
+   *  per Dev's follow-up after using it more ("the little timer bar... is
+   *  too short... change it back to the other timer that it was at") — one
+   *  named constant drives both the fill animation and the auto-navigate
+   *  timing, so they can never drift apart. */
+  const AUTO_ENTER_MS = 1500;
 
   const runDismissEnd = useCallback((e: { translationY: number; velocityY: number }) => {
     'worklet';
