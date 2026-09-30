@@ -50,6 +50,7 @@ import {
 import { activeStoryIds } from '@/components/profile/profileAvatarGeometry';
 import { TILE_ASPECT_4_5, useProfileLayout } from '@/components/profile/profileLayout';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -168,7 +169,13 @@ export default function ProfileScreen() {
   const requestUserRef = useRef<string | null>(null);
 
   const loadPosts = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
+    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
+    // user so protected screens render at all) still reports a truthy
+    // userId, which would otherwise fall through to the real backend-less
+    // endpoints below and log a console 404 — see the identical
+    // isSellerDevPreview() fix in app/seller-inbox.tsx.
+    if (!authLoaded || !userId || isSellerDevPreview()) return;
     const requestUser = userId;
     setPostsError(false);
     try {
@@ -183,7 +190,13 @@ export default function ProfileScreen() {
   }, [authLoaded, userId]);
 
   const loadMyStories = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
+    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
+    // user so protected screens render at all) still reports a truthy
+    // userId, which would otherwise fall through to the real backend-less
+    // endpoints below and log a console 404 — see the identical
+    // isSellerDevPreview() fix in app/seller-inbox.tsx.
+    if (!authLoaded || !userId || isSellerDevPreview()) return;
     const requestUser = userId;
     try {
       const rows = await api.social.myStories();
@@ -192,7 +205,13 @@ export default function ProfileScreen() {
   }, [api, authLoaded, userId]);
 
   const loadProfile = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
+    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
+    // user so protected screens render at all) still reports a truthy
+    // userId, which would otherwise fall through to the real backend-less
+    // endpoints below and log a console 404 — see the identical
+    // isSellerDevPreview() fix in app/seller-inbox.tsx.
+    if (!authLoaded || !userId || isSellerDevPreview()) return;
     const requestUser = userId;
     try {
       const data = await api.seller.getProfile();
@@ -222,7 +241,13 @@ export default function ProfileScreen() {
   }, [api, authLoaded, userId]);
 
   const loadSocialCounts = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
+    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
+    // user so protected screens render at all) still reports a truthy
+    // userId, which would otherwise fall through to the real backend-less
+    // endpoints below and log a console 404 — see the identical
+    // isSellerDevPreview() fix in app/seller-inbox.tsx.
+    if (!authLoaded || !userId || isSellerDevPreview()) return;
     const requestUser = userId;
     try {
       // True totals from the profile endpoint — the follower/following lists
@@ -253,7 +278,13 @@ export default function ProfileScreen() {
   }, [api, authLoaded, userId]);
 
   const loadShopCount = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
+    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
+    // user so protected screens render at all) still reports a truthy
+    // userId, which would otherwise fall through to the real backend-less
+    // endpoints below and log a console 404 — see the identical
+    // isSellerDevPreview() fix in app/seller-inbox.tsx.
+    if (!authLoaded || !userId || isSellerDevPreview()) return;
     const requestUser = userId;
     try {
       const data = await api.publicSellers?.get?.(userId);
@@ -263,7 +294,13 @@ export default function ProfileScreen() {
   }, [api, authLoaded, userId]);
 
   const loadPage = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
+    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
+    // user so protected screens render at all) still reports a truthy
+    // userId, which would otherwise fall through to the real backend-less
+    // endpoints below and log a console 404 — see the identical
+    // isSellerDevPreview() fix in app/seller-inbox.tsx.
+    if (!authLoaded || !userId || isSellerDevPreview()) return;
     void loadMyStories();
     void loadShopCount();
     // The three sources behind the four visible stats — awaited together so
@@ -282,8 +319,8 @@ export default function ProfileScreen() {
     setPostsLoading(true);
     setSocialCounts({ followers: 0, following: 0, likes: 0 });
     setStatsInitialLoading(true);
-    if (authLoaded && userId) void loadPage();
-    if (authLoaded && !userId) { setPostsLoading(false); setStatsInitialLoading(false); }
+    if (authLoaded && userId && !isSellerDevPreview()) void loadPage();
+    if (authLoaded && (!userId || isSellerDevPreview())) { setPostsLoading(false); setStatsInitialLoading(false); }
     // New / edited / deleted posts publish through socialService — refresh.
     const unsub = subscribeSocial(() => { loadPosts(); loadMyStories(); });
     // Belt-and-braces: if auth itself never resolves (a slow or stuck Clerk
@@ -311,7 +348,13 @@ export default function ProfileScreen() {
 
   // Shop tab: the seller's live listings (same source as the full products page).
   const loadShopProducts = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
+    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
+    // user so protected screens render at all) still reports a truthy
+    // userId, which would otherwise fall through to the real backend-less
+    // endpoints below and log a console 404 — see the identical
+    // isSellerDevPreview() fix in app/seller-inbox.tsx.
+    if (!authLoaded || !userId || isSellerDevPreview()) return;
     const requestUser = userId;
     setShopError(false);
     setShopLoading(true);
