@@ -7,10 +7,13 @@
  * recorded in the double-entry ledger, idempotency-keyed so a retried
  * request can never double-pay.
  *
- * Thread Cash a seller has EARNED (unlike a buyer's platform-funded reward
- * credit) is real value owed to them — buyers paid real money for it via
- * Apple IAP (see docs/payments/thread-cash-cash-out.md for the full
- * accounting note) — so, unlike buyer Thread Cash, it is cashable.
+ * Thread Cash a seller has EARNED is real value owed to them, so, unlike a
+ * buyer's platform-funded reward credit, it is cashable. NOTE: no code path
+ * sells Thread Cash for money today (balances come only from daily check-in,
+ * streak bonus, refund credit and peer transfers; see
+ * docs/review-readiness/iap-rails.md). If a purchasable top-up is ever added,
+ * App Store 3.1.1 requires it to be a RevenueCat/StoreKit consumable on iOS
+ * and Android, and it must not be cashable on a Stripe rail.
  */
 import type Stripe from "stripe";
 import { eq, sql } from "drizzle-orm";

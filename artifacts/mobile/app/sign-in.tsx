@@ -42,6 +42,7 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import {
   APPLE_OAUTH_STRATEGY,
+  oauthProviderVisibility,
   isOAuthCancellationError,
   makeBrandthreadRedirectUri,
   mapOAuthError,
@@ -68,8 +69,10 @@ export default function SignInScreen() {
   const isAddAccount = addAccount === '1';
   const appleOAuthEnabled = useFeatureFlag('oauthAppleEnabled');
   const googleOAuthEnabled = useFeatureFlag('oauthGoogleEnabled');
-  const showAppleOAuth = Platform.OS === 'ios' && appleOAuthEnabled;
-  const showAnyOAuth = showAppleOAuth || googleOAuthEnabled;
+  const { apple: showAppleOAuth, google: showGoogleOAuth } = oauthProviderVisibility(
+    Platform.OS, { apple: appleOAuthEnabled, google: googleOAuthEnabled },
+  );
+  const showAnyOAuth = showAppleOAuth || showGoogleOAuth;
 
   // Warm up the browser on Android for faster OAuth sheet presentation
   useEffect(() => {
@@ -679,7 +682,7 @@ export default function SignInScreen() {
           )}
 
           {/* Google — dark surface with Google logo, per Google brand guidelines */}
-          {googleOAuthEnabled && (
+          {showGoogleOAuth && (
             <PressableScale
               style={s.oauthBtn}
               onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_google', 'Google'); }}

@@ -54,6 +54,11 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/hooks/useApi';
+import { useRevenueCat } from '@/lib/revenueCat';
+import {
+  confirmNativePromotion, isPurchaseCancelled, nativePromotionsEnabled,
+  nearestPromoTierCents, promoProductId,
+} from '@/lib/iapPromotions';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   estimateReach,
@@ -242,6 +247,10 @@ export default function CreateAdScreen() {
   const params    = useLocalSearchParams<{ id?: string; paymentReturn?: string }>();
   const insets    = useSafeAreaInsets();
   const api       = useApi();
+  const { purchaseConsumable } = useRevenueCat();
+  // Native iOS/Android buys the ad through the store (Guideline 3.1.1);
+  // web keeps Stripe Checkout. Off unless EXPO_PUBLIC_IAP_PROMOTIONS=1.
+  const nativeRail = nativePromotionsEnabled();
   const { theme } = useAppTheme();
   const colors    = useColors();
   const { user }  = useUser();
@@ -345,10 +354,18 @@ export default function CreateAdScreen() {
   }, []);
 
   // ── Verify payment (called after browser redirect) ────────────────────────
-  const verifyPayment = useCallback(async (campaignId: string) => {
+  const verifyPayment = useCallback(async (campaignId: string, nativeTransactionId?: string) => {
     setVerifying(true);
     try {
-      const res = await api.adCampaigns.verify(campaignId);
+      let res: { campaign: AdCampaign };
+      if (nativeTransactionId) {
+        // Native store purchase: the server re-reads it from RevenueCat and
+        // grants the campaign; a late grant falls through to "payment pending".
+        await confirmNativePromotion(() => api.adCampaigns.iapVerify(campaignId, nativeTransactionId));
+        res = await api.adCampaigns.get(campaignId);
+      } else {
+        res = await api.adCampaigns.verify(campaignId);
+      }
       setCampaign(res.campaign);
       if (res.campaign.status === 'active') {
         setSucceeded(true);
@@ -515,7 +532,12 @@ export default function CreateAdScreen() {
     const ctaV = validateCtaStage({ ctaKind: ctaKind ?? undefined, ctaDestinationId: ctaDestId ?? undefined });
     if (!ctaV.valid) { Alert.alert('Incomplete', ctaV.errors.join('\n')); return; }
 
-    const budgetV = validateBudgetStage({ formats: DEFAULT_FORMATS, budgetCents, durationDays });
+    // Native store purchases are sold in fixed budget tiers; the price on the
+    // button follows the tier that will actually be bought.
+    const chargeCents = nativeRail ? nearestPromoTierCents(budgetCents) : budgetCents;
+    if (chargeCents !== budgetCents) setBudgetCents(chargeCents);
+
+    const budgetV = validateBudgetStage({ formats: DEFAULT_FORMATS, budgetCents: chargeCents, durationDays });
     if (!budgetV.valid) { Alert.alert('Incomplete', budgetV.errors.join('\n')); return; }
 
     // Dev seller preview: never activate or charge. Show an honest sign-in alert.
@@ -540,7 +562,7 @@ export default function CreateAdScreen() {
         ctaDestinationKind: selected?.destinationKind,
         ...(ctaDestId ? { ctaDestinationId: ctaDestId } : {}),
         formats: DEFAULT_FORMATS,
-        budgetCents,
+        budgetCents: chargeCents,
         durationDays,
       });
       setCampaign(updated.campaign);
@@ -550,6 +572,21 @@ export default function CreateAdScreen() {
       return;
     }
     setLoading(false);
+
+    if (nativeRail) {
+      setPaying(true);
+      try {
+        const { transactionId } = await purchaseConsumable(promoProductId('ad_campaign', chargeCents));
+        await verifyPayment(campaign.id, transactionId);
+      } catch (e: any) {
+        if (!isPurchaseCancelled(e)) {
+          Alert.alert('Payment failed', 'Could not complete the purchase. Please try again.', [{ text: 'OK' }]);
+        }
+      } finally {
+        setPaying(false);
+      }
+      return;
+    }
 
     setPaying(true);
     try {
@@ -612,9 +649,11 @@ export default function CreateAdScreen() {
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: SP.md }}>
         <ActivityIndicator color={theme.accentLight} size="large" />
         <Text style={[styles.stageSub, { color: colors.mutedForeground }]}>Verifying your payment…</Text>
-        <Text style={[styles.stageSub, { fontSize: FS.xs, color: colors.subtle, textAlign: 'center', paddingHorizontal: SP.xl }]}>
-          Never activates on redirect alone — confirming with Stripe now.
-        </Text>
+        {!nativeRail && (
+          <Text style={[styles.stageSub, { fontSize: FS.xs, color: colors.subtle, textAlign: 'center', paddingHorizontal: SP.xl }]}>
+            Never activates on redirect alone — confirming with Stripe now.
+          </Text>
+        )}
       </View>
     );
   }

@@ -26,6 +26,8 @@ import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
 import { reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
+import { grantPromotionPurchase, iapPromotionsEnabled, promotionPurchaseFromWebhookEvent } from "../lib/iapPromotions";
+import { drizzlePromoStore } from "../lib/iapPromotionsStore";
 import {
   awardLoyaltyPointsOnce,
   consumeLoyaltyRedemption,
@@ -476,6 +478,19 @@ router.post("/revenuecat", async (req: Request, res: Response): Promise<void> =>
     }).onConflictDoNothing().returning({ id: revenueCatWebhookEvents.id });
     if (!recorded) {
       res.json({ received: true, duplicate: true });
+      return;
+    }
+    // Consumable Boost / Create-ad purchases (Guideline 3.1.1 native rail).
+    const promo = promotionPurchaseFromWebhookEvent(event);
+    if (promo) {
+      if (!iapPromotionsEnabled()) {
+        req.log.warn({ eventId }, "RevenueCat promotion purchase received while IAP_PROMOTIONS_ENABLED is off");
+        res.json({ received: true, ignored: true });
+        return;
+      }
+      const result = await grantPromotionPurchase(drizzlePromoStore, { ...promo, source: "webhook" });
+      req.log.info({ eventId, result }, "RevenueCat promotion purchase processed");
+      res.json({ received: true, promotion: result.status });
       return;
     }
     // Reconciliation reads the current provider state, so stale/out-of-order
