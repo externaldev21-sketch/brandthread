@@ -59,6 +59,7 @@ import shippingZonesRouter from "./shipping-zones";
 import shippingLabelsRouter from "./shipping-labels";
 import disputesRouter from "./disputes";
 import financeRouter from "./finance";
+import { financeFeesRouter, publicFeeScheduleRouter } from "./fees";
 import taxesRouter from "./taxes";
 import teamRouter from "./team";
 import { requireRole, teamContext } from "../middlewares/requireRole";
@@ -110,6 +111,7 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
+router.use("/public",          publicFeeScheduleRouter); // GET /fee-schedule (no auth)
 router.use("/public",          publicRouter);
 router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/profile",         profileCoverRouter); // cover video (all account types) + first-visit coach mark
@@ -211,6 +213,7 @@ router.use("/returns",                   tc, returnsRouter);
 router.use("/sample-orders",             tc, sampleOrdersRouter);
 router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
+router.use("/finance/fees",              financeFeesRouter); // before financeRouter: no payout permission needed
 router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
 router.use("/taxes",                     tc, taxesRouter);
 // teamRouter owns its middleware ordering so membership discovery sees the

@@ -18,6 +18,8 @@ import { RADII } from '@/constants/radii';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
+import { useFeeSchedule } from '@/hooks/useFeeSchedule';
+import { quoteFromSchedule } from '@/lib/feeSchedule';
 import { adaptReturnRow, itemsTotalCents, returnReasonLabel as returnRequestReasonLabel, statusLabel as returnRequestStatusLabel, type ReturnView } from '@/lib/returns';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
@@ -269,7 +271,8 @@ export function adaptApiOrder(raw: any): Order {
        sellerAllocationCents:   subtotalCents,
        manufacturerAllocationCents: 0,
        shippingLabelAllocationCents: shippingCents,
-       platformFeeCents:        0,
+       platformFeeCents:        Math.max(0, raw.platformFeeCents ?? 0),
+       processingFeeCents:      Math.max(0, raw.processingFeeChargedCents || raw.processingFeeCents || 0),
       payoutStatus:            isRefundPending ? 'held' : uiStatus === 'refunded' ? 'paid' : 'pending',
     },
     threadCashPayout: sellerThreadCashPayout(raw),
@@ -1244,6 +1247,19 @@ function CustomerTab({ order }: { order: Order }) {
 // TAB: PAYMENT
 // ═══════════════════════════════════════════════════════
 
+/** "Fees" row: the recorded fees for this order, else the schedule's estimate; hidden with neither. */
+function FeesRow({ payment: p }: { payment: Order['payment'] }) {
+  const schedule = useFeeSchedule();
+  const recorded = p.platformFeeCents + (p.processingFeeCents ?? 0);
+  let fees = recorded;
+  if (!recorded && schedule && p.totalCents > 0) {
+    const q = quoteFromSchedule(schedule, Math.max(0, p.subtotalCents - p.discountTotalCents), { shippingCents: p.shippingTotalCents });
+    fees = q.platformFeeCents + q.processingFeeCents;
+  }
+  if (!fees) return null;
+  return <InfoRow label="Fees" value={`-${usd(fees)}`} />;
+}
+
 function PaymentTab({ order }: { order: Order }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
@@ -1260,6 +1276,7 @@ function PaymentTab({ order }: { order: Order }) {
         <InfoRow label="Tax" value={usd(p.taxTotalCents)} />
         <View style={s.divider} />
         <InfoRow label="Total" value={usd(p.totalCents)} bold />
+        <FeesRow payment={p} />
         <InfoRow label="Amount Paid" value={usd(p.amountPaidCents)} valueColor={SUCCESS} />
         {p.amountRefundedCents > 0 && <InfoRow label="Amount Refunded" value={`-${usd(p.amountRefundedCents)}`} valueColor={RED} />}
         <InfoRow label="Amount Held" value={usd(p.amountHeldCents)} valueColor={ORANGE} />
