@@ -17,6 +17,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -349,11 +350,14 @@ export default function LifestyleImagesScreen() {
                   ))}
                 </View>
               ) : resultB64 ? (
-                <Image
-                  source={{ uri: `data:image/png;base64,${resultB64}` }}
-                  style={styles.resultImage}
-                  resizeMode="cover"
-                />
+                <>
+                  <Image
+                    source={{ uri: `data:image/png;base64,${resultB64}` }}
+                    style={styles.resultImage}
+                    resizeMode="cover"
+                  />
+                  <AiGeneratedBadge />
+                </>
               ) : (
                 <Feather name="alert-circle" size={28} color={colors.mutedForeground} />
               )}

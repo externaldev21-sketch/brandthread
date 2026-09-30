@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FS } from '@/lib/theme';
+import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 
 const BRAND_CHECKLIST_ITEMS = [
   'Brand name finalized',
@@ -234,6 +235,7 @@ export default function BrandScreen() {
                       style={styles.logoImage}
                       resizeMode="contain"
                     />
+                    <AiGeneratedBadge position="topLeft" />
                     {isSelected && (
                       <View style={[styles.logoCheckBadge, { backgroundColor: colors.primary }]}>
                         <Feather name="check" size={10} color={colors.primaryForeground} />

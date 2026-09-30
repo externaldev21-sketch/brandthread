@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/Button';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/hooks/useApi';
+import { AiGeneratedBadge } from '@/components/AiGeneratedBadge';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { FONT, FS } from '@/lib/theme';
 
@@ -431,11 +432,14 @@ export default function AIPhotographyChatScreen() {
               {msg.content}
             </Text>
             {msg.image && (
-              <Image
-                source={{ uri: `data:image/png;base64,${msg.image}` }}
-                style={styles.resultImage}
-                resizeMode="cover"
-              />
+              <View>
+                <Image
+                  source={{ uri: `data:image/png;base64,${msg.image}` }}
+                  style={styles.resultImage}
+                  resizeMode="cover"
+                />
+                <AiGeneratedBadge />
+              </View>
             )}
             {msg.error && msg.retryGarment && (
               <Button

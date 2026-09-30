@@ -39,6 +39,22 @@ export const onboardingAiSamples = pgTable("onboarding_ai_samples", {
   reservationIdx: index("onboarding_ai_samples_reservation_idx").on(table.reservationId),
 }));
 
+/**
+ * Provenance registry: one row per AI-generated image returned to a user
+ * (SHA-256 of the bytes). Lets saved assets and posts be labelled
+ * `ai_generated` by lookup. Written by the api-server AI safety guard.
+ */
+export const aiGeneratedMedia = pgTable("ai_generated_media", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: text("owner_id").notNull(),
+  tool: text("tool").notNull(),
+  sha256: text("sha256").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  ownerShaUniq: unique("ai_generated_media_owner_sha_uniq").on(table.ownerId, table.sha256),
+  shaIdx: index("ai_generated_media_sha_idx").on(table.sha256),
+}));
+
 export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
   eventId: text("event_id").primaryKey(),
   eventType: text("event_type").notNull(),
