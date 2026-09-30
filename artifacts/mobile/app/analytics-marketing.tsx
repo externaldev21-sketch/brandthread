@@ -151,7 +151,7 @@ export default function AnalyticsMarketingScreen() {
       {!data ? (
         <EmptyState
           icon="mail"
-          title="Marketing insights are on the way"
+          title="No campaign activity yet"
           description="We'll show channel revenue once campaigns start driving sales."
           style={{ marginTop: SP.lg }}
         />

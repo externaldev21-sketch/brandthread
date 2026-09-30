@@ -138,7 +138,7 @@ export default function AnalyticsProductionScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
       {!data ? (
-        <EmptyState icon="tool" title="Production insights are on the way" description="Production stats will show once you run a job." style={{ marginTop: SP.lg }} />
+        <EmptyState icon="tool" title="No production jobs yet" description="Production stats will show once you run a job." style={{ marginTop: SP.lg }} />
       ) : (
         <>
           {/* KPI tiles */}

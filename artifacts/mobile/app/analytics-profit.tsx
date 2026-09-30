@@ -86,7 +86,7 @@ export default function AnalyticsProfitScreen() {
       )}
 
       {tab === 'profit' && !profit && !loadError && (
-        <EmptyState icon="trending-up" title="Profit insights are on the way" description="We'll show margins once your sales and costs sync." style={{ marginTop: SP.lg }} />
+        <EmptyState icon="trending-up" title="No profit data yet" description="We'll show margins once your sales and costs sync." style={{ marginTop: SP.lg }} />
       )}
 
       {tab === 'profit' && profit && (
@@ -148,7 +148,7 @@ export default function AnalyticsProfitScreen() {
       )}
 
       {tab === 'payout' && !payout && !loadError && (
-        <EmptyState icon="dollar-sign" title="Payout insights are on the way" description="We'll show balances once your sales and payouts sync." style={{ marginTop: SP.lg }} />
+        <EmptyState icon="dollar-sign" title="No payout data yet" description="We'll show balances once your sales and payouts sync." style={{ marginTop: SP.lg }} />
       )}
 
       {tab === 'payout' && payout && (
