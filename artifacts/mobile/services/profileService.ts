@@ -105,6 +105,29 @@ export async function loadVideoFeedThrough(
   return { posts, hasMore, nextOffset: offset, startIndex };
 }
 
+/** An explicit history replay must keep its exact post, even beyond the
+ * creator grid's page cap or when feed preferences hide it from that grid. */
+export async function loadExactCreatorVideoReplay(
+  creatorId: string,
+  postId: string,
+): Promise<{ posts: SellerThreadPost[]; hasMore: boolean; nextOffset: number; startIndex: number }> {
+  const [page, raw] = await Promise.all([
+    getCreatorVideosPage(creatorId),
+    serviceRequest<any>(`/api/posts/${encodeURIComponent(postId)}`, { cache: 'no-store' }),
+  ]);
+  if (raw?.id !== postId || raw.userId !== creatorId || raw.mediaType !== 'video') {
+    throw new Error('Video unavailable');
+  }
+  const exact = mapApiPostToSellerThreadPost(raw, 0);
+  if (!exact.mediaUris.length) throw new Error('Video unavailable');
+  return {
+    posts: [exact, ...page.posts.filter(post => post.id !== exact.id)],
+    hasMore: page.hasMore,
+    nextOffset: page.nextOffset,
+    startIndex: 0,
+  };
+}
+
 // ─── Shop ─────────────────────────────────────────────────────────────────────
 
 export interface ShopProduct {
