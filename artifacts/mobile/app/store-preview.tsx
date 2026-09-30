@@ -263,7 +263,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   // grey fill) with a theme.muted (grey) inactive icon.
   deviceToggle: {
     flexDirection: 'row', borderRadius: RADIUS.pill,
-    backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: '#000000', borderWidth: 1, borderColor: '#8C8C8C',
     padding: 3, gap: 3,
   },
   deviceBtn: {

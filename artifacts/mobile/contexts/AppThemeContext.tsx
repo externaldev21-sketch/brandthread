@@ -37,7 +37,10 @@ const palette = (
 ): Palette => ({
   background, surface, card, cardElevated: card,
   surfaceGlass: `${surface}E8`, cardGlass: `${card}E8`, cardElevatedGlass: `${card}F2`,
-  border: '#C0C0C047', borderSubtle: '#C0C0C024',
+  // Opaque, not translucent: a translucent border blends differently over
+  // every surface it sits on and anti-aliases into a soft/fuzzy edge. See
+  // lib/theme.ts's BORDER/BORDER_SUBTLE for the same fix on the legacy side.
+  border: '#4A4A4A', borderSubtle: '#333333',
   text: '#FFFFFF', muted: '#C0C0C0', subtle: '#B0B0B0',
   accent, accentLight: accent, accentDim: `${accent}2E`, onAccent,
   secondary: accent, secondaryDim: `${accent}24`,

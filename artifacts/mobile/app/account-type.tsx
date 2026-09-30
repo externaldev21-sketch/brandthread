@@ -171,7 +171,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   card: {
     backgroundColor: theme.card,
     borderRadius: RADIUS.card,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: theme.border,
     padding: SPACE.md + 2,
     overflow: 'hidden',
@@ -180,7 +180,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   cardTop: { flexDirection: 'row', gap: SPACE.sm, alignItems: 'center', marginBottom: SPACE.xs },
   iconWrap: {
     width: 44, height: 44, borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
+    borderWidth: 1, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   cardTitleWrap: { flex: 1 },

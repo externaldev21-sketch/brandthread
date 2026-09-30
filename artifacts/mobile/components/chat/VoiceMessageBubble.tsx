@@ -124,7 +124,7 @@ const vs = StyleSheet.create({
   bar: { width: 2.5, borderRadius: 2 },
   duration: { fontSize: FS.xs, fontFamily: FONT.medium, minWidth: 32, textAlign: 'right' },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingLeft: 38 },
-  speedPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth },
+  speedPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.pill, borderWidth: 1 },
   speedText: { fontSize: 10, fontFamily: FONT.semibold },
   transcriptionLink: { fontSize: 11, fontFamily: FONT.medium, textDecorationLine: 'underline' },
 });

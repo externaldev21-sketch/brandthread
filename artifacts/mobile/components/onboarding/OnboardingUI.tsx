@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
   field: {
     height: FIELD_HEIGHT,
     borderRadius: RADIUS.field,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
     maxWidth: 56,
     height: 64,
     borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

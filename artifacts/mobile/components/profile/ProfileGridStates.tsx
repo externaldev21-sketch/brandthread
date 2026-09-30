@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   footer: { paddingVertical: SP.lg, alignItems: 'center' },
   previewRow: { flexDirection: 'row', gap: 1, marginBottom: SP.md },
   previewTile: {
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',

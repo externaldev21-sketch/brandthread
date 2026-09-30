@@ -90,5 +90,5 @@ const makeStyles = () => StyleSheet.create({
   root: { flex: 1 },
   body: { paddingHorizontal: SP.md, paddingTop: SP.lg },
   label: { fontFamily: FONT.regular, fontSize: FS.sm, marginBottom: SP.md },
-  input: { height: 48, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base },
+  input: { height: 48, borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base },
 });

@@ -133,12 +133,12 @@ function InboxPillRow({
 const pillS = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   iconPill: {
-    width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
   },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    height: 36, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    height: 36, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, borderWidth: 1,
   },
   pillLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.1 },
   pillCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
@@ -1970,12 +1970,12 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   noteBubbleTouchable: { height: 34, width: 84, alignItems: 'center', justifyContent: 'flex-end' },
   noteBubble: {
     maxWidth: 84, paddingHorizontal: 9, paddingVertical: 5,
-    borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: RADIUS.lg, borderWidth: 1,
   },
   noteBubbleText: { fontSize: 11, fontFamily: FONT.medium, lineHeight: 14 },
   noteBubbleTail: {
     width: 7, height: 7, marginTop: -4, borderRadius: 1.5,
-    borderWidth: StyleSheet.hairlineWidth, transform: [{ rotate: '45deg' }],
+    borderWidth: 1, transform: [{ rotate: '45deg' }],
   },
 
   // Note-compose bottom sheet
@@ -1988,7 +1988,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   },
   noteComposeHint: { fontSize: FS.meta, fontFamily: FONT.medium, marginBottom: SP.sm },
   noteComposeInput: {
-    minHeight: 72, maxHeight: 120, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 72, maxHeight: 120, borderRadius: RADIUS.md, borderWidth: 1,
     padding: SP.md, fontSize: FS.md, fontFamily: FONT.regular, textAlignVertical: 'top',
   },
   noteComposeCount: {

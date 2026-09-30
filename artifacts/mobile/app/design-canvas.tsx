@@ -5426,13 +5426,13 @@ const styles = StyleSheet.create({
   sizeSlider: {
     width: 36, height: 220, alignItems: 'center', justifyContent: 'center',
     paddingVertical: SP.md, gap: SP.sm, borderRadius: RADIUS.pill,
-    backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: '#000000', borderWidth: 1, borderColor: '#999999',
     marginLeft: SP.xs,
   },
   opacitySlider: {
     width: 24, height: 180, alignItems: 'center', justifyContent: 'center',
     paddingVertical: SP.md, paddingTop: SP.lg, gap: SP.sm, borderRadius: RADIUS.pill,
-    backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: '#000000', borderWidth: 1, borderColor: '#999999',
     marginLeft: SP.xs,
   },
   opacityIcon: { marginBottom: 4 },
@@ -5443,7 +5443,7 @@ const styles = StyleSheet.create({
   // Procreate-style track: a thin white outline line the full rail height
   // (not a grey/white filled bar growing from the bottom) with a single
   // solid-white thumb dot marking the current value.
-  sizeTrack: { width: 2, flex: 1, backgroundColor: 'transparent', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)', position: 'relative' },
+  sizeTrack: { width: 2, flex: 1, backgroundColor: 'transparent', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: '#A6A6A6', position: 'relative' },
   sizeThumb: { position: 'absolute', left: '50%', width: 12, height: 12, marginLeft: -6, borderRadius: 6, backgroundColor: FG },
   sizeBubble:{ position: 'absolute', right: 50, top: '50%', backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: BORDER },
   sizeBubbleText: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm },

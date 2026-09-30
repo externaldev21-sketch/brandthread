@@ -143,7 +143,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     alignItems: 'flex-end',
     borderRadius: 26,
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
     paddingLeft: 16,
     paddingRight: 6,

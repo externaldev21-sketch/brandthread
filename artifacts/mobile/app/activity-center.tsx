@@ -1533,7 +1533,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
     backgroundColor: theme.cardElevated,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1593,7 +1593,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     height: 44,
     borderRadius: 8,
     backgroundColor: theme.card,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: theme.borderSubtle,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1616,7 +1616,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   followBtnFollowing: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: '#8C8C8C',
   },
   followText: {
     fontFamily: FONT.semibold,

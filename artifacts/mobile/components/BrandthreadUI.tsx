@@ -792,7 +792,7 @@ const esS = StyleSheet.create({
   root:    { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, paddingVertical: SP.xxl, gap: SP.sm },
   rootCompact: { paddingVertical: SP.lg },
   illustration: { width: 150, height: 128, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
-  artCircle: { width: 96, height: 96, borderRadius: 48, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  artCircle: { width: 96, height: 96, borderRadius: 48, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   title:   { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center', letterSpacing: -0.2 },
   desc:    { maxWidth: 330, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 21 },
   actions: { width: '100%', gap: SP.sm, marginTop: SP.sm },

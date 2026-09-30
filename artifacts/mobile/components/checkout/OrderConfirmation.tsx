@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
   sellerName: { fontFamily: FONT.semibold, fontSize: FS.base, flexShrink: 1 },
 
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4, paddingVertical: SP.sm + 2 },
-  thumb: { width: 54, height: 72, borderRadius: RADII.chip, borderWidth: StyleSheet.hairlineWidth },
+  thumb: { width: 54, height: 72, borderRadius: RADII.chip, borderWidth: 1 },
   thumbFallback: { alignItems: 'center', justifyContent: 'center' },
   itemName: { fontFamily: FONT.semibold, fontSize: FS.base },
   itemPrice: { fontFamily: FONT.semibold, fontSize: FS.sm },
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   moreSection: { marginTop: SP.xs, marginBottom: SP.md },
   moreScroll: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm + 4 },
   moreTile: { width: 96 },
-  moreThumb: { width: 96, height: 128, borderRadius: RADII.chip, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 6 },
+  moreThumb: { width: 96, height: 128, borderRadius: RADII.chip, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 6 },
   moreName: { fontFamily: FONT.medium, fontSize: FS.sm },
   morePrice: { fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: 2 },
 

@@ -2285,7 +2285,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 2,
     backgroundColor: PURPLE,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: PURPLE,
   },
   textInput: {

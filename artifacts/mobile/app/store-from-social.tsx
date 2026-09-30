@@ -398,7 +398,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row', alignItems: 'center', gap: SP.md,
     marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.md,
     backgroundColor: CARD, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: theme.borderSubtle,
   },
   postRowSelected: { borderColor: PURPLE_LIGHT, backgroundColor: PURPLE_DIM },
   postCheck: {
@@ -414,7 +414,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   input: {
     fontSize: FS.base, fontFamily: FONT.regular, color: FG,
     backgroundColor: SURFACE, borderRadius: RADIUS.sm,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: theme.borderSubtle,
     paddingHorizontal: SP.md, paddingVertical: 10,
   },
   noteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },

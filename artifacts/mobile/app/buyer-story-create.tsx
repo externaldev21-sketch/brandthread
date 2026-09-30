@@ -269,7 +269,7 @@ function GridIcon({ spec, active }: { spec: GridSpec; active: boolean }) {
   const cells = [];
   for (let i = 0; i < spec.cols * spec.rows; i++) cells.push(i);
   return (
-    <View style={{ width: 24, height: 24, flexDirection: 'row', flexWrap: 'wrap', borderRadius: 3, overflow: 'hidden', borderWidth: active ? 1.5 : 1, borderColor: active ? '#FFFFFF' : 'rgba(255,255,255,0.4)' }}>
+    <View style={{ width: 24, height: 24, flexDirection: 'row', flexWrap: 'wrap', borderRadius: 3, overflow: 'hidden', borderWidth: active ? 1.5 : 1, borderColor: active ? '#FFFFFF' : '#999999' }}>
       {cells.map((i) => (
         <View
           key={i}
@@ -277,7 +277,7 @@ function GridIcon({ spec, active }: { spec: GridSpec; active: boolean }) {
             width: `${100 / spec.cols}%`,
             height: `${100 / spec.rows}%`,
             borderWidth: 0.5,
-            borderColor: 'rgba(255,255,255,0.3)',
+            borderColor: '#8C8C8C',
             backgroundColor: active ? 'rgba(255,255,255,0.25)' : 'transparent',
           }}
         />
@@ -2072,9 +2072,9 @@ const styles = StyleSheet.create({
   createToolAa: { color: ON_DARK, fontSize: FS.base },
   colorCircle: { width: 28, height: 28, borderRadius: 14 },
   colorCircleActive: { borderWidth: 2, borderColor: ON_DARK },
-  colorCircleBorder: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  colorCircleBorder: { borderWidth: 1, borderColor: '#8C8C8C' },
   bgSwatchRow: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', gap: SP.sm, justifyContent: 'center' },
-  bgSwatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
+  bgSwatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: '#999999' },
   bgSwatchActive: { borderWidth: 2.5, borderColor: ON_DARK },
 
 
@@ -2155,7 +2155,7 @@ const styles = StyleSheet.create({
   shareRowAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#444', alignItems: 'center', justifyContent: 'center' },
   shareRowTitle: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
   shareRowSubtitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
+  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#8C8C8C', alignItems: 'center', justifyContent: 'center' },
   radioOuterActive: { borderColor: ON_DARK },
   radioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: ON_DARK },
 

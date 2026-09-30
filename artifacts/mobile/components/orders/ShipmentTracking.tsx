@@ -211,14 +211,14 @@ const styles = StyleSheet.create({
   title: { fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.4 },
   subtitle: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, lineHeight: 19 },
   map: {
-    height: MAP_H, borderRadius: RADIUS.md, borderWidth: StyleSheet.hairlineWidth,
+    height: MAP_H, borderRadius: RADIUS.md, borderWidth: 1,
     overflow: 'hidden', marginBottom: SP.md,
   },
   marker: { position: 'absolute', width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   mapLegend: {
     position: 'absolute', left: SP.sm, bottom: SP.sm, maxWidth: '80%',
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: RADIUS.pill, borderWidth: 1,
     paddingHorizontal: 10, paddingVertical: 5,
   },
   legendText: { fontFamily: FONT.medium, fontSize: FS.xs, flexShrink: 1 },

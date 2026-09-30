@@ -154,7 +154,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
   followAllBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
-    borderWidth: StyleSheet.hairlineWidth, borderRadius: RADIUS.pill, paddingHorizontal: 16, minHeight: 40,
+    borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 16, minHeight: 40,
     marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
   followAllText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
@@ -163,7 +163,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SPACE.xs },
   cardWrap: { width: '31%' },
   card: {
-    backgroundColor: theme.card, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: theme.card, borderRadius: 18, borderWidth: 1,
     borderColor: theme.border, padding: 10, gap: 8,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -172,7 +172,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   logoFallbackText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
   followBadge: {
     width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: theme.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
+    backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
   },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cardName: { flexShrink: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.text },

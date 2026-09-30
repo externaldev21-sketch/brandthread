@@ -47,7 +47,7 @@ export function ThemePickerSheet({
               onPress={() => { hapticSelection(); onPickDefault(); }}
               testID="theme-tile-default"
             >
-              <View style={[s.tile, { backgroundColor: theme.background, borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth }]}>
+              <View style={[s.tile, { backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1 }]}>
                 {!currentThemeId && <Feather name="check" size={ICON_SIZE} color={theme.text} />}
               </View>
               <Text style={[s.tileLabel, { color: theme.muted }]} numberOfLines={2}>Default</Text>

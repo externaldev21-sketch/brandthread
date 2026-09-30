@@ -83,7 +83,7 @@ export function TabBarGlass({ theme, radius, animatedStyle }: { theme: AppThemeP
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { borderRadius: radius, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)' },
+          { borderRadius: radius, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
           animatedStyle,
         ]}
       />
@@ -588,12 +588,12 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     pointerEvents: 'none',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
   activeFill: {
     position: 'absolute',
     pointerEvents: 'none',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
   circleContent: {
     pointerEvents: 'none',

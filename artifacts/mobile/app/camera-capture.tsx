@@ -790,7 +790,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 7,
     borderRadius: RADIUS.pill,
     backgroundColor: GLASS,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1, borderColor: '#595959',
   },
   durationBtnActive: { backgroundColor: ACCENT, borderColor: ACCENT },
   durationText: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.semibold },
@@ -805,7 +805,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 11, paddingVertical: 6,
     borderRadius: RADIUS.pill,
     backgroundColor: GLASS_LT,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1, borderColor: '#525252',
   },
   filterChipActive: { borderColor: ACCENT, backgroundColor: `${ACCENT}22` },
   filterText: { color: 'rgba(255,255,255,0.72)', fontSize: FS.xs, fontFamily: FONT.semibold },
@@ -821,7 +821,7 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.sm, paddingVertical: 5,
     borderRadius: RADIUS.sm,
     backgroundColor: 'rgba(0,0,0,0.78)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1, borderColor: '#4D4D4D',
   },
   clipChipText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
 
@@ -843,7 +843,7 @@ const s = StyleSheet.create({
   galleryThumb: {
     width: 44, height: 44, borderRadius: RADIUS.sm,
     backgroundColor: GLASS_LT,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1, borderColor: '#666666',
     alignItems: 'center', justifyContent: 'center',
   },
   flipBtn: {

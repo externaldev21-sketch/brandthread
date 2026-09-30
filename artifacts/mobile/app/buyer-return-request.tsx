@@ -436,7 +436,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   itemThumb: {
     width: 44, height: 55, borderRadius: RADIUS.sm, overflow: 'hidden',
     backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
+    borderWidth: 1, borderColor: theme.border,
   },
   itemName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   itemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
@@ -453,7 +453,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
 
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   photoCell: { width: 72, height: 72 },
-  evidenceThumb: { width: 72, height: 72, borderRadius: RADIUS.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
+  evidenceThumb: { width: 72, height: 72, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border },
   evidenceRemove: {
     position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.7)',
     borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center',
