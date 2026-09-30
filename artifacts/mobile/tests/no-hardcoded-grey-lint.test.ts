@@ -72,7 +72,6 @@ const HARDCODED_GREY_ALLOWLIST = new Set([
   'app/create-post.tsx',
   'app/design-bg-replace.tsx',
   'app/design-garment.tsx',
-  'app/integrations/index.tsx',
   'app/live-feed.tsx',
   'app/seller-go-live.tsx',
   'app/seller-live.tsx',
