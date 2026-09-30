@@ -295,11 +295,14 @@ export default function PayoutsScreen() {
       </View>
 
       {activeTab === 'payouts' ? (
-        <ScrollView contentContainerStyle={[
-          styles.list,
-          { paddingBottom: tabBarMetrics.occupiedHeight + SP.md },
-          payouts.length === 0 && { flexGrow: 1, justifyContent: 'center' },
-        ]}>
+        <ScrollView
+          style={{ marginBottom: tabBarMetrics.occupiedHeight }}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: SP.md },
+            payouts.length === 0 && { flexGrow: 1, justifyContent: 'center' },
+          ]}
+        >
           {loading ? (
             <View style={{ gap: 10 }}>
               {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
@@ -335,7 +338,10 @@ export default function PayoutsScreen() {
           )}
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: tabBarMetrics.occupiedHeight + SP.md }]}>
+        <ScrollView
+          style={{ marginBottom: tabBarMetrics.occupiedHeight }}
+          contentContainerStyle={[styles.list, { paddingBottom: SP.md }]}
+        >
            <View style={styles.bankCard}>
              <Feather name="credit-card" size={20} color={theme.accent} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
