@@ -161,6 +161,9 @@ describe('seller bar full-screen deny-list', () => {
     'add-product',
     'plans',
     'design-canvas',
+    // Create Ad wizard — its own sticky two-row bottom bar (Meta-ads link +
+    // "Launch · $X") overlapped the tab bar's cart badge underneath it.
+    'design-campaign',
     'store-generate',
     'store-generating',
     'quote-request',
@@ -240,7 +243,6 @@ describe('seller bar full-screen deny-list', () => {
     'design-brand-assets',
     'design-ai-photoshoot',
     'design-bg-replace',
-    'design-campaign',
     'design-mockup-to-model',
     'design-text-to-design',
     'design-mockup-preview',
