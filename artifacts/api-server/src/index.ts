@@ -16,6 +16,7 @@ import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
 import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
 import { startLiveRecordingFinalizeJob } from "./jobs/liveRecordingFinalize";
 import { startLiveViewersPresenceJob } from "./jobs/liveViewersPresence";
+import { startThreadCashExpiryJob } from "./jobs/threadCashExpiry";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
 import { attachCommunityWebSocket } from "./ws/communityHub";
@@ -73,6 +74,7 @@ const server = app.listen(port, (err) => {
   startNotificationBatchFlushJob();
   startLiveRecordingFinalizeJob();
   startLiveViewersPresenceJob();
+  startThreadCashExpiryJob();
   startCommunityPushJob();
 });
 

@@ -326,6 +326,17 @@ export default function ThreadCashScreen() {
             </View>
           )}
 
+          <Pressable
+            onPress={() => router.push('/thread-cash-ledger')}
+            accessibilityRole="button"
+            accessibilityLabel="Open full Thread Cash ledger"
+            testID="thread-cash-open-ledger"
+            style={[styles.ledgerRow, { borderColor: theme.borderSubtle }]}
+          >
+            <Text style={[styles.historyLabel, { color: theme.text, flex: 1 }]}>Full ledger</Text>
+            <Feather name="chevron-right" size={ICON.md} color={theme.muted} />
+          </Pressable>
+
           {/* Rules */}
             <Text style={[styles.sectionTitle, { color: theme.text }]}>How it works</Text>
             <BrandthreadCard style={styles.rulesCard}>
@@ -395,6 +406,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   historyLabel: { fontSize: FS.sm, fontFamily: FONT.medium },
   historyDate: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   historyAmount: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'right' },
+  ledgerRow: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: SP.xs, borderTopWidth: StyleSheet.hairlineWidth },
   rulesCard: { marginBottom: SP.lg, padding: 0, overflow: 'hidden' },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, paddingVertical: SP.sm, paddingHorizontal: SP.md },
   ruleDot: { width: 5, height: 5, borderRadius: 3, marginTop: 7 },

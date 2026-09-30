@@ -5,6 +5,7 @@ export * from './subscriptionEntitlements';
 export * from './security';
 export * from './money';
 export * from './threadCash';
+export * from './threadCashExpiry';
 export * from './shopifyFulfillment';
 export * from './metaAds';
 export * from './communities';
