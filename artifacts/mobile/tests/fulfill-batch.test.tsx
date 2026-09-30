@@ -55,6 +55,10 @@ vi.mock('@/lib/theme', () => ({
   SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 },
   RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, xl: 24, pill: 999 },
   ICON: { xs: 14, sm: 16, md: 20, lg: 24, xl: 28, xxl: 36 },
+  COMP: { buttonH: 52, buttonHSm: 44, inputH: 52, tabBarH: 72, headerH: 56, cardRadius: 18, iconBtn: 44, minTouchTarget: 44 },
+  BG: '#000000', CARD: '#101012', CARD_GLASS: '#1A1A1D', FG: '#FAFAFA', ACCENT: '#F7F7FA',
+  MUTED: '#999999', SUBTLE: '#6B6B70', BORDER: '#2A2A2E',
+  RED: '#F87171', SUCCESS: '#10B981', ORANGE: '#F59E0B', GOLD: '#D4AF37',
 }));
 
 vi.mock('@/contexts/AppThemeContext', () => ({
@@ -72,10 +76,7 @@ vi.mock('@/components/BrandthreadUI', () => ({
   SecondaryButton: ({ label, onPress, disabled, loading }: any) =>
     React.createElement('SecondaryButton', { label, onPress, disabled, loading, accessibilityLabel: label }),
   SectionHeader: ({ title }: any) => React.createElement('SectionHeader', {}, title),
-}));
-
-vi.mock('@/components/layout', () => ({
-  Header: nativeComponent('Header'),
+  PressableScale: nativeComponent('PressableScale'),
 }));
 
 const orderGetMock = vi.fn();

@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
+import { ModalSafeArea } from '@/components/ModalSafeArea';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -394,14 +395,10 @@ export default function LifestyleImagesScreen() {
         presentationStyle="formSheet"
         onRequestClose={() => setShowProductPicker(false)}
       >
+        <ModalSafeArea>
         <View style={[styles.pickerRoot, { backgroundColor: colors.background }]}>
-          <View style={styles.pickerHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Choose a product</Text>
-            <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
-              <Feather name="x" size={20} color={colors.foreground} />
-            </TouchableOpacity>
-          </View>
-          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground, paddingHorizontal: 20 }]}>
+          <ScreenHeader title="Choose a product" variant="modal" onBack={() => setShowProductPicker(false)} />
+          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground, paddingHorizontal: 20, marginTop: 8 }]}>
             The photo will be added to the product's media gallery.
           </Text>
           {loadingPickerProducts ? (
@@ -429,6 +426,7 @@ export default function LifestyleImagesScreen() {
             />
           )}
         </View>
+        </ModalSafeArea>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -438,7 +436,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
   pickerRoot: { flex: 1 },
-  pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingBottom: 8 },
   pickerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   pickerThumb: { width: 44, height: 44, borderRadius: 8 },
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
