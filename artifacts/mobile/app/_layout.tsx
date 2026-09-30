@@ -686,7 +686,7 @@ function AuthGate() {
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
       (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
-      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
+      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products', 'muted-words'].includes(segments[0] as string);
 
     // Development previews skip the onboarding redirect without writing
     // completion flags. Expo Go temporarily starts in the buyer preview;

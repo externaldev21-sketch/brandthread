@@ -45,6 +45,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { matchesGuestMutedWords, readGuestMutedWords } from '@/lib/guestMutedWords';
 import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
@@ -323,6 +324,7 @@ interface SpotlightItem {
   videoPosterSource?: ImageSourcePropType;
   contentType: 'photo' | 'slideshow' | 'video';
   caption: string;
+  hashtags?: string[];
   sound: string;
   productName: string;
   productPrice: string;
@@ -1902,6 +1904,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     videoPosterUri: post.thumbnailUri,
     contentType: post.contentType === 'video' || post.contentType === 'slideshow' ? post.contentType : 'photo',
     caption: post.caption,
+    hashtags: post.hashtags,
     sound: post.sound
       ? `${post.sound.soundTitle} · ${post.sound.artist}`
       : `Original Sound · ${post.authorHandle.slice(1)}`,
@@ -2121,6 +2124,7 @@ export default function FeedScreen({
   // nothing in memory yet; `hydrateFeedPostsCache` below fills it in from
   // AsyncStorage a beat later, still well before any skeleton would ever be
   // justified, and with no placeholder shapes in between either way.
+  const [guestMutedPhrases, setGuestMutedPhrases] = useState<string[] | null>(null);
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>(() => (
     creatorSource && creatorId ? [] : getCachedFeedPosts<SpotlightItem>('for-you') ?? []
   ));
@@ -2339,6 +2343,22 @@ export default function FeedScreen({
   // the real count and bump only if it went up (an add happened) — never on
   // first load, a plain refocus, or a removal.
   const screenFocused = useIsFocused();
+  useEffect(() => {
+    if (userId) {
+      setGuestMutedPhrases([]);
+      return;
+    }
+    if (!screenFocused) return;
+    let active = true;
+    // Read again on return from settings. Until then, do not briefly reveal
+    // a cached post whose caption was muted in the last visit.
+    setGuestMutedPhrases(null);
+    void readGuestMutedWords().then(
+      (words) => { if (active) setGuestMutedPhrases(words.map((word) => word.phrase)); },
+      () => { if (active) setGuestMutedPhrases(null); },
+    );
+    return () => { active = false; };
+  }, [userId, screenFocused]);
   const wasScreenFocusedRef = useRef(screenFocused);
   useEffect(() => {
     const refocused = screenFocused && !wasScreenFocusedRef.current;
@@ -2415,10 +2435,14 @@ export default function FeedScreen({
   // Production and seller feeds remain real published seller posts only.
   // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
   const allItems = useMemo(() => {
+    if (!userId && guestMutedPhrases === null) return [];
     const previewPosts = __DEV__ && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you'
       ? FASHION_PREVIEW_POSTS
       : [];
-    const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts];
+    const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts]
+      .filter((post) => userId || !matchesGuestMutedWords(
+        [post.caption, ...(post.hashtags ?? [])].join(' '), guestMutedPhrases ?? [],
+      ));
     // A creator/product-scoped player shows only those videos — no live
     // streams or rails woven in.
     if (isCreatorFeed || feedTab === 'following') return regular;
@@ -2432,7 +2456,7 @@ export default function FeedScreen({
     // so a live card never has to fit inside the feed's own search bar/tabs/
     // tab bar chrome.
     return regular;
-  }, [sellerFeedPosts, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed]);
+  }, [sellerFeedPosts, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed, userId, guestMutedPhrases]);
 
   // Every on-screen post's real engagement snapshot (server-backed likes/
   // saves/reposts/liked-by-me/saved-by-me), keyed by id. `engagements` state
