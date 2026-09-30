@@ -76,6 +76,7 @@ import {
   TransformMode, ExtHandleKind,
   computeHandlePositions, applyFreeformHandle, applyUniformHandle,
   transformToQuad, deriveAffineFromQuad, defaultWarpMesh, deriveAffineFromWarpMesh,
+  computeRotationDelta, applyRotateHandle,
   DistortQuad, WarpMeshPoint,
 } from '@/lib/transformModel';
 import {
@@ -214,6 +215,8 @@ type HandleKind =
 
 // Handle size constant (display px) for hit-testing overlay
 const HS = 22; // tap target — larger than visual for 44pt finger usability
+// Distance (display px) from the layer's top edge up to the rotate handle.
+const ROTATE_HANDLE_OFFSET = 28;
 
 // Selection mode
 type SelectionSubMode = SelectionMode;
@@ -403,6 +406,13 @@ export default function DesignCanvasScreen() {
     origTransform: import('../services/designTypes').DesignTransform;
     origQuad: DistortQuad | null;
     origMesh: WarpMeshPoint[] | null;
+    // Rotate-only: the layer's (unrotated) center and the drag's start
+    // touch position, both in LOCATION space (locationX/locationY — local
+    // to the canvas View extTransformPanResponder is attached to), not
+    // page space. Needed because rotation measures an angle from a fixed
+    // point, unlike the other handles which only ever need a page-space
+    // delta (where any canvas offset cancels out).
+    cx?: number; cy?: number; startLocX?: number; startLocY?: number;
   } | null>(null);
   const pendingExtHandleRef = useRef<ExtHandleKind>('move');
 
@@ -1345,14 +1355,22 @@ export default function DesignCanvasScreen() {
         const layer = layersRef.current.find(l => l.id === selId);
         if (!layer || layer.locked) return;
         const kind = pendingExtHandleRef.current;
+        const sx = dispScaleXRef.current || 1;
+        const sy = dispScaleYRef.current || 1;
+        const t = layer.transform;
         extHandleDragRef.current = {
           layerId: selId,
           kind,
           startX: e.nativeEvent.pageX,
           startY: e.nativeEvent.pageY,
-          origTransform: { ...layer.transform },
+          origTransform: { ...t },
           origQuad: distortQuadRef.current ? { ...distortQuadRef.current } : null,
           origMesh: warpMeshRef.current ? [...warpMeshRef.current] : null,
+          // Only meaningful for 'rotate', but cheap to always capture.
+          cx: (t.x + t.width  / 2) * sx,
+          cy: (t.y + t.height / 2) * sy,
+          startLocX: e.nativeEvent.locationX,
+          startLocY: e.nativeEvent.locationY,
         };
       },
 
@@ -1364,6 +1382,20 @@ export default function DesignCanvasScreen() {
         const ddx = (e.nativeEvent.pageX - drag.startX) / sx;
         const ddy = (e.nativeEvent.pageY - drag.startY) / sy;
         const mode = transformModeRef.current;
+
+        if (drag.kind === 'rotate') {
+          const deltaDeg = computeRotationDelta(
+            drag.cx ?? 0, drag.cy ?? 0,
+            drag.startLocX ?? 0, drag.startLocY ?? 0,
+            e.nativeEvent.locationX, e.nativeEvent.locationY,
+          );
+          setLayers(prev => prev.map(l =>
+            l.id === drag.layerId
+              ? { ...l, transform: applyRotateHandle(drag.origTransform, deltaDeg) }
+              : l
+          ));
+          return;
+        }
 
         setLayers(prev => prev.map(l => {
           if (l.id !== drag.layerId) return l;
@@ -3497,6 +3529,26 @@ export default function DesignCanvasScreen() {
                         />
                       );
                     })}
+                    {/* Rotate handle — a small circle offset above top-center,
+                        connected by a stem line, same as Procreate's own
+                        rotate handle. Only meaningful for freeform/uniform
+                        (distort/warp already give full per-corner control). */}
+                    {(transformMode === 'freeform' || transformMode === 'uniform') && (() => {
+                      const rhX = cx;
+                      const rhY = t.y * dispScaleY - ROTATE_HANDLE_OFFSET;
+                      return (
+                        <G key="rotate-handle">
+                          <Line
+                            x1={rhX} y1={t.y * dispScaleY} x2={rhX} y2={rhY}
+                            stroke={PURPLE_LIGHT} strokeWidth={1} opacity={0.7}
+                          />
+                          <Circle
+                            cx={rhX} cy={rhY} r={VS / 2 + 1}
+                            fill={CARD_ELEVATED} stroke={PURPLE_LIGHT} strokeWidth={1.5}
+                          />
+                        </G>
+                      );
+                    })()}
                     {/* Warp mesh grid lines */}
                     {transformMode === 'warp' && warpMesh && warpMesh.map((p, pi) => (
                       <Circle key={`wp${pi}`}
@@ -3600,24 +3652,47 @@ export default function DesignCanvasScreen() {
             </Pressable>
           )}
 
-          {/* ── EXTENDED TRANSFORM HANDLE PRESSABLE OVERLAYS (8 handles) ── */}
+          {/* ── EXTENDED TRANSFORM HANDLE PRESSABLE OVERLAYS (8 handles + rotate) ── */}
           {selectedLayer && activeTopTool === 'transform' && (() => {
             const handles = computeHandlePositions(selectedLayer.transform);
-            return handles.map(h => (
+            const t = selectedLayer.transform;
+            const rotateHandle = (transformMode === 'freeform' || transformMode === 'uniform') ? (
               <Pressable
-                key={h.kind}
+                key="rotate"
+                testID="transform-handle-rotate"
                 style={[
                   styles.handlePressable,
                   {
-                    left:   h.lx * dispScaleX - HS / 2,
-                    top:    h.ly * dispScaleY - HS / 2,
+                    left: (t.x + t.width / 2) * dispScaleX - HS / 2,
+                    top:  t.y * dispScaleY - ROTATE_HANDLE_OFFSET - HS / 2,
                     width:  HS,
                     height: HS,
                   },
                 ]}
-                onPressIn={() => { pendingExtHandleRef.current = h.kind; }}
+                onPressIn={() => { pendingExtHandleRef.current = 'rotate'; }}
               />
-            ));
+            ) : null;
+            return (
+              <>
+                {handles.map(h => (
+                  <Pressable
+                    key={h.kind}
+                    testID={`transform-handle-${h.kind}`}
+                    style={[
+                      styles.handlePressable,
+                      {
+                        left:   h.lx * dispScaleX - HS / 2,
+                        top:    h.ly * dispScaleY - HS / 2,
+                        width:  HS,
+                        height: HS,
+                      },
+                    ]}
+                    onPressIn={() => { pendingExtHandleRef.current = h.kind; }}
+                  />
+                ))}
+                {rotateHandle}
+              </>
+            );
           })()}
 
           {/* Select mode intentionally has no handle Pressables: transformPanResponder
