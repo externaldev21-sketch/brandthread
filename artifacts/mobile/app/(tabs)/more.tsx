@@ -76,7 +76,7 @@ const GROWTH_ITEMS: NavItem[] = [
   { icon: 'trending-up', label: 'Marketing', desc: 'Campaigns and promotions', accent: 'warning', route: '/(tabs)/marketing' },
   { icon: 'bar-chart-2', label: 'Analytics', desc: 'Sales, traffic and insights', accent: 'accentLight', route: '/(tabs)/analytics' },
   { icon: 'video', label: 'Content', desc: 'Posts, drafts and scheduled', accent: 'secondary', route: '/content' },
-  { icon: 'briefcase', label: 'Community', desc: 'Hire freelance creatives', accent: 'secondary', route: '/community' },
+  { icon: 'users', label: 'Community', desc: 'Join topic group chats', accent: 'secondary', route: '/community' },
 ];
 
 const MONEY_ITEMS: NavItem[] = [

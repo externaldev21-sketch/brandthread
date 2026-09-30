@@ -11,6 +11,7 @@ import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
 import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
 import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
 import { startMoneySweepJob } from "./jobs/moneySweep";
+import { startDeliveryDeadlinesJob } from "./jobs/deliveryDeadlines";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
 import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
 import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
@@ -18,6 +19,8 @@ import { startLiveRecordingFinalizeJob } from "./jobs/liveRecordingFinalize";
 import { startLiveViewersPresenceJob } from "./jobs/liveViewersPresence";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { attachLiveWebSocket } from "./ws/liveHub";
+import { attachCommunityWebSocket } from "./ws/communityHub";
+import { startCommunityPushJob } from "./lib/communityPush";
 import { pool } from "@workspace/db";
 
 validateEnv();
@@ -48,6 +51,8 @@ const server = app.listen(port, (err) => {
   // Live-stream WebSocket — attached to this same HTTP server (upgrade
   // requests to /ws/live), not a second port.
   attachLiveWebSocket(server);
+  // Community chat realtime channel (/ws/community), same HTTP server.
+  attachCommunityWebSocket(server);
 
   // Ensure Stripe webhook endpoint includes all required event types
   // (especially customer.subscription.* for live seller subscription updates)
@@ -64,11 +69,13 @@ const server = app.listen(port, (err) => {
   startSellerTrialReminderJob();
   startDesignStudioObjectCleanupJob();
   startMoneySweepJob();
+  startDeliveryDeadlinesJob();
   startStoryCleanupJob();
   startPushReceiptCleanupJob();
   startNotificationBatchFlushJob();
   startLiveRecordingFinalizeJob();
   startLiveViewersPresenceJob();
+  startCommunityPushJob();
 });
 
 // ─── Graceful shutdown ──────────────────────────────────────────────────────
