@@ -375,7 +375,7 @@ export const ACTIVITY_CHIPS: readonly { key: ActivityChip; label: string }[] = [
 const FOLLOW_TYPES = new Set(['new_follower']);
 const LIKE_TYPES = new Set(['post_like', 'story_like']);
 const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'mention', 'story_mention']);
-const THREAD_CASH_TYPES = new Set(['thread_cash_received']);
+const THREAD_CASH_TYPES = new Set(['thread_cash_received', 'referral_joined', 'referral_reward']);
 
 /** Which chip an item belongs to; 'other' rows (reposts, drops…) show under All only. */
 export function activityCategory(item: Pick<ActivityItem, 'category' | 'type'>): Exclude<ActivityChip, 'all'> | 'other' {
@@ -452,7 +452,9 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'new_follower': return 'user-plus';
     case 'repost':
     case 'story_reshare': return 'repeat';
-    case 'thread_cash_received': return 'dollar-sign';
+    case 'thread_cash_received':
+    case 'referral_reward': return 'dollar-sign';
+    case 'referral_joined': return 'user-plus';
     case 'price_drop': return 'trending-down';
     case 'back_in_stock':
     case 'waitlist_restock':
@@ -604,6 +606,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
         : `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}`;
     case 'thread_cash_transfer':
       return '/thread-cash';
+    case 'referral':
+      return '/buyer-invite';
     case 'product':
       return id ? `/buyer-product-detail?productId=${q(id)}` : null;
     case 'user': {

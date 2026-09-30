@@ -486,3 +486,69 @@ export async function notifyNewProduct(input: { productId: string }): Promise<vo
     logger.warn({ err, productId: input.productId }, "New product notification failed");
   }
 }
+
+// ─── Referrals ────────────────────────────────────────────────────────────────
+
+/** Tell an inviter a friend joined with their code. Idempotent per invitee. */
+export async function notifyReferralJoined(input: { inviterId: string; inviteeId: string }): Promise<void> {
+  try {
+    if (input.inviterId === input.inviteeId) return;
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, input.inviterId),
+        eq(notificationsFeed.type, "referral_joined"),
+        eq(notificationsFeed.targetId, input.inviteeId),
+      ))
+      .limit(1);
+    if (existing) return;
+    const actor = await actorFields(input.inviteeId);
+    await publishNotification({
+      userId: input.inviterId,
+      category: "social",
+      type: "referral_joined",
+      title: `${actor?.actorName ?? "A friend"} joined with your invite`,
+      body: "You earn $10 Thread Cash after their first order of $10 or more",
+      ...(actor ?? {}),
+      targetId: input.inviteeId,
+      targetType: "referral",
+    });
+  } catch (err) {
+    logger.warn({ err, inviteeId: input.inviteeId }, "Referral joined notification failed");
+  }
+}
+
+/** Tell an inviter their $10 Thread Cash landed. Idempotent per invitee. */
+export async function notifyReferralReward(input: {
+  inviterId: string;
+  inviteeId: string;
+  amountCents: number;
+}): Promise<void> {
+  try {
+    const [existing] = await db
+      .select({ id: notificationsFeed.id })
+      .from(notificationsFeed)
+      .where(and(
+        eq(notificationsFeed.userId, input.inviterId),
+        eq(notificationsFeed.type, "referral_reward"),
+        eq(notificationsFeed.targetId, input.inviteeId),
+      ))
+      .limit(1);
+    if (existing) return;
+    const actor = await actorFields(input.inviteeId);
+    const dollars = (input.amountCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+    await publishNotification({
+      userId: input.inviterId,
+      category: "social",
+      type: "referral_reward",
+      title: `${actor?.actorName ?? "Your friend"} placed their first order`,
+      body: `${dollars} Thread Cash added to your balance`,
+      ...(actor ?? {}),
+      targetId: input.inviteeId,
+      targetType: "thread_cash_transfer",
+    });
+  } catch (err) {
+    logger.warn({ err, inviteeId: input.inviteeId }, "Referral reward notification failed");
+  }
+}

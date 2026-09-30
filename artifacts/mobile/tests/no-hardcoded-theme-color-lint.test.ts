@@ -161,7 +161,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/buyer-drops.tsx',
   'app/buyer-friend-requests.tsx',
   'app/buyer-highlights-manager.tsx',
-  'app/buyer-invite.tsx',
   'app/buyer-live.tsx',
   'app/buyer-muted.tsx',
   'app/buyer-order-detail.tsx',

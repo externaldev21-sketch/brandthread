@@ -116,7 +116,7 @@ export function createNotificationResponseHandler(
     // of a generic feed.
     if (
       (data?.targetType === 'post' || data?.targetType === 'story' || data?.targetType === 'user'
-        || data?.targetType === 'thread_cash_transfer')
+        || data?.targetType === 'thread_cash_transfer' || data?.targetType === 'referral')
       && typeof data.targetId === 'string' && data.targetId
     ) {
       const href = activityHref({

@@ -1,31 +1,67 @@
 /**
- * Referral / invite-code system.
+ * Referral / invite-code system ("Give $10, get $10" Thread Cash).
  *
+ * GET  /api/referrals/invite/:code — PUBLIC: count an invite-link click, say if the code is valid
  * GET  /api/referrals/code      — get (or lazily generate) my invite code + shareable link
- * GET  /api/referrals/stats     — how many people joined using my code, with join dates
+ * GET  /api/referrals/stats     — my invitees with status, pending vs earned Thread Cash
  * POST /api/referrals/apply     — apply an invite code (call once after signup)
+ *
+ * Reward timing (see lib/referrals/policy.ts): the invitee gets $10 Thread Cash
+ * on joining; the inviter gets $10 when the invitee's first order of $10 or
+ * more is paid (hook: qualifyReferralForOrderSafe in routes/webhooks.ts). The
+ * inviter's 500 loyalty points on join are unchanged.
  */
 import { Router } from "express";
 import { db, users, referrals } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { awardLoyaltyPointsOnce } from "./loyalty";
+import { rateLimit } from "../middlewares/rateLimit";
+import { applyReferralCode } from "../lib/referrals/rewards";
+import { notifyReferralJoined } from "../lib/activityEvents";
+import {
+  REFERRAL_INVITEE_REWARD_CENTS,
+  REFERRAL_INVITER_REWARD_CENTS,
+  REFERRAL_JOIN_POINTS,
+  REFERRAL_MAX_PAID_PER_INVITER,
+  REFERRAL_MIN_ORDER_CENTS,
+  generateInviteCode,
+  inviteLink,
+  normalizeInviteCode,
+} from "../lib/referrals/policy";
 
 const router = Router();
+
+const rewardTerms = {
+  inviteeRewardCents: REFERRAL_INVITEE_REWARD_CENTS,
+  inviterRewardCents: REFERRAL_INVITER_REWARD_CENTS,
+  minOrderCents: REFERRAL_MIN_ORDER_CENTS,
+  joinPoints: REFERRAL_JOIN_POINTS,
+  maxPaidReferrals: REFERRAL_MAX_PAID_PER_INVITER,
+};
+
+// ─── GET /api/referrals/invite/:code (public) ─────────────────────────────────
+// Lightweight link-click tracking for the invite landing/deep link. Returns no
+// personal data about the inviter — only whether the code exists.
+router.get("/invite/:code", rateLimit("public-read"), async (req, res) => {
+  const code = normalizeInviteCode(req.params.code);
+  if (!code) {
+    res.status(404).json({ valid: false });
+    return;
+  }
+  const updated = await db
+    .update(users)
+    .set({ inviteLinkClicks: sql`${users.inviteLinkClicks} + 1`, inviteLastClickedAt: new Date() })
+    .where(eq(users.inviteCode, code))
+    .returning({ clerkId: users.clerkId });
+  if (updated.length === 0) {
+    res.status(404).json({ valid: false });
+    return;
+  }
+  res.set("Cache-Control", "no-store");
+  res.json({ valid: true, code, terms: rewardTerms });
+});
+
 router.use(requireAuth);
-
-// Unambiguous characters only — avoids 0/O, 1/I/L confusion
-const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-
-function generateCode(len = 6): string {
-  return Array.from({ length: len }, () =>
-    ALPHABET[Math.floor(Math.random() * ALPHABET.length)]
-  ).join("");
-}
-
-function inviteLink(code: string): string {
-  return `https://brandthread.app/onboarding?referralCode=${code}`;
-}
 
 // ─── GET /api/referrals/code ──────────────────────────────────────────────────
 // Returns the caller's invite code, generating one lazily on first call.
@@ -46,21 +82,26 @@ router.get("/code", async (req, res) => {
   let code = user.inviteCode;
 
   if (!code) {
-    // Lazily generate a unique code (max 10 attempts before giving up)
-    for (let i = 0; i < 10; i++) {
-      const candidate = generateCode();
-      const [collision] = await db
-        .select({ clerkId: users.clerkId })
-        .from(users)
-        .where(eq(users.inviteCode, candidate))
-        .limit(1);
-      if (!collision) {
-        await db
+    // Lazily generate a unique code (max 10 attempts before giving up). The
+    // conditional update means two racing requests can't overwrite each other.
+    for (let i = 0; i < 10 && !code; i++) {
+      const candidate = generateInviteCode();
+      try {
+        const updated = await db
           .update(users)
           .set({ inviteCode: candidate, updatedAt: new Date() })
-          .where(eq(users.clerkId, myId));
-        code = candidate;
-        break;
+          .where(and(eq(users.clerkId, myId), sql`${users.inviteCode} IS NULL`))
+          .returning({ inviteCode: users.inviteCode });
+        if (updated[0]) {
+          code = updated[0].inviteCode;
+        } else {
+          const [again] = await db.select({ inviteCode: users.inviteCode }).from(users)
+            .where(eq(users.clerkId, myId)).limit(1);
+          code = again?.inviteCode ?? null;
+        }
+      } catch (err: any) {
+        if (err?.code === "23505" || err?.cause?.code === "23505") continue; // collision: retry
+        throw err;
       }
     }
     if (!code) {
@@ -75,8 +116,9 @@ router.get("/code", async (req, res) => {
   res.json({
     code,
     link,
+    terms: rewardTerms,
     /** Pre-composed share text — mobile client can pass directly to Share API */
-    shareText: `${senderName} invited you to Brandthread — fashion made personal.\n\nUse invite code ${code} or tap: ${link}`,
+    shareText: `${senderName} invited you to Brandthread. Join with my link and get $10 Thread Cash.\n\nUse invite code ${code} or tap: ${link}`,
   });
 });
 
@@ -84,13 +126,42 @@ router.get("/code", async (req, res) => {
 router.get("/stats", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
 
+  const [me] = await db
+    .select({ clicks: users.inviteLinkClicks })
+    .from(users)
+    .where(eq(users.clerkId, myId))
+    .limit(1);
+
   const rows = await db
-    .select({ inviteeId: referrals.inviteeId, joinedAt: referrals.joinedAt })
+    .select({
+      inviteeId: referrals.inviteeId,
+      joinedAt: referrals.joinedAt,
+      status: referrals.status,
+      inviterRewardCents: referrals.inviterRewardCents,
+      rewardedAt: referrals.rewardedAt,
+    })
     .from(referrals)
     .where(eq(referrals.inviterId, myId));
 
+  const earnedCents = rows.reduce((sum, r) => sum + r.inviterRewardCents, 0);
+  const rewardedCount = rows.filter((r) => r.status === "rewarded").length;
+  const pendingCount = rows.filter((r) => r.status === "pending").length;
+  // Pending cash only counts friends the inviter can still be paid for.
+  const payableSlots = Math.max(0, REFERRAL_MAX_PAID_PER_INVITER - rewardedCount);
+  const pendingCents = Math.min(pendingCount, payableSlots) * REFERRAL_INVITER_REWARD_CENTS;
+
+  const base = {
+    total: rows.length,
+    clicks: me?.clicks ?? 0,
+    earnedCents,
+    pendingCents,
+    terms: rewardTerms,
+    /** Loyalty points earned on joins (500 each), unchanged from before. */
+    pointsEarned: rows.length * REFERRAL_JOIN_POINTS,
+  };
+
   if (rows.length === 0) {
-    res.json({ total: 0, pointsEarned: 0, referrals: [] });
+    res.json({ ...base, referrals: [] });
     return;
   }
 
@@ -104,16 +175,20 @@ router.get("/stats", async (req, res) => {
   const profileMap = new Map(profiles.map((p) => [p.clerkId, p]));
 
   res.json({
-    total: rows.length,
-    pointsEarned: rows.length * 500,
-    referrals: rows.map((r) => {
-      const p = profileMap.get(r.inviteeId);
-      return {
-        inviteeId: r.inviteeId,
-        name:      p ? (p.displayName || p.name) : null,
-        joinedAt:  r.joinedAt,
-      };
-    }),
+    ...base,
+    referrals: rows
+      .sort((a, b) => b.joinedAt.getTime() - a.joinedAt.getTime())
+      .map((r) => {
+        const p = profileMap.get(r.inviteeId);
+        return {
+          inviteeId: r.inviteeId,
+          name:      p ? (p.displayName || p.name) : null,
+          joinedAt:  r.joinedAt,
+          status:    r.status,
+          rewardCents: r.inviterRewardCents,
+          rewardedAt: r.rewardedAt,
+        };
+      }),
   });
 });
 
@@ -139,61 +214,16 @@ router.post("/apply", async (req, res) => {
   }
   const normalizedCode = code.trim().toUpperCase();
 
-  // Idempotency: already referred?
-  const [existing] = await db
-    .select({ inviteeId: referrals.inviteeId })
-    .from(referrals)
-    .where(eq(referrals.inviteeId, myId))
-    .limit(1);
-  if (existing) {
-    res.status(409).json({ error: "Referral already recorded.", code: "ALREADY_APPLIED" });
+  const result = await applyReferralCode({ inviteeId: myId, code: normalizedCode });
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error, code: result.code });
     return;
   }
 
-  // Resolve inviter
-  const [inviter] = await db
-    .select({ clerkId: users.clerkId })
-    .from(users)
-    .where(eq(users.inviteCode, normalizedCode))
-    .limit(1);
-  if (!inviter) {
-    res.status(404).json({ error: "Invite code not found.", code: "INVALID_CODE" });
-    return;
-  }
-  if (inviter.clerkId === myId) {
-    res.status(400).json({ error: "You cannot use your own invite code." });
-    return;
-  }
+  // Post-commit, non-throwing: tell the inviter a friend joined.
+  void notifyReferralJoined({ inviterId: result.inviterId, inviteeId: myId });
 
-  // Attribution and reward issuance commit together. The unique invitee row
-  // plus awardLoyaltyPointsOnce make concurrent/retried applies idempotent.
-  const applied = await db.transaction(async (tx) => {
-    const [created] = await tx.insert(referrals).values({
-      inviterId: inviter.clerkId,
-      inviteeId: myId,
-      inviteCode: normalizedCode,
-    }).onConflictDoNothing().returning({ inviteeId: referrals.inviteeId });
-    if (!created) return false;
-
-    await tx.update(users)
-      .set({ referredByCode: normalizedCode, updatedAt: new Date() })
-      .where(eq(users.clerkId, myId));
-    await awardLoyaltyPointsOnce({
-      buyerId: inviter.clerkId,
-      points: 500,
-      source: "referral",
-      referenceId: myId,
-      note: "Referral bonus — friend joined",
-    }, tx);
-    return true;
-  });
-
-  if (!applied) {
-    res.status(409).json({ error: "Referral already recorded.", code: "ALREADY_APPLIED" });
-    return;
-  }
-
-  res.json({ ok: true, inviterId: inviter.clerkId });
+  res.json({ ok: true, inviterId: result.inviterId, inviteeRewardCents: result.inviteeRewardCents });
 });
 
 export default router;

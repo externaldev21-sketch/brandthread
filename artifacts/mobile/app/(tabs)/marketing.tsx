@@ -37,6 +37,7 @@ type DiscountCode = {
 type ReferralStats = {
   total: number;
   pointsEarned: number;
+  earnedCents: number;
 };
 
 function formatCount(n: number): string {
@@ -101,7 +102,7 @@ export default function MarketingScreen() {
         .then((res) => { if (!cancelled) { setDiscounts(Array.isArray(res) ? (res as DiscountCode[]) : []); setDiscountsError(false); } })
         .catch(() => { if (!cancelled) { setDiscounts([]); setDiscountsError(!isSellerDevPreview()); } });
       api.referrals.stats()
-        .then((res) => { if (!cancelled) setReferrals({ total: res.total ?? 0, pointsEarned: res.pointsEarned ?? 0 }); })
+        .then((res) => { if (!cancelled) setReferrals({ total: res.total ?? 0, pointsEarned: res.pointsEarned ?? 0, earnedCents: res.earnedCents ?? 0 }); })
         .catch(() => { if (!cancelled) setReferrals(null); });
       return () => { cancelled = true; };
     }, [api, reloadToken]),
@@ -272,9 +273,9 @@ export default function MarketingScreen() {
           <Text style={[styles.referralTitle, { color: colors.foreground }]}>Invite and earn</Text>
           <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>
             {referrals == null
-              ? 'Share your invite link'
+              ? 'Give $10, get $10 Thread Cash'
               : referrals.total > 0
-                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts earned`
+                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts${referrals.earnedCents > 0 ? ` · $${(referrals.earnedCents / 100).toFixed(0)} Thread Cash` : ''} earned`
                 : 'No referrals yet'}
           </Text>
         </View>

@@ -1,21 +1,31 @@
-import React, { useState, useCallback } from 'react';
+/**
+ * Invite friends — "Give $10. Get $10." Thread Cash referral screen.
+ * Extends the original code/share/joined-list screen with the Thread Cash
+ * reward, a how-it-works list, pending vs earned totals and per-friend status.
+ * Layout reference (Mobbin): Cash App "$5 for you. $5 for a friend.", Klarna
+ * numbered steps, Yami invite-history tiles. Timing copy lives in
+ * lib/referralCopy.ts so every surface says the same thing.
+ */
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
+  View, Text, StyleSheet, ActivityIndicator, ScrollView, Share,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
-import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { PrimaryButton } from '@/components/BrandthreadUI';
+import { formatCents } from '@/lib/money';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { PrimaryButton, PressableScale } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { CenteredToast } from '@/components/social/CenteredToast';
+import {
+  REFERRAL_HEADLINE, REFERRAL_STEPS, REFERRAL_SUBHEAD, referralStatusLabel,
+} from '@/lib/referralCopy';
 
 type InviteData = {
   code: string;
@@ -26,33 +36,62 @@ type InviteData = {
 type Stats = {
   total: number;
   pointsEarned: number;
-  referrals: Array<{ inviteeId: string; name: string | null; joinedAt: string }>;
+  clicks?: number;
+  earnedCents?: number;
+  pendingCents?: number;
+  referrals: Array<{
+    inviteeId: string;
+    name: string | null;
+    joinedAt: string;
+    status?: string;
+    rewardCents?: number;
+  }>;
+};
+
+const DEMO_INVITE: InviteData = {
+  code: 'K7M2QP',
+  link: 'https://brandthread.app/invite/K7M2QP',
+  shareText: 'Join Brandthread with my link and get $10 Thread Cash.',
+};
+const DEMO_STATS: Stats = {
+  total: 3, pointsEarned: 1500, clicks: 12, earnedCents: 1000, pendingCents: 2000,
+  referrals: [
+    { inviteeId: 'd1', name: 'Amara Chen', joinedAt: new Date(Date.now() - 2 * 864e5).toISOString(), status: 'rewarded', rewardCents: 1000 },
+    { inviteeId: 'd2', name: 'Jordan Reyes', joinedAt: new Date(Date.now() - 4 * 864e5).toISOString(), status: 'pending' },
+    { inviteeId: 'd3', name: 'Sam Patel', joinedAt: new Date(Date.now() - 6 * 864e5).toISOString(), status: 'pending' },
+  ],
 };
 
 export default function BuyerInviteScreen() {
   const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const PURPLE_DIM = theme.accentDim;
-  const styles = makeStyles(theme);
-  const router  = useRouter();
-  const api     = useApi();
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
+  const api = useApi();
+  const insets = useSafeAreaInsets();
 
-  const [invite, setInvite]         = useState<InviteData | null>(null);
-  const [stats, setStats]           = useState<Stats | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [copied, setCopied]         = useState(false);
+  const [invite, setInvite] = useState<InviteData | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(message);
+    toastTimer.current = setTimeout(() => setToast(null), 1600);
+  }, []);
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [inv, st] = await Promise.all([
-        api.referrals.code(),
-        api.referrals.stats(),
-      ]);
+      const [inv, st] = await Promise.all([api.referrals.code(), api.referrals.stats()]);
       setInvite(inv as InviteData);
       setStats(st as Stats);
     } catch {
-      // Non-fatal — show empty state
+      if (isPreviewDemoMode()) {
+        setInvite(DEMO_INVITE);
+        setStats(DEMO_STATS);
+      }
     } finally {
       setLoading(false);
     }
@@ -64,282 +103,183 @@ export default function BuyerInviteScreen() {
     if (!invite) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(invite.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    showToast('Code copied');
   }
 
   async function copyLink() {
     if (!invite) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(invite.link);
-    Alert.alert('Copied!', 'Invite link copied to clipboard.');
+    showToast('Link copied');
   }
 
   async function shareInvite() {
     if (!invite) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        // expo-sharing needs a file; use RN Share for text
-        const { Share } = await import('react-native');
-        await Share.share({ message: invite.shareText, url: invite.link });
-      } else {
-        await copyLink();
-      }
+      await Share.share({ message: invite.shareText, url: invite.link });
     } catch {
       await copyLink();
     }
   }
 
+  const pendingCents = stats?.pendingCents ?? 0;
+  const earnedCents = stats?.earnedCents ?? 0;
+
   return (
     <View style={styles.root}>
-      <ScreenHeader title="Invite Friends" />
+      <ScreenHeader title="Invite friends" />
 
       {loading ? (
         <View style={styles.loadingState}>
-          <ActivityIndicator color={PURPLE} />
+          <ActivityIndicator color={theme.text} />
         </View>
       ) : (
-        <View style={styles.content}>
-          {/* Hero */}
-          <LinearGradient
-            colors={[theme.accentDim, BG]}
-            style={styles.hero}
-          >
-            <View style={styles.giftIconWrap}>
-              <Feather name="gift" size={40} color={PURPLE} />
-            </View>
-            <Text style={styles.heroTitle}>Invite to Brandthread</Text>
-            <Text style={styles.heroSub}>
-              Share your invite code with friends. Earn 500 points when a new friend joins with your code.
-            </Text>
-          </LinearGradient>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SP.xl }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.hero}>
+            <Text style={styles.heroTitle}>{REFERRAL_HEADLINE}</Text>
+            <Text style={styles.heroSub}>{REFERRAL_SUBHEAD}</Text>
+          </View>
 
-          {/* Invite code card */}
           <View style={styles.codeCard}>
             <Text style={styles.codeLabel}>Your invite code</Text>
-            <TouchableOpacity style={styles.codeRow} onPress={copyCode} activeOpacity={0.8}>
+            <PressableScale style={styles.codeRow} onPress={copyCode} accessibilityLabel="Copy invite code">
               <Text style={styles.codeText}>{invite?.code ?? '------'}</Text>
               <View style={styles.copyPill}>
-                <Feather
-                  name={copied ? 'check' : 'copy'}
-                  size={14}
-                  color={copied ? SUCCESS : PURPLE}
-                />
-                <Text style={[styles.copyPillText, copied && { color: SUCCESS }]}>
-                  {copied ? 'Copied!' : 'Copy'}
-                </Text>
+                <Feather name="copy" size={14} color={theme.text} />
+                <Text style={styles.copyPillText}>Copy</Text>
               </View>
-            </TouchableOpacity>
-            <Text style={styles.codeSub}>Tap to copy</Text>
+            </PressableScale>
           </View>
 
-          {/* Share button */}
-          <PrimaryButton label="Share invite link" icon="share-2" onPress={shareInvite} style={{ marginHorizontal: SP.md, marginBottom: SP.md }} />
+          <PrimaryButton
+            label="Share invite link"
+            icon="share-2"
+            onPress={shareInvite}
+            style={{ marginHorizontal: SP.md, marginTop: SP.md }}
+          />
 
-          {/* Stats */}
-          <View style={styles.statsCard}>
-            <View style={styles.statRow}>
-              <View style={styles.statIconWrap}>
-                <Feather name="users" size={18} color={PURPLE} />
+          <View style={styles.steps}>
+            {REFERRAL_STEPS.map((step, i) => (
+              <View key={step.title} style={styles.stepRow}>
+                <View style={styles.stepNum}><Text style={styles.stepNumText}>{i + 1}</Text></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.stepTitle}>{step.title}</Text>
+                  <Text style={styles.stepBody}>{step.body}</Text>
+                </View>
               </View>
-              <View style={styles.statContent}>
-                <Text style={styles.statValue}>{stats?.total ?? 0}</Text>
-                <Text style={styles.statLabel}>
-                  {stats?.total === 1 ? 'friend joined' : 'friends joined'}
-                </Text>
-              </View>
-              <View style={styles.pointsPill}>
-                <Text style={styles.pointsValue}>{stats?.pointsEarned ?? 0}</Text>
-                <Text style={styles.pointsLabel}>points earned</Text>
-              </View>
+            ))}
+          </View>
+
+          <View style={styles.tiles}>
+            <View style={styles.tile}>
+              <Text style={styles.tileValue}>{stats?.total ?? 0}</Text>
+              <Text style={styles.tileLabel}>{stats?.total === 1 ? 'Friend joined' : 'Friends joined'}</Text>
             </View>
+            <View style={styles.tile}>
+              <Text style={styles.tileValue}>{formatCents(pendingCents)}</Text>
+              <Text style={styles.tileLabel}>Pending</Text>
+            </View>
+            <View style={styles.tile}>
+              <Text style={[styles.tileValue, earnedCents > 0 && { color: theme.success }]}>{formatCents(earnedCents)}</Text>
+              <Text style={styles.tileLabel}>Earned</Text>
+            </View>
+          </View>
 
-            {(stats?.referrals ?? []).length > 0 && (
-              <View style={styles.joinedList}>
-                {(stats?.referrals ?? []).slice(0, 5).map((r, i) => (
+          {(stats?.referrals ?? []).length > 0 && (
+            <View style={styles.joinedCard}>
+              <Text style={styles.sectionLabel}>Your friends</Text>
+              {(stats?.referrals ?? []).slice(0, 10).map((r) => {
+                const rewarded = r.status === 'rewarded';
+                return (
                   <View key={r.inviteeId} style={styles.joinedRow}>
-                    <View style={styles.joinedDot} />
-                    <Text style={styles.joinedName}>
-                      {r.name ?? 'Someone'} joined
-                    </Text>
-                    <Text style={styles.joinedDate}>
-                      {new Date(r.joinedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.joinedName} numberOfLines={1}>{r.name ?? 'Someone'}</Text>
+                      <Text style={styles.joinedStatus}>
+                        {referralStatusLabel(r.status ?? 'pending')}
+                      </Text>
+                    </View>
+                    <Text style={[styles.joinedDate, rewarded && { color: theme.success }]}>
+                      {rewarded
+                        ? `+${formatCents(r.rewardCents ?? 1000)}`
+                        : new Date(r.joinedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </Text>
                   </View>
-                ))}
-                {(stats?.total ?? 0) > 5 && (
-                  <Text style={styles.moreJoined}>+{(stats?.total ?? 0) - 5} more</Text>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
+                );
+              })}
+              {(stats?.total ?? 0) > 10 && (
+                <Text style={styles.moreJoined}>+{(stats?.total ?? 0) - 10} more</Text>
+              )}
+            </View>
+          )}
+        </ScrollView>
       )}
+      <CenteredToast message={toast} />
     </View>
   );
 }
 
-const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
-  root:   { flex: 1, backgroundColor: 'transparent' },
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: 'transparent' },
   loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { flex: 1 },
+  content: { paddingTop: SP.md },
 
-  // Hero
-  hero: {
-    alignItems:     'center',
-    paddingTop:     SP.xl,
-    paddingBottom:  SP.lg,
-    paddingHorizontal: SP.xl,
-    gap: SP.sm,
-  },
-  giftIconWrap: {
-    width:  80, height: 80,
-    borderRadius: 40,
-    backgroundColor: theme.accentDim,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: SP.sm,
-  },
-  heroTitle: {
-    fontSize:   FS.xl,
-    fontFamily: FONT.bold,
-    color:      FG,
-    textAlign:  'center',
-  },
-  heroSub: {
-    fontSize:   FS.sm,
-    fontFamily: FONT.regular,
-    color:      MUTED,
-    textAlign:  'center',
-    lineHeight: 20,
-  },
+  hero: { alignItems: 'center', paddingHorizontal: SP.xl, paddingTop: SP.lg, paddingBottom: SP.lg, gap: SP.sm },
+  heroTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, textAlign: 'center' },
+  heroSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 20 },
 
-  // Code card
   codeCard: {
     marginHorizontal: SP.md,
-    marginTop:        SP.lg,
-    backgroundColor:  CARD,
-    borderRadius:     RADIUS.lg,
-    borderWidth:      1,
-    borderColor:      BORDER,
-    padding:          SP.md,
-    alignItems:       'center',
+    backgroundColor: theme.card,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: SP.md,
+    alignItems: 'center',
   },
   codeLabel: {
-    fontSize:   FS.xs,
-    fontFamily: FONT.semibold,
-    color:      MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: SP.sm,
+    fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted,
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm,
   },
-  codeRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           SP.md,
-  },
-  codeText: {
-    fontSize:   36,
-    fontFamily: FONT.bold,
-    color:      FG,
-    letterSpacing: 6,
-  },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
+  codeText: { fontSize: 32, fontFamily: FONT.bold, color: theme.text, letterSpacing: 6 },
   copyPill: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             4,
-    backgroundColor: theme.accentDim,
-    paddingHorizontal: SP.sm,
-    paddingVertical:   SP.xs,
-    borderRadius:    RADIUS.pill,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: theme.accentDim, paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderRadius: RADIUS.pill,
   },
-  copyPillText: {
-    fontSize:   FS.xs,
-    fontFamily: FONT.semibold,
-    color:      theme.accent,
-  },
-  codeSub: {
-    marginTop:  SP.xs,
-    fontSize:   FS.xs,
-    fontFamily: FONT.regular,
-    color:      SUBTLE,
-  },
+  copyPillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text },
 
-  // Stats card
-  statsCard: {
-    marginHorizontal: SP.md,
-    marginTop:        SP.md,
-    backgroundColor:  CARD,
-    borderRadius:     RADIUS.lg,
-    borderWidth:      1,
-    borderColor:      BORDER,
-    padding:          SP.md,
+  steps: { marginHorizontal: SP.md, marginTop: SP.lg, gap: SP.md },
+  stepRow: { flexDirection: 'row', gap: SP.md, alignItems: 'flex-start' },
+  stepNum: {
+    width: 26, height: 26, borderRadius: 13, backgroundColor: theme.card,
+    borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center',
   },
-  statRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           SP.md,
+  stepNumText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.text },
+  stepTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
+  stepBody: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, lineHeight: 19 },
+
+  tiles: { flexDirection: 'row', gap: SP.sm, marginHorizontal: SP.md, marginTop: SP.lg },
+  tile: {
+    flex: 1, backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,
+    paddingVertical: SP.md, paddingHorizontal: SP.sm, alignItems: 'center',
   },
-  statIconWrap: {
-    width:  40, height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.accentDim,
-    alignItems: 'center', justifyContent: 'center',
+  tileValue: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
+  tileLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2, textAlign: 'center' },
+
+  joinedCard: {
+    marginHorizontal: SP.md, marginTop: SP.md, backgroundColor: theme.card,
+    borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, padding: SP.md, gap: SP.sm,
   },
-  statContent: { flex: 1 },
-  pointsPill: {
-    alignItems: 'flex-end',
-    backgroundColor: theme.accentDim,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SP.sm,
-    paddingVertical: SP.xs,
+  sectionLabel: {
+    fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.8,
   },
-  pointsValue: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.accent },
-  pointsLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  statValue: {
-    fontSize:   FS.xl,
-    fontFamily: FONT.bold,
-    color:      FG,
-  },
-  statLabel: {
-    fontSize:   FS.sm,
-    fontFamily: FONT.regular,
-    color:      MUTED,
-  },
-  joinedList: {
-    marginTop:  SP.md,
-    gap:        SP.xs,
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
-    paddingTop:     SP.sm,
-  },
-  joinedRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           SP.sm,
-  },
-  joinedDot: {
-    width: 6, height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.accent,
-  },
-  joinedName: {
-    flex:       1,
-    fontSize:   FS.sm,
-    fontFamily: FONT.regular,
-    color:      FG,
-  },
-  joinedDate: {
-    fontSize:   FS.xs,
-    fontFamily: FONT.regular,
-    color:      SUBTLE,
-  },
-  moreJoined: {
-    marginTop:  SP.xs,
-    fontSize:   FS.xs,
-    fontFamily: FONT.regular,
-    color:      MUTED,
-    textAlign:  'center',
-  },
+  joinedRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  joinedName: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
+  joinedStatus: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
+  joinedDate: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.subtle },
+  moreJoined: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
 });
