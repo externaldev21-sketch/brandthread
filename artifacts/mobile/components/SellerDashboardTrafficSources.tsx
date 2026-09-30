@@ -97,15 +97,25 @@ export function SellerDashboardTrafficSources({
   // Defensive: an older/partial analytics payload missing this field must
   // never crash the whole dashboard into the error boundary — fall back to
   // the same real "0 for every source" zero state a brand-new store shows.
+  const hasSources = !!trafficSources && trafficSources.length > 0;
   const bySource = new Map((trafficSources ?? []).map((row) => [row.source, row]));
-  const rows: SourceRow[] = SOURCE_ORDER.map((key) => {
+  // The headline and every row percentage are always derived from the same
+  // number — the sum of the row counts — rather than trusting totalVisits to
+  // already agree with it. Two independently-computed figures (a headline
+  // visitor count and four per-source counts) can drift apart upstream even
+  // when neither is wrong on its own; deriving one from the other here is
+  // what guarantees they can never visibly disagree.
+  const rowCounts = SOURCE_ORDER.map((key) => bySource.get(key)?.count ?? 0);
+  const displayTotal = hasSources ? rowCounts.reduce((sum, c) => sum + c, 0) : totalVisits;
+  const rows: SourceRow[] = SOURCE_ORDER.map((key, i) => {
     const meta = SOURCE_META[key];
-    const row = bySource.get(key);
-    return { key, label: meta.label, icon: meta.icon, count: row?.count ?? 0, sharePercent: row?.sharePercent ?? 0 };
+    const count = rowCounts[i];
+    const sharePercent = displayTotal > 0 ? Math.round((count / displayTotal) * 1000) / 10 : 0;
+    return { key, label: meta.label, icon: meta.icon, count, sharePercent };
   });
   const top = rows.reduce<SourceRow | null>((best, row) => (row.count > 0 && (!best || row.count > best.count) ? row : best), null);
-  const deltaLine = totalVisits > 0 && periodLabel
-    ? describeDashboardDelta(totalVisits, previousVisits, formatCompactCount, periodLabel)
+  const deltaLine = displayTotal > 0 && periodLabel
+    ? describeDashboardDelta(displayTotal, previousVisits, formatCompactCount, periodLabel)
     : null;
 
   return (
@@ -117,7 +127,7 @@ export function SellerDashboardTrafficSources({
         </TouchableOpacity>
       </View>
 
-      {totalVisits === 0 ? (
+      {displayTotal === 0 ? (
         <View style={styles.emptyState}>
           <View style={[styles.emptyBarTrack, { borderColor: theme.borderSubtle }]} />
           <Text style={[styles.emptyText, { color: theme.muted }]}>
@@ -136,7 +146,7 @@ export function SellerDashboardTrafficSources({
       ) : (
         <>
           <Text style={styles.totalLine} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-            <Text style={[styles.totalLineValue, { color: theme.text }]}>{formatCompactCount(totalVisits)}</Text>
+            <Text style={[styles.totalLineValue, { color: theme.text }]}>{formatCompactCount(displayTotal)}</Text>
             <Text style={[styles.totalLineLabel, { color: theme.muted }]}> store visits this period</Text>
           </Text>
           {deltaLine && (
