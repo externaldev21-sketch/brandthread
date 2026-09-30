@@ -1289,11 +1289,12 @@ export function CheckoutSkeleton() {
 // ships on web too, HapticSwitch instead draws its own track+thumb with
 // Animated/Pressable — identical output on every platform, no native
 // component involved at all.
-const SWITCH_WIDTH  = 51;
-const SWITCH_HEIGHT = 31;
-const SWITCH_THUMB_SIZE = 27;
+const SWITCH_WIDTH  = 42;
+const SWITCH_HEIGHT = 24;
+const SWITCH_THUMB_SIZE = 20;
 const SWITCH_THUMB_INSET = 2;
 const SWITCH_TRAVEL = SWITCH_WIDTH - SWITCH_THUMB_SIZE - SWITCH_THUMB_INSET * 2;
+const SWITCH_HIT_AREA = 44; // the drawn switch stays slim; hitSlop alone reaches the full tap target
 const SWITCH_TRACK_OFF = '#E5E5E5'; // white/light
 const SWITCH_TRACK_ON  = '#34C759'; // green — see ALLOWED_ACCENTS note above
 const SWITCH_THUMB_OFF = '#8E8E93'; // mid-grey knob, reads against the light track
@@ -1342,10 +1343,15 @@ export function HapticSwitch({
     <Pressable
       onPress={handlePress}
       disabled={disabled}
-      // 51×31 track already clears 44pt in width; pad height to a full
-      // 44×44 hit area without changing the drawn size.
-      style={[{ width: SWITCH_WIDTH, height: 44, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1 }, style]}
-      hitSlop={hitSlop ?? { top: 7, bottom: 7, left: 0, right: 0 }}
+      // The drawn switch stays at its slim 42×24 size; hitSlop pads out to a
+      // full 44×44 tap target on every side without widening the visual.
+      style={[{ width: SWITCH_WIDTH, height: SWITCH_HEIGHT, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1 }, style]}
+      hitSlop={hitSlop ?? {
+        top: (SWITCH_HIT_AREA - SWITCH_HEIGHT) / 2,
+        bottom: (SWITCH_HIT_AREA - SWITCH_HEIGHT) / 2,
+        left: (SWITCH_HIT_AREA - SWITCH_WIDTH) / 2,
+        right: (SWITCH_HIT_AREA - SWITCH_WIDTH) / 2,
+      }}
       accessibilityRole="switch"
       accessibilityState={{ checked: on, disabled: !!disabled }}
       accessibilityLabel={accessibilityLabel}

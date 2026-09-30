@@ -2156,10 +2156,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           userId: string; name: string; username: string | null;
           displayName: string | null; bio: string | null; avatarUrl: string | null;
           accountType: string; initials: string; color: string; handle: string;
-          followersCount: number; followingCount: number; postsCount: number;
+          followersCount: number; followingCount: number; postsCount: number; likesCount?: number;
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
+      /** Posts where someone tagged this profile (the profile "Tagged" tab). */
+      tagged: (userId: string, limit = 30, offset = 0) =>
+        get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/tagged?limit=${limit}&offset=${offset}`),
       profilePosts: (userId: string, limit = 30, offset = 0) =>
         get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/posts?limit=${limit}&offset=${offset}`),
       friendActivity: (limit = 30, offset = 0) =>

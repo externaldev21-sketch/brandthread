@@ -1,0 +1,474 @@
+[
+  {
+    "case": {
+      "id": "logo-tee--studio-clean",
+      "garment": "logo-tee",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "single-stage",
+    "providers": [
+      "fashn-direct"
+    ],
+    "outputPath": "logo-tee--studio-clean__single-stage__fashn-direct.png",
+    "costUsd": 0.075,
+    "latencyMs": 1047,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--studio-clean",
+      "garment": "logo-tee",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "single-stage",
+    "providers": [
+      "fal-kling"
+    ],
+    "outputPath": "logo-tee--studio-clean__single-stage__fal-kling.png",
+    "costUsd": 0.07,
+    "latencyMs": 573,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--studio-clean",
+      "garment": "logo-tee",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "openai",
+      "fashn-direct"
+    ],
+    "outputPath": "logo-tee--studio-clean__two-stage__openai+fashn-direct.png",
+    "costUsd": 0.242,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--studio-clean",
+      "garment": "logo-tee",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "openai",
+      "fal-kling"
+    ],
+    "outputPath": "logo-tee--studio-clean__two-stage__openai+fal-kling.png",
+    "costUsd": 0.23700000000000002,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--studio-clean",
+      "garment": "logo-tee",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "fal-nano-banana",
+      "fashn-direct"
+    ],
+    "outputPath": "logo-tee--studio-clean__two-stage__fal-nano-banana+fashn-direct.png",
+    "costUsd": 0.22499999999999998,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--studio-clean",
+      "garment": "logo-tee",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "fal-nano-banana",
+      "fal-kling"
+    ],
+    "outputPath": "logo-tee--studio-clean__two-stage__fal-nano-banana+fal-kling.png",
+    "costUsd": 0.22,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--street-night",
+      "garment": "logo-tee",
+      "referenceStyle": "street-night",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/street-night.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the street scene at night, mixed streetlight for scene, pose, and lighting."
+    },
+    "pipeline": "single-stage",
+    "providers": [
+      "fashn-direct"
+    ],
+    "outputPath": "logo-tee--street-night__single-stage__fashn-direct.png",
+    "costUsd": 0.075,
+    "latencyMs": 870,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--street-night",
+      "garment": "logo-tee",
+      "referenceStyle": "street-night",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/street-night.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the street scene at night, mixed streetlight for scene, pose, and lighting."
+    },
+    "pipeline": "single-stage",
+    "providers": [
+      "fal-kling"
+    ],
+    "outputPath": "logo-tee--street-night__single-stage__fal-kling.png",
+    "costUsd": 0.07,
+    "latencyMs": 466,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--street-night",
+      "garment": "logo-tee",
+      "referenceStyle": "street-night",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/street-night.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the street scene at night, mixed streetlight for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "openai",
+      "fashn-direct"
+    ],
+    "outputPath": "logo-tee--street-night__two-stage__openai+fashn-direct.png",
+    "costUsd": 0.242,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--street-night",
+      "garment": "logo-tee",
+      "referenceStyle": "street-night",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/street-night.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the street scene at night, mixed streetlight for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "openai",
+      "fal-kling"
+    ],
+    "outputPath": "logo-tee--street-night__two-stage__openai+fal-kling.png",
+    "costUsd": 0.23700000000000002,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--street-night",
+      "garment": "logo-tee",
+      "referenceStyle": "street-night",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/street-night.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the street scene at night, mixed streetlight for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "fal-nano-banana",
+      "fashn-direct"
+    ],
+    "outputPath": "logo-tee--street-night__two-stage__fal-nano-banana+fashn-direct.png",
+    "costUsd": 0.22499999999999998,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--street-night",
+      "garment": "logo-tee",
+      "referenceStyle": "street-night",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/street-night.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the street scene at night, mixed streetlight for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "fal-nano-banana",
+      "fal-kling"
+    ],
+    "outputPath": "logo-tee--street-night__two-stage__fal-nano-banana+fal-kling.png",
+    "costUsd": 0.22,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--exotic-location",
+      "garment": "logo-tee",
+      "referenceStyle": "exotic-location",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/exotic-location.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the exotic location with dramatic natural light for scene, pose, and lighting."
+    },
+    "pipeline": "single-stage",
+    "providers": [
+      "fashn-direct"
+    ],
+    "outputPath": "logo-tee--exotic-location__single-stage__fashn-direct.png",
+    "costUsd": 0.075,
+    "latencyMs": 1040,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--exotic-location",
+      "garment": "logo-tee",
+      "referenceStyle": "exotic-location",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/exotic-location.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the exotic location with dramatic natural light for scene, pose, and lighting."
+    },
+    "pipeline": "single-stage",
+    "providers": [
+      "fal-kling"
+    ],
+    "outputPath": "logo-tee--exotic-location__single-stage__fal-kling.png",
+    "costUsd": 0.07,
+    "latencyMs": 1064,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--exotic-location",
+      "garment": "logo-tee",
+      "referenceStyle": "exotic-location",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/exotic-location.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the exotic location with dramatic natural light for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "openai",
+      "fashn-direct"
+    ],
+    "outputPath": "logo-tee--exotic-location__two-stage__openai+fashn-direct.png",
+    "costUsd": 0.242,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--exotic-location",
+      "garment": "logo-tee",
+      "referenceStyle": "exotic-location",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/exotic-location.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the exotic location with dramatic natural light for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "openai",
+      "fal-kling"
+    ],
+    "outputPath": "logo-tee--exotic-location__two-stage__openai+fal-kling.png",
+    "costUsd": 0.23700000000000002,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--exotic-location",
+      "garment": "logo-tee",
+      "referenceStyle": "exotic-location",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/exotic-location.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the exotic location with dramatic natural light for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "fal-nano-banana",
+      "fashn-direct"
+    ],
+    "outputPath": "logo-tee--exotic-location__two-stage__fal-nano-banana+fashn-direct.png",
+    "costUsd": 0.22499999999999998,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "logo-tee--exotic-location",
+      "garment": "logo-tee",
+      "referenceStyle": "exotic-location",
+      "garmentFixture": "fixtures/logo-tee.png",
+      "referenceFixture": "fixtures/refs/exotic-location.png",
+      "prompt": "Product photoshoot. Garment: graphic tee with a printed logo — logo/text must stay pixel-exact, zero warping. Match the exotic location with dramatic natural light for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "fal-nano-banana",
+      "fal-kling"
+    ],
+    "outputPath": "logo-tee--exotic-location__two-stage__fal-nano-banana+fal-kling.png",
+    "costUsd": 0.22,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "knit-sweater--studio-clean",
+      "garment": "knit-sweater",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/knit-sweater.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: cable-knit sweater — preserve knit texture and true color. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "single-stage",
+    "providers": [
+      "fashn-direct"
+    ],
+    "outputPath": "knit-sweater--studio-clean__single-stage__fashn-direct.png",
+    "costUsd": 0.075,
+    "latencyMs": 1112,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "knit-sweater--studio-clean",
+      "garment": "knit-sweater",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/knit-sweater.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: cable-knit sweater — preserve knit texture and true color. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "single-stage",
+    "providers": [
+      "fal-kling"
+    ],
+    "outputPath": "knit-sweater--studio-clean__single-stage__fal-kling.png",
+    "costUsd": 0.07,
+    "latencyMs": 545,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "knit-sweater--studio-clean",
+      "garment": "knit-sweater",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/knit-sweater.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: cable-knit sweater — preserve knit texture and true color. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "openai",
+      "fashn-direct"
+    ],
+    "outputPath": "knit-sweater--studio-clean__two-stage__openai+fashn-direct.png",
+    "costUsd": 0.242,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "knit-sweater--studio-clean",
+      "garment": "knit-sweater",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/knit-sweater.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: cable-knit sweater — preserve knit texture and true color. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "openai",
+      "fal-kling"
+    ],
+    "outputPath": "knit-sweater--studio-clean__two-stage__openai+fal-kling.png",
+    "costUsd": 0.23700000000000002,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "knit-sweater--studio-clean",
+      "garment": "knit-sweater",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/knit-sweater.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: cable-knit sweater — preserve knit texture and true color. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "fal-nano-banana",
+      "fashn-direct"
+    ],
+    "outputPath": "knit-sweater--studio-clean__two-stage__fal-nano-banana+fashn-direct.png",
+    "costUsd": 0.22499999999999998,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  },
+  {
+    "case": {
+      "id": "knit-sweater--studio-clean",
+      "garment": "knit-sweater",
+      "referenceStyle": "studio-clean",
+      "garmentFixture": "fixtures/knit-sweater.png",
+      "referenceFixture": "fixtures/refs/studio-clean.png",
+      "prompt": "Product photoshoot. Garment: cable-knit sweater — preserve knit texture and true color. Match the clean studio reference photo for scene, pose, and lighting."
+    },
+    "pipeline": "two-stage",
+    "providers": [
+      "fal-nano-banana",
+      "fal-kling"
+    ],
+    "outputPath": "knit-sweater--studio-clean__two-stage__fal-nano-banana+fal-kling.png",
+    "costUsd": 0.22,
+    "latencyMs": 0,
+    "ok": true,
+    "mock": true
+  }
+]

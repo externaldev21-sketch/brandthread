@@ -1,14 +1,23 @@
 /**
- * Seller profile — a brand's public profile, and the seller's own view of it
- * (`isOwner=true`, or automatically when a seller opens their own brand).
+ * Seller profile — ONE screen, two modes, like Instagram's own-profile vs
+ * other-profile: the mode is decided only by `viewerId === sellerId`
+ * (lib/profileAccess.ts), never by a route param.
  *
- * Renders into the shared ProfileShell. The main content is the brand's feed
- * videos; tapping a tile opens the same full-screen feed player at that
- * video. Products live one tap away behind the floating "Shop N products"
- * pill (the seller's live listings, same source as product detail).
+ *  - VISITOR (a buyer / another seller): avatar, name, @username, seller
+ *    badge, followers / following / rating, bio + links, then the tabs
+ *    Posts | Products | Tagged. Products open the buyer product page (Buy now /
+ *    Add to cart). Actions: Follow, Message, and a "..." menu
+ *    (Share profile, Report, Block). No plan, dashboard, edit or inbox.
+ *  - OWNER: all of the above plus the plan chip, Professional dashboard, Edit
+ *    profile, inbox, and edit affordances (not Buy) on the product grid. The
+ *    "..." menu has "View as visitor", which re-opens this screen with
+ *    `asVisitor=1` — that param can only ever downgrade an owner to visitor.
+ *
+ * Renders into the shared ProfileShell. Tapping a post opens the full-screen
+ * feed player at that post.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Modal, Platform, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
@@ -26,8 +35,16 @@ import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProf
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  connectionsHref, messageSellerHref, profileProductsHref, profileVideosHref, resolveStoreVisitSource,
+  connectionsHref, messageSellerHref, productDetailHref, profileVideosHref, resolveStoreVisitSource,
 } from '@/lib/profileNavigation';
+import {
+  hasPaidPlan, isVisitorPreviewParam, planChipLabel, profileCapabilities, resolveProfileMode, viewAsVisitorHref,
+} from '@/lib/profileAccess';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { getSellerShopPage, taggedItemHref, type ShopProduct } from '@/services/profileService';
+import { ProfileMenuSheet, type ProfileMenuItem } from '@/components/profile/ProfileMenuSheet';
+import { ProfileProductTile } from '@/components/profile/ProfileProductTile';
+import { useTaggedPosts } from '@/components/profile/useTaggedPosts';
 import { BrandDropsCard } from '@/components/BrandDropsCard';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { confirmBlock, reportHref } from '@/lib/safety';
@@ -38,7 +55,7 @@ import { ListRow } from '@/components/ui/ListRow';
 import { hapticLight, hapticMedium, hapticSuccessAction } from '@/lib/haptics';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
-  ProfileButton, ProfileChip, ProfileGlassButton, ShopPill, type ProfileStat,
+  ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
@@ -48,6 +65,18 @@ import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import {
   CoverCoachmarkSheet, CoverHeroAffordance, CoverManageSheet, CoverTrimSheet, useProfileCover,
 } from '@/components/profile/ProfileCover';
+
+type ContentTab = 'Posts' | 'Shop' | 'Tagged';
+// Internal key stays 'Shop'; the label (and accessibility name) is "Products".
+const CONTENT_TAB_ITEMS: ProfileTab[] = [
+  { key: 'Posts', label: 'Posts', icon: 'grid' },
+  { key: 'Shop', label: 'Products', icon: 'shopping-bag' },
+  { key: 'Tagged', label: 'Tagged', icon: 'tag' },
+];
+
+type GridRow =
+  | { kind: 'post'; item: ProfileGridItem }
+  | { kind: 'product'; product: ShopProduct };
 
 interface SellerView {
   sellerId: string;
@@ -67,6 +96,10 @@ interface SellerView {
   videosCount: number;
   coverVideoUrl: string | null;
   coverPosterUrl: string | null;
+  /** Authoritative public totals from the API (likes on public posts, follower / following counts). */
+  likesCount: number | null;
+  followersCount: number | null;
+  followingCount: number | null;
 }
 
 function initialsOf(name: string): string {
@@ -98,6 +131,9 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
     videosCount: Number(profile?.videosCount ?? 0),
     coverVideoUrl: httpOrNull(profile?.coverVideoUrl),
     coverPosterUrl: httpOrNull(profile?.coverPosterUrl),
+    likesCount: typeof profile?.likesCount === 'number' ? profile.likesCount : null,
+    followersCount: typeof profile?.followersCount === 'number' ? profile.followersCount : null,
+    followingCount: typeof profile?.followingCount === 'number' ? profile.followingCount : null,
   };
 }
 
@@ -107,7 +143,7 @@ export default function SellerProfileScreen() {
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string; sellerId?: string; isOwner?: string; src?: string }>();
+  const params = useLocalSearchParams<{ id?: string; sellerId?: string; isOwner?: string; src?: string; asVisitor?: string }>();
   const routeSellerId = params.id ?? params.sellerId;
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
@@ -124,22 +160,37 @@ export default function SellerProfileScreen() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followers, setFollowers] = useState<number | null>(null);
   const [following, setFollowing] = useState<number | null>(null);
+  const [likes, setLikes] = useState<number | null>(null);
   const [followPending, setFollowPending] = useState(false);
   const [rating, setRating] = useState<{ avgRating: number; totalCount: number } | null>(null);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<SellerThreadPost | null>(null);
   const [snackbar, setSnackbar] = useState('');
+  const [activeTab, setActiveTab] = useState<ContentTab>('Posts');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [shopProducts, setShopProducts] = useState<ShopProduct[]>([]);
+  const [shopLoading, setShopLoading] = useState(false);
+  const [shopError, setShopError] = useState(false);
+  const [plan, setPlan] = useState<{ planId: string | null; status: string | null } | null>(null);
 
-  const explicitOwner = params.isOwner === 'true';
+  // `isOwner=true` only means "load my own profile when no id is given" (the
+  // /seller/profile read is scoped to the signed-in user, so it can only ever
+  // return the caller's own record). It never grants owner UI by itself.
+  const loadOwnProfile = params.isOwner === 'true' && !routeSellerId;
+  const previewAsVisitor = isVisitorPreviewParam(params.asVisitor);
   // Canonical Clerk id from the API — follow/message/report/videos all use it,
   // never the route alias (which may be the users.id UUID from /u/:username).
   const canonicalSellerId = seller?.sellerId ?? null;
-  const isOwner = explicitOwner || (!!userId && canonicalSellerId === userId);
+  const mode = resolveProfileMode({ viewerId: userId, ownerId: canonicalSellerId, previewAsVisitor });
+  const isOwner = mode === 'owner';
+  const caps = profileCapabilities('seller', mode);
+  // The signed-out web preview (?bt_preview=…) must never reach protected APIs.
+  const devPreview = isSellerDevPreview() || isBuyerDevPreview();
 
   // ── Profile load ──────────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
-    if (explicitOwner && (!authLoaded || !userId)) {
+    if (loadOwnProfile && (!authLoaded || !userId)) {
       if (authLoaded) { setProfileLoading(false); setProfileError(true); }
       return () => { active = false; };
     }
@@ -148,12 +199,13 @@ export default function SellerProfileScreen() {
       setProfileError(false);
       try {
         let view: SellerView;
-        if (explicitOwner && !routeSellerId) {
+        if (loadOwnProfile) {
           const own = await api.seller.getProfile();
           const publicData = await api.publicSellers.get(own.clerkId).catch(() => null);
           // The public read carries the signed avatar URL, live counts and the
           // derived verified badge; the owner read adds private fields.
           view = toSellerView({ ...own, ...(publicData?.profile ?? {}) }, own.clerkId);
+          setPlan({ planId: own.subscriptionPlanId ?? null, status: own.subscriptionStatus ?? null });
         } else {
           if (!routeSellerId) throw new Error('Seller not found.');
           api.publicSellers.recordVisit(routeSellerId).catch(() => {});
@@ -167,6 +219,10 @@ export default function SellerProfileScreen() {
         }
         if (!active) return;
         setSeller(view);
+        // The public profile's totals are authoritative (computed server-side, not from a loaded page).
+        if (view.likesCount != null) setLikes(view.likesCount);
+        if (view.followersCount != null) setFollowers((count) => count ?? view.followersCount);
+        if (view.followingCount != null) setFollowing((count) => count ?? view.followingCount);
       } catch {
         if (active && reloadTick === 0) setProfileError(true);
       } finally {
@@ -174,7 +230,7 @@ export default function SellerProfileScreen() {
       }
     })();
     return () => { active = false; };
-  }, [api, authLoaded, explicitOwner, routeSellerId, userId, reloadTick]);
+  }, [api, authLoaded, loadOwnProfile, routeSellerId, userId, reloadTick]);
 
   // ── Social counts + follow state (public counts for everyone; follow
   // state only once signed in) ──────────────────────────────────────────────
@@ -197,6 +253,7 @@ export default function SellerProfileScreen() {
       if (social.status === 'fulfilled' && social.value) {
         setFollowers(Number(social.value.followersCount ?? 0));
         setFollowing(Number(social.value.followingCount ?? 0));
+        if (typeof social.value.likesCount === 'number') setLikes(social.value.likesCount);
       }
     });
     return () => { active = false; };
@@ -212,6 +269,38 @@ export default function SellerProfileScreen() {
     return () => { active = false; };
   }, [api, canonicalSellerId, reloadTick]);
 
+  // ── Owner-only: the plan chip. Fetched only in owner mode (never in the
+  // visitor preview), and the endpoint itself is scoped to the caller. ─────────
+  useEffect(() => {
+    if (!isOwner || loadOwnProfile || devPreview || !authLoaded || !userId) { if (!isOwner) setPlan(null); return; }
+    let active = true;
+    api.seller.getProfile()
+      .then((own: any) => { if (active) setPlan({ planId: own?.subscriptionPlanId ?? null, status: own?.subscriptionStatus ?? null }); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [api, authLoaded, devPreview, isOwner, loadOwnProfile, userId, reloadTick]);
+
+  // ── Products tab: the seller's live listings (public read, same source as
+  // product detail and checkout) ────────────────────────────────────────────────
+  const loadShop = useCallback(async () => {
+    if (!canonicalSellerId) return;
+    setShopLoading(true);
+    setShopError(false);
+    try {
+      const page = await getSellerShopPage(canonicalSellerId, 0);
+      setShopProducts(page.products);
+    } catch {
+      setShopError(true);
+    } finally {
+      setShopLoading(false);
+    }
+  }, [canonicalSellerId]);
+  useEffect(() => {
+    if (activeTab === 'Shop') void loadShop();
+  }, [activeTab, loadShop, reloadTick]);
+
+  const tagged = useTaggedPosts(canonicalSellerId, activeTab === 'Tagged' && !!userId && !devPreview);
+
   // ── Follow changes made anywhere else (feed rail, lists) update counts here ─
   useEffect(() => subscribeProfileEvents((event) => {
     if (event.type !== 'follow' || !canonicalSellerId) return;
@@ -223,7 +312,7 @@ export default function SellerProfileScreen() {
     }
   }), [canonicalSellerId, isOwner]);
 
-  const videos = useCreatorVideos(canonicalSellerId, { fresh: isOwner });
+  const videos = useCreatorVideos(canonicalSellerId, { fresh: isOwner, asVisitor: previewAsVisitor });
   const coverFlow = useProfileCover({
     own: isOwner,
     cover: { videoUrl: seller?.coverVideoUrl ?? null, posterUrl: seller?.coverPosterUrl ?? null },
@@ -318,25 +407,27 @@ export default function SellerProfileScreen() {
     router.push((isOwner ? '/seller-inbox' : '/(buyer)/inbox') as never);
   }, [isOwner, router]);
 
-  const handleMoreOptions = useCallback(() => {
-    if (!seller) return;
+  const menuItems = useMemo<ProfileMenuItem[]>(() => {
+    if (!seller) return [];
     const sellerId = seller.sellerId;
-    Alert.alert(seller.brandName, 'What would you like to do?', [
-      { text: 'Share profile', onPress: handleShare },
-      ...(isOwner ? [] : [
+    const items: ProfileMenuItem[] = [];
+    if (caps.showShare) items.push({ key: 'share', icon: 'share-2', label: 'Share profile', onPress: handleShare });
+    if (caps.showViewAsVisitor) {
+      items.push({
+        key: 'view-as-visitor', icon: 'eye', label: 'View as visitor',
+        onPress: () => router.push(viewAsVisitorHref('seller', sellerId) as never),
+      });
+    }
+    if (caps.showVisitorMenu) {
+      items.push(
         {
-          text: 'Report seller',
+          key: 'report', icon: 'flag', label: 'Report',
           onPress: () => router.push(reportHref({
-            targetType: 'profile',
-            targetId: sellerId,
-            label: seller.brandName,
-            ownerId: sellerId,
-            ownerName: seller.brandName,
+            targetType: 'profile', targetId: sellerId, label: seller.brandName, ownerId: sellerId, ownerName: seller.brandName,
           }) as never),
         },
         {
-          text: `Block ${seller.brandName}`,
-          style: 'destructive' as const,
+          key: 'block', icon: 'slash', label: `Block ${seller.brandName}`, destructive: true,
           onPress: async () => {
             if (await confirmBlock({ userId: sellerId, name: seller.brandName }, api.social.block)) {
               if (router.canGoBack()) goBackOr(router);
@@ -344,10 +435,10 @@ export default function SellerProfileScreen() {
             }
           },
         },
-      ]),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
-  }, [api, handleShare, isOwner, router, seller]);
+      );
+    }
+    return items;
+  }, [api, caps.showShare, caps.showViewAsVisitor, caps.showVisitorMenu, handleShare, router, seller]);
 
   const openVideo = useCallback((item: ProfileGridItem) => {
     if (!seller) return;
@@ -369,22 +460,55 @@ export default function SellerProfileScreen() {
     setSnackbar('Link copied');
   }, [seller]);
 
-  const openShop = useCallback(() => {
-    if (!seller) return;
-    router.push(profileProductsHref({ sellerId: seller.sellerId, sellerName: seller.brandName, isOwner }) as never);
-  }, [isOwner, router, seller]);
+  // Owner → the seller's own product screen (edit); visitor → the buyer
+  // product page, where Buy now / Add to cart / gallery / sizes / reviews live.
+  const openProduct = useCallback((product: ShopProduct) => {
+    router.push(productDetailHref(product.id, { isOwner: caps.canEditProducts, src: 'profile' }) as never);
+  }, [caps.canEditProducts, router]);
 
-  const gridItems = useMemo(() => videos.posts.map(gridItemFromThreadPost), [videos.posts]);
-  const renderTile = useCallback(({ item, index }: { item: ProfileGridItem; index: number }) => (
-    <ProfileVideoTile
-      item={item}
-      index={index}
-      width={layout.tileWidth}
-      height={layout.tileHeight}
-      onPress={openVideo}
-      onLongPress={isOwner ? handleTileLongPress : undefined}
-    />
-  ), [handleTileLongPress, isOwner, layout.tileHeight, layout.tileWidth, openVideo]);
+  const openTagged = useCallback((item: ProfileGridItem) => {
+    const entry = tagged.items.find((candidate) => candidate.id === item.id);
+    if (!entry) return;
+    router.push(taggedItemHref(entry) as never);
+  }, [router, tagged.items]);
+
+  const postItems = useMemo(() => videos.posts.map(gridItemFromThreadPost), [videos.posts]);
+  const taggedItems = useMemo<ProfileGridItem[]>(() => tagged.items.map((entry) => ({
+    id: entry.id,
+    kind: entry.mediaType === 'video' ? 'video' : entry.mediaType === 'slideshow' ? 'slideshow' : 'photo',
+    posterUri: entry.posterUri,
+    caption: entry.caption ?? '',
+    productCount: 0,
+  })), [tagged.items]);
+  const gridData = useMemo<GridRow[]>(() => {
+    if (activeTab === 'Shop') return shopProducts.map((product) => ({ kind: 'product' as const, product }));
+    const source = activeTab === 'Tagged' ? taggedItems : postItems;
+    return source.map((item) => ({ kind: 'post' as const, item }));
+  }, [activeTab, postItems, shopProducts, taggedItems]);
+  const gridItems = postItems;
+  const renderTile = useCallback(({ item, index }: { item: GridRow; index: number }) => {
+    if (item.kind === 'product') {
+      return (
+        <ProfileProductTile
+          product={item.product}
+          width={layout.tileWidth}
+          height={layout.tileHeight}
+          owner={caps.canEditProducts}
+          onPress={openProduct}
+        />
+      );
+    }
+    return (
+      <ProfileVideoTile
+        item={item.item}
+        index={index}
+        width={layout.tileWidth}
+        height={layout.tileHeight}
+        onPress={activeTab === 'Tagged' ? openTagged : openVideo}
+        onLongPress={isOwner && activeTab === 'Posts' ? handleTileLongPress : undefined}
+      />
+    );
+  }, [activeTab, caps.canEditProducts, handleTileLongPress, isOwner, layout.tileHeight, layout.tileWidth, openProduct, openTagged, openVideo]);
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) goBackOr(router);
@@ -429,35 +553,32 @@ export default function SellerProfileScreen() {
       key: 'following', label: 'Following', value: following == null ? '–' : formatCompactCount(following),
       onPress: canonicalSellerId ? () => router.push(connectionsHref('following', isOwner ? null : canonicalSellerId) as never) : undefined,
     },
-    { key: 'rating', label: 'Rating', value: rating && rating.totalCount > 0 ? rating.avgRating.toFixed(1) : '–' },
+    { key: 'likes', label: 'Likes', value: likes == null ? '–' : formatCompactCount(likes) },
   ];
 
   const actions = isOwner ? (
     <>
-      {/* Instagram's own-profile shape, matched 1:1 (mobbin.com/screens/
-          7b7b7c39-39a7-4ba6-bf3a-45c009a4769d): a full-width "Professional
-          dashboard" row ABOVE the action buttons, then Edit profile / Share
-          profile as the only two buttons in one row — nothing else. The
-          previous two even rows of two (Edit/Share, then Messages/Create
-          post) duplicated the header's own Inbox and Share glass icons
-          (topRight above) and read as a wall of near-identical buttons.
-          Messages is one tap away via the header's Inbox icon; Create post
-          is reachable from the Products and Studio tabs, so dropping both
-          from here loses no functionality. */}
-      <ListRow
-        icon="bar-chart-2"
-        title="Professional dashboard"
-        subtitle="Views, followers and content stats"
-        chevron
-        // navigate (not push): this switches to the existing Dashboard tab
-        // rather than stacking a duplicate instance of the whole tab
-        // navigator on top of itself.
-        onPress={() => router.navigate('/(tabs)' as never)}
-        style={styles.dashboardRow}
-        testID="seller-profile-dashboard"
-      />
+      {/* Instagram's own-profile shape: a full-width "Professional dashboard"
+          row above Edit profile / Share profile. Owner-only — visitors never
+          get the dashboard, edit, plan or inbox (lib/profileAccess.ts). */}
+      {caps.showDashboard ? (
+        <ListRow
+          icon="bar-chart-2"
+          title="Professional dashboard"
+          subtitle="Views, followers and content stats"
+          chevron
+          // navigate (not push): this switches to the existing Dashboard tab
+          // rather than stacking a duplicate instance of the whole tab
+          // navigator on top of itself.
+          onPress={() => router.navigate('/(tabs)' as never)}
+          style={styles.dashboardRow}
+          testID="seller-profile-dashboard"
+        />
+      ) : null}
       <View style={styles.actionRow}>
-        <ProfileButton label="Edit profile" icon="edit-3" variant="primary" onPress={() => router.push('/edit-profile' as never)} testID="seller-profile-edit" />
+        {caps.showEditProfile ? (
+          <ProfileButton label="Edit profile" icon="edit-3" variant="primary" onPress={() => router.push('/edit-profile' as never)} testID="seller-profile-edit" />
+        ) : null}
         <ProfileButton
           label="Share profile"
           icon="share-2"
@@ -468,24 +589,18 @@ export default function SellerProfileScreen() {
       </View>
     </>
   ) : (
-    <>
-      <View style={styles.actionRow}>
-        <View style={styles.flex} testID="seller-profile-follow-btn">
-          <FollowMorphButton
-            following={isFollowing}
-            onChange={handleFollow}
-            disabled={followPending || !canonicalSellerId || !userId}
-            style={styles.followBtn}
-            labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
-          />
-        </View>
-        <ProfileButton label="Message" icon="message-circle" onPress={handleMessageSeller} />
+    <View style={styles.actionRow}>
+      <View style={styles.flex} testID="seller-profile-follow-btn">
+        <FollowMorphButton
+          following={isFollowing}
+          onChange={handleFollow}
+          disabled={previewAsVisitor || followPending || !canonicalSellerId || !userId}
+          style={styles.followBtn}
+          labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
+        />
       </View>
-      <View style={styles.actionRow}>
-        <ProfileButton label="Share" icon="share-2" onPress={handleShare} accessibilityHint="Share this seller profile" />
-        <ProfileButton label="More" icon="more-horizontal" onPress={handleMoreOptions} accessibilityLabel="More options" />
-      </View>
-    </>
+      <ProfileButton label="Message" icon="message-circle" onPress={handleMessageSeller} disabled={previewAsVisitor} testID="seller-profile-message" />
+    </View>
   );
 
   const meta = seller ? (
@@ -496,6 +611,23 @@ export default function SellerProfileScreen() {
       onOpenWebsite={(url) => { void Linking.openURL(url); }}
     >
       {seller.category ? <ProfileChip label={seller.category} icon="tag" /> : null}
+      {rating && rating.totalCount > 0 ? <ProfileChip label={`${rating.avgRating.toFixed(1)} · ${rating.totalCount} reviews`} icon="star" /> : null}
+      {caps.showPlanChip && plan ? (
+        <ProfileChip
+          label={planChipLabel(plan)}
+          icon={hasPaidPlan(plan) ? 'award' : 'layers'}
+          tone={hasPaidPlan(plan) ? 'accent' : 'muted'}
+        />
+      ) : null}
+      {previewAsVisitor ? (
+        <View style={styles.previewBanner} testID="seller-profile-visitor-preview">
+          <Feather name="eye" size={16} color={theme.text} />
+          <Text style={styles.previewText}>You’re viewing your profile as a visitor</Text>
+          <Pressable onPress={goBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Exit visitor view" testID="seller-profile-exit-preview">
+            <Text style={styles.previewExit}>Exit</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {!isOwner && seller.vacationMode ? (
         <View style={styles.vacation} accessibilityRole="alert">
           <Feather name="sun" size={16} color={theme.warning} />
@@ -508,8 +640,13 @@ export default function SellerProfileScreen() {
     </ProfileMeta>
   ) : null;
 
-  const showShopPill = !!seller && (isOwner || productsCount > 0);
   const videosEmpty = profileEmptyState('seller:videos', isOwner);
+  const emptyKey = activeTab === 'Shop' ? 'shop' as const : activeTab === 'Tagged' ? 'seller:tagged' as const : null;
+  const tabEmpty = emptyKey ? profileEmptyState(emptyKey, isOwner) : null;
+  const gridLoadingNow = activeTab === 'Shop' ? shopLoading && shopProducts.length === 0
+    : activeTab === 'Tagged' ? tagged.loading
+    : profileLoading || videos.loading;
+  const gridErrorNow = activeTab === 'Shop' ? shopError : activeTab === 'Tagged' ? tagged.error : videos.error;
 
   return (
     <>
@@ -536,15 +673,14 @@ export default function SellerProfileScreen() {
         topLeft={<ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
         topRight={(
           <>
+            {caps.showInbox ? (
+              <ProfileGlassButton icon="message-circle" onPress={handleOpenInbox} accessibilityLabel="Inbox" />
+            ) : null}
             <ProfileGlassButton
-              icon="message-circle"
-              onPress={isOwner ? handleOpenInbox : handleMessageSeller}
-              accessibilityLabel={isOwner ? 'Inbox' : 'Message seller'}
-            />
-            <ProfileGlassButton
-              icon="share-2"
-              onPress={handleShare}
-              accessibilityLabel={isOwner ? 'Share profile' : 'Share seller profile'}
+              icon="more-horizontal"
+              onPress={() => { hapticLight(); setMenuOpen(true); }}
+              accessibilityLabel="More options"
+              testID="seller-profile-more"
             />
           </>
         )}
@@ -553,37 +689,40 @@ export default function SellerProfileScreen() {
         statsLoading={profileLoading}
         actions={actions}
         extras={canonicalSellerId ? <BrandDropsCard sellerId={canonicalSellerId} sellerName={brandName} /> : null}
-        section={{ label: 'Videos', count: videosCount }}
-        data={gridItems}
+        tabsVariant="iconOnly"
+        tabs={{
+          items: CONTENT_TAB_ITEMS,
+          active: activeTab,
+          onChange: (key) => { hapticLight(); setActiveTab(key === 'Shop' || key === 'Tagged' ? key : 'Posts'); },
+        }}
+        data={gridData}
         renderItem={renderTile}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(row) => (row.kind === 'product' ? `p-${row.product.id}` : `i-${row.item.id}`)}
         numColumns={layout.gridColumns}
-        listKey={`seller-grid-${layout.gridColumns}`}
+        listKey={`seller-grid-${activeTab}-${layout.gridColumns}`}
         ListEmptyComponent={(
           <ProfileGridPlaceholder
-            loading={profileLoading || videos.loading}
-            error={videos.error}
-            onRetry={() => { void videos.reload({ fresh: true }); }}
+            loading={gridLoadingNow}
+            error={gridErrorNow}
+            onRetry={() => {
+              if (activeTab === 'Shop') void loadShop();
+              else if (activeTab === 'Tagged') void tagged.reload();
+              else void videos.reload({ fresh: true });
+            }}
             layout={layout}
-            icon={videosEmpty.icon as never}
-            title={videosEmpty.title}
-            description={isOwner ? videosEmpty.message : `${brandName || 'This brand'} hasn't posted any videos yet.`}
-            action={videosEmpty.cta ? { label: videosEmpty.cta.label, onPress: () => router.push(videosEmpty.cta!.route as never) } : undefined}
-            testID="seller-profile-videos-empty"
+            icon={(tabEmpty?.icon ?? videosEmpty.icon) as never}
+            title={tabEmpty?.title ?? videosEmpty.title}
+            description={tabEmpty
+              ? tabEmpty.message
+              : isOwner ? videosEmpty.message : `${brandName || 'This brand'} hasn't posted any videos yet.`}
+            action={(tabEmpty ?? videosEmpty).cta ? { label: (tabEmpty ?? videosEmpty).cta!.label, onPress: () => router.push((tabEmpty ?? videosEmpty).cta!.route as never) } : undefined}
+            testID={`seller-profile-${activeTab.toLowerCase()}-empty`}
           />
         )}
         ListFooterComponent={<ProfileGridFooter loadingMore={videos.loadingMore} />}
-        onEndReached={videos.loadMore}
+        onEndReached={activeTab === 'Posts' ? videos.loadMore : undefined}
         refreshing={refreshing}
         onRefresh={handleRefresh}
-        renderFloating={showShopPill ? (bottom) => (
-          <ShopPill
-            bottom={bottom}
-            label={productsCount > 0 ? `Shop ${productsCount} product${productsCount === 1 ? '' : 's'}` : 'Set up your shop'}
-            sublabel={isOwner ? (productsCount > 0 ? 'Your live listings' : 'Add a product') : brandName}
-            onPress={openShop}
-          />
-        ) : undefined}
         bottomInset={barInset}
       />
 
@@ -625,6 +764,8 @@ export default function SellerProfileScreen() {
         />
       ) : null}
 
+      <ProfileMenuSheet visible={menuOpen} title={brandName} items={menuItems} onClose={() => setMenuOpen(false)} />
+
       <Snackbar visible={!!snackbar} message={snackbar} onDismiss={() => setSnackbar('')} />
     </>
   );
@@ -655,6 +796,12 @@ function makeStyles(theme: AppThemePreset) {
       borderRadius: RADIUS.md, marginBottom: SP.sm,
     },
     followBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },
+    previewBanner: {
+      flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.xs,
+      borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, borderRadius: RADIUS.md, padding: SP.sm,
+    },
+    previewText: { flex: 1, color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm },
+    previewExit: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.sm, textDecorationLine: 'underline' },
     vacation: {
       flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.xs,
       borderWidth: 1, borderColor: `${theme.warning}55`, borderRadius: RADIUS.md, padding: SP.sm,
