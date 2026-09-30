@@ -1,11 +1,11 @@
 # Half-done audit report
 
-Generated 2026-09-30T04:13:10.217Z (partial run — time budget hit).
+Generated 2026-09-30T04:32:00.548Z (partial run — time budget hit).
 
 - Route files discovered: 266
-- Route × role combinations audited: 218
+- Route × role combinations audited: 298
 - Unreachable: 0
-- Total findings: 1327 (hard: 178, warn: 1149)
+- Total findings: 1779 (hard: 262, warn: 1517)
 
 ## Scoreboard by area/owner
 
@@ -13,12 +13,13 @@ Each owning session's row — see `route-ownership.mjs`/`route-ownership.json` f
 
 | Area/owner | Hard | Warn | Routes | Zero-finding routes | Routes still failing |
 |---|---|---|---|---|---|
-| profiles+social (session 01MjTkyh) | 48 | 491 | 15 | 0 | 15 |
-| buyer (session 01AaWLh1) | 44 | 348 | 11 | 0 | 11 |
+| profiles+social (session 01MjTkyh) | 94 | 801 | 24 | 0 | 24 |
+| buyer (session 01AaWLh1) | 80 | 406 | 21 | 0 | 21 |
 | growth (session 019SGXKf) | 44 | 140 | 16 | 0 | 16 |
 | store+account (session 01Cdzzzi) | 20 | 58 | 5 | 0 | 5 |
 | design (session 01DgPbif) | 16 | 80 | 7 | 0 | 7 |
 | seller commerce (session 011WGHYC) | 6 | 32 | 1 | 0 | 1 |
+| live (session 01Kp8Jgx) | 2 | 0 | 1 | 0 | 1 |
 
 ## Notes on this run
 
@@ -36,15 +37,15 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 | Type | Tier | Count |
 |---|---|---|
-| hit-target-too-small | warn | 430 |
-| type-scale-drift | warn | 415 |
-| overlapping-text | warn | 176 |
-| console-error | hard | 162 |
-| contrast-violation | warn | 77 |
-| clipped-text | warn | 26 |
+| hit-target-too-small | warn | 562 |
+| type-scale-drift | warn | 543 |
+| console-error | hard | 226 |
+| overlapping-text | warn | 196 |
+| contrast-violation | warn | 129 |
+| font-family | warn | 44 |
+| clipped-text | warn | 30 |
+| preview-demo-wording | hard | 28 |
 | color-rule-violation | warn | 12 |
-| font-family | warn | 12 |
-| preview-demo-wording | hard | 8 |
 | error-boundary | hard | 4 |
 | placeholder-copy | hard | 4 |
 | min-size-violation | warn | 1 |
@@ -55,7 +56,7 @@ None.
 
 ## Findings by area (audit-script grouping, not the owner scoreboard above)
 
-### Other (475)
+### Other (877)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -121,6 +122,72 @@ None.
 | `/buyer-collection` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-collection/buyer/00-initial.png) |
 | `/buyer-conversation` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-conversation/seller/00-initial.png) |
 | `/buyer-conversation` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-conversation/seller/00-initial.png) |
+| `/buyer-download-data` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-download-data/seller/00-initial.png) |
+| `/buyer-download-data` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-download-data/seller/00-initial.png) |
+| `/buyer-drafts` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-drafts/seller/00-initial.png) |
+| `/buyer-drafts` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-drafts/seller/00-initial.png) |
+| `/buyer-drop-detail` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-drop-detail/seller/00-initial.png) |
+| `/buyer-drop-detail` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-drop-detail/seller/00-initial.png) |
+| `/buyer-drop-detail` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-drop-detail/buyer/00-initial.png) |
+| `/buyer-drop-detail` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-drop-detail/buyer/00-initial.png) |
+| `/buyer-friend-requests` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-friend-requests/seller/00-initial.png) |
+| `/buyer-friend-requests` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-friend-requests/seller/00-initial.png) |
+| `/buyer-friend-requests` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-friend-requests/buyer/00-initial.png) |
+| `/buyer-friend-requests` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-friend-requests/buyer/00-initial.png) |
+| `/buyer-highlights-manager` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-highlights-manager/seller/00-initial.png) |
+| `/buyer-highlights-manager` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-highlights-manager/seller/00-initial.png) |
+| `/buyer-invite` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-invite/seller/00-initial.png) |
+| `/buyer-invite` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-invite/seller/00-initial.png) |
+| `/buyer-invite` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-invite/buyer/00-initial.png) |
+| `/buyer-invite` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-invite/buyer/00-initial.png) |
+| `/buyer-login-activity` | seller | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-login-activity/seller/00-initial.png) |
+| `/buyer-login-activity` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-login-activity/seller/00-initial.png) |
+| `/buyer-login-activity` | seller | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-login-activity/seller/00-initial.png) |
+| `/buyer-login-activity` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-login-activity/seller/00-initial.png) |
+| `/buyer-login-activity` | buyer | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-login-activity/buyer/00-initial.png) |
+| `/buyer-login-activity` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-login-activity/buyer/00-initial.png) |
+| `/buyer-login-activity` | buyer | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-login-activity/buyer/00-initial.png) |
+| `/buyer-login-activity` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-login-activity/buyer/00-initial.png) |
+| `/buyer-muted` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-muted/seller/00-initial.png) |
+| `/buyer-muted` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-muted/seller/00-initial.png) |
+| `/buyer-notifications` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-notifications/seller/00-initial.png) |
+| `/buyer-notifications` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-notifications/seller/00-initial.png) |
+| `/buyer-payment-methods` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-payment-methods/seller/00-initial.png) |
+| `/buyer-payment-methods` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-payment-methods/seller/00-initial.png) |
+| `/buyer-payment-methods` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-payment-methods/buyer/00-initial.png) |
+| `/buyer-payment-methods` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-payment-methods/buyer/00-initial.png) |
+| `/buyer-personal-details` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-personal-details/seller/00-initial.png) |
+| `/buyer-personal-details` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-personal-details/seller/00-initial.png) |
+| `/buyer-post-comments` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-post-comments/seller/00-initial.png) |
+| `/buyer-post-comments` | seller | fresh | console-error | hard | Failed to load resource: net::ERR_FAILED | [view](../../docs/audit/screenshots/buyer-post-comments/seller/00-initial.png) |
+| `/buyer-post-comments` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-post-comments/seller/00-initial.png) |
+| `/buyer-post-comments` | seller | demo | console-error | hard | Failed to load resource: net::ERR_FAILED | [view](../../docs/audit/screenshots/buyer-post-comments/seller/00-initial.png) |
+| `/buyer-post-comments` | buyer | fresh | console-error | hard | Failed to load resource: net::ERR_FAILED | [view](../../docs/audit/screenshots/buyer-post-comments/buyer/00-initial.png) |
+| `/buyer-post-comments` | buyer | demo | console-error | hard | Failed to load resource: net::ERR_FAILED | [view](../../docs/audit/screenshots/buyer-post-comments/buyer/00-initial.png) |
+| `/buyer-post-viewer` | seller | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/seller/00-initial.png) |
+| `/buyer-post-viewer` | seller | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/seller/00-initial.png) |
+| `/buyer-post-viewer` | seller | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/seller/00-initial.png) |
+| `/buyer-post-viewer` | seller | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/seller/00-initial.png) |
+| `/buyer-post-viewer` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-post-viewer/seller/00-initial.png) |
+| `/buyer-post-viewer` | seller | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/seller/00-initial.png) |
+| `/buyer-post-viewer` | seller | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/seller/00-initial.png) |
+| `/buyer-post-viewer` | seller | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/seller/00-initial.png) |
+| `/buyer-post-viewer` | seller | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/seller/00-initial.png) |
+| `/buyer-post-viewer` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-post-viewer/seller/00-initial.png) |
+| `/buyer-post-viewer` | buyer | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/buyer/00-initial.png) |
+| `/buyer-post-viewer` | buyer | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/buyer/00-initial.png) |
+| `/buyer-post-viewer` | buyer | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/buyer/00-initial.png) |
+| `/buyer-post-viewer` | buyer | fresh | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/buyer/00-initial.png) |
+| `/buyer-post-viewer` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-post-viewer/buyer/00-initial.png) |
+| `/buyer-post-viewer` | buyer | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/buyer/00-initial.png) |
+| `/buyer-post-viewer` | buyer | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/buyer/00-initial.png) |
+| `/buyer-post-viewer` | buyer | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/buyer/00-initial.png) |
+| `/buyer-post-viewer` | buyer | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "preview-1" | [view](../../docs/audit/screenshots/buyer-post-viewer/buyer/00-initial.png) |
+| `/buyer-post-viewer` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-post-viewer/buyer/00-initial.png) |
+| `/buyer-problem-report` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-problem-report/seller/00-initial.png) |
+| `/buyer-problem-report` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-problem-report/seller/00-initial.png) |
+| `/buyer-problem-report` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-problem-report/buyer/00-initial.png) |
+| `/buyer-problem-report` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-problem-report/buyer/00-initial.png) |
 | `/(buyer)/activity` | seller | fresh | overlapping-text | warn | "Priya Shah" overlaps "started following you" | [view](../../docs/audit/screenshots/-buyer-activity/seller/00-initial.png) |
 | `/(buyer)/activity` | seller | fresh | overlapping-text | warn | "started following you" overlaps "6h" | [view](../../docs/audit/screenshots/-buyer-activity/seller/00-initial.png) |
 | `/(buyer)/activity` | seller | fresh | overlapping-text | warn | "Marcus Webb" overlaps "started following you" | [view](../../docs/audit/screenshots/-buyer-activity/seller/00-initial.png) |
@@ -293,72 +360,6 @@ None.
 | `/(buyer)` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-/buyer/00-initial.png) |
 | `/(buyer)` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-/buyer/00-initial.png) |
 | `/(buyer)` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-/buyer/00-initial.png) |
-| `/(buyer)` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-/buyer/00-initial.png) |
-| `/(buyer)` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-/buyer/00-initial.png) |
-| `/(buyer)` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-/buyer/00-initial.png) |
-| `/(buyer)` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-/buyer/00-initial.png) |
-| `/(buyer)` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-/buyer/00-initial.png) |
-| `/activity-center` | seller | fresh | overlapping-text | warn | "Priya Shah" overlaps "started following you" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | overlapping-text | warn | "started following you" overlaps "6h" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | overlapping-text | warn | "Marcus Webb" overlaps "started following you" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | overlapping-text | warn | "started following you" overlaps "1d" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Activity" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Follow back" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Follow back" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | hit-target-too-small | warn | 41x34px control "All" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | hit-target-too-small | warn | 74x34px control "Follows" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | hit-target-too-small | warn | 58x34px control "Likes" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | hit-target-too-small | warn | 95x34px control "Comments" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | hit-target-too-small | warn | 69x34px control "Orders" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | hit-target-too-small | warn | 234x40px control "PSPriya Shah started following you  6h" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | hit-target-too-small | warn | 115x32px control "Follow back" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | hit-target-too-small | warn | 234x40px control "MWMarcus Webb started following you  1d" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | hit-target-too-small | warn | 115x32px control "Follow back" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | fresh | hit-target-too-small | warn | 305x40px control "JLJordan Lee liked your post  3d" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | overlapping-text | warn | "Priya Shah" overlaps "started following you" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | overlapping-text | warn | "started following you" overlaps "6h" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | overlapping-text | warn | "Marcus Webb" overlaps "started following you" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | overlapping-text | warn | "started following you" overlaps "1d" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Activity" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Follow back" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Follow back" | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | hit-target-too-small | warn | 41x34px control "All" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | hit-target-too-small | warn | 74x34px control "Follows" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | hit-target-too-small | warn | 58x34px control "Likes" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | hit-target-too-small | warn | 95x34px control "Comments" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | hit-target-too-small | warn | 69x34px control "Orders" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | hit-target-too-small | warn | 234x40px control "PSPriya Shah started following you  6h" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | hit-target-too-small | warn | 115x32px control "Follow back" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | hit-target-too-small | warn | 234x40px control "MWMarcus Webb started following you  1d" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | hit-target-too-small | warn | 115x32px control "Follow back" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | seller | demo | hit-target-too-small | warn | 305x40px control "JLJordan Lee liked your post  3d" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/seller/00-initial.png) |
-| `/activity-center` | buyer | fresh | overlapping-text | warn | "Priya Shah" overlaps "started following you" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | overlapping-text | warn | "started following you" overlaps "6h" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | overlapping-text | warn | "Marcus Webb" overlaps "started following you" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | overlapping-text | warn | "started following you" overlaps "1d" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Activity" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Follow back" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Follow back" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | hit-target-too-small | warn | 41x34px control "All" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | hit-target-too-small | warn | 74x34px control "Follows" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | hit-target-too-small | warn | 58x34px control "Likes" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | hit-target-too-small | warn | 95x34px control "Comments" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | hit-target-too-small | warn | 69x34px control "Orders" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | hit-target-too-small | warn | 234x40px control "PSPriya Shah started following you  6h" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | hit-target-too-small | warn | 115x32px control "Follow back" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | hit-target-too-small | warn | 234x40px control "MWMarcus Webb started following you  1d" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | hit-target-too-small | warn | 115x32px control "Follow back" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | fresh | hit-target-too-small | warn | 305x40px control "JLJordan Lee liked your post  3d" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | overlapping-text | warn | "Priya Shah" overlaps "started following you" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | overlapping-text | warn | "started following you" overlaps "6h" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | overlapping-text | warn | "Marcus Webb" overlaps "started following you" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | overlapping-text | warn | "started following you" overlaps "1d" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Activity" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Follow back" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Follow back" | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | hit-target-too-small | warn | 41x34px control "All" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | hit-target-too-small | warn | 74x34px control "Follows" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
-| `/activity-center` | buyer | demo | hit-target-too-small | warn | 58x34px control "Likes" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/activity-center/buyer/00-initial.png) |
 
 ### Seller dashboard / analytics (236)
 
@@ -601,7 +602,7 @@ None.
 | `/analytics-store` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Store Analytics" | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
 | `/analytics-store` | buyer | demo | hit-target-too-small | warn | 79x36px control "Edit Store" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
 
-### Buyer discover / feed (184)
+### Buyer discover / feed (190)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -617,6 +618,8 @@ None.
 | `/(buyer)/feed` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-feed/seller/00-initial.png) |
 | `/(buyer)/feed` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-feed/buyer/00-initial.png) |
 | `/(buyer)/feed` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-buyer-feed/buyer/00-initial.png) |
+| `/buyer-drops` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-drops/seller/00-initial.png) |
+| `/buyer-drops` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-drops/seller/00-initial.png) |
 | `/(buyer)/discover-feed` | seller | fresh | contrast-violation | warn | contrast 1.06:1 (need 4.5:1) for "Retry" — rgb(0, 0, 0) on rgb(10, 10, 11) | [view](../../docs/audit/screenshots/-buyer-discover-feed/seller/00-initial.png) |
 | `/(buyer)/discover-feed` | seller | demo | contrast-violation | warn | contrast 1.06:1 (need 4.5:1) for "Retry" — rgb(0, 0, 0) on rgb(10, 10, 11) | [view](../../docs/audit/screenshots/-buyer-discover-feed/seller/00-initial.png) |
 | `/(buyer)/discover-feed` | buyer | fresh | contrast-violation | warn | contrast 1.06:1 (need 4.5:1) for "Retry" — rgb(0, 0, 0) on rgb(10, 10, 11) | [view](../../docs/audit/screenshots/-buyer-discover-feed/buyer/00-initial.png) |
@@ -789,8 +792,12 @@ None.
 | `/(buyer)/feed` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-feed/buyer/00-initial.png) |
 | `/(buyer)/feed` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-feed/buyer/00-initial.png) |
 | `/(buyer)/feed` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-feed/buyer/00-initial.png) |
+| `/buyer-drops` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Drops" | [view](../../docs/audit/screenshots/buyer-drops/seller/00-initial.png) |
+| `/buyer-drops` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Drops" | [view](../../docs/audit/screenshots/buyer-drops/seller/00-initial.png) |
+| `/buyer-drops` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Drops" | [view](../../docs/audit/screenshots/buyer-drops/buyer/00-initial.png) |
+| `/buyer-drops` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Drops" | [view](../../docs/audit/screenshots/buyer-drops/buyer/00-initial.png) |
 
-### Profile / settings (158)
+### Profile / settings (190)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -832,6 +839,14 @@ None.
 | `/buyer-account-control` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
 | `/buyer-account-control` | buyer | demo | preview-demo-wording | hard | Visible text announces preview/demo mode: "Not part of the demo data" | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
 | `/buyer-account-control` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
+| `/buyer-other-profile` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-other-profile/seller/00-initial.png) |
+| `/buyer-other-profile` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-other-profile/seller/00-initial.png) |
+| `/buyer-other-profile` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-other-profile/buyer/00-initial.png) |
+| `/buyer-other-profile` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-other-profile/buyer/00-initial.png) |
+| `/buyer-privacy-settings` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-privacy-settings/seller/00-initial.png) |
+| `/buyer-privacy-settings` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-privacy-settings/seller/00-initial.png) |
+| `/buyer-privacy-settings` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-privacy-settings/buyer/00-initial.png) |
+| `/buyer-privacy-settings` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-privacy-settings/buyer/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Edit profile" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Change profile photo or video" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
 | `/(buyer)/edit-profile` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Add profile video" | [view](../../docs/audit/screenshots/-buyer-edit-profile/seller/00-initial.png) |
@@ -956,8 +971,32 @@ None.
 | `/buyer-account-control` | buyer | fresh | hit-target-too-small | warn | 34x44px control "Retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
 | `/buyer-account-control` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Delete account" | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
 | `/buyer-account-control` | buyer | demo | hit-target-too-small | warn | 34x44px control "Retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-account-control/buyer/00-initial.png) |
+| `/buyer-other-profile` | seller | fresh | type-scale-drift | warn | font-size 44px not on declared FS scale (nearest 36) on "Northline Studio" | [view](../../docs/audit/screenshots/buyer-other-profile/seller/00-initial.png) |
+| `/buyer-other-profile` | seller | fresh | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "1,280" | [view](../../docs/audit/screenshots/buyer-other-profile/seller/00-initial.png) |
+| `/buyer-other-profile` | seller | fresh | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "340" | [view](../../docs/audit/screenshots/buyer-other-profile/seller/00-initial.png) |
+| `/buyer-other-profile` | seller | demo | type-scale-drift | warn | font-size 44px not on declared FS scale (nearest 36) on "Northline Studio" | [view](../../docs/audit/screenshots/buyer-other-profile/seller/00-initial.png) |
+| `/buyer-other-profile` | seller | demo | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "1,280" | [view](../../docs/audit/screenshots/buyer-other-profile/seller/00-initial.png) |
+| `/buyer-other-profile` | seller | demo | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "340" | [view](../../docs/audit/screenshots/buyer-other-profile/seller/00-initial.png) |
+| `/buyer-other-profile` | buyer | fresh | type-scale-drift | warn | font-size 44px not on declared FS scale (nearest 36) on "Jordan Reyes" | [view](../../docs/audit/screenshots/buyer-other-profile/buyer/00-initial.png) |
+| `/buyer-other-profile` | buyer | fresh | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "1,280" | [view](../../docs/audit/screenshots/buyer-other-profile/buyer/00-initial.png) |
+| `/buyer-other-profile` | buyer | fresh | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "340" | [view](../../docs/audit/screenshots/buyer-other-profile/buyer/00-initial.png) |
+| `/buyer-other-profile` | buyer | demo | type-scale-drift | warn | font-size 44px not on declared FS scale (nearest 36) on "Jordan Reyes" | [view](../../docs/audit/screenshots/buyer-other-profile/buyer/00-initial.png) |
+| `/buyer-other-profile` | buyer | demo | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "1,280" | [view](../../docs/audit/screenshots/buyer-other-profile/buyer/00-initial.png) |
+| `/buyer-other-profile` | buyer | demo | type-scale-drift | warn | font-size 28px not on declared FS scale (nearest 26) on "340" | [view](../../docs/audit/screenshots/buyer-other-profile/buyer/00-initial.png) |
+| `/buyer-privacy-settings` | seller | fresh | clipped-text | warn | Text clipped (434px into 231px): "Find friends from contacts (no contacts uploaded without permission)" | [view](../../docs/audit/screenshots/buyer-privacy-settings/seller/00-initial.png) |
+| `/buyer-privacy-settings` | seller | fresh | overlapping-text | warn | "Appear in search" overlaps "2" | [view](../../docs/audit/screenshots/buyer-privacy-settings/seller/00-initial.png) |
+| `/buyer-privacy-settings` | seller | fresh | overlapping-text | warn | "Let others find your profile in search" overlaps "2" | [view](../../docs/audit/screenshots/buyer-privacy-settings/seller/00-initial.png) |
+| `/buyer-privacy-settings` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Privacy" | [view](../../docs/audit/screenshots/buyer-privacy-settings/seller/00-initial.png) |
+| `/buyer-privacy-settings` | seller | demo | clipped-text | warn | Text clipped (434px into 231px): "Find friends from contacts (no contacts uploaded without permission)" | [view](../../docs/audit/screenshots/buyer-privacy-settings/seller/00-initial.png) |
+| `/buyer-privacy-settings` | seller | demo | overlapping-text | warn | "Appear in search" overlaps "2" | [view](../../docs/audit/screenshots/buyer-privacy-settings/seller/00-initial.png) |
+| `/buyer-privacy-settings` | seller | demo | overlapping-text | warn | "Let others find your profile in search" overlaps "2" | [view](../../docs/audit/screenshots/buyer-privacy-settings/seller/00-initial.png) |
+| `/buyer-privacy-settings` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Privacy" | [view](../../docs/audit/screenshots/buyer-privacy-settings/seller/00-initial.png) |
+| `/buyer-privacy-settings` | buyer | fresh | clipped-text | warn | Text clipped (434px into 231px): "Find friends from contacts (no contacts uploaded without permission)" | [view](../../docs/audit/screenshots/buyer-privacy-settings/buyer/00-initial.png) |
+| `/buyer-privacy-settings` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Privacy" | [view](../../docs/audit/screenshots/buyer-privacy-settings/buyer/00-initial.png) |
+| `/buyer-privacy-settings` | buyer | demo | clipped-text | warn | Text clipped (434px into 231px): "Find friends from contacts (no contacts uploaded without permission)" | [view](../../docs/audit/screenshots/buyer-privacy-settings/buyer/00-initial.png) |
+| `/buyer-privacy-settings` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Privacy" | [view](../../docs/audit/screenshots/buyer-privacy-settings/buyer/00-initial.png) |
 
-### Checkout / orders (96)
+### Checkout / orders (104)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -971,6 +1010,10 @@ None.
 | `/buyer-checkout` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-checkout/seller/00-initial.png) |
 | `/buyer-checkout` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
 | `/buyer-checkout` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-order-detail` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-order-detail/seller/00-initial.png) |
+| `/buyer-order-detail` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-order-detail/seller/00-initial.png) |
+| `/buyer-order-detail` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-order-detail/buyer/00-initial.png) |
+| `/buyer-order-detail` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-order-detail/buyer/00-initial.png) |
 | `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "F" overlaps "$483.00" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
 | `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "Field Office" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
 | `/(buyer)/cart` | seller | fresh | overlapping-text | warn | "@fieldoffice" overlaps "Checkout" | [view](../../docs/audit/screenshots/-buyer-cart/seller/00-initial.png) |
@@ -1057,6 +1100,10 @@ None.
 | `/buyer-checkout` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Express checkout" | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
 | `/buyer-checkout` | buyer | demo | hit-target-too-small | warn | 98x15px control "Terms of Service" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
 | `/buyer-checkout` | buyer | demo | hit-target-too-small | warn | 81x15px control "Privacy Policy" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-checkout/buyer/00-initial.png) |
+| `/buyer-order-detail` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Order Details" | [view](../../docs/audit/screenshots/buyer-order-detail/seller/00-initial.png) |
+| `/buyer-order-detail` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Order Details" | [view](../../docs/audit/screenshots/buyer-order-detail/seller/00-initial.png) |
+| `/buyer-order-detail` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Order Details" | [view](../../docs/audit/screenshots/buyer-order-detail/buyer/00-initial.png) |
+| `/buyer-order-detail` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Order Details" | [view](../../docs/audit/screenshots/buyer-order-detail/buyer/00-initial.png) |
 
 ### Messaging (86)
 
@@ -1208,7 +1255,7 @@ None.
 | `/ai-studio` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Lifestyle Images" | [view](../../docs/audit/screenshots/ai-studio/buyer/00-initial.png) |
 | `/ai-studio` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Tech Pack Generator" | [view](../../docs/audit/screenshots/ai-studio/buyer/00-initial.png) |
 
-### Products (38)
+### Products (40)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -1218,6 +1265,8 @@ None.
 | `/add-product` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/add-product/seller/00-initial.png) |
 | `/add-product` | buyer | fresh | placeholder-copy | hard | Text matches placeholder pattern: "Title" | [view](../../docs/audit/screenshots/add-product/buyer/00-initial.png) |
 | `/add-product` | buyer | demo | placeholder-copy | hard | Text matches placeholder pattern: "Title" | [view](../../docs/audit/screenshots/add-product/buyer/00-initial.png) |
+| `/buyer-product-detail` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-product-detail/seller/00-initial.png) |
+| `/buyer-product-detail` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-product-detail/seller/00-initial.png) |
 | `/add-product` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Cancel" | [view](../../docs/audit/screenshots/add-product/seller/00-initial.png) |
 | `/add-product` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Save" | [view](../../docs/audit/screenshots/add-product/seller/00-initial.png) |
 | `/add-product` | seller | fresh | hit-target-too-small | warn | 96x36px control "Cancel" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/add-product/seller/00-initial.png) |
@@ -1250,3 +1299,10 @@ None.
 | `/add-product` | buyer | demo | hit-target-too-small | warn | 361x27px control "Add description" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/add-product/buyer/00-initial.png) |
 | `/add-product` | buyer | demo | hit-target-too-small | warn | 361x27px control "Select category" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/add-product/buyer/00-initial.png) |
 | `/add-product` | buyer | demo | hit-target-too-small | warn | 86x16px control "+ Add options" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/add-product/buyer/00-initial.png) |
+
+### Live (2)
+
+| Route | Role | Data state | Type | Tier | Detail | Screenshot |
+|---|---|---|---|---|---|---|
+| `/buyer-live` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-live/seller/00-initial.png) |
+| `/buyer-live` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/buyer-live/seller/00-initial.png) |
