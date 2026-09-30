@@ -53,7 +53,36 @@ describe('Seller Studio sheet: 4-column feature grid', () => {
     );
   });
 
-  it('appends every other previously-reachable route after the priority row so nothing is dropped', () => {
-    expect(studio).toContain('...ALL_ITEMS.filter((item) => !PRIORITY_IDS.includes(item.id)),');
+  it('appends every other previously-reachable route after the priority row so nothing is dropped — except help, deliberately excluded (see next describe block)', () => {
+    expect(studio).toContain('...ALL_ITEMS.filter((item) => !PRIORITY_IDS.includes(item.id) && !GRID_EXCLUDED_IDS.includes(item.id)),');
+  });
+});
+
+/**
+ * Dev's bug report on this same sheet (round 2): a mid-word line break
+ * ("Manufacture/r Hub"), inconsistent row heights from some 2-line labels
+ * sitting next to 1-line ones, Boost and Create Ad sharing one icon, and
+ * Help & Support left alone in an otherwise-empty final row.
+ */
+describe('Seller Studio sheet: label wrapping, row alignment, icon uniqueness, no orphan row', () => {
+  it('resets wordWrap to normal on the grid label, so a long word overflows/wraps at spaces only — never mid-word (react-native-web defaults numberOfLines>1 Text to wordWrap: break-word)', () => {
+    expect(studio).toContain("wordWrap: 'normal'");
+  });
+
+  it('reserves a fixed 2-line-tall box for every label, so a 1-line label and a 2-line label in the same row still align', () => {
+    expect(studio).toContain('const GRID_LABEL_LINE_HEIGHT = 15;');
+    expect(studio).toContain('height: GRID_LABEL_LINE_HEIGHT * 2,');
+  });
+
+  it("renders each grid item's shortLabel when set, falling back to its full label", () => {
+    expect(studio).toContain('{item.shortLabel ?? item.label}');
+    // Accessibility must still announce the full, unabbreviated name.
+    expect(studio).toContain('accessibilityLabel={item.label}');
+  });
+
+  it('excludes help from the grid — it moved to a header "?" icon instead, and 28 remaining items divide evenly into full rows of 4', () => {
+    expect(studio).toContain("const GRID_EXCLUDED_IDS = ['help'];");
+    expect(studio).toContain("accessibilityLabel=\"Help & Support\"");
+    expect(studio).toContain("router.push('/help' as never)");
   });
 });
