@@ -23,6 +23,21 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { apiErrorMessage } from '@/lib/safety';
 import type { AccountSession } from '@/lib/safetyTypes';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
+
+/**
+ * Dev-preview has no real Clerk session list to show (and this app's audit/
+ * e2e harnesses fake a signed-in user, which would otherwise reach the real
+ * backend-less /api/auth/sessions endpoint and log a console 404) — this is
+ * the one honest thing that's still true in that mode: the browser tab
+ * currently open IS a real, current session, just with nothing else to
+ * report (no other devices, no location/IP worth fabricating).
+ */
+const PREVIEW_CURRENT_SESSION: AccountSession = {
+  id: 'this-device', current: true, status: 'active', device: 'This device',
+  browser: null, isMobile: false, location: null, ipAddress: null,
+  lastActiveAt: new Date().toISOString(), createdAt: new Date().toISOString(),
+};
 
 function lastActiveLabel(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -59,6 +74,17 @@ export default function LoginActivity() {
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     setError(null);
+    // isSellerDevPreview()/isBuyerDevPreview() (not just relying on the
+    // catch below): a stubbed/fake-signed-in Clerk session (this app's own
+    // audit/e2e harnesses fake a signed-in user so protected screens render
+    // at all) would otherwise reach the real, backend-less
+    // /api/auth/sessions endpoint and log a console 404.
+    if (isSellerDevPreview() || isBuyerDevPreview()) {
+      setSessions([PREVIEW_CURRENT_SESSION]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       const data = await api.auth.sessions();
       setSessions(data.sessions);
