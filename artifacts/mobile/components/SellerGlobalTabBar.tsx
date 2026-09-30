@@ -20,9 +20,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
-import { useReducedMotion } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { useAuth } from '@clerk/expo';
+import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';
+import { tabBarSlideTargetY } from '@/lib/tabBarSlide';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticLight, hapticTabChange } from '@/lib/haptics';
@@ -171,9 +173,16 @@ function getActiveTab(segments: string[]): string {
 
 interface SellerGlobalTabBarProps {
   onOpenStudio: () => void;
+  /** True on a full-screen creation/camera/live flow (see
+   *  SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS in app/_layout.tsx) — the bar
+   *  stays mounted but slides fully off the bottom of the screen instead of
+   *  unmounting, then slides back to its exact resting position when this
+   *  flips back to false. Defaults to false so every other call site (none
+   *  today; SellerBarGate always passes it explicitly) keeps the bar shown. */
+  hidden?: boolean;
 }
 
-export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
+export function SellerGlobalTabBar({ onOpenStudio, hidden = false }: SellerGlobalTabBarProps) {
   const metrics = useTabBarMetrics(2);
   const router = useRouter();
   const segments = useSegments();
@@ -279,9 +288,33 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
     onOpenStudio();
   };
 
+  // ── Slide off/on screen for full-screen creation flows (`hidden` prop) ──
+  // Measured via onLayout (not a fixed guess) so "fully off-screen, nothing
+  // peeking" holds regardless of device/metrics — mirrors
+  // components/ui/BottomSheet.tsx's onSheetLayout pattern. Falls back to a
+  // generous default before the first layout so an extremely early `hidden`
+  // still clears the screen.
+  const [barHeight, setBarHeight] = useState(96);
+  const offscreenY = barHeight + metrics.bottomOffset;
+  const translateY = useSharedValue(hidden ? offscreenY : 0);
+  useEffect(() => {
+    // Always withTiming toward the exact target — never a bare `.set()` —
+    // so the bar can never rest at a stuck partial offset; see
+    // lib/tabBarSlide.ts's doc for why (the #490 web "stuck mid-transform"
+    // bug class this guards against).
+    translateY.set(withTiming(tabBarSlideTargetY(hidden, offscreenY), {
+      duration: TAB_BAR_SLIDE_MS,
+      easing: TAB_BAR_SLIDE_EASING,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hidden, offscreenY]);
+  const slideStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+
   return (
-    <View
-      style={[styles.bar, { bottom: metrics.bottomOffset, gap: metrics.gap }]}
+    <Animated.View
+      onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
+      pointerEvents={hidden ? 'none' : 'box-none'}
+      style={[styles.bar, { bottom: metrics.bottomOffset, gap: metrics.gap }, slideStyle]}
       testID="seller-global-tab-bar"
     >
       {/* Frosted glass over whatever's actually rendered behind the bar —
@@ -380,7 +413,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
       >
         <BrandthreadLogo size={metrics.iconSize - 1} opacity={1} />
       </TabBarCircle>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -395,7 +428,6 @@ const styles = StyleSheet.create({
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'center',
-    pointerEvents:  'box-none',
   },
   slotRow: {
     flexDirection: 'row',

@@ -76,6 +76,15 @@ export const SCREEN_PUSH_EASING_BEZIER = [0.16, 1, 0.3, 1] as const;
 /** Generic fade (modals, tab content swaps, toasts appearing/disappearing). */
 export const FADE_MS = 180;
 
+/** Floating tab bar slide off/on screen for full-screen creation flows
+ *  (camera, story composer, Go Live, …): fast and swift, a plain ease-out
+ *  with no spring/bounce/overshoot — the bar must always land in the exact
+ *  same resting position it started from. See lib/tabBarSlide.ts for the
+ *  guaranteed-end-state helper that uses these. */
+export const TAB_BAR_SLIDE_MS = 150;
+export const TAB_BAR_SLIDE_EASING_BEZIER = [0, 0, 0.2, 1] as const;
+export const TAB_BAR_SLIDE_EASING = Easing.bezier(...TAB_BAR_SLIDE_EASING_BEZIER);
+
 export const MOTION = {
   pressScale: PRESS_SCALE,
   pressDurationMs: PRESS_DURATION_MS,
