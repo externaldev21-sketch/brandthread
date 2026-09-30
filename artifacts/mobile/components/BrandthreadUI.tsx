@@ -1031,18 +1031,22 @@ interface FormInputProps {
   onSubmitEditing?: () => void;
   style?: StyleProp<ViewStyle>;
   rightElement?: React.ReactNode;
+  /** Inline validation message: error border + text under the field. */
+  error?: string | null;
+  /** Quiet helper text under the field (replaced by `error` when both are set). */
+  helper?: string;
 }
 
 export function FormInput({
   label, value, onChange, placeholder, multiline, secureTextEntry, keyboardType,
-  returnKeyType, onSubmitEditing, style, rightElement,
+  returnKeyType, onSubmitEditing, style, rightElement, error, helper,
 }: FormInputProps) {
   const [focused, setFocused] = useState(false);
   const { theme } = useAppTheme();
   return (
     <View style={[fiS.wrap, style]}>
       {label && <Text style={[fiS.label, { color: theme.muted }]}>{label}</Text>}
-      <View style={[fiS.inputRow, { backgroundColor: theme.card, borderColor: theme.border }, focused && [fiS.focusedRow, { borderColor: theme.accent }], multiline && fiS.multilineRow]}>
+      <View style={[fiS.inputRow, { backgroundColor: theme.card, borderColor: theme.border }, focused && [fiS.focusedRow, { borderColor: theme.accent }], !!error && { borderColor: theme.error }, multiline && fiS.multilineRow]}>
         <TextInput
           style={[fiS.input, { color: theme.text }, multiline && fiS.multilineInput, WEB_INPUT_RESET]}
           value={value}
@@ -1060,6 +1064,11 @@ export function FormInput({
         />
         {rightElement}
       </View>
+      {error ? (
+        <Text style={[fiS.note, { color: theme.error }]} accessibilityLiveRegion="polite">{error}</Text>
+      ) : helper ? (
+        <Text style={[fiS.note, { color: theme.muted }]}>{helper}</Text>
+      ) : null}
     </View>
   );
 }
@@ -1067,6 +1076,7 @@ export function FormInput({
 const fiS = StyleSheet.create({
   wrap:         { gap: SP.sm },
   label:        { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 0.2 },
+  note:         { fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 18 },
   inputRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD,
                   borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
                   paddingHorizontal: SP.md, minHeight: COMP.inputH },
