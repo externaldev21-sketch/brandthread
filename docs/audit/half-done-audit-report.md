@@ -1,11 +1,11 @@
 # Half-done audit report
 
-Generated 2026-09-30T11:43:52.675Z (partial run — time budget hit).
+Generated 2026-09-30T12:09:26.260Z (partial run — time budget hit).
 
 - Route files discovered: 268
-- Route × role combinations audited: 427
+- Route × role combinations audited: 480
 - Unreachable: 0
-- Total findings: 3815 (hard: 38, warn: 3777)
+- Total findings: 4289 (hard: 46, warn: 4243)
 
 ## Scoreboard by area/owner
 
@@ -13,13 +13,13 @@ Each owning session's row — see `route-ownership.mjs`/`route-ownership.json` f
 
 | Area/owner | Hard | Warn | Routes | Zero-finding routes | Routes still failing |
 |---|---|---|---|---|---|
-| seller commerce (session 011WGHYC) | 13 | 176 | 7 | 1 | 4 |
-| supply (session 01Lbcp8K) | 13 | 142 | 4 | 0 | 3 |
-| growth (session 019SGXKf) | 8 | 464 | 14 | 1 | 2 |
-| store+account (session 01Cdzzzi) | 4 | 463 | 12 | 0 | 1 |
+| seller commerce (session 011WGHYC) | 17 | 216 | 8 | 1 | 5 |
+| supply (session 01Lbcp8K) | 17 | 365 | 11 | 0 | 4 |
+| growth (session 019SGXKf) | 8 | 626 | 18 | 1 | 2 |
+| store+account (session 01Cdzzzi) | 4 | 504 | 13 | 0 | 1 |
 | profiles+social (session 01MjTkyh) | 0 | 995 | 27 | 1 | 0 |
 | buyer (session 01AaWLh1) | 0 | 874 | 24 | 0 | 0 |
-| design (session 01DgPbif) | 0 | 643 | 20 | 0 | 0 |
+| design (session 01DgPbif) | 0 | 643 | 21 | 1 | 0 |
 | live (session 01Kp8Jgx) | 0 | 20 | 1 | 0 | 0 |
 
 ## Notes on this run
@@ -38,12 +38,12 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 | Type | Tier | Count |
 |---|---|---|
-| hit-target-too-small | warn | 2773 |
-| type-scale-drift | warn | 622 |
-| clipped-text | warn | 179 |
-| min-size-violation | warn | 176 |
-| console-error | hard | 35 |
-| overlapping-text | warn | 20 |
+| hit-target-too-small | warn | 3107 |
+| type-scale-drift | warn | 699 |
+| clipped-text | warn | 205 |
+| min-size-violation | warn | 204 |
+| console-error | hard | 43 |
+| overlapping-text | warn | 21 |
 | color-rule-violation | warn | 6 |
 | placeholder-copy | hard | 2 |
 | contrast-violation | warn | 1 |
@@ -55,7 +55,7 @@ None.
 
 ## Findings by area (audit-script grouping, not the owner scoreboard above)
 
-### Other (2367)
+### Other (2614)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -75,6 +75,10 @@ None.
 | `/integrations/shopify-fulfillment` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/integrations-shopify-fulfillment/seller/00-initial.png) |
 | `/integrations/shopify-fulfillment` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/integrations-shopify-fulfillment/buyer/00-initial.png) |
 | `/integrations/shopify-fulfillment` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/integrations-shopify-fulfillment/buyer/00-initial.png) |
+| `/metafields` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/metafields/seller/00-initial.png) |
+| `/metafields` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/metafields/seller/00-initial.png) |
+| `/metafields` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/metafields/buyer/00-initial.png) |
+| `/metafields` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/metafields/buyer/00-initial.png) |
 | `/(buyer)/activity` | seller | demo | overlapping-text | warn | "Priya Shah" overlaps "started following you" | [view](../../docs/audit/screenshots/-buyer-activity/seller/00-initial.png) |
 | `/(buyer)/activity` | seller | demo | overlapping-text | warn | "started following you" overlaps "6h" | [view](../../docs/audit/screenshots/-buyer-activity/seller/00-initial.png) |
 | `/(buyer)/activity` | seller | demo | overlapping-text | warn | "Marcus Webb" overlaps "started following you" | [view](../../docs/audit/screenshots/-buyer-activity/seller/00-initial.png) |
@@ -355,12 +359,8 @@ None.
 | `/admin-reports` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
 | `/admin-reports` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
 | `/admin-reports` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
-| `/admin-reports` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
-| `/admin-reports` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
-| `/admin-reports` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
-| `/admin-reports` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/admin-reports/buyer/00-initial.png) |
 
-### Profile / settings (559)
+### Profile / settings (579)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -669,6 +669,235 @@ None.
 | `/buyer-security` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/buyer-security/buyer/00-initial.png) |
 | `/buyer-security` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-security/buyer/00-initial.png) |
 
+### Manufacturer hub (224)
+
+| Route | Role | Data state | Type | Tier | Detail | Screenshot |
+|---|---|---|---|---|---|---|
+| `/invite-manufacturer` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
+| `/invite-manufacturer` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | demo | clipped-text | warn | Text clipped (129px into 126px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-compare` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Compare Suppliers" | [view](../../docs/audit/screenshots/manufacturer-compare/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | clipped-text | warn | Text clipped (111px into 108px): "Porto Knit Collective" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | clipped-text | warn | Text clipped (123px into 108px): "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | clipped-text | warn | Text clipped (295px into 245px): "Panels are cut — sending sewing line photos tomorrow." | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer Hub" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "2" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "1" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Porto, Portugal" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Los Angeles, USA" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Ho Chi Minh City, Vietnam" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "Tiruppur, India" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "2" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "1" | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-hub` | buyer | demo | hit-target-too-small | warn | 40x16px control "See all" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-hub/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-onboard` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-onboard/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer-product` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-product/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+| `/manufacturer` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer/buyer/00-initial.png) |
+
 ### Checkout / orders (187)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
@@ -861,6 +1090,179 @@ None.
 | `/fulfill-order` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/fulfill-order/buyer/00-initial.png) |
 | `/fulfill-order` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/fulfill-order/buyer/00-initial.png) |
 
+### Messaging (168)
+
+| Route | Role | Data state | Type | Tier | Detail | Screenshot |
+|---|---|---|---|---|---|---|
+| `/manufacturer-messages` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/seller/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/community-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Manufacturer" | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+| `/manufacturer-messages` | buyer | demo | hit-target-too-small | warn | 36x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/manufacturer-messages/buyer/00-initial.png) |
+
 ### Seller dashboard / analytics (165)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
@@ -1030,152 +1432,6 @@ None.
 | `/analytics-store` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
 | `/analytics-store` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
 | `/analytics-store` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
-
-### Messaging (141)
-
-| Route | Role | Data state | Type | Tier | Detail | Screenshot |
-|---|---|---|---|---|---|---|
-| `/(buyer)/inbox` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/(buyer)/inbox` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-buyer-inbox/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "AI Clothing Mockups" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-mockup-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-mockup-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/ai-photography-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/ai-photography-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
-| `/community-chat` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/community-chat/buyer/00-initial.png) |
 
 ### Buyer discover / feed (140)
 
@@ -1523,55 +1779,6 @@ None.
 | `/buyer-product-detail` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-product-detail/buyer/00-initial.png) |
 | `/buyer-product-detail` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-product-detail/buyer/00-initial.png) |
 | `/buyer-product-detail` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/buyer-product-detail/buyer/00-initial.png) |
-
-### Manufacturer hub (44)
-
-| Route | Role | Data state | Type | Tier | Detail | Screenshot |
-|---|---|---|---|---|---|---|
-| `/invite-manufacturer` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
-| `/invite-manufacturer` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/seller/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
-| `/invite-manufacturer` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/invite-manufacturer/buyer/00-initial.png) |
 
 ### Live (20)
 
