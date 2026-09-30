@@ -68,17 +68,15 @@ describe('Design Studio back arrow', () => {
     expect(designScreen).toContain('testID="design-gallery-back"');
   });
 
-  it('uses router.back() for history and a seller fallback when no history', () => {
-    expect(designScreen).toContain('router.back()');
-    // The replace call uses a type cast (as never) for Expo Router's strict routing
+  it('uses the shared goBackOr helper for history and a seller fallback when no history', () => {
+    // goBackOr(router, fallback) pops history when there is any (its own
+    // router.back()) and otherwise router.replace()s to fallback — see
+    // lib/navigation/goBackOr.ts. Design Studio doesn't duplicate that
+    // canGoBack()/back()/replace() branching inline.
+    expect(designScreen).toContain('goBackOr(router');
+    // The fallback uses a type cast (as never) for Expo Router's strict routing
     expect(designScreen).toContain("'/(tabs)/'");
-    expect(designScreen).toContain('router.replace');
-  });
-
-  it('uses Expo Router to check whether back navigation is available', () => {
-    expect(designScreen).toContain('router.canGoBack()');
     expect(designScreen).not.toContain('useNavigationState');
-    expect(designScreen).toContain('canGoBack');
   });
 
   it('has accessible back button label', () => {
