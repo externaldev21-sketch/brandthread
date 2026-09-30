@@ -3,6 +3,7 @@
  * Tabs: overview | customer | payment | fulfillment | timeline | returns | disputes | notes
  */
 
+import { shareInvoice, invoiceFromSellerOrder } from '@/lib/invoice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -1325,6 +1326,11 @@ function PaymentTab({ order }: { order: Order }) {
         {p.amountRefundedCents > 0 && <InfoRow label="Amount Refunded" value={`-${usd(p.amountRefundedCents)}`} valueColor={RED} />}
         <InfoRow label="Amount Held" value={usd(p.amountHeldCents)} valueColor={ORANGE} />
       </BrandthreadCard>
+      <SecondaryButton
+        label="Download invoice"
+        icon="file-text"
+        onPress={() => { shareInvoice(invoiceFromSellerOrder(order)).catch((err: any) => Alert.alert('Could not create invoice', err?.message ?? 'Please try again.')); }}
+      />
 
       {order.heldFunds && (
         <View style={s.section}>

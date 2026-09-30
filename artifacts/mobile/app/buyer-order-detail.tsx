@@ -16,6 +16,7 @@
  *   - Post-submit: "Thanks for reviewing" state, no re-entry
  *   - Gate: order.status === 'delivered' && !reviewSubmitted && real order ID (not local/demo)
  */
+import { shareInvoice, invoiceFromBuyerOrder } from '@/lib/invoice';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
@@ -1082,6 +1083,12 @@ export default function BuyerOrderDetailScreen() {
             <Text style={styles.totalAmount}>{formatCents(order.payment.totalCents)}</Text>
           </View>
           <Text style={styles.paymentNote}>Payment processed securely via Brandthread</Text>
+          <SecondaryButton
+            label="Download invoice"
+            icon="file-text"
+            onPress={() => { shareInvoice(invoiceFromBuyerOrder(order)).catch(() => Alert.alert('Could not create invoice', 'Please try again.')); }}
+            style={{ marginTop: SP.md }}
+          />
         </SectionCard>
 
         {/* ── Buyer protection (same note as product detail + checkout) ──── */}
