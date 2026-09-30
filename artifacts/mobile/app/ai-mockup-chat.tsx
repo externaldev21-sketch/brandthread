@@ -16,6 +16,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
+import { FONT, FS } from '@/lib/theme';
 
 interface Message {
   id: string;
@@ -97,7 +98,7 @@ export default function AIMockupChatScreen() {
         subtitle="AI-generated mockups"
         rightElement={
           <View style={[styles.statusBadge, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.statusText, { color: colors.success }]}>Online</Text>
+            <Text style={[styles.statusText, { color: colors.foreground }]}>Online</Text>
           </View>
         }
       />
@@ -196,21 +197,21 @@ export default function AIMockupChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  statusText: { fontSize: 11, fontFamily: FONT.semibold },
   bubble: { maxWidth: '85%', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1 },
   userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  bubbleText: { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
+  bubbleText: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
   mockupImage: { width: 240, height: 240, borderRadius: 10, marginTop: 10 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
-  loadingText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  loadingText: { fontSize: 13, fontFamily: FONT.regular },
   suggestionList: { flexGrow: 0, maxHeight: 40 },
   suggestion: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, maxWidth: 220, alignSelf: 'center' },
-  suggestionText: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  suggestionText: { fontSize: 12, fontFamily: FONT.regular },
   inputBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 10 },
   inputWrap: { flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, gap: 8 },
-  input: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', maxHeight: 100, paddingTop: 6, paddingBottom: 6 },
-  sendBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  input: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, maxHeight: 100, paddingTop: 6, paddingBottom: 6 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, // 44x44 minimum touch target (COMP.minTouchTarget); was 36x36.
 });

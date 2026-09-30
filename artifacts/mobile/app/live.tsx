@@ -31,8 +31,11 @@ import { CachedImage } from '@/components/CachedImage';
 import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { FONT, FS, RADIUS } from '@/lib/theme';
+import { formatCents } from '@/lib/money';
 import { hapticLight } from '@/lib/haptics';
 import { profileHref } from '@/lib/profileNavigation';
+import { useApi } from '@/lib/api';
+import { confirmBlock, reportHref } from '@/lib/safety';
 import { verticalPagerListProps, VERTICAL_PAGER_VIEWABILITY } from '@/lib/feedPager';
 import { getLiveStreamProvider } from '@/lib/live/liveProvider';
 import { useLivePager, LIVE_END_ANIMATION_MS, type LiveRuntime } from '@/lib/live/useLivePager';
@@ -43,6 +46,8 @@ import {
   LiveViewerCount, LiveViewerStack, type LiveHeartLayerHandle,
 } from '@/components/live/LiveOverlays';
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
+import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
+import { LiveStreamOptionsSheet } from '@/components/live/LiveStreamOptionsSheet';
 import { LiveEmptyState } from '@/components/live/LiveEmptyState';
 import { VideoVisual } from './(tabs)/feed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
@@ -56,7 +61,7 @@ const ND = Platform.OS !== 'web';
 
 function LivePage({
   stream, rt, isActive, ending, pageWidth, pageHeight, topInset, bottomInset, muted,
-  onClose, onToggleSound, onFollow, onOpenHost, onBuy, onOpenBag, onShare, onGift, onLike, onSend, onOpenRtcPlayer,
+  onClose, onToggleSound, onFollow, onOpenHost, onBuy, onOpenBag, onShare, onGift, onMore, onLike, onSend, onOpenRtcPlayer,
 }: {
   stream: LiveStream;
   rt: LiveRuntime | undefined;
@@ -75,6 +80,8 @@ function LivePage({
   onOpenBag: () => void;
   onShare: () => void;
   onGift: () => void;
+  /** Report this live stream / block its host. */
+  onMore: () => void;
   onLike: (x: number, y: number, count?: number) => void;
   onSend: (text: string) => Promise<void>;
   onOpenRtcPlayer: () => void;
@@ -223,7 +230,7 @@ function LivePage({
         {pinned && (
           <LivePinnedProductCard product={pinned} onBuy={() => onBuy(pinned.productId)} onOpenBag={onOpenBag} />
         )}
-        <LiveCommentBar onSend={onSend} disabled={ending} onGift={onGift} onShare={onShare} />
+        <LiveCommentBar onSend={onSend} disabled={ending} onGift={onGift} onShare={onShare} onMore={onMore} />
       </View>
     </Animated.View>
   );
@@ -233,6 +240,7 @@ function LivePage({
 
 export default function LiveScreen() {
   const router = useRouter();
+  const api = useApi();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ streamId?: string; hostId?: string }>();
   const provider = useMemo(() => getLiveStreamProvider(), []);
@@ -247,6 +255,8 @@ export default function LiveScreen() {
   const [muted, setMuted] = useState(true);
   const [bagFor, setBagFor] = useState<LiveStream | null>(null);
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
+  const [giftFor, setGiftFor] = useState<LiveStream | null>(null);
+  const [optionsFor, setOptionsFor] = useState<LiveStream | null>(null);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [notice, setNotice] = useState('');
 
@@ -289,9 +299,50 @@ export default function LiveScreen() {
     } catch { /* dismissed */ }
   }, []);
 
-  const gift = useCallback(() => {
+  const gift = useCallback((stream: LiveStream) => {
     hapticLight();
-    setNotice('Thread Cash gifting is coming soon');
+    setGiftFor(stream);
+  }, []);
+
+  // Report/block — same reportHref()/confirmBlock() flow the real-time RTC
+  // viewer (app/buyer-live.tsx) already uses, so a report lands in the same
+  // moderation queue either way. Not Alert.alert though: react-native-web's
+  // Alert.alert is a no-op (see LiveStreamOptionsSheet's doc comment), which
+  // is exactly why buyer-live.tsx's equivalent menu silently does nothing in
+  // the web preview — a real Modal-based sheet instead.
+  const openStreamOptions = useCallback((stream: LiveStream) => {
+    hapticLight();
+    setOptionsFor(stream);
+  }, []);
+
+  const reportStream = useCallback((stream: LiveStream) => {
+    router.push(reportHref({
+      targetType: 'live',
+      targetId: stream.id,
+      label: stream.title,
+      ownerId: stream.host.id,
+      ownerName: stream.host.name,
+    }) as never);
+  }, [router]);
+
+  const blockStreamHost = useCallback(async (stream: LiveStream) => {
+    if (await confirmBlock({ userId: stream.host.id, name: stream.host.name }, api.social.block)) {
+      pager.removeStream(stream.id, stream.host.name);
+    }
+  }, [api, pager]);
+
+  const handleGiftSent = useCallback(async (stream: LiveStream, amountCents: number) => {
+    setGiftFor(null);
+    try {
+      await pager.sendChat(`sent ${formatCents(amountCents)} Thread Cash`);
+    } catch {
+      // The transfer already went through — a failed chat post isn't worth
+      // surfacing as an error on top of a successful gift.
+    }
+  }, [pager]);
+
+  const handleGiftFailed = useCallback((message: string) => {
+    setNotice(message);
   }, []);
 
   const buy = useCallback((stream: LiveStream, productId: string) => {
@@ -381,7 +432,8 @@ export default function LiveScreen() {
                 onBuy={pid => buy(item, pid)}
                 onOpenBag={() => setBagFor(item)}
                 onShare={() => { void share(item); }}
-                onGift={gift}
+                onGift={() => gift(item)}
+                onMore={() => openStreamOptions(item)}
                 onLike={(x, y, count) => { heartsRef.current?.burst(x, y, count); pager.like(item.id); }}
                 onSend={async text => {
                   try { await pager.sendChat(text); } catch (e: any) {
@@ -418,6 +470,25 @@ export default function LiveScreen() {
           reduceMotion={reduceMotion}
         />
       )}
+      {giftFor && (
+        <LiveThreadCashSheet
+          visible
+          brandName={giftFor.host.name}
+          recipientId={giftFor.host.id}
+          onClose={() => setGiftFor(null)}
+          onSent={amountCents => { void handleGiftSent(giftFor, amountCents); }}
+          onSendFailed={handleGiftFailed}
+        />
+      )}
+      {optionsFor && (
+        <LiveStreamOptionsSheet
+          visible
+          hostName={optionsFor.host.name}
+          onClose={() => setOptionsFor(null)}
+          onReport={() => reportStream(optionsFor)}
+          onBlock={() => { void blockStreamHost(optionsFor); }}
+        />
+      )}
       <Snackbar visible={!!notice} message={notice} onDismiss={() => setNotice('')} />
     </View>
   );
@@ -433,8 +504,8 @@ const styles = StyleSheet.create({
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   topRow: { position: 'absolute', left: 10, right: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  topIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  topIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   title: {
     position: 'absolute', left: 14, right: 14, color: 'rgba(255,255,255,0.9)', fontFamily: FONT.medium, fontSize: 13,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3,
@@ -446,5 +517,5 @@ const styles = StyleSheet.create({
   // and anchors the top-fade gradient to the same box.
   chatWrap: { maxHeight: 210, justifyContent: 'flex-end' },
   chatTopFade: { position: 'absolute', top: 0, left: 0, right: 0, height: 28 },
-  emptyClose: { position: 'absolute', right: 10, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  emptyClose: { position: 'absolute', right: 8, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

@@ -20,7 +20,7 @@ import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
 import { isPreviewInboxEnabled, getSellerPreviewConversations } from '@/lib/previewInbox';
-import { isPreviewDemoMode } from '@/lib/devPreview';
+import { isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -90,7 +90,16 @@ export default function SellerInboxScreen() {
   }, [myId]);
 
   const load = useCallback(async (generation: number, silent = false) => {
-    if (!myId) {
+    // isSellerDevPreview() (not just !myId): a stubbed/fake-signed-in Clerk
+    // session (e.g. this app's own audit/e2e harnesses, which fake a signed
+    // -in user so protected screens render at all) still reports a truthy
+    // myId, which used to fall through to the real api.conversations.list()
+    // call below and 404 against a harness with no backend — a real,
+    // avoidable console error, not a genuine failure. bt_preview is read
+    // straight off the URL/persisted role (lib/devPreview.ts), independent
+    // of Clerk's auth state, so it still routes to the branch below however
+    // Clerk is stubbed.
+    if (!myId || isSellerDevPreview()) {
       // The dev-web ?bt_preview=seller bypass never signs in through Clerk
       // (see lib/devPreview.ts), so `myId` is empty here in that mode —
       // without this branch the seller inbox had nothing to show at all in
