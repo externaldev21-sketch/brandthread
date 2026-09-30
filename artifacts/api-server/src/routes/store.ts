@@ -121,14 +121,20 @@ function safeFontFamily(val: unknown, fallback: string): string {
   return SAFE_FONT_RE.test(s) && s.length <= 200 ? s : fallback;
 }
 
+// Brand-new, never-customized storefronts (getOrCreateStorefront's own
+// insert default, below) get this theme — black/white/silver + Inter,
+// matching the app's own monochrome identity, since this is the first
+// thing a genuinely fresh real seller with an empty store sees. A seller
+// who customizes their own theme afterward keeps their own chosen values;
+// this only ever affects the untouched default.
 const THREAD_THEME_LIGHT = {
   themeId: "thread",
-  primaryColor: "#111111",
-  secondaryColor: "#6B6B6B",
-  accentColor: "#2B2B2B",
-  backgroundColor: "#F7F7F5",
-  textColor: "#111111",
-  fontFamily: "Cormorant Garamond, Georgia, serif",
+  primaryColor: "#000000",
+  secondaryColor: "#C0C0C0",
+  accentColor: "#000000",
+  backgroundColor: "#FFFFFF",
+  textColor: "#000000",
+  fontFamily: "'Inter', system-ui, sans-serif",
   borderRadius: 0,
 };
 
@@ -373,6 +379,47 @@ async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; s
     </section>`;
   }).join("\n");
 
+  // sectionHtml can be a non-empty STRING (so the old `sectionHtml ||
+  // fallback` check below never triggered) while still rendering nothing
+  // visible: a storefront whose sections are all "footer"/"spacer" (which
+  // deliberately render "" — see above) joins into a whitespace-only
+  // string that's truthy in JS even though the <body> is empty. That is
+  // exactly how a real signed-in seller's own real preview read as a
+  // blank/broken page with zero visible text — not the sections.length
+  // === 0 case (which already had a working "story" welcome fallback
+  // below), but a non-empty sections array whose rendered output happens
+  // to be blank. hasVisibleSectionContent (trimmed) catches both; only
+  // the second, previously-uncaught case gets this product-grid fallback
+  // (the same "No products published yet." copy every configured
+  // product_grid section already shows) — sections.length === 0 keeps
+  // its existing "story" welcome message unchanged, since that one
+  // already rendered correctly.
+  const hasVisibleSectionContent = sectionHtml.trim().length > 0;
+  const fallbackSectionHtml = !hasVisibleSectionContent && sections.length > 0
+    ? (() => {
+        const cards = storeProducts.length > 0
+          ? storeProducts.map((p) => {
+              const img = p.image && /^https?:\/\//i.test(p.image)
+                ? `<img src="${escapeAttr(p.image)}" alt="${escapeAttr(p.name)}">`
+                : `<div class="product-image-placeholder" aria-hidden="true"></div>`;
+              return `<article class="product-card">
+                <div class="product-image">${img}</div>
+                <div class="product-meta"><span>${escapeHtml(p.name)}</span><span>${formatUsdCents(p.priceCents)}</span></div>
+                <button type="button" class="add-to-cart-btn" ${p.inStock ? "" : "disabled"}
+                  data-product-id="${escapeAttr(p.id)}" data-variant-id="${escapeAttr(p.variantId)}"
+                  data-name="${escapeAttr(p.name)}" data-price="${p.priceCents}" data-image="${escapeAttr(p.image ?? "")}">
+                  ${p.inStock ? "Add to cart" : "Sold out"}
+                </button>
+              </article>`;
+            }).join("")
+          : `<p class="empty-catalog">No products published yet.</p>`;
+        return `<section class="collection">
+          <div class="section-heading"><h2>Current collection</h2><p></p></div>
+          <div class="product-grid">${cards}</div>
+        </section>`;
+      })()
+    : "";
+
   // SEO fields go into attributes / <title> — escape accordingly
   const metaTitle = escapeHtml(seo.metaTitle ?? sf.title ?? "My Store");
   const metaDesc  = escapeAttr(seo.metaDescription ?? branding.tagline ?? "");
@@ -390,9 +437,12 @@ async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; s
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>${metaTitle}</title>
 <meta name="description" content="${metaDesc}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:${bg};color:${txt};font-family:Raleway,Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:64px;}
+body{background:${bg};color:${txt};font-family:${font};-webkit-font-smoothing:antialiased;padding-bottom:64px;}
 nav{display:flex;align-items:center;justify-content:space-between;padding:22px clamp(20px,4vw,64px);background:${bg}f2;border-bottom:1px solid ${secondary};position:sticky;top:0;z-index:10;}
 .logo{font:500 clamp(1.1rem,2vw,1.5rem)/1 ${font};color:${txt};letter-spacing:.08em;}
 .nav-links{display:flex;gap:clamp(14px,3vw,36px);}
@@ -459,7 +509,7 @@ ${bannerText ? `<div class="preview-banner">${bannerText}</div>` : ""}
   <span class="logo">${title}</span>
   <div class="nav-links"><a href="#">Shop</a><a href="#">Collections</a><a href="#">About</a><a href="#">Contact</a></div>
 </nav>
-${sectionHtml || `<section class="story">
+${hasVisibleSectionContent ? sectionHtml : sections.length > 0 ? fallbackSectionHtml : `<section class="story">
   <p class="eyebrow">Thread Theme by Brandthread</p>
   <h1>${title}</h1>
   <p>${tagline || "Your storefront is ready. Publish to go live."}</p>
