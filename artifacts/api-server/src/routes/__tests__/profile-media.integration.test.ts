@@ -139,7 +139,7 @@ describe("GET /api/public/users/:userId/videos", () => {
       mediaType: "video",
       authorAccountType: "seller",
       viewsCount: 2,
-       likesCount: 2,
+      likesCount: 2,
       seller: { brandName: "Thread Atelier" },
     });
     // Tagged product carries its live lowest variant price for the shop pill.

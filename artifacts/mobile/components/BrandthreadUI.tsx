@@ -10,7 +10,7 @@ import {
   View, Text, TouchableOpacity, TextInput, ScrollView,
   StyleSheet, ActivityIndicator, Animated, Platform,
   ViewStyle, TextStyle, StyleProp, Pressable,
-  Switch, SwitchProps, PressableProps, LayoutChangeEvent,
+  SwitchProps, PressableProps, LayoutChangeEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -1272,44 +1272,121 @@ export function CheckoutSkeleton() {
   );
 }
 
-// Brand rule: the app is black/white/silver only — green (and any other
-// accent hue) is reserved for Thread Cash. A Switch has no "brand accent" of
-// its own the way a button or link does, so every toggle in the app defaults
-// to this fixed monochrome pair regardless of which of the 12 seller
-// storefront themes (AppThemeContext) is active — a toggle is a system-style
-// control, not storefront-brand-colored chrome. `trackColor`/`thumbColor`
-// stay overridable for the rare legitimate exception (e.g. Thread Cash).
-const SWITCH_TRACK_OFF = '#3A3A3C'; // dark grey
-const SWITCH_TRACK_ON  = '#E5E5E5'; // silver/white
-const SWITCH_THUMB_OFF = '#FFFFFF'; // white thumb reads clearly on the dark-grey track
-const SWITCH_THUMB_ON  = '#000000'; // black thumb reads clearly on the silver/white track
+// Brand rule: the app is black/white/silver only — color is reserved for a
+// short, explicit allowlist (LIVE red, end-call red, Thread Cash green, and
+// this switch's own ON green — see half-done-audit.mjs's ALLOWED_ACCENTS).
+// The ON state gets its own green rather than staying monochrome: a switch
+// that's just "black or white" like everything else around it reads as
+// ambiguous about which state is on, in a way a live/Thread-Cash accent
+// doesn't need to worry about.
+//
+// This does NOT render react-native's <Switch>: RN's Switch, given custom
+// colors, renders correctly on iOS/Android but badly on web — react-
+// native-web draws its thumb and track as independently-sized elements, so
+// a thumb bigger than a thin custom-colored track hangs off the end instead
+// of sliding inside it (see the screenshot this was filed from: Add
+// Product's "Track inventory"/"Allow overselling" toggles). Since this app
+// ships on web too, HapticSwitch instead draws its own track+thumb with
+// Animated/Pressable — identical output on every platform, no native
+// component involved at all.
+const SWITCH_WIDTH  = 51;
+const SWITCH_HEIGHT = 31;
+const SWITCH_THUMB_SIZE = 27;
+const SWITCH_THUMB_INSET = 2;
+const SWITCH_TRAVEL = SWITCH_WIDTH - SWITCH_THUMB_SIZE - SWITCH_THUMB_INSET * 2;
+const SWITCH_TRACK_OFF = '#E5E5E5'; // white/light
+const SWITCH_TRACK_ON  = '#34C759'; // green — see ALLOWED_ACCENTS note above
+const SWITCH_THUMB_OFF = '#8E8E93'; // mid-grey knob, reads against the light track
+const SWITCH_THUMB_ON  = '#1E8E3E'; // deeper green knob, stays visible on the green track
+const SWITCH_BORDER_OFF = '#BDBDBD'; // 1px border, off state only
 
-export function HapticSwitch({ onValueChange, trackColor, thumbColor, value, ...props }: SwitchProps) {
-  const resolvedThumbColor = thumbColor ?? (value ? SWITCH_THUMB_ON : SWITCH_THUMB_OFF);
+export function HapticSwitch({
+  onValueChange, trackColor, thumbColor, value, disabled, style, testID,
+  accessibilityLabel, accessibilityHint, hitSlop,
+}: SwitchProps) {
+  const on = !!value;
+  const anim = useRef(new Animated.Value(on ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: on ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false, // animating backgroundColor/border, not transform-only
+    }).start();
+  }, [on, anim]);
+
+  const trackOffColor = trackColor?.false ?? SWITCH_TRACK_OFF;
+  const trackOnColor  = trackColor?.true  ?? SWITCH_TRACK_ON;
+
+  const trackBackground = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [trackOffColor, trackOnColor] as unknown as number[],
+  });
+  // A caller-supplied `thumbColor` is one static color in both states (same
+  // shape react-native's own Switch uses); otherwise the knob crossfades
+  // between its own off/on colors right alongside the track.
+  const thumbBackground = thumbColor ?? anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SWITCH_THUMB_OFF, SWITCH_THUMB_ON] as unknown as number[],
+  });
+  const thumbTranslateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, SWITCH_TRAVEL] });
+  const borderOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+
+  function handlePress() {
+    if (disabled) return;
+    hapticSelection();
+    onValueChange?.(!on);
+  }
+
   return (
-    <Switch
-      {...props}
-      value={value}
-      trackColor={trackColor ?? { false: SWITCH_TRACK_OFF, true: SWITCH_TRACK_ON }}
-      thumbColor={resolvedThumbColor}
-      // react-native-web's Switch has a web-only `activeThumbColor` prop for
-      // the thumb while the switch is on, separate from `thumbColor`. Native
-      // iOS/Android ignore it entirely and just use `thumbColor` in both
-      // states. When a screen sets a custom `thumbColor` (e.g. white) but
-      // never passes `activeThumbColor`, react-native-web silently falls
-      // back to its own default (#009688, teal) for the "on" thumb — so on
-      // web only, every switch with a custom thumb color showed a
-      // hardcoded teal dot once flipped on. Mirror the resolved thumb color
-      // into it so web matches native and the app stays on-brand in all
-      // themes.
-      {...({ activeThumbColor: resolvedThumbColor } as object)}
-      onValueChange={(next) => {
-        hapticSelection();
-        onValueChange?.(next);
-      }}
-    />
+    <Pressable
+      onPress={handlePress}
+      disabled={disabled}
+      // 51×31 track already clears 44pt in width; pad height to a full
+      // 44×44 hit area without changing the drawn size.
+      style={[{ width: SWITCH_WIDTH, height: 44, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1 }, style]}
+      hitSlop={hitSlop ?? { top: 7, bottom: 7, left: 0, right: 0 }}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: on, disabled: !!disabled }}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      testID={testID}
+    >
+      <Animated.View style={[switchStyles.track, { backgroundColor: trackBackground }]}>
+        {/* Border only reads on the OFF track (crossfades out with `anim`) — the
+            ON track is a solid, already-visible green with no border needed. */}
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, switchStyles.track, { borderWidth: 1, borderColor: SWITCH_BORDER_OFF, opacity: borderOpacity }]} />
+        <Animated.View
+          style={[
+            switchStyles.thumb,
+            { backgroundColor: thumbBackground, transform: [{ translateX: thumbTranslateX }] },
+          ]}
+        />
+      </Animated.View>
+    </Pressable>
   );
 }
+
+const switchStyles = StyleSheet.create({
+  track: {
+    width: SWITCH_WIDTH,
+    height: SWITCH_HEIGHT,
+    borderRadius: SWITCH_HEIGHT / 2,
+    justifyContent: 'center',
+  },
+  thumb: {
+    position: 'absolute',
+    left: SWITCH_THUMB_INSET,
+    width: SWITCH_THUMB_SIZE,
+    height: SWITCH_THUMB_SIZE,
+    borderRadius: SWITCH_THUMB_SIZE / 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+});
 
 const skS = StyleSheet.create({
   feed: { padding: SP.md, gap: SP.sm, backgroundColor: SCREEN_BG },

@@ -14,12 +14,13 @@
  * where the two colors differ. This component is transparent; the
  * screen's own root background shows straight through.
  */
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FilterChip, PressableScale, SearchBar } from '@/components/BrandthreadUI';
+import { hapticSelection } from '@/lib/haptics';
 
 export interface SellerListHeaderAction {
   icon: keyof typeof Feather.glyphMap;
@@ -35,10 +36,24 @@ export interface SellerListHeaderChip {
   onPress: () => void;
 }
 
+/** A real, working alternate view for the title dropdown — never a filter
+ *  already exposed as a status chip below (that would be a second control
+ *  for the same thing) and never a route/screen that doesn't actually
+ *  exist yet. See each screen's own call site for what's real for it. */
+export interface SellerListHeaderMenuOption {
+  key: string;
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}
+
 export interface SellerListHeaderProps {
   title: string;
-  onTitlePress: () => void;
-  titleAccessibilityLabel: string;
+  /** Omit (or pass an empty array) when there is nothing real to switch
+   *  to — the title then renders as plain static text with no chevron,
+   *  rather than an affordance that opens a menu leading nowhere. */
+  titleMenu?: SellerListHeaderMenuOption[];
+  titleAccessibilityLabel?: string;
   actions: SellerListHeaderAction[];
   searchValue: string;
   onSearchChange: (value: string) => void;
@@ -71,7 +86,7 @@ export const sellerListCountRowStyles = StyleSheet.create({
 });
 
 export function SellerListHeader({
-  title, onTitlePress, titleAccessibilityLabel, actions,
+  title, titleMenu, titleAccessibilityLabel, actions,
   searchValue, onSearchChange, searchPlaceholder,
   onFilterPress, hasActiveFilter, filterAccessibilityLabel,
   onSortPress, sortAccessibilityLabel,
@@ -79,19 +94,42 @@ export function SellerListHeader({
 }: SellerListHeaderProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
+  const hasMenu = !!titleMenu && titleMenu.length > 0;
+  const titleWrapRef = useRef<View>(null);
+  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
+
+  function openTitleMenu() {
+    hapticSelection();
+    titleWrapRef.current?.measureInWindow((x, y, _width, height) => {
+      setMenuAnchor({ x, y: y + height + 6 });
+    });
+  }
+
+  function closeTitleMenu() {
+    setMenuAnchor(null);
+  }
 
   return (
     <View>
       {/* Title row */}
       <View style={s.titleRow}>
-        <PressableScale
-          style={s.titleBtn}
-          onPress={onTitlePress}
-          accessibilityLabel={titleAccessibilityLabel}
-        >
-          <Text style={[s.titleText, { color: theme.text }]}>{title}</Text>
-          <Feather name="chevron-down" size={18} color={theme.muted} />
-        </PressableScale>
+        <View ref={titleWrapRef} collapsable={false}>
+          {hasMenu ? (
+            <PressableScale
+              style={s.titleBtn}
+              onPress={openTitleMenu}
+              accessibilityLabel={titleAccessibilityLabel ?? `${title}, choose a view`}
+              accessibilityRole="button"
+            >
+              <Text style={[s.titleText, { color: theme.text }]}>{title}</Text>
+              <Feather name="chevron-down" size={18} color={theme.muted} />
+            </PressableScale>
+          ) : (
+            <View style={s.titleBtn}>
+              <Text style={[s.titleText, { color: theme.text }]}>{title}</Text>
+            </View>
+          )}
+        </View>
         <View style={s.titleActions}>
           {actions.map((action) => (
             <PressableScale
@@ -105,6 +143,49 @@ export function SellerListHeader({
           ))}
         </View>
       </View>
+
+      {hasMenu && (
+        <Modal
+          visible={!!menuAnchor}
+          transparent
+          animationType="fade"
+          onRequestClose={closeTitleMenu}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeTitleMenu} accessibilityLabel="Close menu" />
+          {menuAnchor && (
+            <View
+              style={[
+                s.titleMenu,
+                {
+                  top: menuAnchor.y,
+                  left: menuAnchor.x,
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                  shadowColor: theme.shadowColor,
+                },
+              ]}
+            >
+              {titleMenu!.map((option) => (
+                <PressableScale
+                  key={option.key}
+                  style={s.titleMenuRow}
+                  onPress={() => {
+                    hapticSelection();
+                    closeTitleMenu();
+                    option.onSelect();
+                  }}
+                  accessibilityRole="menuitem"
+                  accessibilityState={{ selected: option.selected }}
+                  accessibilityLabel={option.label}
+                >
+                  <Text style={[s.titleMenuLabel, { color: theme.text }]}>{option.label}</Text>
+                  {option.selected && <Feather name="check" size={16} color={theme.text} />}
+                </PressableScale>
+              ))}
+            </View>
+          )}
+        </Modal>
+      )}
 
       {/* Search row */}
       <View style={s.searchRow}>
@@ -214,5 +295,28 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     paddingBottom: SP.sm,
     paddingTop: 2,
     gap: SP.xs,
+  },
+  titleMenu: {
+    position: 'absolute',
+    minWidth: 190,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    paddingVertical: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  titleMenuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SP.md,
+    paddingHorizontal: SP.md,
+    minHeight: 44,
+  },
+  titleMenuLabel: {
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
   },
 });

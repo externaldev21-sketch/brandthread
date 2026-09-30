@@ -385,17 +385,18 @@ export async function publishNotification(n: {
   if (!notification || isMuted) return;
 
   if (pushCategory) {
-    // Conversation mute only suppresses device delivery. The feed row above is
-    // still retained and unread state remains unchanged.
+    // A muted conversation (conversation_participants.muted_until in the
+    // future) only suppresses device delivery; the feed row above is kept and
+    // unread state is unchanged.
     if (n.targetType === "conversation" && n.targetId) {
-      const [participant] = await db.select({ isMuted: conversationParticipants.isMuted })
+      const [participant] = await db.select({ mutedUntil: conversationParticipants.mutedUntil })
         .from(conversationParticipants)
         .where(and(
           eq(conversationParticipants.conversationId, n.targetId),
           eq(conversationParticipants.userId, n.userId),
         ))
         .limit(1);
-      if (participant?.isMuted) return;
+      if (participant?.mutedUntil && participant.mutedUntil.getTime() > Date.now()) return;
     }
 
     await sendPushToUser(n.userId, {
