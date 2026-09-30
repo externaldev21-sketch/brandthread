@@ -8,16 +8,23 @@
  * instant search, an editable row of pinned shortcuts, and compact grouped
  * sections covering every seller destination.
  *
- * Presented as a tall spring-rise sheet (not the old centered fade), with a
- * swipe-down-to-dismiss drag on the handle/header, haptics on every tap, and
- * full theming via useAppTheme() so all 12 brand themes apply through tokens.
+ * Presented as a fast slide-up/down sheet (Reanimated + react-native-gesture-
+ * handler, UI thread only): swipe DOWN anywhere on the sheet dismisses it —
+ * the sheet tracks the finger 1:1, rubber-bands if dragged up past its
+ * resting position, and either snaps back or slides fully offscreen once
+ * released past ~25% of its height or on a fast downward flick. Inner
+ * content (the ScrollView) still scrolls normally; the drag only takes over
+ * once that content is scrolled to the top, exactly like an iOS page sheet.
+ * Tapping the dimmed area above the sheet triggers the identical fast
+ * slide-down. There is no separate close (X) button — Dev's own call: once
+ * swipe/tap-to-dismiss exist, a dedicated close button is redundant chrome,
+ * and it used to float over the "View store" pill. Android back and Escape
+ * (web) still close it via the Modal's own onRequestClose.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
   Modal,
-  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,12 +32,21 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  cancelAnimation,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
+import { SHEET_EASING, SHEET_OPEN_MS, SHEET_CLOSE_MS } from '@/constants/motion';
 
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
@@ -70,6 +86,16 @@ export { ALL_ITEMS, SECTIONS, DEFAULT_PINNED_IDS } from '@/lib/sellerControlCent
 const PIN_TILE_SIZE = 78;
 const PIN_TILE_GAP = 8;
 
+/** Rubber-band resistance for dragging the sheet up past its resting
+ *  position — a diminishing-returns curve (never a hard clamp) that
+ *  asymptotically approaches -(dim*c) however far past rest the finger
+ *  travels. `value` is always <= 0 here (translateY dragged negative). */
+function rubberBandUp(value: number, dim = 100, c = 0.55) {
+  'worklet';
+  const x = -value;
+  return -((x * dim * c) / (dim + c * x));
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface SellerStudioRadialMenuProps {
@@ -93,18 +119,16 @@ export default function SellerStudioRadialMenu({
 
   const { userId, isSignedIn } = useAuth();
 
-  // Backdrop + close-button progress (kept — device contract taps by label).
-  const progress = useRef(new Animated.Value(0)).current;
-  // Sheet rise + drag-to-dismiss.
-  const sheetY = useRef(new Animated.Value(0)).current;
-  const dragY = useRef(new Animated.Value(0)).current;
   const sheetHeight = Math.min(screenHeight * 0.9, screenHeight - insets.top - 24);
-  // Close (X) button floats in the dimmed backdrop, clear ABOVE the sheet's
-  // top edge, so it never overlaps the sheet header's "View store" button.
-  // Was previously pinned to `insets.top + SP.xl` regardless of sheet
-  // height, which put it on top of the header row on most phone sizes.
-  const sheetTop = screenHeight - sheetHeight;
-  const closeButtonTop = Math.max(headerTopInset + SP.md, sheetTop - 52 - SP.md);
+
+  // Sheet transform + backdrop opacity, both UI-thread shared values —
+  // translateY doubles as the "distance below resting position" the sheet
+  // sits at, so 0 = fully open and `sheetHeight` = fully offscreen.
+  const translateY = useSharedValue(sheetHeight);
+  const backdropOpacity = useSharedValue(0);
+  // Captured at the start of each drag so onUpdate computes an absolute
+  // position from the gesture's cumulative translation, not a running delta.
+  const dragStartY = useSharedValue(0);
 
   const [open, setOpen] = useState(false);
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
@@ -182,39 +206,42 @@ export default function SellerStudioRadialMenu({
   }, [userId]);
 
   useEffect(() => () => {
-    progress.stopAnimation();
-    sheetY.stopAnimation();
-    dragY.stopAnimation();
-  }, [progress, sheetY, dragY]);
+    cancelAnimation(translateY);
+    cancelAnimation(backdropOpacity);
+  }, [translateY, backdropOpacity]);
 
   // ── Open / close ────────────────────────────────────────────────────────────
+  // A single fast timeline (never a spring — a spring's overshoot/settle
+  // reads as a bounce, not the "swift and fast" slide Dev asked for) shared
+  // by every way the sheet opens or closes: the initial expand, choosing an
+  // item, tapping the backdrop, and the swipe gesture below. `pendingAfterRef`
+  // carries a one-shot callback (e.g. "navigate after the sheet finishes
+  // closing") through to `finishClose`, which only ever runs once the close
+  // animation has actually completed.
+
+  const pendingAfterRef = useRef<(() => void) | null>(null);
+
+  const finishClose = useCallback(() => {
+    setOpen(false);
+    const after = pendingAfterRef.current;
+    pendingAfterRef.current = null;
+    after?.();
+  }, []);
+
+  const hapticDismiss = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }, []);
 
   const expand = useCallback(() => {
     setOpen(true);
     setEditMode(false);
     setQuery('');
-    progress.setValue(0);
-    sheetY.setValue(sheetHeight);
-    dragY.setValue(0);
+    translateY.value = sheetHeight;
+    backdropOpacity.value = 0;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-
-    requestAnimationFrame(() => {
-      Animated.spring(progress, {
-        toValue: 1,
-        damping: 22,
-        stiffness: 220,
-        mass: 0.6,
-        useNativeDriver: true,
-      }).start();
-      Animated.spring(sheetY, {
-        toValue: 0,
-        damping: 20,
-        stiffness: 180,
-        mass: 0.7,
-        useNativeDriver: true,
-      }).start();
-    });
-  }, [progress, sheetY, dragY, sheetHeight]);
+    translateY.value = withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING });
+    backdropOpacity.value = withTiming(1, { duration: SHEET_OPEN_MS, easing: SHEET_EASING });
+  }, [translateY, backdropOpacity, sheetHeight]);
 
   useEffect(() => {
     if (openRequestKey > 0 && !open) expand();
@@ -222,33 +249,60 @@ export default function SellerStudioRadialMenu({
   }, [openRequestKey]);
 
   const collapse = useCallback((after?: () => void) => {
-    Animated.timing(progress, { toValue: 0, duration: 180, useNativeDriver: true }).start();
-    Animated.timing(sheetY, { toValue: sheetHeight, duration: 200, useNativeDriver: true }).start(() => {
-      setOpen(false);
-      after?.();
+    pendingAfterRef.current = after ?? null;
+    backdropOpacity.value = withTiming(0, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING });
+    translateY.value = withTiming(sheetHeight, { duration: SHEET_CLOSE_MS, easing: SHEET_EASING }, (finished) => {
+      if (finished) runOnJS(finishClose)();
     });
-  }, [progress, sheetY, sheetHeight]);
+  }, [backdropOpacity, translateY, sheetHeight, finishClose]);
 
-  // ── Drag-to-dismiss (handle + header) ─────────────────────────────────────
+  // ── Swipe-to-dismiss (anywhere on the sheet) ───────────────────────────────
+  // Wraps the ENTIRE sheet (header + search + the ScrollView), not just the
+  // handle — react-native-gesture-handler's Pan gesture only takes over from
+  // a nested native ScrollView once that ScrollView can't scroll further in
+  // the gesture's direction (i.e. already at the top), so inner content
+  // keeps scrolling normally and the drag only starts a dismiss once scrolled
+  // to the top — the same composition every other sheet in this app
+  // (ShopProductSheet, useSheetTransition) already relies on.
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 6 && Math.abs(g.dy) > Math.abs(g.dx),
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) dragY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 100 || g.vy > 0.8) {
-          collapse();
-        } else {
-          Animated.spring(dragY, { toValue: 0, damping: 18, stiffness: 220, useNativeDriver: true }).start();
-        }
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(dragY, { toValue: 0, damping: 18, stiffness: 220, useNativeDriver: true }).start();
-      },
-    }),
-  ).current;
+  const panGesture = useMemo(() => Gesture.Pan()
+    .onStart(() => {
+      dragStartY.value = translateY.value;
+    })
+    .onUpdate((e) => {
+      const next = dragStartY.value + e.translationY;
+      // Dragging down (next > 0) tracks the finger 1:1. Dragging up past the
+      // sheet's resting position (next < 0) rubber-bands instead of hard
+      // clamping to 0 — a diminishing-returns curve that asymptotically
+      // approaches -55pt no matter how far past rest the finger travels.
+      translateY.value = next >= 0 ? next : rubberBandUp(next);
+    })
+    .onEnd((e) => {
+      const shouldClose = e.translationY > sheetHeight * 0.25 || e.velocityY > 800;
+      if (!shouldClose) {
+        translateY.value = withTiming(0, { duration: SHEET_OPEN_MS, easing: SHEET_EASING });
+        return;
+      }
+      runOnJS(hapticDismiss)();
+      // A flick carries its release velocity into the slide so a hard swipe
+      // feels instant rather than waiting out the standard close duration —
+      // never slower than SHEET_CLOSE_MS, never faster than a floor short
+      // enough to still read as a slide rather than a jump-cut.
+      const remaining = sheetHeight - translateY.value;
+      const velocityMs = e.velocityY > 0 ? (remaining / e.velocityY) * 1000 : SHEET_CLOSE_MS;
+      const duration = Math.min(SHEET_CLOSE_MS, Math.max(90, velocityMs));
+      backdropOpacity.value = withTiming(0, { duration, easing: SHEET_EASING });
+      translateY.value = withTiming(sheetHeight, { duration, easing: SHEET_EASING }, (finished) => {
+        if (finished) runOnJS(finishClose)();
+      });
+    }), [sheetHeight, translateY, dragStartY, backdropOpacity, hapticDismiss, finishClose]);
+
+  const sheetAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+  const backdropAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
 
   // ── Navigation / gating ────────────────────────────────────────────────────
 
@@ -447,30 +501,30 @@ export default function SellerStudioRadialMenu({
         <Animated.View
           testID="seller-studio-menu-backdrop"
           accessibilityLabel="Studio tools dark backdrop"
-          style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: progress }]}
+          style={[StyleSheet.absoluteFill, styles.backdrop, backdropAnimatedStyle]}
           pointerEvents="none"
         />
         <Pressable
           testID="seller-studio-menu-dismiss"
           accessibilityLabel="Dismiss Studio tools backdrop"
-          onPress={() => collapse()}
+          onPress={() => { hapticDismiss(); collapse(); }}
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Sheet */}
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              height: sheetHeight,
-              paddingBottom: Math.max(insets.bottom, 16),
-              transform: [
-                { translateY: Animated.add(sheetY, dragY) },
-              ],
-            },
-          ]}
-        >
-          <View {...panResponder.panHandlers}>
+        {/* Sheet — the whole thing (not just the handle) carries the
+            swipe-down-to-dismiss gesture; see panGesture's comment above for
+            why this composes correctly with the ScrollView inside it. */}
+        <GestureDetector gesture={panGesture}>
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                height: sheetHeight,
+                paddingBottom: Math.max(insets.bottom, 16),
+              },
+              sheetAnimatedStyle,
+            ]}
+          >
             <SheetHandle />
 
             {/* ── Store header ── */}
@@ -504,9 +558,8 @@ export default function SellerStudioRadialMenu({
             <View style={styles.searchWrap}>
               <SearchBar value={query} onChange={setQuery} placeholder="Search tools and settings…" />
             </View>
-          </View>
 
-          <ScrollView
+            <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -601,32 +654,8 @@ export default function SellerStudioRadialMenu({
               </>
             )}
           </ScrollView>
-        </Animated.View>
-
-        {/* Close button */}
-        <Animated.View
-          style={[
-            styles.toggle,
-            {
-              top: closeButtonTop,
-              backgroundColor: theme.accent,
-              shadowColor: theme.shadowColor,
-              opacity: progress,
-              transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }],
-            },
-          ]}
-          pointerEvents={open ? 'auto' : 'none'}
-        >
-          <Pressable
-            testID="seller-studio-menu-close"
-            accessibilityRole="button"
-            accessibilityLabel="Close Studio tools"
-            onPress={() => collapse()}
-            style={styles.toggleInner}
-          >
-            <Feather name="x" size={22} color={theme.onAccent} />
-          </Pressable>
-        </Animated.View>
+          </Animated.View>
+        </GestureDetector>
       </Modal>
 
       {/* ── Add-a-pin picker ── */}
@@ -883,11 +912,18 @@ const makeStyles = (theme: AppThemePreset, isTablet: boolean) => StyleSheet.crea
     borderBottomWidth: 1,
     borderBottomColor: theme.border,
   },
+  // Black fill + thin silver outline — same treatment as the add-pin
+  // picker's own icon tile (pickerIcon, below) — never a translucent-accent
+  // "grey square" fill, which in the monochrome (black/white/silver) theme
+  // rendered as a washed-out grey tile instead of matching the rest of the
+  // app's black/silver surfaces.
   rowIcon: {
     width: 36,
     height: 36,
     borderRadius: RADIUS.sm,
-    backgroundColor: theme.accentDim,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
