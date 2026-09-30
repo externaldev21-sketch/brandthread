@@ -348,17 +348,27 @@ const HEADER_GEOMETRY_SCRIPT = `(() => {
  * migrated onto ScreenHeader still looked wrong because ScreenHeader's own
  * push-variant back button was a bordered circular chip (fixed since, but
  * this guards against it — or any hand-rolled equivalent — coming back).
- * Only considers a `role=button`/`BUTTON` near the top-left or top-right of
- * the viewport (top < 130px, within 80px of either edge — where a header's
- * primary dismiss control lives) with BOTH a visible background color (not
- * transparent) and a visible border — a plain icon on a transparent
- * background is fine; a filled/bordered chip there is the regression. */
+ *
+ * Scoped specifically to the header's PRIMARY dismiss control, not any
+ * boxed button near the header — a first pass that flagged every boxed
+ * button near either edge false-positived on legitimate, intentionally-
+ * boxed chrome: right-side action icon buttons (ScreenHeader's own
+ * `actionBtn`, e.g. Customers' analytics icon) and labeled nav pills
+ * (Marketing Analytics' "Marketing" pill, Store Analytics' "Edit Store").
+ * ScreenHeader always labels its primary button "Go back from …" or
+ * "Close …" (and every hand-rolled header this crawl has found uses "Back"
+ * or "Close" too) — action buttons and pills are labeled with what they
+ * DO ("View customer analytics", "Marketing"), never "back"/"close", so
+ * matching the accessible name is a precise, reusable signal instead of
+ * position + styling alone. */
 const BOXED_HEADER_BUTTON_SCRIPT = `(() => {
   const results = [];
   const candidates = [...document.querySelectorAll('button, [role="button"]')];
   for (const el of candidates) {
     if (el.closest('[data-notch-exempt]')) continue;
     if (el.closest('[data-testid="buyer-bottom-tab-bar"], [data-testid="seller-global-tab-bar"]')) continue;
+    const label = el.getAttribute('aria-label') || '';
+    if (!/\\b(back|close)\\b/i.test(label)) continue;
     const style = window.getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
     const rect = el.getBoundingClientRect();
@@ -372,7 +382,7 @@ const BOXED_HEADER_BUTTON_SCRIPT = `(() => {
     const borderWidth = parseFloat(style.borderTopWidth) || 0;
     const hasVisibleBorder = borderWidth > 0 && style.borderTopStyle !== 'none';
     if (hasVisibleBg && hasVisibleBorder) {
-      results.push({ box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, element: (el.tagName + (el.id ? '#' + el.id : '') + ' "' + (el.textContent || el.getAttribute('aria-label') || '').slice(0, 40) + '"') });
+      results.push({ box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, element: (el.tagName + (el.id ? '#' + el.id : '') + ' "' + label.slice(0, 40) + '"') });
     }
   }
   return results;

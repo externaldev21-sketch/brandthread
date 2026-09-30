@@ -4,11 +4,12 @@
  *
  * Covers: (1) a real send actually persists before anything closes, (2) the
  * "You sent $X to {name}" confirmation reuses the existing monochrome
- * SuccessCheck 'draw' component (no new green/colored moment introduced),
- * and only afterward hands off to onSent + closes, (3) the in-thread
- * ThreadCashMessageCard's Accept/Cancel affordances follow status/sender
- * correctly, matching what both app/buyer-conversation.tsx and
- * app/seller-conversation.tsx rely on.
+ * SuccessCheck 'draw' component (no new colored checkmark/animation
+ * introduced — only the dollar amount itself is green, per "black/white UI,
+ * Thread Cash green only for amounts"), and only afterward hands off to
+ * onSent + closes, (3) the in-thread ThreadCashMessageCard's Accept/Cancel
+ * affordances follow status/sender correctly, matching what both
+ * app/buyer-conversation.tsx and app/seller-conversation.tsx rely on.
  */
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
@@ -94,6 +95,10 @@ vi.mock('@/components/motion/SheetRise', () => ({
 vi.mock('@/components/thread-cash/ThreadCashBill', () => ({
   ThreadCashBill: () => React.createElement('ThreadCashBill'),
   ThreadCashBillIcon: () => React.createElement('ThreadCashBillIcon'),
+  // Black/white UI, Thread Cash green only for amounts — the real token
+  // components/thread-cash/ChatAttachThreadCash.tsx colors every dollar
+  // figure with, same one SellerThreadCashCard uses for the Payouts balance.
+  THREAD_CASH_GREEN_MID: '#3DBE4F',
 }));
 // SuccessCheck itself is unit-tested in tests/success-check-draw.test.tsx
 // (its monochrome white-stroke-only rendering, no fill/color). Mocked here
@@ -116,6 +121,16 @@ function render(element: React.ReactElement) {
   let renderer!: ReactTestRenderer;
   act(() => { renderer = create(element); });
   return renderer;
+}
+
+/** Reassembles a Text test-instance's full rendered string, including any
+ *  nested <Text> children (e.g. a green amount split out of its surrounding
+ *  sentence) — `instance.props.children` alone only sees the immediate,
+ *  unrendered props, not a nested Text's own resolved contents. */
+function flattenTextInstance(instance: { children: Array<string | { children: unknown[] }> }): string {
+  return instance.children.map((child) =>
+    typeof child === 'string' ? child : flattenTextInstance(child as never),
+  ).join('');
 }
 
 describe('ThreadCashAttachButton — send confirmation (item 72)', () => {
@@ -172,7 +187,12 @@ describe('ThreadCashAttachButton — send confirmation (item 72)', () => {
     // draw variant as the checkout/order-published success screens —
     // never a new (potentially green) checkmark or animation curve.
     expect(successCheckCalls.at(-1)).toMatchObject({ variant: 'draw' });
-    const texts = tree.root.findAllByType('Text' as never).map((n) => [n.props.children].flat().join(''));
+    // The amount is now its own nested <Text> (green, per "black/white UI,
+    // Thread Cash green only for amounts") inside the "You sent …" line, so
+    // a Text node's own `props.children` no longer carries the full string —
+    // walk each Text instance's rendered children (which does include the
+    // nested Text instance) to reassemble it.
+    const texts = tree.root.findAllByType('Text' as never).map((n) => flattenTextInstance(n));
     expect(texts).toEqual(expect.arrayContaining([expect.stringContaining('You sent $10.00')]));
     expect(texts).toEqual(expect.arrayContaining([expect.stringContaining('to @forme22')]));
 
@@ -285,5 +305,23 @@ describe('ThreadCashMessageCard — chat bubble status affordances', () => {
       />,
     );
     expect(() => tree.root.findByProps({ testID: 'thread-cash-accept' })).toThrow();
+  });
+
+  it('colors the amount green (THREAD_CASH_GREEN_MID) and leaves "Thread Cash" itself black/white — the spec is amounts only', () => {
+    const tree = render(
+      <ThreadCashMessageCard
+        amountCents={500}
+        status="pending"
+        isRecipient
+        isSender={false}
+        onClaim={() => {}}
+      />,
+    );
+    const greenNode = tree.root.find((n) => (n.type as unknown) === 'Text' && n.props.style?.color === '#3DBE4F');
+    expect(flattenTextInstance(greenNode as never)).toBe('$5.00');
+    const monoNode = tree.root.find((n) =>
+      (n.type as unknown) === 'Text' && n.props.style?.color === '#FAFAFA' && n.props.children === ' Thread Cash',
+    );
+    expect(monoNode).toBeTruthy();
   });
 });
