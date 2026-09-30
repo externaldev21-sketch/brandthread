@@ -1356,6 +1356,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         ),
     },
     buyer: {
+      /** Saved sizes / preferences. GET returns defaults when nothing is saved; update is a partial merge (null clears a size). */
+      preferences: {
+        get: () => get<BuyerPreferences>('/api/buyer/preferences'),
+        update: (body: BuyerPreferencesPatch) => patch<BuyerPreferences>('/api/buyer/preferences', body),
+      },
       addresses: {
         list:   () => get<any[]>('/api/buyer/addresses'),
         autocomplete: (query: string, country = 'US') =>
@@ -3089,6 +3094,29 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       syncPayment: (id: string) => post<{ job: FreelancerJob; paymentStatus: string }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/sync-payment`, {}),
     },
   };
+}
+
+export interface BuyerMeasurementsDto { heightCm?: number; weightKg?: number; chestCm?: number; waistCm?: number; hipsCm?: number }
+export interface BuyerSizesDto {
+  tops?: string; bottoms?: string; outerwear?: string; shoes?: string;
+  measurements?: BuyerMeasurementsDto;
+}
+export interface BuyerPreferences {
+  sizes: BuyerSizesDto;
+  likedBrandIds: string[];
+  styleInterests: string[];
+  surveyCompletedAt: string | null;
+  updatedAt: string | null;
+}
+/** Partial update: omitted = unchanged, null = clear, arrays replace, surveyCompleted stamps/clears surveyCompletedAt. */
+export interface BuyerPreferencesPatch {
+  sizes?: {
+    tops?: string | null; bottoms?: string | null; outerwear?: string | null; shoes?: string | null;
+    measurements?: { [K in keyof BuyerMeasurementsDto]?: number | null };
+  };
+  likedBrandIds?: string[];
+  styleInterests?: string[];
+  surveyCompleted?: boolean;
 }
 
 export type BrandthreadApi = ReturnType<typeof createApi>;

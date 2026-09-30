@@ -1350,6 +1350,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-my-sizes" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-security"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-account-control" options={{ headerShown: false, animation: 'ios_from_right' }} />
