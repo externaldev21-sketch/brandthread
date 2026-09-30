@@ -165,7 +165,13 @@ const VIOLATION_SCRIPT = `(() => {
     if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
     const isText = el.childNodes.length > 0 && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent && n.textContent.trim());
     const tag = el.tagName;
-    const isLeafOfInterest = isText || tag === 'IMG' || tag === 'INPUT' || tag === 'BUTTON' || tag === 'svg' || el.getAttribute('role') === 'button' || el.getAttribute('role') === 'img';
+    // A BUTTON/role=button only counts if it has actual visible content
+    // (its own text, or an icon/image inside it) — an invisible full-width
+    // tap-to-dismiss zone above a bottom sheet (no text, no icon) has
+    // nothing to hide under the notch, so it isn't a real finding.
+    const hasVisibleContent = isText || !!el.querySelector('svg, img');
+    const isButton = tag === 'BUTTON' || el.getAttribute('role') === 'button';
+    const isLeafOfInterest = (isButton && hasVisibleContent) || tag === 'IMG' || tag === 'INPUT' || tag === 'svg' || el.getAttribute('role') === 'img';
     if (!isLeafOfInterest) continue;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) continue;
