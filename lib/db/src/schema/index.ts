@@ -15,6 +15,10 @@ import { relations, sql } from 'drizzle-orm';
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   clerkId: text('clerk_id').notNull().unique(),
+  // Case-insensitive uniqueness (one email = one account, 'A@x.com' and
+  // 'a@x.com' can't both exist) is enforced by a UNIQUE INDEX on
+  // lower(email) — migration 109 — not by this .unique(), which Drizzle's
+  // DSL can't express as case-insensitive. Always compare/store lowercased.
   email: text('email').notNull().unique(),
   name: text('name').notNull(),
   // role: 'owner' | 'admin' | 'member' (seller side) | 'buyer' | 'seller'
@@ -112,7 +116,10 @@ export const users = pgTable('users', {
   avatarPosterUrl:      text('avatar_poster_url'),
   avatarVideoUpdatedAt: timestamp('avatar_video_updated_at', { withTimezone: true }),
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
-  // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
+  // existing rows are unaffected. Case-insensitive platform-wide uniqueness
+  // ('GalleryDesires' and 'gallerydesires' can't both exist) is enforced by
+  // a UNIQUE INDEX on lower(username) WHERE username IS NOT NULL —
+  // migration 109 — not by this .unique(). Always store/compare lowercased.
   username: text('username').unique(),
   // Storefront visit counter — incremented by a public endpoint each time a buyer
   // views this seller's storefront. Drives the real conversion rate stat.

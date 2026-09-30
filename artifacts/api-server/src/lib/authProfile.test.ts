@@ -23,6 +23,18 @@ describe("Apple/private relay profile email handling", () => {
       .toBe("new@example.com");
   });
 
+  it("lowercases emails so the case-insensitive unique index (migration 109) always sees consistent casing", () => {
+    expect(getClerkEmailAddress({
+      primaryEmailAddressId: "primary",
+      emailAddresses: [{ id: "primary", emailAddress: "Ava.Reyes@Example.COM" }],
+    })).toBe("ava.reyes@example.com");
+    expect(preserveExistingEmail("New.Case@Example.com", "old@example.com"))
+      .toBe("new.case@example.com");
+    // A blank sync value still falls back to the existing stored value, untouched.
+    expect(preserveExistingEmail("", "Already.Stored@example.com"))
+      .toBe("Already.Stored@example.com");
+  });
+
   it("treats a missing later Apple name as absent instead of blank profile data", () => {
     expect(normalizeProfileName("  Alex   Rivera ")).toBe("Alex Rivera");
     expect(normalizeProfileName("   ")).toBeUndefined();

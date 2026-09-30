@@ -166,6 +166,8 @@ describe('seller bar full-screen deny-list', () => {
     'design-mockup-to-model',
     'store-generate',
     'store-generating',
+    // Full-bleed storefront render below its own close+device-toggle bar.
+    'store-preview',
     'quote-request',
     'seller-go-live',
     'seller-live',
@@ -225,7 +227,6 @@ describe('seller bar full-screen deny-list', () => {
     'store-policies',
     'store-publish',
     'store-seo',
-    'store-preview',
     'store-editor',
     'seller-profile',
     'seller-verification',

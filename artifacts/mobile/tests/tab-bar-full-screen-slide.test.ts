@@ -1,0 +1,104 @@
+/**
+ * Guard against the "floating seller tab bar renders on top of a full-screen
+ * camera/creation flow" regression class (e.g. 'buyer-story-create' was
+ * missing from the deny-list, so the bar rendered jammed under the story
+ * camera's shutter row) — and asserts the deny-list drives a real slide
+ * animation (never a spring, never a bare jump) rather than an instant
+ * mount/unmount.
+ *
+ * Source-inspection, same convention as lib/__tests__/freshInstallPreview.test.ts:
+ * app/_layout.tsx pulls in Clerk/Notifications/etc. at module scope, which
+ * vitest can't import directly.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { tabBarSlideTargetY } from '../lib/tabBarSlide';
+
+function src(relPath: string): string {
+  return readFileSync(resolve(__dirname, relPath), 'utf8');
+}
+
+describe('SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS covers every fullScreenModal route', () => {
+  it('every Stack.Screen registered with presentation: \'fullScreenModal\' is in the deny-list', () => {
+    const layout = src('../app/_layout.tsx');
+
+    const screenNames: string[] = [];
+    const screenRegex = /<Stack\.Screen\s+name="([^"]+)"[^/]*?presentation:\s*'fullScreenModal'/gs;
+    let match: RegExpExecArray | null;
+    while ((match = screenRegex.exec(layout)) !== null) {
+      screenNames.push(match[1]);
+    }
+    // Sanity: this regex must actually find the known fullScreenModal
+    // routes, or the test would pass vacuously on a parsing regression.
+    expect(screenNames).toEqual(expect.arrayContaining([
+      'camera-capture', 'create-post', 'buyer-story-viewer', 'buyer-story-create',
+      'seller-go-live', 'seller-live', 'buyer-live', 'live', 'live-feed',
+    ]));
+
+    const setMatch = layout.match(/const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set\(\[([\s\S]*?)\]\);/);
+    expect(setMatch).toBeTruthy();
+    const setBody = setMatch![1];
+
+    for (const name of screenNames) {
+      expect(setBody, `'${name}' is a fullScreenModal route but missing from SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS`)
+        .toMatch(new RegExp(`'${name}'`));
+    }
+  });
+
+  it('SellerBarGate keeps SellerGlobalTabBar mounted through a full-screen route (passes `hidden`, doesn\'t unmount it) so it can animate', () => {
+    const layout = src('../app/_layout.tsx');
+    expect(layout).toMatch(/if \(!showBar\) return null;/);
+    expect(layout).toMatch(/<SellerGlobalTabBar hidden=\{isFullScreenRoute\}/);
+  });
+});
+
+describe('tab bar slide motion: fast, plain ease-out, no spring', () => {
+  it('SellerGlobalTabBar drives translateY via withTiming on TAB_BAR_SLIDE_MS/EASING, never a spring', () => {
+    const bar = src('../components/SellerGlobalTabBar.tsx');
+    expect(bar).toContain("import { TAB_BAR_SLIDE_EASING, TAB_BAR_SLIDE_MS } from '@/constants/motion';");
+    expect(bar).toMatch(/withTiming\(tabBarSlideTargetY\(hidden, offscreenY\), \{\s*duration: TAB_BAR_SLIDE_MS,\s*easing: TAB_BAR_SLIDE_EASING,/);
+    expect(bar).not.toMatch(/withSpring/);
+    expect(bar).not.toContain('Animated.spring');
+  });
+
+  it('TAB_BAR_SLIDE_MS is fast (~150ms) and defines no spring constant alongside it', () => {
+    const motion = src('../constants/motion.ts');
+    expect(motion).toMatch(/export const TAB_BAR_SLIDE_MS = 150;/);
+    expect(motion).toMatch(/export const TAB_BAR_SLIDE_EASING = Easing\.bezier\(/);
+    expect(motion).not.toMatch(/TAB_BAR_SLIDE_SPRING/);
+  });
+
+  it('while hidden, the bar does not block taps (pointerEvents flips to none, not just visually offscreen)', () => {
+    const bar = src('../components/SellerGlobalTabBar.tsx');
+    expect(bar).toMatch(/pointerEvents=\{hidden \? 'none' : 'box-none'\}/);
+  });
+});
+
+describe('tabBarSlideTargetY: guaranteed end state, any toggle sequence', () => {
+  const offscreenY = 132;
+
+  it('returns exactly 0 when shown, exactly offscreenY when hidden — never anything in between', () => {
+    expect(tabBarSlideTargetY(false, offscreenY)).toBe(0);
+    expect(tabBarSlideTargetY(true, offscreenY)).toBe(offscreenY);
+  });
+
+  it('a rapid alternating sequence of hidden toggles always resolves to one of exactly two values', () => {
+    const sequence = [true, false, true, true, false, false, true, false];
+    const results = sequence.map((h) => tabBarSlideTargetY(h, offscreenY));
+    for (const r of results) {
+      expect([0, offscreenY]).toContain(r);
+    }
+    // The final call in any sequence determines the final target — never a
+    // stale/blended value from an earlier toggle.
+    expect(results[results.length - 1]).toBe(tabBarSlideTargetY(sequence[sequence.length - 1], offscreenY));
+  });
+
+  it('is a pure function of its two inputs (same inputs always produce the same output)', () => {
+    for (const hidden of [true, false]) {
+      for (const y of [0, 96, 250]) {
+        expect(tabBarSlideTargetY(hidden, y)).toBe(tabBarSlideTargetY(hidden, y));
+      }
+    }
+  });
+});
