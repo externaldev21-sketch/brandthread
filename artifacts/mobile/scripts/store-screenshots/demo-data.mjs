@@ -608,6 +608,15 @@ export function respond({ method, path, query, role, options = {} }) {
   let match;
 
   if (p === '/config/features') return { flags: { aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }, updatedAt: null };
+  // app/boost.tsx (Promote a post) fetches all three of these on load;
+  // unseeded, they 404 on every single load of that screen. The demo seller
+  // has no video/slideshow posts (only photo posts in the feed fixture, and
+  // boost only accepts video/2+-image slideshows), so an honest empty state
+  // — no eligible posts yet, no active boosts — is the real answer here,
+  // not fabricated boost data.
+  if (p === '/boosts/targets') return [];
+  if (p === '/boosts/summary') return { totalImpressions: 0, spentCentsThisMonth: 0, activeCount: 0 };
+  if (p === '/boosts') return [];
   if (p === '/auth/me') return profileFor(role);
   // Buyer account/settings screens the half-done audit crawls on load —
   // previously unseeded, so every one of these 404'd as soon as the screen
@@ -1034,9 +1043,8 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/buyer/payment-methods') return [];
   if (p === '/buyer/recently-viewed') return [];
   if ((match = p.match(/^\/buyer\/collections\/[^/]+\/items$/))) return [];
-  if (p === '/boosts') return [];
-  if (p === '/boosts/summary') return { activeCount: 0, totalSpendCents: 0, totalImpressions: 0, totalClicks: 0 };
-  if (p === '/boosts/targets') return [];
+  // (/boosts, /boosts/summary and /boosts/targets are seeded once, above,
+  // with the real Summary field names the client actually reads.)
   if (p === '/auth/feed-gestures-tip') return { seenVersion: 0 };
   if (p === '/auth/account/deletion-check') return { canDelete: true, accountType: role, blockers: [], willDelete: [], willRetain: [] };
   if (p === '/auth/sessions') return { sessions: [] };

@@ -10,8 +10,8 @@
  *  - dragging up past the resting position rubber-bands instead of
  *    hard-clamping;
  *  - a fast flick's release velocity shortens the close duration;
- *  - the row icon tiles are black + thin silver outline, never the
- *    translucent-accent "grey square" fill.
+ *  - the feature-grid items are a plain icon + label, never a background
+ *    tile or border behind them (Binance Features-sheet reskin, Dev's call).
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -90,11 +90,17 @@ describe('Seller Studio menu swipe-to-dismiss is UI-thread Reanimated + gesture-
   });
 });
 
-describe('Seller Studio menu row icon tiles are black + silver outline, not a grey fill', () => {
-  it('rowIcon no longer fills with a translucent accent color', () => {
-    const rowIconBlock = studio.slice(studio.indexOf('rowIcon: {'), studio.indexOf('rowIcon: {') + 300);
-    expect(rowIconBlock).not.toContain('theme.accentDim');
-    expect(rowIconBlock).toContain('backgroundColor: theme.card');
-    expect(rowIconBlock).toContain('borderColor: theme.border');
+describe('Seller Studio menu feature-grid items have no tile or border behind the icon', () => {
+  it('gridIconWrap and gridItem carry no backgroundColor or border', () => {
+    const iconWrapBlock = studio.slice(studio.indexOf('gridIconWrap: {'), studio.indexOf('gridIconWrap: {') + 200);
+    const itemBlock = studio.slice(studio.indexOf('gridItem: {'), studio.indexOf('gridItem: {') + 200);
+    expect(iconWrapBlock).not.toContain('backgroundColor');
+    expect(iconWrapBlock).not.toContain('borderWidth');
+    expect(itemBlock).not.toContain('backgroundColor');
+    expect(itemBlock).not.toContain('borderWidth');
+  });
+
+  it('icons render at 26pt in white (theme.text), not a themed accent tint', () => {
+    expect(studio).toContain('<Feather name={item.icon as any} size={26} color={theme.text} />');
   });
 });
