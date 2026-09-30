@@ -95,12 +95,24 @@ export function SellerDashboardChart({
     : 0;
   const activeRangeIndex = DASHBOARD_RANGES.findIndex((item) => item.id === range);
   const rangeIndicatorX = useSharedValue(0);
+  // The pill only mounts once rangeSegmentWidth is known (below), but that
+  // first layout measurement lands well after mount — often seconds, on a
+  // screen that waits on real data first. Springing to the initial position
+  // from this shared value's x=0 default made the indicator visibly launch
+  // from "Today" (index 0) and glide over to whatever range was actually
+  // selected the moment it appeared, reading as the period switching itself
+  // after load. Only animate real, user-driven range changes; snap directly
+  // to the correct spot the first time a width is known.
+  const hasPositionedIndicatorRef = React.useRef(false);
   React.useEffect(() => {
     if (rangeSegmentWidth <= 0 || activeRangeIndex < 0) return;
-    rangeIndicatorX.value = withSpring(
-      activeRangeIndex * (rangeSegmentWidth + rangeSegmentGap),
-      TAB_INDICATOR_SPRING,
-    );
+    const x = activeRangeIndex * (rangeSegmentWidth + rangeSegmentGap);
+    if (!hasPositionedIndicatorRef.current) {
+      hasPositionedIndicatorRef.current = true;
+      rangeIndicatorX.value = x;
+    } else {
+      rangeIndicatorX.value = withSpring(x, TAB_INDICATOR_SPRING);
+    }
   }, [activeRangeIndex, rangeSegmentGap, rangeSegmentWidth, rangeIndicatorX]);
   const rangeIndicatorStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: rangeIndicatorX.value }],
