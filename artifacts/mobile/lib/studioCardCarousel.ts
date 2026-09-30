@@ -4,17 +4,18 @@
  *
  * The seller Studio sheet (components/SellerStudioRadialMenu.tsx) shows one
  * destination at a time as a full "card"; dragging a finger horizontally
- * scrubs through the list — every CARD_SCRUB_STEP_PX of horizontal movement
+ * scrubs through the list — every SCRUB_PX_PER_CARD of horizontal movement
  * advances exactly one card, in either direction, clamped at both ends (this
  * is a bounded list, not an infinite wheel).
  */
 
-/** One card step per this many px of horizontal drag. Chosen so a single
- *  full-width swipe (~360px of usable drag range on a 393pt-wide phone)
- *  comfortably covers the whole menu in one pass, and two passes for any
- *  realistic future growth of the list — see indexForDrag's own doc comment
- *  for the exact math this satisfies. */
-export const CARD_SCRUB_STEP_PX = 26;
+/** One card step per this many px of horizontal drag — the single knob to
+ *  turn for scrub feel. Raised from 26 to 32 per Dev's live-testing
+ *  feedback ("a tiny bit too fast"); a full edge-to-edge swipe (~360px of
+ *  usable drag range on a 393pt-wide phone) still comfortably covers the
+ *  whole 16-card menu in one pass — see indexForDrag's own doc comment for
+ *  the exact math this satisfies. */
+export const SCRUB_PX_PER_CARD = 32;
 
 /**
  * Maps a drag's cumulative horizontal translation to the resulting card
@@ -34,7 +35,7 @@ export function indexForDrag(
   startIndex: number,
   translationX: number,
   itemCount: number,
-  stepPx: number = CARD_SCRUB_STEP_PX,
+  stepPx: number = SCRUB_PX_PER_CARD,
 ): number {
   'worklet';
   if (itemCount <= 0) return 0;
@@ -48,6 +49,6 @@ export function indexForDrag(
  *  393pt-wide screen's realistic drag range actually covers `itemCount`
  *  cards in at most `maxSwipes` swipes, instead of hard-coding the math
  *  twice. */
-export function dragRangeForFullList(itemCount: number, stepPx: number = CARD_SCRUB_STEP_PX): number {
+export function dragRangeForFullList(itemCount: number, stepPx: number = SCRUB_PX_PER_CARD): number {
   return Math.max(0, itemCount - 1) * stepPx;
 }
