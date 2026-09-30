@@ -1935,7 +1935,28 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           } | null;
           requirementsDue?: string[];
           taxInfoStatus?: 'submitted' | 'needed' | 'unknown';
+          /** Setup checklist (identity / bank account / tax info). */
+          setupState?: 'not_started' | 'in_progress' | 'in_review' | 'complete' | 'restricted';
+          steps?: Array<{
+            id: 'identity' | 'bank_account' | 'tax_info';
+            label: string;
+            status: 'complete' | 'needed' | 'in_review';
+            detail: string;
+            requirements: string[];
+            pastDue: boolean;
+            upcoming: string[];
+          }>;
+          /** ISO date Stripe needs the outstanding details by, if any. */
+          deadline?: string | null;
+          disabledReason?: string | null;
         }>('/api/seller/connect/status'),
+        /** A fresh single-use hosted link to resume setup (or the Express dashboard once complete). */
+        link: () => get<{
+          url: string;
+          kind: 'account_onboarding' | 'login_link';
+          expiresAt: number | null;
+          stripeAccountId: string;
+        }>('/api/seller/connect/link'),
       },
       /** Update the current user's public profile. username must be letters/numbers/underscores, 3-30 chars. */
       updateProfile: (body: {
