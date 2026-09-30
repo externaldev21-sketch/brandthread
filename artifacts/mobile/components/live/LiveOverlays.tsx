@@ -407,7 +407,7 @@ export function LiveCommentBar({
 }
 
 const styles = StyleSheet.create({
-  hostAvatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  hostAvatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: '#999999' },
   hostInitials: { color: '#fff', fontFamily: FONT.bold },
   // flexShrink so this compresses (its own text truncates via numberOfLines)
   // before the viewer stack/count/close button on the other side of the row
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   viewerStack: { flexDirection: 'row', alignItems: 'center', width: 56, flexShrink: 0 },
   viewerDot: {
     width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.6)', overflow: 'hidden', flexShrink: 0,
+    borderWidth: 1.5, borderColor: '#000000', overflow: 'hidden', flexShrink: 0,
   },
   viewerInitials: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   viewerCountPill: { marginLeft: 6 },

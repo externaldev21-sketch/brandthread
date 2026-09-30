@@ -61,9 +61,9 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
   menu: {
     width: 220, borderRadius: RADII.card, overflow: 'hidden',
-    backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: '#4D4D4D',
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
-  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.12)' },
+  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#4D4D4D' },
   label: { fontSize: 15, fontFamily: FONT.medium, color: ON_DARK },
 });

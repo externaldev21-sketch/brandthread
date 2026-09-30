@@ -264,7 +264,7 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
   );
 }
 const createSsc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  chip:     { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: RADIUS.pill, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
   emoji:    { fontSize: 16 },
   chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
@@ -285,7 +285,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
   );
 }
 const createSc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  chip:       { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.pill, minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: RADIUS.pill, minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
   chipText:   { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
 
@@ -312,7 +312,7 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
   );
 }
 const createSr = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  row:     { backgroundColor: theme.card, borderRadius: RADIUS.card, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 18, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', gap: SPACE.md, overflow: 'hidden' },
+  row:     { backgroundColor: theme.card, borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, paddingHorizontal: 18, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', gap: SPACE.md, overflow: 'hidden' },
   stitch:  { position: 'absolute', top: 10, left: 18 },
   label:   { fontSize: 17, lineHeight: 22, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2 },
   labelOn: { color: theme.text },
@@ -439,7 +439,7 @@ const createSl = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   stepRail:  { alignItems: 'center' },
   stepIcon:  {
     width: 28, height: 28, borderRadius: 14,
-    borderWidth: 1, borderColor: BORDER,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   stepJoin:       { width: 1, height: 20, marginVertical: 2 },
@@ -520,7 +520,7 @@ const createSn = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   body: { flex: 1, justifyContent: 'center', paddingBottom: SPACE.lg },
   hero: { height: 120, justifyContent: 'center', marginBottom: SPACE.lg },
   heroThread: { position: 'absolute', left: -SPACE.lg, right: -SPACE.lg, top: 0 },
-  bellBg:   { width: 72, height: 72, borderRadius: 36, borderWidth: 1, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 8, marginLeft: SPACE.xl },
+  bellBg:   { width: 72, height: 72, borderRadius: 36, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 8, marginLeft: SPACE.xl },
   examples: { gap: SPACE.sm, width: '100%', marginTop: SPACE.lg },
   exampleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
   exampleDot: { width: 5, height: 5, borderRadius: 3 },
@@ -1545,10 +1545,10 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chooseSub: { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 22, marginBottom: 32 },
   bigRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    borderRadius: 14, borderWidth: 1, borderColor: BORDER,
+    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
     paddingVertical: 16, paddingHorizontal: 16, backgroundColor: CARD, marginBottom: 10,
   },
-  appleRow: { backgroundColor: '#000000', borderColor: '#595959' },
+  appleRow: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
   bigRowIcon: { width: 28, alignItems: 'center' },
   bigRowText: { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
   signInLink: { paddingVertical: 16, alignItems: 'center' },
@@ -1559,7 +1559,7 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 20 },
   inputWrap: { marginBottom: 12 },
   label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 5 },
-  input:     { backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular', color: FG },
+  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular', color: FG },
   codeInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontFamily: 'Inter_700Bold' },
   pwRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12 },
   pwInput:   { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
@@ -1616,17 +1616,17 @@ const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   divider:   { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, marginVertical: SPACE.md },
   divLine:   { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: BORDER },
   divText:   { ...TYPE.label, color: MUTED },
-  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 999, borderWidth: 1, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
+  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
   appleBtn:  { borderColor: BORDER },
   oauthText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: FG },
   existingEmailChip: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderRadius: RADIUS.pill, borderWidth: 1,
+    borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14, paddingVertical: 8, marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
   existingEmailText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   existingCard: {
-    borderRadius: RADIUS.card, borderWidth: 1,
+    borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth,
     padding: SPACE.md + 2,
   },
   existingCardTitle: {
@@ -1777,7 +1777,7 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xl },
   sectionLabel: { ...TYPE.eyebrow, color: FG, textTransform: 'uppercase', marginTop: SPACE.xl, marginBottom: SPACE.sm },
   themeRow: { gap: SPACE.xs, paddingRight: SPACE.xs },
-  themeCard: { width: 104, padding: 6, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  themeCard: { width: 104, padding: 6, borderRadius: 18, backgroundColor: CARD, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER },
   themeSwatch: { height: 56, borderRadius: 13, padding: 10, justifyContent: 'space-between' },
   themeDot: { width: 16, height: 16, borderRadius: 8 },
   themeLine: { width: 36, height: 3, borderRadius: 2 },
@@ -1787,11 +1787,11 @@ const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   sampleHeader: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: SPACE.sm },
   sampleSub: { ...TYPE.caption, color: MUTED, paddingRight: 18, marginTop: -4 },
   styleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs, marginBottom: SPACE.md },
-  resultCard: { borderRadius: RADIUS.card, borderWidth: 1, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: SPACE.sm },
+  resultCard: { borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: SPACE.sm },
   resultImage: { width: '100%', height: 180 },
   resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, backgroundColor: 'rgba(0,0,0,0.86)' },
   resultText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  errorBox: { flexDirection: 'row', alignItems: 'center', gap: SPACE.xs, marginTop: SPACE.xs, padding: SPACE.sm, borderRadius: 14, borderWidth: 1, borderColor: ERR },
+  errorBox: { flexDirection: 'row', alignItems: 'center', gap: SPACE.xs, marginTop: SPACE.xs, padding: SPACE.sm, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: ERR },
   errorText: { flex: 1, fontSize: 12, lineHeight: 17, color: ERR },
   retryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
   continueWrap: { marginTop: SPACE.md },
@@ -2859,7 +2859,7 @@ const createSm = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SPACE.lg,
     paddingBottom: 8,
   },
-  backBtn:   { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  backBtn:   { width: 36, height: 36, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   weave:     { position: 'absolute', left: 0, right: 0, zIndex: 0, opacity: 0.9 },
   stepWrap:  { flex: 1, paddingHorizontal: SPACE.lg },
   interactiveStepWrap: { position: 'relative', zIndex: 2 },

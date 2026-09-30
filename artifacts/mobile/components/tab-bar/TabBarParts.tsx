@@ -83,7 +83,7 @@ export function TabBarGlass({ theme, radius, animatedStyle }: { theme: AppThemeP
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { borderRadius: radius, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
+          { borderRadius: radius, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)' },
           animatedStyle,
         ]}
       />

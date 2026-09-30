@@ -171,7 +171,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   card: {
     backgroundColor: theme.card,
     borderRadius: RADIUS.card,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.border,
     padding: SPACE.md + 2,
     overflow: 'hidden',

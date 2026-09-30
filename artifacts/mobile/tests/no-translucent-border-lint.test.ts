@@ -17,15 +17,17 @@
  * intentional pattern (a colored tint conveying state), not the neutral
  * "outline" bug this guards against.
  *
- * Enforced via a shrinking allowlist rather than a hard cutover — matching
- * tests/no-hardcoded-grey-lint.test.ts and
- * tests/no-hardcoded-theme-color-lint.test.ts's approach for the same class
- * of problem. A file already in the allowlist may keep its hits (no new
- * failure, most of them are deliberate "glass over photo/video" overlay
- * chrome where only the border needed to become opaque, not the fill); the
- * allowlist can only ever get SMALLER — remove a file the moment its
- * translucent borders are migrated to the token, and only add one in the
- * same change that adds the file.
+ * The tree was otherwise clean of both patterns when this lint was added
+ * (every hit — including "glass over photo/video" overlay chrome — was
+ * migrated to an opaque border, keeping any deliberately translucent FILL
+ * untouched), so this is a near-hard cutover, not an open-ended ratchet: the
+ * allowlist holds only the handful of pre-existing, deliberately thin
+ * "reduced-chrome" designs that a separate structure test already locks in
+ * (see each entry's comment) — a hairline width there is the point, not the
+ * blur bug, and its border color is already opaque. Add a new entry only in
+ * the same change that adds the file, with the same kind of justification,
+ * the way tests/no-hardcoded-grey-lint.test.ts and
+ * tests/no-hardcoded-theme-color-lint.test.ts do for their own allowlists.
  *
  * `pnpm vitest run tests/no-translucent-border-lint.test.ts -t stale` fails
  * the moment an allowlist entry no longer needs to be there.
@@ -69,15 +71,20 @@ function hasTranslucentBorder(source: string): boolean {
   return source.split('\n').some((line) => TRANSLUCENT_NEUTRAL_BORDER.test(line) || HAIRLINE_BORDER.test(line));
 }
 
-// Generated from the state of the tree when this lint was added, after the
-// first fix pass (the shared token, plus the highest-traffic generic-chrome
-// call sites). Most remaining entries are deliberate "glass over
-// photo/video" overlay chrome (camera capture, live streaming, story
-// creation/viewer, drop-detail hero badges) whose FILL is meant to stay
-// translucent; give the BORDER an opaque edge and delete the file's line
-// here in the same change.
+// Each entry is a deliberately thin "reduced-chrome" hairline border, with
+// an already-opaque color, locked in by its own structure test — see the
+// file doc comment. Not the translucency bug this lint otherwise guards.
 const TRANSLUCENT_BORDER_ALLOWLIST = new Set<string>([
-  '__PLACEHOLDER__',
+  // tests/buyer-bottom-navigation-layout.test.ts: "real frosted glass ...
+  // a hairline border" — TabBarGlass's edge over the feed.
+  'components/tab-bar/TabBarParts.tsx',
+  // tests/onboarding-visual-structure.test.ts: "reduced-chrome cards in
+  // account type and seller plans".
+  'app/account-type.tsx',
+  'components/onboarding/SellerPlanRecommendationStep.tsx',
+  // tests/onboarding-visual-structure.test.ts: "uses hairline default
+  // borders for onboarding inputs and choices" (requires >= 5 of them).
+  'app/onboarding.tsx',
 ]);
 
 describe('no translucent neutral borders or hairline borders outside the theme files', () => {

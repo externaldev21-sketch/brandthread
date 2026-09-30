@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   trialBadge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginTop: 12 },
   trialBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
   planRow: { gap: 10, paddingVertical: 18 },
-  card: { width: '100%', minHeight: 340, borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: 'rgba(255,255,255,0.045)', padding: 16 },
+  card: { width: '100%', minHeight: 340, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: '#4D4D4D', backgroundColor: 'rgba(255,255,255,0.045)', padding: 16 },
   badgeRow: { minHeight: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   badge: { flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },

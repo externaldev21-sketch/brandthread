@@ -575,7 +575,7 @@ function DiscoverCard({
       <View style={[styles.actionsRow, { marginBottom: insets.bottom + SP.lg }]}>
         <View style={{ flex: 1 }}>
           <PressableScale
-            style={[styles.secondaryBtn, { borderColor: '#FFFFFF55' }]}
+            style={[styles.secondaryBtn, { borderColor: '#8C8C8C' }]}
             accessibilityLabel="Add to cart"
             onPress={() => {
               hapticPrimaryAction();

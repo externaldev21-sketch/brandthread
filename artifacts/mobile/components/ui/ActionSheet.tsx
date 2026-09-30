@@ -130,6 +130,6 @@ const styles = StyleSheet.create({
   header: { paddingVertical: SP.sm, alignItems: 'center' },
   title: { fontSize: FS.md, fontFamily: FONT.bold, textAlign: 'center' },
   message: { fontSize: FS.sm, marginTop: 2, textAlign: 'center' },
-  row: { paddingVertical: SP.md, alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.2)' },
+  row: { paddingVertical: SP.md, alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#666666' },
   rowText: { fontSize: FS.md, fontFamily: FONT.regular },
 });

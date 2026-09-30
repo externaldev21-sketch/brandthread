@@ -71,7 +71,7 @@ export function WebAppShell({ children }: { children: React.ReactNode }) {
         testID="web-app-shell-column"
         style={[
           styles.column,
-          { backgroundColor: background, borderColor: palette.border ?? 'rgba(255,255,255,0.08)' },
+          { backgroundColor: background, borderColor: palette.border ?? '#4D4D4D' },
         ]}
       >
         {children}

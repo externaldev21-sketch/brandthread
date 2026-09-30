@@ -144,7 +144,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     borderRadius: 26,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: '#525252',
     paddingLeft: 16,
     paddingRight: 6,
     paddingVertical: 6,
