@@ -66,6 +66,70 @@ describe('seller tab switch transition', () => {
 });
 
 /**
+ * Live verification (a real device/preview session, not just this harness)
+ * caught the seller profile tab rendering shifted right by a varying amount
+ * on every load, never settling. First theory: the tab layout's `settled`
+ * flag flips off a FIXED 280ms timer (app/(tabs)/_layout.tsx), not a real
+ * "animation finished" callback, so a still-mid-flight `current.progress`
+ * read got baked into a permanent transform. Rounding that read to its
+ * nearest rest position (-1, 0, 1) was the first fix — it's still correct
+ * and still applies to native, where the animation genuinely runs.
+ *
+ * But a second live round (after that fix shipped) proved the real root
+ * cause on web is deeper: `current.progress` was found frozen at exactly
+ * its pre-animation STARTING value (never having moved at all, not even a
+ * little), reproducibly, on every load — not a timing race. React
+ * Navigation's bottom-tabs disables the native driver on web, and whatever
+ * runs the JS-driven fallback there never actually advances this value.
+ * There is no correct moment to sample a value that never moves, so the fix
+ * is to skip this whole progress-driven slide on web outright (see
+ * forDirectionalSlide's own `Platform.OS === 'web'` branch).
+ */
+describe('forDirectionalSlide never freezes a settled scene at a fractional, off-target position (native)', () => {
+  const shared = read('lib/tabSlideTransition.ts');
+
+  it('rounds the settled progress value to its nearest rest position (-1, 0, or 1) before using it', () => {
+    expect(shared).toContain('const restPosition = Math.round(currentValue(current.progress));');
+    expect(shared).toContain('const translateX = restPosition * width;');
+    // The old, buggy line this replaced — must not still be present.
+    expect(shared).not.toContain('const translateX = currentValue(current.progress) * width;');
+  });
+
+  it("the unsettled (live) branch is untouched — only the settled snapshot's read was rounded", () => {
+    const unsettledBranch = shared.slice(shared.indexOf('return {\n      sceneStyle: {\n        transform: [{'));
+    expect(unsettledBranch).toContain('current.progress.interpolate({');
+    expect(unsettledBranch).not.toContain('Math.round');
+  });
+});
+
+describe('forDirectionalSlide skips the progress-driven slide entirely on web', () => {
+  const shared = read('lib/tabSlideTransition.ts');
+
+  it("imports Platform and checks it before touching current.progress at all", () => {
+    expect(shared).toContain("import { Animated, Easing, Platform } from 'react-native';");
+    const fnBody = shared.slice(shared.indexOf('export function forDirectionalSlide'));
+    const webBranchIndex = fnBody.indexOf("Platform.OS === 'web'");
+    const settledBranchIndex = fnBody.indexOf('if (settled) {');
+    expect(webBranchIndex).toBeGreaterThan(-1);
+    expect(settledBranchIndex).toBeGreaterThan(-1);
+    expect(webBranchIndex).toBeLessThan(settledBranchIndex);
+  });
+
+  it('returns a plain, transform-free sceneStyle on web — never reads current.progress there', () => {
+    const fnBody = shared.slice(shared.indexOf('export function forDirectionalSlide'));
+    const webBranch = fnBody.slice(
+      fnBody.indexOf("Platform.OS === 'web'"),
+      fnBody.indexOf('if (settled) {'),
+    );
+    expect(webBranch).toContain('return { sceneStyle: {} };');
+    // Only the explanatory comment may mention current.progress on this
+    // branch — the actual code (after the return) must never touch it.
+    const codeAfterReturn = webBranch.slice(webBranch.indexOf('return { sceneStyle: {} };') + 'return { sceneStyle: {} };'.length);
+    expect(codeAfterReturn).not.toContain('current.progress');
+  });
+});
+
+/**
  * The clipped press-highlight bug ("the transparency of the button is cut
  * off on each side"): mobile browsers draw their own translucent
  * tap-highlight rectangle on every pressed element, which doesn't share a

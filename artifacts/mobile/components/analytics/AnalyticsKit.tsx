@@ -80,9 +80,13 @@ export function HeaderPillButton({ label, onPress }: { label: string; onPress: (
     </TouchableOpacity>
   );
 }
-const pillBtnStyles = (colors: Colors) => StyleSheet.create({
-  btn:  { paddingHorizontal: SP.sm + 4, paddingVertical: SP.sm - 1, minHeight: 36, borderRadius: RADIUS.pill, backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  text: { fontSize: FS.xs, fontFamily: FONT.semibold, color: colors.accentForeground },
+// Deliberately NOT theme-derived, unlike the rest of this file: `colors.accent`
+// resolved to a translucent white fill here (rgba(255,255,255,0.18)) — a grey/
+// translucent look Dev has banned app-wide. This pill is a plain white/black
+// chip on every theme preset, not a themed accent surface.
+const pillBtnStyles = (_colors: Colors) => StyleSheet.create({
+  btn:  { paddingHorizontal: SP.sm + 4, paddingVertical: SP.sm - 1, minHeight: 36, borderRadius: RADIUS.pill, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#000000', alignItems: 'center', justifyContent: 'center' },
+  text: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#000000' },
 });
 
 // ─── Section ────────────────────────────────────────────────────────────────

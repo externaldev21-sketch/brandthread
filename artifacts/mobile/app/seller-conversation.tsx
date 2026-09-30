@@ -1385,32 +1385,40 @@ export default function SellerConversationScreen() {
           >
             <Feather name="arrow-left" size={ICON.lg} color={FG} />
           </PressableScale>
-          <PressableScale
-            style={s.headerCenterRow}
-            disabled={!other || !id}
-            onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
-            testID="seller-conversation-header-name"
-            accessibilityRole="button"
-            accessibilityLabel={`${displayName} — chat details`}
-          >
-            {other && (
-              <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
-                <Text style={s.headerAvatarInitials}>
-                  {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
-                </Text>
+          {/* PressableScale forwards `style` only to its inner Animated.View,
+              never to the outer Pressable node that actually participates in
+              headerLeftGroup's row layout (same root cause as the Messages-
+              button width bug fixed earlier this round) — so the flex/
+              minWidth constraints that let the name truncate have to live on
+              a plain wrapping View instead of on the PressableScale itself. */}
+          <View style={s.headerCenterWrap}>
+            <PressableScale
+              style={s.headerCenterRow}
+              disabled={!other || !id}
+              onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+              testID="seller-conversation-header-name"
+              accessibilityRole="button"
+              accessibilityLabel={`${displayName} — chat details`}
+            >
+              {other && (
+                <View style={[s.headerAvatar, { backgroundColor: other.color || PURPLE }]}>
+                  <Text style={s.headerAvatarInitials}>
+                    {other.initials || (other.name?.[0] ?? '?').toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={s.headerCenter}>
+                <Text style={s.headerName} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>
+                {/* Real-time "X is typing…" (conv.otherTyping) takes priority
+                    over the static handle line when present — same field/poll
+                    app/buyer-conversation.tsx's statusLine reads, just no
+                    existing subtitle slot there to reuse before now. */}
+                {conv?.otherTyping
+                  ? <Text style={s.headerHandle} numberOfLines={1}>typing…</Text>
+                  : (other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null)}
               </View>
-            )}
-            <View style={s.headerCenter}>
-              <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
-              {/* Real-time "X is typing…" (conv.otherTyping) takes priority
-                  over the static handle line when present — same field/poll
-                  app/buyer-conversation.tsx's statusLine reads, just no
-                  existing subtitle slot there to reuse before now. */}
-              {conv?.otherTyping
-                ? <Text style={s.headerHandle} numberOfLines={1}>typing…</Text>
-                : (other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null)}
-            </View>
-          </PressableScale>
+            </PressableScale>
+          </View>
         </View>
 
         {/* Icon group hard-right-aligned to the header edge, per Mobbin
@@ -2129,7 +2137,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingLeft: SP.md, paddingBottom: SP.sm,
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
-  headerLeftGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  // flex: 1 + minWidth: 0 all the way down this chain (leftGroup ->
+  // centerRow -> center -> name) is what actually lets the name truncate
+  // instead of overlapping the call/video/context icons for a long name —
+  // flexShrink alone isn't enough on React Native Web, where a flex item's
+  // default min-width is its own content width ("auto"), not 0, so it never
+  // shrinks below that no matter how little room justifyContent: 'space-
+  // between' leaves it (confirmed live: "Torres" overlapping the phone
+  // glyph with 3 action icons + the overflow menu in the icon group).
+  headerLeftGroup: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
   headerIconGroup: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   headerBack: { marginRight: SP.sm },
   headerAvatar: {
@@ -2137,9 +2153,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center', justifyContent: 'center', marginRight: SP.sm,
   },
   headerAvatarInitials: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
-  headerCenterRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
-  headerCenter: { flexShrink: 1 },
-  headerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+  // The actual flex/minWidth constraint has to live here, on a plain View —
+  // see the JSX's own comment on why it can't live on the PressableScale
+  // (headerCenterRow) that wraps the avatar+name row.
+  headerCenterWrap: { flex: 1, minWidth: 0 },
+  headerCenterRow: { flexDirection: 'row', alignItems: 'center' },
+  headerCenter: { flex: 1, minWidth: 0 },
+  headerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flexShrink: 1, minWidth: 0 },
   headerHandle: { fontSize: FS.meta, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
 
   orderCard: {

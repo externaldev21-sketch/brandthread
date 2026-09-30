@@ -162,8 +162,12 @@ describe('seller bar full-screen deny-list', () => {
     // Create Ad wizard — its own sticky two-row bottom bar (Meta-ads link +
     // "Launch · $X") overlapped the tab bar's cart badge underneath it.
     'design-campaign',
+    // Mockup-to-Model — its own sticky "Create N photos" bottom CTA.
+    'design-mockup-to-model',
     'store-generate',
     'store-generating',
+    // Full-bleed storefront render below its own close+device-toggle bar.
+    'store-preview',
     'quote-request',
     'seller-go-live',
     'seller-live',
@@ -176,6 +180,11 @@ describe('seller bar full-screen deny-list', () => {
     // never render underneath it (it previously did, and the AI composer
     // rendered behind it).
     'ai-brain',
+    // Seller<->buyer conversation thread: same full-screen-chat-with-its-own-
+    // composer category as ai-brain — confirmed live that the floating bar
+    // sat on top of it and silently intercepted every tap on the composer,
+    // including the Thread Cash attach button.
+    'seller-conversation',
   ];
 
   for (const route of mustHideBar) {
@@ -218,7 +227,6 @@ describe('seller bar full-screen deny-list', () => {
     'store-policies',
     'store-publish',
     'store-seo',
-    'store-preview',
     'store-editor',
     'seller-profile',
     'seller-verification',
@@ -241,7 +249,6 @@ describe('seller bar full-screen deny-list', () => {
     'design-brand-assets',
     'design-ai-photoshoot',
     'design-bg-replace',
-    'design-mockup-to-model',
     'design-text-to-design',
     'design-mockup-preview',
     'lifestyle-images',

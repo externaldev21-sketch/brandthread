@@ -264,9 +264,16 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // literally overlapped it (audit: "Launch · $25" overlapping the tab
   // bar's cart badge).
   'design-campaign',
+  // Mockup-to-Model — its own sticky "Create N photos" bottom CTA (audit:
+  // "Create photos" overlapping the tab bar's cart badge), same category.
+  'design-mockup-to-model',
   // Storefront-from-AI wizard and its full-screen generating/progress screen.
   'store-generate',
   'store-generating',
+  // Store Preview — full-bleed render of the actual storefront (an iframe/
+  // WebView filling the screen below its own close+device-toggle bar); the
+  // persistent tab bar has no business floating on top of that.
+  'store-preview',
   // Multi-step quote wizard with its own step header/footer.
   'quote-request',
   // Seller livestream — real full-screen camera/broadcast controls.
@@ -297,6 +304,34 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // the bottom; the bar previously floated on top of the payment note (it
   // only pads for the safe-area inset, not the bar's own height), covering it.
   'boost',
+  // Same category as ai-brain/ai-mockup-chat above: a full-screen chat
+  // thread with its own composer (text input, attach menu — including the
+  // Thread Cash send button) pinned to the safe-area bottom inset only.
+  // The floating seller tab bar wasn't deny-listed against this route
+  // either, so it rendered on top of the composer and silently intercepted
+  // every tap there (confirmed live: a real click on the Thread Cash attach
+  // button hit the tab bar's own DOM node instead). The equivalent buyer
+  // screen (buyer-conversation) never has this problem — the buyer tab bar
+  // only mounts inside the (buyer) group's own layout, and buyer-conversation
+  // is a root-Stack sibling of it, not a member — but the seller tab bar is
+  // a global, default-on overlay gated by this deny-list instead, and this
+  // route was simply missing from it.
+  'seller-conversation',
+  // ── Every other full-screen-modal-presentation route below ──
+  // Regression guard: tests/tab-bar-full-screen-slide.test.ts asserts every
+  // Stack.Screen registered as a full-screen modal presentation in this
+  // file is in this Set, so a future camera/capture/full-bleed screen can't
+  // ship without being added here (and, via SellerBarGate below, without the
+  // slide-off/on animation). The four below are buyer routes a seller can
+  // still land on (buyer-facing preview, a seller opening a buyer link,
+  // etc.) — real camera/live UI with its own bottom controls, same category
+  // as camera-capture/seller-go-live above; this is the actual fresh-install
+  // bug a seller hit: 'buyer-story-create' was missing, so the floating
+  // seller tab bar rendered on top of the story camera's shutter row.
+  'buyer-story-create',
+  'buyer-story-viewer',
+  'buyer-live',
+  'live-feed',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
@@ -330,12 +365,17 @@ function SellerBarGate() {
   const firstSegment = (segments[0] as string | undefined) ?? '';
   const isFullScreenRoute = SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment);
 
-  if (!showBar || isFullScreenRoute) return null;
+  if (!showBar) return null;
 
+  // The bar itself stays mounted through a full-screen route so it can
+  // slide fully off screen and back (see SellerGlobalTabBar's `hidden`
+  // prop) instead of instantly popping in/out — only the Studio radial menu
+  // (which has no slide affordance of its own) unmounts immediately, same
+  // as before.
   return (
     <>
-      <SellerGlobalTabBar onOpenStudio={() => setStudioOpenRequestKey((k) => k + 1)} />
-      <SellerStudioRadialMenu hideTrigger openRequestKey={studioOpenRequestKey} />
+      <SellerGlobalTabBar hidden={isFullScreenRoute} onOpenStudio={() => setStudioOpenRequestKey((k) => k + 1)} />
+      {!isFullScreenRoute && <SellerStudioRadialMenu hideTrigger openRequestKey={studioOpenRequestKey} />}
     </>
   );
 }
@@ -465,6 +505,33 @@ if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
   const demoParam = new URLSearchParams(window.location.search).get('demo');
   if (demoParam === '1') localStorage.setItem('bt_preview_demo', '1');
   else localStorage.removeItem('bt_preview_demo');
+  // Preserve the ORIGINAL requested path for this load, so a preview
+  // session can restore its real destination even after some other code
+  // bounces it through "/" first — e.g. an onboarding-skip redirect that
+  // fires ahead of this file's own devRole check below. Live-verified: a
+  // cold load of "/seller-inbox?bt_preview=seller&demo=1" was still landing
+  // on the dashboard even after app/index.tsx's own race fixes (#497, #498)
+  // closed every gap THIS file introduces — meaning something else, outside
+  // this file's control, is the one doing the actual bounce-to-"/" here.
+  // app/index.tsx reads this back (see its own comment) and navigates to
+  // the real destination instead of defaulting to the dashboard once it
+  // regains control. Session-scoped (not just an in-memory variable) in
+  // case that other redirect is a hard reload rather than an SPA
+  // navigation, which would otherwise wipe this module's own memory of it.
+  // Timestamped and read-once (see app/index.tsx) so a stale leftover from
+  // an earlier load in this same tab is never mistaken for the current one.
+  if (typeof sessionStorage !== 'undefined') {
+    if (window.location.pathname !== '/') {
+      sessionStorage.setItem('bt_preview_entry_path', JSON.stringify({
+        path: window.location.pathname + window.location.search,
+        ts: Date.now(),
+      }));
+    } else {
+      // A genuine load of the bare root must never restore an old deep
+      // link left over from a previous navigation in this same tab.
+      sessionStorage.removeItem('bt_preview_entry_path');
+    }
+  }
 }
 if (DEV_BYPASS_ROLE && Platform.OS !== 'web') {
   AsyncStorage.multiSet([
@@ -687,9 +754,34 @@ function AuthGate() {
       : null;
     const devRole = PREVIEW_ROLE ?? webPreviewRole ?? DEV_BYPASS_ROLE;
     if (devRole) {
-      // The index route handles the preview redirect after the root Stack has
-      // mounted. Redirecting from this root-level effect races Expo Router's
-      // initial navigator on web and produces a blank error screen.
+      // The index route handles the "/" preview redirect after the root
+      // Stack has mounted (redirecting from this root-level effect for
+      // `atRoot` races Expo Router's initial navigator on web and produces
+      // a blank error screen) — but a direct deep link to a route name
+      // that exists, identically, in BOTH (buyer) and (tabs) (e.g.
+      // "/profile") is a different problem: route groups add no path
+      // segment, so Expo Router resolves the bare URL to whichever
+      // same-named file it statically prefers, regardless of
+      // `bt_preview=`. A real signed-in account gets this corrected by the
+      // "Role mismatch corrections" block below (storedRole vs
+      // inBuyerGroup/inTabsGroup) — preview mode has no storedRole to
+      // check, but the exact same inBuyerGroup/inTabsGroup-vs-role
+      // mismatch can happen here too (confirmed live:
+      // "/profile?bt_preview=seller" loaded the buyer's own profile).
+      // Mirroring that same correction for devRole, still without racing
+      // the atRoot redirect above. Preserves whatever comes after the group
+      // segment (e.g. "profile") rather than dropping to the group's own
+      // root — confirmed live that redirecting to the bare group root landed
+      // on the seller Dashboard instead of the seller Profile that
+      // "/profile?bt_preview=seller" actually asked for.
+      if (!atRoot) {
+        const rest = (segments as string[]).slice(1).join('/');
+        if (devRole === 'buyer' && inTabsGroup) {
+          router.replace(`/(buyer)/${rest}` as never);
+        } else if (devRole === 'seller' && inBuyerGroup) {
+          router.replace(`/(tabs)/${rest}` as never);
+        }
+      }
       return;
     }
 

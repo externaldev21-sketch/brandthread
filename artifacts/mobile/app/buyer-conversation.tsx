@@ -2100,48 +2100,57 @@ export default function BuyerConversationScreen() {
             <Feather name="arrow-left" size={ICON.md} color={theme.text} />
           </PressableScale>
 
-          <PressableScale rippleEnabled={false}
-            style={s.headerCenter}
-            activeOpacity={participant ? 0.7 : 1}
-            disabled={!participant}
-            onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
-            testID="conversation-header-name"
-            accessibilityRole="button"
-            accessibilityLabel={`${displayName} — chat details`}
-          >
-            {participant && (
-              <View style={s.headerAvatarWrap} testID="conversation-avatar">
-                {isAgentConv ? (
-                  <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                    <BrandthreadLogo size={18} />
-                  </View>
-                ) : (
-                  <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                    <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
-                  </View>
-                )}
-                {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
-              </View>
-            )}
-            <View style={s.headerTextCol}>
-              <View style={s.headerNameRow}>
-                <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
-                {isAgentConv && (
-                  <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
-                    <Feather name="check-circle" size={14} color={theme.accent} style={{ marginLeft: 4 }} />
-                    <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
-                      <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
+          {/* PressableScale forwards `style` only to its inner Animated.View,
+              never to the outer Pressable node that actually participates in
+              headerLeftGroup's row layout — so the flex/minWidth constraint
+              that lets the name truncate has to live on a plain wrapping
+              View instead of on the PressableScale (headerCenter) itself.
+              Same root cause as the Messages-button width bug and
+              app/seller-conversation.tsx's identical header fix. */}
+          <View style={s.headerCenterWrap}>
+            <PressableScale rippleEnabled={false}
+              style={s.headerCenter}
+              activeOpacity={participant ? 0.7 : 1}
+              disabled={!participant}
+              onPress={() => { hapticPrimaryAction(); openChatDetails(); }}
+              testID="conversation-header-name"
+              accessibilityRole="button"
+              accessibilityLabel={`${displayName} — chat details`}
+            >
+              {participant && (
+                <View style={s.headerAvatarWrap} testID="conversation-avatar">
+                  {isAgentConv ? (
+                    <View style={[s.headerAvatarCircle, s.headerAvatarOfficial, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                      <BrandthreadLogo size={18} />
                     </View>
-                  </View>
-                )}
+                  ) : (
+                    <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
+                      <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                    </View>
+                  )}
+                  {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
+                </View>
+              )}
+              <View style={s.headerTextCol}>
+                <View style={s.headerNameRow}>
+                  <Text style={s.headerName} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>
+                  {isAgentConv && (
+                    <View style={s.headerAiBadgeRow} testID="conversation-official-badge">
+                      <Feather name="check-circle" size={14} color={theme.accent} style={{ marginLeft: 4 }} />
+                      <View style={[s.headerAiTag, { backgroundColor: theme.accentDim }]}>
+                        <Text style={[s.headerAiTagText, { color: theme.accent }]}>AI</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+                {statusLine ? (
+                  <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
+                    {statusLine}
+                  </Text>
+                ) : null}
               </View>
-              {statusLine ? (
-                <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
-                  {statusLine}
-                </Text>
-              ) : null}
-            </View>
-          </PressableScale>
+            </PressableScale>
+          </View>
         </View>
 
         {/* Icon group hard-right-aligned to the header edge, per Mobbin
@@ -3043,10 +3052,19 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderBottomColor: theme.border,
     zIndex: 5,
   },
+  // flex: 1 + minWidth: 0 all the way down this chain (leftGroup -> center
+  // -> textCol -> nameRow -> name) is what actually lets a long name
+  // truncate instead of overlapping the call/video/options icons —
+  // flexShrink alone isn't enough on React Native Web, where a flex item's
+  // default min-width is its own content width ("auto"), not 0, so it never
+  // shrinks below that. Same overlap app/seller-conversation.tsx's header
+  // had (confirmed live there for a long name against 3 icons + overflow),
+  // fixed the same way here for parity.
   headerLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 1,
+    flex: 1,
+    minWidth: 0,
     gap: SP.sm,
   },
   headerIconGroup: {
@@ -3061,24 +3079,40 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // The actual flex/minWidth constraint has to live on headerCenterWrap (a
+  // plain View) — see the JSX's own comment on why it can't live on
+  // headerCenter, which is a PressableScale.
+  headerCenterWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
   headerCenter: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 1,
     gap: SP.sm,
   },
   headerTextCol: {
-    alignItems: 'center',
+    // No alignItems here (default stretch): headerNameRow needs to actually
+    // stretch to this column's now-bounded width (flex: 1 below) for
+    // headerName's numberOfLines/flexShrink truncation to engage at all —
+    // 'center' left this column sized to its own unconstrained content, so
+    // it never got narrower than the name itself regardless of the row's
+    // available space.
+    flex: 1,
+    minWidth: 0,
   },
   headerNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    minWidth: 0,
   },
   headerName: {
     fontSize: 16,
     fontFamily: FONT.semibold,
     color: theme.text,
     letterSpacing: -0.2,
+    flexShrink: 1,
+    minWidth: 0,
   },
   headerAiBadgeRow: {
     flexDirection: 'row',

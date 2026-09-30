@@ -5,12 +5,35 @@
  * redirect fires (previously "/" matched no route and rendered blank).
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import { Redirect, useLocalSearchParams, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import BootScreen from '@/components/BootScreen';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+
+/**
+ * Reads (and always consumes — a stored entry is one-shot, read-once,
+ * whether or not it's actually used below) the original path a preview
+ * session's page load requested, stashed by app/_layout.tsx's module-load
+ * block. Ignored if older than 10s: that block only ever writes it once per
+ * real page load, so anything older is a stale leftover from an earlier
+ * load in this same tab, not this one — never worth trusting over a plain
+ * dashboard redirect.
+ */
+function consumePreviewEntryPath(): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  const raw = sessionStorage.getItem('bt_preview_entry_path');
+  if (!raw) return null;
+  sessionStorage.removeItem('bt_preview_entry_path');
+  try {
+    const { path, ts } = JSON.parse(raw) as { path?: string; ts?: number };
+    if (!path || path === '/' || typeof ts !== 'number' || Date.now() - ts > 10_000) return null;
+    return path;
+  } catch {
+    return null;
+  }
+}
 
 export default function Index() {
   const router = useRouter();
@@ -29,6 +52,20 @@ export default function Index() {
   // would stomp on a deep link the person actually meant to land on.
   const segments = useSegments();
   const atRoot = !segments[0] || (segments[0] as string) === 'index';
+  // Mirrors `atRoot` on every render, synchronously in the render body — not
+  // in an effect. The 50ms timer below re-checks this ref rather than the
+  // value it closed over when scheduled: relying on the effect's own
+  // cleanup+reschedule cycle (via the `atRoot` dependency) to cancel a stale
+  // timer left a real race — confirmed live, direct-loading a deep link
+  // whose route does extra work while resolving (e.g. "/seller-inbox?
+  // …&demo=1", which seeds a demo dataset) delayed the commit that would
+  // have cancelled the old timer past the 50ms mark, so it fired anyway with
+  // a stale atRoot === true and hard-redirected to the dashboard over the
+  // real destination. A ref update happens the instant this component
+  // re-renders, with no effect-flush to wait on, so the callback below sees
+  // the real, current segments even if the cancelling effect hasn't run yet.
+  const atRootRef = useRef(atRoot);
+  atRootRef.current = atRoot;
 
   useEffect(() => {
     if (!rootNavigationState?.key) return;
@@ -49,13 +86,35 @@ export default function Index() {
       effectivePreviewRole = DEV_BYPASS_ROLE;
     }
     if (!effectivePreviewRole) return;
+    // 150ms, not the original 50ms: still imperceptible for the common case
+    // (a bare "/" load with no deep link to resolve), but gives a heavier
+    // destination route more real time to finish resolving before this even
+    // fires — reduces how often the checks inside actually need to catch a
+    // still in-flight resolution.
     const redirect = setTimeout(() => {
-      // Re-check at fire time too: segments can change during the 50ms
-      // delay (e.g. the real deep-linked route finishes resolving), and a
-      // stale closure over an old "atRoot" would otherwise still fire.
-      if (!atRoot) return;
-      router.replace((effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
-    }, 50);
+      // Re-check the LIVE ref at fire time, not the atRoot this effect
+      // closed over — see atRootRef's own comment above for why.
+      if (!atRootRef.current) return;
+      // Belt-and-suspenders, web only: Expo Router updates the browser's
+      // actual URL via the History API as part of resolving a deep link,
+      // which is a real DOM mutation, not something that waits on this
+      // component's own re-render — it can commit before `segments` (and
+      // therefore `atRoot`/atRootRef) has caught up here. Live-verified
+      // still redirecting a direct "/seller-inbox?…&demo=1" load to the
+      // dashboard even with atRootRef in place, meaning that ref can still
+      // read stale in a window this narrow. window.location.pathname has no
+      // such dependency on React's render/commit timing at all, so trust it
+      // over atRootRef whenever the two disagree.
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') return;
+      // Restore the ORIGINAL requested path if this load ever had one and
+      // some other redirect (outside this file's control — e.g. an
+      // onboarding-skip path that runs ahead of AuthGate's own devRole
+      // check in app/_layout.tsx) bounced us back to "/" before we got a
+      // chance to land on it. Falls back to the plain dashboard root for a
+      // genuine bare "/" load, exactly as before.
+      const entryPath = consumePreviewEntryPath();
+      router.replace((entryPath ?? (effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/')) as never);
+    }, 150);
     return () => clearTimeout(redirect);
   }, [previewRole, rootNavigationState?.key, router, atRoot]);
 

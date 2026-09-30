@@ -147,7 +147,7 @@ export default function AnalyticsContentScreen() {
       {!data ? (
         <EmptyState
           icon="video"
-          title="Content insights are on the way"
+          title="No content views yet"
           description="We'll show post performance once your Seller posts start getting views."
           style={{ marginTop: SP.lg }}
         />
@@ -184,7 +184,7 @@ export default function AnalyticsContentScreen() {
           />
 
           {posts.length === 0 ? (
-            <EmptyState icon="video" title="No post stats yet" description="Post stats will land here soon." />
+            <EmptyState icon="video" title="No post stats yet" description="Post stats will show once your posts start getting views." />
           ) : (
             <Card>
               {posts.map((p, i) => (

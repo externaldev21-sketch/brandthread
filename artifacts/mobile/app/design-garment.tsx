@@ -8,6 +8,7 @@ import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Ellipse, Rect, Line } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -17,7 +18,7 @@ import {
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS, ICON, COMP,
 } from '@/lib/theme';
 import { getProject, updateProject } from '@/services/designService';
 import { GARMENT_TYPES, GARMENT_TEMPLATES, GARMENT_VIEWS } from '@/services/designTypes';
@@ -70,6 +71,108 @@ const ZONE_RECTS: Record<string, { x: number; y: number; w: number; h: number }>
   'Custom':       { x: 20, y: 20, w: 60, h: 60 },
 };
 
+// ─── Garment silhouette ───────────────────────────────────────────────────
+// A real vector garment outline, tinted by the selected color — not a flat
+// colored card with a text label. Front/back share the same body silhouette
+// (accurate to how a real garment looks from either side) with a small
+// front-only or back-only detail (collar tag vs. neck seam) so the two
+// views are still visually distinct; "detail" zooms into the chest/pocket
+// area via a tighter viewBox, mimicking a close-up product shot.
+// All paths sit on a shared 200×240 canvas.
+
+const GARMENT_STROKE = 'rgba(0,0,0,0.22)';
+
+function torsoBodyPath(sleeveLength: number): string {
+  // Crew-neck tee/sweatshirt/jacket body: shoulders → sleeve → underarm →
+  // hem → mirrored back up the other side, with a shallow front neckline.
+  // Real tee proportions: body width 80 (shoulder-to-shoulder, x 60–140),
+  // height 96 — 1.2× the width, y 40 (neckline) to 136 (hem). The previous
+  // path was ~64 wide by ~192 tall (a 1:3 column), which read as a dress,
+  // not a T-shirt.
+  const s = sleeveLength; // how far the sleeve extends past the shoulder
+  return `M 75 40
+    C 80 33, 120 33, 125 40
+    L 140 48
+    L ${140 + s} 66
+    L ${132 + s} 84
+    L 140 92
+    L 140 136
+    L 60 136
+    L 60 92
+    L ${68 - s} 84
+    L ${60 - s} 66
+    L 60 48
+    Z`;
+}
+
+function GarmentSilhouette({ type, view, colorHex }: { type: string; view: string; colorHex: string }) {
+  const isDetail = view === 'detail';
+  const isBack = view === 'back';
+  const viewBox = isDetail ? '65 45 70 60' : '0 0 200 240';
+  const fill = colorHex;
+  const isPants = type === 'sweatpants' || type === 'shorts';
+  const isHat = type === 'hat';
+  const isBag = type === 'bag';
+  const isBoxy = type === 'packaging';
+
+  return (
+    <Svg width="72%" height="72%" viewBox={viewBox} preserveAspectRatio="xMidYMid meet">
+      {isHat ? (
+        <>
+          <Path d="M 40 130 C 40 80, 75 45, 100 45 C 125 45, 160 80, 160 130 Z" fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
+          <Ellipse cx={100} cy={132} rx={72} ry={14} fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
+        </>
+      ) : isBag ? (
+        <>
+          <Path d="M 55 90 L 145 90 L 155 205 L 45 205 Z" fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
+          <Path d="M 75 90 C 75 60, 125 60, 125 90" fill="none" stroke={GARMENT_STROKE} strokeWidth={4} />
+        </>
+      ) : isBoxy ? (
+        <>
+          <Rect x={45} y={70} width={110} height={110} fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
+          <Path d="M 45 70 L 100 40 L 155 70" fill="none" stroke={GARMENT_STROKE} strokeWidth={2} />
+          <Path d="M 100 40 L 100 180" fill="none" stroke={GARMENT_STROKE} strokeWidth={1.5} opacity={0.5} />
+        </>
+      ) : isPants ? (
+        <>
+          <Path
+            d="M 62 20 L 138 20 L 142 100 L 116 220 L 100 220 L 100 130 L 84 220 L 68 220 L 58 100 Z"
+            fill={fill}
+            stroke={GARMENT_STROKE}
+            strokeWidth={2}
+          />
+          <Line x1={72} y1={20} x2={72} y2={95} stroke={GARMENT_STROKE} strokeWidth={1} opacity={0.4} />
+          <Line x1={128} y1={20} x2={128} y2={95} stroke={GARMENT_STROKE} strokeWidth={1} opacity={0.4} />
+        </>
+      ) : (
+        <>
+          <Path
+            d={torsoBodyPath(type === 'tank' ? 2 : type === 'longsleeve' ? 30 : 16)}
+            fill={fill}
+            stroke={GARMENT_STROKE}
+            strokeWidth={2}
+          />
+          {type === 'hoodie' && (
+            <Path d="M 76 20 C 76 2, 124 2, 124 20 C 124 30, 112 30, 100 34 C 88 30, 76 30, 76 20 Z" fill={fill} stroke={GARMENT_STROKE} strokeWidth={2} />
+          )}
+          {!isBack && (type === 'jacket' || type === 'denim') && (
+            <Line x1={100} y1={44} x2={100} y2={136} stroke={GARMENT_STROKE} strokeWidth={2} opacity={0.6} />
+          )}
+          {!isBack && type !== 'jacket' && type !== 'denim' && (
+            <Path d="M 88 40 Q 100 52 112 40" fill="none" stroke={GARMENT_STROKE} strokeWidth={2} opacity={0.55} />
+          )}
+          {isBack && (
+            <Line x1={100} y1={40} x2={100} y2={136} stroke={GARMENT_STROKE} strokeWidth={1.5} opacity={0.35} />
+          )}
+          {type === 'hoodie' && (
+            <Path d="M 92 64 L 108 64 L 108 96 L 100 104 L 92 96 Z" fill="none" stroke={GARMENT_STROKE} strokeWidth={1.5} opacity={0.5} />
+          )}
+        </>
+      )}
+    </Svg>
+  );
+}
+
 export default function DesignGarmentScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
@@ -118,22 +221,17 @@ export default function DesignGarmentScreen() {
 
   // Determine if garment is light or dark for text contrast
   const isDarkGarment = ['#000000', '#1E3A5F', '#6B7280', '#EF4444', '#3B82F6', '#0F766E', '#22C55E', '#F97316', '#EC4899'].includes(garmentColor);
-  const garmentTextColor = isDarkGarment ? '#FFFFFF' : '#111111';
 
   return (
     <View style={gs.root}>
       <ScreenHeader
         title="Garment Design"
         onBack={() => goBackOr(router)}
-        rightElement={(
-          <TouchableOpacity
-            style={gs.openEditorBtn}
-            onPress={() => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any)}
-          >
-            <Feather name="edit-2" size={ICON.sm} color={PURPLE_LIGHT} />
-            <Text style={gs.openEditorText}>Open Editor</Text>
-          </TouchableOpacity>
-        )}
+        actions={[{
+          icon: 'edit-2',
+          onPress: () => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any),
+          accessibilityLabel: 'Open in editor',
+        }]}
       />
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -157,14 +255,15 @@ export default function DesignGarmentScreen() {
 
         {/* ── GARMENT PREVIEW ── */}
         <View style={gs.previewContainer}>
-          <View style={[gs.garmentPreview, { backgroundColor: garmentColor }]}>
-            {/* Garment silhouette label */}
-            <Text style={[gs.garmentLabel, { color: garmentTextColor }]}>
-              {garmentLabel(garmentType)}
-            </Text>
-            <Text style={[gs.garmentViewLabel, { color: garmentTextColor + 'AA' }]}>
-              {viewLabel(currentView)} View
-            </Text>
+          <View style={gs.garmentPreview}>
+            {/* Real vector garment mockup, tinted by the selected color —
+                not a flat color card with a text label standing in for it. */}
+            <GarmentSilhouette type={garmentType} view={currentView} colorHex={garmentColor} />
+            <View style={gs.garmentCaption}>
+              <Text style={gs.garmentCaptionText}>
+                {garmentLabel(garmentType)} · {viewLabel(currentView)}
+              </Text>
+            </View>
 
             {/* Selected placement overlay */}
             {selectedZone && ZONE_RECTS[selectedZone] && (() => {
@@ -201,7 +300,7 @@ export default function DesignGarmentScreen() {
                 style={[gs.viewTab, currentView === view && gs.viewTabActive]}
                 onPress={() => { Haptics.selectionAsync(); setCurrentView(view); }}
               >
-                <Text style={[gs.viewTabText, currentView === view && { color: PURPLE_LIGHT }]}>{viewLabel(view)}</Text>
+                <Text style={[gs.viewTabText, currentView === view && { color: '#000000', fontFamily: FONT.bold }]}>{viewLabel(view)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -263,14 +362,19 @@ export default function DesignGarmentScreen() {
         </View>
 
         {/* ── ACTIONS ── */}
-        <View style={[gs.section, { paddingBottom: insets.bottom + SP.xl }]}>
+        {/* This screen keeps the persistent seller tab bar — its own real
+            44px+ tall floating capsule, not just the safe-area inset. A
+            flat `insets.bottom + SP.xl` guess left the last section (and,
+            above it, Garment Color's swatch row) sitting under the bar
+            instead of clearing it. */}
+        <View style={[gs.section, { paddingBottom: Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md }]}>
           <TouchableOpacity
             style={gs.savePlacementBtn}
             onPress={handleSavePlacement}
             disabled={saving}
             activeOpacity={0.85}
           >
-            <Feather name="save" size={ICON.sm} color="#FFFFFF" />
+            <Feather name="save" size={ICON.sm} color="#000000" />
             <Text style={gs.savePlacementText}>{saving ? 'Saving…' : 'Save Placement'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -278,7 +382,7 @@ export default function DesignGarmentScreen() {
             onPress={() => router.push(`/design-canvas?id=${projectId}&garmentView=${currentView}` as any)}
             activeOpacity={0.85}
           >
-            <Feather name="edit-2" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Feather name="edit-2" size={ICON.sm} color={FG} />
             <Text style={gs.openEditorLargeText}>Open in Editor</Text>
           </TouchableOpacity>
         </View>
@@ -291,8 +395,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  openEditorBtn:{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 6, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  openEditorText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
 
   section:      { paddingHorizontal: SP.md, paddingTop: SP.md },
   sectionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.sm },
@@ -302,9 +404,13 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   typePillText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   previewContainer: { paddingHorizontal: SP.md, paddingTop: SP.md },
-  garmentPreview: { width: '100%', aspectRatio: 0.85, borderRadius: RADIUS.lg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER, position: 'relative' },
-  garmentLabel: { fontSize: FS.xxl, fontFamily: FONT.bold, letterSpacing: -0.5 },
-  garmentViewLabel: { fontSize: FS.sm, fontFamily: FONT.medium, marginTop: 4 },
+  // A near-square (0.85) preview card left almost nothing above the fold
+  // for Garment Color once View/Type picker chrome was accounted for — the
+  // swatch row landed right at the floating tab bar on first load, not
+  // just at the very end of scroll. Shorter card gives real headroom.
+  garmentPreview: { width: '100%', aspectRatio: 1.35, borderRadius: RADIUS.lg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER, position: 'relative', backgroundColor: CARD_ELEVATED },
+  garmentCaption: { position: 'absolute', bottom: SP.md, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: 6 },
+  garmentCaptionText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#FFFFFF' },
 
   zoneOverlay:  { position: 'absolute', borderRadius: RADIUS.xs, borderWidth: 2, borderColor: PURPLE, backgroundColor: PURPLE_DIM },
   safeAreaOverlay: { position: 'absolute', left: '8%', top: '8%', width: '84%', height: '84%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: SUCCESS, backgroundColor: 'rgba(16,185,129,0.12)', borderStyle: 'dashed' },
@@ -312,7 +418,9 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   viewTabs:     { flexDirection: 'row', backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   viewTab:      { flex: 1, paddingVertical: SP.sm, alignItems: 'center', justifyContent: 'center' },
-  viewTabActive:{ backgroundColor: PURPLE_DIM },
+  // Monochrome rule: the selected segment is a solid white fill with black
+  // text, not a tinted grey pill.
+  viewTabActive:{ backgroundColor: FG },
   viewTabText:  { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   colorGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
@@ -329,9 +437,15 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   optionToggleActive: { borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
   optionToggleText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 
+  // PURPLE resolves to white (#FFFFFF) in the monochrome theme — that's
+  // the intended white primary-button fill, but the label/icon must be
+  // black on it, not white-on-white.
   savePlacementBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: SP.md, marginBottom: SP.sm },
-  savePlacementText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
-  openEditorLargeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, paddingVertical: SP.md, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  openEditorLargeText: { fontSize: FS.base, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
+  savePlacementText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#000000' },
+  // Black fill + a 1px white border, not a translucent white wash — same
+  // "translucency reads as grey once real content is behind it" issue as
+  // the canvas sliders, and the monochrome rule bans grey fills outright.
+  openEditorLargeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, backgroundColor: '#000000', borderRadius: RADIUS.md, paddingVertical: SP.md, borderWidth: 1, borderColor: FG },
+  openEditorLargeText: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   });
 };

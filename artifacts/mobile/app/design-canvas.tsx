@@ -37,6 +37,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -571,7 +572,9 @@ export default function DesignCanvasScreen() {
 
   // ─── Load project ──────────────────────────────────────────────────────────
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    async function load(attempt = 0) {
+     try {
       const proj = projectId
         ? await getProject(projectId)
         : await createProject('canvas', 'Untitled Artwork', {});
@@ -646,7 +649,33 @@ export default function DesignCanvasScreen() {
         setTimerDisplay({ session: formatDuration(sessS), total: formatDuration(totalS) });
       }, 10_000);
       setLoading(false);
-    })();
+     } catch (error) {
+      // getProject/createProject can throw a "store context changed during
+      // sync"/"project was deleted during sync" guard error (see
+      // services/designService.ts) if the design-service scope changes
+      // mid-flight (e.g. auth still resolving right after mount) — this
+      // effect has no fire-and-forget wrapper of its own to swallow that
+      // the way background syncs do, so it used to reach the browser as an
+      // unhandled-rejection pageerror. Swallowing it outright without a
+      // retry is worse: the scope settles a moment later, but nothing
+      // would ever re-run getProject/createProject against it, leaving the
+      // screen stuck on the loading skeleton forever with no error and no
+      // way out. Retry a few times first — the retry runs against
+      // whatever the *current* scope is by the time it fires, so it
+      // succeeds once things settle; only fall through (and dev-log) after
+      // genuinely exhausting that.
+      const isStale = error instanceof Error && /store context changed during sync|project was deleted during sync/.test(error.message);
+      if (isStale && attempt < 4 && !cancelled) {
+        setTimeout(() => { if (!cancelled) load(attempt + 1); }, 150);
+        return;
+      }
+      if (__DEV__ && !isStale) {
+        console.error('[design-canvas] failed to load project:', error);
+      }
+     }
+    }
+    load();
+    return () => { cancelled = true; };
   }, [projectId]);
 
   // ─── Dirty generation tracking ─────────────────────────────────────────────
@@ -2943,10 +2972,32 @@ export default function DesignCanvasScreen() {
   }
 
   // ── Loading ────────────────────────────────────────────────────────────────
+  // A real skeleton of the editor's own chrome — header bar, tool row,
+  // artboard — instead of a bare "Loading…" string on a blank screen. The
+  // project fetch itself is fast (AsyncStorage); what actually takes a
+  // moment is this screen's own large bundle hydrating on web, and a
+  // skeleton reads as "the editor is opening" rather than "something is
+  // stuck".
   if (loading) {
+    const skW = Math.min(SW - SP.lg * 2, 420);
     return (
-      <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.base }}>Loading…</Text>
+      <View style={[styles.root, { paddingTop: headerTopInset }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, gap: SP.sm, height: 44 }}>
+          <SkeletonBlock width={32} height={32} radius={16} />
+          <SkeletonBlock width={120} height={16} />
+          <View style={{ flex: 1 }} />
+          <SkeletonBlock width={28} height={28} radius={14} />
+          <SkeletonBlock width={28} height={28} radius={14} />
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.md }}>
+          <SkeletonBlock width={64} height={28} radius={RADIUS.sm} />
+          <SkeletonBlock width={64} height={28} radius={RADIUS.sm} />
+          <SkeletonBlock width={64} height={28} radius={RADIUS.sm} />
+          <SkeletonBlock width={64} height={28} radius={RADIUS.sm} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <SkeletonBlock width={skW} height={skW} radius={RADIUS.md} />
+        </View>
       </View>
     );
   }
@@ -3142,8 +3193,8 @@ export default function DesignCanvasScreen() {
               <View style={[
                 styles.sizeDisc,
                 {
-                  width:  Math.max(8, Math.min(56, activeSize * 1.4)),
-                  height: Math.max(8, Math.min(56, activeSize * 1.4)),
+                  width:  Math.max(8, Math.min(28, activeSize * 1.4)),
+                  height: Math.max(8, Math.min(28, activeSize * 1.4)),
                   borderRadius: 999,
                   backgroundColor: activeTopTool === 'eraser' ? CARD_ELEVATED : drawColor,
                   borderColor: activeTopTool === 'eraser' ? FG : 'transparent',
@@ -3151,7 +3202,7 @@ export default function DesignCanvasScreen() {
                 },
               ]} />
               <View style={styles.sizeTrack}>
-                <View style={[styles.sizeFill, { height: `${(activeSize / 80) * 100}%` }]} />
+                <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, (activeSize / 80) * 100))}%`, marginBottom: -6 }]} />
               </View>
               {sizeSliderDragging && (
                 <View style={styles.sizeBubble}>
@@ -3168,7 +3219,7 @@ export default function DesignCanvasScreen() {
             >
               <Feather name="droplet" size={ICON.xs} color={MUTED} style={styles.opacityIcon} />
               <View style={styles.sizeTrack}>
-                <View style={[styles.sizeFill, { height: `${brushOpacity * 100}%` }]} />
+                <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, brushOpacity * 100))}%`, marginBottom: -6 }]} />
               </View>
               {opacitySliderDragging && (
                 <View style={styles.sizeBubble}>
@@ -5349,23 +5400,51 @@ const styles = StyleSheet.create({
 
   canvasOuter: { flex: 1, flexDirection: 'row' },
 
+  // Procreate's own size/opacity rail is a short, fixed-height pair of
+  // pills floating OVER the canvas's left edge — not a sidebar stretched to
+  // the full canvas height. `alignSelf: 'stretch'` with no definite height
+  // anywhere in its own ancestor chain (canvasOuter is `flex: 1` inside a
+  // column whose own height comes from further flex/stretch, not a fixed
+  // pixel value) is exactly the kind of chain that only reliably resolves
+  // on native Yoga layout — on web's CSS flexbox it can leave `sizeTrack`
+  // (itself `flex: 1`) with an effectively unbounded height, so its `height:
+  // '{pct}%'` fill resolves against that instead of a real ~200px rail
+  // (the "full-height white bars" bug), and pushed `canvas` over by its
+  // width when mounted instead of overlaying it. Fixed pixel dimensions +
+  // `position: 'absolute'` sidesteps both: no percentage-height ambiguity,
+  // and the canvas never shifts when a drawing tool toggles the rail.
   leftSliderRail: {
-    flexDirection: 'row', alignSelf: 'stretch',
+    position: 'absolute', left: 0, top: 0, bottom: 0,
+    flexDirection: 'row', alignItems: 'center', zIndex: 5,
   },
+  // Opaque black + a white outline, not a translucent black wash — a
+  // translucent pill was designed assuming a black canvas behind it, but
+  // once a blank canvas is a real white artboard (see the backgroundHex
+  // fix), that same translucency read as a solid grey blob instead.
+  // Monochrome rule: black/white only, no grey fill, regardless of what's
+  // behind the rail.
   sizeSlider: {
-    width: 36, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: SP.lg, gap: SP.sm,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    width: 36, height: 220, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: SP.md, gap: SP.sm, borderRadius: RADIUS.pill,
+    backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    marginLeft: SP.xs,
   },
   opacitySlider: {
-    width: 24, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: SP.lg, paddingTop: SP.xl, gap: SP.sm,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    width: 24, height: 180, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: SP.md, paddingTop: SP.lg, gap: SP.sm, borderRadius: RADIUS.pill,
+    backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
+    marginLeft: SP.xs,
   },
   opacityIcon: { marginBottom: 4 },
-  sizeDisc:  { marginBottom: 8 },
-  sizeTrack: { width: 4, flex: 1, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: RADIUS.pill, overflow: 'hidden', justifyContent: 'flex-end' },
-  sizeFill:  { width: '100%', backgroundColor: FG, borderRadius: RADIUS.pill },
+  // Fixed, clamped disc size — not derived from a track height that can
+  // itself be wrong; this is what was reading as "a huge white circle"
+  // once the rail's height stopped resolving correctly.
+  sizeDisc:  { marginBottom: 8, maxWidth: 28, maxHeight: 28 },
+  // Procreate-style track: a thin white outline line the full rail height
+  // (not a grey/white filled bar growing from the bottom) with a single
+  // solid-white thumb dot marking the current value.
+  sizeTrack: { width: 2, flex: 1, backgroundColor: 'transparent', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)', position: 'relative' },
+  sizeThumb: { position: 'absolute', left: '50%', width: 12, height: 12, marginLeft: -6, borderRadius: 6, backgroundColor: FG },
   sizeBubble:{ position: 'absolute', right: 50, top: '50%', backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: BORDER },
   sizeBubbleText: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm },
 

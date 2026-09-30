@@ -20,7 +20,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Pressable, Alert, Animated, Easing } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { ThreadCashBill, ThreadCashBillIcon } from './ThreadCashBill';
+import { ThreadCashBill, ThreadCashBillIcon, THREAD_CASH_GREEN_MID } from './ThreadCashBill';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/ui/Button';
@@ -41,8 +41,8 @@ import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
  * and the real chat message is posted (`onSent` fires). Mobbin: Cash App
  * "You sent $1 to {name}" (a big checkmark + a big "You sent…" headline,
  * minimal chrome — https://mobbin.com/screens/4bdf43be-a22e-4594-bc27-9ef221c49362).
- * Adapted monochrome per spec ("no green unless approved"): this app has no
- * green checkmark convention to begin with — SuccessCheck's `variant="draw"`
+ * Adapted per spec ("black/white UI, Thread Cash green only for amounts"):
+ * this app has no green checkmark convention — SuccessCheck's `variant="draw"`
  * (white ring + white stroke check, no fill, no color, see
  * components/ui/SuccessCheck.tsx) is the one "it's done" moment used
  * everywhere else in the app (order confirmed, product published) and is
@@ -50,7 +50,11 @@ import type { ThreadCashTransferStatus } from '@/lib/threadCashTypes';
  * animation curve. The ring+check finishes drawing at ~730ms; this holds a
  * further ~420ms so the amount/name headline is legible before the sheet
  * closes and the real chat bubble takes over — under 1.2s total, "clean and
- * quick, not bouncy".
+ * quick, not bouncy". The dollar amount itself (and only the amount — never
+ * the surrounding "You sent"/name/chrome) renders in THREAD_CASH_GREEN_MID,
+ * same token components/thread-cash/SellerThreadCashCard.tsx uses for the
+ * Payouts balance figure, so every Thread Cash amount in the app reads the
+ * same way.
  */
 const SEND_CONFIRM_HOLD_MS = 1150;
 
@@ -330,7 +334,9 @@ export function ThreadCashAttachButton({
               <View style={[styles.balancePill, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
                 <ThreadCashBillMark size={14} color={theme.text} accent={theme.accent} />
                 <Text style={[styles.balanceText, { color: theme.text }]} testID="thread-cash-balance">
-                  {balanceCents == null ? '···' : formatCents(balanceCents)}
+                  {balanceCents == null ? '···' : (
+                    <Text style={{ color: THREAD_CASH_GREEN_MID }}>{formatCents(balanceCents)}</Text>
+                  )}
                 </Text>
               </View>
             </View>
@@ -350,14 +356,14 @@ export function ThreadCashAttachButton({
                   re-fired here on mount. */}
               <SuccessCheck variant="draw" size={72} haptic={false} testID="thread-cash-sent-check" />
               <Text style={[styles.sentAmount, { color: theme.text }]}>
-                You sent {formatAmountDisplay(sentResult.amountCents)}
+                You sent <Text style={{ color: THREAD_CASH_GREEN_MID }}>{formatAmountDisplay(sentResult.amountCents)}</Text>
               </Text>
               <Text style={[styles.subtitle, { color: theme.muted, marginBottom: 0 }]}>to {handle}</Text>
             </View>
           ) : step === 'keypad' ? (
             <>
               <Text
-                style={[styles.bigAmount, { color: insufficientBalance ? theme.error : cents > 0 ? theme.text : theme.subtle }]}
+                style={[styles.bigAmount, { color: insufficientBalance ? theme.error : cents > 0 ? THREAD_CASH_GREEN_MID : theme.subtle }]}
                 accessibilityLabel={`Amount ${formatAmountDisplay(cents)}`}
                 testID="thread-cash-amount"
               >
@@ -387,7 +393,7 @@ export function ThreadCashAttachButton({
             </>
           ) : step === 'confirm' ? (
             <View style={styles.confirmBlock}>
-              <Text style={[styles.title, { color: theme.text }]}>{formatAmountDisplay(cents)}</Text>
+              <Text style={[styles.title, { color: THREAD_CASH_GREEN_MID }]}>{formatAmountDisplay(cents)}</Text>
               <Text style={[styles.subtitle, { color: theme.muted }]}>to {handle}</Text>
               {note.trim() ? <Text style={[styles.confirmNote, { color: theme.muted }]} numberOfLines={2}>“{note.trim()}”</Text> : null}
             </View>
@@ -575,7 +581,10 @@ export function ThreadCashMessageCard({
       </View>
       <View style={styles.cardTextCol} onLayout={(e) => setAmountWidth(e.nativeEvent.layout.width)}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>{formatCents(amountCents)} Thread Cash</Text>
+          <Text style={styles.cardTitle}>
+            <Text style={{ color: THREAD_CASH_GREEN_MID }}>{formatCents(amountCents)}</Text>
+            <Text style={{ color: theme.text }}> Thread Cash</Text>
+          </Text>
           {status === 'pending' && amountWidth > 0 && <ShimmerSweep width={amountWidth} height={20} />}
         </View>
         <Text style={[styles.cardSubtitle, { color: theme.muted }]} numberOfLines={1}>{subtitle}</Text>
