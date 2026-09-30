@@ -18,7 +18,8 @@ export type RateLimitPolicyName =
   | "comment"
   | "follow"
   | "report"
-  | "feed-event";
+  | "feed-event"
+  | "post-interact";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -139,6 +140,14 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: 120,
     windowMs: 60_000,
     message: "Too many feed events submitted. Please wait a moment and try again.",
+  },
+  "post-interact": {
+    id: "post-interact",
+    // Likes/views/watch-time pings from a fast-scrolling feed; generous for
+    // real use, but bounds scripted like/unlike toggling.
+    limit: scaled(240),
+    windowMs: 60_000,
+    message: "You're doing that too fast. Please wait a moment and try again.",
   },
 };
 
