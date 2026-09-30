@@ -1,0 +1,1576 @@
+{
+  "generatedAt": "2026-09-30T03:14:20.192Z",
+  "interrupted": false,
+  "routesDiscovered": 266,
+  "results": [
+    {
+      "route": "/(buyer)/activity",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/activity.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Priya Shah\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"6h\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Marcus Webb\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"1d\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Activity\"",
+          "text": "Activity"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "41x34px control \"All\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "74x34px control \"Follows\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "58x34px control \"Likes\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "95x34px control \"Comments\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "69x34px control \"Orders\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"PSPriya Shah started following you  6h\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"MWMarcus Webb started following you  1d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "305x40px control \"JLJordan Lee liked your post  3d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-activity/seller"
+    },
+    {
+      "route": "/(buyer)/activity",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/activity.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Priya Shah\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"6h\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Marcus Webb\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"1d\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Activity\"",
+          "text": "Activity"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "41x34px control \"All\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "74x34px control \"Follows\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "58x34px control \"Likes\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "95x34px control \"Comments\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "69x34px control \"Orders\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"PSPriya Shah started following you  6h\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"MWMarcus Webb started following you  1d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "305x40px control \"JLJordan Lee liked your post  3d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-activity/seller"
+    },
+    {
+      "route": "/(buyer)/activity",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/activity.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Priya Shah\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"6h\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Marcus Webb\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"1d\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Activity\"",
+          "text": "Activity"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "41x34px control \"All\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "74x34px control \"Follows\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "58x34px control \"Likes\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "95x34px control \"Comments\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "69x34px control \"Orders\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"PSPriya Shah started following you  6h\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"MWMarcus Webb started following you  1d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "305x40px control \"JLJordan Lee liked your post  3d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-activity/buyer"
+    },
+    {
+      "route": "/(buyer)/activity",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/activity.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Priya Shah\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"6h\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Marcus Webb\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"1d\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Activity\"",
+          "text": "Activity"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "41x34px control \"All\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "74x34px control \"Follows\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "58x34px control \"Likes\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "95x34px control \"Comments\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "69x34px control \"Orders\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"PSPriya Shah started following you  6h\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"MWMarcus Webb started following you  1d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "305x40px control \"JLJordan Lee liked your post  3d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-activity/buyer"
+    },
+    {
+      "route": "/(buyer)/cart",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/cart.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"F\" overlaps \"$483.00\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Field Office\" overlaps \"Checkout\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"@fieldoffice\" overlaps \"Checkout\""
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(255, 213, 128) on \"Only 3 left\"",
+          "text": "Only 3 left"
+        },
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"·\"",
+          "text": "·"
+        },
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"·\"",
+          "text": "·"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x16px control \"Edit\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "217x30px control \"M\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "217x30px control \"L\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-cart/seller"
+    },
+    {
+      "route": "/(buyer)/cart",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/cart.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"F\" overlaps \"$483.00\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Field Office\" overlaps \"Checkout\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"@fieldoffice\" overlaps \"Checkout\""
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(255, 213, 128) on \"Only 3 left\"",
+          "text": "Only 3 left"
+        },
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"·\"",
+          "text": "·"
+        },
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"·\"",
+          "text": "·"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x16px control \"Edit\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "217x30px control \"M\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "217x30px control \"L\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-cart/seller"
+    },
+    {
+      "route": "/(buyer)/cart",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/cart.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"F\" overlaps \"$483.00\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Field Office\" overlaps \"Checkout\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"@fieldoffice\" overlaps \"Checkout\""
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(255, 213, 128) on \"Only 3 left\"",
+          "text": "Only 3 left"
+        },
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"·\"",
+          "text": "·"
+        },
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"·\"",
+          "text": "·"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x16px control \"Edit\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "217x30px control \"M\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "217x30px control \"L\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-cart/buyer"
+    },
+    {
+      "route": "/(buyer)/cart",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/cart.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"F\" overlaps \"$483.00\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Field Office\" overlaps \"Checkout\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"@fieldoffice\" overlaps \"Checkout\""
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(255, 213, 128) on \"Only 3 left\"",
+          "text": "Only 3 left"
+        },
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"·\"",
+          "text": "·"
+        },
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"·\"",
+          "text": "·"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x16px control \"Edit\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "217x30px control \"M\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "217x30px control \"L\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "32x32px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-cart/buyer"
+    },
+    {
+      "route": "/(buyer)/discover-feed",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/discover-feed.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.06:1 (need 4.5:1) for \"Retry\" — rgb(0, 0, 0) on rgb(10, 10, 11)",
+          "text": "Retry"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-discover-feed/seller"
+    },
+    {
+      "route": "/(buyer)/discover-feed",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/discover-feed.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.06:1 (need 4.5:1) for \"Retry\" — rgb(0, 0, 0) on rgb(10, 10, 11)",
+          "text": "Retry"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-discover-feed/seller"
+    },
+    {
+      "route": "/(buyer)/discover-feed",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/discover-feed.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.06:1 (need 4.5:1) for \"Retry\" — rgb(0, 0, 0) on rgb(10, 10, 11)",
+          "text": "Retry"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-discover-feed/buyer"
+    },
+    {
+      "route": "/(buyer)/discover-feed",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/discover-feed.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.06:1 (need 4.5:1) for \"Retry\" — rgb(0, 0, 0) on rgb(10, 10, 11)",
+          "text": "Retry"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-discover-feed/buyer"
+    },
+    {
+      "route": "/(buyer)/discover",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/discover.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Discover\"",
+          "text": "Discover"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"N\"",
+          "text": "N"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"F\"",
+          "text": "F"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"Q\"",
+          "text": "Q"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"E\"",
+          "text": "E"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"N\"",
+          "text": "N"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"F\"",
+          "text": "F"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Heavyweight Hoodie — Ember\"",
+          "text": "Heavyweight Hoodie — Ember"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Field Shell Jacket — Rust\"",
+          "text": "Field Shell Jacket — Rust"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Boxy Fleece Hoodie — Graphite\"",
+          "text": "Boxy Fleece Hoodie — Graphite"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "210x36px control \"Search\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "82x34px control \"For You\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "56x34px control \"Fits\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x34px control \"Brands\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "77x34px control \"People\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "71x34px control \"Drops\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-buyer-discover/seller"
+    },
+    {
+      "route": "/(buyer)/discover",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/discover.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/discover",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/discover.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/discover",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/discover.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/edit-profile",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/edit-profile.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/edit-profile",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/edit-profile.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/edit-profile",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/edit-profile.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/edit-profile",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/edit-profile.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/feed",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/feed.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/feed",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/feed.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/feed",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/feed.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/feed",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/feed.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/following",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/following.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/following",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/following.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/following",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/following.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/following",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/following.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/friends",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/friends.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/friends",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/friends.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/friends",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/friends.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/friends",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/friends.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/inbox",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/inbox.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/inbox",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/inbox.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/inbox",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/inbox.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/inbox",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/inbox.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/index.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/index.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/index.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/index.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/orders",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/orders.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/orders",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/orders.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/orders",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/orders.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/orders",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/orders.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/profile",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(buyer)/profile.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/profile",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(buyer)/profile.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/profile",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(buyer)/profile.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(buyer)/profile",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(buyer)/profile.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/analytics",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/analytics.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/analytics",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/analytics.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/analytics",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/analytics.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/analytics",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/analytics.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/feed",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/feed.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/feed",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/feed.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/feed",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/feed.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/feed",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/feed.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/following",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/following.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/following",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/following.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/following",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/following.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/following",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/following.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/index.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/index.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/index.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/index.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/marketing",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/marketing.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/marketing",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/marketing.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/marketing",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/marketing.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/marketing",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/marketing.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/more",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/more.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/more",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/more.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/more",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/more.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/more",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/more.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/orders",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/orders.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/orders",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/orders.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/orders",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/orders.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/orders",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/orders.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/products",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/products.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/products",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/products.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/products",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/products.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    },
+    {
+      "route": "/(tabs)/products",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/products.tsx",
+      "reachable": false,
+      "unreachableReason": "browser.newContext: Target page, context or browser has been closed",
+      "findings": []
+    }
+  ]
+}
