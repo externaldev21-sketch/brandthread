@@ -164,7 +164,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   mutedOnInverted: { color: 'rgba(10,10,11,0.6)' },
 
   recBadge: { alignSelf: 'center', backgroundColor: theme.text, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 3, marginBottom: 2 },
-  recBadgeText: { fontSize: 10, fontFamily: FONT.semibold, color: theme.background, letterSpacing: 0.6 },
+  recBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.background, letterSpacing: 0.6 },
   recBadgeOnInverted: { backgroundColor: '#0A0A0B' },
   recBadgeTextOnInverted: { color: '#FFFFFF' },
 
@@ -174,7 +174,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   priceCol: { alignItems: 'flex-end' },
   priceLabel: { fontSize: 26, fontFamily: FONT.semibold, color: theme.text, letterSpacing: -0.5 },
   pricePeriod: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
-  priceWeekly: { fontSize: 10, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
+  priceWeekly: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
 
   currentRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   currentRowText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.success },

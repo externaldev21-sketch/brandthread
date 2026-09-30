@@ -28,6 +28,6 @@ export function SellerPaywallHeadline({ theme, eyebrow, title, subtitle }: Selle
 const styles = StyleSheet.create({
   hero: { gap: 6, alignItems: 'center', paddingHorizontal: 4 },
   eyebrow: { fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 1.5, textAlign: 'center' },
-  title: { fontSize: 28, fontFamily: FONT.bold, letterSpacing: -0.4, lineHeight: 34, textAlign: 'center' },
+  title: { fontSize: FS.xxl, fontFamily: FONT.bold, letterSpacing: -0.4, lineHeight: 34, textAlign: 'center' },
   subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', marginTop: 2 },
 });
