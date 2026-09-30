@@ -729,7 +729,15 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/buyer/payment-methods') return { paymentMethods: [] };
   if (p === '/buyer/recently-viewed') return [];
   if (p === '/buyer/collections') return [];
-  if (p.match(/^\/buyer\/collections\/[^/]+\/items$/)) return [];
+  // { collection, items } — a bare array crashed buyer-collection.tsx
+  // (reads response.collection.name / response.items.length).
+  if ((match = p.match(/^\/buyer\/collections\/([^/]+)\/items$/))) {
+    const id = decodeURIComponent(match[1]);
+    return {
+      collection: { id, name: 'Ember favorites', coverImageUrl: null, isPublic: true, sortOrder: 0, itemCount: 0, createdAt: iso(10 * DAY), updatedAt: iso(10 * DAY) },
+      items: [],
+    };
+  }
   if (p === '/returns/buyer') return [];
   if (p === '/loyalty') return { balance: 0, valueCents: 0, history: [] };
   if (p === '/profile/cover-coachmark') return { seen: true };
