@@ -33,7 +33,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/layout';
 
 type DiscountType = 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
-type AppliesTo = 'entire_store' | 'specific_products';
+type AppliesTo = 'entire_store' | 'specific_products' | 'collections';
 type DiscountStatus = 'active' | 'scheduled' | 'paused' | 'expired' | 'exhausted';
 
 interface DiscountCode {
@@ -47,6 +47,9 @@ interface DiscountCode {
   maxUses: number | null;
   usesCount: number;
   oneUsePerCustomer: boolean;
+  firstOrderOnly: boolean;
+  collectionIds: string[];
+  minQuantity: number;
   startsAt: string | null;
   expiresAt: string | null;
   active: boolean;
@@ -66,6 +69,9 @@ function normalizeDiscount(raw: any): DiscountCode {
     maxUses: raw.maxUses ?? null,
     usesCount: raw.usesCount ?? 0,
     oneUsePerCustomer: !!raw.oneUsePerCustomer,
+    firstOrderOnly: !!raw.firstOrderOnly,
+    collectionIds: Array.isArray(raw.collectionIds) ? raw.collectionIds : [],
+    minQuantity: raw.minQuantity ?? 0,
     startsAt: raw.startsAt ?? null,
     expiresAt: raw.expiresAt ?? null,
     active: !!raw.active,
@@ -139,6 +145,10 @@ export default function DiscountsScreen() {
   const [usageMode, setUsageMode] = useState<'unlimited' | 'limited' | 'single'>('unlimited');
   const [usageLimit, setUsageLimit] = useState('100');
   const [oneUsePerCustomer, setOneUsePerCustomer] = useState(false);
+  const [firstOrderOnly, setFirstOrderOnly] = useState(false);
+  const [minQuantity, setMinQuantity] = useState('');
+  const [collections, setCollections] = useState<Array<{ id: string; title: string }>>([]);
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
   const [hasEnd, setHasEnd] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -154,10 +164,12 @@ export default function DiscountsScreen() {
     }
     setLoading(true);
     try {
-      const [data, prods] = await Promise.all([
+      const [data, prods, cols] = await Promise.all([
         api.discountCodes.list(),
         api.products.list().catch(() => []),
+        api.discountCodes.collections().catch(() => []),
       ]);
+      setCollections(Array.isArray(cols) ? cols : []);
       setDiscounts(Array.isArray(data) ? data.map(normalizeDiscount) : []);
       setProducts(Array.isArray(prods) ? prods : Array.isArray((prods as any)?.products) ? (prods as any).products : []);
       setLoadError(false);
@@ -182,6 +194,9 @@ export default function DiscountsScreen() {
     setUsageMode('unlimited');
     setUsageLimit('100');
     setOneUsePerCustomer(false);
+    setFirstOrderOnly(false);
+    setMinQuantity('');
+    setSelectedCollectionIds([]);
     setHasEnd(false);
     setStartDate('');
     setEndDate('');
@@ -204,6 +219,9 @@ export default function DiscountsScreen() {
     setUsageMode(d.maxUses === 1 ? 'single' : d.maxUses != null ? 'limited' : 'unlimited');
     setUsageLimit(d.maxUses != null ? String(d.maxUses) : '100');
     setOneUsePerCustomer(d.oneUsePerCustomer);
+    setFirstOrderOnly(d.firstOrderOnly);
+    setMinQuantity(d.minQuantity ? String(d.minQuantity) : '');
+    setSelectedCollectionIds(d.collectionIds);
     setHasEnd(!!d.expiresAt);
     setStartDate(d.startsAt ? d.startsAt.slice(0, 10) : '');
     setEndDate(d.expiresAt ? d.expiresAt.slice(0, 10) : '');
@@ -221,9 +239,13 @@ export default function DiscountsScreen() {
         : 'Free item (cheapest eligible)';
   const summaryScopeLabel = appliesTo === 'entire_store'
     ? 'Entire store'
-    : selectedProductIds.length > 0
-      ? `${selectedProductIds.length} product${selectedProductIds.length === 1 ? '' : 's'}`
-      : 'Select products';
+    : appliesTo === 'collections'
+      ? selectedCollectionIds.length > 0
+        ? `${selectedCollectionIds.length} collection${selectedCollectionIds.length === 1 ? '' : 's'}`
+        : 'Select collections'
+      : selectedProductIds.length > 0
+        ? `${selectedProductIds.length} product${selectedProductIds.length === 1 ? '' : 's'}`
+        : 'Select products';
   const summaryUsageLabel = usageMode === 'unlimited' ? 'Unlimited uses' : usageMode === 'single' ? 'Single use (1 total)' : `${usageLimit || '0'} total uses`;
   const summaryDatesLabel = !startDate && !hasEnd
     ? 'Active immediately, no end date'
@@ -251,6 +273,14 @@ export default function DiscountsScreen() {
       Alert.alert('Select products', 'Choose at least one product this code applies to.');
       return;
     }
+    if (appliesTo === 'collections' && selectedCollectionIds.length === 0) {
+      Alert.alert('Select collections', 'Choose at least one collection this code applies to.');
+      return;
+    }
+    if (minQuantity && (!/^\d+$/.test(minQuantity.trim()) || Number(minQuantity) < 1)) {
+      Alert.alert('Invalid minimum items', 'Enter a whole number of 1 or more.');
+      return;
+    }
     if (minOrder && minOrderCents == null) {
       Alert.alert('Invalid minimum', 'Enter a valid minimum order amount.');
       return;
@@ -273,6 +303,9 @@ export default function DiscountsScreen() {
         maxUses: usageMode === 'unlimited' ? null : usageMode === 'single' ? 1 : Number(usageLimit),
         singleUse: usageMode === 'single',
         oneUsePerCustomer,
+        firstOrderOnly,
+        collectionIds: appliesTo === 'collections' ? selectedCollectionIds : [],
+        minQuantity: minQuantity.trim() ? Number(minQuantity) : 0,
         startsAt: startDate ? new Date(startDate).toISOString() : null,
         expiresAt: hasEnd && endDate ? new Date(endDate).toISOString() : null,
       };
@@ -292,6 +325,9 @@ export default function DiscountsScreen() {
             maxUses: payload.maxUses,
             usesCount: 0,
             oneUsePerCustomer: payload.oneUsePerCustomer,
+            firstOrderOnly: payload.firstOrderOnly,
+            collectionIds: payload.collectionIds,
+            minQuantity: payload.minQuantity,
             startsAt: payload.startsAt,
             expiresAt: payload.expiresAt,
             active: true,
@@ -419,8 +455,9 @@ export default function DiscountsScreen() {
               </View>
               <Text style={s.summaryValue}>{summaryValueLabel}</Text>
               <View style={s.summaryRow}><Feather name="shopping-bag" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryScopeLabel}</Text></View>
+              {minQuantity.trim() ? <View style={s.summaryRow}><Feather name="layers" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. {minQuantity.trim()} item{minQuantity.trim() === '1' ? '' : 's'}</Text></View> : null}
               {minOrderCents ? <View style={s.summaryRow}><Feather name="dollar-sign" size={12} color={MUTED} /><Text style={s.summaryLine}>Min. order {formatCents(minOrderCents)}</Text></View> : null}
-              <View style={s.summaryRow}><Feather name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}{oneUsePerCustomer ? ' · 1 per customer' : ''}</Text></View>
+              <View style={s.summaryRow}><Feather name="hash" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryUsageLabel}{oneUsePerCustomer ? ' · 1 per customer' : ''}{firstOrderOnly ? ' · First order only' : ''}</Text></View>
               <View style={s.summaryRow}><Feather name="calendar" size={12} color={MUTED} /><Text style={s.summaryLine}>{summaryDatesLabel}</Text></View>
             </View>
 
@@ -503,9 +540,11 @@ export default function DiscountsScreen() {
             <View>
               <Text style={s.label}>Applies to</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {(['entire_store', 'specific_products'] as const).map(t => (
+                {((collections.length > 0 || appliesTo === 'collections'
+                  ? ['entire_store', 'specific_products', 'collections']
+                  : ['entire_store', 'specific_products']) as AppliesTo[]).map(t => (
                   <TouchableOpacity key={t} style={[s.typeBtn, { flex: 1 }, appliesTo === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAppliesTo(t); }}>
-                    <Text style={[s.typeBtnText, appliesTo === t && { color: theme.accent }]}>{t === 'entire_store' ? 'Entire store' : 'Specific products'}</Text>
+                    <Text style={[s.typeBtnText, appliesTo === t && { color: theme.accent }]}>{t === 'entire_store' ? 'Entire store' : t === 'collections' ? 'Collections' : 'Specific products'}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -519,6 +558,27 @@ export default function DiscountsScreen() {
               )}
             </View>
 
+            {appliesTo === 'collections' && (
+              <View style={{ gap: 8 }}>
+                {collections.map(c => {
+                  const selected = selectedCollectionIds.includes(c.id);
+                  return (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[s.productRow, selected && { borderColor: theme.accent, backgroundColor: theme.accent + '15' }]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setSelectedCollectionIds(prev => selected ? prev.filter(id => id !== c.id) : [...prev, c.id]);
+                      }}
+                    >
+                      <Text style={s.productName} numberOfLines={1}>{c.title}</Text>
+                      <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? theme.accent : MUTED} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
             {/* Min order */}
             <View>
               <Text style={s.label}>Minimum order ($) <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional)</Text></Text>
@@ -529,6 +589,19 @@ export default function DiscountsScreen() {
                 placeholder="50.00"
                 placeholderTextColor={MUTED}
                 keyboardType="decimal-pad"
+              />
+            </View>
+
+            {/* Min quantity */}
+            <View>
+              <Text style={s.label}>Minimum items <Text style={{ color: MUTED, fontSize: FS.xs }}>(optional)</Text></Text>
+              <TextInput
+                style={s.input}
+                value={minQuantity}
+                onChangeText={t => setMinQuantity(t.replace(/[^0-9]/g, ''))}
+                placeholder="2"
+                placeholderTextColor={MUTED}
+                keyboardType="number-pad"
               />
             </View>
 
@@ -559,6 +632,10 @@ export default function DiscountsScreen() {
               <View style={s.switchRow}>
                 <Text style={s.switchLabel}>One use per customer</Text>
                 <HapticSwitch value={oneUsePerCustomer} onValueChange={setOneUsePerCustomer} />
+              </View>
+              <View style={s.switchRow}>
+                <Text style={s.switchLabel}>First order only</Text>
+                <HapticSwitch value={firstOrderOnly} onValueChange={setFirstOrderOnly} />
               </View>
             </View>
 
@@ -656,7 +733,7 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
             <Feather name="copy" size={12} color={MUTED} />
           </View>
           <Text style={[s.valueText, { color: theme.accentLight }]}>{fmtValue(d)}</Text>
-          <Text style={s.metaText}>{d.appliesTo === 'entire_store' ? 'Entire store' : `${d.productIds.length} product${d.productIds.length === 1 ? '' : 's'}`}</Text>
+          <Text style={s.metaText}>{d.appliesTo === 'entire_store' ? 'Entire store' : d.appliesTo === 'collections' ? `${d.collectionIds.length} collection${d.collectionIds.length === 1 ? '' : 's'}` : `${d.productIds.length} product${d.productIds.length === 1 ? '' : 's'}`}</Text>
           {d.minOrderCents > 0 && <Text style={s.metaText}>Min. order {formatCents(d.minOrderCents)}</Text>}
           <Text style={s.metaText}>
             {d.startsAt && new Date(d.startsAt).getTime() > Date.now() ? `Starts ${fmtDate(d.startsAt)}` : d.expiresAt ? `Ends ${fmtDate(d.expiresAt)}` : 'No end date'}

@@ -1373,11 +1373,19 @@ export const discountCodes = pgTable('discount_codes', {
   maxUses:        integer('max_uses'),
   usesCount:      integer('uses_count').notNull().default(0),
   expiresAt:      timestamp('expires_at'),
-  /** 'entire_store' | 'specific_products' */
+  /** 'entire_store' | 'specific_products' | 'collections' */
   appliesTo:      text('applies_to').notNull().default('entire_store'),
   /** Product ids the code applies to when appliesTo === 'specific_products' */
   productIds:     jsonb('product_ids').$type<string[]>().notNull().default([]),
   oneUsePerCustomer: boolean('one_use_per_customer').notNull().default(false),
+  /** Only buyers with no prior paid order from this seller may use the code. */
+  firstOrderOnly: boolean('first_order_only').notNull().default(false),
+  /** shopify_import_collections ids the code applies to when appliesTo === 'collections' */
+  collectionIds:  jsonb('collection_ids').$type<string[]>().notNull().default([]),
+  /** Generalises oneUsePerCustomer: max redemptions per customer (null = unlimited). */
+  maxUsesPerCustomer: integer('max_uses_per_customer'),
+  /** Minimum number of eligible items in the cart (0 = none). */
+  minQuantity:    integer('min_quantity').notNull().default(0),
   startsAt:       timestamp('starts_at'),
   active:         boolean('active').notNull().default(true),
   createdAt:      timestamp('created_at').defaultNow().notNull(),

@@ -2436,13 +2436,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     /** Discount codes — seller-managed promo codes */
     discountCodes: {
       list:   () => get<any[]>('/api/discount-codes'),
+      collections: () => get<Array<{ id: string; title: string }>>('/api/discount-codes/collections'),
       create: (data: {
         code?: string;
         type: 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
         value?: number;
         minOrderCents?: number;
-        appliesTo?: 'entire_store' | 'specific_products';
+        appliesTo?: 'entire_store' | 'specific_products' | 'collections';
         productIds?: string[];
+        collectionIds?: string[];
+        firstOrderOnly?: boolean;
+        minQuantity?: number;
         maxUses?: number | null;
         singleUse?: boolean;
         oneUsePerCustomer?: boolean;
@@ -2456,8 +2460,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         minOrderCents?: number;
         maxUses?: number | null;
         oneUsePerCustomer?: boolean;
-        appliesTo?: 'entire_store' | 'specific_products';
+        appliesTo?: 'entire_store' | 'specific_products' | 'collections';
         productIds?: string[];
+        collectionIds?: string[];
+        firstOrderOnly?: boolean;
+        minQuantity?: number;
         value?: number;
       }) => patch<any>(`/api/discount-codes/${id}`, data),
       delete: (id: string) => del<any>(`/api/discount-codes/${id}`),
