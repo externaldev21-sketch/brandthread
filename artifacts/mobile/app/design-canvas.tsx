@@ -36,6 +36,11 @@ import Svg, {
   Path, Rect, Circle, G, Line, Text as SvgText,
   Image as SvgImage, Defs, Mask as SvgMask, Filter, FeColorMatrix, FeBlend, FeComposite,
 } from 'react-native-svg';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue, useAnimatedStyle, runOnJS,
+} from 'react-native-reanimated';
+import { rubberband, dragPct, toStepPercent } from '@/lib/sliderGestureModel';
 import { File, Paths, EncodingType } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
@@ -490,7 +495,6 @@ export default function DesignCanvasScreen() {
 
   const [sizeSliderDragging, setSizeSliderDragging] = useState(false);
   const [opacitySliderDragging, setOpacitySliderDragging] = useState(false);
-  const sizeSliderHeightRef = useRef(200);
 
   const brushIdxRef     = useRef(brushIdx);
   const brushSizeRef    = useRef(brushSize);
@@ -1489,64 +1493,157 @@ export default function DesignCanvasScreen() {
     );
   }
 
-  // ─── Left size slider PanResponder ─────────────────────────────────────────
-  // Was recomputing `pct` from scratch on every single move event, anchored
-  // to a fixed 0.5 baseline plus only the incremental delta since the LAST
-  // event (not the cumulative delta since the drag started) — so the value
-  // never tracked a smooth, continuous position; it jumped around the
-  // midpoint on every pixel of movement, exactly the "keeps messing up"
-  // symptom. Fixed to the standard pattern: capture the value's starting
-  // percentage once at grant, then use PanResponder's own `gestureState.dy`
-  // (cumulative since grant, not per-move) to offset from that fixed start.
-  const sizeSliderStartPctRef = useRef(0);
-  const sizePanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder:  () => true,
-      onPanResponderGrant: () => {
-        setSizeSliderDragging(true);
-        const tool = activeTopToolRef.current;
-        const current = tool === 'eraser' ? eraserSizeRef.current
-          : tool === 'smudge' ? smudgeSizeRef.current
-          : brushSizeRef.current;
-        sizeSliderStartPctRef.current = Math.max(0, Math.min(1, current / 80));
-      },
-      onPanResponderMove: (_e, gestureState) => {
-        const deltaPct = -gestureState.dy / sizeSliderHeightRef.current;
-        const pct = Math.max(0, Math.min(1, sizeSliderStartPctRef.current + deltaPct));
-        const tool = activeTopToolRef.current;
-        if (tool === 'eraser')       setEraserSize(Math.max(2, Math.round(pct * 80)));
-        else if (tool === 'smudge')  setSmudgeSize(Math.max(2, Math.round(pct * 80)));
-        else                         setBrushSize(Math.max(1, Math.round(pct * 80)));
-      },
-      onPanResponderRelease: () => setSizeSliderDragging(false),
-      onPanResponderTerminate: () => setSizeSliderDragging(false),
-    })
-  ).current;
+  // ─── Left size/opacity sliders — Reanimated + Gesture Handler, UI thread ──
+  // Earlier version used PanResponder and recomputed `pct` from scratch on
+  // every move event, anchored to a fixed 0.5 baseline plus only the
+  // incremental delta since the LAST event — the "keeps messing up/
+  // glitching" bug. A first pass fixed the math (cumulative gestureState.dy
+  // from grant) but still drove every single pointer move through
+  // PanResponder's JS-thread bridge via setState, which is a real source of
+  // dropped frames once the canvas itself is doing drawing work. This
+  // version moves the actual gesture tracking onto the UI thread:
+  //   - `sizePct`/`opacityPct` are Reanimated shared values. The thumb
+  //     position and the drag-preview card's dot both read directly from
+  //     them via useAnimatedStyle — pure worklets, no JS-thread involvement
+  //     while dragging, so they stay smooth even if JS is busy.
+  //   - Gesture.Pan().onUpdate is a worklet: it computes the new percentage
+  //     from the gesture's own cumulative translationY (equivalent to the
+  //     old gestureState.dy fix, but evaluated on the UI thread) and
+  //     supports rubber-banding past 0%/100% that springs back on release.
+  //   - React state (brushSize/eraserSize/smudgeSize/brushOpacity — read
+  //     synchronously all over the drawing code, so they stay plain state
+  //     rather than becoming shared values themselves) is committed via
+  //     runOnJS, but ONLY when the rounded 1%-step value actually changes,
+  //     not on every raw pointer event — satisfying "clamp 0–100% in 1%
+  //     steps" while keeping JS-thread traffic to ~100 calls across a full
+  //     drag instead of one per pixel.
+  const SIZE_MAX = 80;
+  const sizePct = useSharedValue(Math.max(0, Math.min(1, brushSizeRef.current / SIZE_MAX)));
+  const opacityPct = useSharedValue(Math.max(0.02, Math.min(1, brushOpacityRef.current)));
+  const sizeDragStartPct = useSharedValue(0);
+  const opacityDragStartPct = useSharedValue(0);
+  const sizeSliderHeightSV = useSharedValue(200);
+  const opacitySliderHeightSV = useSharedValue(200);
 
-  // ─── Left opacity slider PanResponder — same fix as sizePanResponder above:
-  // a fixed start percentage captured at grant, offset by gestureState.dy
-  // (cumulative since grant), instead of recomputing from a 0.5 baseline on
-  // every move event. ──────────────────────────────────────────────────────
-  const opacitySliderHeightRef = useRef(200);
-  const opacitySliderStartPctRef = useRef(0);
-  const opacityPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder:  () => true,
-      onPanResponderGrant: () => {
-        setOpacitySliderDragging(true);
-        opacitySliderStartPctRef.current = Math.max(0.02, Math.min(1, brushOpacityRef.current));
-      },
-      onPanResponderMove: (_e, gestureState) => {
-        const deltaPct = -gestureState.dy / opacitySliderHeightRef.current;
-        const pct = Math.max(0.02, Math.min(1, opacitySliderStartPctRef.current + deltaPct));
-        setBrushOpacity(pct);
-      },
-      onPanResponderRelease: () => setOpacitySliderDragging(false),
-      onPanResponderTerminate: () => setOpacitySliderDragging(false),
+  // Keep the shared values in sync with state changes that don't come from
+  // this drag itself (tool switch, +/- buttons in the Brush Library sheet,
+  // loading a saved brush, etc.), but only while not actively dragging —
+  // otherwise an in-flight drag would fight with a render-triggered sync.
+  const activeSizeForSync = activeTopTool === 'eraser' ? eraserSize : activeTopTool === 'smudge' ? smudgeSize : brushSize;
+  useEffect(() => {
+    if (!sizeSliderDragging) {
+      sizePct.value = Math.max(0, Math.min(1, activeSizeForSync / SIZE_MAX));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSizeForSync, sizeSliderDragging]);
+  useEffect(() => {
+    if (!opacitySliderDragging) {
+      opacityPct.value = Math.max(0.02, Math.min(1, brushOpacity));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brushOpacity, opacitySliderDragging]);
+
+  // rubberband/dragPct/toStepPercent are imported from lib/sliderGestureModel
+  // (worklet-safe pure functions, unit-tested in tests/sliderGestureModel.test.ts).
+  // rubberband gives past-the-edge drags a little elastic give instead of a
+  // hard stop, matching the slight overshoot Procreate's own sliders have.
+
+  function commitSizeStep(stepPct: number) {
+    const tool = activeTopToolRef.current;
+    const raw = Math.round(stepPct * SIZE_MAX);
+    if (tool === 'eraser')       setEraserSize(Math.max(2, raw));
+    else if (tool === 'smudge')  setSmudgeSize(Math.max(2, raw));
+    else                         setBrushSize(Math.max(1, raw));
+  }
+  function commitOpacityStep(stepPct: number) {
+    setBrushOpacity(Math.max(0.02, stepPct));
+  }
+
+  const sizeLastStepRef = useRef(-1);
+  const opacityLastStepRef = useRef(-1);
+  function beginSizeDrag() {
+    setSizeSliderDragging(true);
+    sizeLastStepRef.current = -1;
+  }
+  function beginOpacityDrag() {
+    setOpacitySliderDragging(true);
+    opacityLastStepRef.current = -1;
+  }
+
+  const sizeGesture = Gesture.Pan()
+    .onBegin(() => {
+      'worklet';
+      sizeDragStartPct.value = sizePct.value;
+      runOnJS(beginSizeDrag)();
     })
-  ).current;
+    .onUpdate((e) => {
+      'worklet';
+      const raw = dragPct(sizeDragStartPct.value, e.translationY, sizeSliderHeightSV.value);
+      sizePct.value = rubberband(raw, 0, 1);
+      const clamped = Math.max(0, Math.min(1, sizePct.value));
+      runOnJS(maybeCommitSizeStep)(toStepPercent(clamped), clamped);
+    })
+    .onEnd(() => {
+      'worklet';
+      sizePct.value = Math.max(0, Math.min(1, sizePct.value));
+    })
+    .onFinalize(() => {
+      'worklet';
+      runOnJS(setSizeSliderDragging)(false);
+    });
+
+  function maybeCommitSizeStep(step: number, clampedPct: number) {
+    if (sizeLastStepRef.current === step) return;
+    sizeLastStepRef.current = step;
+    commitSizeStep(clampedPct);
+  }
+
+  const opacityGesture = Gesture.Pan()
+    .onBegin(() => {
+      'worklet';
+      opacityDragStartPct.value = opacityPct.value;
+      runOnJS(beginOpacityDrag)();
+    })
+    .onUpdate((e) => {
+      'worklet';
+      const raw = dragPct(opacityDragStartPct.value, e.translationY, opacitySliderHeightSV.value);
+      opacityPct.value = rubberband(raw, 0.02, 1);
+      const clamped = Math.max(0.02, Math.min(1, opacityPct.value));
+      runOnJS(maybeCommitOpacityStep)(toStepPercent(clamped), clamped);
+    })
+    .onEnd(() => {
+      'worklet';
+      opacityPct.value = Math.max(0.02, Math.min(1, opacityPct.value));
+    })
+    .onFinalize(() => {
+      'worklet';
+      runOnJS(setOpacitySliderDragging)(false);
+    });
+
+  function maybeCommitOpacityStep(step: number, clampedPct: number) {
+    if (opacityLastStepRef.current === step) return;
+    opacityLastStepRef.current = step;
+    commitOpacityStep(clampedPct);
+  }
+
+  const sizeThumbStyle = useAnimatedStyle(() => ({
+    bottom: `${Math.max(0, Math.min(100, sizePct.value * 100))}%`,
+    marginBottom: -6,
+  }));
+  const opacityThumbStyle = useAnimatedStyle(() => ({
+    bottom: `${Math.max(0, Math.min(100, opacityPct.value * 100))}%`,
+    marginBottom: -6,
+  }));
+  const sizePreviewDotStyle = useAnimatedStyle(() => {
+    const px = Math.max(4, Math.min(72, sizePct.value * SIZE_MAX * 1.8));
+    return { width: px, height: px };
+  });
+  const opacityPreviewDotStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0.02, Math.min(1, opacityPct.value)),
+  }));
+  // Labels shown in the drag-preview card while dragging — kept as plain
+  // React state (not a worklet-driven Animated.Text) since they're only
+  // read on the committed 1%-step value, same cadence as the state commit.
 
   // ─── Layer actions ─────────────────────────────────────────────────────────
   function handleAddDrawingLayer() {
@@ -3196,27 +3293,29 @@ export default function DesignCanvasScreen() {
         <View style={styles.leftSliderRail} pointerEvents="box-none">
           {['brush', 'smudge', 'eraser'].includes(activeTopTool) && (
             <>
-              <View
-                style={styles.sizeSlider}
-                onLayout={e => { sizeSliderHeightRef.current = e.nativeEvent.layout.height; }}
-                {...sizePanResponder.panHandlers}
-                testID="brush-size-slider"
-              >
-                <View style={styles.sizeTrack}>
-                  <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, (activeSize / 80) * 100))}%`, marginBottom: -6 }]} />
+              <GestureDetector gesture={sizeGesture}>
+                <View
+                  style={styles.sizeSlider}
+                  onLayout={e => { sizeSliderHeightSV.value = e.nativeEvent.layout.height || 200; }}
+                  testID="brush-size-slider"
+                >
+                  <View style={styles.sizeTrack}>
+                    <Animated.View style={[styles.sizeThumb, sizeThumbStyle]} />
+                  </View>
                 </View>
-              </View>
+              </GestureDetector>
 
-              <View
-                style={styles.opacitySlider}
-                onLayout={e => { opacitySliderHeightRef.current = e.nativeEvent.layout.height; }}
-                {...opacityPanResponder.panHandlers}
-                testID="brush-opacity-slider"
-              >
-                <View style={styles.sizeTrack}>
-                  <View style={[styles.sizeThumb, { bottom: `${Math.max(0, Math.min(100, brushOpacity * 100))}%`, marginBottom: -6 }]} />
+              <GestureDetector gesture={opacityGesture}>
+                <View
+                  style={styles.opacitySlider}
+                  onLayout={e => { opacitySliderHeightSV.value = e.nativeEvent.layout.height || 200; }}
+                  testID="brush-opacity-slider"
+                >
+                  <View style={styles.sizeTrack}>
+                    <Animated.View style={[styles.sizeThumb, opacityThumbStyle]} />
+                  </View>
                 </View>
-              </View>
+              </GestureDetector>
             </>
           )}
 
@@ -3248,22 +3347,22 @@ export default function DesignCanvasScreen() {
               {sizeSliderDragging ? `Size ${Math.round((activeSize / 80) * 100)}%` : `Opacity ${Math.round(brushOpacity * 100)}%`}
             </Text>
             <View style={styles.dragPreviewDotWrap}>
-              <View
+              <Animated.View
                 style={[
                   styles.dragPreviewDot,
                   sizeSliderDragging
-                    ? {
-                        width: Math.max(4, Math.min(72, activeSize * 1.8)),
-                        height: Math.max(4, Math.min(72, activeSize * 1.8)),
-                        backgroundColor: activeTopTool === 'eraser' ? CARD_ELEVATED : drawColor,
-                        borderColor: activeTopTool === 'eraser' ? FG : 'transparent',
-                        borderWidth: activeTopTool === 'eraser' ? 1.5 : 0,
-                      }
-                    : {
-                        width: 40, height: 40,
-                        backgroundColor: drawColor,
-                        opacity: brushOpacity,
-                      },
+                    ? [
+                        sizePreviewDotStyle,
+                        {
+                          backgroundColor: activeTopTool === 'eraser' ? CARD_ELEVATED : drawColor,
+                          borderColor: activeTopTool === 'eraser' ? FG : 'transparent',
+                          borderWidth: activeTopTool === 'eraser' ? 1.5 : 0,
+                        },
+                      ]
+                    : [
+                        opacityPreviewDotStyle,
+                        { width: 40, height: 40, backgroundColor: drawColor },
+                      ],
                 ]}
               />
             </View>
@@ -3589,6 +3688,7 @@ export default function DesignCanvasScreen() {
             return handles.map(h => (
               <Pressable
                 key={h.kind}
+                testID={`transform-handle-${h.kind}`}
                 style={[
                   styles.handlePressable,
                   {
