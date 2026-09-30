@@ -42,8 +42,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -96,7 +96,6 @@ export default function PlansScreen() {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const insets    = useSafeAreaInsets();
-  const topPad    = useHeaderTopInset();
   const router    = useRouter();
   const api       = useApi();
   const { fromOnboarding } = useLocalSearchParams<{ fromOnboarding?: string }>();
@@ -381,29 +380,13 @@ export default function PlansScreen() {
   const bottomPad = insets.bottom;
 
   return (
-    <View style={[styles.root, { paddingTop: topPad }]}>
+    <View style={styles.root}>
 
-      {/* Header */}
-      <View style={styles.header}>
-        {isOnboarding ? (
-          <View style={{ width: 40 }} />
-        ) : (
-          <TouchableOpacity
-            style={styles.closeBtn}
-            activeOpacity={0.7}
-            onPress={requestExit}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Feather name="x" size={18} color={theme.text} />
-          </TouchableOpacity>
-        )}
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {isOnboarding ? 'Choose your plan' : 'Subscription plans'}
-          </Text>
-        </View>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader
+        title={isOnboarding ? 'Choose your plan' : 'Subscription plans'}
+        variant="modal"
+        onBack={requestExit}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -578,20 +561,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background ?? '#0A0A0B' },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  closeBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
-  headerCenter:{ flex: 1, alignItems: 'center' },
-  headerTitle: { fontSize: FS.lg, fontFamily: FONT.semibold, color: theme.text },
-
   // Phone-framed dashboard preview
   phoneFrame: {
     alignSelf: 'center',
@@ -619,7 +588,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   phoneStatRow: { flexDirection: 'row', gap: 8 },
   phoneStatCard: { flex: 1, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, padding: 8, gap: 2 },
-  phoneStatLabel: { fontSize: 9, fontFamily: FONT.medium, color: theme.muted },
+  phoneStatLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
   phoneStatValue: { fontSize: 13, fontFamily: FONT.semibold, color: theme.text },
   phoneChart: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
