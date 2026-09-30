@@ -10,6 +10,8 @@ import { getSetupState, type SetupState } from '@/lib/setupStore';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { SP, RADIUS, SCREEN_BG } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { SELLER_DASHBOARD_STEPS } from '@/lib/firstRunTips/content';
 
 const DEFAULT_SETUP: SetupState = {
   started: false,
@@ -85,6 +87,12 @@ export default function SellerHomeScreen() {
         userId={userId}
         setupState={setupState}
         onSetupStateChange={setSetupState}
+      />
+      <FirstRunTip
+        id="seller-dashboard"
+        variant="anchored"
+        contentReady={!loading}
+        anchored={{ steps: SELLER_DASHBOARD_STEPS }}
       />
     </View>
   );

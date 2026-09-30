@@ -42,6 +42,8 @@ import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -2123,6 +2125,12 @@ export default function AddProductScreen() {
           />
         );
       })()}
+      <FirstRunTip
+        id="add-product"
+        variant="anchored"
+        contentReady
+        anchored={{ steps: ADD_PRODUCT_STEPS }}
+      />
     </View>
   );
 }

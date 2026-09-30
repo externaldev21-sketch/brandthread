@@ -35,6 +35,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryClient';
 import { prefetchOnPressIn } from '@/lib/prefetch';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { SELLER_ORDERS_GESTURE } from '@/lib/firstRunTips/content';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1295,6 +1297,12 @@ export default function OrdersScreen() {
         onClose={() => setFilterSheetVisible(false)}
       />
 
+      <FirstRunTip
+        id="seller-orders"
+        variant="gesture"
+        contentReady={!loading}
+        gesture={SELLER_ORDERS_GESTURE}
+      />
     </View>
   );
 }

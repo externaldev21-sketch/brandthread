@@ -1042,6 +1042,31 @@ export const savedItems = pgTable('saved_items', {
   userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
 }));
 
+// ─── First-run tips (per-account "seen" tracking) ─────────────────────────────
+// One row per (user, tip) once that tip has been shown and dismissed — source
+// of truth so reinstalling the app or switching devices never replays a tip
+// the account already saw. See artifacts/mobile/lib/firstRunTips for the
+// client-side local cache + reconcile logic and
+// artifacts/api-server/src/routes/first-run-tips.ts for the API surface.
+export const firstRunTipsSeen = pgTable('first_run_tips_seen', {
+  id:      uuid('id').primaryKey().defaultRandom(),
+  userId:  text('user_id').notNull(),
+  tipId:   text('tip_id').notNull(),
+  seenAt:  timestamp('seen_at').defaultNow().notNull(),
+}, (table) => ({
+  userTipUnique: uniqueIndex('first_run_tips_seen_user_tip_unique').on(table.userId, table.tipId),
+  userIdIdx:     index('first_run_tips_seen_user_id_idx').on(table.userId),
+}));
+
+// "Skip all tips" — a single global per-account setting that suppresses
+// every future first-run tip once set. A separate one-row-per-user table
+// (rather than a column on `users`) keeps this additive and self-contained.
+export const firstRunTipsSettings = pgTable('first_run_tips_settings', {
+  userId:    text('user_id').primaryKey(),
+  skipAll:   boolean('skip_all').notNull().default(false),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // ─── Recently viewed products ──────────────────────────────────────────────────
 // One row per (buyer, product); viewing again bumps viewedAt via upsert
 // rather than creating a duplicate.
