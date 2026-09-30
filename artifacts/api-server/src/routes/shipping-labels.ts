@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
-  db, orders, shippingLabelQuotes, shippingLabels, orderFundReservations, dropWallets, sellerCashoutAttempts,
+  db, orders, orderItems, shippingLabelQuotes, shippingLabels, orderFundReservations, dropWallets, sellerCashoutAttempts,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
@@ -12,11 +12,17 @@ import {
 } from "../lib/money/escrow";
 import { orderHeldCents } from "../lib/money/ledger";
 import { logger } from "../lib/logger";
+import { parseItemIds, partialLabelItemError } from "../lib/partialLabel";
+import { shipItems } from "../lib/delivery/deliveryState";
+import { registerTrackingWithCarrier } from "../lib/delivery/trackingSync";
+import { publishNotification } from "./notifications-feed";
 
 const router = Router();
 router.use(requireAuth);
 router.use(teamContext());
 const ELIGIBLE_STATUSES = ["pending", "processing", "fulfilled"];
+// A label for part of an order may also be bought once earlier items shipped.
+const PARTIAL_ELIGIBLE_STATUSES = [...ELIGIBLE_STATUSES, "shipped"];
 
 function cents(amount: string): number {
   const match = amount.match(/^(\d+)(?:\.(\d{1,2}))?$/);
@@ -44,7 +50,9 @@ router.post("/:orderId/rates", requireRole("staff"), async (req, res) => {
     eq(orders.id, req.params.orderId), eq(orders.ownerId, ownerId),
   )).limit(1);
   if (!order) return void res.status(404).json({ error: "Order not found" });
-  if (!ELIGIBLE_STATUSES.includes(order.status)) {
+  const ratesItemIds = parseItemIds(req.body?.itemIds);
+  if (ratesItemIds === "invalid") return void res.status(400).json({ error: "itemIds must be a non-empty list of order item ids" });
+  if (!(ratesItemIds ? PARTIAL_ELIGIBLE_STATUSES : ELIGIBLE_STATUSES).includes(order.status)) {
     return void res.status(409).json({ error: "Labels are only available before shipment" });
   }
   try {
@@ -81,9 +89,35 @@ router.post("/:orderId/rates", requireRole("staff"), async (req, res) => {
   }
 });
 
+async function shipLabelledItems(
+  orderId: string, ownerId: string, itemIds: string[], trackingNumber: string, carrier: string | null, notify = true,
+) {
+  try {
+    const result = await shipItems({ orderId, ownerId, itemIds, trackingNumber, carrier });
+    if (!result.ok) {
+      logger.error({ orderId, code: result.code }, "Label was bought but its items could not be marked shipped");
+      return;
+    }
+    void registerTrackingWithCarrier(orderId, carrier, trackingNumber);
+    if (notify && result.buyerId) {
+      publishNotification({
+        userId: result.buyerId, category: "orders", pushCategory: "order", type: "order_shipped",
+        title: "Part of your order has shipped!",
+        body: `Order #${result.orderNumber} is on its way via ${carrier ?? "carrier"} — tracking: ${trackingNumber}`,
+        targetId: orderId, targetType: "buyer_order",
+      }).catch(() => { /* non-critical */ });
+    }
+  } catch (err) {
+    logger.error({ err, orderId }, "Could not mark a labelled parcel's items shipped");
+  }
+}
+
 router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { rateId, idempotencyKey } = req.body;
+  // Optional: a label for some of the order's items (split shipment).
+  const itemIds = parseItemIds(req.body?.itemIds);
+  if (itemIds === "invalid") return void res.status(400).json({ error: "itemIds must be a non-empty list of order item ids" });
   if (!rateId || !idempotencyKey) {
     return void res.status(400).json({ error: "rateId and idempotencyKey are required" });
   }
@@ -103,6 +137,9 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
         WHERE order_id = ${order.id}::uuid
           AND owner_id = ${ownerId}
           AND status IN ('purchasing', 'active', 'void_pending')
+          AND ${itemIds
+            ? sql`idempotency_key = ${idempotencyKey} AND item_ids IS NOT NULL`
+            : sql`item_ids IS NULL`}
         ORDER BY created_at DESC LIMIT 1
       `);
       const open = (openResult as any).rows?.[0];
@@ -113,6 +150,7 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
           ownerId: open.owner_id,
           idempotencyKey: open.idempotency_key,
           providerRateId: open.provider_rate_id,
+          itemIds: open.item_ids,
           providerShipmentId: open.provider_shipment_id,
           providerTransactionId: open.provider_transaction_id,
           trackingNumber: open.tracking_number,
@@ -126,8 +164,20 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
         duplicate = open.status !== "purchasing";
         return;
       }
-      if (!ELIGIBLE_STATUSES.includes(order.status)) {
+      if (!(itemIds ? PARTIAL_ELIGIBLE_STATUSES : ELIGIBLE_STATUSES).includes(order.status)) {
         throw Object.assign(new Error("Labels are only available before shipment"), { status: 409 });
+      }
+      if (itemIds) {
+        const rows = await tx.select({
+          id: orderItems.id, refundedAt: orderItems.refundedAt, deliveredAt: orderItems.deliveredAt, trackingNumber: orderItems.trackingNumber,
+        }).from(orderItems).where(eq(orderItems.orderId, order.id));
+        const openLabels = await tx.execute(sql`
+          SELECT item_ids FROM shipping_labels
+          WHERE order_id = ${order.id}::uuid AND status IN ('purchasing', 'active', 'void_pending') AND item_ids IS NOT NULL
+        `);
+        const onOpenLabels = ((openLabels as any).rows ?? []).flatMap((row: any) => row.item_ids ?? []) as string[];
+        const problem = partialLabelItemError(rows, onOpenLabels, itemIds);
+        if (problem) throw Object.assign(new Error(problem), { status: 409, code: "INVALID_LABEL_ITEMS" });
       }
       const [quote] = await tx.select().from(shippingLabelQuotes).where(and(
         eq(shippingLabelQuotes.orderId, order.id),
@@ -187,7 +237,7 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
       }
 
       [label] = await tx.insert(shippingLabels).values({
-        orderId: order.id, ownerId, idempotencyKey, providerRateId: rateId,
+        orderId: order.id, ownerId, idempotencyKey, providerRateId: rateId, itemIds,
         providerShipmentId: quote.providerShipmentId,
         carrier: quote.carrier, service: quote.service,
         priceCents, status: "purchasing", previousOrderStatus: order.status,
@@ -202,6 +252,10 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
       await tx.update(orders).set({ status: "label_purchasing", updatedAt: new Date() }).where(eq(orders.id, order.id));
     });
     if (duplicate) {
+      if (label.itemIds && label.status === "active" && label.trackingNumber) {
+        // Retry-safe: re-applies the same tracking to the same items.
+        await shipLabelledItems(label.orderId, ownerId, label.itemIds, label.trackingNumber, label.carrier ?? null, false);
+      }
       return void res.json({
         label,
         duplicate: true,
@@ -288,18 +342,24 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
       await tx.update(orders).set({
         status: label.previousOrderStatus ?? "processing",
         // The label's tracking number is the order's tracking number.
-        ...(!money?.trackingNumber && transaction.tracking_number ? {
+        // A label for some items ships those items (shipItems, below); the
+        // order takes its headline tracking from the first shipment.
+        ...(!label.itemIds && !money?.trackingNumber && transaction.tracking_number ? {
           trackingNumber: transaction.tracking_number,
           carrier: transaction.rate?.provider ?? label.carrier,
           trackingStatus: "label_created",
         } : {}),
         updatedAt: new Date(),
       }).where(and(eq(orders.id, label.orderId), eq(orders.status, "label_purchasing")));
-      moneyFollowUp.value = money?.chargeModel ?? null;
+      // Held preorder funds release per order on delivery; a part-order label alone must not trigger it.
+      moneyFollowUp.value = label.itemIds && money?.chargeModel === "held" ? null : (money?.chargeModel ?? null);
       return updated ?? label;
     });
     if (providerFailure.value) {
       return void res.status(409).json({ error: providerFailure.value.message, code: providerFailure.value.code });
+    }
+    if (label.itemIds && label.status === "active" && label.trackingNumber) {
+      await shipLabelledItems(label.orderId, ownerId, label.itemIds, label.trackingNumber, label.carrier ?? null);
     }
     // A generated tracking number releases a preorder's funds (per order);
     // an in-stock order's label cost is recovered from the seller's balance.
@@ -379,6 +439,15 @@ router.post("/:orderId/:labelId/void", requireRole("staff"), async (req, res) =>
         status: pending ? "void_pending" : "voided", refundedAt: pending ? null : new Date(), updatedAt: new Date(),
       }).where(eq(shippingLabels.id, label.id)).returning();
       if (!pending) {
+        const labelItemIds: string[] | null = label.itemIds ?? label.item_ids ?? null;
+        const labelTracking: string | null = label.trackingNumber ?? label.tracking_number ?? null;
+        if (labelItemIds && labelTracking) {
+          // The parcel never shipped: its items go back to "not shipped yet".
+          await tx.update(orderItems).set({ trackingNumber: null, carrier: null, shippedAt: null, trackingStatus: null })
+            .where(and(
+              inArray(orderItems.id, labelItemIds), eq(orderItems.trackingNumber, labelTracking), isNull(orderItems.deliveredAt),
+            ));
+        }
         await tx.update(orderFundReservations).set({ status: "refunded", updatedAt: new Date() }).where(eq(orderFundReservations.shippingLabelId, label.id));
         const orderId = label.orderId ?? label.order_id;
         const [order] = await tx.select({ dropId: orders.dropId, chargeModel: orders.chargeModel })

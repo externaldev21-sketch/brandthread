@@ -950,6 +950,10 @@ export default function OrderDetailScreen() {
         items={unshippedItems(order.lineItems).map(li => ({ id: li.id, productName: li.productName, variant: li.variant, quantity: li.quantity }))}
         onClose={() => setShowShipItems(false)}
         onSubmit={handleShipItems}
+        onBuyLabel={(itemIds) => {
+          setShowShipItems(false);
+          router.push(`/fulfill-order?orderId=${id}&itemIds=${itemIds.join(',')}`);
+        }}
       />
 
       {/* Tracking Events Modal */}
