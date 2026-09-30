@@ -10,6 +10,7 @@ import {
   Alert, ActivityIndicator, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, BLUE, ORANGE, GOLD,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS, ICON, COMP,
 } from '@/lib/theme';
 import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
@@ -64,6 +65,12 @@ export default function DesignExportScreen() {
   const styles = createStyles(theme);
   const router   = useRouter();
   const headerTopInset = useHeaderTopInset();
+  const insets = useSafeAreaInsets();
+  // This screen keeps the persistent seller tab bar (a normal card-pushed
+  // screen, not a full-screen flow) but scrollContent's paddingBottom was a
+  // flat guess (120) that didn't account for the device's actual safe-area
+  // inset — the audit caught it overlapping the tab bar's cart badge.
+  const tabBarClearance = Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md;
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
 
   const [project, setProject]       = useState<DesignProject | null>(null);
@@ -115,7 +122,7 @@ export default function DesignExportScreen() {
     <View style={styles.root}>
       <ScreenHeader title="Export" variant="modal" onBack={() => goBackOr(router)} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarClearance }]}>
 
         {/* Preview thumbnail */}
         <View style={styles.thumbWrap}>
@@ -214,7 +221,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  scrollContent: { paddingBottom: 120, paddingHorizontal: SP.md },
+  scrollContent: { paddingHorizontal: SP.md },
 
   thumbWrap: { alignItems: 'center', marginBottom: SP.md, marginTop: SP.sm },
   thumb: {

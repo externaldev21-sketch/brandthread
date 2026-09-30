@@ -161,6 +161,8 @@ describe('seller bar full-screen deny-list', () => {
     'add-product',
     'plans',
     'design-canvas',
+    // Mockup-to-Model — its own sticky "Create N photos" bottom CTA.
+    'design-mockup-to-model',
     'store-generate',
     'store-generating',
     'quote-request',
@@ -241,7 +243,6 @@ describe('seller bar full-screen deny-list', () => {
     'design-ai-photoshoot',
     'design-bg-replace',
     'design-campaign',
-    'design-mockup-to-model',
     'design-text-to-design',
     'design-mockup-preview',
     'lifestyle-images',
