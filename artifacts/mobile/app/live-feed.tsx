@@ -17,8 +17,10 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput, Platform, Pressable, Share, ActivityIndicator, useWindowDimensions,
+  View, Text, StyleSheet, FlatList, TextInput, Platform, Pressable, Share, ActivityIndicator,
+  AccessibilityInfo, useWindowDimensions,
 } from 'react-native';
+import { Asset } from 'expo-asset';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import type { StyleProp, ViewStyle, ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,6 +44,7 @@ import { ThreadCashBillIcon } from '@/components/thread-cash/ThreadCashBill';
 import { LiveThreadCashSheet } from '@/components/live/LiveThreadCashSheet';
 import { LiveMoreSheet } from '@/components/live/LiveMoreSheet';
 import { LiveEmptyState } from '@/components/live/LiveEmptyState';
+import { ShopProductSheet, type ShopSheetSelection } from '@/components/ShopProductSheet';
 import { SHEET_TIMING } from '@/constants/motion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { LIVE_RED } from '@/components/live/LiveAvatarRing';
@@ -56,6 +59,8 @@ const SAMPLE_ROOMS_SOURCE = [
   {
     id: 'sample-live-maison-vela',
     brandName: 'Maison Vela',
+    sellerId: 'sample-seller-maison-vela',
+    sellerHandle: 'maisonvela',
     title: 'Evening silhouettes, live from the studio',
     viewerCount: 1204,
     video: require('../assets/videos/fashion_runway_02.mp4'),
@@ -64,17 +69,21 @@ const SAMPLE_ROOMS_SOURCE = [
     // real headshots in this seed set) — a different frame than the room's
     // own video/poster so the avatar doesn't just repeat it.
     avatar: require('../assets/videos/fashion_runway_05.jpg'),
+    productId: 'sample-product-liquid-silver-dress',
     productName: 'Liquid Silver Dress',
     priceCents: 32500,
   },
   {
     id: 'sample-live-atelier-noire',
     brandName: 'Atelier Noire',
+    sellerId: 'sample-seller-atelier-noire',
+    sellerHandle: 'ateliernoire',
     title: 'New arrivals — tailoring walkthrough',
     viewerCount: 862,
     video: require('../assets/videos/fashion_runway_01.mp4'),
     poster: require('../assets/videos/fashion_runway_01.jpg'),
     avatar: require('../assets/videos/fashion_runway_06.jpg'),
+    productId: 'sample-product-sculpted-blazer',
     productName: 'Sculpted Blazer',
     priceCents: 28500,
   },
@@ -93,6 +102,7 @@ interface LiveRoom {
   isSample: boolean;
   streamId?: string;
   brandName: string;
+  sellerId?: string;
   title: string;
   viewerCount: number;
   videoSource?: VideoSource;
@@ -101,8 +111,56 @@ interface LiveRoom {
   avatarSource?: number;
   avatarUri?: string | null;
   thumbnailUrl?: string | null;
+  productId?: string;
   productName?: string;
   priceCents?: number;
+}
+
+/**
+ * "Buy" on a sample room opens the same real ShopProductSheet → cart →
+ * checkout flow the Threads feed and app/live.tsx use — never a no-op.
+ * Sample rooms have no real backend product to fetch, so (same pattern as
+ * lib/live/liveShop.ts's previewLiveBuyerProduct) this builds the sheet's
+ * `previewProduct` locally from the room's own data; the sheet still runs
+ * its real addToCart()/checkout path against it.
+ */
+function previewLiveFeedProduct(room: LiveRoom): ShopSheetSelection | null {
+  if (!room.productId || !room.productName || room.priceCents == null || !room.sellerId) return null;
+  const posterUri = room.posterSource != null ? Asset.fromModule(room.posterSource).uri : undefined;
+  const optionId = `${room.productId}-size`;
+  const sizes = ['XS', 'S', 'M', 'L'].map(label => ({ id: `${optionId}-${label.toLowerCase()}`, label }));
+  return {
+    postId: `live-feed-${room.id}`,
+    postSellerId: room.sellerId,
+    activeTagIndex: 0,
+    tags: [{ productId: room.productId, productName: room.productName, priceCents: room.priceCents }],
+    previewProduct: {
+      id: room.productId,
+      sellerId: room.sellerId,
+      sellerName: room.brandName,
+      sellerHandle: room.brandName.toLowerCase().replace(/[^a-z0-9]/g, ''),
+      name: room.productName,
+      description: `Selling live now on ${room.brandName}'s stream — ${room.title}.`,
+      priceCents: room.priceCents,
+      imageUris: posterUri ? [posterUri] : [],
+      category: 'High Fashion',
+      isPreOrder: false,
+      cancellationPolicy: 'Preview item — no real order will be placed.',
+      refundPolicy: 'Returns accepted within 14 days of delivery for unworn items with tags attached.',
+      options: [{ id: optionId, name: 'Size', values: sizes }],
+      variants: sizes.map((size, index) => ({
+        id: `${room.productId}-variant-${size.label.toLowerCase()}`,
+        title: size.label,
+        optionValues: [{ optionId, valueId: size.id }],
+        priceCents: room.priceCents!,
+        inventoryQuantity: 2 + index * 2,
+        isAvailable: true,
+        imageUri: posterUri,
+      })),
+      isActive: true,
+      tags: ['live', 'preview'],
+    },
+  };
 }
 
 export default function LiveFeedScreen() {
@@ -119,11 +177,13 @@ export default function LiveFeedScreen() {
         id: sample.id,
         isSample: true,
         brandName: sample.brandName,
+        sellerId: sample.sellerId,
         title: sample.title,
         viewerCount: sample.viewerCount,
         videoSource: sample.video,
         posterSource: sample.poster,
         avatarSource: sample.avatar,
+        productId: sample.productId,
         productName: sample.productName,
         priceCents: sample.priceCents,
       }))
@@ -147,10 +207,12 @@ export default function LiveFeedScreen() {
             isSample: false,
             streamId: s.id,
             brandName: s.brand_name ?? s.seller_name ?? 'Live',
+            sellerId: s.seller_id,
             title: s.title ?? '',
             viewerCount: s.viewer_count ?? 0,
             avatarUri: s.avatar_url ?? null,
             thumbnailUrl: s.thumbnail_url ?? null,
+            productId: s.product_tags?.[0]?.productId,
             productName: s.product_tags?.[0]?.productName,
             priceCents: s.product_tags?.[0]?.priceCents,
           })));
@@ -171,6 +233,30 @@ export default function LiveFeedScreen() {
   function close() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     goBackOr(router, '/(tabs)/feed');
+  }
+
+  // "Buy" opens the same shared Shop sheet → cart → checkout flow as the
+  // Threads feed and app/live.tsx — the room's own video keeps playing
+  // behind it, nothing pauses.
+  const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
+  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
+  useEffect(() => {
+    void AccessibilityInfo.isReduceMotionEnabled?.().then(setReduceMotion).catch(() => setReduceMotion(false));
+  }, []);
+
+  function buy(room: LiveRoom) {
+    hapticLight();
+    if (!room.productId) return;
+    if (room.isSample) {
+      setShopSelection(previewLiveFeedProduct(room));
+      return;
+    }
+    setShopSelection({
+      postId: `live-feed-${room.id}`,
+      postSellerId: room.sellerId,
+      activeTagIndex: 0,
+      tags: [{ productId: room.productId, productName: room.productName ?? '', priceCents: room.priceCents ?? 0 }],
+    });
   }
 
   return (
@@ -212,7 +298,7 @@ export default function LiveFeedScreen() {
                 insetTop={topInset}
                 insetBottom={insets.bottom}
                 onClose={close}
-                onJoinReal={(streamId) => router.push(`/buyer-live?streamId=${encodeURIComponent(streamId)}` as never)}
+                onBuy={() => buy(item)}
               />
             )}
             pagingEnabled
@@ -225,6 +311,13 @@ export default function LiveFeedScreen() {
             getItemLayout={(_, index) => ({ length: windowHeight, offset: windowHeight * index, index })}
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
+          />
+        )}
+        {shopSelection && (
+          <ShopProductSheet
+            selection={shopSelection}
+            onClose={() => setShopSelection(null)}
+            reduceMotion={reduceMotion}
           />
         )}
       </FeedToastProvider>
@@ -249,7 +342,7 @@ function ProductCardBlur({ style }: { style?: StyleProp<ViewStyle> }) {
 }
 
 function LiveRoomPage({
-  room, isActive, pageWidth, pageHeight, insetTop, insetBottom, onClose, onJoinReal,
+  room, isActive, pageWidth, pageHeight, insetTop, insetBottom, onClose, onBuy,
 }: {
   room: LiveRoom;
   isActive: boolean;
@@ -258,7 +351,7 @@ function LiveRoomPage({
   insetTop: number;
   insetBottom: number;
   onClose: () => void;
-  onJoinReal: (streamId: string) => void;
+  onBuy: () => void;
 }) {
   const [following, setFollowing] = useState(false);
   const [chat, setChat] = useState(room.isSample ? SAMPLE_CHAT_LINES.slice(0, 2) : []);
@@ -332,11 +425,6 @@ function LiveRoomPage({
     if (!text) return;
     setMessage('');
     setChat(prev => [...prev, { user: 'You', text }]);
-  }
-
-  function handleBuy() {
-    hapticLight();
-    if (!room.isSample && room.streamId) onJoinReal(room.streamId);
   }
 
   // ─── Right rail: Share / Thread Cash / More ────────────────────────────
@@ -581,7 +669,7 @@ function LiveRoomPage({
           // buttons it visually stopped short of. Putting it on the
           // wrapper narrows the real tap target too.
           <ReanimatedAnimated.View style={[styles.productCardWrap, cardStyle]}>
-            <PressableScale onPress={handleBuy} style={styles.productCard} accessibilityRole="button" accessibilityLabel={`Buy ${room.productName}`}>
+            <PressableScale onPress={onBuy} style={styles.productCard} accessibilityRole="button" accessibilityLabel={`Buy ${room.productName}`}>
               {Platform.OS !== 'android' && <ProductCardBlur style={StyleSheet.absoluteFill} />}
               <View style={[StyleSheet.absoluteFill, styles.productCardTint]} pointerEvents="none" />
               {room.posterSource ? (

@@ -190,6 +190,27 @@ describe('ScreenHeader (components/ScreenHeader.tsx) vs insets, at all three vie
     expect((flattenStyle(backBtn.props.style).width as number)).toBeLessThan(width);
     expect((flattenStyle(backBtn.props.style).width as number)).toBeLessThanOrEqual(44);
   });
+
+  // Regression guard for the exact bug reported after #418: every screen on
+  // ScreenHeader's push variant rendered a bordered/boxed circular back
+  // button (borderWidth + card background) next to the title, looking like
+  // the pre-#418 "old header" even though the file itself was correctly
+  // migrated. The primary back/close button must be plain — no border, no
+  // background — for BOTH variants, so this can't quietly regress per-variant.
+  it.each(['push', 'modal'] as const)('renders a plain (unboxed) primary %s button — no border, no background', async (variant) => {
+    const { ScreenHeader } = await import('@/components/ScreenHeader');
+
+    await act(async () => {
+      renderer = create(<ScreenHeader title="Settings" variant={variant} />);
+    });
+
+    const label = variant === 'modal' ? 'Close Settings' : 'Go back from Settings';
+    const btn = renderer!.root.findByProps({ accessibilityLabel: label });
+    const style = flattenStyle(btn.props.style);
+    expect(style.borderWidth ?? 0).toBe(0);
+    expect(style.backgroundColor).toBeUndefined();
+    expect(style.borderRadius ?? 0).toBe(0);
+  });
 });
 
 // ─── useHeaderTopInset (hooks/useHeaderTopInset.ts) ────────────────────────────

@@ -157,6 +157,18 @@ interface TabBarOverlapFailure {
   screenshot: string;
 }
 
+interface BoxedHeaderButtonFailure {
+  kind: 'boxed-header-button';
+  route: string;
+  role: string;
+  dataState: string;
+  depth: number;
+  via?: string[];
+  element: string;
+  box: { x: number; y: number; width: number; height: number };
+  screenshot: string;
+}
+
 interface ConsistencyFailure {
   kind: 'consistency';
   route: string;
@@ -331,6 +343,41 @@ const HEADER_GEOMETRY_SCRIPT = `(() => {
   };
 })()`;
 
+/** Flags a boxed/bordered back or close button sitting at the top of a
+ * screen — the exact "old header" look Dev reported after #418: a screen
+ * migrated onto ScreenHeader still looked wrong because ScreenHeader's own
+ * push-variant back button was a bordered circular chip (fixed since, but
+ * this guards against it — or any hand-rolled equivalent — coming back).
+ * Only considers a `role=button`/`BUTTON` near the top-left or top-right of
+ * the viewport (top < 130px, within 80px of either edge — where a header's
+ * primary dismiss control lives) with BOTH a visible background color (not
+ * transparent) and a visible border — a plain icon on a transparent
+ * background is fine; a filled/bordered chip there is the regression. */
+const BOXED_HEADER_BUTTON_SCRIPT = `(() => {
+  const results = [];
+  const candidates = [...document.querySelectorAll('button, [role="button"]')];
+  for (const el of candidates) {
+    if (el.closest('[data-notch-exempt]')) continue;
+    if (el.closest('[data-testid="buyer-bottom-tab-bar"], [data-testid="seller-global-tab-bar"]')) continue;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    if (rect.top >= 130) continue;
+    const nearLeft = rect.left < 80;
+    const nearRight = rect.right > window.innerWidth - 80;
+    if (!nearLeft && !nearRight) continue;
+    const bg = style.backgroundColor;
+    const hasVisibleBg = bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)';
+    const borderWidth = parseFloat(style.borderTopWidth) || 0;
+    const hasVisibleBorder = borderWidth > 0 && style.borderTopStyle !== 'none';
+    if (hasVisibleBg && hasVisibleBorder) {
+      results.push({ box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, element: (el.tagName + (el.id ? '#' + el.id : '') + ' "' + (el.textContent || el.getAttribute('aria-label') || '').slice(0, 40) + '"') });
+    }
+  }
+  return results;
+})()`;
+
 test.setTimeout(0);
 
 /** Light client-side navigation — same pushState trick openScreen uses for
@@ -382,6 +429,7 @@ test('every screen clears the notch, the home indicator, and matches every other
   const failures: Failure[] = [];
   const consistencyFailures: ConsistencyFailure[] = [];
   const tabBarOverlapFailures: TabBarOverlapFailure[] = [];
+  const boxedHeaderButtonFailures: BoxedHeaderButtonFailure[] = [];
   const domNestingFailures: DomNestingFailure[] = [];
   let checked = 0;
   // Updated on every navigation/tap so a console warning fired asynchronously
@@ -401,7 +449,7 @@ test('every screen clears the notch, the home indicator, and matches every other
     checked += 1;
     const violations: any[] = await page.evaluate(VIOLATION_SCRIPT).catch(() => []);
     for (const v of violations) {
-      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length}.png`);
+      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length + boxedHeaderButtonFailures.length}.png`);
       await page.screenshot({ path: shot }).catch(() => {});
       failures.push({
         kind: 'clearance', route, role, dataState, depth, via: via.length ? via : undefined,
@@ -411,11 +459,21 @@ test('every screen clears the notch, the home indicator, and matches every other
 
     const tabBarOverlaps: any[] = await page.evaluate(TAB_BAR_OVERLAP_SCRIPT).catch(() => []);
     for (const o of tabBarOverlaps) {
-      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length}.png`);
+      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length + boxedHeaderButtonFailures.length}.png`);
       await page.screenshot({ path: shot }).catch(() => {});
       tabBarOverlapFailures.push({
         kind: 'tab-bar-overlap', route, role, dataState, depth, via: via.length ? via : undefined,
         element: o.element, box: o.box, screenshot: shot,
+      });
+    }
+
+    const boxedButtons: any[] = await page.evaluate(BOXED_HEADER_BUTTON_SCRIPT).catch(() => []);
+    for (const b of boxedButtons) {
+      const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length + boxedHeaderButtonFailures.length}.png`);
+      await page.screenshot({ path: shot }).catch(() => {});
+      boxedHeaderButtonFailures.push({
+        kind: 'boxed-header-button', route, role, dataState, depth, via: via.length ? via : undefined,
+        element: b.element, box: b.box, screenshot: shot,
       });
     }
 
@@ -431,7 +489,7 @@ test('every screen clears the notch, the home indicator, and matches every other
         if (Math.abs(geo.fontSize - baseline.fontSize) > 1) mismatches.push(`fontSize ${geo.fontSize} vs baseline ${baseline.fontSize}`);
         if (geo.fontWeight !== baseline.fontWeight) mismatches.push(`fontWeight ${geo.fontWeight} vs baseline ${baseline.fontWeight}`);
         if (mismatches.length) {
-          const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length}.png`);
+          const shot = path.join(outDir, `fail-${failures.length + consistencyFailures.length + tabBarOverlapFailures.length + boxedHeaderButtonFailures.length}.png`);
           await page.screenshot({ path: shot }).catch(() => {});
           consistencyFailures.push({
             kind: 'consistency', route, role, dataState, mismatch: mismatches.join('; '),
@@ -513,12 +571,13 @@ test('every screen clears the notch, the home indicator, and matches every other
       failureCount: failures.length, failures,
       consistencyFailureCount: consistencyFailures.length, consistencyFailures,
       tabBarOverlapFailureCount: tabBarOverlapFailures.length, tabBarOverlapFailures,
+      boxedHeaderButtonFailureCount: boxedHeaderButtonFailures.length, boxedHeaderButtonFailures,
       domNestingFailureCount: domNestingFailures.length, domNestingFailures,
       headerBaselines,
     }, null, 2),
   );
 
-  const total = failures.length + consistencyFailures.length + tabBarOverlapFailures.length + domNestingFailures.length;
+  const total = failures.length + consistencyFailures.length + tabBarOverlapFailures.length + boxedHeaderButtonFailures.length + domNestingFailures.length;
   if (total > 0) {
     const clearanceSummary = failures
       .slice(0, 20)
@@ -531,6 +590,10 @@ test('every screen clears the notch, the home indicator, and matches every other
     const tabBarOverlapSummary = tabBarOverlapFailures
       .slice(0, 20)
       .map((f) => `  [${f.role}/${f.dataState}] ${f.route}${f.via ? ` → ${f.via.join(' → ')}` : ''} (depth ${f.depth}): ${f.element} hidden behind tab bar`)
+      .join('\n');
+    const boxedHeaderButtonSummary = boxedHeaderButtonFailures
+      .slice(0, 20)
+      .map((f) => `  [${f.role}/${f.dataState}] ${f.route}${f.via ? ` → ${f.via.join(' → ')}` : ''} (depth ${f.depth}): ${f.element} is a boxed/bordered header button`)
       .join('\n');
     // Deduped by (route, message) — the same nested-pressable bug typically
     // fires the identical warning once per render across a handful of
@@ -548,7 +611,7 @@ test('every screen clears the notch, the home indicator, and matches every other
       .join('\n');
     expect(
       total,
-      `${failures.length} clearance + ${consistencyFailures.length} header-consistency + ${tabBarOverlapFailures.length} tab-bar-overlap + ${domNestingFailures.length} DOM-nesting console-warning failures (see ${outDir}/notch-crawl-report.json for all of them):\n${clearanceSummary}\n${consistencySummary}\n${tabBarOverlapSummary}\n${domNestingSummary}`,
+      `${failures.length} clearance + ${consistencyFailures.length} header-consistency + ${tabBarOverlapFailures.length} tab-bar-overlap + ${boxedHeaderButtonFailures.length} boxed-header-button + ${domNestingFailures.length} DOM-nesting console-warning failures (see ${outDir}/notch-crawl-report.json for all of them):\n${clearanceSummary}\n${consistencySummary}\n${tabBarOverlapSummary}\n${boxedHeaderButtonSummary}\n${domNestingSummary}`,
     ).toBe(0);
   }
 });

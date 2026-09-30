@@ -8,7 +8,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { isProductionPreviewHost } from '@/lib/devPreview';
+import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -689,10 +689,15 @@ function AuthGate() {
       (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
       ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products', 'muted-words'].includes(segments[0] as string);
 
-    // Development previews skip the onboarding redirect without writing
-    // completion flags. Expo Go temporarily starts in the buyer preview;
-    // production and normal account data stay server-authoritative.
-    if (PREVIEW_ROLE || DEV_BYPASS_ROLE) {
+    // Development previews skip onboarding without writing completion flags.
+    // PREVIEW_ROLE reads the query only once, while these dev-only web helpers
+    // also recognize the persisted role when reloading a deep link without it.
+    // Expo Go still uses DEV_BYPASS_ROLE; normal accounts remain auth-gated.
+    const webPreviewRole = Platform.OS === 'web'
+      ? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null)
+      : null;
+    const devRole = PREVIEW_ROLE ?? webPreviewRole ?? DEV_BYPASS_ROLE;
+    if (devRole) {
       // The index route handles the preview redirect after the root Stack has
       // mounted. Redirecting from this root-level effect races Expo Router's
       // initial navigator on web and produces a blank error screen.

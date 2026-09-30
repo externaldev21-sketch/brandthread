@@ -92,7 +92,7 @@ export function ScreenHeader({
           showBack ? (
             <PressableScale
               onPress={closeOrBack}
-              style={[styles.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={styles.closeBtnPlain}
               accessibilityRole="button"
               accessibilityLabel={backAccessibilityLabel ?? `Go back from ${title}`}
               accessibilityHint={`Returns from ${title}`}
@@ -201,17 +201,11 @@ const styles = StyleSheet.create({
     paddingBottom: SP.md,
     gap: SP.sm,
   },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
   closeBtnPlain: {
-    // Modal-variant close button: plain icon, no box/background/border —
-    // Dev wants it visually lighter than the push-variant back button.
+    // Back (push) / close (modal) button: plain icon, no box/background/
+    // border, 44px hit area — the one shared style for both variants' primary
+    // dismiss control. Previously push showed a bordered/boxed circular
+    // button while modal's close was plain; unified to plain everywhere.
     width: 44,
     height: 44,
     alignItems: 'center',
