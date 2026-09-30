@@ -13,7 +13,7 @@
  * playback URL> }` (Mux / Cloudflare / LiveKit egress) or a native RTC
  * renderer — and return it from `createProvider()` below. No UI changes.
  */
-import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isPreviewDemoMode, isSellerDevPreview } from '@/lib/devPreview';
 import { createApiLiveProvider } from './apiLiveProvider';
 import { createPreviewLiveProvider } from './previewLiveProvider';
 import type { LiveStreamProvider } from './types';
@@ -27,18 +27,21 @@ export function isLivePreviewMode(searchOverride?: string): boolean {
 // module is imported by the feed at boot, and modules evaluate once per page
 // load, same as PREVIEW_ROLE in app/_layout.tsx).
 const BOOT_PREVIEW = isLivePreviewMode();
-const BOOT_EMPTY = BOOT_PREVIEW && (() => {
-  if (typeof window === 'undefined' || !window.location) return false;
-  return new URLSearchParams(window.location.search).get('bt_live') === 'empty';
-})();
+// Fresh install (the default — no `&demo=1`) must never show the seeded
+// PREVIEW_LIVE_STREAMS cast (fake viewer counts, scripted chat) — that's the
+// same isPreviewDemoMode() opt-in every other preview module in the app
+// gates its seeded content on (lib/devPreview.ts). This used to be the
+// inverse: an explicit `?bt_live=empty` opt-OUT was the only way to see the
+// real "nobody is live" state, so a plain `?bt_preview=buyer` always leaked
+// fake live streams.
+const BOOT_DEMO = BOOT_PREVIEW && isPreviewDemoMode();
 
 function shouldUseLocalPreview(): boolean {
   return BOOT_PREVIEW || isLivePreviewMode();
 }
 
-/** `?bt_live=empty` in preview renders the "nobody is live" state. */
 function previewForcesEmpty(): boolean {
-  return BOOT_EMPTY;
+  return !(BOOT_DEMO || isPreviewDemoMode());
 }
 
 function createProvider(): LiveStreamProvider {
