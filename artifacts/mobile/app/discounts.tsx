@@ -539,11 +539,11 @@ export default function DiscountsScreen() {
             {/* Applies to */}
             <View>
               <Text style={s.label}>Applies to</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                 {((collections.length > 0 || appliesTo === 'collections'
                   ? ['entire_store', 'specific_products', 'collections']
                   : ['entire_store', 'specific_products']) as AppliesTo[]).map(t => (
-                  <TouchableOpacity key={t} style={[s.typeBtn, { flex: 1 }, appliesTo === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAppliesTo(t); }}>
+                  <TouchableOpacity key={t} style={[s.typeBtn, (collections.length > 0 || appliesTo === 'collections') && { flexGrow: 0, width: '48.5%' }, appliesTo === t && { borderColor: theme.accent, backgroundColor: theme.accent + '22' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAppliesTo(t); }}>
                     <Text style={[s.typeBtnText, appliesTo === t && { color: theme.accent }]}>{t === 'entire_store' ? 'Entire store' : t === 'collections' ? 'Collections' : 'Specific products'}</Text>
                   </TouchableOpacity>
                 ))}

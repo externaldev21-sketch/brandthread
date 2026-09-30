@@ -799,7 +799,9 @@ export async function applyDiscount(
     let errCode = 'UNKNOWN';
     let errMessage = '';
     try {
-      const body = err?.message ?? '';
+      // ApiError keeps the raw JSON body ({ error: CODE, message }); older
+      // error shapes only carry it inside the message text.
+      const body = typeof err?.body === 'string' && err.body ? err.body : (err?.message ?? '');
       const match = body.match(/\{.*\}/);
       if (match) {
         const parsed = JSON.parse(match[0]);
