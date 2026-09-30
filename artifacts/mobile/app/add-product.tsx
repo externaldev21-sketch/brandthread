@@ -45,6 +45,7 @@ import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
 import { ADD_PRODUCT_STEPS } from '@/lib/firstRunTips/content';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -163,6 +164,7 @@ function centsToInput(cents: number | undefined): string {
 // ─── Screen ─────────────────────────────────────────────────────────
 
 export default function AddProductScreen() {
+  useHideTabBar();
   const { theme } = useAppTheme();
   const {
     background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
