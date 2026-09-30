@@ -3,6 +3,11 @@
     "console-error::/account-type::seller::fresh::TypeError: t.__internal_state.signUpSignal is not a function\n    at http://127.0",
     "console-error::/account-type::seller::demo::TypeError: t.__internal_state.signUpSignal is not a function\n    at http://127.0",
     "console-error::/account-type::buyer::fresh::TypeError: t.__internal_state.signUpSignal is not a function\n    at http://127.0",
-    "console-error::/account-type::buyer::demo::TypeError: t.__internal_state.signUpSignal is not a function\n    at http://127.0"
+    "console-error::/account-type::buyer::demo::TypeError: t.__internal_state.signUpSignal is not a function\n    at http://127.0",
+    "placeholder-copy::/customer-accounts::seller::demo::Not available yet",
+    "placeholder-copy::/customer-accounts::buyer::fresh::Not available yet",
+    "console-error::/customer-orders::seller::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/customer-orders::seller::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/customer-orders::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)"
   ]
 }
