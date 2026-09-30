@@ -240,7 +240,8 @@ function OverlayChip({
       <Pressable
         onPress={() => latest.current.onTap?.(overlay.id)}
         onLongPress={removable ? () => { hapticLight(); onRemove(overlay.id); } : undefined}
-        accessibilityRole="button"
+        // No button role on the reshare card: its credit row is a button and web forbids nested <button>s.
+        accessibilityRole={removable ? 'button' : undefined}
         accessibilityLabel={removable ? 'Long-press to remove' : 'Drag to move'}
       >
         {children}
@@ -613,9 +614,9 @@ export default function StoryComposer() {
     id: 'ov_reshare_card',
     type: 'reshare_card',
     x: (W - RESHARE_CARD_WIDTH) / 2,
-    y: Math.max(topInset + 60, (H - RESHARE_CARD_HEIGHT) / 2 - 24),
+    y: Math.max(topInset + 40, (H - RESHARE_CARD_HEIGHT) / 2 - 56),
     rotation: 0,
-    scale: 1,
+    scale: 0.88,
     cardImageUri: reshareImage,
     cardRadius: RESHARE_CARD_RADIUS,
   }] : []));
@@ -1725,7 +1726,7 @@ export default function StoryComposer() {
               </Text>
               <View style={styles.mentionOpacityRow}>
                 <Feather name="droplet" size={14} color={MUTED} />
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, paddingHorizontal: 8 }}>
                   <InlineSlider
                     value={Math.round(clampMentionOpacity(selectedMention.opacity) * 100)}
                     min={0}
@@ -2393,8 +2394,8 @@ const styles = StyleSheet.create({
   reshareAction: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: SP.md },
   reshareActionOutline: { borderWidth: 1, borderColor: 'rgba(192,192,192,0.5)' },
   reshareActionLabel: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
-  reshareNotNowWrap: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: SP.lg },
-  reshareNotNow: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.semibold },
+  reshareNotNowWrap: { alignSelf: 'center', minHeight: 40, justifyContent: 'center', paddingHorizontal: SP.lg, marginTop: SP.xs, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.55)' },
+  reshareNotNow: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
   reshareUnavailable: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)', padding: SP.md },
   reshareUnavailableTitle: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.semibold },
   reshareUnavailableSub: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular },
