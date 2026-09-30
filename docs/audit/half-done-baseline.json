@@ -147,6 +147,16 @@
     "console-error::/store-settings::buyer::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
     "console-error::/store-theme-picker::seller::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
     "console-error::/store-theme-picker::seller::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
-    "console-error::/store-theme-picker::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)"
+    "console-error::/store-theme-picker::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "error-boundary::/thread-explainer::buyer::fresh::\nSomething went wrong\nPlease try again, or head back home.\nTry again\nGo home",
+    "console-error::/thread-explainer::buyer::fresh::TypeError: t.__internal_state.signUpSignal is not a function\n    at http://127.0",
+    "console-error::/users::seller::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/users::seller::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/users::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/users::buyer::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/vacation-mode::seller::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/vacation-mode::seller::demo::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/vacation-mode::buyer::fresh::Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "console-error::/vacation-mode::buyer::demo::Failed to load resource: the server responded with a status of 404 (Not Found)"
   ]
 }
