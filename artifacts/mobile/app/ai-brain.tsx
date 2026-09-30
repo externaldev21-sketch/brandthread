@@ -396,6 +396,12 @@ const GREETING: AIMessage = {
   ts: 0,
 };
 
+// Stable reference for "no session yet" — `session?.messages ?? []` would
+// otherwise hand a brand-new array to a useMemo dependency on every render,
+// defeating its memoization (same bug class as app/boost.tsx's infinite
+// render loop, though here it doesn't set state so it isn't infinite).
+const EMPTY_MESSAGES: AIMessage[] = [];
+
 export default function AiBrainScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -645,7 +651,7 @@ export default function AiBrainScreen() {
    * session. It is always shown so the screen never opens blank.
    * FlatList is inverted, so items are reversed for rendering.
    */
-  const sessionMessages = session?.messages ?? [];
+  const sessionMessages = session?.messages ?? EMPTY_MESSAGES;
   const allMessages: AIMessage[] = [GREETING, ...sessionMessages];
 
   // Build a map from assistant-message id → preceding user text for retry.
