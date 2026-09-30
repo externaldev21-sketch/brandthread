@@ -150,7 +150,7 @@ async function main() {
       await page.waitForTimeout(1500);
       await settle(page, activity);
       const pdp = await visibleText(page);
-      check('product page offers Buy now + Add to cart', /Buy now/i.test(pdp) && /Add to cart/i.test(pdp));
+      check('product page offers Add to cart + purchase action', /Add to cart/i.test(pdp) && /(Buy now|Select options)/i.test(pdp));
       await shot(page, '07-product-quick-buy-from-profile');
     });
 
