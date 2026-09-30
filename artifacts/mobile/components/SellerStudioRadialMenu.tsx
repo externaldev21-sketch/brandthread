@@ -105,6 +105,8 @@ import { getSetupState, completionPercent, completedRequiredTaskCount, requiredT
 import { setNextPushAnimationNone } from '@/lib/navigationAnimationOverride';
 import { SCRUB_PX_PER_CARD, indexForDrag } from '@/lib/studioCardCarousel';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { STUDIO_MENU_SCRUB_ROWS } from '@/lib/firstRunTips/content';
 import {
   ALL_ITEMS,
   type ControlCenterItem,
@@ -1203,6 +1205,13 @@ export default function SellerStudioRadialMenu({
           setUpsellFeature(null);
           router.push('/subscription' as never);
         }}
+      />
+
+      <FirstRunTip
+        id="studio-menu-scrub"
+        variant="fullscreen"
+        contentReady={open}
+        fullscreen={{ title: 'Studio', subtitle: 'Scrub through your tools', rows: STUDIO_MENU_SCRUB_ROWS }}
       />
     </>
   );

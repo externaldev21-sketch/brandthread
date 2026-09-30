@@ -95,6 +95,8 @@ import {
 } from '@/components/checkout/StripePayment';
 import type { ConfirmOutcome, PaymentControllerApi } from '@/components/checkout/stripePaymentTypes';
 import { FONT, FS, SP } from '@/lib/theme';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { BUYER_CHECKOUT_STEPS } from '@/lib/firstRunTips/content';
 
 /**
  * A fully verified order reference returned from the server after payment.
@@ -1133,6 +1135,12 @@ export default function BuyerCheckoutScreen() {
             </View>
           </View>
         </StickyFooter>
+        <FirstRunTip
+          id="buyer-checkout"
+          variant="anchored"
+          contentReady={!loading}
+          anchored={{ steps: BUYER_CHECKOUT_STEPS }}
+        />
       </KeyboardAvoidingView>
   );
   // Stripe (and Stripe.js on web) is only loaded when this order pays in the app.

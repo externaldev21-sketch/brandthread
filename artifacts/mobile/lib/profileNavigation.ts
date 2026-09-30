@@ -70,12 +70,14 @@ export function profileVideosHref(opts: {
   id: string;
   startPostId?: string | null;
   title?: string | null;
+  exactPost?: boolean;
 }): string {
   return `/profile-videos${qs({
     source: opts.source ?? 'creator',
     id: opts.id,
     startPostId: opts.startPostId ?? undefined,
     title: opts.title ?? undefined,
+    exactPost: opts.exactPost ? '1' : undefined,
   })}`;
 }
 

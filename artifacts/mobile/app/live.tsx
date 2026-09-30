@@ -52,6 +52,8 @@ import { LiveEmptyState } from '@/components/live/LiveEmptyState';
 import { VideoVisual } from './(tabs)/feed';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { a11yHidden } from '@/lib/a11yHidden';
+import { FirstRunTip } from '@/components/first-run-tips/FirstRunTip';
+import { LIVE_VIEWER_GESTURE } from '@/lib/firstRunTips/content';
 
 /** Same preference key as the Threads feed, so sound on/off carries over. */
 const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
@@ -491,6 +493,12 @@ export default function LiveScreen() {
         />
       )}
       <Snackbar visible={!!notice} message={notice} onDismiss={() => setNotice('')} />
+      <FirstRunTip
+        id="live-viewer"
+        variant="gesture"
+        contentReady
+        gesture={LIVE_VIEWER_GESTURE}
+      />
     </View>
   );
 }
