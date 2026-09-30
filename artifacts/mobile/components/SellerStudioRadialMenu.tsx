@@ -44,10 +44,13 @@
  *    accident-prone"). It LOCKS on whatever card is currently centered — a
  *    quick snap-to-center, a single firmer "landed" haptic, a subtle white
  *    ring + scale-up, and the "Entering page" button appears and fills
- *    left-to-right over EXACTLY 1.5s, opening the card the instant it
- *    completes. Touching/scrubbing again cancels the fill immediately and
- *    continues from the locked card; a tap or a quick upward flick skips
- *    the wait and opens right away.
+ *    left-to-right over EXACTLY AUTO_ENTER_MS (1s), opening the card the
+ *    instant it completes. A plain "Cancel" text link shows just above the
+ *    pill while it counts down; tapping it stops the fill and swaps the
+ *    pill to a static "Continue" (tap it any time to still open). Touching/
+ *    scrubbing again cancels either state immediately and continues from
+ *    the locked card, arming a fresh countdown once it re-locks; a tap on
+ *    the pill or a quick upward flick skips the wait and opens right away.
  *  - A downward drag (anywhere on the card area or the header) or the close
  *    (X) button dismisses the whole page without navigating, sliding it
  *    back down to reveal the screen underneath — the same rubber-band/
@@ -326,13 +329,33 @@ export default function SellerStudioRadialMenu({
   // that's a fresh scrub or the tap/flick that opens the locked card.
   const landedPulse = useSharedValue(0);
   // ── Auto-enter fill (replaces tap-to-open as the main path) ─────────────────
-  // 0→1 over ENTER_FILL_MS the moment a card locks; its completion callback
-  // opens the card exactly like a tap would. `isLockedJS` mirrors "is a card
-  // currently locked, with the button showing" on the JS side, since the
-  // button's own presence/press-handling can't be driven from a worklet.
+  // 0→1 over AUTO_ENTER_MS the moment a card locks; its completion callback
+  // opens the card exactly like a tap would.
+  //   'hidden'    — no card locked, the pill/Cancel are gone.
+  //   'counting'  — the fill is running; the pill reads "Entering page" and
+  //                 a plain "Cancel" text link shows just above it.
+  //   'cancelled' — the user tapped Cancel: the fill is stopped and reset to
+  //                 empty, the pill reads "Continue" (a static tap target,
+  //                 no more auto-navigate), and Cancel itself is gone (there
+  //                 is nothing left to cancel).
+  // Any new touch on the card area/header — a fresh scrub, or the very tap
+  // that's about to open the locked card — resets this straight to
+  // 'hidden', so a cancelled state never carries over to a different card;
+  // landing and releasing on any card (even the same one again) always
+  // starts a fresh 'counting'.
   const fillProgress = useSharedValue(0);
-  const [isLockedJS, setIsLockedJS] = useState(false);
+  const [enterState, setEnterState] = useState<'hidden' | 'counting' | 'cancelled'>('hidden');
   const [enterButtonWidth, setEnterButtonWidth] = useState(0);
+  // A brief fade whenever the pill's own label text changes (counting ->
+  // cancelled reads "Entering page" -> "Continue") — a lightweight
+  // crossfade rather than an abrupt text swap.
+  const pillContentOpacity = useSharedValue(1);
+  useEffect(() => {
+    if (enterState === 'hidden') return;
+    pillContentOpacity.value = 0;
+    pillContentOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.quad), ...NO_REDUCE_MOTION });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enterState]);
 
   // ── Per-card micro-animation trigger (see MICRO_KIND above) ─────────────────
   // A global "play token": microTriggerIndex names which card should play,
@@ -354,7 +377,7 @@ export default function SellerStudioRadialMenu({
       fillProgress.value = 0;
       microTriggerIndex.value = -1;
       microTriggerSeq.value = 0;
-      setIsLockedJS(false);
+      setEnterState('hidden');
       setCardIndexJS(0);
       lastStepAtRef.current = 0;
     }
@@ -451,7 +474,7 @@ export default function SellerStudioRadialMenu({
   const cancelEnterFill = useCallback(() => {
     cancelAnimation(fillProgress);
     fillProgress.value = 0;
-    setIsLockedJS(false);
+    setEnterState('hidden');
   }, [fillProgress]);
 
   /** Release-to-select / tap-to-select: no closing animation at all — the
@@ -467,7 +490,7 @@ export default function SellerStudioRadialMenu({
     // complete on its own).
     cancelAnimation(fillProgress);
     fillProgress.value = 0;
-    setIsLockedJS(false);
+    setEnterState('hidden');
     setOpen(false);
     if (
       GROWTH_PLAN_ENFORCEMENT_ENABLED &&
@@ -524,10 +547,12 @@ export default function SellerStudioRadialMenu({
    *  its ring/scale "landed" pulse takes to ramp in. */
   const CARD_LOCK_MS = 100;
   /** Exactly how long the "Entering page" button takes to fill left-to-right
-   *  and auto-open the locked card — Dev's spec: "EXACTLY 1.5s", a plain
-   *  linear fill (no easing curve to imply acceleration/deceleration, no
-   *  countdown number). */
-  const ENTER_FILL_MS = 1500;
+   *  and auto-open the locked card — a plain linear fill (no easing curve to
+   *  imply acceleration/deceleration, no countdown number). Lowered from
+   *  1.5s per Dev's live-testing feedback ("the timer is like half a second
+   *  too long") — one named constant drives both the fill animation and the
+   *  auto-navigate timing, so they can never drift apart. */
+  const AUTO_ENTER_MS = 1000;
 
   const runDismissEnd = useCallback((e: { translationY: number; velocityY: number }) => {
     'worklet';
@@ -555,7 +580,7 @@ export default function SellerStudioRadialMenu({
       // itself would (spec: "cancel and close, never navigates").
       cancelAnimation(fillProgress);
       fillProgress.value = 0;
-      runOnJS(setIsLockedJS)(false);
+      runOnJS(setEnterState)('hidden');
     })
     .onUpdate((e) => {
       const next = dragStartY.value + e.translationY;
@@ -581,7 +606,7 @@ export default function SellerStudioRadialMenu({
       landedPulse.value = 0;
       cancelAnimation(fillProgress);
       fillProgress.value = 0;
-      runOnJS(setIsLockedJS)(false);
+      runOnJS(setEnterState)('hidden');
     })
     .onUpdate((e) => {
       if (cardGestureAxis.value === 'none') {
@@ -627,14 +652,14 @@ export default function SellerStudioRadialMenu({
         microTriggerIndex.value = target;
         microTriggerSeq.value = microTriggerSeq.value + 1;
         // Auto-enter: the "Entering page" button appears and fills over
-        // EXACTLY ENTER_FILL_MS; when it completes, open the card exactly
+        // EXACTLY AUTO_ENTER_MS; when it completes, open the card exactly
         // like a tap would. onBegin above cancels this the instant any new
         // touch starts, and commitAndOpen cancels it unconditionally on
         // every path that actually opens a card (tap, flick, or this fill
         // completing), so it can never double-fire.
-        runOnJS(setIsLockedJS)(true);
+        runOnJS(setEnterState)('counting');
         fillProgress.value = 0;
-        fillProgress.value = withTiming(1, { duration: ENTER_FILL_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }, (finished) => {
+        fillProgress.value = withTiming(1, { duration: AUTO_ENTER_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }, (finished) => {
           if (finished) runOnJS(openCurrentItem)();
         });
       }
@@ -665,6 +690,10 @@ export default function SellerStudioRadialMenu({
   // width, produces the left-to-right white-fill/black-text-reveal effect.
   const enterFillStyle = useAnimatedStyle(() => ({
     width: fillProgress.value * enterButtonWidth,
+  }));
+  // Crossfades the pill's own label text on "Entering page" <-> "Continue".
+  const pillContentStyle = useAnimatedStyle(() => ({
+    opacity: pillContentOpacity.value,
   }));
 
   // ── Derived data ────────────────────────────────────────────────────────────
@@ -1060,32 +1089,60 @@ export default function SellerStudioRadialMenu({
             </View>
           </GestureDetector>
 
-          {/* ── Auto-enter fill button ──
-              Appears the instant a card locks; fills left-to-right over
-              EXACTLY ENTER_FILL_MS and opens the card when it completes —
-              see the block comment above cardAreaPan's onEnd for the full
-              cancel/skip rules. The "reveal" is two identical labels: a
-              plain white-on-dark one underneath, and a black-on-white copy
-              inside a width-animated, overflow-hidden container on top,
-              both using the SAME fixed enterButtonWidth so the revealed
-              black text lines up exactly with the white text it's covering
-              rather than re-centering as the fill container shrinks/grows. */}
-          {isLockedJS && (
-            <Pressable
-              testID="seller-studio-enter-button"
-              accessibilityRole="button"
-              accessibilityLabel="Entering page. Tap to open now."
-              onPress={openCurrentItem}
-              onLayout={(e) => setEnterButtonWidth(e.nativeEvent.layout.width)}
-              style={styles.enterButton}
-            >
-              <Text style={styles.enterButtonLabelBase}>Entering page</Text>
-              <Animated.View style={[styles.enterButtonFill, enterFillStyle]} pointerEvents="none">
-                <View style={[styles.enterButtonFillInner, { width: enterButtonWidth }]}>
-                  <Text style={styles.enterButtonLabelFilled} numberOfLines={1}>Entering page</Text>
-                </View>
-              </Animated.View>
-            </Pressable>
+          {/* ── Cancel link + auto-enter fill button ──
+              Appears the instant a card locks. While 'counting', the pill
+              reads "Entering page" and fills left-to-right over EXACTLY
+              AUTO_ENTER_MS, opening the card when it completes; a plain
+              "Cancel" text link (no background/border) sits just above it.
+              Tapping Cancel stops the fill, resets it to empty, and swaps
+              the pill to a static "Continue" (still tappable to open) with
+              a brief crossfade — see the block comment above cardAreaPan's
+              onEnd for the full cancel/skip rules. The fill "reveal" itself
+              is two identical labels: a plain white-on-dark one underneath,
+              and a black-on-white copy inside a width-animated, overflow-
+              hidden container on top, both using the SAME fixed
+              enterButtonWidth so the revealed black text lines up exactly
+              with the white text it's covering rather than re-centering as
+              the fill container shrinks/grows. */}
+          {enterState !== 'hidden' && (
+            <>
+              {enterState === 'counting' && (
+                <Pressable
+                  testID="seller-studio-enter-cancel"
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel entering page"
+                  onPress={() => {
+                    cancelAnimation(fillProgress);
+                    fillProgress.value = 0;
+                    setEnterState('cancelled');
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  }}
+                  hitSlop={{ top: 14, bottom: 14, left: 20, right: 20 }}
+                  style={styles.cancelLink}
+                >
+                  <Text style={styles.cancelLinkLabel}>Cancel</Text>
+                </Pressable>
+              )}
+              <Pressable
+                testID="seller-studio-enter-button"
+                accessibilityRole="button"
+                accessibilityLabel={enterState === 'cancelled' ? 'Continue to page' : 'Entering page. Tap to open now.'}
+                onPress={openCurrentItem}
+                onLayout={(e) => setEnterButtonWidth(e.nativeEvent.layout.width)}
+                style={styles.enterButton}
+              >
+                <Animated.Text style={[styles.enterButtonLabelBase, pillContentStyle]}>
+                  {enterState === 'cancelled' ? 'Continue' : 'Entering page'}
+                </Animated.Text>
+                <Animated.View style={[styles.enterButtonFill, enterFillStyle]} pointerEvents="none">
+                  <View style={[styles.enterButtonFillInner, { width: enterButtonWidth }]}>
+                    <Animated.Text style={[styles.enterButtonLabelFilled, pillContentStyle]} numberOfLines={1}>
+                      {enterState === 'cancelled' ? 'Continue' : 'Entering page'}
+                    </Animated.Text>
+                  </View>
+                </Animated.View>
+              </Pressable>
+            </>
           )}
 
           {/* Small position dots — replaces the old "X / 16" text. */}
@@ -1284,8 +1341,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   cardLabel: {
-    fontSize: 24,
-    fontFamily: FONT.bold,
+    // Dropped from 24/bold — Dev: with the fill pill now the only visible
+    // action, the big bottom title was reading like a second button.
+    // Semibold at 20 still reads clearly as a title, not a control.
+    fontSize: 20,
+    fontFamily: FONT.semibold,
     color: theme.text,
     textAlign: 'center',
     letterSpacing: 0.2,
@@ -1331,19 +1391,35 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   dotActive: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.text },
 
-  // ── Auto-enter fill button — see the JSX comment for how the reveal works.
+  // Plain text link, no background/border — sits just above the pill while
+  // it's counting down. theme.muted is this app's own silver token (never
+  // hardcoded), so it matches across every preset.
+  cancelLink: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  cancelLinkLabel: { fontSize: 14, fontFamily: FONT.medium, color: theme.muted },
+
+  // ── Auto-enter fill button ──
+  // Dev, after #525 shipped: "less bold and smaller." A compact pill sized
+  // to its own label (not full width), a thin 1px hairline instead of a
+  // heavy solid block, and a Medium-weight label instead of Bold — the fill
+  // itself still runs the full AUTO_ENTER_MS, just reads as a subtle
+  // white/silver wash behind lighter text rather than a loud CTA.
   enterButton: {
-    height: 52,
+    height: 42,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: theme.border,
-    marginHorizontal: SP.lg,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
     marginTop: SP.xs,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  enterButtonLabelBase: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text, letterSpacing: 0.3 },
+  enterButtonLabelBase: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.text, letterSpacing: 0.2 },
   enterButtonFill: {
     position: 'absolute',
     left: 0,
@@ -1353,5 +1429,5 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     overflow: 'hidden',
   },
   enterButtonFillInner: { height: '100%', alignItems: 'center', justifyContent: 'center' },
-  enterButtonLabelFilled: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#000000', letterSpacing: 0.3 },
+  enterButtonLabelFilled: { fontSize: FS.base, fontFamily: FONT.medium, color: '#000000', letterSpacing: 0.2 },
 });
