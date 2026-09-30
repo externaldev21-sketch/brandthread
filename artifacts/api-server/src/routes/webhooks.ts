@@ -71,6 +71,7 @@ import { postLedgerTransaction } from "../lib/money/ledger";
 import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
 import { forwardOrderToShopifyIfLinked } from "../lib/shopify/orderForwarding";
 import { reserveStockForOrder } from "../lib/stockReservation";
+import { promotePendingRequestsOnOrder } from "../lib/conversationRouting";
 
 /**
  * Which Stripe mode the configured secret key belongs to. An event from the
@@ -1194,6 +1195,16 @@ export async function handleCheckoutPaid(
         await sendOrderConfirmationForOrder(createdOrderId);
       } catch (err) {
         logger.error({ err, orderId: createdOrderId }, "Order confirmation email delivery failed");
+      }
+
+      // This buyer now has a real paid order with this seller — if a
+      // pending message request from this buyer is sitting in the seller's
+      // Requests, it's exactly the condition that routes it to the
+      // seller's main inbox instead (lib/conversationRouting.ts).
+      try {
+        await promotePendingRequestsOnOrder(buyerId, ownerId);
+      } catch (err) {
+        logger.error({ err, orderId: createdOrderId }, "Pending-request promotion on paid order failed");
       }
 
       // Fulfillment via Shopify (opt-in): forward this paid order to the

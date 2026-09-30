@@ -87,13 +87,14 @@ describe('seller fresh preview: no seeded/demo data by default', () => {
   it('discounts.tsx routes fresh-preview create/update/delete through the in-session store, never the network, when there is no signed-in account', () => {
     const src = read('app/discounts.tsx');
     expect(src).toContain("import { addPreviewDiscount, deletePreviewDiscount, getPreviewDiscounts, updatePreviewDiscount");
-    expect(src).toContain('if (isPreviewMode && !userId) {');
+    expect(src).toContain('const previewOnly = isPreviewMode && (!authLoaded || !isSignedIn || !userId);');
+    expect(src).toContain('if (previewOnly) {');
   });
 
   it('customers, finance and payouts resolve to the honest empty/zero state (not a fake seeded list) when previewing with no account', () => {
     for (const file of ['app/customers.tsx', 'app/finance.tsx', 'app/payouts.tsx']) {
       const src = read(file);
-      expect(src).toContain('isPreviewMode && !userId');
+      expect(src).toMatch(/isPreviewMode && !userId|isPreviewMode && \(!(authLoaded|isAuthLoaded) \|\| !isSignedIn\)/);
     }
   });
 });

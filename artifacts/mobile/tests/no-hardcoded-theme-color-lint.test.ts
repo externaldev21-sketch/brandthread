@@ -178,6 +178,7 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'app/buyer-search.tsx',
   'app/buyer-story-create.tsx',
   'app/buyer-story-viewer.tsx',
+  'app/story-mention-viewer.tsx',
   'app/c/[collectionId].tsx',
   'app/call-screen.tsx',
   'app/camera-capture.tsx',
@@ -273,6 +274,7 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/ErrorFallback.tsx',
   'components/FeedGestureGuide.tsx',
   'components/InlineSlider.tsx',
+  'components/MentionPickerSheet.tsx',
   'components/PlanUpsellModal.tsx',
   'components/ProductReviewsSection.tsx',
   'components/SaveToCollectionSheet.tsx',
@@ -286,6 +288,8 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/ShareProfileSheet.tsx',
   'components/ShopProductSheet.tsx',
   'components/StoreContextBanner.tsx',
+  'components/StoryMentionSticker.tsx',
+  'components/StoryMentionViewerParts.tsx',
   'components/StripeConnectWarning.tsx',
   'components/StyleTagsPicker.tsx',
   'components/SupportChatBubble.tsx',
@@ -293,6 +297,17 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/ai/AiComposer.tsx',
   'components/ai/AuroraGlow.tsx',
   'components/ai/MarkdownLite.tsx',
+  // components/ai-tools/* — the Mockup to Model / Remove Background / AI
+  // Photoshoot shared components (PRs #555/#556/#559), built against the
+  // pure-monochrome lib/theme.ts tokens before this Appearance-theme
+  // migration reached them — same as most of the app per this file's own
+  // ~2,000-hit note above. Not re-themed here; a follow-up can migrate
+  // them onto useAppTheme() like the rest of the ratchet.
+  'components/ai-tools/AiResultViewer.tsx',
+  'components/ai-tools/AiResultsGrid.tsx',
+  'components/ai-tools/AiToolButtons.tsx',
+  'components/ai-tools/BgRemovalGlowSweep.tsx',
+  'components/ai-tools/ReferencePhotoTiles.tsx',
   'components/analytics/AnalyticsKit.tsx',
   'components/buy-now/BuyNowFlow.tsx',
   'components/buy-now/OrderSuccessSheet.tsx',
@@ -303,7 +318,6 @@ const HARDCODED_THEME_COLOR_ALLOWLIST = new Set<string>([
   'components/buyer-feed/LongPressMenu.tsx',
   'components/buyer-feed/RightActionRail.tsx',
   'components/buyer-feed/ShopSideTab.tsx',
-  'components/buyer-nav/TabBarGlassZone.tsx',
   'components/calls/CallAvatarCircle.tsx',
   'components/calls/InCallView.tsx',
   'components/chat/MediaUploadThumb.tsx',

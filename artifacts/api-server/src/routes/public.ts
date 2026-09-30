@@ -17,8 +17,9 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { toPublicPost, toPublicProduct, toPublicSellerProfile, toPublicVariant } from "../lib/publicProfile";
 import { matchesMutedWords } from "../lib/contentModerator";
-import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { publicPostCondition, publicProfileLikes, visibleCommentCounts } from "../lib/postVisibility";
 import { isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
 import {
   paginationMetadata,
@@ -227,7 +228,7 @@ router.get("/products", async (req, res) => {
       ...p,
       sellerDisplayName: sellerMap[p.ownerId]?.displayName ?? null,
       sellerVerified: sellerMap[p.ownerId] ? deriveSellerVerified(sellerMap[p.ownerId]) : false,
-      variants: variantsByProduct[p.id] ?? [],
+      variants: (variantsByProduct[p.id] ?? []).map(toPublicVariant),
     }));
 
     res.json(result);
@@ -469,7 +470,7 @@ router.get("/products/:id", async (req, res) => {
       sellerVacationMessage: vacation.active ? vacation.message : null,
       sellerVacationUntil: vacation.until?.toISOString() ?? null,
       claimedUnits: Math.max(0, Number(claimedRow?.claimedUnits ?? 0)),
-      variants,
+      variants: variants.map(toPublicVariant),
     });
   } catch (err) {
     req.log.error({ err, productId: req.params.id }, "Failed to fetch public product");
@@ -1197,7 +1198,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
     eq(products.status, "active"),
     isNull(products.deletedAt),
   );
-  const [sellerProducts, sellerPosts, [{ activeProductsCount }], [{ publicPostsCount }]] = await Promise.all([
+  const [sellerProducts, sellerPosts, [{ activeProductsCount }], [{ publicPostsCount }], likesCount, [followersRow], [followingRow]] = await Promise.all([
     db
       .select()
       .from(products)
@@ -1222,6 +1223,9 @@ router.get("/sellers/:sellerId", async (req, res) => {
     db.select({ activeProductsCount: count() }).from(products).where(activeProductsWhere),
     db.select({ publicPostsCount: count() }).from(posts)
       .where(and(eq(posts.userId, canonicalClerkId), publicPostCondition())),
+    publicProfileLikes(canonicalClerkId),
+    db.select({ total: count() }).from(follows).where(eq(follows.followingId, canonicalClerkId)),
+    db.select({ total: count() }).from(follows).where(eq(follows.followerId, canonicalClerkId)),
   ]);
 
   // Attach variants to each product — mirrors the /products list enrichment so
@@ -1236,10 +1240,8 @@ router.get("/sellers/:sellerId", async (req, res) => {
     if (!sellerVariantsByProduct[v.productId]) sellerVariantsByProduct[v.productId] = [];
     sellerVariantsByProduct[v.productId].push(v);
   }
-  const sellerProductsWithVariants = sellerProducts.map((p) => ({
-    ...p,
-    variants: sellerVariantsByProduct[p.id] ?? [],
-  }));
+  const sellerProductsWithVariants = sellerProducts.map((p) =>
+    toPublicProduct(p, sellerVariantsByProduct[p.id] ?? []));
 
   // Attach tagged products per post
   const postIds = sellerPosts.map((p) => p.id);
@@ -1275,7 +1277,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
 
   return res.json({
     profile: {
-      ...seller,
+      ...toPublicSellerProfile(seller),
       // Expose the canonical Clerk ID so callers can use it for follow/message/review actions.
       // This is safe: it's the functional identity needed by downstream authenticated endpoints,
       // not a secret (Clerk IDs are sent on every authenticated request header).
@@ -1287,15 +1289,15 @@ router.get("/sellers/:sellerId", async (req, res) => {
       profileImageUrl,
       productsCount: Number(activeProductsCount),
       videosCount: Number(publicPostsCount),
+      likesCount,
+      followersCount: Number(followersRow?.total ?? 0),
+      followingCount: Number(followingRow?.total ?? 0),
       // Cover video (null while unset or moderated away); never the raw status.
       ...publicCoverFields(seller),
       coverVideoModerationStatus: undefined,
     },
     products: sellerProductsWithVariants,
-    posts: sellerPosts.map((p) => ({
-      ...p,
-      taggedProducts: tagsByPost.get(p.id) ?? [],
-    })),
+    posts: sellerPosts.map((p) => toPublicPost(p, tagsByPost.get(p.id) ?? [])),
   });
 });
 
@@ -1427,7 +1429,9 @@ router.get("/drops/:id", async (req, res) => {
 
   return res.json({
     ...drop,
-    seller: seller ? { ...seller, verified: deriveSellerVerified(seller) } : null,
+    seller: seller
+      ? { displayName: seller.displayName, brandName: seller.brandName, verified: deriveSellerVerified(seller) }
+      : null,
     products: dropProducts.map((p) => ({ ...p, soldOut: p.stockRemaining <= 0 })),
     viewerHasEarlyAccess,
     effectiveReleaseAt,

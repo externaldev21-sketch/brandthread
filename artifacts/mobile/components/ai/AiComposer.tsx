@@ -78,12 +78,15 @@ export default function AiComposer({
         <Animated.View pointerEvents="none" style={[styles.edgeGlow, glowStyle]} />
         <View style={styles.pill}>
           {Platform.OS !== 'android' && (
-            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView pointerEvents="none" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
           )}
-          <View style={styles.pillTint} />
+          <View pointerEvents="none" style={styles.pillTint} />
 
           <TextInput
             style={styles.textInput}
+            // On web, an ancestor press handler dismisses the keyboard on
+            // bubbled clicks. Keep the tap inside the composer so focus sticks.
+            {...(Platform.OS === 'web' ? { onClick: (event: React.MouseEvent) => event.stopPropagation() } : {})}
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}
@@ -91,6 +94,7 @@ export default function AiComposer({
             multiline
             returnKeyType="send"
             blurOnSubmit={false}
+            accessibilityLabel="Message Brandthread AI"
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             onSubmitEditing={() => {
@@ -156,6 +160,8 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   textInput: {
     flex: 1,
+    // The frosted layers are absolutely positioned; paint the text above them.
+    zIndex: 1,
     color: colors.text,
     fontSize: FS.base,
     fontFamily: FONT.regular,
@@ -165,6 +171,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   // 44x44 minimum comfortable touch target (COMP.minTouchTarget); was 40x40.
   sendBtn: {
+    zIndex: 1,
     width: 44,
     height: 44,
     borderRadius: 22,

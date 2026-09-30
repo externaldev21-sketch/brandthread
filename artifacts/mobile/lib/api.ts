@@ -20,6 +20,7 @@ import type {
   CartQuote, CreatePaymentIntentBody, PaymentIntentStart, PaymentIntentStatus, QuoteBody,
 } from '@/lib/checkoutPayment';
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
+import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -761,6 +762,16 @@ export interface ShopifyImportJob {
   createdAt: string;
   updatedAt: string;
 }
+export interface WatchedVideo {
+  postId: string;
+  authorId: string;
+  authorName: string;
+  authorAccountType: 'buyer' | 'seller';
+  caption: string;
+  thumbnailUrl: string | null;
+  watchedAt: string;
+}
+
 export interface PostAnalyticsResponse {
   post: {
     id: string;
@@ -2067,6 +2078,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       publicList: (ownerId?: string) =>
         get<any[]>(`/api/public/posts${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get: (id: string) => get<any>(`/api/posts/${encodeURIComponent(id)}`),
+      watchedVideos: (cursor?: string) =>
+        freshGet<{ items: WatchedVideo[]; nextCursor: string | null }>(
+          `/api/posts/watched-videos${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+        ),
+      recordWatchedVideo: (id: string) =>
+        post<{ action: string }>(`/api/posts/${encodeURIComponent(id)}/watched`, {}),
       /** Owner-only verified performance. Untracked metrics return tracked=false and null values. */
       analytics: (id: string) =>
         get<PostAnalyticsResponse>(`/api/posts/${encodeURIComponent(id)}/analytics`),
@@ -2141,10 +2158,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           userId: string; name: string; username: string | null;
           displayName: string | null; bio: string | null; avatarUrl: string | null;
           accountType: string; initials: string; color: string; handle: string;
-          followersCount: number; followingCount: number; postsCount: number;
+          followersCount: number; followingCount: number; postsCount: number; likesCount?: number;
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
+      /** Posts where someone tagged this profile (the profile "Tagged" tab). */
+      tagged: (userId: string, limit = 30, offset = 0) =>
+        get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/tagged?limit=${limit}&offset=${offset}`),
       profilePosts: (userId: string, limit = 30, offset = 0) =>
         get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/posts?limit=${limit}&offset=${offset}`),
       friendActivity: (limit = 30, offset = 0) =>
@@ -2186,7 +2206,29 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         authorColor?: string; authorAccountType?: string;
         media: any[]; repliesDisabled?: boolean;
         privacy?: { visibility?: string; replyPermission?: string };
+        /** Reshare of a story that tagged me ("Add to your story"). */
+        originalStoryId?: string;
       }) => post<any>('/api/social/stories', body),
+      /** People picker for the @mention sticker: people I follow first, then everyone. */
+      mentionSearch: (q: string, limit = 20) =>
+        get<MentionPerson[]>(`/api/social/mention-search?q=${encodeURIComponent(q)}&limit=${limit}`),
+      /** Activity "Story mentions" rail: active (<24h) stories that tagged me, newest first. */
+      storyMentions: () =>
+        freshGet<{ items: StoryMentionItem[]; unseenCount: number }>('/api/social/stories/mentions'),
+      /** One story, if I'm the author, tagged, or a follower. 404 { code: 'STORY_UNAVAILABLE' } otherwise. */
+      storyById: (storyId: string) =>
+        get<Story>(`/api/social/stories/${encodeURIComponent(storyId)}`),
+      /** "Not now" on a story that tagged me. */
+      dismissStoryMention: (storyId: string) =>
+        post<{ ok: boolean }>(`/api/social/stories/${encodeURIComponent(storyId)}/mention-dismiss`, {}),
+      /**
+       * Find/create the conversation for replying to a mention story. The
+       * server routes it to the main inbox or Requests; send the message into
+       * `conversationId` with the normal messages endpoint.
+       */
+      storyMentionReplyConversation: (storyId: string) =>
+        post<{ conversationId: string; route: 'inbox' | 'requests'; isRequest: boolean; requestedBy: string | null }>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/mention-reply`, {}),
       /** My active stories */
       myStories: () => get<any[]>('/api/social/stories/me'),
       /** Another user's active stories — visible to that author's followers only */
@@ -2273,6 +2315,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get: () => get<{ seenVersion: number }>('/api/auth/feed-gestures-tip'),
       markSeen: (version: number) =>
         patch<{ seenVersion: number }>('/api/auth/feed-gestures-tip', { version }),
+    },
+    /**
+     * Server-side "seen" state for the reusable <FirstRunTip> system (every
+     * screen's first-run gesture hint / spotlight / anchored card /
+     * full-screen guide) — source of truth across reinstalls/devices. See
+     * lib/firstRunTips/storage.ts for the local cache + reconcile logic.
+     */
+    firstRunTips: {
+      get: () => get<{ seenTipIds: string[]; skipAll: boolean }>('/api/first-run-tips/seen'),
+      markSeen: (tipId: string) => post<void>(`/api/first-run-tips/${encodeURIComponent(tipId)}/seen`, {}),
+      skipAll: () => post<void>('/api/first-run-tips/skip-all', {}),
+      reset: () => post<void>('/api/first-run-tips/reset', {}),
     },
     /** Public seller storefront — profile + products + posts */
     publicSellers: {

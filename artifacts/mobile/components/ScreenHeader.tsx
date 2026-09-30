@@ -32,6 +32,8 @@ interface ScreenHeaderProps {
   /** Scroll distance over which the large title fully collapses. */
   collapseDistance?: number;
   onBack?: () => void;
+  /** Override the spoken back label when the route changes between a list and an inline form. */
+  backAccessibilityLabel?: string;
   /** Optional testID forwarded to the back/close button, for screens whose tests target it directly. */
   backTestID?: string;
   /**
@@ -59,7 +61,7 @@ const MAX_HEADER_ACTIONS = 2;
 const TITLE_SIZE = 20;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, variant = 'push',
+  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, backAccessibilityLabel, variant = 'push',
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -89,7 +91,7 @@ export function ScreenHeader({
             onPress={closeOrBack}
             style={styles.closeBtnPlain}
             accessibilityRole="button"
-            accessibilityLabel={`Go back from ${title}`}
+            accessibilityLabel={backAccessibilityLabel ?? `Go back from ${title}`}
             accessibilityHint={`Returns from ${title}`}
             testID={backTestID ?? 'screen-header-back'}
           >
@@ -133,7 +135,7 @@ export function ScreenHeader({
                 onPress={closeOrBack}
                 style={styles.closeBtnPlain}
                 accessibilityRole="button"
-                accessibilityLabel={`Close ${title}`}
+                accessibilityLabel={backAccessibilityLabel ?? `Close ${title}`}
                 accessibilityHint={`Dismisses ${title}`}
                 testID={backTestID ?? 'screen-header-back'}
               >

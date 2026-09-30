@@ -9,6 +9,8 @@
  * the dwell-based mark-as-read tracker used by the list.
  */
 
+import { storyMentionViewerHref } from './storyMentionsRail';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /** One notifications-feed row as returned by the API. */
@@ -305,7 +307,8 @@ export function stripEmoji(text: string): string {
 export function activityDetail(row: ActivityRow): string | null {
   // Merged comment rows would show only the newest excerpt; keep them tidy.
   if (row.type === 'post_comment' && row.ids.length > 1) return null;
-  if (row.type === 'post_like' || row.type === 'new_follower' || row.type === 'story_like' || row.type === 'repost') return null;
+  if (row.type === 'post_like' || row.type === 'new_follower' || row.type === 'story_like' || row.type === 'repost'
+    || row.type === 'story_mention' || row.type === 'story_reshare') return null;
   const body = row.body?.trim();
   if (!body) return null;
   if (row.type === 'post_comment' || row.type === 'comment_reply' || row.type === 'mention') {
@@ -373,7 +376,7 @@ export const ACTIVITY_CHIPS: readonly { key: ActivityChip; label: string }[] = [
 
 const FOLLOW_TYPES = new Set(['new_follower']);
 const LIKE_TYPES = new Set(['post_like', 'story_like']);
-const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'mention']);
+const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'mention', 'story_mention']);
 const THREAD_CASH_TYPES = new Set(['thread_cash_received']);
 
 /** Which chip an item belongs to; 'other' rows (reposts, drops…) show under All only. */
@@ -446,9 +449,11 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'story_like': return 'heart';
     case 'post_comment':
     case 'comment_reply': return 'message-circle';
-    case 'mention': return 'at-sign';
+    case 'mention':
+    case 'story_mention': return 'at-sign';
     case 'new_follower': return 'user-plus';
-    case 'repost': return 'repeat';
+    case 'repost':
+    case 'story_reshare': return 'repeat';
     case 'thread_cash_received': return 'dollar-sign';
     case 'price_drop': return 'trending-down';
     case 'back_in_stock':
@@ -595,7 +600,13 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
         ? `/buyer-post-comments?postId=${q(id)}${row.commentId ? `&commentId=${q(row.commentId)}` : ''}`
         : `/buyer-post-viewer?postId=${q(id)}`;
     case 'story':
-      return id ? `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}` : null;
+      if (!id) return null;
+      // "@name mentioned you in their story" plays in the mention viewer
+      // (reply / heart / Add to your story); every other story row opens the
+      // plain viewer.
+      return row.type === 'story_mention'
+        ? storyMentionViewerHref(id)
+        : `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}`;
     case 'thread_cash_transfer':
       return '/thread-cash';
     case 'product':

@@ -18,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
@@ -30,7 +30,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import {
   CARD, BORDER, FG, MUTED, ON_DARK, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
-import { createStory, MY_COLOR, searchProfiles, createOrGetConversation, sendMessage } from '@/services/socialService';
+import { createStory, searchProfiles, createOrGetConversation, sendMessage } from '@/services/socialService';
 import type { ProfileSearchResult } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import type { StoryMedia, StoryOverlay, StoryOverlayType, StoryPrivacySettings } from '@/services/socialTypes';
@@ -48,6 +48,15 @@ import { WEB_INPUT_RESET } from '@/lib/inputReset';
 import { MediaCropper } from '@/components/media/MediaCropper';
 import { applyCropRect, type NormalizedCropRect } from '@/lib/mediaCrop';
 import { ModalSafeArea } from '@/components/ModalSafeArea';
+import { MentionPickerSheet, MentionSuggestionsBar } from '@/components/MentionPickerSheet';
+import { MentionStickerView, ReshareCard, RESHARE_CARD_WIDTH, RESHARE_CARD_HEIGHT } from '@/components/StoryMentionSticker';
+import { InlineSlider } from '@/components/InlineSlider';
+import {
+  MAX_MENTIONS_PER_STORY, MENTION_MIN_SCALE, activeMentionQuery, clampMentionOpacity, clampOverlayPosition, clampOverlayScale,
+  insertMention, nextMentionStyle, tapSlop, taggedPeople, withAt,
+} from '@/lib/storyMentionSticker';
+import { RESHARE_CARD_RADIUS, RESHARE_FALLBACK_COLORS, reshareGradientFromBackground, sampleImageColor } from '@/lib/storyReshare';
+import type { MentionPerson } from '@/services/socialTypes';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
@@ -69,6 +78,8 @@ type CapturedMedia = {
   originalUri?: string; cropRect?: NormalizedCropRect;
 };
 type SharePayload = { type: 'photo' | 'video' | 'text'; uri?: string; bg?: string; text?: string; textColor?: string; ovs: StoryOverlay[] };
+
+const firstParam = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined;
 
 // ─── Layout capture grids — Instagram's 6-option "Changing grid" popover ───
 type GridSpec = { id: string; cols: number; rows: number };
@@ -108,14 +119,22 @@ const FONT_PRESETS: { key: string; label: string; weight: 'normal' | 'bold'; ita
 type Align = 'left' | 'center' | 'right';
 
 // ─── Draggable / pinch-scalable / rotatable overlay chip ───────────────────
+// Mention stickers are tags first, so they break the usual limits: scale goes
+// down to 0.05, the drag is never clamped into the safe area (see
+// clampOverlayPosition), the touch target never drops below 44pt on screen
+// (hitSlop grows as the sticker shrinks), and a dashed outline marks it when
+// selected so a speck or an edge-tucked sticker can always be found again.
 function OverlayChip({
-  overlay, canvasSize, onChange, onRemove, onTap, children,
+  overlay, canvasSize, onChange, onRemove, onTap, selected, removable = true, children,
 }: {
   overlay: StoryOverlay;
   canvasSize: { width: number; height: number };
   onChange: (id: string, patch: Partial<StoryOverlay>) => void;
   onRemove: (id: string) => void;
-  onTap?: () => void;
+  onTap?: (id: string) => void;
+  selected?: boolean;
+  /** false for the reshare card — it can move/scale but not be deleted. */
+  removable?: boolean;
   children: React.ReactNode;
 }) {
   const pan = useRef(new Animated.ValueXY({ x: overlay.x, y: overlay.y })).current;
@@ -124,11 +143,19 @@ function OverlayChip({
   const rotationRef = useRef(overlay.rotation ?? 0);
   const [scale, setScale] = useState(scaleRef.current);
   const [rotation, setRotation] = useState(rotationRef.current);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
   const pinchStartDist = useRef<number | null>(null);
   const pinchStartAngle = useRef<number | null>(null);
   const pinchStartScale = useRef(1);
   const pinchStartRotation = useRef(0);
   const movedRef = useRef(false);
+  // The responder below is created once, so read everything that can change
+  // (handlers, canvas size) through a ref.
+  const latest = useRef({ overlay, canvasSize, onChange, onTap });
+  latest.current = { overlay, canvasSize, onChange, onTap };
+  const isMention = overlay.type === 'mention';
 
   const dragResponder = useRef(
     PanResponder.create({
@@ -153,7 +180,7 @@ function OverlayChip({
           if (pinchStartDist.current == null || pinchStartAngle.current == null) return;
           const dist = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
           const angle = Math.atan2(b.pageY - a.pageY, b.pageX - a.pageX);
-          const nextScale = Math.max(0.4, Math.min(4, pinchStartScale.current * (dist / Math.max(1, pinchStartDist.current))));
+          const nextScale = clampOverlayScale(latest.current.overlay.type, pinchStartScale.current * (dist / Math.max(1, pinchStartDist.current)));
           const nextRotation = pinchStartRotation.current + ((angle - pinchStartAngle.current) * 180) / Math.PI;
           scaleRef.current = nextScale;
           rotationRef.current = nextRotation;
@@ -165,10 +192,11 @@ function OverlayChip({
         Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false })(e, g);
       },
       onPanResponderRelease: () => {
+        const { overlay: ov, canvasSize: canvas, onChange: change } = latest.current;
         if (pinchStartDist.current != null) {
           pinchStartDist.current = null;
           pinchStartAngle.current = null;
-          onChange(overlay.id, { scale: scaleRef.current, rotation: rotationRef.current });
+          change(ov.id, { scale: scaleRef.current, rotation: rotationRef.current });
           return;
         }
         pan.flattenOffset();
@@ -176,29 +204,45 @@ function OverlayChip({
         const rawX = (pan.x as any)._value as number;
         // @ts-ignore
         const rawY = (pan.y as any)._value as number;
-        const x = Math.max(-40, Math.min(canvasSize.width - 20, rawX));
-        const y = Math.max(-40, Math.min(canvasSize.height - 20, rawY));
+        const { x, y } = clampOverlayPosition(ov.type, { x: rawX, y: rawY }, canvas, sizeRef.current);
         pan.setValue({ x, y });
         lastPos.current = { x, y };
-        if (movedRef.current) onChange(overlay.id, { x, y });
-        else onTap?.();
+        if (movedRef.current) change(ov.id, { x, y });
       },
     }),
   ).current;
 
+  const slop = isMention ? tapSlop(size, scale) : null;
   return (
     <Animated.View
       {...dragResponder.panHandlers}
       testID={`story-overlay-${overlay.id}`}
+      onLayout={isMention ? (e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height }) : undefined}
+      hitSlop={slop ? { left: slop.x, right: slop.x, top: slop.y, bottom: slop.y } : undefined}
       style={[
         styles.overlayChip,
+        isMention && { opacity: clampMentionOpacity(overlay.opacity) },
         { transform: [...pan.getTranslateTransform(), { scale }, { rotate: `${rotation}deg` }] },
       ]}
     >
+      {isMention && selected && slop ? (
+        <View
+          pointerEvents="none"
+          style={[styles.selectionOutline, {
+            left: -slop.x, right: -slop.x, top: -slop.y, bottom: -slop.y,
+            // keep the outline ~1.5pt on screen however far the sticker is zoomed out
+            borderWidth: 1.5 / Math.max(scale, MENTION_MIN_SCALE),
+            borderRadius: 10 / Math.max(scale, MENTION_MIN_SCALE),
+          }]}
+        />
+      ) : null}
+      {/* A plain tap lands on this Pressable (the pan responder above only takes over once the finger moves or a second finger lands). */}
       <Pressable
-        onLongPress={() => { hapticLight(); onRemove(overlay.id); }}
-        accessibilityRole="button"
-        accessibilityLabel="Long-press to remove"
+        onPress={() => latest.current.onTap?.(overlay.id)}
+        onLongPress={removable ? () => { hapticLight(); onRemove(overlay.id); } : undefined}
+        // No button role on the reshare card: its credit row is a button and web forbids nested <button>s.
+        accessibilityRole={removable ? 'button' : undefined}
+        accessibilityLabel={removable ? 'Long-press to remove' : 'Drag to move'}
       >
         {children}
       </Pressable>
@@ -454,7 +498,17 @@ export default function StoryComposer() {
   const myHandle = user?.username ? `@${user.username}` : '';
   const myInitials = myName.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase() || 'Y';
 
-  const [step, setStep] = useState<Step>('camera');
+  // Reshare ("Add to your story" from a story that tagged me): skips the camera
+  // and opens the editor on a text-type slide holding the original as a card.
+  const params = useLocalSearchParams<{ reshareStoryId?: string; reshareImage?: string; reshareHandle?: string; reshareSlide?: string }>();
+  const reshareStoryId = firstParam(params.reshareStoryId);
+  const reshareImage = firstParam(params.reshareImage);
+  const reshareHandle = firstParam(params.reshareHandle);
+  const isReshare = !!reshareStoryId;
+  const [reshareBg, setReshareBg] = useState<string>(RESHARE_FALLBACK_COLORS[0]);
+  const [reshareUnavailable, setReshareUnavailable] = useState(false);
+
+  const [step, setStep] = useState<Step>(isReshare ? 'edit' : 'camera');
 
   // ── Camera state ──
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -556,7 +610,19 @@ export default function StoryComposer() {
   const [createAlign, setCreateAlign] = useState<Align>('center');
 
   // ── Edit-screen state ──
-  const [overlays, setOverlays] = useState<StoryOverlay[]>([]);
+  const [overlays, setOverlays] = useState<StoryOverlay[]>(() => (isReshare ? [{
+    id: 'ov_reshare_card',
+    type: 'reshare_card',
+    x: (W - RESHARE_CARD_WIDTH) / 2,
+    y: Math.max(topInset + 40, (H - RESHARE_CARD_HEIGHT) / 2 - 56),
+    rotation: 0,
+    scale: 0.88,
+    cardImageUri: reshareImage,
+    cardRadius: RESHARE_CARD_RADIUS,
+  }] : []));
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
+  const [taggedSheetOpen, setTaggedSheetOpen] = useState(false);
   const [textToolOpen, setTextToolOpen] = useState(false);
   const [textDraft, setTextDraft] = useState('');
   const [textDraftColor, setTextDraftColor] = useState('#FFFFFF');
@@ -600,6 +666,15 @@ export default function StoryComposer() {
   const [postingPercent, setPostingPercent] = useState(0);
 
   const canvasSize = { width: W, height: H };
+
+  // Reshare: sample the original's dominant colour for the slide background
+  // (best-effort — CORS/decode failures keep the black/silver fallback).
+  useEffect(() => {
+    if (!isReshare || !reshareImage) return;
+    let cancelled = false;
+    void sampleImageColor(reshareImage).then((hex) => { if (!cancelled && hex) setReshareBg(hex); });
+    return () => { cancelled = true; };
+  }, [isReshare, reshareImage]);
 
   // ── Camera controls ──────────────────────────────────────────────────────
 
@@ -785,6 +860,40 @@ export default function StoryComposer() {
 
   const removeOverlay = useCallback((id: string) => {
     setOverlays((prev) => prev.filter((o) => o.id !== id));
+    setSelectedId((cur) => (cur === id ? null : cur));
+  }, []);
+
+  const overlaysRef = useRef(overlays);
+  overlaysRef.current = overlays;
+  const mentionOverlays = overlays.filter((o) => o.type === 'mention');
+  const selectedMention = mentionOverlays.find((o) => o.id === selectedId) ?? null;
+
+  const addMention = (person: MentionPerson) => {
+    setMentionPickerOpen(false);
+    const handle = withAt(person.username ?? person.handle);
+    const existing = mentionOverlays.find((o) => o.mentionUserId === person.userId);
+    if (existing) { setSelectedId(existing.id); return; }
+    if (mentionOverlays.length >= MAX_MENTIONS_PER_STORY) {
+      Alert.alert('Mention limit', `You can tag up to ${MAX_MENTIONS_PER_STORY} people in one story.`);
+      return;
+    }
+    hapticLight();
+    const id = `ov_${Date.now()}_${overlays.length}`;
+    setOverlays((prev) => [...prev, {
+      id, type: 'mention', x: W / 2 - 60, y: H / 2 - 40, rotation: 0, scale: 1, opacity: 1,
+      mentionUserId: person.userId, mentionHandle: handle, mentionName: person.name, mentionStyle: 'classic',
+    }]);
+    setSelectedId(id);
+  };
+
+  // Tap on a placed overlay: a mention is selected and its style cycles
+  // classic → outline → solid → neon; anything else just clears the selection.
+  const tapOverlay = useCallback((id: string) => {
+    const tapped = overlaysRef.current.find((o) => o.id === id);
+    if (tapped?.type !== 'mention') { setSelectedId(null); return; }
+    hapticToggle();
+    setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, mentionStyle: nextMentionStyle(o.mentionStyle) } : o)));
+    setSelectedId(id);
   }, []);
 
   const commitTextOverlay = () => {
@@ -805,6 +914,9 @@ export default function StoryComposer() {
     setTextDraft('');
     setTextToolOpen(false);
   };
+
+  // The "@partial" the text tool's caret is in (drives the inline suggestions).
+  const atToken = textToolOpen ? activeMentionQuery(textDraft) : null;
 
   const openProductPicker = async () => {
     try {
@@ -837,7 +949,13 @@ export default function StoryComposer() {
     }
   }, [router, user?.id]);
 
-  const doShare = useCallback(async (payload: SharePayload) => {
+  const doShare = useCallback(async (payload: SharePayload, opts?: { closeFriendsOnly?: boolean }) => {
+    // Signed out (incl. the web preview) there is nothing to post to — never hit the protected API.
+    if (!user?.id) {
+      Alert.alert('Sign in to share', 'Sign in to post a story.');
+      return;
+    }
+    const closeOnly = opts?.closeFriendsOnly ?? closeFriendsOnly;
     setIsPosting(true);
     setPostingPercent(0);
     postingProgress.setValue(0);
@@ -866,20 +984,14 @@ export default function StoryComposer() {
         visibility: 'public',
         replyPermission: 'everyone',
         hiddenFromUserIds: [],
-        closeFriendsOnly,
+        closeFriendsOnly: closeOnly,
       };
 
-      await createStory({ media, privacy, repliesDisabled: false });
-      api.social.createStory({
-        authorName: myName,
-        authorHandle: myHandle,
-        authorInitials: myInitials,
-        authorColor: MY_COLOR,
-        authorAccountType: isSeller ? 'seller' : 'buyer',
-        media,
-        repliesDisabled: false,
-        privacy: { visibility: 'public', replyPermission: 'everyone' },
-      }).catch(() => {});
+      // One POST. (This used to be followed by a second api.social.createStory
+      // with the same media, which would have published every story — and
+      // notified every @mention — twice.) media[].overlays carries the mention
+      // fields (mentionUserId/mentionHandle/mentionStyle/opacity) through as-is.
+      await createStory({ media, privacy, repliesDisabled: false, originalStoryId: reshareStoryId });
 
       hapticSuccessAction();
       // Let the ring visibly complete (matches IG's own pill, which always
@@ -895,13 +1007,21 @@ export default function StoryComposer() {
       // Instagram's own "Also share to" sheet appears once the story is
       // live — this replaces the previous immediate goBackOr(router).
       setAlsoShareOpen(true);
-    } catch {
+    } catch (err) {
       postingProgress.removeListener(progressListener);
       endUploadActivity(activityId, { status: 'failed' });
-      Alert.alert("Couldn't share your story", 'Try again.');
       setIsPosting(false);
+      // The original expired / was removed (410) or I'm no longer tagged in it (403):
+      // show the inline "Story unavailable" state instead of a generic alert.
+      const status = (err as { status?: number } | null)?.status;
+      if (reshareStoryId && (status === 403 || status === 410)) {
+        setShareSheetOpen(false);
+        setReshareUnavailable(true);
+        return;
+      }
+      Alert.alert("Couldn't share your story", 'Try again.');
     }
-  }, [api, myName, myHandle, myInitials, isSeller, closeFriendsOnly, postingProgress, showArchiveNoticeOnce]);
+  }, [user?.id, reshareStoryId, closeFriendsOnly, postingProgress, showArchiveNoticeOnce]);
 
   // Tapping send/Share opens Instagram's own Share sheet rather than posting
   // immediately (see docs/story-flows.md for what's shown there).
@@ -910,6 +1030,28 @@ export default function StoryComposer() {
     hapticLight();
     setPendingSharePayload({ type: media.kind, uri: media.uri, text: captionDraft.trim() || undefined, ovs: overlays });
     setShareSheetOpen(true);
+  };
+
+  // Reshare's "Your story" / "Close Friends" buttons publish straight away, like
+  // Instagram's own add-to-story screen (no extra Share sheet in between).
+  const shareReshare = (closeFriends: boolean) => {
+    if (isPosting || reshareUnavailable) return;
+    hapticPrimaryAction();
+    setSelectedId(null);
+    setCloseFriendsOnly(closeFriends);
+    void doShare({ type: 'text', bg: reshareBg, ovs: overlays }, { closeFriendsOnly: closeFriends });
+  };
+
+  const notNowReshare = () => {
+    hapticLight();
+    // Signed out there is no tag to dismiss — just leave.
+    if (reshareStoryId && user?.id) api.social.dismissStoryMention(reshareStoryId).catch(() => {});
+    goBackOr(router);
+  };
+
+  const openReshareOriginal = () => {
+    if (!reshareStoryId) return;
+    router.push(`/buyer-story-viewer?storyId=${encodeURIComponent(reshareStoryId)}&allStoryIds=${encodeURIComponent(reshareStoryId)}` as never);
   };
 
   const openShareSheetFromCreate = () => {
@@ -1452,18 +1594,32 @@ export default function StoryComposer() {
     <View style={styles.root}>
       <StatusBar style="light" />
 
-      {media?.kind === 'video' ? <VideoPreview uri={media.uri} /> : media ? (
+      {isReshare ? (
+        <LinearGradient colors={reshareGradientFromBackground(reshareBg)} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
+      ) : media?.kind === 'video' ? <VideoPreview uri={media.uri} /> : media ? (
         <Image source={{ uri: media.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
       )}
 
+      {/* Tap empty canvas to clear the mention selection */}
+      {selectedId ? <Pressable style={StyleSheet.absoluteFill} onPress={() => setSelectedId(null)} accessibilityLabel="Deselect" /> : null}
+
       {drawOpen ? <DrawCanvas strokes={strokes} onAddStroke={(s) => setStrokes((p) => [...p, s])} color={drawColor} width={drawWidth} /> : null}
 
       {/* Overlays */}
       {overlays.map((ov) => (
-        <OverlayChip key={ov.id} overlay={ov} canvasSize={canvasSize} onChange={changeOverlay} onRemove={removeOverlay}>
-          {renderOverlayContent(ov)}
+        <OverlayChip
+          key={ov.id}
+          overlay={ov}
+          canvasSize={canvasSize}
+          onChange={changeOverlay}
+          onRemove={removeOverlay}
+          onTap={tapOverlay}
+          selected={ov.id === selectedId}
+          removable={ov.type !== 'reshare_card'}
+        >
+          {renderOverlayContent(ov, { creditHandle: reshareHandle, onCreditPress: reshareStoryId ? openReshareOriginal : undefined })}
         </OverlayChip>
       ))}
 
@@ -1472,6 +1628,15 @@ export default function StoryComposer() {
         <TouchableOpacity
           style={styles.camIconBtn}
           onPress={() => {
+            const edited = overlays.some((o) => o.type !== 'reshare_card') || strokes.length > 0;
+            if (isReshare) {
+              if (!edited) { goBackOr(router); return; }
+              Alert.alert('Discard edits?', 'Your text, stickers and drawing will be lost.', [
+                { text: 'Keep editing', style: 'cancel' },
+                { text: 'Discard', style: 'destructive', onPress: () => goBackOr(router) },
+              ]);
+              return;
+            }
             if (!overlays.length && !strokes.length) { setMedia(null); setStep('camera'); return; }
             Alert.alert('Discard edits?', 'Your text, stickers and drawing will be lost.', [
               { text: 'Keep editing', style: 'cancel' },
@@ -1541,7 +1706,90 @@ export default function StoryComposer() {
         </View>
       ) : null}
 
+      {/* Mention controls: tagged-people chip (works even when every sticker is invisible) + style/opacity for the selected sticker */}
+      {mentionOverlays.length > 0 ? (
+        <View style={[styles.mentionDock, { bottom: insets.bottom + (isReshare ? 150 : 138) }]} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.taggedChip}
+            onPress={() => { hapticLight(); setTaggedSheetOpen(true); }}
+            accessibilityRole="button"
+            accessibilityLabel={`Tagged people, ${mentionOverlays.length}`}
+            testID="story-tagged-chip"
+          >
+            <Feather name="at-sign" size={14} color={ON_DARK} />
+            <Text style={styles.taggedChipText}>{mentionOverlays.length}</Text>
+          </TouchableOpacity>
+          {selectedMention ? (
+            <View style={styles.mentionControls} testID="mention-controls">
+              <Text style={styles.mentionControlsLabel} numberOfLines={1}>
+                {selectedMention.mentionHandle} · {selectedMention.mentionStyle ?? 'classic'}
+              </Text>
+              <View style={styles.mentionOpacityRow}>
+                <Feather name="droplet" size={14} color={MUTED} />
+                <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                  <InlineSlider
+                    value={Math.round(clampMentionOpacity(selectedMention.opacity) * 100)}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onChange={(v) => changeOverlay(selectedMention.id, { opacity: clampMentionOpacity(v / 100) })}
+                    accessibilityLabel="Mention opacity"
+                  />
+                </View>
+                <Text style={styles.mentionOpacityValue}>{Math.round(clampMentionOpacity(selectedMention.opacity) * 100)}%</Text>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       {/* Bottom bar */}
+      {isReshare ? (
+        <View style={[styles.editBottom, { paddingBottom: insets.bottom + SP.md }]}>
+          {reshareUnavailable ? (
+            <View style={styles.reshareUnavailable} testID="reshare-unavailable">
+              <Feather name="slash" size={16} color={ON_DARK} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.reshareUnavailableTitle}>Story unavailable</Text>
+                <Text style={styles.reshareUnavailableSub}>This story expired or you can no longer share it.</Text>
+              </View>
+              <TouchableOpacity onPress={() => goBackOr(router)} accessibilityRole="button" accessibilityLabel="Close">
+                <Text style={styles.reshareNotNow}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <View style={styles.audienceRow}>
+                <PressableScale
+                  style={[styles.reshareAction, isPosting && { opacity: 0.6 }]}
+                  onPress={() => shareReshare(false)}
+                  disabled={isPosting}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share to your story"
+                  testID="reshare-your-story"
+                >
+                  <View style={styles.myAvatar}><Text style={styles.myAvatarText}>{myInitials}</Text></View>
+                  <Text style={styles.reshareActionLabel}>Your story</Text>
+                </PressableScale>
+                <PressableScale
+                  style={[styles.reshareAction, styles.reshareActionOutline, isPosting && { opacity: 0.6 }]}
+                  onPress={() => shareReshare(true)}
+                  disabled={isPosting}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share to Close Friends"
+                  testID="reshare-close-friends"
+                >
+                  <Feather name="star" size={14} color={ON_DARK} />
+                  <Text style={styles.reshareActionLabel}>Close Friends</Text>
+                </PressableScale>
+              </View>
+              <TouchableOpacity style={styles.reshareNotNowWrap} onPress={notNowReshare} accessibilityRole="button" accessibilityLabel="Not now" testID="reshare-not-now">
+                <Text style={styles.reshareNotNow}>Not now</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      ) : (
       <View style={[styles.editBottom, { paddingBottom: insets.bottom + SP.md }]}>
         <TextInput
           style={styles.captionInput}
@@ -1577,6 +1825,7 @@ export default function StoryComposer() {
           </PressableScale>
         </View>
       </View>
+      )}
 
       {/* ── Text tool overlay ── */}
       <Modal visible={textToolOpen} transparent animationType="fade" onRequestClose={() => setTextToolOpen(false)}>
@@ -1675,13 +1924,22 @@ export default function StoryComposer() {
               </TouchableOpacity>
             </View>
 
+            {/* Typing "@…" swaps the shortcuts for Instagram-style people suggestions; picking one
+                inserts "@username" into the text (the server turns it into a real mention). */}
+            <MentionSuggestionsBar
+              active={!!atToken}
+              query={atToken?.query ?? ''}
+              enabled={!!user?.id}
+              onPick={(p) => { hapticLight(); setTextDraft((t) => insertMention(t, (p.username ?? p.handle ?? '').replace(/^@+/, ''))); }}
+            />
+
             {/* Above-keyboard row — Instagram's quick Mention/Location shortcuts. Rewrite is
                 intentionally omitted: it needs a real LLM call, which is out of scope here
                 rather than a fake button (see docs/story-flows.md). */}
-            <View style={styles.textAccessoryRow}>
+            <View style={[styles.textAccessoryRow, atToken ? { display: 'none' } : null]}>
               <TouchableOpacity
                 style={styles.textAccessoryItem}
-                onPress={() => { addOverlay({ type: 'mention', mentionHandle: '@friend' }); setTextToolOpen(false); }}
+                onPress={() => { hapticLight(); setTextDraft((t) => (t && !/\s$/.test(t) ? `${t} @` : `${t}@`)); }}
                 accessibilityRole="button"
                 accessibilityLabel="Add mention"
               >
@@ -1793,7 +2051,7 @@ export default function StoryComposer() {
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Stickers</Text>
             <View style={styles.stickerGrid}>
-              <StickerTile icon="at-sign" label="Mention" onPress={() => { addOverlay({ type: 'mention', mentionHandle: '@friend' }); setStickerSheetOpen(false); }} />
+              <StickerTile icon="at-sign" label="Mention" onPress={() => { setStickerSheetOpen(false); setMentionPickerOpen(true); }} />
               <StickerTile icon="map-pin" label="Location" onPress={() => { addOverlay({ type: 'location', locationLabel: 'Add location' }); setStickerSheetOpen(false); }} />
               <StickerTile icon="clock" label="Time" onPress={() => { addOverlay({ type: 'time', text: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }); setStickerSheetOpen(false); }} />
               <StickerTile icon="bar-chart-2" label="Poll" onPress={() => { addOverlay({ type: 'poll', pollQuestion: 'This or that?', pollOptions: [{ label: 'This', votes: 0 }, { label: 'That', votes: 0 }] }); setStickerSheetOpen(false); }} />
@@ -1847,6 +2105,46 @@ export default function StoryComposer() {
                   <Feather name="chevron-right" size={16} color={MUTED} />
                 </PressableScale>
               ))}
+            </ScrollView>
+          </View>
+        </ModalSafeArea>
+      </Modal>
+
+      {/* ── Mention picker (sticker tray → Mention) ── */}
+      <MentionPickerSheet visible={mentionPickerOpen} enabled={!!user?.id} onClose={() => setMentionPickerOpen(false)} onPick={addMention} />
+
+      {/* ── Tagged people: reach (or remove) a mention even when its sticker is a speck or off the edge ── */}
+      <Modal visible={taggedSheetOpen} transparent animationType="slide" onRequestClose={() => setTaggedSheetOpen(false)}>
+        <ModalSafeArea>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setTaggedSheetOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+          <View style={[styles.stickerSheet, { paddingBottom: insets.bottom + SP.md, maxHeight: '60%' }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Tagged people</Text>
+            <ScrollView>
+              {taggedPeople(mentionOverlays).map((p) => {
+                const ov = mentionOverlays.find((o) => o.mentionUserId === p.userId);
+                return (
+                  <View key={p.userId} style={styles.alsoShareRow}>
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      onPress={() => { if (ov) setSelectedId(ov.id); setTaggedSheetOpen(false); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select ${p.handle} sticker`}
+                    >
+                      <Text style={styles.shareRowTitle}>{p.handle}</Text>
+                      {p.name ? <Text style={styles.shareRowSubtitle}>{p.name}</Text> : null}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.alsoShareSendBtn}
+                      onPress={() => { if (ov) removeOverlay(ov.id); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${p.handle}`}
+                    >
+                      <Text style={styles.alsoShareSendText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </ScrollView>
           </View>
         </ModalSafeArea>
@@ -1914,7 +2212,7 @@ function StickerTile({ icon, label, onPress, custom }: { icon: keyof typeof Feat
 }
 
 // ─── Overlay content renderer (edit-screen canvas) ──────────────────────────
-function renderOverlayContent(ov: StoryOverlay) {
+function renderOverlayContent(ov: StoryOverlay, ctx?: { creditHandle?: string; onCreditPress?: () => void }) {
   switch (ov.type) {
     case 'text': {
       const textColor = ov.bgStyle && ov.bgStyle !== 'none' ? (ov.color === '#FFFFFF' ? '#000' : '#FFF') : (ov.color ?? '#FFF');
@@ -1935,7 +2233,9 @@ function renderOverlayContent(ov: StoryOverlay) {
       );
     }
     case 'mention':
-      return <View style={styles.pillChip}><Feather name="at-sign" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.mentionHandle}</Text></View>;
+      return <MentionStickerView handle={ov.mentionHandle} variant={ov.mentionStyle} />;
+    case 'reshare_card':
+      return <ReshareCard imageUri={ov.cardImageUri} radius={ov.cardRadius} handle={ctx?.creditHandle} onCreditPress={ctx?.onCreditPress} />;
     case 'location':
       return <View style={styles.pillChip}><Feather name="map-pin" size={12} color="#fff" /><Text style={styles.pillChipText}>{ov.locationLabel}</Text></View>;
     case 'time':
@@ -2079,6 +2379,28 @@ const styles = StyleSheet.create({
 
 
   overlayChip: { position: 'absolute', top: 0, left: 0, zIndex: 15 },
+  mentionDock: { position: 'absolute', left: SP.md, right: SP.md, zIndex: 22, flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm },
+  taggedChip: {
+    minWidth: 44, height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    paddingHorizontal: SP.sm, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.6)',
+    borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)',
+  },
+  taggedChipText: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
+  mentionControls: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)', paddingHorizontal: SP.sm, paddingVertical: 6 },
+  mentionControlsLabel: { color: ON_DARK, fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'capitalize' },
+  mentionOpacityRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  mentionOpacityValue: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, width: 34, textAlign: 'right' },
+
+  reshareAction: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: SP.md },
+  reshareActionOutline: { borderWidth: 1, borderColor: 'rgba(192,192,192,0.5)' },
+  reshareActionLabel: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
+  reshareNotNowWrap: { alignSelf: 'center', minHeight: 40, justifyContent: 'center', paddingHorizontal: SP.lg, marginTop: SP.xs, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.55)' },
+  reshareNotNow: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.semibold },
+  reshareUnavailable: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(192,192,192,0.4)', padding: SP.md },
+  reshareUnavailableTitle: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.semibold },
+  reshareUnavailableSub: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular },
+
+  selectionOutline: { position: 'absolute', borderColor: 'rgba(255,255,255,0.9)', borderStyle: 'dashed' },
   aaIcon: { color: ON_DARK, fontSize: FS.md, fontFamily: FONT.bold },
 
   drawBar: {

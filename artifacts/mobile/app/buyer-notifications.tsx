@@ -74,6 +74,8 @@ function notifIcon(type: Notification['type']): string {
     case 'post_comment': return 'message-circle';
     case 'repost': return 'repeat';
     case 'mention': return 'at-sign';
+    case 'story_mention': return 'at-sign';
+    case 'story_reshare': return 'repeat';
     case 'story_reaction': return 'zap';
     case 'story_reply': return 'message-square';
     case 'new_follower': return 'user-plus';
