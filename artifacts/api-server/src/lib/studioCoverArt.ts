@@ -54,19 +54,57 @@ export function isKnownStudioCoverCard(cardId: string): boolean {
   return Object.prototype.hasOwnProperty.call(STUDIO_COVER_SUBJECTS, cardId);
 }
 
+export type StudioCoverVariant = "mono" | "gel";
+
+/** Dev: "two variants to pick from — A strict monochrome, B colour-gel: same
+ *  chrome object, UI chrome stays black/white/silver, but the PHOTO gets one
+ *  signature coloured light/gel per card (never neon, colour lives in the
+ *  light/reflections, never a flat fill)." Go Live keeps its single red
+ *  tally light as its only colour in both variants — not overridden here. */
+const GEL_ACCENTS: Record<string, string> = {
+  "post-video": "deep cobalt blue",
+  "add-product": "warm amber",
+  "go-live": "red",
+  "analytics": "emerald green",
+  "payouts": "amber",
+  "customers": "violet",
+  "community": "teal",
+  "manufacturer": "crimson",
+  "design-studio": "deep cobalt blue",
+  "mockup-to-model": "violet",
+  "remove-bg": "teal",
+  "ai-design": "emerald green",
+  "campaign-gen": "crimson",
+  "ai-photoshoot": "deep cobalt blue",
+};
+
 /** One shared template so every card reads as the same series — only the
- *  hero object, its material, and the backdrop texture vary per card. */
-export function buildStudioCoverArtPrompt(cardId: string): string {
+ *  hero object, its material, and the backdrop texture vary per card (and,
+ *  for the 'gel' variant, one signature light colour). */
+export function buildStudioCoverArtPrompt(cardId: string, variant: StudioCoverVariant = "mono"): string {
   const subject = STUDIO_COVER_SUBJECTS[cardId];
   if (!subject) throw new Error(`No cover-art subject defined for card id "${cardId}"`);
-  return [
+  const base = [
     `Product-launch hero photograph, single ${subject.object}, ${subject.materialAccent},`,
     `centered on a ${subject.backdropTexture} seamless studio backdrop,`,
     "one large overhead softbox, crisp specular highlights and reflections, subtle floor reflection,",
-    "shallow depth of field, fine film grain, strictly monochrome black/silver palette",
-    "(no color anywhere in the frame except where the subject's own description says otherwise),",
-    "no text, no logo, no watermark, shot straight-on at eye level, 9:16 portrait composition.",
-  ].join(" ");
+    "shallow depth of field, fine film grain,",
+  ];
+  if (variant === "gel") {
+    const accent = GEL_ACCENTS[cardId] ?? "amber";
+    base.push(
+      `otherwise strictly monochrome black/silver palette, with a single ${accent} gel light`,
+      "washing across the subject's specular highlights and reflections only — never a flat colour fill,",
+      "never neon, the rest of the frame (backdrop, shadows, non-reflective surfaces) stays black/silver,",
+    );
+  } else {
+    base.push(
+      "strictly monochrome black/silver palette",
+      "(no color anywhere in the frame except where the subject's own description says otherwise),",
+    );
+  }
+  base.push("no text, no logo, no watermark, shot straight-on at eye level, 9:16 portrait composition.");
+  return base.join(" ");
 }
 
 const GENERATION_SIZE = "1024x1536" as const;
@@ -74,6 +112,7 @@ const GENERATION_SIZE = "1024x1536" as const;
 export interface StudioCoverCandidate {
   objectPath: string;
   createdAt: string;
+  variant: StudioCoverVariant;
 }
 
 /** Generates `count` fresh candidates for one card, uploads each to object
@@ -82,18 +121,19 @@ export interface StudioCoverCandidate {
 export async function generateStudioCoverArtCandidates(
   cardId: string,
   count = 4,
+  variant: StudioCoverVariant = "mono",
 ): Promise<StudioCoverCandidate[]> {
   if (!isKnownStudioCoverCard(cardId)) {
     throw new Error(`Unknown Studio cover-art card id: "${cardId}"`);
   }
-  const prompt = buildStudioCoverArtPrompt(cardId);
+  const prompt = buildStudioCoverArtPrompt(cardId, variant);
 
   const fresh: StudioCoverCandidate[] = [];
   for (let i = 0; i < count; i++) {
     const buffer = await generateImageBuffer(prompt, GENERATION_SIZE, { quality: "high" });
     const objectPath = `/objects/studio-cover-art/${cardId}/${randomUUID()}.png`;
     await objectStorage.createObjectEntityFromBuffer(buffer, "image/png", objectPath);
-    fresh.push({ objectPath, createdAt: new Date().toISOString() });
+    fresh.push({ objectPath, createdAt: new Date().toISOString(), variant });
   }
 
   const [existing] = await db.select().from(studioCoverArt).where(eq(studioCoverArt.cardId, cardId)).limit(1);

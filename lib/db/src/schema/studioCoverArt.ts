@@ -13,7 +13,7 @@ export const studioCoverArt = pgTable('studio_cover_art', {
   /** Every candidate ever generated for this card, oldest first — kept even
    *  after one is chosen, so a re-review doesn't lose earlier options. */
   candidates: jsonb('candidates')
-    .$type<Array<{ objectPath: string; createdAt: string }>>()
+    .$type<Array<{ objectPath: string; createdAt: string; variant: 'mono' | 'gel' }>>()
     .notNull()
     .default([]),
   /** The candidate an admin picked (an `/objects/...` path from `candidates`

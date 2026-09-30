@@ -22,6 +22,20 @@ pnpm --filter @workspace/api-server exec tsx ./scripts/generateStudioCoverArt.ts
 pnpm --filter @workspace/api-server exec tsx ./scripts/generateStudioCoverArt.ts --count 2 add-product
 ```
 
+**Two variants** — generate both for a side-by-side comparison before
+picking (Dev decides which reads better as a series):
+
+```
+pnpm --filter @workspace/api-server exec tsx ./scripts/generateStudioCoverArt.ts --variant mono
+pnpm --filter @workspace/api-server exec tsx ./scripts/generateStudioCoverArt.ts --variant gel
+```
+
+`mono` (the default) is strictly monochrome black/silver/chrome. `gel` is
+the same chrome object and monochrome UI/backdrop, but the photo gets one
+signature coloured light/gel in its reflections (never a flat colour fill,
+never neon) — Go Live keeps its single red tally light as its only colour
+in both variants.
+
 **Requires** (all already provisioned for this app's other AI-image
 features — nothing new to set up):
 

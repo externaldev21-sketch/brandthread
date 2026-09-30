@@ -18,19 +18,30 @@
  *   pnpm --filter @workspace/api-server exec tsx ./scripts/generateStudioCoverArt.ts
  *   pnpm --filter @workspace/api-server exec tsx ./scripts/generateStudioCoverArt.ts add-product go-live payouts
  *   pnpm --filter @workspace/api-server exec tsx ./scripts/generateStudioCoverArt.ts --count 2 add-product
+ *   pnpm --filter @workspace/api-server exec tsx ./scripts/generateStudioCoverArt.ts --variant gel
  *
  * With no card ids given, runs for every known card (see
- * STUDIO_COVER_SUBJECTS). Defaults to 4 candidates per card.
+ * STUDIO_COVER_SUBJECTS). Defaults to 4 candidates per card, variant 'mono'.
+ * --variant gel generates the colour-gel variant instead (same chrome
+ * object, one signature coloured light in the photo) for side-by-side
+ * comparison.
  */
-import { generateStudioCoverArtCandidates, STUDIO_COVER_SUBJECTS } from "../src/lib/studioCoverArt";
+import { generateStudioCoverArtCandidates, STUDIO_COVER_SUBJECTS, type StudioCoverVariant } from "../src/lib/studioCoverArt";
 
 async function main() {
   const args = process.argv.slice(2);
   let count = 4;
+  let variant: StudioCoverVariant = "mono";
   const cardIds: string[] = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--count") {
       count = Number(args[++i]);
+      continue;
+    }
+    if (args[i] === "--variant") {
+      const raw = args[++i];
+      if (raw !== "mono" && raw !== "gel") throw new Error(`--variant must be "mono" or "gel", got "${raw}"`);
+      variant = raw;
       continue;
     }
     cardIds.push(args[i]);
@@ -42,8 +53,8 @@ async function main() {
       console.error(`Skipping unknown card id "${cardId}" (known: ${Object.keys(STUDIO_COVER_SUBJECTS).join(", ")})`);
       continue;
     }
-    console.log(`Generating ${count} candidate(s) for "${cardId}"...`);
-    const candidates = await generateStudioCoverArtCandidates(cardId, count);
+    console.log(`Generating ${count} "${variant}" candidate(s) for "${cardId}"...`);
+    const candidates = await generateStudioCoverArtCandidates(cardId, count, variant);
     candidates.forEach((c) => console.log(`  ${c.objectPath}`));
   }
 

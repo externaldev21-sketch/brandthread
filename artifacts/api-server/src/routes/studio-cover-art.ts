@@ -14,7 +14,12 @@ import {
   isKnownStudioCoverCard,
   selectStudioCoverArt,
   STUDIO_COVER_SUBJECTS,
+  type StudioCoverVariant,
 } from "../lib/studioCoverArt";
+
+function normalizeVariant(raw: unknown): StudioCoverVariant {
+  return raw === "gel" ? "gel" : "mono";
+}
 
 const objectStorage = new ObjectStorageService();
 
@@ -51,6 +56,7 @@ router.get("/:cardId/candidates", requireAuth, requireModerator, async (req, res
     const candidates = await Promise.all((row?.candidates ?? []).map(async (c) => ({
       objectPath: c.objectPath,
       createdAt: c.createdAt,
+      variant: c.variant ?? "mono",
       url: await objectStorage.getObjectEntityDownloadURL(c.objectPath, 3600),
       chosen: c.objectPath === row?.chosenObjectPath,
     })));
@@ -61,9 +67,10 @@ router.get("/:cardId/candidates", requireAuth, requireModerator, async (req, res
 });
 
 /** POST /config/studio-cover-art/:cardId/generate — admin-only. Body:
- *  { count?: number } (defaults to 4). Returns the freshly generated
- *  candidates (their object paths, not signed URLs — an admin reviewing
- *  candidates uses the /candidates listing below, which does sign them). */
+ *  { count?: number, variant?: 'mono' | 'gel' } (defaults to 4, 'mono').
+ *  Returns the freshly generated candidates (their object paths, not signed
+ *  URLs — an admin reviewing candidates uses the /candidates listing below,
+ *  which does sign them). */
 router.post("/:cardId/generate", requireAuth, requireModerator, async (req, res, next) => {
   const cardId = normalizeCardId(req.params.cardId);
   if (!isKnownStudioCoverCard(cardId)) {
@@ -71,9 +78,10 @@ router.post("/:cardId/generate", requireAuth, requireModerator, async (req, res,
     return;
   }
   const count = Number.isInteger(req.body?.count) ? Math.min(Math.max(req.body.count, 1), 8) : 4;
+  const variant = normalizeVariant(req.body?.variant);
   try {
-    const candidates = await generateStudioCoverArtCandidates(cardId, count);
-    res.json({ cardId, generated: candidates });
+    const candidates = await generateStudioCoverArtCandidates(cardId, count, variant);
+    res.json({ cardId, variant, generated: candidates });
   } catch (error) {
     next(error);
   }
