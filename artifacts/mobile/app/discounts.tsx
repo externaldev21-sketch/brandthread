@@ -660,9 +660,30 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
         <View style={{ alignItems: 'flex-end', gap: 8 }}>
           <StatusBadge label={STATUS_LABEL[d.status]} variant={STATUS_VARIANT[d.status]} small />
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity onPress={onEdit}><Feather name="edit-2" size={15} color={MUTED} /></TouchableOpacity>
-            <TouchableOpacity onPress={onTogglePause}><Feather name={d.active ? 'pause-circle' : 'play-circle'} size={15} color={d.active ? ORANGE : SUCCESS} /></TouchableOpacity>
-            <TouchableOpacity onPress={onDelete}><Feather name="trash-2" size={15} color={RED} /></TouchableOpacity>
+            <TouchableOpacity
+              onPress={onEdit}
+              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${d.code}`}
+            >
+              <Feather name="edit-2" size={15} color={MUTED} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onTogglePause}
+              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+              accessibilityRole="button"
+              accessibilityLabel={d.active ? `Pause ${d.code}` : `Resume ${d.code}`}
+            >
+              <Feather name={d.active ? 'pause-circle' : 'play-circle'} size={15} color={d.active ? ORANGE : SUCCESS} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onDelete}
+              hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${d.code}`}
+            >
+              <Feather name="trash-2" size={15} color={RED} />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
