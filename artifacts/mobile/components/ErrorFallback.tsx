@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   Modal,
   Platform,
@@ -9,7 +8,6 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -29,7 +27,6 @@ export type ErrorFallbackProps = {
 export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const headerTopInset = useHeaderTopInset();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -58,16 +55,6 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {__DEV__ ? (
-        <IconButton
-          name="alert-circle"
-          onPress={() => setIsModalVisible(true)}
-          accessibilityLabel="View error details"
-          color={colors.foreground}
-          style={[styles.topButton, { top: headerTopInset + SPACING.md }]}
-        />
-      ) : null}
-
       <View style={styles.content}>
         <View style={[styles.iconCircle, { borderColor: colors.border, backgroundColor: colors.card }]}>
           <Feather name="alert-triangle" size={28} color={colors.mutedForeground} />
@@ -78,39 +65,37 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
         </Text>
 
         <Text style={[TYPE_SCALE.body, styles.message, { color: colors.mutedForeground }]}>
-          Please reload the app to continue.
+          Please try again, or head back home.
         </Text>
-        {__DEV__ ? (
-          <Text style={[TYPE_SCALE.footnote, styles.devMessage, { color: colors.mutedForeground }]}>
-            {error.message}
-          </Text>
-        ) : null}
 
         <View style={styles.actions}>
           <Button
-            label="Try Again"
+            label="Try again"
             onPress={handleRestart}
             variant="primary"
             style={styles.button}
           />
-          <View style={styles.secondaryRow}>
-            <Button
-              label="Go back"
-              onPress={() => {
-                if (router.canGoBack()) goBackOr(router);
-                else router.replace('/' as never);
-              }}
-              variant="secondary"
-              style={styles.halfButton}
-            />
-            <Button
-              label="Go home"
-              onPress={() => router.replace('/' as never)}
-              variant="secondary"
-              style={styles.halfButton}
-            />
-          </View>
+          <Button
+            label="Go home"
+            onPress={() => router.replace('/' as never)}
+            variant="tertiary"
+            style={styles.button}
+          />
         </View>
+
+        {/* Raw error text/stack trace is never shown by default — only in
+            __DEV__, and only behind this explicit tap, per the standard
+            every other error surface in the app follows. */}
+        {__DEV__ ? (
+          <Button
+            label="Details"
+            onPress={() => setIsModalVisible(true)}
+            variant="tertiary"
+            size="compact"
+            style={styles.detailsButton}
+            accessibilityLabel="View error details"
+          />
+        ) : null}
       </View>
 
       {__DEV__ ? (
@@ -213,17 +198,6 @@ const styles = StyleSheet.create({
   message: {
     textAlign: 'center',
   },
-  devMessage: {
-    textAlign: 'center',
-    maxWidth: 320,
-  },
-  topButton: {
-    // Clear of the centered icon/title block above at any screen height —
-    // pinned to the top-right corner rather than floating near the content.
-    position: 'absolute',
-    right: SPACING.md,
-    zIndex: 10,
-  },
   actions: {
     width: '100%',
     alignItems: 'center',
@@ -233,14 +207,8 @@ const styles = StyleSheet.create({
   button: {
     minWidth: 200,
   },
-  secondaryRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    width: '100%',
-    maxWidth: 320,
-  },
-  halfButton: {
-    flex: 1,
+  detailsButton: {
+    marginTop: SPACING.xs,
   },
   modalOverlay: {
     flex: 1,
