@@ -21,6 +21,7 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { blockRelation, blockedUserIds, profilesById, publishingRestriction } from "../lib/safety";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { ensureStoryReplyConversation, withOriginalInfo } from "../lib/storyMentions";
+import { audienceAllows, viewerRelations } from "../lib/storyAccess";
 
 /** Brand palette is black/white/silver: every avatar without a photo is a white monogram on this. */
 const MONOGRAM_COLOR = "#1C1C1E";
@@ -47,10 +48,10 @@ function storyView(row: typeof stories.$inferSelect, likedByMe: boolean) {
     media: (row.media as any[]) ?? [],
     repliesDisabled: row.repliesDisabled,
     privacy: {
-      visibility: row.privacyVisibility,
+      visibility: row.privacyVisibility === "close_friends" ? "public" : row.privacyVisibility,
       replyPermission: row.privacyReplyPerm,
       hiddenFromUserIds: [] as string[],
-      closeFriendsOnly: row.privacyVisibility === "friends",
+      closeFriendsOnly: row.privacyVisibility === "friends" || row.privacyVisibility === "close_friends",
     },
     viewers: [] as unknown[],
     likesCount: row.likesCount,
@@ -140,7 +141,10 @@ router.get("/stories/mentions", async (req, res) => {
     .orderBy(desc(stories.createdAt));
 
   const blocked = await blockedUserIds(myId);
-  const visible = rows.filter((r) => !blocked.has(r.story.authorId));
+  // A Close Friends story is only for the author's list: a tag alone does not open it.
+  const rel = await viewerRelations(myId, rows.map((r) => r.story.authorId));
+  const visible = rows.filter((r) => !blocked.has(r.story.authorId)
+    && (r.story.privacyVisibility !== "close_friends" || audienceAllows("close_friends", r.story.authorId, myId, rel)));
   if (visible.length === 0) { res.json({ items: [], unseenCount: 0 }); return; }
 
   const storyIds = visible.map((r) => r.story.id);
@@ -196,6 +200,10 @@ router.get("/stories/:id", async (req, res) => {
 
   if (row.authorId !== myId) {
     if ((await blockRelation(myId, row.authorId)) !== "none") { gone(); return; }
+    if (row.privacyVisibility === "close_friends") {
+      const rel = await viewerRelations(myId, [row.authorId]);
+      if (!audienceAllows("close_friends", row.authorId, myId, rel)) { gone(); return; }
+    }
     const [tagged] = await db.select({ storyId: storyMentions.storyId }).from(storyMentions)
       .where(and(eq(storyMentions.storyId, row.id), eq(storyMentions.mentionedUserId, myId))).limit(1);
     if (!tagged) {
@@ -249,6 +257,10 @@ router.post("/stories/:id/mention-reply", rateLimit("messaging"), async (req, re
   const [tagged] = await db.select({ storyId: storyMentions.storyId }).from(storyMentions)
     .where(and(eq(storyMentions.storyId, story.id), eq(storyMentions.mentionedUserId, myId))).limit(1);
   if (!tagged) { res.status(403).json({ error: "Only people tagged in a story can reply this way", code: "NOT_TAGGED" }); return; }
+  if (story.privacyVisibility === "close_friends"
+      && !audienceAllows("close_friends", story.authorId, myId, await viewerRelations(myId, [story.authorId]))) {
+    res.status(404).json({ error: "Story unavailable", code: "STORY_UNAVAILABLE" }); return;
+  }
 
   const relation = await blockRelation(myId, story.authorId);
   if (relation === "blocked_by_me") { res.status(403).json({ error: "You blocked this account. Unblock them to send a message.", code: "BLOCKED_BY_ME" }); return; }

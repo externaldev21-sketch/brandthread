@@ -13,7 +13,7 @@
  */
 import { Router } from "express";
 import { publicCoverFields } from "../lib/profileCover";
-import { db, users, follows, stories, storyMentions, storyLikes, storyViews, notes, blocks, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
+import { db, users, follows, storyHighlightItems, closeFriends, stories, storyMentions, storyLikes, storyViews, notes, blocks, posts, postUserTags, interactions, notificationsFeed, suggestionDismissals, activityMutes } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, notInArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
@@ -30,6 +30,7 @@ import {
   publishingRestriction,
 } from "../lib/safety";
 import { actorFieldsFromProfile, notifyStoryLike, notifyStoryMention, notifyStoryReshare } from "../lib/activityEvents";
+import { viewerRelations, audienceAllows, viewerMayOpenAudience } from "../lib/storyAccess";
 import { sanitizeStoryMentions, recordStoryMentions, withOriginalInfo } from "../lib/storyMentions";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
@@ -633,7 +634,7 @@ router.get("/profile/:userId/tagged", async (req, res) => {
       eq(storyMentions.mentionedUserId, other),
       gt(stories.expiresAt, new Date()),
       ne(stories.moderationStatus, "removed"),
-      ne(stories.privacyVisibility, "friends"),
+      notInArray(stories.privacyVisibility, ["friends", "close_friends"]),
       notBlockedWith(myId, stories.authorId),
       authorInGoodStanding(stories.authorId),
     ))
@@ -999,10 +1000,12 @@ function buildStoryView(row: typeof stories.$inferSelect, likedByMe: boolean) {
     media:             (row.media as any[]) ?? [],
     repliesDisabled:   row.repliesDisabled,
     privacy: {
-      visibility:        row.privacyVisibility,
+      // 'close_friends' is reported as closeFriendsOnly on a public-typed story
+      // so clients that only know 'public' | 'friends' keep working.
+      visibility:        row.privacyVisibility === "close_friends" ? "public" : row.privacyVisibility,
       replyPermission:   row.privacyReplyPerm,
       hiddenFromUserIds: [],
-      closeFriendsOnly:  row.privacyVisibility === "friends",
+      closeFriendsOnly:  row.privacyVisibility === "friends" || row.privacyVisibility === "close_friends",
     },
     viewers:    [],          // viewer list omitted for listing; fetch separately if needed
     likesCount: row.likesCount,
@@ -1038,7 +1041,7 @@ router.post("/stories", async (req, res) => {
     media:              any[];
     originalStoryId?:   string;
     repliesDisabled?:   boolean;
-    privacy?: { visibility?: string; replyPermission?: string; };
+    privacy?: { visibility?: string; replyPermission?: string; closeFriendsOnly?: boolean; };
   };
 
   if (!Array.isArray(rawMedia) || rawMedia.length === 0) {
@@ -1092,7 +1095,11 @@ router.post("/stories", async (req, res) => {
   const { media, mentions } = await sanitizeStoryMentions(rawMedia, myId);
 
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const visibility = privacy?.visibility === "friends" ? "friends" : "public";
+  // Close Friends wins over the coarser visibility: the mobile client sends
+  // { visibility: 'public', closeFriendsOnly: true } for a Close Friends story.
+  const visibility = privacy?.closeFriendsOnly === true
+    ? "close_friends"
+    : privacy?.visibility === "friends" ? "friends" : "public";
 
   const [row] = await db.insert(stories).values({
     authorId:           myId,
@@ -1110,8 +1117,17 @@ router.post("/stories", async (req, res) => {
     expiresAt,
   }).returning();
 
-  await recordStoryMentions(row.id, myId, mentions);
-  for (const mention of mentions) {
+  // A Close Friends story is invisible to anyone outside the list, so only
+  // list members are recorded / notified as tagged (others would get a dead link).
+  let taggable = mentions;
+  if (visibility === "close_friends" && mentions.length) {
+    const members = await db.select({ id: closeFriends.friendId }).from(closeFriends)
+      .where(and(eq(closeFriends.userId, myId), inArray(closeFriends.friendId, mentions.map((m) => m.userId))));
+    const memberSet = new Set(members.map((m) => m.id));
+    taggable = mentions.filter((m) => memberSet.has(m.userId));
+  }
+  await recordStoryMentions(row.id, myId, taggable);
+  for (const mention of taggable) {
     void notifyStoryMention({
       storyId: row.id, taggerId: myId, mentionedUserId: mention.userId, media, slide: mention.sticker.slide,
     });
@@ -1168,13 +1184,8 @@ router.get("/stories/user/:userId", async (req, res) => {
 
   if (!rows.length) { res.json([]); return; }
 
-  const visibleRows = authorId === myId
-    ? rows
-    : rows.filter((r) => r.privacyVisibility !== "friends");
-  const needsMutualCheck = authorId !== myId && rows.some((r) => r.privacyVisibility === "friends");
-  const finalRows = needsMutualCheck && await isFollowing(authorId, myId)
-    ? rows
-    : visibleRows;
+  const rel = await viewerRelations(myId, [authorId]);
+  const finalRows = rows.filter((r) => audienceAllows(r.privacyVisibility, authorId, myId, rel));
 
   if (!finalRows.length) { res.json([]); return; }
 
@@ -1211,11 +1222,11 @@ router.get("/stories/following", async (req, res) => {
       .flatMap((b) => [b.blockerId === myId ? b.blockedId : b.blockerId]),
   );
 
+  const rel = await viewerRelations(myId, rows.map((r) => r.authorId));
   const visibleRows = rows.filter((r) => {
     if (r.authorId === myId) return true;
     if (blockedIds.has(r.authorId)) return false;
-    if (r.privacyVisibility === "friends") return false; // mutual-only check omitted from the tray for simplicity; per-user fetch still enforces it
-    return true;
+    return audienceAllows(r.privacyVisibility, r.authorId, myId, rel);
   });
   if (!visibleRows.length) { res.json([]); return; }
 
@@ -1258,7 +1269,7 @@ router.get("/stories/following", async (req, res) => {
       isMe:              authorId === myId,
       storyIds:          authorStories.map((s) => s.id),
       seen:              authorStories.every((s) => viewedSet.has(s.id)),
-      closeFriendsOnly:  authorStories.some((s) => s.privacyVisibility === "friends"),
+      closeFriendsOnly:  authorStories.some((s) => s.privacyVisibility === "friends" || s.privacyVisibility === "close_friends"),
       latestCreatedAt:   new Date(latest.createdAt).getTime(),
     };
   });
@@ -1309,6 +1320,8 @@ router.delete("/stories/:id", async (req, res) => {
     .where(and(eq(stories.id, storyId), eq(stories.authorId, myId)))
     .returning({ id: stories.id });
   if (!deleted) { res.status(404).json({ error: "Story not found" }); return; }
+  // Deleting a story early also takes it out of any highlight (expiry does not).
+  await db.delete(storyHighlightItems).where(eq(storyHighlightItems.storyId, storyId));
   res.json({ id: deleted.id, deleted: true });
 });
 
@@ -1320,6 +1333,9 @@ router.post("/stories/:id/like", async (req, res) => {
   const story = await loadActiveStory(storyId);
   if (!story) { res.status(404).json({ error: "Story not found" }); return; }
   if (story.authorId !== myId && (await blockRelation(myId, story.authorId)) !== "none") {
+    res.status(404).json({ error: "Story not found" }); return;
+  }
+  if (!(await viewerMayOpenAudience(story.privacyVisibility, story.authorId, myId))) {
     res.status(404).json({ error: "Story not found" }); return;
   }
 
@@ -1360,6 +1376,9 @@ router.post("/stories/:id/view", async (req, res) => {
   const story = await loadActiveStory(storyId);
   if (!story) { res.status(404).json({ error: "Story not found" }); return; }
   if (story.authorId !== myId && (await blockRelation(myId, story.authorId)) !== "none") {
+    res.status(404).json({ error: "Story not found" }); return;
+  }
+  if (!(await viewerMayOpenAudience(story.privacyVisibility, story.authorId, myId))) {
     res.status(404).json({ error: "Story not found" }); return;
   }
 

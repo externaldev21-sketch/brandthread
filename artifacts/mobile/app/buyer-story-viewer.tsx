@@ -36,6 +36,8 @@ import {
   isPreviewInboxEnabled, getOrCreatePreviewConversationForAuthor, appendPreviewMessage, touchPreviewConversation,
 } from '@/lib/previewInbox';
 import { getPreviewActivityStory } from '@/lib/previewActivity';
+import { isPreviewDemoMode } from '@/lib/devPreview';
+import { PREVIEW_HIGHLIGHT_ID, previewHighlightStories } from '@/lib/previewHighlights';
 import { useAuth } from '@clerk/expo';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import type { Story, StoryMedia, MessageAttachment } from '@/services/socialTypes';
@@ -124,7 +126,9 @@ export default function BuyerStoryViewer() {
   const insets = useSafeAreaInsets();
   const headerTopInset = useHeaderTopInset();
   const router = useRouter();
-  const { storyId, allStoryIds } = useLocalSearchParams<{ storyId: string; allStoryIds: string }>();
+  const { storyId, allStoryIds, highlightId } = useLocalSearchParams<{ storyId: string; allStoryIds: string; highlightId?: string }>();
+  // A profile highlight: its saved stories come from /highlights/:id and have no like / reply / view tracking.
+  const isHighlight = !!highlightId;
 
   const api = useApi();
   const { userId: myUserId } = useAuth();
@@ -169,6 +173,26 @@ export default function BuyerStoryViewer() {
 
   const loadStories = useCallback(async () => {
     const generation = ++loadGeneration.current;
+    if (highlightId) {
+      // Demo preview only: the seeded highlight has no backend to answer.
+      if (isPreviewDemoMode() && highlightId === PREVIEW_HIGHLIGHT_ID) {
+        setStories(previewHighlightStories());
+        setStoryIdx(0);
+        setLoading(false);
+        return;
+      }
+      try {
+        const hl = await api.social.highlight(String(highlightId));
+        if (loadGeneration.current !== generation) return;
+        setStories((hl.stories ?? []) as Story[]);
+        setStoryIdx(0);
+      } catch {
+        if (loadGeneration.current === generation) setStories([]);
+      } finally {
+        if (loadGeneration.current === generation) setLoading(false);
+      }
+      return;
+    }
     try {
       const all = await getStories().catch(() => [] as Story[]);
       if (loadGeneration.current !== generation) return;
@@ -200,7 +224,7 @@ export default function BuyerStoryViewer() {
 
   useEffect(() => {
     loadStories();
-    if (storyId) {
+    if (storyId && !highlightId) {
       trackStoryView(storyId).catch(() => {});
       // Also record view server-side (fire-and-forget)
       api.social.viewStory(storyId).catch(() => {});
@@ -232,7 +256,7 @@ export default function BuyerStoryViewer() {
   // into the full viewers sheet.
   useEffect(() => {
     const isMine = (!!myUserId && currentStory?.authorId === myUserId) || currentStory?.authorId === 'me';
-    if (!currentStory || !isMine) return;
+    if (!currentStory || !isMine || isHighlight) return;
     let cancelled = false;
     setViewersLoading(true);
     api.social.storyViewers(currentStory.id)
@@ -265,7 +289,7 @@ export default function BuyerStoryViewer() {
   };
 
   useEffect(() => {
-    const unsub = subscribeSocial(() => loadStories());
+    const unsub = subscribeSocial(() => { if (!highlightId) loadStories(); });
     return unsub;
   }, []);
 
@@ -454,7 +478,7 @@ export default function BuyerStoryViewer() {
   // no real Clerk sign-in under ?bt_preview, so myUserId alone can't tell
   // "my own story" apart from anyone else's there. Same check the story
   // options menu below already uses for the same reason.
-  const isMyStory = (!!myUserId && currentStory.authorId === myUserId) || currentStory.authorId === 'me';
+  const isMyStory = !isHighlight && ((!!myUserId && currentStory.authorId === myUserId) || currentStory.authorId === 'me');
   const seenByCount = serverViewers.length || (currentStory as any).viewsCount || currentStory.viewers.length;
 
   const slidePeople = taggedPeople(currentSlide.overlays);
@@ -957,7 +981,7 @@ export default function BuyerStoryViewer() {
                 )}
               </>
             ) : (
-              <Text style={styles.repliesDisabled}>Replies disabled</Text>
+              isHighlight ? null : <Text style={styles.repliesDisabled}>Replies disabled</Text>
             )}
           </View>
         </KeyboardAvoidingView>

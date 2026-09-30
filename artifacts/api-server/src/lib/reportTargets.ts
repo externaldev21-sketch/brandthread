@@ -8,7 +8,7 @@
  */
 import { and, eq, or, sql } from "drizzle-orm";
 import {
-  db, messages, postComments, posts, products, stories, users,
+  db, messages, postComments, posts, products, stories, storyHighlightItems, storyArchive, users,
   communities, communityMessages,
 } from "@workspace/db";
 import type { ReportTargetType } from "./safety";
@@ -224,6 +224,9 @@ export async function removeReportedContent(type: ReportTargetType, id: string, 
     }
     case "story": {
       const rows = await db.delete(stories).where(eq(stories.id, id)).returning({ id: stories.id });
+      // A removed story must not live on in highlights or the author's archive.
+      await db.delete(storyHighlightItems).where(eq(storyHighlightItems.storyId, id));
+      await db.delete(storyArchive).where(eq(storyArchive.storyId, id));
       return rows.length > 0;
     }
     case "product": {

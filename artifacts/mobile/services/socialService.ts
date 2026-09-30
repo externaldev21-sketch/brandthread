@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { emitProfileEvent } from '@/lib/profileEvents';
 import { canUsePreviewFollow, setPreviewFollowing } from '@/lib/previewFollowStore';
-import { isBuyerDevPreview } from '@/lib/devPreview';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import { MY_AVATAR_COLOR, pickAvatarColor } from '@/lib/avatarColors';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
@@ -1021,8 +1021,12 @@ export async function isCloseFriendOf(userId: string): Promise<boolean> {
   } catch { return false; }
 }
 
-/** Load close-friends IDs for the current user (buyer-close-friends screen). */
-export async function getCloseFriendIds(): Promise<string[]> {
+/** True when this session can talk to the server for social data (signed in, not the dev preview). */
+export function canSyncSocialServer(): boolean {
+  return _socialUserId !== 'anon' && !isBuyerDevPreview() && !isSellerDevPreview();
+}
+
+async function readLocalCloseFriends(): Promise<string[]> {
   try {
     const raw = await AsyncStorage.getItem(K().closeFriends);
     if (!raw) return [];
@@ -1031,9 +1035,53 @@ export async function getCloseFriendIds(): Promise<string[]> {
   } catch { return []; }
 }
 
-/** Persist close-friends IDs for the current user (buyer-close-friends screen). */
+/**
+ * Load close-friends IDs for the current user (buyer-close-friends screen).
+ * The server list is the source of truth (it decides who can open Close
+ * Friends stories) and is cached locally. The first time an account loads it
+ * with an empty server list but a non-empty local one (the list used to be
+ * local-only), the local list is uploaded once; after that the server wins.
+ */
+export async function getCloseFriendIds(): Promise<string[]> {
+  const local = await readLocalCloseFriends();
+  if (!canSyncSocialServer()) return local;
+  const keys = K();
+  const syncedKey = `${keys.closeFriends}:server`;
+  try {
+    const remote = await serviceRequest<{ userIds: string[] }>('/api/social/close-friends', {}, false);
+    let ids = Array.isArray(remote?.userIds) ? remote.userIds : [];
+    let alreadyMigrated = false;
+    try { alreadyMigrated = (await AsyncStorage.getItem(syncedKey)) === '1'; } catch { /* treat as not migrated */ }
+    if (!alreadyMigrated) {
+      if (ids.length === 0 && local.length > 0) {
+        const up = await serviceRequest<{ userIds: string[] }>('/api/social/close-friends', {
+          method: 'PUT', body: JSON.stringify({ userIds: local }),
+        }, false);
+        ids = Array.isArray(up?.userIds) ? up.userIds : [];
+      }
+      try { await AsyncStorage.setItem(syncedKey, '1'); } catch { /* best effort */ }
+    }
+    await AsyncStorage.setItem(keys.closeFriends, JSON.stringify(ids));
+    return ids;
+  } catch { return local; }
+}
+
+/**
+ * Persist close-friends IDs: local cache first, then the server, which drops
+ * anyone who is not in my follow graph or is blocked. Throws when the server
+ * rejects the save so callers can tell the user (the local copy is kept).
+ */
 export async function saveCloseFriendIds(ids: string[]): Promise<void> {
-  await AsyncStorage.setItem(K().closeFriends, JSON.stringify(ids));
+  const keys = K();
+  await AsyncStorage.setItem(keys.closeFriends, JSON.stringify(ids));
+  if (!canSyncSocialServer()) return;
+  const saved = await serviceRequest<{ userIds: string[] }>('/api/social/close-friends', {
+    method: 'PUT', body: JSON.stringify({ userIds: ids }),
+  }, false);
+  if (Array.isArray(saved?.userIds)) {
+    await AsyncStorage.setItem(keys.closeFriends, JSON.stringify(saved.userIds));
+  }
+  try { await AsyncStorage.setItem(`${keys.closeFriends}:server`, '1'); } catch { /* best effort */ }
 }
 export async function sendFriendRequest(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<{ success: boolean; message: string; request?: FriendRequest }> {
   const k = K();

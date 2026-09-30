@@ -22,6 +22,20 @@ import type {
 import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 import type { MentionPerson, Story, StoryMentionItem } from '@/services/socialTypes';
 
+/** Server story highlight (GET /api/social/highlights/*). */
+export interface ServerHighlight {
+  id: string; userId: string; title: string;
+  coverUrl: string | null; coverEmoji: string | null; coverColor: string | null;
+  position: number; itemCount: number;
+  items: Array<{ id: string; storyId: string | null; media: any[]; visibility: string; thumbnailUrl: string | null; storyCreatedAt: number | null; position: number }>;
+  createdAt: number; updatedAt: number;
+}
+/** A story of mine that can be added to a highlight (live or archived). */
+export interface HighlightPickerStory {
+  storyId: string; thumbnailUrl: string | null; slides: number;
+  visibility: 'public' | 'friends' | 'close_friends'; createdAt: number; live: boolean;
+}
+
 import type {
   Community, CommunityAttachment, CommunityInvitePreview, CommunityJoinRequest, CommunityMember,
   CommunityMessage, CommunityMessagesPage, CommunityReaction, CreateCommunityInput, UpdateCommunityInput,
@@ -994,9 +1008,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
         patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
-      /** Ship part of an order: tracking for just these items (409 AUTO_REFUNDED on a refunded order). */
-      addItemsTracking: (id: string, body: { itemIds: string[]; trackingNumber: string; carrier?: string }) =>
-        patch(`/api/orders/${id}/items-tracking`, body),
       updateTracking: (id: string, body: {
         trackingStatus: 'label_created' | 'accepted' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned_to_sender';
         estimatedDelivery?: string | null;
@@ -1447,10 +1458,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       orders: {
         list:   () => get<any[]>('/api/buyer/orders'),
         get:    (id: string) => get<any>(`/api/buyer/orders/${encodeURIComponent(id)}`),
-        /** "I received it": marks the order delivered (idempotent). 409 NOT_SHIPPED | ALREADY_REFUNDED. */
-        confirmReceipt: (id: string) => post<{ delivery: unknown }>(
-          `/api/buyer/orders/${encodeURIComponent(id)}/confirm-receipt`, {}
-        ),
         /** Cancel a pending order within the 60-minute window. Returns { cancelled, refunded, orderNumber }. */
         cancel: (id: string) => post<{ cancelled: boolean; refunded: boolean; orderNumber: string }>(
           `/api/buyer/orders/${encodeURIComponent(id)}/cancel`, {}
@@ -2285,7 +2292,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         authorName: string; authorHandle?: string; authorInitials?: string;
         authorColor?: string; authorAccountType?: string;
         media: any[]; repliesDisabled?: boolean;
-        privacy?: { visibility?: string; replyPermission?: string };
+        privacy?: { visibility?: string; replyPermission?: string; closeFriendsOnly?: boolean };
         /** Reshare of a story that tagged me ("Add to your story"). */
         originalStoryId?: string;
       }) => post<any>('/api/social/stories', body),
@@ -2351,6 +2358,29 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Record a story view */
       viewStory: (storyId: string) =>
         post<{ ok: boolean }>(`/api/social/stories/${encodeURIComponent(storyId)}/view`, {}),
+      // ── Close Friends (server-backed audience list) ────────────────────────
+      closeFriends: () =>
+        get<{ friends: Array<{ userId: string; name: string; handle: string; initials: string; avatarUrl: string | null }>; userIds: string[]; cap: number }>(
+          '/api/social/close-friends'),
+      saveCloseFriends: (userIds: string[]) =>
+        put<{ userIds: string[]; rejected: string[] }>('/api/social/close-friends', { userIds }),
+      // ── Story highlights (server-backed) ───────────────────────────────────
+      myHighlights: () => get<ServerHighlight[]>('/api/social/highlights/me'),
+      userHighlights: (userId: string) =>
+        get<ServerHighlight[]>(`/api/social/highlights/user/${encodeURIComponent(userId)}`),
+      highlight: (id: string) =>
+        get<ServerHighlight & { stories: any[] }>(`/api/social/highlights/${encodeURIComponent(id)}`),
+      highlightStories: () => get<HighlightPickerStory[]>('/api/social/highlights/stories'),
+      createHighlight: (body: { title: string; coverEmoji?: string | null; coverColor?: string | null; coverUrl?: string | null; storyIds?: string[] }) =>
+        post<ServerHighlight>('/api/social/highlights', body),
+      updateHighlight: (id: string, body: { title?: string; coverEmoji?: string | null; coverColor?: string | null; coverUrl?: string | null; position?: number }) =>
+        patch<ServerHighlight>(`/api/social/highlights/${encodeURIComponent(id)}`, body),
+      deleteHighlight: (id: string) =>
+        del<{ id: string; deleted: boolean }>(`/api/social/highlights/${encodeURIComponent(id)}`),
+      addHighlightItem: (id: string, storyId: string) =>
+        post<ServerHighlight>(`/api/social/highlights/${encodeURIComponent(id)}/items`, { storyId }),
+      removeHighlightItem: (id: string, itemId: string) =>
+        del<{ id: string; deleted: boolean }>(`/api/social/highlights/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`),
       /** Block a user — removes mutual follows, prevents messaging/following */
       block: (userId: string) =>
         post<{ ok: boolean }>('/api/social/block', { userId }),

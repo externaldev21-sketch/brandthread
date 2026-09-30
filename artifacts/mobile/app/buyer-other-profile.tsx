@@ -35,6 +35,8 @@ import { emitProfileEvent, subscribeProfileEvents } from '@/lib/profileEvents';
 import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
+import { ProfileStoriesRow } from '@/components/profile/ProfileStoriesRow';
+import { highlightFromServer, type Highlight } from '@/lib/highlightsService';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
@@ -107,6 +109,8 @@ export default function BuyerOtherProfileScreen() {
   const [msgLoading, setMsgLoading]     = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [storyIds, setStoryIds]         = useState<string[]>([]);
+  // Their saved-story highlights (only the ones my audience may open); empty hides the row.
+  const [highlights, setHighlights]     = useState<Highlight[]>([]);
   const [refreshing, setRefreshing]     = useState(false);
   // Canonical clerkId resolved from the profile API response. The route
   // `userId` may be a DB UUID alias when arriving from /u/[username]; every
@@ -156,6 +160,8 @@ export default function BuyerOtherProfileScreen() {
       setLoadFailed(false);
       const stories = await api.social.storiesForUser(resolvedId).catch(() => []);
       setStoryIds((Array.isArray(stories) ? stories : []).map((s: any) => s.id));
+      const hl = await api.social.userHighlights(resolvedId).catch(() => []);
+      setHighlights((Array.isArray(hl) ? hl : []).map(highlightFromServer));
     } catch {
       setLoadFailed(true);
     } finally {
@@ -461,6 +467,17 @@ export default function BuyerOtherProfileScreen() {
           />
         )}
         meta={meta}
+        extras={highlights.length > 0 && !iBlockedThem ? (
+          <View testID="other-profile-highlights">
+            <ProfileStoriesRow
+              items={highlights.map((h) => ({ id: h.id, label: h.label, emoji: h.emoji, coverColor: h.coverColor, imageUri: h.coverUrl ?? null }))}
+              onPressItem={(item) => {
+                hapticLight();
+                router.push({ pathname: '/buyer-story-viewer' as any, params: { highlightId: item.id } });
+              }}
+            />
+          </View>
+        ) : undefined}
         stats={stats}
         statsLoading={!apiLoaded}
         actions={actions}
