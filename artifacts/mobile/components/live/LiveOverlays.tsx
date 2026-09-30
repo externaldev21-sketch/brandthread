@@ -343,14 +343,15 @@ export const LiveHeartLayer = forwardRef<LiveHeartLayerHandle, { originOffset?: 
 // ─── Comment bar (bottom) ────────────────────────────────────────────────────
 
 export function LiveCommentBar({
-  onSend, disabled, onGift, onShare,
+  onSend, disabled, onGift, onShare, onMore,
 }: {
   onSend: (text: string) => Promise<void> | void;
   disabled?: boolean;
   /** Quick icons to the right of the pill, TikTok-style (gift/Thread Cash,
-   *  share) — omitted has no effect on the pill itself. */
+   *  share, report/block overflow) — each omitted has no effect on the pill itself. */
   onGift?: () => void;
   onShare?: () => void;
+  onMore?: () => void;
 }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -394,6 +395,11 @@ export function LiveCommentBar({
       {onShare && (
         <Pressable onPress={onShare} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Share this live" hitSlop={4} testID="live-comment-share">
           <Feather name="share" size={22} color="#fff" />
+        </Pressable>
+      )}
+      {onMore && (
+        <Pressable onPress={onMore} style={styles.quickIconBtn} accessibilityRole="button" accessibilityLabel="Live stream options" hitSlop={4} testID="live-comment-more">
+          <Feather name="more-horizontal" size={22} color="#fff" />
         </Pressable>
       )}
     </View>
