@@ -20,6 +20,8 @@ import { rateLimit } from "../middlewares/rateLimit";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
 import { getForYouFeed, applyEventToProfile, type ForYouResultItem } from "../lib/ranking/forYou";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { serveSponsoredSlots } from "../lib/promotions/sponsoredService";
+import { injectSponsored } from "../lib/promotions/sponsored";
 
 const router = Router();
 
@@ -218,8 +220,29 @@ router.get("/for-you", requireAuth, async (req, res) => {
       };
     }).filter((i): i is NonNullable<typeof i> => i !== null);
 
+    // Sponsored placement (opt-in via ?sessionId=): approved, paid boosts are
+    // spliced in as clearly labelled items under the frequency cap. Failure
+    // never affects the organic page.
+    let outItems: unknown[] = items;
+    const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "";
+    if (/^[A-Za-z0-9_-]{8,64}$/.test(sessionId)) {
+      try {
+        const slots = await serveSponsoredSlots({ viewerId: userId, sessionId, organicOffset: offset, organicCount: items.length });
+        if (slots.length > 0) {
+          const sponsoredPostIds = new Set(slots.map((s) => s.post.id));
+          const organic = items.filter((i) => !(i.type === "post" && sponsoredPostIds.has(i.id)));
+          outItems = injectSponsored(organic, slots.map((s) => ({
+            afterIndex: Math.min(s.afterIndex, organic.length - 1),
+            item: { type: "post" as const, ...s.post, sponsored: true, boostId: s.boostId, label: "Sponsored" as const, score: 0 },
+          })));
+        }
+      } catch (err) {
+        req.log.error({ err, userId }, "Failed to inject sponsored items");
+      }
+    }
+
     res.json({
-      items,
+      items: outItems,
       nextOffset: offset + slice.length < ranked.length ? offset + slice.length : null,
     });
   } catch (err) {
