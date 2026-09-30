@@ -628,7 +628,7 @@ export default function SellerHomeCommerceDashboard({
             <View style={styles.errorBanner} testID="seller-dashboard-error">
               <Feather name="alert-circle" size={16} color={theme.error} />
               <Text style={[styles.errorText, { color: theme.error }]}>Couldn’t load your dashboard.</Text>
-              <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} accessibilityRole="button" accessibilityLabel="Retry loading the dashboard">
+              <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel="Retry loading the dashboard">
                 <Text style={[styles.retryText, { color: theme.accent }]}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -740,7 +740,7 @@ export default function SellerHomeCommerceDashboard({
                   <View style={[isTablet && styles.tabletRowItem, styles.errorBanner]}>
                     <Feather name="alert-circle" size={16} color={theme.error} />
                     <Text style={[styles.errorText, { color: theme.error }]}>Some dashboard data couldn’t load.</Text>
-                    <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} accessibilityRole="button" accessibilityLabel="Retry loading dashboard data">
+                    <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }} accessibilityRole="button" accessibilityLabel="Retry loading dashboard data">
                       <Text style={[styles.retryText, { color: theme.accent }]}>Retry</Text>
                     </TouchableOpacity>
                   </View>
@@ -839,7 +839,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   topBarAction: { width: 44, height: 44, marginRight: -SP.sm },
-  screenTitle: { fontFamily: FONT.bold, fontSize: 20, letterSpacing: -0.4 },
+  screenTitle: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.4 },
 
   heroSkeleton: { paddingTop: SP.md },
 
@@ -852,7 +852,7 @@ const styles = StyleSheet.create({
   },
   heroValue: {
     fontFamily: FONT.bold,
-    fontSize: 52,
+    fontSize: FS.h1,
     letterSpacing: -1.2,
     marginTop: 2,
     fontVariant: ['tabular-nums'],
@@ -886,7 +886,7 @@ const styles = StyleSheet.create({
   balanceLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.6 },
   balanceValue: { fontFamily: FONT.bold, fontSize: FS.lg, marginTop: 2, fontVariant: ['tabular-nums'] },
   withdrawButton: {
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: SP.md,
     borderRadius: RADIUS.md,
     alignItems: 'center',
