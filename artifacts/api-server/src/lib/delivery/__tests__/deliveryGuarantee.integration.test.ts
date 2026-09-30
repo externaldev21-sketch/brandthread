@@ -50,10 +50,11 @@ import { db, notificationsFeed, orderItems, orders, products, returns } from "@w
 import { and, eq, sql } from "drizzle-orm";
 import { fake } from "../../money/__tests__/fakeStripe";
 import {
-  call, expectLedgerBalanced, pay, reloadOrder, seedBuyer, seedProduct, seedSeller, startApp, uid,
+  buyLabel, call, expectLedgerBalanced, ledgerKinds, pay, reloadOrder, seedBuyer, seedProduct, seedSeller, startApp, uid,
 } from "../../money/__tests__/moneyHarness";
 import { logger } from "../../logger";
 import { sweepTransferOrders } from "../../money/cartTransfers";
+import { recoverLabelCost } from "../../money/escrow";
 import { applyDisputePause } from "../disputePause";
 import { runAutoRefundSweep, runDeadlineWarnings } from "../autoRefund";
 import { applyShippoTrack } from "../trackingSync";
@@ -442,6 +443,21 @@ describe("hold-until-delivered payout", () => {
     } finally {
       process.env.PAYOUT_MODE = "hold";
     }
+  });
+
+  it("pays a shipping label from the order's held funds: the platform fronts nothing and the transfer is net of it", async () => {
+    const { order, seller } = await place();
+    const label = await buyLabel(order.id, seller, 800);
+    const tracking = await ship(order.id);
+    await carrierDelivers(order.id, tracking, at(4));
+
+    expect(await ledgerKinds(order.id)).toContain("label_paid_from_held");
+    expect(await ledgerKinds(order.id)).not.toContain("label_advanced");
+    expect(await recoverLabelCost(label.id)).toBe("skipped"); // nothing to claw back from the seller
+
+    expect(await sweepTransferOrders({ now: at(7, 1) })).toBe(1);
+    expect(fake.state.transfers[0].amount).toBe(order.sellerNetCents - 800);
+    expect(fake.state.reversals).toHaveLength(0);
   });
 
   it("an auto-refund after a release would claw back from the seller — which hold mode prevents", async () => {

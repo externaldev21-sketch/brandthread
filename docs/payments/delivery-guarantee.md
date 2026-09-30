@@ -39,7 +39,7 @@ Dev's rule, verbatim: *"For a regular order, if it's not pre-order, it should on
 
 ### Buyer — `GET /api/buyer/orders` and `GET /api/buyer/orders/:id`
 
-Both add `delivery` to every order. Items (detail) add `deliveredAt`, `refundedAt`, `trackingNumber`.
+Both add `delivery` to every order (the list version has `events: []`; the scan history loads with the detail). Items (detail) add `deliveredAt`, `refundedAt`, `trackingNumber`.
 
 ```ts
 delivery: {
@@ -75,3 +75,50 @@ Flat fields on each order: `deliverBy`, `isPreorder`, `promisedShipDate`, `deliv
 ### Listing a pre-order
 
 `POST/PATCH /api/products` with `isPreOrder: true` requires a future `preOrderEstShipDate` → `400 { code: "PREORDER_SHIP_DATE_REQUIRED" }`.
+
+## Architecture
+
+```
+checkout paid (webhook) ──► stampDeliveryDeadlines        orders.deliver_by, order_items.deliver_by
+                            recordOrderPaid (transfer)    funds_state = held, nothing paid to the seller
+seller adds tracking ─────► order + item tracking_number; Shippo registerTrack (webhook push)
+Shippo webhook / hourly poll ─► applyCarrierTracking ─► order_tracking_events, statuses, ETA,
+                                                        buyer pushes (out for delivery, exception)
+                              └─ DELIVERED ─► recordDelivery ─► order delivered, payout_release_at = +buffer
+buyer "I received it" ────► recordDelivery (source = buyer)
+every 10 min (jobs/deliveryDeadlines.ts):
+   pollShippedOrders ─► runAutoRefundSweep ─► runDeadlineWarnings
+every 5 min (jobs/moneySweep.ts):
+   sweepTransferOrders / sweepOrderReleases  (only orders past payout_release_at, no dispute, no open return)
+```
+
+* `lib/delivery/policy.ts` pure rules and config; `deliveryState.ts` DB transitions; `autoRefund.ts` refund + warning sweeps; `trackingSync.ts` Shippo mapping/poll; `payoutGate.ts` the hold rule (TS + SQL twin); `disputePause.ts`; `notifications.ts`; `buyerView.ts` the buyer `delivery` object.
+* Carrier tracking uses the **existing Shippo integration** (`lib/shippo.ts`, API key held by the connector proxy, never the client). Register Shippo's `track_updated` webhook at `POST /api/webhooks/shippo` (set `SHIPPO_WEBHOOK_SECRET` and pass it as `?secret=`); the hourly poll covers a missed webhook and carriers Shippo can't map (then only the buyer's confirmation or the deadline refund applies).
+* The refund goes through `refundOrder` (the same path as buyer/seller cancellations and failed drops): order-row lock, `order_refunds` row in `processing`, Stripe idempotency key `order-refund/<refundId>/<attempt>`, ledger posted exactly once, Thread Cash returned, loyalty points reversed.
+
+## Edge cases
+
+| Case | Behaviour |
+|---|---|
+| Cancelled / already refunded | Skipped by the sweep (status `cancelled`/`delivered`, `funds_state = refunded`). |
+| Buyer or seller cancels mid-flight (`refund_pending`) | Left alone, unless it is the auto-refund's own unconfirmed refund, which the sweep retries with the same key. |
+| Return | A return is for delivered goods, so it never touches the auto-refund; an **open** return (`pending`/`approved`) blocks the seller payout until it resolves. |
+| Dispute | `charge.dispute.created/updated` sets `orders.dispute_paused_at`; the sweep skips the order and the payout is withheld. `won` / `warning_closed` lifts it; `lost` keeps it (the bank already returned the money). |
+| Lost tracking | Nothing is marked delivered, so the deadline refund fires on schedule; before refunding, the carrier is polled one last time. |
+| Carrier exception / returned to sender | Buyer is notified; the deadline still applies. |
+| Refund to original payment method | Stripe refunds the PaymentIntent, i.e. back to the buyer's card. Thread Cash spent on the order is returned to their Thread Cash wallet. |
+| Multi-seller carts | One order per seller (already the case), each with its own `deliver_by`, refund and payout. |
+| Mixed regular + pre-order in one order | Per-item deadlines: the regular items are refunded at day 15, the pre-order items at day 60, sum = exactly what was charged. |
+| Pre-order drops (`held` model) | Orders released on delivery + buffer instead of on tracking entry. A drop's production deadline no longer refunds an order that is already shipped; that order's own 60-day guarantee applies. |
+| Shipping labels | In hold mode a label is paid from the order's held money (`label_paid_from_held`), so the platform never fronts it and the transfer is net of it. |
+| Time zones | Deadlines are absolute instants (`paid_at + N×24h`), immune to DST and server zone. The app shows the date in the viewer's local zone; pushes use the recipient's `quiet_hours_timezone` (UTC if unset). |
+| Seller declares "delivered" | Refused (`DELIVERY_NOT_SELLER_CONFIRMED`). |
+| Seller ships after the auto-refund | Refused (`AUTO_REFUNDED`). |
+
+## Operating it
+
+* Kill switches: `AUTO_REFUND_ENABLED=false` stops the refund sweep; `PAYOUT_MODE=immediate` restores instant seller payouts for **new** orders.
+* Stuck refunds: look for the error log `ALERT: automatic non-delivery refund keeps failing` (`alert: "auto_refund_stuck"`, reported to Sentry) or `orders.auto_refund_attempts >= 3`; `auto_refund_last_error` has the reason. The sweep keeps retrying every 6 hours with the same idempotency key, so a human fix (e.g. reconnecting Stripe) is enough.
+* Money safety check: with `PAYOUT_MODE=hold`, `SELECT id FROM orders WHERE deliver_by IS NOT NULL AND delivered_at IS NULL AND stripe_transfer_id IS NOT NULL` must always be empty.
+* Orders created before migration 110 have `deliver_by IS NULL` and are untouched.
+* Needs Dev's confirmation: HOLD delays every seller's payout until delivery + 3 days (up to ~18 days for a regular order, more for a pre-order), and the platform's Stripe balance must cover those held amounts. The default can be flipped with `PAYOUT_MODE` and the buffer tuned with `PAYOUT_RELEASE_BUFFER_DAYS`. Confirm with Stripe how long a platform may keep a charge's funds before transferring them (see the same caveat in money-flow.md §8).

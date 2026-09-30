@@ -219,6 +219,7 @@ export async function runMoneySweep(now = new Date()): Promise<{
     WHERE o.charge_model IN ('destination', 'transfer') AND l.status = 'active'
       AND EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label/' || l.id)
       AND NOT EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label-recovery/' || l.id)
+      AND NOT EXISTS (SELECT 1 FROM ledger_transactions t WHERE t.idempotency_key = 'label/' || l.id AND t.kind = 'label_paid_from_held')
     LIMIT 100
   `));
   for (const label of unrecovered) await recoverLabelCost(label.id);

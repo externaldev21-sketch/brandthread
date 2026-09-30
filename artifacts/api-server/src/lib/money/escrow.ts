@@ -684,8 +684,27 @@ export async function recordLabelPurchased(executor: DbExecutor, input: {
     if (posted) await adjustWallet(executor, input.dropId, { reserved: -input.priceCents, released: input.priceCents });
     return;
   }
-  // "transfer" orders (one-page checkout) were also already paid out to the
-  // seller, by our own transfer instead of a destination charge.
+  // A "transfer" order whose seller transfer hasn't gone out yet
+  // (hold-until-delivered, the default): pay the label from that order's own
+  // held money, like a held preorder. The platform never fronts it, and the
+  // eventual transfer is simply the net of the label.
+  if (input.chargeModel === "transfer" && await transferStillHeld(executor, input.orderId)) {
+    await postLedgerTransaction(executor, {
+      idempotencyKey: `label/${input.labelId}`,
+      kind: "label_paid_from_held",
+      sellerId: input.sellerId,
+      orderId: input.orderId,
+      memo: "Shipping label paid from this order's held funds (seller is paid after delivery)",
+      postings: [
+        { account: "seller_held", partyId: input.sellerId, amountCents: -input.priceCents },
+        { account: "shipping_carrier", amountCents: input.priceCents },
+      ],
+    });
+    return;
+  }
+  // "transfer" orders (one-page checkout) already paid out to the seller
+  // (PAYOUT_MODE=immediate, or orders from before hold-until-delivered) were
+  // paid by our own transfer instead of a destination charge.
   if (input.chargeModel === "destination" || input.chargeModel === "transfer") {
     await postLedgerTransaction(executor, {
       idempotencyKey: `label/${input.labelId}`,
@@ -701,6 +720,19 @@ export async function recordLabelPurchased(executor: DbExecutor, input: {
   }
 }
 
+async function transferStillHeld(executor: DbExecutor, orderId: string): Promise<boolean> {
+  const [order] = rows<{ funds_state: string | null; stripe_transfer_id: string | null }>(await executor.execute(sql`
+    SELECT funds_state, stripe_transfer_id FROM orders WHERE id = ${orderId}::uuid
+  `));
+  return order?.funds_state === "held" && !order.stripe_transfer_id;
+}
+
+async function labelWasPaidFromHeld(executor: DbExecutor, labelId: string): Promise<boolean> {
+  return rows(await executor.execute(sql`
+    SELECT 1 FROM ledger_transactions WHERE idempotency_key = ${`label/${labelId}`} AND kind = 'label_paid_from_held'
+  `)).length > 0;
+}
+
 /** The carrier refunded a voided label: undo exactly what the purchase did. */
 export async function recordLabelVoided(executor: DbExecutor, input: {
   labelId: string;
@@ -712,6 +744,20 @@ export async function recordLabelVoided(executor: DbExecutor, input: {
 }): Promise<void> {
   const purchased = await accountBalanceCents(executor, { account: "shipping_carrier", orderId: input.orderId });
   if (purchased <= 0 || input.priceCents <= 0) return;
+  if (!input.dropId && await labelWasPaidFromHeld(executor, input.labelId)) {
+    await postLedgerTransaction(executor, {
+      idempotencyKey: `label-void/${input.labelId}`,
+      kind: "label_void_to_held",
+      sellerId: input.sellerId,
+      orderId: input.orderId,
+      memo: "Voided label refunded back to this order's held funds",
+      postings: [
+        { account: "shipping_carrier", amountCents: -input.priceCents },
+        { account: "seller_held", partyId: input.sellerId, amountCents: input.priceCents },
+      ],
+    });
+    return;
+  }
   if (input.chargeModel === "held" && input.dropId) {
     const { posted } = await postLedgerTransaction(executor, {
       idempotencyKey: `label-void/${input.labelId}`,
@@ -759,6 +805,8 @@ export async function recoverLabelCost(
     WHERE l.id = ${labelId}::uuid
   `));
   if (!label || (label.charge_model !== "destination" && label.charge_model !== "transfer") || label.status !== "active") return "skipped";
+  // Paid from the order's held funds: nothing to recover from the seller.
+  if (await labelWasPaidFromHeld(db, labelId)) return "skipped";
   const done = rows(await db.execute(sql`
     SELECT 1 FROM ledger_transactions WHERE idempotency_key = ${`label-recovery/${labelId}`}
   `));
