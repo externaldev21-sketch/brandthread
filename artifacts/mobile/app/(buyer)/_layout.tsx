@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Tabs } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Tabs, usePathname } from 'expo-router';
 import { useWindowDimensions } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { useColors } from '@/hooks/useColors';
+import { useSettled } from '@/lib/animationUtils';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
 import { BuyerTabBar } from '@/components/buyer-nav/BuyerTabBar';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
@@ -20,7 +21,8 @@ import { getPreviewConversations, getPreviewNotifications } from '@/lib/previewI
 // Activity, Profile) so that order, not just tab-bar visual position, is
 // what decides slide direction.
 import {
-  SLIDE_TRANSITION_SPEC, REDUCED_MOTION_TRANSITION_SPEC, forDirectionalSlide, forReducedMotionCrossfade,
+  SLIDE_TRANSITION_SPEC, REDUCED_MOTION_TRANSITION_SPEC, SLIDE_DURATION, REDUCED_MOTION_SLIDE_DURATION,
+  forDirectionalSlide, forReducedMotionCrossfade,
 } from '@/lib/tabSlideTransition';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
@@ -35,6 +37,31 @@ function BuyerTabLayout() {
   const [inboxBadgeCount, setInboxBadgeCount] = useState(0);
   const { width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
+
+  // Blurry-text fix: drop the slide's `transform` once a tab switch has
+  // settled, so the resting (focused) screen's full-screen wrapper carries
+  // no transform at all instead of a permanent identity matrix — see
+  // forDirectionalSlide's `settled` param in lib/tabSlideTransition.ts and
+  // lib/animationUtils.ts's useSettled/identityOrNone doc. Starts settled
+  // (true) since nothing has switched yet on mount. Same pattern as the
+  // seller tab layout (app/(tabs)/_layout.tsx) — kept in sync there too.
+  const pathname = usePathname();
+  const settled = useSettled(true);
+  const prevPathnameRef = useRef(pathname);
+  if (prevPathnameRef.current !== pathname) {
+    // Unsettle synchronously during render (not in an effect) so this
+    // render's sceneStyleInterpolator already wires up the live animated
+    // interpolation before the Tabs navigator's own effect starts the
+    // transitionSpec animation — an effect-based unsettle would race that.
+    prevPathnameRef.current = pathname;
+    settled.unsettle();
+  }
+  useEffect(() => {
+    if (settled.value) return;
+    const duration = reduceMotion ? REDUCED_MOTION_SLIDE_DURATION : SLIDE_DURATION;
+    const timer = setTimeout(() => settled.settleImmediately(), duration);
+    return () => clearTimeout(timer);
+  }, [settled.value, settled.settleImmediately, reduceMotion]);
 
   const loadBadgeCount = useCallback(async () => {
     try {
@@ -98,7 +125,7 @@ function BuyerTabLayout() {
         // detachInactiveScreens/freezeOnBlur below), so this is purely a
         // visual transition, not a remount.
         transitionSpec: reduceMotion ? REDUCED_MOTION_TRANSITION_SPEC : SLIDE_TRANSITION_SPEC,
-        sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width),
+        sceneStyleInterpolator: reduceMotion ? forReducedMotionCrossfade : forDirectionalSlide(width, settled.value),
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
