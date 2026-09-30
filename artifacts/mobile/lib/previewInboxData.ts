@@ -196,6 +196,10 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantInitials: 'MV',
     participantColor: pickAvatarColor('preview-seller-02'),
     posterIndex: 1,
+    // Seeded already-pinned (in addition to the always-pinned agent thread)
+    // so the preview inbox has more than one pinned row to screenshot the
+    // pinned-row treatment against — see item 66's PR.
+    isPinned: true,
     lastMessage: 'Thank you so much — enjoy the dress!',
     lastMessageFromMe: false,
     minutesAgo: 130,
@@ -267,6 +271,7 @@ export const PREVIEW_CONVERSATION_SEEDS: PreviewConversationSeed[] = [
     participantInitials: 'KL',
     participantColor: pickAvatarColor('preview-seller-05'),
     posterIndex: 4,
+    isPinned: true,
     lastMessage: 'Order #BT-10234',
     // The order card is sent BY the seller (Kuro Line) — only a seller can
     // attach their linked order to a reply (see attachLinkedOrder() in

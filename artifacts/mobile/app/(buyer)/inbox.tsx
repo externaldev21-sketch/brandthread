@@ -1212,9 +1212,29 @@ export default function InboxScreen() {
                 right-aligned to the same edge (Threads style). No numeric
                 badge, no chevron. */}
             <View style={s.convTrailing}>
-              {conv.lastMessageTs ? (
-                <Text style={[s.convTime, { color: theme.muted, marginLeft: 0 }]} numberOfLines={1}>{timeAgo(conv.lastMessageTs)}</Text>
-              ) : null}
+              <View style={s.convTrailingTopRow}>
+                {/* Pinned marker (item 66) — WhatsApp-style: a small, muted
+                    glyph on the row itself rather than a separate "Pinned"
+                    section/header (see this PR's Mobbin citation). Reuses
+                    the exact same Feather icon as item 62's swipe > Pin
+                    action for visual consistency. isPinned is real per-
+                    viewer state (conversationParticipants.pinnedAt) and is
+                    always true for the official Brandthread Agent thread
+                    too, so that row picks up the same glyph here rather
+                    than looking inconsistent with genuinely pinned rows. */}
+                {conv.isPinned ? (
+                  <Feather
+                    name="bookmark"
+                    size={11}
+                    color={theme.muted}
+                    style={s.pinGlyph}
+                    testID={`inbox-pinned-badge-${conv.id}`}
+                  />
+                ) : null}
+                {conv.lastMessageTs ? (
+                  <Text style={[s.convTime, { color: theme.muted, marginLeft: 0 }]} numberOfLines={1}>{timeAgo(conv.lastMessageTs)}</Text>
+                ) : null}
+              </View>
               {isUnread ? (
                 <View style={[s.unreadDotTrailing, { backgroundColor: theme.accent }]} testID={`inbox-unread-badge-${conv.id}`} />
               ) : null}
@@ -2211,6 +2231,17 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     justifyContent: 'center',
     gap: 6,
     marginLeft: SP.sm,
+  },
+  // Pin glyph (item 66) sits inline before the timestamp, right-aligned
+  // with it as a single unit — matches the WhatsApp reference's small
+  // trailing-edge pin glyph rather than a separate section/divider.
+  convTrailingTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pinGlyph: {
+    marginTop: 1,
   },
   convPreview: {
     fontSize: 14,

@@ -567,6 +567,43 @@ describe('buyer inbox', () => {
     expect(pinAction().findByType('Text' as never).props.children).toBe('Pin');
   });
 
+  it('shows the pinned-row glyph only on pinned conversations (item 66)', async () => {
+    const convs: ConversationFixture[] = [
+      conversation('pinned-row', 0, { isPinned: true }),
+      conversation('unpinned-row', 0, { isPinned: false }),
+    ];
+    getConversationsMock.mockResolvedValue(convs);
+    renderer = await renderScreen();
+
+    expect(renderer!.root.findAllByProps({ testID: 'inbox-pinned-badge-pinned-row' }).length).toBe(1);
+    expect(renderer!.root.findAllByProps({ testID: 'inbox-pinned-badge-unpinned-row' }).length).toBe(0);
+  });
+
+  it('adds the pinned-row glyph once a conversation is pinned via the swipe action', async () => {
+    const convs: ConversationFixture[] = [conversation('pin-glyph-thread', 0, { isPinned: false })];
+    getConversationsMock.mockResolvedValue(convs);
+    renderer = await renderScreen();
+
+    expect(renderer!.root.findAllByProps({ testID: 'inbox-pinned-badge-pin-glyph-thread' }).length).toBe(0);
+
+    await act(async () => {
+      renderer!.root.findByProps({ testID: 'inbox-swipe-pin-pin-glyph-thread' }).props.onPress();
+      await flushPromises();
+    });
+
+    expect(renderer!.root.findAllByProps({ testID: 'inbox-pinned-badge-pin-glyph-thread' }).length).toBe(1);
+  });
+
+  it('shows the pinned glyph on the always-pinned official Brandthread Agent row too', async () => {
+    const convs: ConversationFixture[] = [
+      conversation('agent-thread', 0, { isPinned: true, isOfficial: true }),
+    ];
+    getConversationsMock.mockResolvedValue(convs);
+    renderer = await renderScreen();
+
+    expect(renderer!.root.findAllByProps({ testID: 'inbox-pinned-badge-agent-thread' }).length).toBe(1);
+  });
+
   it('shows a skeleton while loading, then a CTA empty state once loaded empty', async () => {
     let resolveConvs!: (value: ConversationFixture[]) => void;
     const pending = new Promise<ConversationFixture[]>((resolve) => { resolveConvs = resolve; });
