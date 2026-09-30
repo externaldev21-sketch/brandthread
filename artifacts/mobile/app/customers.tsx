@@ -127,6 +127,8 @@ export default function CustomersScreen() {
             hitSlop={10}
             activeOpacity={0.7}
             style={[styles.analyticsBtnHdr, { borderColor: colors.border, backgroundColor: colors.card }]}
+            accessibilityRole="button"
+            accessibilityLabel="View customer analytics"
           >
             <Feather name="bar-chart-2" size={18} color={colors.foreground} />
           </TouchableOpacity>
@@ -275,17 +277,20 @@ const styles = StyleSheet.create({
   pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
   statsRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
   stat: { flex: 1, borderRadius: 12, padding: 10, borderWidth: 1, alignItems: 'center', gap: 3 },
-  statVal: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  statVal: { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
   statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
-  analyticsBtnHdr: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  // 44x44: matches ScreenHeader's own actionBtn convention and the minimum
+  // comfortable touch target (was 36x36 with only hitSlop making up the
+  // difference, which the audit can't verify from the DOM).
+  analyticsBtnHdr: { width: 44, height: 44, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   loyaltyCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 16 },
   loyaltyLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  loyaltyTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  loyaltyTitle: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold' },
   loyaltySub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   loyaltyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   loyaltyBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   searchWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, marginBottom: 12 },
-  searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  searchInput: { flex: 1, fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
   segments: { marginBottom: 16 },
   sortRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   segChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
@@ -293,9 +298,9 @@ const styles = StyleSheet.create({
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   custRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  avatarText: { fontSize: FS.sm, fontFamily: 'Inter_700Bold' },
   custInfo: { flex: 1, gap: 2 },
-  custName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  custName: { fontSize: FS.sm, fontFamily: 'Inter_600SemiBold' },
   custEmail: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   custOrders: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   custRight: { alignItems: 'flex-end', justifyContent: 'center' },
@@ -305,6 +310,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
   rewardRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   rewardIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  rewardLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  rewardLabel: { flex: 1, fontSize: FS.sm, fontFamily: 'Inter_400Regular' },
   rewardVal: { fontSize: 13, fontFamily: 'Inter_500Medium' },
 });

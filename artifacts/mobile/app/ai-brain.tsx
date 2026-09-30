@@ -168,7 +168,7 @@ function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
 
       {status === 'applied' && (
         <View style={styles.actionAppliedRow}>
-          <Feather name="check-circle" size={14} color={colors.success} />
+          <Feather name="check-circle" size={14} color={colors.foreground} />
           <Text style={styles.actionAppliedText}>Applied</Text>
           {card.canUndo && (
             <TouchableOpacity onPress={() => onUndo(msg.id)} activeOpacity={0.7}>
@@ -1118,8 +1118,10 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     gap: 6,
     marginTop: 10,
   },
+  // Monochrome only — no green "success" accent here; it isn't one of
+  // the app's 3 allowed color accents.
   actionAppliedText: {
-    color: colors.success,
+    color: colors.foreground,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
     flex: 1,
