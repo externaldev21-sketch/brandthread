@@ -894,7 +894,12 @@ function writeMarkdown(summary, flat, results = []) {
   lines.push('');
   lines.push('## Notes on this run');
   lines.push('');
-  lines.push('This is a time-budgeted pass, not full coverage — see `routesAudited` vs `routesDiscovered` above. One caveat found while producing it:');
+  const fullyCovered = !summary.interrupted && summary.routesAudited >= summary.routesDiscovered * 4;
+  lines.push(
+    fullyCovered
+      ? 'This run has full coverage: every route × role × data-state combination discovered was audited. One caveat found while producing it:'
+      : 'This is a time-budgeted pass, not full coverage — see `routesAudited` vs `routesDiscovered` above. One caveat found while producing it:',
+  );
   lines.push('');
   lines.push('- **Group-root layouts under the "wrong" role are expected unreachable, not bugs**: `/(tabs)` is the seller tab root and `/(buyer)` is the buyer tab root — a `/(tabs)` load under `?bt_preview=buyer` (or vice versa) correctly renders nothing, the same way a signed-in buyer account would never land on the seller shell. Do not treat those specific role/route pairings in the Unreachable table below as findings.');
   lines.push('');

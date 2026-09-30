@@ -1732,46 +1732,6 @@
       "shotDir": "docs/audit/screenshots/sign-in/buyer"
     },
     {
-      "route": "/splash",
-      "role": "seller",
-      "dataState": "fresh",
-      "file": "app/splash.tsx",
-      "reachable": false,
-      "unreachableReason": "blank page body",
-      "findings": [],
-      "shotDir": "docs/audit/screenshots/splash/seller"
-    },
-    {
-      "route": "/splash",
-      "role": "seller",
-      "dataState": "demo",
-      "file": "app/splash.tsx",
-      "reachable": false,
-      "unreachableReason": "blank page body",
-      "findings": [],
-      "shotDir": "docs/audit/screenshots/splash/seller"
-    },
-    {
-      "route": "/splash",
-      "role": "buyer",
-      "dataState": "fresh",
-      "file": "app/splash.tsx",
-      "reachable": false,
-      "unreachableReason": "blank page body",
-      "findings": [],
-      "shotDir": "docs/audit/screenshots/splash/buyer"
-    },
-    {
-      "route": "/splash",
-      "role": "buyer",
-      "dataState": "demo",
-      "file": "app/splash.tsx",
-      "reachable": false,
-      "unreachableReason": "blank page body",
-      "findings": [],
-      "shotDir": "docs/audit/screenshots/splash/buyer"
-    },
-    {
       "route": "/store/product/prod_nl_jacket_rust",
       "role": "seller",
       "dataState": "fresh",
@@ -2742,6 +2702,152 @@
         }
       ],
       "shotDir": "docs/audit/screenshots/store-from-moodboard/buyer"
+    },
+    {
+      "route": "/splash",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/splash.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/splash/seller"
+    },
+    {
+      "route": "/splash",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/splash.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/splash/seller"
+    },
+    {
+      "route": "/splash",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/splash.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/splash/buyer"
+    },
+    {
+      "route": "/splash",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/splash.tsx",
+      "reachable": false,
+      "unreachableReason": "blank page body",
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/splash/buyer"
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-09-30T07:54:57.557Z",
-  "interrupted": true,
+  "interrupted": false,
   "routesDiscovered": 267,
   "results": [
     {
@@ -2989,6 +2989,1612 @@
       "unreachableReason": null,
       "findings": [],
       "shotDir": "docs/audit/screenshots/-tabs-feed/seller"
+    },
+    {
+      "route": "/(tabs)/feed",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/feed.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "34x34px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "34x34px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "60x25px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "52x25px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-feed/seller"
+    },
+    {
+      "route": "/(tabs)/feed",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/feed.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-feed/buyer"
+    },
+    {
+      "route": "/(tabs)/feed",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/feed.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "34x34px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "34x34px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "60x25px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "52x25px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-feed/buyer"
+    },
+    {
+      "route": "/(tabs)/following",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/following.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"0 orders placed so far.\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Following\"",
+          "text": "Following"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"0 orders placed so far.\"",
+          "text": "0 orders placed so far."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Shop drop\"",
+          "text": "Shop drop"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Field Office\"",
+          "text": "Field Office"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"0 orders placed so far.\"",
+          "text": "0 orders placed so far."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"View drop\"",
+          "text": "View drop"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.40:1 (need 4.5:1) for \"Live now\" — rgb(255, 255, 255) on rgba(127, 240, 176, 0.8)",
+          "text": "Live now"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-following/seller"
+    },
+    {
+      "route": "/(tabs)/following",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/following.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/-tabs-following/seller"
+    },
+    {
+      "route": "/(tabs)/following",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/following.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-following/buyer"
+    },
+    {
+      "route": "/(tabs)/following",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/following.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-following/buyer"
+    },
+    {
+      "route": "/(tabs)",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/index.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/-tabs-/seller"
+    },
+    {
+      "route": "/(tabs)",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/index.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/-tabs-/seller"
+    },
+    {
+      "route": "/(tabs)",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/index.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-/buyer"
+    },
+    {
+      "route": "/(tabs)",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/index.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-/buyer"
+    },
+    {
+      "route": "/(tabs)/marketing",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/marketing.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/-tabs-marketing/seller"
+    },
+    {
+      "route": "/(tabs)/marketing",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/marketing.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/-tabs-marketing/seller"
+    },
+    {
+      "route": "/(tabs)/marketing",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/marketing.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-marketing/buyer"
+    },
+    {
+      "route": "/(tabs)/marketing",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/marketing.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Marketing\"",
+          "text": "Marketing"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-marketing/buyer"
+    },
+    {
+      "route": "/(tabs)/more",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/more.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/-tabs-more/seller"
+    },
+    {
+      "route": "/(tabs)/more",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/more.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/-tabs-more/seller"
+    },
+    {
+      "route": "/(tabs)/more",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/more.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/-tabs-more/buyer"
+    },
+    {
+      "route": "/(tabs)/more",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/more.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-more/buyer"
+    },
+    {
+      "route": "/(tabs)/orders",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/orders.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/-tabs-orders/seller"
+    },
+    {
+      "route": "/(tabs)/orders",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/orders.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(255, 213, 128) on \"NEW\"",
+          "text": "NEW"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Accept\"",
+          "text": "Accept"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Accept\"",
+          "text": "Accept"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Ready\"",
+          "text": "Ready"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "121x36px control \"Accept\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "121x36px control \"Accept\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x36px control \"Ready\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-orders/seller"
+    },
+    {
+      "route": "/(tabs)/orders",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/orders.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-orders/buyer"
+    },
+    {
+      "route": "/(tabs)/orders",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/orders.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(255, 213, 128) on \"NEW\"",
+          "text": "NEW"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Accept\"",
+          "text": "Accept"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Accept\"",
+          "text": "Accept"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Ready\"",
+          "text": "Ready"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "121x36px control \"Accept\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "121x36px control \"Accept\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x36px control \"Ready\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-orders/buyer"
+    },
+    {
+      "route": "/(tabs)/products",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/products.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(249, 115, 22) on \"Draft\"",
+          "text": "Draft"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(16, 185, 129) on \"Active\"",
+          "text": "Active"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-products/seller"
+    },
+    {
+      "route": "/(tabs)/products",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/products.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [],
+      "shotDir": "docs/audit/screenshots/-tabs-products/seller"
+    },
+    {
+      "route": "/(tabs)/products",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/products.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-products/buyer"
+    },
+    {
+      "route": "/(tabs)/products",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/products.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (71px into 62px): \"$220.00 +1\"",
+          "text": "$220.00 +1"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Drop 04 is live. Ember season, cut heavy and made to last.\"",
+          "text": "Drop 04 is live. Ember season, cut heavy and made to last."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 10px not on declared FS scale (nearest 11) on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "min-size-violation",
+          "severity": "warn",
+          "detail": "font-size 10px below the 11pt caption floor on \"3\"",
+          "text": "3"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x38px control \"NO\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "14x14px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"18.4K\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"612\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x44px control \"1,290\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "38x29px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "78x32px control \"ShopField Shell Jacket — Rust$220.00 +1\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "293x36px control \"Northline Studio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "215x24px control \"Original Sound · northlinestudio\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "92x18px control \"Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "84x18px control \"Threads\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x36px control \"3\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-products/buyer"
     }
   ]
 }

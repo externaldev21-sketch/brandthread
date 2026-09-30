@@ -1,11 +1,11 @@
 # Half-done audit report
 
-Generated 2026-09-30T07:55:12.404Z (partial run — time budget hit).
+Generated 2026-09-30T08:14:26.984Z.
 
 - Route files discovered: 267
-- Route × role combinations audited: 1037
-- Unreachable: 12
-- Total findings: 4768 (hard: 934, warn: 3834)
+- Route × role combinations audited: 1068
+- Unreachable: 1
+- Total findings: 5142 (hard: 934, warn: 4208)
 
 ## Scoreboard by area/owner
 
@@ -13,19 +13,19 @@ Each owning session's row — see `route-ownership.mjs`/`route-ownership.json` f
 
 | Area/owner | Hard | Warn | Routes | Zero-finding routes | Routes still failing |
 |---|---|---|---|---|---|
-| store+account (session 01Cdzzzi) | 258 | 847 | 60 | 0 | 60 |
-| seller commerce (session 011WGHYC) | 166 | 478 | 37 | 0 | 37 |
-| profiles+social (session 01MjTkyh) | 126 | 909 | 45 | 1 | 38 |
+| store+account (session 01Cdzzzi) | 258 | 950 | 62 | 0 | 59 |
+| seller commerce (session 011WGHYC) | 166 | 554 | 39 | 0 | 37 |
+| profiles+social (session 01MjTkyh) | 126 | 1001 | 46 | 0 | 38 |
 | buyer (session 01AaWLh1) | 110 | 596 | 39 | 0 | 33 |
-| growth (session 019SGXKf) | 98 | 292 | 24 | 0 | 23 |
+| growth (session 019SGXKf) | 98 | 353 | 26 | 0 | 23 |
 | design (session 01DgPbif) | 88 | 294 | 28 | 0 | 28 |
-| supply (session 01Lbcp8K) | 66 | 294 | 20 | 0 | 20 |
+| supply (session 01Lbcp8K) | 66 | 336 | 20 | 0 | 19 |
 | live (session 01Kp8Jgx) | 20 | 124 | 6 | 0 | 6 |
 | headers/tab bar/crawl (session 0193ZtXu) | 2 | 0 | 1 | 0 | 1 |
 
 ## Notes on this run
 
-This is a time-budgeted pass, not full coverage — see `routesAudited` vs `routesDiscovered` above. One caveat found while producing it:
+This run has full coverage: every route × role × data-state combination discovered was audited. One caveat found while producing it:
 
 - **Group-root layouts under the "wrong" role are expected unreachable, not bugs**: `/(tabs)` is the seller tab root and `/(buyer)` is the buyer tab root — a `/(tabs)` load under `?bt_preview=buyer` (or vice versa) correctly renders nothing, the same way a signed-in buyer account would never land on the seller shell. Do not treat those specific role/route pairings in the Unreachable table below as findings.
 
@@ -39,17 +39,17 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 | Type | Tier | Count |
 |---|---|---|
-| type-scale-drift | warn | 1702 |
-| hit-target-too-small | warn | 1148 |
+| type-scale-drift | warn | 1772 |
+| hit-target-too-small | warn | 1412 |
 | console-error | hard | 737 |
-| contrast-violation | warn | 399 |
-| clipped-text | warn | 182 |
-| overlapping-text | warn | 136 |
-| min-size-violation | warn | 124 |
+| contrast-violation | warn | 400 |
+| clipped-text | warn | 199 |
+| min-size-violation | warn | 141 |
+| overlapping-text | warn | 137 |
 | preview-demo-wording | hard | 104 |
 | font-family | warn | 92 |
 | placeholder-copy | hard | 72 |
-| color-rule-violation | warn | 51 |
+| color-rule-violation | warn | 55 |
 | error-boundary | hard | 17 |
 | repeated-labels | hard | 4 |
 
@@ -57,22 +57,11 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 
 | Route | Role | Data state | Reason |
 |---|---|---|---|
-| `/` | seller | fresh | blank page body |
-| `/` | seller | demo | blank page body |
-| `/` | buyer | fresh | blank page body |
-| `/` | buyer | demo | blank page body |
-| `/request-sample` | seller | fresh | blank page body |
-| `/request-sample` | seller | demo | blank page body |
-| `/request-sample` | buyer | fresh | blank page body |
-| `/request-sample` | buyer | demo | blank page body |
-| `/splash` | seller | fresh | blank page body |
-| `/splash` | seller | demo | blank page body |
-| `/splash` | buyer | fresh | blank page body |
 | `/splash` | buyer | demo | blank page body |
 
 ## Findings by area (audit-script grouping, not the owner scoreboard above)
 
-### Other (2737)
+### Other (2862)
 
 | Route | Role | Data state | Type | Tier | Detail | Screenshot |
 |---|---|---|---|---|---|---|
@@ -380,6 +369,311 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/integrations` | buyer | fresh | placeholder-copy | hard | Text matches placeholder pattern: "Coming soon" | [view](../../docs/audit/screenshots/integrations/buyer/00-initial.png) |
 | `/integrations` | buyer | fresh | placeholder-copy | hard | Text matches placeholder pattern: "Coming soon" | [view](../../docs/audit/screenshots/integrations/buyer/00-initial.png) |
 | `/integrations` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/integrations/buyer/00-initial.png) |
+
+### Seller dashboard / analytics (651)
+
+| Route | Role | Data state | Type | Tier | Detail | Screenshot |
+|---|---|---|---|---|---|---|
+| `/(tabs)/profile` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
+| `/(tabs)/profile` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
+| `/(tabs)/profile` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
+| `/(tabs)/profile` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
+| `/(tabs)/studio` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-studio/seller/00-initial.png) |
+| `/(tabs)/studio` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-studio/seller/00-initial.png) |
+| `/analytics-content` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-content/seller/00-initial.png) |
+| `/analytics-content` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-content/seller/00-initial.png) |
+| `/analytics-customers` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-customers/seller/00-initial.png) |
+| `/analytics-customers` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-customers/seller/00-initial.png) |
+| `/analytics-customers` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-customers/buyer/00-initial.png) |
+| `/analytics-customers` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-customers/buyer/00-initial.png) |
+| `/analytics-marketing` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-marketing/seller/00-initial.png) |
+| `/analytics-marketing` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-marketing/seller/00-initial.png) |
+| `/analytics-production` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-production/seller/00-initial.png) |
+| `/analytics-production` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-production/seller/00-initial.png) |
+| `/analytics-products` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/seller/00-initial.png) |
+| `/analytics-products` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/seller/00-initial.png) |
+| `/analytics-products` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/buyer/00-initial.png) |
+| `/analytics-products` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/buyer/00-initial.png) |
+| `/analytics-profit` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-profit` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
+| `/analytics-sales` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/seller/00-initial.png) |
+| `/analytics-sales` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/seller/00-initial.png) |
+| `/analytics-sales` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/buyer/00-initial.png) |
+| `/analytics-sales` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/buyer/00-initial.png) |
+| `/analytics-store` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
+| `/analytics-store` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
+| `/post-analytics` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/post-analytics/seller/00-initial.png) |
+| `/post-analytics` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/post-analytics/seller/00-initial.png) |
+| `/seller-conversation` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
+| `/seller-conversation` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
+| `/seller-data-export` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
+| `/seller-data-export` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
+| `/seller-drop-create` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
+| `/seller-drop-create` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
+| `/seller-drop-create` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
+| `/seller-drop-create` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
+| `/seller-drop-preview` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-preview/seller/00-initial.png) |
+| `/seller-drop-preview` | seller | fresh | console-error | hard | API 404: Not part of the demo data | [view](../../docs/audit/screenshots/seller-drop-preview/seller/00-initial.png) |
+| `/seller-drop-preview` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-preview/seller/00-initial.png) |
+| `/seller-drop-preview` | seller | demo | console-error | hard | API 404: Not part of the demo data | [view](../../docs/audit/screenshots/seller-drop-preview/seller/00-initial.png) |
+| `/seller-drop-preview` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-preview/buyer/00-initial.png) |
+| `/seller-drop-preview` | buyer | fresh | console-error | hard | API 404: Not part of the demo data | [view](../../docs/audit/screenshots/seller-drop-preview/buyer/00-initial.png) |
+| `/seller-drop-preview` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-preview/buyer/00-initial.png) |
+| `/seller-drop-preview` | buyer | demo | console-error | hard | API 404: Not part of the demo data | [view](../../docs/audit/screenshots/seller-drop-preview/buyer/00-initial.png) |
+| `/seller-drops` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drops/seller/00-initial.png) |
+| `/seller-drops` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drops/seller/00-initial.png) |
+| `/seller-drops` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drops/buyer/00-initial.png) |
+| `/seller-drops` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drops/buyer/00-initial.png) |
+| `/seller-go-live` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-go-live/seller/00-initial.png) |
+| `/seller-go-live` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-go-live/seller/00-initial.png) |
+| `/seller-inbox` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-inbox/seller/00-initial.png) |
+| `/seller-inbox` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-inbox/seller/00-initial.png) |
+| `/seller-live` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-live/seller/00-initial.png) |
+| `/seller-live` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-live/seller/00-initial.png) |
+| `/seller-profile` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-profile/seller/00-initial.png) |
+| `/seller-profile` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-profile/seller/00-initial.png) |
+| `/seller-reviews` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-reviews/seller/00-initial.png) |
+| `/seller-reviews` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-reviews/seller/00-initial.png) |
+| `/seller-reviews` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-reviews/buyer/00-initial.png) |
+| `/seller-reviews` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-reviews/buyer/00-initial.png) |
+| `/seller-settings` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-settings/seller/00-initial.png) |
+| `/seller-settings` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-settings/seller/00-initial.png) |
+| `/seller-settings` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-settings/buyer/00-initial.png) |
+| `/seller-settings` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-settings/buyer/00-initial.png) |
+| `/seller-verification` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-verification/seller/00-initial.png) |
+| `/seller-verification` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-verification/seller/00-initial.png) |
+| `/seller-verification` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-verification/buyer/00-initial.png) |
+| `/seller-verification` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-verification/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Analytics" | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "$0" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 12" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 13" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 14" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 15" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 16" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 17" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 18" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Analytics" | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "$0" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 12" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 13" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 14" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 15" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 16" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 17" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 18" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
+| `/(tabs)/feed` | seller | demo | hit-target-too-small | warn | 34x34px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/seller/00-initial.png) |
+| `/(tabs)/feed` | seller | demo | hit-target-too-small | warn | 34x34px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/seller/00-initial.png) |
+| `/(tabs)/feed` | seller | demo | hit-target-too-small | warn | 60x25px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/seller/00-initial.png) |
+| `/(tabs)/feed` | seller | demo | hit-target-too-small | warn | 52x25px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/seller/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 34x34px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 34x34px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 60x25px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/feed` | buyer | demo | hit-target-too-small | warn | 52x25px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-feed/buyer/00-initial.png) |
+| `/(tabs)/following` | seller | fresh | overlapping-text | warn | "0 orders placed so far." overlaps "2" | [view](../../docs/audit/screenshots/-tabs-following/seller/00-initial.png) |
+| `/(tabs)/following` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Following" | [view](../../docs/audit/screenshots/-tabs-following/seller/00-initial.png) |
+| `/(tabs)/following` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-following/seller/00-initial.png) |
+| `/(tabs)/following` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "0 orders placed so far." | [view](../../docs/audit/screenshots/-tabs-following/seller/00-initial.png) |
+| `/(tabs)/following` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Shop drop" | [view](../../docs/audit/screenshots/-tabs-following/seller/00-initial.png) |
+| `/(tabs)/following` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Field Office" | [view](../../docs/audit/screenshots/-tabs-following/seller/00-initial.png) |
+| `/(tabs)/following` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "0 orders placed so far." | [view](../../docs/audit/screenshots/-tabs-following/seller/00-initial.png) |
+| `/(tabs)/following` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "View drop" | [view](../../docs/audit/screenshots/-tabs-following/seller/00-initial.png) |
+| `/(tabs)/following` | seller | fresh | contrast-violation | warn | contrast 1.40:1 (need 4.5:1) for "Live now" — rgb(255, 255, 255) on rgba(127, 240, 176, 0.8) | [view](../../docs/audit/screenshots/-tabs-following/seller/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)/following` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-following/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/marketing` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Marketing" | [view](../../docs/audit/screenshots/-tabs-marketing/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/more` | buyer | demo | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-more/buyer/00-initial.png) |
+| `/(tabs)/orders` | seller | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "NEW" | [view](../../docs/audit/screenshots/-tabs-orders/seller/00-initial.png) |
+| `/(tabs)/orders` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/-tabs-orders/seller/00-initial.png) |
+| `/(tabs)/orders` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/-tabs-orders/seller/00-initial.png) |
+| `/(tabs)/orders` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Ready" | [view](../../docs/audit/screenshots/-tabs-orders/seller/00-initial.png) |
+| `/(tabs)/orders` | seller | demo | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/seller/00-initial.png) |
+| `/(tabs)/orders` | seller | demo | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/seller/00-initial.png) |
+| `/(tabs)/orders` | seller | demo | hit-target-too-small | warn | 115x36px control "Ready" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/seller/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | type-scale-drift | warn | font-size 10px not on declared FS scale (nearest 11) on "3" | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | min-size-violation | warn | font-size 10px below the 11pt caption floor on "3" | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 38x38px control "NO" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 14x14px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 38x44px control "18.4K" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 38x44px control "612" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 38x44px control "1,290" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 38x29px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 78x32px control "ShopField Shell Jacket — Rust$220.00 +1" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 293x36px control "Northline Studio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 215x24px control "Original Sound · northlinestudio" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 92x18px control "Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 84x18px control "Threads" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 24x36px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | fresh | hit-target-too-small | warn | 24x36px control "3" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(255, 213, 128) on "NEW" | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Accept" | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Ready" | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | demo | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | demo | hit-target-too-small | warn | 121x36px control "Accept" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/orders` | buyer | demo | hit-target-too-small | warn | 115x36px control "Ready" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-orders/buyer/00-initial.png) |
+| `/(tabs)/products` | seller | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(249, 115, 22) on "Draft" | [view](../../docs/audit/screenshots/-tabs-products/seller/00-initial.png) |
+| `/(tabs)/products` | seller | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(16, 185, 129) on "Active" | [view](../../docs/audit/screenshots/-tabs-products/seller/00-initial.png) |
+| `/(tabs)/products` | buyer | fresh | clipped-text | warn | Text clipped (71px into 62px): "$220.00 +1" | [view](../../docs/audit/screenshots/-tabs-products/buyer/00-initial.png) |
+| `/(tabs)/products` | buyer | fresh | type-scale-drift | warn | font-size 16px not on declared FS scale (nearest 15) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-products/buyer/00-initial.png) |
+| `/(tabs)/products` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Drop 04 is live. Ember season, cut heavy and made to last." | [view](../../docs/audit/screenshots/-tabs-products/buyer/00-initial.png) |
 
 ### Profile / settings (471)
 
@@ -689,311 +983,6 @@ The seller dashboard revenue chart (repeated axis labels, misaligned curve, no v
 | `/delete-account` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Delete account" | [view](../../docs/audit/screenshots/delete-account/buyer/00-initial.png) |
 | `/delete-account` | buyer | fresh | hit-target-too-small | warn | 34x44px control "Retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/delete-account/buyer/00-initial.png) |
 | `/delete-account` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Delete account" | [view](../../docs/audit/screenshots/delete-account/buyer/00-initial.png) |
-
-### Seller dashboard / analytics (402)
-
-| Route | Role | Data state | Type | Tier | Detail | Screenshot |
-|---|---|---|---|---|---|---|
-| `/(tabs)/profile` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/studio` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-studio/seller/00-initial.png) |
-| `/(tabs)/studio` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/-tabs-studio/seller/00-initial.png) |
-| `/analytics-content` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-content/seller/00-initial.png) |
-| `/analytics-content` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-content/seller/00-initial.png) |
-| `/analytics-customers` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-customers/seller/00-initial.png) |
-| `/analytics-customers` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-customers/seller/00-initial.png) |
-| `/analytics-customers` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-customers/buyer/00-initial.png) |
-| `/analytics-customers` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-customers/buyer/00-initial.png) |
-| `/analytics-marketing` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-marketing/seller/00-initial.png) |
-| `/analytics-marketing` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-marketing/seller/00-initial.png) |
-| `/analytics-production` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-production/seller/00-initial.png) |
-| `/analytics-production` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-production/seller/00-initial.png) |
-| `/analytics-products` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/seller/00-initial.png) |
-| `/analytics-products` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/seller/00-initial.png) |
-| `/analytics-products` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/buyer/00-initial.png) |
-| `/analytics-products` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-products/buyer/00-initial.png) |
-| `/analytics-profit` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
-| `/analytics-profit` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
-| `/analytics-sales` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/seller/00-initial.png) |
-| `/analytics-sales` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/seller/00-initial.png) |
-| `/analytics-sales` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/buyer/00-initial.png) |
-| `/analytics-sales` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-sales/buyer/00-initial.png) |
-| `/analytics-store` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
-| `/analytics-store` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
-| `/post-analytics` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/post-analytics/seller/00-initial.png) |
-| `/post-analytics` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/post-analytics/seller/00-initial.png) |
-| `/seller-conversation` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-data-export` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-preview` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-preview/seller/00-initial.png) |
-| `/seller-drop-preview` | seller | fresh | console-error | hard | API 404: Not part of the demo data | [view](../../docs/audit/screenshots/seller-drop-preview/seller/00-initial.png) |
-| `/seller-drop-preview` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-preview/seller/00-initial.png) |
-| `/seller-drop-preview` | seller | demo | console-error | hard | API 404: Not part of the demo data | [view](../../docs/audit/screenshots/seller-drop-preview/seller/00-initial.png) |
-| `/seller-drop-preview` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-preview/buyer/00-initial.png) |
-| `/seller-drop-preview` | buyer | fresh | console-error | hard | API 404: Not part of the demo data | [view](../../docs/audit/screenshots/seller-drop-preview/buyer/00-initial.png) |
-| `/seller-drop-preview` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drop-preview/buyer/00-initial.png) |
-| `/seller-drop-preview` | buyer | demo | console-error | hard | API 404: Not part of the demo data | [view](../../docs/audit/screenshots/seller-drop-preview/buyer/00-initial.png) |
-| `/seller-drops` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drops/seller/00-initial.png) |
-| `/seller-drops` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drops/seller/00-initial.png) |
-| `/seller-drops` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drops/buyer/00-initial.png) |
-| `/seller-drops` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-drops/buyer/00-initial.png) |
-| `/seller-go-live` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-go-live/seller/00-initial.png) |
-| `/seller-go-live` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-go-live/seller/00-initial.png) |
-| `/seller-inbox` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-inbox/seller/00-initial.png) |
-| `/seller-inbox` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-inbox/seller/00-initial.png) |
-| `/seller-live` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-live/seller/00-initial.png) |
-| `/seller-live` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-live/seller/00-initial.png) |
-| `/seller-profile` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-profile/seller/00-initial.png) |
-| `/seller-profile` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-profile/seller/00-initial.png) |
-| `/seller-reviews` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-reviews/seller/00-initial.png) |
-| `/seller-reviews` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-reviews/seller/00-initial.png) |
-| `/seller-reviews` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-reviews/buyer/00-initial.png) |
-| `/seller-reviews` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-reviews/buyer/00-initial.png) |
-| `/seller-settings` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-settings/seller/00-initial.png) |
-| `/seller-settings` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-settings/seller/00-initial.png) |
-| `/seller-settings` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-settings/buyer/00-initial.png) |
-| `/seller-settings` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-settings/buyer/00-initial.png) |
-| `/seller-verification` | seller | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-verification/seller/00-initial.png) |
-| `/seller-verification` | seller | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-verification/seller/00-initial.png) |
-| `/seller-verification` | buyer | fresh | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-verification/buyer/00-initial.png) |
-| `/seller-verification` | buyer | demo | console-error | hard | Failed to load resource: the server responded with a status of 404 (Not Found) | [view](../../docs/audit/screenshots/seller-verification/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Analytics" | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "$0" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 12" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 13" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 14" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 15" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 16" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 17" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 18" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Analytics" | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "$0" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 12" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 13" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 14" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 15" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 16" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 17" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Sep 18" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/-tabs-analytics/buyer/00-initial.png) |
-| `/(tabs)/profile` | seller | fresh | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | fresh | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | fresh | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | fresh | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | fresh | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | fresh | hit-target-too-small | warn | 22x22px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | fresh | hit-target-too-small | warn | 60x38px control "1,280Followers" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | fresh | hit-target-too-small | warn | 59x38px control "340Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | demo | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | demo | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | demo | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | demo | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | demo | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | demo | hit-target-too-small | warn | 22x22px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | demo | hit-target-too-small | warn | 60x38px control "1,280Followers" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | seller | demo | hit-target-too-small | warn | 59x38px control "340Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/seller/00-initial.png) |
-| `/(tabs)/profile` | buyer | fresh | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | fresh | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | fresh | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | fresh | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | fresh | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | fresh | hit-target-too-small | warn | 22x22px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | fresh | hit-target-too-small | warn | 60x38px control "1,280Followers" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | fresh | hit-target-too-small | warn | 59x38px control "340Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | demo | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | demo | type-scale-drift | warn | font-size 18px not on declared FS scale (nearest 17) on "Northline Studio" | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | demo | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | demo | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | demo | hit-target-too-small | warn | 24x24px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | demo | hit-target-too-small | warn | 22x22px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | demo | hit-target-too-small | warn | 60x38px control "1,280Followers" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/profile` | buyer | demo | hit-target-too-small | warn | 59x38px control "340Following" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/-tabs-profile/buyer/00-initial.png) |
-| `/(tabs)/studio` | seller | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(249, 115, 22) on "Open →" | [view](../../docs/audit/screenshots/-tabs-studio/seller/00-initial.png) |
-| `/(tabs)/studio` | seller | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(16, 185, 129) on "Open →" | [view](../../docs/audit/screenshots/-tabs-studio/seller/00-initial.png) |
-| `/(tabs)/studio` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Studio" | [view](../../docs/audit/screenshots/-tabs-studio/seller/00-initial.png) |
-| `/(tabs)/studio` | seller | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(249, 115, 22) on "Open →" | [view](../../docs/audit/screenshots/-tabs-studio/seller/00-initial.png) |
-| `/(tabs)/studio` | seller | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(16, 185, 129) on "Open →" | [view](../../docs/audit/screenshots/-tabs-studio/seller/00-initial.png) |
-| `/(tabs)/studio` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Studio" | [view](../../docs/audit/screenshots/-tabs-studio/seller/00-initial.png) |
-| `/(tabs)/studio` | buyer | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(249, 115, 22) on "Open →" | [view](../../docs/audit/screenshots/-tabs-studio/buyer/00-initial.png) |
-| `/(tabs)/studio` | buyer | fresh | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(16, 185, 129) on "Open →" | [view](../../docs/audit/screenshots/-tabs-studio/buyer/00-initial.png) |
-| `/(tabs)/studio` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Studio" | [view](../../docs/audit/screenshots/-tabs-studio/buyer/00-initial.png) |
-| `/(tabs)/studio` | buyer | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(249, 115, 22) on "Open →" | [view](../../docs/audit/screenshots/-tabs-studio/buyer/00-initial.png) |
-| `/(tabs)/studio` | buyer | demo | color-rule-violation | warn | Non-monochrome, non-allowed color rgb(16, 185, 129) on "Open →" | [view](../../docs/audit/screenshots/-tabs-studio/buyer/00-initial.png) |
-| `/(tabs)/studio` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Studio" | [view](../../docs/audit/screenshots/-tabs-studio/buyer/00-initial.png) |
-| `/analytics-content` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Content Analytics" | [view](../../docs/audit/screenshots/analytics-content/seller/00-initial.png) |
-| `/analytics-content` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Content Analytics" | [view](../../docs/audit/screenshots/analytics-content/seller/00-initial.png) |
-| `/analytics-content` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Content Analytics" | [view](../../docs/audit/screenshots/analytics-content/buyer/00-initial.png) |
-| `/analytics-content` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Content Analytics" | [view](../../docs/audit/screenshots/analytics-content/buyer/00-initial.png) |
-| `/analytics-customers` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer Analytics" | [view](../../docs/audit/screenshots/analytics-customers/seller/00-initial.png) |
-| `/analytics-customers` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer Analytics" | [view](../../docs/audit/screenshots/analytics-customers/seller/00-initial.png) |
-| `/analytics-customers` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer Analytics" | [view](../../docs/audit/screenshots/analytics-customers/buyer/00-initial.png) |
-| `/analytics-customers` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Customer Analytics" | [view](../../docs/audit/screenshots/analytics-customers/buyer/00-initial.png) |
-| `/analytics-marketing` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Marketing Analytics" | [view](../../docs/audit/screenshots/analytics-marketing/seller/00-initial.png) |
-| `/analytics-marketing` | seller | fresh | hit-target-too-small | warn | 80x36px control "Marketing" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-marketing/seller/00-initial.png) |
-| `/analytics-marketing` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Marketing Analytics" | [view](../../docs/audit/screenshots/analytics-marketing/seller/00-initial.png) |
-| `/analytics-marketing` | seller | demo | hit-target-too-small | warn | 80x36px control "Marketing" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-marketing/seller/00-initial.png) |
-| `/analytics-marketing` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Marketing Analytics" | [view](../../docs/audit/screenshots/analytics-marketing/buyer/00-initial.png) |
-| `/analytics-marketing` | buyer | fresh | hit-target-too-small | warn | 80x36px control "Marketing" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-marketing/buyer/00-initial.png) |
-| `/analytics-marketing` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Marketing Analytics" | [view](../../docs/audit/screenshots/analytics-marketing/buyer/00-initial.png) |
-| `/analytics-marketing` | buyer | demo | hit-target-too-small | warn | 80x36px control "Marketing" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-marketing/buyer/00-initial.png) |
-| `/analytics-production` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Production Analytics" | [view](../../docs/audit/screenshots/analytics-production/seller/00-initial.png) |
-| `/analytics-production` | seller | fresh | hit-target-too-small | warn | 72x36px control "Mfr. Hub" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-production/seller/00-initial.png) |
-| `/analytics-production` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Production Analytics" | [view](../../docs/audit/screenshots/analytics-production/seller/00-initial.png) |
-| `/analytics-production` | seller | demo | hit-target-too-small | warn | 72x36px control "Mfr. Hub" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-production/seller/00-initial.png) |
-| `/analytics-production` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Production Analytics" | [view](../../docs/audit/screenshots/analytics-production/buyer/00-initial.png) |
-| `/analytics-production` | buyer | fresh | hit-target-too-small | warn | 72x36px control "Mfr. Hub" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-production/buyer/00-initial.png) |
-| `/analytics-production` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Production Analytics" | [view](../../docs/audit/screenshots/analytics-production/buyer/00-initial.png) |
-| `/analytics-production` | buyer | demo | hit-target-too-small | warn | 72x36px control "Mfr. Hub" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-production/buyer/00-initial.png) |
-| `/analytics-products` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product Analytics" | [view](../../docs/audit/screenshots/analytics-products/seller/00-initial.png) |
-| `/analytics-products` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product Analytics" | [view](../../docs/audit/screenshots/analytics-products/seller/00-initial.png) |
-| `/analytics-products` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product Analytics" | [view](../../docs/audit/screenshots/analytics-products/buyer/00-initial.png) |
-| `/analytics-products` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Product Analytics" | [view](../../docs/audit/screenshots/analytics-products/buyer/00-initial.png) |
-| `/analytics-profit` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profit & Payout" | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
-| `/analytics-profit` | seller | fresh | hit-target-too-small | warn | 51x36px control "Profit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
-| `/analytics-profit` | seller | fresh | hit-target-too-small | warn | 65x36px control "Payouts" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
-| `/analytics-profit` | seller | fresh | hit-target-too-small | warn | 281x36px control "Couldn't load profit data — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
-| `/analytics-profit` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profit & Payout" | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
-| `/analytics-profit` | seller | demo | hit-target-too-small | warn | 51x36px control "Profit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
-| `/analytics-profit` | seller | demo | hit-target-too-small | warn | 65x36px control "Payouts" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
-| `/analytics-profit` | seller | demo | hit-target-too-small | warn | 281x36px control "Couldn't load profit data — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/seller/00-initial.png) |
-| `/analytics-profit` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profit & Payout" | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
-| `/analytics-profit` | buyer | fresh | hit-target-too-small | warn | 51x36px control "Profit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
-| `/analytics-profit` | buyer | fresh | hit-target-too-small | warn | 65x36px control "Payouts" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
-| `/analytics-profit` | buyer | fresh | hit-target-too-small | warn | 281x36px control "Couldn't load profit data — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
-| `/analytics-profit` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Profit & Payout" | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
-| `/analytics-profit` | buyer | demo | hit-target-too-small | warn | 51x36px control "Profit" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
-| `/analytics-profit` | buyer | demo | hit-target-too-small | warn | 65x36px control "Payouts" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
-| `/analytics-profit` | buyer | demo | hit-target-too-small | warn | 281x36px control "Couldn't load profit data — Tap to retry" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-profit/buyer/00-initial.png) |
-| `/analytics-sales` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Sales Analytics" | [view](../../docs/audit/screenshots/analytics-sales/seller/00-initial.png) |
-| `/analytics-sales` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Sales Analytics" | [view](../../docs/audit/screenshots/analytics-sales/seller/00-initial.png) |
-| `/analytics-sales` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Sales Analytics" | [view](../../docs/audit/screenshots/analytics-sales/buyer/00-initial.png) |
-| `/analytics-sales` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Sales Analytics" | [view](../../docs/audit/screenshots/analytics-sales/buyer/00-initial.png) |
-| `/analytics-store` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Store Analytics" | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
-| `/analytics-store` | seller | fresh | hit-target-too-small | warn | 79x36px control "Edit Store" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
-| `/analytics-store` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Store Analytics" | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
-| `/analytics-store` | seller | demo | hit-target-too-small | warn | 79x36px control "Edit Store" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/seller/00-initial.png) |
-| `/analytics-store` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Store Analytics" | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
-| `/analytics-store` | buyer | fresh | hit-target-too-small | warn | 79x36px control "Edit Store" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
-| `/analytics-store` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Store Analytics" | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
-| `/analytics-store` | buyer | demo | hit-target-too-small | warn | 79x36px control "Edit Store" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/analytics-store/buyer/00-initial.png) |
-| `/post-analytics` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Post Analytics" | [view](../../docs/audit/screenshots/post-analytics/seller/00-initial.png) |
-| `/post-analytics` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Try again" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/post-analytics/seller/00-initial.png) |
-| `/post-analytics` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Post Analytics" | [view](../../docs/audit/screenshots/post-analytics/seller/00-initial.png) |
-| `/post-analytics` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Try again" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/post-analytics/seller/00-initial.png) |
-| `/post-analytics` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Post Analytics" | [view](../../docs/audit/screenshots/post-analytics/buyer/00-initial.png) |
-| `/post-analytics` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Try again" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/post-analytics/buyer/00-initial.png) |
-| `/post-analytics` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Post Analytics" | [view](../../docs/audit/screenshots/post-analytics/buyer/00-initial.png) |
-| `/post-analytics` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Try again" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/post-analytics/buyer/00-initial.png) |
-| `/seller-conversation` | seller | fresh | hit-target-too-small | warn | 32x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | seller | fresh | hit-target-too-small | warn | 43x44px control "Buyer" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | seller | fresh | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | seller | fresh | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | seller | fresh | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | seller | demo | hit-target-too-small | warn | 32x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | seller | demo | hit-target-too-small | warn | 43x44px control "Buyer" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | seller | demo | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | seller | demo | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | seller | demo | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/seller/00-initial.png) |
-| `/seller-conversation` | buyer | fresh | hit-target-too-small | warn | 32x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
-| `/seller-conversation` | buyer | fresh | hit-target-too-small | warn | 43x44px control "Buyer" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
-| `/seller-conversation` | buyer | fresh | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
-| `/seller-conversation` | buyer | fresh | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
-| `/seller-conversation` | buyer | fresh | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
-| `/seller-conversation` | buyer | demo | hit-target-too-small | warn | 32x44px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
-| `/seller-conversation` | buyer | demo | hit-target-too-small | warn | 43x44px control "Buyer" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
-| `/seller-conversation` | buyer | demo | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
-| `/seller-conversation` | buyer | demo | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
-| `/seller-conversation` | buyer | demo | hit-target-too-small | warn | 36x46px control "" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-conversation/buyer/00-initial.png) |
-| `/seller-data-export` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Export My Data" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Products" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Orders" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Customers" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "JSON" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "CSV" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Generate Export" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Export My Data" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Products" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Orders" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Customers" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "JSON" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "CSV" | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | seller | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Generate Export" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/seller-data-export/seller/00-initial.png) |
-| `/seller-data-export` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Export My Data" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Products" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Orders" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Customers" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "JSON" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "CSV" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | fresh | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Generate Export" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "Export My Data" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Products" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Orders" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Customers" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "JSON" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | demo | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "CSV" | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-data-export` | buyer | demo | contrast-violation | warn | contrast 1.00:1 (need 4.5:1) for "Generate Export" — rgb(0, 0, 0) on rgb(0, 0, 0) | [view](../../docs/audit/screenshots/seller-data-export/buyer/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | overlapping-text | warn | "PRODUCTS IN THIS DROP" overlaps "2" | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "This is the wall-clock time in the timezone abov | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "Add a product first, then come back to include i | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "Limited quantity per product is set via each pro | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "New drop" | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | hit-target-too-small | warn | 69x40px control "Today" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | hit-target-too-small | warn | 95x40px control "Tomorrow" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | hit-target-too-small | warn | 105x40px control "Sun, Sep 20" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | hit-target-too-small | warn | 106x40px control "Mon, Sep 21" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | hit-target-too-small | warn | 90x40px control "12:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | hit-target-too-small | warn | 89x40px control "12:30 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | hit-target-too-small | warn | 82x40px control "1:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | hit-target-too-small | warn | 81x40px control "1:30 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | fresh | hit-target-too-small | warn | 84x40px control "2:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | overlapping-text | warn | "PRODUCTS IN THIS DROP" overlaps "2" | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "This is the wall-clock time in the timezone abov | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "Add a product first, then come back to include i | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "Limited quantity per product is set via each pro | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "New drop" | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | hit-target-too-small | warn | 69x40px control "Today" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | hit-target-too-small | warn | 95x40px control "Tomorrow" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | hit-target-too-small | warn | 105x40px control "Sun, Sep 20" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | hit-target-too-small | warn | 106x40px control "Mon, Sep 21" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | hit-target-too-small | warn | 90x40px control "12:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | hit-target-too-small | warn | 89x40px control "12:30 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | hit-target-too-small | warn | 82x40px control "1:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | hit-target-too-small | warn | 81x40px control "1:30 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | seller | demo | hit-target-too-small | warn | 84x40px control "2:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/seller/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "This is the wall-clock time in the timezone abov | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "Add a product first, then come back to include i | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "Limited quantity per product is set via each pro | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "New drop" | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | hit-target-too-small | warn | 69x40px control "Today" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | hit-target-too-small | warn | 95x40px control "Tomorrow" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | hit-target-too-small | warn | 105x40px control "Sun, Sep 20" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | hit-target-too-small | warn | 106x40px control "Mon, Sep 21" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | hit-target-too-small | warn | 90x40px control "12:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | hit-target-too-small | warn | 89x40px control "12:30 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | hit-target-too-small | warn | 82x40px control "1:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | hit-target-too-small | warn | 81x40px control "1:30 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | fresh | hit-target-too-small | warn | 84x40px control "2:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "This is the wall-clock time in the timezone abov | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "Add a product first, then come back to include i | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "Limited quantity per product is set via each pro | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | type-scale-drift | warn | font-size 20px not on declared FS scale (nearest 19) on "New drop" | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | hit-target-too-small | warn | 69x40px control "Today" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | hit-target-too-small | warn | 95x40px control "Tomorrow" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | hit-target-too-small | warn | 105x40px control "Sun, Sep 20" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | hit-target-too-small | warn | 106x40px control "Mon, Sep 21" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | hit-target-too-small | warn | 90x40px control "12:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | hit-target-too-small | warn | 89x40px control "12:30 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | hit-target-too-small | warn | 82x40px control "1:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | hit-target-too-small | warn | 81x40px control "1:30 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-create` | buyer | demo | hit-target-too-small | warn | 84x40px control "2:00 AM" under 44x44 (hitSlop not verifiable from DOM) | [view](../../docs/audit/screenshots/seller-drop-create/buyer/00-initial.png) |
-| `/seller-drop-preview` | seller | fresh | font-family | warn | Non-Inter font-family "-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif" on "Couldn't load this drop." | [view](../../docs/audit/screenshots/seller-drop-preview/seller/00-initial.png) |
-| `/seller-drop-preview` | seller | fresh | type-scale-drift | warn | font-size 14px not on declared FS scale (nearest 13) on "Couldn't load this drop." | [view](../../docs/audit/screenshots/seller-drop-preview/seller/00-initial.png) |
 
 ### Manufacturer hub (216)
 
