@@ -2162,6 +2162,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         freshGet<{ items: WatchedVideo[]; nextCursor: string | null }>(
           `/api/posts/watched-videos${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
         ),
+      /** Caption tracks of a video post (503 CAPTIONS_UNAVAILABLE while the flag/AI keys are off). */
+      captions: (id: string) =>
+        get<{ postId: string; tracks: Array<{ language: string; status: 'pending' | 'ready' | 'failed'; source: 'whisper' | 'manual'; vttUrl: string | null; segments: Array<{ start: number; end: number; text: string }> }> }>(
+          `/api/posts/${encodeURIComponent(id)}/captions`,
+        ),
+      /** Owner-only: start caption generation (idempotent unless force). */
+      generateCaptions: (id: string, force = false) =>
+        post<{ status: 'pending' | 'ready' }>(`/api/posts/${encodeURIComponent(id)}/captions/generate`, { force }),
+      /** Owner-only: replace the text of every segment, in order (timing is kept server-side). */
+      updateCaptions: (id: string, language: string, texts: string[]) =>
+        patch<any>(`/api/posts/${encodeURIComponent(id)}/captions/${encodeURIComponent(language)}`, {
+          segments: texts.map((text) => ({ text })),
+        }),
       recordWatchedVideo: (id: string) =>
         post<{ action: string }>(`/api/posts/${encodeURIComponent(id)}/watched`, {}),
       /** Owner-only verified performance. Untracked metrics return tracked=false and null values. */

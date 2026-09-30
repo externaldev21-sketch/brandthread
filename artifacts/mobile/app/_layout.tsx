@@ -1211,6 +1211,7 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-verification" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="create-post"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="post-analytics"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="post-captions-edit" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="setup"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="ai-studio"        options={{ headerShown: false }} />
         <Stack.Screen name="product-editor"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
