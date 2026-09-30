@@ -175,8 +175,54 @@ async function open(browser, images, { returning, hostedFlag = false }) {
   return { context, page, calls };
 }
 
-async function shot(page, name) {
+/**
+ * Text-fit check: flags any visible text element that is clipped
+ * (scrollWidth > clientWidth), ellipsised, or sticks out of its parent or the
+ * 393px viewport. Scoped to the given test ids (the rows this PR adds).
+ */
+async function overflowIssues(page, testIds) {
+  return page.evaluate((ids) => {
+    const issues = [];
+    const vw = document.documentElement.clientWidth;
+    for (const id of ids) {
+      for (const root of document.querySelectorAll(`[data-testid="${id}"]`)) {
+        const nodes = [root, ...root.querySelectorAll('*')];
+        for (const el of nodes) {
+          const hasText = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+          if (!hasText) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) continue;
+          const cs = getComputedStyle(el);
+          const parent = el.parentElement?.getBoundingClientRect();
+          const clipped = el.scrollWidth > el.clientWidth + 1;
+          const ellipsis = cs.textOverflow === 'ellipsis' && clipped;
+          const outParent = parent && (r.left < parent.left - 1 || r.right > parent.right + 1);
+          const outViewport = r.left < -1 || r.right > vw + 1;
+          if (clipped || ellipsis || outParent || outViewport) {
+            issues.push({ id, text: el.textContent.trim().slice(0, 40), clipped, outParent, outViewport });
+          }
+        }
+      }
+    }
+    return issues;
+  }, testIds);
+}
+const fitResults = {};
+
+async function shot(page, name, fitIds = []) {
   await page.screenshot({ path: path.join(OUT, `${name}.png`), caret: 'hide' });
+  if (fitIds.length) fitResults[name] = await overflowIssues(page, fitIds);
+  console.log(`  ✓ ${name}`);
+}
+
+/** Zoomed crop (3x) of one element, for reviewing text against its box. */
+async function zoom(page, testId, name) {
+  const box = await page.getByTestId(testId).first().boundingBox();
+  if (!box) return;
+  await page.screenshot({
+    path: path.join(OUT, `${name}.png`),
+    clip: { x: Math.max(0, box.x - 8), y: Math.max(0, box.y - 8), width: Math.min(393, box.width + 16), height: box.height + 16 },
+  });
   console.log(`  ✓ ${name}`);
 }
 
@@ -227,11 +273,13 @@ async function run() {
     const { context, page, calls } = await open(browser, images, { returning: true });
     await scrollToTestId(page, 'checkout-payment');
     results.bnplRow = await page.getByTestId('checkout-bnpl').count();
-    await shot(page, '01-checkout-payment-with-bnpl-row');
+    await shot(page, '01-checkout-payment-with-bnpl-row', ['checkout-payment']);
+    await zoom(page, 'checkout-payment', '01z-payment-card-zoom');
     await page.getByTestId('checkout-bnpl').click();
     await page.waitForTimeout(900);
     await scrollToTestId(page, 'checkout-payment');
-    await shot(page, '02-klarna-afterpay-selected');
+    await shot(page, '02-klarna-afterpay-selected', ['checkout-payment']);
+    await zoom(page, 'checkout-payment', '02z-klarna-afterpay-zoom');
     results.elementsOpts = await page.evaluate(() => window.__btElementsOpts ?? null);
     results.payEnabled = await page.getByTestId('checkout-place-order').isEnabled();
     await context.close();
@@ -243,7 +291,7 @@ async function run() {
     const { context, page } = await open(browser, images, { returning: true });
     await scrollToTestId(page, 'checkout-payment');
     results.bnplRowWhenOff = await page.getByTestId('checkout-bnpl').count();
-    await shot(page, '03-checkout-payment-card-only');
+    await shot(page, '03-checkout-payment-card-only', ['checkout-payment']);
     await context.close();
     bnplOn = true;
   }
@@ -265,15 +313,20 @@ async function run() {
     await page.getByTestId('seller-bnpl-toggle').waitFor({ timeout: 60_000 });
     await waitForQuietNetwork(activity, 900, 20_000);
     await page.waitForTimeout(800);
-    await shot(page, '04-seller-payments-toggle-off');
+    await shot(page, '04-seller-payments-toggle-off', ['seller-bnpl-toggle']);
+    await zoom(page, 'seller-bnpl-toggle', '04z-seller-toggle-zoom');
     await page.getByTestId('seller-bnpl-toggle').getByRole('switch').click();
     await page.waitForTimeout(800);
     results.sellerBnplAfterToggle = sellerBnpl;
-    await shot(page, '05-seller-payments-toggle-on');
+    await shot(page, '05-seller-payments-toggle-on', ['seller-bnpl-toggle']);
     await context.close();
   }
 
+  results.textFit = fitResults;
+  const bad = Object.values(fitResults).flat();
+  console.log(bad.length ? `TEXT-FIT ISSUES: ${JSON.stringify(bad)}` : 'TEXT-FIT: no overflow found');
   writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2));
+  if (bad.length) process.exitCode = 1;
   console.log(JSON.stringify(results, null, 2));
   await browser.close();
 }
