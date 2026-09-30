@@ -139,18 +139,24 @@ export default function ActivityPeopleScreen() {
       setStatus('ready');
       return;
     }
+    // Skip the real call entirely in dev-web preview (rather than trying it
+    // and falling back once it fails/returns nothing) — same reasoning as
+    // activity-center.tsx's identical fix: that mode has no live backend to
+    // begin with, and the audit/e2e harnesses that fake a signed-in Clerk
+    // user would otherwise still reach this real, backend-less endpoint
+    // first and log a console 404 before the fallback ever ran.
+    if (isPreviewActivityEnabled()) {
+      setActors(previewActors(ids));
+      setStatus('ready');
+      return;
+    }
     try {
       const result = await getGroupedActivityActors(ids);
       if (id !== requestId.current) return;
-      setActors(result.length === 0 && isPreviewActivityEnabled() ? previewActors(ids) : result);
+      setActors(result);
       setStatus('ready');
     } catch (err) {
       if (id !== requestId.current) return;
-      if (isPreviewActivityEnabled()) {
-        setActors(previewActors(ids));
-        setStatus('ready');
-        return;
-      }
       setErrorKind(err instanceof ApiError
         ? (err.status === 401 || err.status === 403 ? 'auth' : err.status >= 500 ? 'server' : 'offline')
         : 'offline');

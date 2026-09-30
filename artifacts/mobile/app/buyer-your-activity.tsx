@@ -11,6 +11,7 @@ import { useAuth } from '@clerk/expo';
 import { FONT, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { getMyPosts, getSavedItems, getMyReposts } from '@/services/socialService';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ErrorState, ListRow, SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
@@ -49,7 +50,14 @@ export default function BuyerYourActivity() {
   const [loadError, setLoadError] = useState(false);
 
   const loadData = useCallback(async () => {
-    if (!userId) {
+    // isBuyerDevPreview() (not just !userId): a stubbed/fake-signed-in
+    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
+    // user so protected screens render at all) still reports a truthy
+    // userId, which would otherwise fall through to getSavedItems()'s real,
+    // backend-less-in-preview endpoint below and log a console 404 (getMyPosts
+    // already checks isBuyerDevPreview() internally; getMyReposts is local-
+    // storage-only and already safe).
+    if (!userId || isBuyerDevPreview()) {
       setPostCount(0);
       setSavedCount(0);
       setRepostCount(0);
