@@ -13,9 +13,10 @@ import { sendWelcomeEmail } from "../lib/brandthreadEmail";
 import { isMailerConfigured, sendPasswordResetEmail } from "../lib/mailer";
 import {
   DELETION_GRACE_DAYS,
-  deletionState,
+  recentDeletionCancellation,
   getDeletionBlockers,
   getReauthMethod,
+  graceSyncUpdates,
   hasDeletionConfirmation,
   isPendingDeletion,
   issueDeletionCode,
@@ -136,7 +137,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
     // Sync runs both during app startup and explicitly during onboarding. Use a
     // conflict-safe insert so concurrent first requests cannot turn a real
     // account into a transient 500/error screen.
-    const { user, created } = await db.transaction(async (tx) => {
+    const { user, created, deletionCancelled } = await db.transaction(async (tx) => {
       const [inserted] = await tx
         .insert(users)
         .values({
@@ -159,7 +160,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
           referenceId: clerkUserId,
           note: "Welcome to Brandthread",
         }, tx);
-        return { user: inserted, created: true };
+        return { user: inserted, created: true, deletionCancelled: false };
       }
 
       const [existing] = await tx
@@ -181,6 +182,10 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         avatarUrl,
         updatedAt: new Date(),
       };
+      // Signing back in during the grace period cancels the deletion.
+      const cancellation = graceSyncUpdates(existing);
+      const cancelledDeletion = cancellation !== null;
+      if (cancellation) Object.assign(updates, cancellation);
       if (preferredName) {
         updates.name = preferredName;
         // Preserve a deliberately edited display name, but initialize it for
@@ -195,7 +200,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         .where(eq(users.clerkId, clerkUserId))
         .returning();
       if (!updated) throw new Error("User record disappeared during sync");
-      return { user: updated, created: false };
+      return { user: updated, created: false, deletionCancelled: cancelledDeletion };
     });
     if (created) {
       void sendWelcomeEmail({
@@ -211,7 +216,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         req.log.warn({ err, clerkUserId }, "Welcome email delivery failed");
       });
     }
-    res.status(created ? 201 : 200).json({ ...user, ...deletionState(user) });
+    res.status(created ? 201 : 200).json({ ...user, deletionCancelled });
   } catch (err) {
     if ((err as any)?.statusCode === 410) {
       res.status(410).json({ error: "This account has been deleted." });
@@ -335,7 +340,7 @@ router.post("/data-export", requireAuth, async (req, res) => {
 router.get("/account/deletion-check", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   try {
-    const [account] = await db.select({ accountType: users.accountType, deletedAt: users.deletedAt })
+    const [account] = await db.select({ accountType: users.accountType, deletedAt: users.deletedAt, deletionCancelledAt: users.deletionCancelledAt })
       .from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
     if (!account) {
       res.status(404).json({ error: "Account record was not found." });
@@ -351,22 +356,16 @@ router.get("/account/deletion-check", requireAuth, async (req, res) => {
       accountType: account.accountType,
       graceDays: DELETION_GRACE_DAYS,
       reauth,
+      deletionCancelledAt: recentDeletionCancellation(account.deletionCancelledAt),
       blockers,
       willDelete: [
-        "Your profile, username, photo and bio",
-        "Posts, comments, stories, likes, reposts and follows",
-        "Direct messages you sent",
-        "Saved items, cart, addresses and notification settings",
-        ...(isSeller ? [
-          "Your storefront, product listings, discount codes and shipping settings",
-          "Payout and subscription links to Stripe",
-        ] : []),
-        "Your sign-in, removed for good once the grace period ends",
+        "Your profile, posts, comments and messages",
+        "Your saved items, addresses and settings",
+        ...(isSeller ? ["Your storefront and product listings"] : []),
+        "Your sign-in",
       ],
       willRetain: [
-        "Order, payment, refund and tax records, with your name and address removed — kept as long as the law requires",
-        "Reports you made about other people's content, without your identity",
-        ...(isSeller ? ["Reviews buyers left on past orders, shown as from a deleted account"] : []),
+        "Order, payment and tax records, without your name and address, as the law requires",
       ],
     });
   } catch (err) {
@@ -471,7 +470,7 @@ router.delete("/account", requireAuth, rateLimit("authentication"), async (req, 
 });
 
 // ─── POST /api/auth/account/restore ─────────────────────────────────────────
-// Cancels a pending deletion during the grace period.
+// Explicit cancel for API clients; signing back in (POST /auth/sync) also cancels.
 router.post("/account/restore", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   try {
@@ -1095,7 +1094,7 @@ router.get("/me", requireAuth, async (req, res) => {
     res.status(404).json({ error: "User not found — call POST /auth/sync first" });
     return;
   }
-  res.json({ ...user, ...deletionState(user) });
+  res.json(user);
 });
 
 // ─── POST /api/auth/password-reset/request ──────────────────────────────────

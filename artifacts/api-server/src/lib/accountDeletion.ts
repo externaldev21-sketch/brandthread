@@ -179,7 +179,9 @@ export async function getDeletionBlockers(clerkUserId: string): Promise<Deletion
   return blockers;
 }
 
-/** Days an account stays restorable after the person asks to delete it. */
+/** Days the "deletion cancelled" notice stays visible after signing back in. */
+export const DELETION_CANCELLED_NOTICE_DAYS = 7;
+/** Days the account stays hidden but cancellable (by signing back in) before it is purged. */
 export const DELETION_GRACE_DAYS = 30;
 /** How far a due purge is pushed back when new obligations have appeared. */
 export const DELETION_POSTPONE_DAYS = 7;
@@ -406,16 +408,16 @@ export async function issueDeletionCode(
 export async function scheduleAccountDeletion(clerkUserId: string, now = new Date()): Promise<Date | null> {
   const scheduledFor = addDays(now, DELETION_GRACE_DAYS);
   const rows = await db.update(users)
-    .set({ deletionRequestedAt: now, deletionScheduledFor: scheduledFor, updatedAt: now })
+    .set({ deletionRequestedAt: now, deletionScheduledFor: scheduledFor, deletionCancelledAt: null, updatedAt: now })
     .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt), isNull(users.deletionRequestedAt)))
     .returning({ id: users.id });
   return rows.length > 0 ? scheduledFor : null;
 }
 
-/** Cancel a pending deletion. False when the account was not pending (or is already purged). */
+/** Cancel a pending deletion (signing back in does this via /auth/sync). False when not pending or already purged. */
 export async function restoreAccount(clerkUserId: string, now = new Date()): Promise<boolean> {
   const rows = await db.update(users)
-    .set({ deletionRequestedAt: null, deletionScheduledFor: null, updatedAt: now })
+    .set({ deletionRequestedAt: null, deletionScheduledFor: null, deletionCancelledAt: now, updatedAt: now })
     .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt), isNotNull(users.deletionRequestedAt)))
     .returning({ id: users.id });
   return rows.length > 0;
@@ -428,11 +430,22 @@ export async function revokeAllSessions(clerkUserId: string): Promise<number> {
   return list.data.length;
 }
 
-/** Fields the app needs to show the "scheduled for deletion" screen. */
-export function deletionState(row: { deletedAt?: Date | null; deletionRequestedAt?: Date | null; deletionScheduledFor?: Date | null }) {
-  const pending = isPendingDeletion(row);
-  return {
-    pendingDeletion: pending,
-    deletionScheduledFor: pending && row.deletionScheduledFor ? row.deletionScheduledFor.toISOString() : null,
-  };
+/**
+ * Profile updates applied by /auth/sync. Signing back in during the grace
+ * period cancels the pending deletion; any other account is left untouched.
+ */
+export function graceSyncUpdates(
+  existing: { deletedAt?: Date | null; deletionRequestedAt?: Date | null },
+  now = new Date(),
+): { deletionRequestedAt: null; deletionScheduledFor: null; deletionCancelledAt: Date } | null {
+  if (!isPendingDeletion(existing)) return null;
+  return { deletionRequestedAt: null, deletionScheduledFor: null, deletionCancelledAt: now };
+}
+
+/** When a deletion was cancelled by signing back in, if recent enough to tell the person. */
+export function recentDeletionCancellation(cancelledAt: Date | null | undefined, now = new Date()): string | null {
+  if (!cancelledAt) return null;
+  return now.getTime() - cancelledAt.getTime() <= DELETION_CANCELLED_NOTICE_DAYS * 86_400_000
+    ? cancelledAt.toISOString()
+    : null;
 }

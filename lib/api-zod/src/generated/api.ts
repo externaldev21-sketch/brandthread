@@ -2136,6 +2136,7 @@ export const GetAccountDeletionCheckResponse = zod.object({
   "accountType": zod.string().nullable(),
   "graceDays": zod.number().optional().describe('Days the account stays restorable before permanent deletion'),
   "reauth": zod.enum(['password', 'email_code']).optional().describe('Proof required by DELETE \/auth\/account'),
+  "deletionCancelledAt": zod.coerce.date().nullish().describe('Set for a week after signing back in cancelled a scheduled deletion'),
   "blockers": zod.array(zod.object({
   "code": zod.enum(['seller_open_orders', 'seller_held_funds', 'seller_reserved_label_funds', 'seller_open_returns', 'seller_open_disputes', 'seller_payout_in_flight', 'buyer_orders_awaiting_shipment']),
   "title": zod.string(),
@@ -2175,7 +2176,7 @@ export const RequestAccountDeletionCodeResponse = zod.object({
 
 
 /**
- * @summary Cancel a pending account deletion during the grace period
+ * @summary Cancel a pending account deletion (signing back in via POST /auth/sync also cancels it)
  */
 export const RestoreAccountResponse = zod.object({
   "ok": zod.boolean()

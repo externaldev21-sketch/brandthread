@@ -16,6 +16,11 @@ export interface AccountDeletionCheck {
   graceDays?: number;
   /** Proof required by DELETE /auth/account */
   reauth?: AccountDeletionCheckReauth;
+  /**
+     * Set for a week after signing back in cancelled a scheduled deletion
+     * @nullable
+     */
+  deletionCancelledAt?: Date | null;
   blockers: DeletionBlocker[];
   willDelete: string[];
   willRetain: string[];

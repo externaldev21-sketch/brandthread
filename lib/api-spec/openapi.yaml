@@ -1207,7 +1207,7 @@ paths:
     post:
       operationId: restoreAccount
       tags: [account]
-      summary: Cancel a pending account deletion during the grace period
+      summary: Cancel a pending account deletion (signing back in via POST /auth/sync also cancels it)
       responses:
         "200": { description: Restored, content: { application/json: { schema: { $ref: "#/components/schemas/OkResponse" } } } }
         "409": { description: Not scheduled for deletion (NOT_PENDING_DELETION) }
@@ -2111,6 +2111,7 @@ components:
         accountType: { type: ["string", "null"] }
         graceDays: { type: integer, description: Days the account stays restorable before permanent deletion }
         reauth: { type: string, enum: [password, email_code], description: Proof required by DELETE /auth/account }
+        deletionCancelledAt: { type: ["string", "null"], format: date-time, description: Set for a week after signing back in cancelled a scheduled deletion }
         blockers: { type: array, items: { $ref: "#/components/schemas/DeletionBlocker" } }
         willDelete: { type: array, items: { type: string } }
         willRetain: { type: array, items: { type: string } }

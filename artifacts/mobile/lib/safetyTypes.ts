@@ -113,6 +113,8 @@ export interface AccountDeletionCheck {
   graceDays?: number;
   /** Proof required to delete: the account password, or an emailed code. */
   reauth?: 'password' | 'email_code';
+  /** Set when signing back in recently cancelled a scheduled deletion. */
+  deletionCancelledAt?: string | null;
   blockers: DeletionBlocker[];
   willDelete: string[];
   willRetain: string[];

@@ -82,7 +82,8 @@ vi.mock("../mailer", () => ({
 
 import {
   DELETION_GRACE_DAYS,
-  deletionState,
+  graceSyncUpdates,
+  recentDeletionCancellation,
   generateDeletionCode,
   getDeletionBlockers,
   hashDeletionCode,
@@ -223,6 +224,7 @@ describe("schedule / restore", () => {
     expect(DELETION_GRACE_DAYS).toBe(30);
     expect(state.sets[0]).toMatchObject({ deletionRequestedAt: now, deletionScheduledFor: scheduledFor });
     expect(state.sets[0]).not.toHaveProperty("deletedAt");
+    expect(state.sets[0]).toMatchObject({ deletionCancelledAt: null });
   });
 
   it("is a no-op when already pending or purged", async () => {
@@ -233,6 +235,7 @@ describe("schedule / restore", () => {
   it("restore clears both dates", async () => {
     expect(await restoreAccount("user_1")).toBe(true);
     expect(state.sets[0]).toMatchObject({ deletionRequestedAt: null, deletionScheduledFor: null });
+    expect(state.sets[0].deletionCancelledAt).toBeInstanceOf(Date);
   });
 
   it("restore reports false when the account is not pending", async () => {
@@ -249,16 +252,21 @@ describe("schedule / restore", () => {
 });
 
 describe("sync during grace", () => {
-  it("flags a pending account with its purge date instead of treating it as deleted", () => {
-    const scheduled = new Date("2026-02-01T00:00:00.000Z");
-    expect(deletionState({ deletedAt: null, deletionRequestedAt: new Date(), deletionScheduledFor: scheduled }))
-      .toEqual({ pendingDeletion: true, deletionScheduledFor: scheduled.toISOString() });
+  it("signing back in cancels a pending deletion instead of rejecting the account", () => {
+    const now = new Date("2026-02-01T00:00:00.000Z");
+    expect(graceSyncUpdates({ deletedAt: null, deletionRequestedAt: new Date() }, now))
+      .toEqual({ deletionRequestedAt: null, deletionScheduledFor: null, deletionCancelledAt: now });
   });
 
-  it("does not flag active accounts or purged tombstones", () => {
-    expect(deletionState({ deletedAt: null, deletionRequestedAt: null, deletionScheduledFor: null }))
-      .toEqual({ pendingDeletion: false, deletionScheduledFor: null });
-    expect(deletionState({ deletedAt: new Date(), deletionRequestedAt: new Date(), deletionScheduledFor: new Date() }))
-      .toEqual({ pendingDeletion: false, deletionScheduledFor: null });
+  it("leaves active accounts and purged tombstones alone", () => {
+    expect(graceSyncUpdates({ deletedAt: null, deletionRequestedAt: null })).toBeNull();
+    expect(graceSyncUpdates({ deletedAt: new Date(), deletionRequestedAt: new Date() })).toBeNull();
+  });
+
+  it("shows the cancellation notice for a week only", () => {
+    const now = new Date("2026-02-10T00:00:00.000Z");
+    expect(recentDeletionCancellation(new Date("2026-02-05T00:00:00.000Z"), now)).toBe("2026-02-05T00:00:00.000Z");
+    expect(recentDeletionCancellation(new Date("2026-01-20T00:00:00.000Z"), now)).toBeNull();
+    expect(recentDeletionCancellation(null, now)).toBeNull();
   });
 });

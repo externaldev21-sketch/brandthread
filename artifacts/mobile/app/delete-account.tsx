@@ -8,7 +8,7 @@
  * 2. Confirm: type DELETE, acknowledge, and re-authenticate (password, or an
  *    emailed code for accounts that sign in without one).
  * 3. Done: the account is hidden and scheduled for deletion in 30 days, every
- *    session is signed out, and signing back in within 30 days restores it.
+ *    session is signed out, and signing back in within 30 days cancels it.
  *    The hard delete runs server-side after the grace period.
  */
 import React, { useCallback, useMemo, useState } from 'react';
@@ -30,10 +30,15 @@ import { clearAccountLifecycleState } from '@/lib/accountService';
 import { PressableScale, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { apiErrorCode, apiErrorDetails, apiErrorMessage } from '@/lib/safety';
-import { formatScheduledDate } from '@/components/account/AccountDeletionGate';
 import type { AccountDeletionCheck, DeletionBlocker } from '@/lib/safetyTypes';
 
 type Step = 'overview' | 'confirm' | 'done';
+
+function formatScheduledDate(iso: string | null | undefined): string {
+  const date = iso ? new Date(iso) : null;
+  if (!date || Number.isNaN(date.getTime())) return 'in 30 days';
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
 const CONFIRM_WORD = 'DELETE';
 
 export default function DeleteAccountScreen() {
@@ -137,7 +142,7 @@ export default function DeleteAccountScreen() {
           <View style={s.doneIcon}><Feather name="check" size={30} color={theme.onAccent} /></View>
           <Text style={s.title}>Your account is scheduled for deletion</Text>
           <Text style={s.lead}>
-            {`Your profile is now hidden and you’ve been signed out on every device. Your account and personal data will be permanently deleted on ${formatScheduledDate(scheduledFor)}. Sign back in before then if you change your mind.`}
+            {`Your account is hidden and you’ve been signed out on every device. It will be permanently deleted on ${formatScheduledDate(scheduledFor)}. Sign back in before then to cancel.`}
           </Text>
         </View>
         <View style={{ paddingHorizontal: SP.md }}>
@@ -157,8 +162,15 @@ export default function DeleteAccountScreen() {
             <View style={s.heroIcon}><Feather name="trash-2" size={24} color={theme.error} /></View>
             <Text style={s.title}>Delete your Brandthread account</Text>
             <Text style={s.lead}>
-              {`Your account${isSeller ? ' and storefront are' : ' is'} hidden right away and permanently deleted after ${graceDays} days. Sign back in any time during those ${graceDays} days to restore it. After that it can’t be recovered.`}
+              {`Your account${isSeller ? ' and storefront are' : ' is'} hidden right away and permanently deleted after ${graceDays} days. Sign back in before then to cancel.`}
             </Text>
+
+            {check?.deletionCancelledAt ? (
+              <View style={s.readyCard}>
+                <Feather name="check-circle" size={16} color={theme.success} />
+                <Text style={s.readyText}>Deletion cancelled. You signed back in, so your account is active.</Text>
+              </View>
+            ) : null}
 
             {loading ? (
               <View style={s.loadingCard}>
@@ -262,7 +274,7 @@ export default function DeleteAccountScreen() {
             <View style={s.heroIcon}><Feather name="alert-octagon" size={24} color={theme.error} /></View>
             <Text style={s.title}>Are you absolutely sure?</Text>
             <Text style={s.lead}>
-              {`Your account will be hidden now and you’ll be signed out on every device. It is permanently deleted after ${graceDays} days, unless you sign back in to restore it.`}
+              {`Your account will be hidden now and permanently deleted after ${graceDays} days. Signing back in before then cancels it.`}
             </Text>
 
             <Text style={s.fieldLabel}>Type <Text style={{ color: theme.text, fontFamily: FONT.bold }}>{CONFIRM_WORD}</Text> to confirm</Text>

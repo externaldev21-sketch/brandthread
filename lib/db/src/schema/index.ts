@@ -151,6 +151,8 @@ export const users = pgTable('users', {
   // deletionScheduledFor passes, unless they restore it first.
   deletionRequestedAt: timestamp('deletion_requested_at', { withTimezone: true }),
   deletionScheduledFor: timestamp('deletion_scheduled_for', { withTimezone: true }),
+  // Set when signing back in during the grace period cancelled a deletion.
+  deletionCancelledAt: timestamp('deletion_cancelled_at', { withTimezone: true }),
   // Platform suspension set by a moderator. Suspended accounts cannot publish
   // and their public content is hidden from every surface.
   suspendedAt: timestamp('suspended_at', { withTimezone: true }),

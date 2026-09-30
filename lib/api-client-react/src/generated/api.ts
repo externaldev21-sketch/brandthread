@@ -5090,7 +5090,7 @@ export const getRestoreAccountUrl = () => {
 }
 
 /**
- * @summary Cancel a pending account deletion during the grace period
+ * @summary Cancel a pending account deletion (signing back in via POST /auth/sync also cancels it)
  */
 export const restoreAccount = async ( options?: RequestInit): Promise<OkResponse> => {
 
@@ -5138,7 +5138,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RestoreAccountMutationError = ErrorType<void>
 
     /**
- * @summary Cancel a pending account deletion during the grace period
+ * @summary Cancel a pending account deletion (signing back in via POST /auth/sync also cancels it)
  */
 export const useRestoreAccount = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreAccount>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
