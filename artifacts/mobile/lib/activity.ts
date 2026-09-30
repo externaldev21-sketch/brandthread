@@ -452,6 +452,7 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'mention':
     case 'story_mention': return 'at-sign';
     case 'new_follower': return 'user-plus';
+    case 'live_started': return 'radio';
     case 'repost':
     case 'story_reshare': return 'repeat';
     case 'thread_cash_received': return 'dollar-sign';
@@ -607,6 +608,8 @@ export function activityHref(row: ActivityItem, role: 'buyer' | 'seller' | null 
       return row.type === 'story_mention'
         ? storyMentionViewerHref(id)
         : `/buyer-story-viewer?storyId=${q(id)}&allStoryIds=${q(id)}`;
+    case 'live':
+      return id ? `/buyer-live?streamId=${q(id)}` : null;
     case 'thread_cash_transfer':
       return '/thread-cash';
     case 'product':

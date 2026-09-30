@@ -27,6 +27,7 @@
  * an HTTP fallback) by jobs/liveViewersPresence.ts.
  */
 import { Router } from "express";
+import { notifyFollowersLiveStarted } from "../lib/liveNotifications";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
@@ -132,6 +133,10 @@ router.post("/start", requireAuth, hostPlan, async (req, res) => {
   // (see lib/liveReplay.ts + the part-1 guard on GET /:id and /end below).
   beginCloudRecording(stream).catch((err) =>
     logger.error({ err, streamId: stream.id }, "beginCloudRecording threw unexpectedly"),
+  );
+
+  notifyFollowersLiveStarted({ streamId: stream.id, sellerId, title: stream.title }).catch((err) =>
+    logger.error({ err, streamId: stream.id }, "notifyFollowersLiveStarted threw unexpectedly"),
   );
 
   return res.status(201).json({
