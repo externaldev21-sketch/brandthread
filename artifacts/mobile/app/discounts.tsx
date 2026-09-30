@@ -8,7 +8,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, ActivityIndicator, Switch, Platform,
+  StyleSheet, Alert, Modal, ActivityIndicator, Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { InlineSlider } from '@/components/InlineSlider';

@@ -4,7 +4,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import * as ImagePicker from 'expo-image-picker';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Switch, Modal, Image, ActivityIndicator,
+  StyleSheet, Alert, Modal, Image, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
