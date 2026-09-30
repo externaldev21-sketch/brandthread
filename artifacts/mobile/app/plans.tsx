@@ -384,8 +384,11 @@ export default function PlansScreen() {
 
       <ScreenHeader
         title={isOnboarding ? 'Choose your plan' : 'Subscription plans'}
-        variant="modal"
-        onBack={requestExit}
+        variant="push"
+        onBack={() => { haptic(); goBackOr(router, isOnboarding ? '/onboarding' : '/(tabs)'); }}
+        backAccessibilityLabel="Back to previous page"
+        backTestID="seller-plans-back"
+        actions={[{ icon: 'x', onPress: requestExit, accessibilityLabel: 'Close subscription plans' }]}
       />
 
       <ScrollView
