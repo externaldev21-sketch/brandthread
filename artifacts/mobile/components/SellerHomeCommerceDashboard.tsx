@@ -39,6 +39,7 @@ import ActivityBellButton from '@/components/ActivityBellButton';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { bucketLabel, type SellerHomeTimeRange } from '@/lib/sellerHomeChartLabels';
 import { isSellerDevPreview, isPreviewDemoMode } from '@/lib/devPreview';
+import { allPreviewSellerOrders } from '@/lib/previewSellerOrders';
 import { buildPreviewSellerAnalytics } from '@/lib/previewSellerChartData';
 import { formatCents } from '@/lib/money';
 import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
@@ -113,6 +114,8 @@ interface PersistedCashoutAttempt {
   amount: number;
   currency: string;
 }
+
+const PREVIEW_ANALYTICS_USER = 'preview-seller';
 
 function cashoutAttemptStorageKey(userId: string): string {
   return `bt:seller-cashout-attempt:${userId}`;
@@ -230,7 +233,9 @@ export default function SellerHomeCommerceDashboard({
     setStoreContextTick((t) => t + 1);
   }), []);
 
-  const data = selectSellerHomeAnalytics(snapshot, userId, range);
+  // The dev preview has no account; it keys its local snapshot under a fixed id so it still renders.
+  const analyticsUserId = userId ?? (isSellerDevPreview() ? PREVIEW_ANALYTICS_USER : null);
+  const data = selectSellerHomeAnalytics(snapshot, analyticsUserId, range);
 
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [celebrationVisible, setCelebrationVisible] = useState(false);
@@ -270,12 +275,12 @@ export default function SellerHomeCommerceDashboard({
 
   // ── Range-scoped analytics (hero + chart + stat grid) ────────────────────
   useEffect(() => {
-    if (!userId) {
+    if (!analyticsUserId) {
       setLoading(false);
       return;
     }
     let active = true;
-    const requestKey = sellerHomeAnalyticsKey(userId, range);
+    const requestKey = sellerHomeAnalyticsKey(analyticsUserId, range);
     setLoading(true);
 
     // The dev web seller preview (?bt_preview=seller) has no real backend to
@@ -317,6 +322,26 @@ export default function SellerHomeCommerceDashboard({
   // ── Range-independent data (orders, inventory, hub, products) — fetched
   // once per seller/refresh, not re-fetched on every chart range switch. ────
   const loadSecondaryData = useCallback(async () => {
+    // Dev preview: derive everything locally from the same demo order set the
+    // Orders tab lists (lib/previewSellerOrders.ts) - never call the API.
+    if (isSellerDevPreview()) {
+      const previewOrders = isPreviewDemoMode() ? allPreviewSellerOrders() : [];
+      const byProduct = new Map<string, TopProductSummary>();
+      for (const order of previewOrders) {
+        for (const item of order.items) {
+          const row = byProduct.get(item.productId) ?? { productId: item.productId, name: item.productName, imageUrl: null, unitsSold: 0, revenueCents: 0 };
+          row.unitsSold += item.quantity;
+          row.revenueCents += item.priceCents * item.quantity;
+          byProduct.set(item.productId, row);
+        }
+      }
+      setSecondaryError(false);
+      setEverSoldCount(previewOrders.length);
+      setRecentOrders(previewOrders.slice(0, 5).map(normalizeRecentOrder));
+      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0, toShip: filterOrders(previewOrders.map(apiRowToOrder), 'unfulfilled').length });
+      setTopProducts(mergeTopProductImages([...byProduct.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 5), []));
+      return;
+    }
     if (!userId) {
       setTopProducts([]);
       setRecentOrders([]);

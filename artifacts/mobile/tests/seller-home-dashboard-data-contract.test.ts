@@ -11,7 +11,8 @@ describe('seller home dashboard data contract', () => {
   it('waits for the authenticated seller and reloads analytics when the range changes', () => {
     expect(source).toContain('if (!userId)');
     expect(source).toContain('[api, range, userId, retryTick, storeContextTick]');
-    expect(source).toContain('sellerHomeAnalyticsKey(userId, range)');
+    // analyticsUserId = the signed-in user, or a fixed id in the dev preview (which has no account).
+    expect(source).toContain('sellerHomeAnalyticsKey(analyticsUserId, range)');
     expect(source).toContain('setSnapshot({ key: requestKey');
   });
 

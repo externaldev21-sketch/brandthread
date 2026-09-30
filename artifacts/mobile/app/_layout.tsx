@@ -360,7 +360,7 @@ function SellerBarGate() {
   // Honor the dev web preview bypass: PREVIEW_ROLE is evaluated at module load
   // time (before Clerk resolves) so it must be checked independently of
   // isActiveSeller. It is inert in production builds (__DEV__ guard in PREVIEW_ROLE).
-  const isPreviewSeller = PREVIEW_ROLE === 'seller';
+  const isPreviewSeller = PREVIEW_SESSION_ROLE === 'seller';
 
   const showBar = isActiveSeller || isPreviewSeller;
 
@@ -489,6 +489,13 @@ const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if (v !== 'buyer' && v !== 'seller') return null;
   return v;
 })();
+
+// The preview role for THIS page: the one the URL asked for, or - after a reload of a plain tab URL
+// such as /orders, where in-app navigation had already dropped `?bt_preview=` - the role the first
+// load persisted (lib/devPreview.ts). Without the fallback a reloaded preview lost its seller tab
+// bar and waited on a Clerk session that preview never has.
+const PREVIEW_SESSION_ROLE: 'buyer' | 'seller' | null = PREVIEW_ROLE
+  ?? (Platform.OS === 'web' ? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null) : null);
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
 if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
@@ -1534,7 +1541,7 @@ export default function RootLayout() {
     <AppIntroSplash ready={appReady}>
       <ClerkLoadErrorBoundary>
         <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-          {PREVIEW_ROLE ? (
+          {PREVIEW_SESSION_ROLE ? (
             // DEV preview bypass: don't wait for clerk-js — render screens directly.
             appTree
           ) : (
