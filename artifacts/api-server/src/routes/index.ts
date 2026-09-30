@@ -60,6 +60,7 @@ import shippingLabelsRouter from "./shipping-labels";
 import disputesRouter from "./disputes";
 import financeRouter from "./finance";
 import taxesRouter from "./taxes";
+import sellerPaymentSettingsRouter from "./seller-payment-settings";
 import teamRouter from "./team";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import notificationEventsRouter from "./notification-events";
@@ -213,6 +214,7 @@ router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
 router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
 router.use("/taxes",                     tc, taxesRouter);
+router.use("/seller/payment-settings",    tc, sellerPaymentSettingsRouter);
 // teamRouter owns its middleware ordering so membership discovery sees the
 // actual caller before any store-context rewrite.
 router.use("/team",                      teamRouter);
