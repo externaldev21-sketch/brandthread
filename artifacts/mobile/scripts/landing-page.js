@@ -114,52 +114,54 @@ header{padding-top:env(safe-area-inset-top)}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;letter-spacing:-.01em;font-size:18px}
 .brand img{width:36px;height:36px;display:block}
 .nav{display:flex;align-items:center;gap:20px}
-.nav a.text{font-size:15px;font-weight:600;color:var(--silver);text-decoration:none}
+.nav a.text{font-size:14px;font-weight:600;color:var(--silver);text-decoration:none}
 .nav a.text:hover{color:var(--white)}
-.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 24px;border-radius:12px;font-weight:700;font-size:16px;text-decoration:none;border:1px solid var(--white);cursor:pointer;font-family:inherit}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border-radius:12px;font-weight:700;font-size:16px;line-height:1.2;text-align:center;text-decoration:none;border:1px solid var(--white);cursor:pointer;font-family:inherit}
 .btn.solid{background:var(--white);color:var(--black)}
 .btn.solid:hover{background:var(--silver);border-color:var(--silver)}
 .btn.ghost{background:var(--black);color:var(--white);border-color:var(--line)}
 .btn.ghost:hover{border-color:var(--white)}
-.btn.small{min-height:40px;padding:0 18px;font-size:14px}
+.btn.small{min-height:40px;padding:0 16px;font-size:14px}
 .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center;padding-top:56px;padding-bottom:88px}
-h1{font-size:clamp(40px,6.2vw,68px);line-height:1.04;letter-spacing:-.035em;margin:0 0 20px;font-weight:700}
-.lede{font-size:clamp(17px,2vw,20px);color:var(--silver);max-width:34em;margin:0 0 32px}
-.ctas{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:28px}
-.badges{display:flex;flex-wrap:wrap;gap:12px;margin:0;padding:0;list-style:none}
-.badge{display:flex;flex-direction:column;justify-content:center;min-height:52px;padding:6px 18px;border:1px solid var(--line);border-radius:12px;background:var(--panel);text-decoration:none;line-height:1.15}
+h1{font-size:64px;text-wrap:balance;line-height:1.04;letter-spacing:-.035em;margin:0 0 20px;font-weight:700}
+.lede{font-size:18px;color:var(--silver);max-width:34em;margin:0 0 32px;text-wrap:pretty}
+.ctas,.badges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;max-width:440px}
+.ctas{margin-bottom:12px}
+.badges{margin:0;padding:0;list-style:none}
+.badge{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:52px;padding:8px 16px;text-align:center;border:1px solid var(--line);border-radius:12px;background:var(--panel);text-decoration:none;line-height:1.15}
 .badge:hover{border-color:var(--white)}
-.badge small{font-size:11px;color:var(--mute);font-weight:400}
-.badge strong{font-size:17px;font-weight:700}
+.badge small{font-size:12px;color:var(--mute);font-weight:400}
+.badge strong{font-size:16px;font-weight:700}
 .stage{display:flex;justify-content:center}
 .device{width:min(300px,78%);aspect-ratio:9/18.5;border-radius:44px;padding:10px;background:linear-gradient(145deg,#e8e8e8,#7a7a7a 55%,#d6d6d6);box-shadow:0 30px 80px #1a1a1a}
 .screen{height:100%;border-radius:35px;background:radial-gradient(120% 70% at 50% 0,#262626,#050505 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:24px}
 .screen img{width:55%;height:auto;display:block}
 .screen ul{list-style:none;margin:0;padding:0;display:flex;gap:8px}
-.screen li{border:1px solid #3a3a3a;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--silver)}
+.screen li{border:1px solid #3a3a3a;border-radius:999px;padding:6px 14px;font-size:14px;font-weight:600;color:var(--silver)}
 section{padding:80px 0;border-top:1px solid var(--line)}
-h2{font-size:clamp(30px,4.2vw,44px);line-height:1.1;letter-spacing:-.03em;margin:0 0 12px;font-weight:700}
-.sub{color:var(--silver);font-size:18px;max-width:38em;margin:0 0 48px}
+h2{font-size:44px;text-wrap:balance;line-height:1.1;letter-spacing:-.03em;margin:0 0 12px;font-weight:700}
+.sub{color:var(--silver);font-size:18px;max-width:38em;margin:0 0 48px;text-wrap:balance}
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:32px 28px}
-.card h3{font-size:24px;letter-spacing:-.02em;margin:0 0 12px}
-.card p{margin:0;color:var(--silver);font-size:16px}
+.card h3{font-size:24px;line-height:1.2;letter-spacing:-.02em;margin:0 0 12px}
+.card p{margin:0;color:var(--silver);font-size:16px;text-wrap:pretty}
 .steps{list-style:none;margin:0;padding:0;display:grid;gap:36px}
 .steps li{display:grid;grid-template-columns:96px 1fr;gap:24px;align-items:start}
 .num{font-size:88px;line-height:.9;font-weight:700;letter-spacing:-.05em;color:var(--white)}
-.steps h3{font-size:24px;margin:6px 0 8px;letter-spacing:-.02em}
-.steps p{margin:0;color:var(--silver);max-width:36em}
+.steps h3{font-size:24px;line-height:1.2;margin:6px 0 8px;letter-spacing:-.02em}
+.steps p{margin:0;color:var(--silver);font-size:16px;max-width:36em;text-wrap:pretty}
 .split{display:grid;grid-template-columns:.8fr 1.2fr;gap:56px;align-items:start}
 .final{text-align:center}
 .final .sub{margin-left:auto;margin-right:auto}
-.final .ctas{justify-content:center;margin-bottom:0}
+.final .ctas,.final .badges{margin-left:auto;margin-right:auto}
 footer{border-top:1px solid var(--line);padding:40px 0 calc(40px + env(safe-area-inset-bottom))}
 .foot{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:center;justify-content:space-between}
 .foot nav{display:flex;flex-wrap:wrap;gap:8px 24px}
-.foot a{color:var(--silver);text-decoration:none;font-size:15px;padding:6px 0}
+.foot a{color:var(--silver);text-decoration:none;font-size:14px;padding:6px 0}
 .foot a:hover{color:var(--white);text-decoration:underline}
 .foot p{margin:0;color:var(--mute);font-size:14px}
 @media (max-width:860px){
+h1{font-size:48px}
 .hero{grid-template-columns:1fr;gap:40px;padding-top:32px;padding-bottom:64px}
 .cards{grid-template-columns:1fr}
 .split{grid-template-columns:1fr;gap:32px}
@@ -167,9 +169,12 @@ section{padding:64px 0}
 .device{width:min(260px,70%)}
 }
 @media (max-width:480px){
+h1{font-size:40px}
+h2{font-size:32px}
+.ctas{grid-template-columns:1fr}
+.foot nav{display:grid;grid-template-columns:1fr 1fr;width:100%;gap:4px 16px}
 .steps li{grid-template-columns:64px 1fr;gap:16px}
-.num{font-size:60px}
-.ctas .btn{flex:1 1 100%}
+.num{font-size:64px}
 .nav{gap:14px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -258,14 +263,14 @@ function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null } = {}) {
   <section aria-labelledby="sell-title">
     <div class="wrap split">
       <div>
-        <h2 id="sell-title">Sell your label on Brandthread.</h2>
+        <h2 id="sell-title">Sell on Brandthread.</h2>
         <p class="sub">Free to browse and buy. Selling plans and premium seller tools are available as subscriptions.</p>
         <a class="btn solid" href="${ROUTES.signUp}" data-flow="seller">Start selling</a>
       </div>
       <ol class="steps">
-        <li><span class="num" aria-hidden="true">1</span><div><h3>Open your storefront</h3><p>Create your seller account and set up your shop in minutes.</p></div></li>
-        <li><span class="num" aria-hidden="true">2</span><div><h3>List and go live</h3><p>Add products, manage inventory, and show them off in video posts and live streams.</p></div></li>
-        <li><span class="num" aria-hidden="true">3</span><div><h3>Ship and get paid</h3><p>Track orders and payouts, message customers, and grow with built-in analytics.</p></div></li>
+        <li><span class="num" aria-hidden="true">1</span><div><h3>Open your storefront</h3><p>Create your seller account.</p></div></li>
+        <li><span class="num" aria-hidden="true">2</span><div><h3>List your products</h3><p>Add products and go live.</p></div></li>
+        <li><span class="num" aria-hidden="true">3</span><div><h3>Ship and get paid</h3><p>Track orders and payouts.</p></div></li>
       </ol>
     </div>
   </section>
@@ -278,7 +283,7 @@ function renderLandingHtml({ appStoreUrl = null, playStoreUrl = null } = {}) {
         <a class="btn solid" href="${ROUTES.signUp}" data-flow="seller">Start selling</a>
         <a class="btn ghost" href="${ROUTES.signUp}" data-flow="buyer">Start shopping</a>
       </div>
-      ${badges.length ? `<div style="margin-top:24px;display:flex;justify-content:center">${badgeBlock}</div>` : ''}
+      ${badgeBlock}
     </div>
   </section>
 </main>
