@@ -385,6 +385,16 @@ export default function ManufacturerProfileScreen() {
                 <Text style={s.pricingValue}>{m.leadTimeDays} days</Text>
               </View>
             </View>
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push((`/request-sample?manufacturerId=${m.id}`) as never); }}
+              style={s.requestSampleBtn}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={`Request a sample from ${m.name}`}
+            >
+              <Feather name="scissors" size={ICON.sm} color={FG} />
+              <Text style={s.requestSampleBtnText}>Request a Sample</Text>
+            </TouchableOpacity>
           </SectionCard>
 
           {/* ── Product / Sample Catalog ── */}
@@ -668,6 +678,15 @@ const s = StyleSheet.create({
   },
   pricingValue: {
     fontSize: FS.md, fontFamily: FONT.bold, color: PURPLE_LIGHT,
+  },
+  requestSampleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs,
+    marginTop: SP.sm, minHeight: COMP.minTouchTarget,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER_ACTIVE,
+    backgroundColor: CARD,
+  },
+  requestSampleBtnText: {
+    fontSize: FS.sm, fontFamily: FONT.semibold, color: FG,
   },
   galleryRow: {
     gap: SP.sm,
