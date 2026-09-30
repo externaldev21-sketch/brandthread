@@ -679,6 +679,11 @@ export function respond({ method, path, query, role, options = {} }) {
   if ((match = p.match(/^\/public\/products\/([^/]+)$/))) return byId(PUBLIC_PRODUCTS)(match[1]);
   if (p.startsWith('/reviews/product/')) return REVIEWS;
   if (p === '/public/posts' || p === '/posts/feed') return role === 'buyer' ? feedPosts() : [];
+  // lib/appStartPrefetch.ts's warmSellerTabs() calls this on every seller
+  // app boot — unseeded, it 404s on every single seller page load. The demo
+  // feed already has two Northline Studio (the seller persona) posts;
+  // these are exactly those, as "mine".
+  if (p === '/posts/mine') return role === 'seller' ? feedPosts().filter((post) => post.userId === SELLER_USER.id) : [];
   if (p === '/posts/repost-context') return {};
   if (p === '/live/active') return { streams: [] };
   if (p.startsWith('/social/status/')) return { isFollowing: false, followersCount: 24800 };
@@ -776,9 +781,18 @@ export function respond({ method, path, query, role, options = {} }) {
     ];
   }
   if (p === '/shipping-rates/calculate') return { shippingCents: 1200, rateName: 'Express courier (2–3 days)', isFree: false };
+  // app/meta-ads-connect.tsx, app/meta-ads-manage.tsx and app/meta-ads-setup.tsx
+  // all call this before showing anything — unseeded, it 404s on every load
+  // of every Meta Ads screen. Honestly disconnected (no fabricated Meta
+  // business/ad-account data): this demo seller hasn't run Meta's real OAuth.
+  if (p === '/meta-ads/connection') return { connected: false, status: 'disconnected' };
+  if (p === '/meta-ads/campaigns') return { campaigns: [] };
 
   // Seller
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
+  // lib/appStartPrefetch.ts's warmSellerTabs() calls this on every seller
+  // app boot too — unseeded, it 404s on every single seller page load.
+  if (p === '/products') return role === 'seller' ? SELLER_PRODUCTS : [];
   if (p === '/finance/balance') return { available: { amount: 184250, currency: 'usd', formatted: '$1,842.50' }, pending: { amount: 62740, currency: 'usd', formatted: '$627.40' }, connected: true, payoutsEnabled: true, bankConnected: true, processingCashout: null };
   if (p === '/orders') return sellerOrders(options.fresh ? 0 : options.orderCount ?? 9);
   if ((match = p.match(/^\/orders\/([^/]+)$/))) return sellerOrderDetail(match[1], options.fresh ? 0 : options.orderCount ?? 9);
