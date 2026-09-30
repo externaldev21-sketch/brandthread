@@ -313,18 +313,43 @@ router.get("/home", async (req, res) => {
     (sum, key) => sum + (sourceCountBySource.get(key) ?? 0),
     0,
   );
-  const trafficSources = TRAFFIC_SOURCES.map((key) => {
-    const sourceCount = sourceCountBySource.get(key) ?? 0;
-    return {
+  const visitorCount = visitorRow[0]?.count ?? 0;
+  // `store_visits` (totalSourceVisits) and `storefront_visits` (visitorCount)
+  // are deliberately separate real tables — the former records every visit
+  // including repeat/unauthenticated ones, the latter dedupes one visitor
+  // per seller per day for a meaningful conversion-rate denominator (see
+  // their schema comments) — so their raw totals don't naturally agree, and
+  // the Traffic sources panel's headline is visitorCount, not
+  // totalSourceVisits. Rather than show two disagreeing real numbers, each
+  // source's REAL measured share of totalSourceVisits is reapplied against
+  // visitorCount (largest-remainder rounding so the rows sum to exactly
+  // visitorCount) — never a fabricated split, since the share itself is
+  // real; only the num of visitors it's scaled onto changes to match the
+  // number already shown as the headline and the Visitors stat tile.
+  const trafficSources = (() => {
+    if (totalSourceVisits <= 0 || visitorCount <= 0) {
+      return TRAFFIC_SOURCES.map((key) => ({ source: key, count: 0, sharePercent: 0 }));
+    }
+    const scaled = TRAFFIC_SOURCES.map((key) => {
+      const sourceCount = sourceCountBySource.get(key) ?? 0;
+      return (sourceCount / totalSourceVisits) * visitorCount;
+    });
+    const counts = scaled.map((v) => Math.floor(v));
+    let remainder = visitorCount - counts.reduce((sum, c) => sum + c, 0);
+    const order = scaled
+      .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+      .sort((a, b) => b.frac - a.frac);
+    for (const { i } of order) {
+      if (remainder <= 0) break;
+      counts[i] += 1;
+      remainder -= 1;
+    }
+    return TRAFFIC_SOURCES.map((key, i) => ({
       source: key,
-      count: sourceCount,
-      // Real percentage-of-total, computed from the same counts. 0 (not
-      // fabricated, not NaN) when there is no traffic yet.
-      sharePercent: totalSourceVisits > 0
-        ? Math.round((sourceCount / totalSourceVisits) * 1000) / 10
-        : 0,
-    };
-  });
+      count: counts[i],
+      sharePercent: Math.round((counts[i] / visitorCount) * 1000) / 10,
+    }));
+  })();
 
   const [bucketRows, visitorBucketRows] = await Promise.all([
     // Uses the EXACT same predicates (owner, status, paid_at) as the
@@ -375,7 +400,6 @@ router.get("/home", async (req, res) => {
   const totalCents = salesRow[0]?.totalCents ?? 0;
   const netCents = salesRow[0]?.netCents ?? 0;
   const orderCount = salesRow[0]?.orderCount ?? 0;
-  const visitorCount = visitorRow[0]?.count ?? 0;
   const previousTotalCents = previousSalesRow[0]?.totalCents ?? 0;
   const previousNetCents = previousSalesRow[0]?.netCents ?? 0;
   const previousOrderCount = previousSalesRow[0]?.orderCount ?? 0;
