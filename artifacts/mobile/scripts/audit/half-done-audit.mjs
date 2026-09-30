@@ -105,7 +105,18 @@ function extractFsScale(src) {
 const INTER_FAMILIES = extractFontFamilies(THEME_SRC); // e.g. Inter_400Regular, Inter_500Medium, ...
 const FS_SCALE = extractFsScale(THEME_SRC); // e.g. [11,12,13,15,17,19,22,26,30,36]
 
-const PLACEHOLDER_RE = /coming soon|isn't tracked yet|is not tracked yet|not available yet|TODO\b|lorem ipsum|placeholder|^Label$|^Title$|\bundefined\b|\bNaN\b|\$NaN|Invalid Date/i;
+// Deliberately NOT included as a bare exact-word match: "Label" and "Title"
+// on their own. The original `^Label$|^Title$` rule was meant to catch an
+// un-customized default component prop (a control that still literally says
+// "Label" because nobody filled it in) but a full fresh+demo run found it
+// false-positiving on genuine, deliberately-short domain vocabulary — the
+// "Title" field label on the real Add Product form (app/add-product.tsx,
+// shared by product-editor.tsx) and the "Label" step in the shipping-status
+// tracker's Order/Label/Pickup/Transit/Delivered row (app/shipping.tsx,
+// shared by shipping-delivery.tsx) — both real, permanent, correctly-used
+// one-word UI copy, not stubs. Same judgement-call treatment as bare
+// "sample"/"read-only" below for preview-demo-wording.
+const PLACEHOLDER_RE = /coming soon|isn't tracked yet|is not tracked yet|not available yet|TODO\b|lorem ipsum|placeholder|\bundefined\b|\bNaN\b|\$NaN|Invalid Date/i;
 
 // Dev's explicit rule: no visible preview/demo tell anywhere, ever — a fresh
 // (empty) real install must read exactly like this text, never like a demo
@@ -982,6 +993,7 @@ export {
   paramValueFor,
   APP_DIR,
   MOBILE_ROOT as MOBILE_ROOT_EXPORT,
+  PLACEHOLDER_RE,
 };
 
 // Only run the CLI when this file is executed directly (`node

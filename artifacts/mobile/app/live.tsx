@@ -475,6 +475,7 @@ export default function LiveScreen() {
           visible
           brandName={giftFor.host.name}
           recipientId={giftFor.host.id}
+          streamId={giftFor.id}
           onClose={() => setGiftFor(null)}
           onSent={amountCents => { void handleGiftSent(giftFor, amountCents); }}
           onSendFailed={handleGiftFailed}
