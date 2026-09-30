@@ -100,6 +100,15 @@ export default function DisputeDetailScreen() {
   const [submittingAll, setSubmittingAll] = useState(false);
 
   const load = useCallback(async () => {
+    // No id at all (e.g. a bad/incomplete deep link) — show "not found"
+    // directly. Never fall through to the preview-only legacy path below
+    // without a real disputeId: that path is meant to be reachable only in
+    // dev preview, but skipping the `if (disputeId)` block here (no
+    // exception thrown) used to fall through to it unconditionally.
+    if (!disputeId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(false);
     try {

@@ -80,6 +80,13 @@ export default function RefundDetailScreen() {
   const [restockInventory, setRestockInventory] = useState(false);
 
   const load = useCallback(async () => {
+    // No order id at all (e.g. a bad/incomplete deep link) — nothing to
+    // fetch; show "Order not found" without firing a request that can only
+    // ever 404.
+    if (!orderId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(false);
     try {
