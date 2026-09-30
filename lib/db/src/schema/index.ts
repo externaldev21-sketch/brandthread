@@ -153,6 +153,11 @@ export const users = pgTable('users', {
   // Terms of Service / Community Guidelines / Privacy Policy acceptance.
   termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
   termsVersion: text('terms_version'),
+  // Age gate (migration 113). Only the derived band is stored, never the date
+  // of birth. NULL = legacy account not yet asked. 'under_13' accounts are blocked.
+  ageBand: text('age_band'),
+  ageVerifiedAt: timestamp('age_verified_at', { withTimezone: true }),
+  underageBlockedAt: timestamp('underage_blocked_at', { withTimezone: true }),
   // The single official "Brandthread Agent" AI friend account (see
   // lib/brandthreadAgent.ts in api-server). At most one row may ever have
   // this set — enforced by a partial unique index in migration 091. Distinct

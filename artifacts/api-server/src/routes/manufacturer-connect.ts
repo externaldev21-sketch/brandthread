@@ -3,6 +3,7 @@
  * Mounted at /api/manufacturers/connect
  * Requires the authenticated user to have a manufacturer profile.
  */
+import { denyIfAgeRestricted } from "../lib/ageGate";
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
@@ -83,6 +84,7 @@ router.post("/onboard", async (req, res) => {
     const stripe = requireStripe();
     const { userId } = getAuth(req);
     if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    if (await denyIfAgeRestricted(userId, res)) return;
 
     const baseUrl = getWebOrigin("https://localhost:3000");
     const {

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import healthRouter from "./health";
 import authRouter from "./auth";
+import ageRouter from "./age";
 import productsRouter from "./products";
 import ordersRouter from "./orders";
 import customersRouter from "./customers";
@@ -134,6 +135,7 @@ router.use("/seller/export",   sellerExportRouter);
 router.use("/call",            callRouter);
 router.use("/healthz",         healthRouter);
 router.use("/auth",            authRouter);
+router.use("/auth",            ageRouter); // POST /auth/age (age gate)
 // This route is intentionally before paid AI mounts: it is the single,
 // server-enforced sample offered during seller onboarding.
 router.use("/onboarding-sample", logoRouter);

@@ -32,6 +32,7 @@
  *                                      value and can be cashed out. Requires the
  *                                      "payouts" permission, same as POST /finance/payout.
  */
+import { denyIfAgeRestricted } from "../lib/ageGate";
 import { Router } from "express";
 import { eq, sql } from "drizzle-orm";
 import { db, threadCashStreaks } from "@workspace/db";
@@ -528,6 +529,7 @@ router.get("/quote", (req, res) => {
 
 router.post("/cash-out", requirePermission("payouts"), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
+  if (await denyIfAgeRestricted(sellerId, res)) return;
   const threadCashCents = Math.floor(Number(req.body?.threadCashCents));
   if (!threadCashCents || threadCashCents < 1) {
     res.status(400).json({ error: "Provide a valid Thread Cash amount." });
