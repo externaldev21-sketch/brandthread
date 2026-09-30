@@ -231,6 +231,9 @@ export function createPreviewLiveProvider(opts: PreviewLiveOptions): LiveStreamP
     },
 
     async listUpcoming(): Promise<UpcomingLive[]> {
+      // Same fresh-install rule as allSeeds(): no `&demo=1` means no seeded
+      // fake schedule, only the real "no one's live" empty state.
+      if (forceEmpty) return [];
       const now = Date.now();
       return PREVIEW_UPCOMING_LIVES.map(u => ({
         id: u.id,
@@ -242,6 +245,7 @@ export function createPreviewLiveProvider(opts: PreviewLiveOptions): LiveStreamP
     },
 
     async listSuggestedCreators(): Promise<SuggestedCreator[]> {
+      if (forceEmpty) return [];
       return PREVIEW_SUGGESTED_CREATORS.map(i => ({
         host: hostFor(i, media),
         followerCount: PREVIEW_LIVE_BRANDS[i].followerCount,

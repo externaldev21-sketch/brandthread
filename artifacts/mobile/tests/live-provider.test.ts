@@ -124,11 +124,11 @@ describe('preview live provider', () => {
     expect((await provider.listUpcoming())[0].reminderSet).toBe(true);
   });
 
-  it('forceEmpty renders the empty state data (no lives, but upcoming + suggested)', async () => {
+  it('forceEmpty (fresh install, no &demo=1) renders the real empty state: no lives, no seeded upcoming schedule, no seeded suggested creators', async () => {
     const empty = createPreviewLiveProvider({ media, forceEmpty: true });
     expect(await empty.listLive()).toEqual([]);
-    expect((await empty.listUpcoming()).length).toBeGreaterThan(0);
-    expect((await empty.listSuggestedCreators()).length).toBeGreaterThan(0);
+    expect(await empty.listUpcoming()).toEqual([]);
+    expect(await empty.listSuggestedCreators()).toEqual([]);
   });
 });
 
