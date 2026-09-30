@@ -1642,8 +1642,8 @@ export default function SellerConversationScreen() {
           accessibilityLabel="Photo or video"
         >
           {isUploading
-            ? <ActivityIndicator size="small" color="#000000" />
-            : <Feather name="camera" size={20} color="#000000" />
+            ? <ActivityIndicator size="small" color={ON_DARK} />
+            : <Feather name="camera" size={20} color={ON_DARK} />
           }
         </PressableScale>
 
@@ -2275,16 +2275,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginBottom: 2,
   },
   // IG-style camera-circle attach trigger — same visual as
-  // app/buyer-conversation.tsx's cameraCircleBtn: a solid white circle
-  // with a black camera glyph, 36pt diameter, fixed white/black regardless
-  // of theme (Mobbin: mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7).
+  // app/buyer-conversation.tsx's cameraCircleBtn: a solid accent-filled
+  // circle with an onAccent camera glyph, 36pt diameter (Mobbin:
+  // mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7), themed like
+  // every other filled control in this composer (e.g. sendBtn) instead of
+  // a fixed white/black pair.
   cameraCircleBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 2,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: PURPLE,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.12)',
+    borderColor: PURPLE,
   },
   textInput: {
     flex: 1, backgroundColor: CARD, borderRadius: RADIUS.xl,

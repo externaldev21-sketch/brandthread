@@ -20,13 +20,13 @@
  * pill-shaped. Non-Safari web gets a neutral "Express checkout" button,
  * since brand marks are never combined in one custom button.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import type { PaymentPath } from '@/lib/checkoutPayment';
 import { FONT, FS, SP } from '@/lib/theme';
-import { CK, CheckoutSection, OptionRow } from './CheckoutPrimitives';
+import { CheckoutSection, OptionRow, useCheckoutColors, type CheckoutColors } from './CheckoutPrimitives';
 import { CardEntry } from './StripePayment';
 
 export interface SavedCard {
@@ -88,26 +88,26 @@ export const WALLET_NAMES: Record<WalletKind, string> = {
 function WalletMark({ kind }: { kind: WalletKind }) {
   if (kind === 'google') {
     return (
-      <View style={styles.walletMark}>
-        <Text style={styles.walletLead}>Buy with</Text>
+      <View style={walletStyles.walletMark}>
+        <Text style={walletStyles.walletLead}>Buy with</Text>
         <Ionicons name="logo-google" size={18} color={WALLET_FG} />
-        <Text style={styles.walletText}>Pay</Text>
+        <Text style={walletStyles.walletText}>Pay</Text>
       </View>
     );
   }
   if (kind === 'apple') {
     return (
-      <View style={styles.walletMark}>
-        <Text style={styles.walletLead}>Buy with</Text>
+      <View style={walletStyles.walletMark}>
+        <Text style={walletStyles.walletLead}>Buy with</Text>
         <Ionicons name="logo-apple" size={20} color={WALLET_FG} style={{ marginTop: -3 }} />
-        <Text style={styles.walletText}>Pay</Text>
+        <Text style={walletStyles.walletText}>Pay</Text>
       </View>
     );
   }
   return (
-    <View style={styles.walletMark}>
+    <View style={walletStyles.walletMark}>
       <Feather name="zap" size={16} color={WALLET_FG} />
-      <Text style={styles.walletLead}>Express checkout</Text>
+      <Text style={walletStyles.walletLead}>Express checkout</Text>
     </View>
   );
 }
@@ -126,7 +126,7 @@ export function HostedExpressButton({
       <PressableScale
         onPress={onPress}
         disabled={disabled || loading}
-        style={styles.wallet}
+        style={walletStyles.wallet}
         accessibilityRole="button"
         accessibilityLabel={walletKind === 'express' ? 'Express checkout' : `Buy with ${WALLET_NAMES[walletKind]}`}
         accessibilityHint={walletKind === 'express'
@@ -144,6 +144,8 @@ export function HostedExpressButton({
 
 /** Express row: the wallet button, then "or" before the rest of the form. */
 export function ExpressSection({ children, visible }: { children: React.ReactNode; visible: boolean }) {
+  const ck = useCheckoutColors();
+  const styles = useMemo(() => makeStyles(ck), [ck]);
   return (
     // Stays mounted while hidden: the in-app wallet button reports whether a
     // wallet is available only once it has mounted.
@@ -171,11 +173,13 @@ export function PaymentSection({
   onCardComplete: (complete: boolean) => void;
   sellerCount: number;
 }) {
+  const ck = useCheckoutColors();
+  const styles = useMemo(() => makeStyles(ck), [ck]);
   if (path === 'preview') {
     return (
       <CheckoutSection title="Payment" testID="checkout-payment">
         <View style={styles.noteRow} testID="checkout-preview-note">
-          <Feather name="info" size={14} color={CK.muted} style={styles.noteIcon} />
+          <Feather name="info" size={14} color={ck.muted} style={styles.noteIcon} />
           {/* No mention of "preview"/"demo" here — the dev/demo preview
               bypass must have zero user-visible tells (Dev's explicit
               request). The underlying `path === 'preview'` code path stays;
@@ -190,13 +194,13 @@ export function PaymentSection({
     return (
       <CheckoutSection title="Payment" testID="checkout-payment">
         <View style={styles.cardRow}>
-          <View style={styles.cardIcon}><Feather name="credit-card" size={16} color={CK.text} /></View>
+          <View style={styles.cardIcon}><Feather name="credit-card" size={16} color={ck.text} /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Card, Apple Pay or Google Pay</Text>
             <Text style={styles.cardSub}>Entered on Stripe’s secure page after you tap Pay</Text>
           </View>
         </View>
-        <SecureLine sellerCount={sellerCount} hosted />
+        <SecureLine sellerCount={sellerCount} hosted ck={ck} styles={styles} />
       </CheckoutSection>
     );
   }
@@ -230,15 +234,17 @@ export function PaymentSection({
           <CardEntry onCompleteChange={onCardComplete} />
         </View>
       ) : null}
-      <SecureLine sellerCount={sellerCount} />
+      <SecureLine sellerCount={sellerCount} ck={ck} styles={styles} />
     </CheckoutSection>
   );
 }
 
-function SecureLine({ sellerCount, hosted }: { sellerCount: number; hosted?: boolean }) {
+function SecureLine({ sellerCount, hosted, ck, styles }: {
+  sellerCount: number; hosted?: boolean; ck: CheckoutColors; styles: ReturnType<typeof makeStyles>;
+}) {
   return (
     <View style={styles.secure}>
-      <Feather name="lock" size={13} color={CK.muted} style={styles.noteIcon} />
+      <Feather name="lock" size={13} color={ck.muted} style={styles.noteIcon} />
       <Text style={styles.secureText}>
         {hosted && sellerCount > 1
           ? `Secured by Stripe. Items from ${sellerCount} sellers are paid in ${sellerCount} separate secure payments.`
@@ -256,28 +262,36 @@ const SYSTEM_FONT = Platform.select({
   default: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Roboto, system-ui, sans-serif',
 });
 
-const styles = StyleSheet.create({
-  express: { paddingTop: SP.md },
-  hidden: { display: 'none' },
+// The wallet button itself is fixed white/black per the platform brand spec
+// (see the module comment) and does not follow the app theme, so its styles
+// stay a plain module-level StyleSheet.
+const walletStyles = StyleSheet.create({
   wallet: { height: 50, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: WALLET_BG },
   walletMark: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   // The platform's own typeface, not Inter (see the module comment).
   walletLead: { fontFamily: SYSTEM_FONT, fontWeight: '500', fontSize: FS.base + 1, color: WALLET_FG },
   walletText: { fontFamily: SYSTEM_FONT, fontWeight: '600', fontSize: FS.md + 1, letterSpacing: -0.2, color: WALLET_FG },
-  orRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md + 2, marginBottom: SP.xs + 2 },
-  orLine: { flex: 1, height: 1, backgroundColor: CK.divider },
-  orText: { fontFamily: FONT.medium, fontSize: FS.xs + 1, color: CK.subtle },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4 },
-  cardIcon: {
-    width: 40, height: 28, borderRadius: 6, borderWidth: 1, borderColor: CK.fieldBorder,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  cardTitle: { fontFamily: FONT.medium, fontSize: FS.base, color: CK.text },
-  cardSub: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2, lineHeight: 18, color: CK.muted },
-  cardEntryUnderRows: { paddingTop: SP.md },
-  noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
-  noteIcon: { marginTop: 2 },
-  note: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: CK.muted },
-  secure: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.md },
-  secureText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs + 1, lineHeight: 17, color: CK.muted },
 });
+
+function makeStyles(ck: CheckoutColors) {
+  return StyleSheet.create({
+    express: { paddingTop: SP.md },
+    hidden: { display: 'none' },
+    orRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.md + 2, marginBottom: SP.xs + 2 },
+    orLine: { flex: 1, height: 1, backgroundColor: ck.divider },
+    orText: { fontFamily: FONT.medium, fontSize: FS.xs + 1, color: ck.subtle },
+    cardRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4 },
+    cardIcon: {
+      width: 40, height: 28, borderRadius: 6, borderWidth: 1, borderColor: ck.fieldBorder,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    cardTitle: { fontFamily: FONT.medium, fontSize: FS.base, color: ck.text },
+    cardSub: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2, lineHeight: 18, color: ck.muted },
+    cardEntryUnderRows: { paddingTop: SP.md },
+    noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
+    noteIcon: { marginTop: 2 },
+    note: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, color: ck.muted },
+    secure: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.md },
+    secureText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs + 1, lineHeight: 17, color: ck.muted },
+  });
+}

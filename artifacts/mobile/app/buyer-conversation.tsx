@@ -1299,7 +1299,7 @@ export default function BuyerConversationScreen() {
         fromId: participant?.userId ?? BRANDTHREAD_AGENT_USER_ID,
         fromName: displayName,
         fromInitials: participant?.initials ?? 'BT',
-        fromColor: participant?.color ?? '#0A0A0B',
+        fromColor: participant?.color ?? theme.cardElevated,
         text: replyText,
         attachment: cardKind
           ? { type: 'agent_card', title: cardKind === 'thread_cash' ? 'How Thread Cash works' : 'Go to Discover', meta: { cardKind, deepLink: cardKind === 'thread_cash' ? '/thread-cash' : '/(buyer)/discover' } }
@@ -1332,7 +1332,7 @@ export default function BuyerConversationScreen() {
         fromId: participant?.userId ?? BRANDTHREAD_AGENT_USER_ID,
         fromName: displayName,
         fromInitials: participant?.initials ?? 'BT',
-        fromColor: participant?.color ?? '#0A0A0B',
+        fromColor: participant?.color ?? theme.cardElevated,
         text: replyText,
         reactions: [],
         status: 'read',
@@ -2452,8 +2452,8 @@ export default function BuyerConversationScreen() {
               accessibilityLabel="Attach"
             >
               {isUploading
-                ? <UploadRing size={ICON.md} color="#000000" />
-                : <Feather name="camera" size={20} color="#000000" />
+                ? <UploadRing size={ICON.md} color={theme.onAccent} />
+                : <Feather name="camera" size={20} color={theme.onAccent} />
               }
             </PressableScale>
 
@@ -2988,7 +2988,7 @@ function RequestActionPanel({
         </PressableScale>
         <PressableScale
           rippleEnabled={false}
-          style={[rs.actionBtn, rs.acceptBtn, { backgroundColor: theme.text }]}
+          style={[rs.actionBtn, rs.acceptBtn, { backgroundColor: theme.accent }]}
           onPress={onAccept}
           disabled={loading}
           accessibilityRole="button"
@@ -2996,9 +2996,9 @@ function RequestActionPanel({
           testID="conversation-request-accept"
         >
           {loading ? (
-            <ActivityIndicator color={theme.background} size="small" />
+            <ActivityIndicator color={theme.onAccent} size="small" />
           ) : (
-            <Text style={[rs.actionText, rs.acceptText, { color: theme.background }]}>Accept</Text>
+            <Text style={[rs.actionText, rs.acceptText, { color: theme.onAccent }]}>Accept</Text>
           )}
         </PressableScale>
       </View>
@@ -3531,11 +3531,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     justifyContent: 'center',
     marginBottom: 2,
   },
-  // IG-style camera-circle attach trigger — a solid white circle with a
-  // black camera glyph, 36pt diameter (Mobbin: Instagram DM composer,
-  // mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7). Fixed
-  // white/black regardless of theme, same as Instagram's own control, with
-  // a hairline border for definition against a light-theme background.
+  // IG-style camera-circle attach trigger — a solid accent-filled circle
+  // with an onAccent camera glyph, 36pt diameter (Mobbin: Instagram DM
+  // composer, mobbin.com/screens/db4e29c8-e47e-47ce-8f01-b7a98376c6e7).
+  // Themed like every other filled control in this composer (e.g. the
+  // send button) instead of a fixed white/black pair.
   cameraCircleBtn: {
     width: COMPOSER_CONTROL,
     height: COMPOSER_CONTROL,
@@ -3543,9 +3543,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.accent,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.12)',
+    borderColor: theme.accent,
   },
   // The single composer pill — holds the TextInput, the Thread Cash coin,
   // and the mic⇄send morph, all inside one rounded surface. ~44pt tall at
