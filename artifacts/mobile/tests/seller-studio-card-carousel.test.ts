@@ -64,7 +64,7 @@ describe('Studio card carousel: horizontal release LOCKS (does not navigate); ta
     const horizontalBranch = endBlock.slice(endBlock.indexOf("cardGestureAxis.value === 'horizontal'"));
     // The only occurrence of openCurrentItem in this branch must be inside
     // the fillProgress withTiming's OWN completion callback (i.e. after the
-    // full ENTER_FILL_MS elapses) — never called synchronously as part of
+    // full AUTO_ENTER_MS elapses) — never called synchronously as part of
     // locking itself.
     const openIdx = horizontalBranch.indexOf('runOnJS(openCurrentItem)()');
     const fillStartIdx = horizontalBranch.indexOf('fillProgress.value = withTiming(1,');
@@ -77,7 +77,11 @@ describe('Studio card carousel: horizontal release LOCKS (does not navigate); ta
 
   it('the fill and lock/scrub timings force NO_REDUCE_MOTION — they are functional (a real cancel window), not decorative, so Reduce Motion must never collapse them to instant', () => {
     expect(studio).toContain('const NO_REDUCE_MOTION = { reduceMotion: ReduceMotion.Never } as const;');
-    expect(studio).toContain('fillProgress.value = withTiming(1, { duration: ENTER_FILL_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }');
+    expect(studio).toContain('fillProgress.value = withTiming(1, { duration: AUTO_ENTER_MS, easing: Easing.linear, ...NO_REDUCE_MOTION }');
+  });
+
+  it('the auto-enter duration is a single named constant at 1500ms (restored after Dev found the briefly-shipped 1000ms too short in real use)', () => {
+    expect(studio).toContain('const AUTO_ENTER_MS = 1500;');
   });
 
   it('fireLandedHaptic uses a firmer/distinct impact style from the per-card scrub tick (fireHapticTick)', () => {

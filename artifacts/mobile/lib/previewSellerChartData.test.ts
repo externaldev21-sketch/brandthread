@@ -97,4 +97,16 @@ describe('buildPreviewSellerAnalytics — demo mode (populated)', () => {
     const labels = data.buckets.map((b) => bucketLabel(b.bucket, 'week'));
     expect(labels).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
   });
+
+  it('trafficSources rows always sum to visitorCount, and sharePercent is always derived from that same total', () => {
+    for (const range of RANGES) {
+      const data = buildPreviewSellerAnalytics(range, 'demo', NOW);
+      const rowSum = data.trafficSources.reduce((sum, row) => sum + row.count, 0);
+      expect(rowSum).toBe(data.visitorCount);
+      for (const row of data.trafficSources) {
+        const expectedShare = data.visitorCount > 0 ? Math.round((row.count / data.visitorCount) * 1000) / 10 : 0;
+        expect(row.sharePercent).toBe(expectedShare);
+      }
+    }
+  });
 });

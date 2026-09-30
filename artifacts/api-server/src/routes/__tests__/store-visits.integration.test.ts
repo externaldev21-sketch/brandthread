@@ -16,7 +16,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, storeVisits, users } from "@workspace/db";
+import { db, storeVisits, storefrontVisits, users } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 
 const suffix = crypto.randomBytes(6).toString("hex");
@@ -171,6 +171,7 @@ describe("GET /api/analytics/home — real per-source traffic aggregation", () =
     authState.clerkUserId = sellerB;
     // Wipe any prior rows so this test owns the count exactly.
     await db.delete(storeVisits).where(eq(storeVisits.sellerId, sellerB));
+    await db.delete(storefrontVisits).where(eq(storefrontVisits.sellerId, sellerB));
 
     const zeroResponse = await fetch(`${base}/api/analytics/home?range=month`);
     const zeroBody = await zeroResponse.json() as any;
@@ -195,15 +196,77 @@ describe("GET /api/analytics/home — real per-source traffic aggregation", () =
       // A different seller's traffic must never leak into sellerB's numbers.
       { sellerId: sellerA, source: "feed" },
     ]);
+    // 8 distinct deduped storefront visitors — exactly matching the 8
+    // store_visits rows above, so `visitorCount` and the per-source total
+    // agree here and the largest-remainder scaling below is a no-op.
+    const visitDate = new Date().toISOString().slice(0, 10);
+    await db.insert(storefrontVisits).values(
+      Array.from({ length: 8 }, (_, i) => ({
+        sellerId: sellerB,
+        visitorId: `${buyerA}-${i}`,
+        visitDate,
+      })),
+    );
 
     const response = await fetch(`${base}/api/analytics/home?range=month`);
     const body = await response.json() as any;
     expect(response.status).toBe(200);
+    expect(body.visitorCount).toBe(8);
     const bySource = Object.fromEntries(body.trafficSources.map((r: any) => [r.source, r]));
     expect(bySource.feed).toEqual({ source: "feed", count: 4, sharePercent: 50 });
     expect(bySource.search).toEqual({ source: "search", count: 2, sharePercent: 25 });
     expect(bySource.profile).toEqual({ source: "profile", count: 1, sharePercent: 12.5 });
     expect(bySource.external).toEqual({ source: "external", count: 1, sharePercent: 12.5 });
+    // The core invariant the seller Dashboard's Traffic sources panel
+    // depends on: its headline, its rows, and the separate Visitors stat
+    // tile (also `visitorCount`) can never visibly disagree.
+    const rowSum = body.trafficSources.reduce((sum: number, r: any) => sum + r.count, 0);
+    expect(rowSum).toBe(body.visitorCount);
+  });
+
+  it("scales real per-source counts onto visitorCount (largest-remainder rounding) when store_visits and storefront_visits totals genuinely differ", async () => {
+    authState.clerkUserId = sellerB;
+    await db.delete(storeVisits).where(eq(storeVisits.sellerId, sellerB));
+    await db.delete(storefrontVisits).where(eq(storefrontVisits.sellerId, sellerB));
+
+    // 8 real store_visits (a product page can be visited without ever
+    // hitting the deduped storefront endpoint), but only 5 deduped
+    // storefront visitors — a realistic, common divergence between the two
+    // tables, not a contrived edge case.
+    await db.insert(storeVisits).values([
+      { sellerId: sellerB, source: "feed" },
+      { sellerId: sellerB, source: "feed" },
+      { sellerId: sellerB, source: "feed" },
+      { sellerId: sellerB, source: "feed" },
+      { sellerId: sellerB, source: "search" },
+      { sellerId: sellerB, source: "search" },
+      { sellerId: sellerB, source: "profile" },
+      { sellerId: sellerB, source: "external" },
+    ]);
+    const visitDate = new Date().toISOString().slice(0, 10);
+    await db.insert(storefrontVisits).values(
+      Array.from({ length: 5 }, (_, i) => ({
+        sellerId: sellerB,
+        visitorId: `${buyerA}-scaled-${i}`,
+        visitDate,
+      })),
+    );
+
+    const response = await fetch(`${base}/api/analytics/home?range=month`);
+    const body = await response.json() as any;
+    expect(response.status).toBe(200);
+    expect(body.visitorCount).toBe(5);
+    // Real per-source proportions (4:2:1:1) reapplied onto the real
+    // visitorCount of 5, rounded so the rows sum to exactly 5 — never a
+    // number disagreeing with the headline/Visitors tile, and never a
+    // fabricated proportion (the 4:2:1:1 shape is the real measured split).
+    const rowSum = body.trafficSources.reduce((sum: number, r: any) => sum + r.count, 0);
+    expect(rowSum).toBe(5);
+    const bySource = Object.fromEntries(body.trafficSources.map((r: any) => [r.source, r]));
+    expect(bySource.feed.count).toBe(2);
+    expect(bySource.search.count).toBe(1);
+    expect(bySource.profile.count).toBe(1);
+    expect(bySource.external.count).toBe(1);
   });
 
   it("excludes traffic outside the requested range", async () => {
