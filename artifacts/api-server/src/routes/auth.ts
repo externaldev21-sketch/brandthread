@@ -20,6 +20,7 @@ import {
   normalizeProfileName,
   preserveExistingEmail,
 } from "../lib/authProfile";
+import { isUniqueViolation, violatedConstraint } from "../lib/dbErrors";
 import { createWelcomeConversationOnce } from "../lib/brandthreadAgent";
 
 const router = Router();
@@ -200,6 +201,19 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
   } catch (err) {
     if ((err as any)?.statusCode === 410) {
       res.status(410).json({ error: "This account has been deleted." });
+      return;
+    }
+    // A brand-new Clerk user (different clerkId) whose email collides,
+    // case-insensitively, with an existing local account — Clerk itself
+    // allows this in some configurations (e.g. two verified addresses that
+    // only differ by case). Never silently attach this session to the
+    // other account; the person must log into the account that already
+    // owns that email.
+    if (isUniqueViolation(err) && violatedConstraint(err) === "users_email_ci_unique") {
+      res.status(409).json({
+        error: "An account with this email already exists. Log in instead.",
+        code: "EMAIL_TAKEN",
+      });
       return;
     }
     req.log.error({ err, clerkUserId }, "Failed to sync user");
@@ -593,7 +607,7 @@ router.patch("/onboarding", requireAuth, validateRequest({ body: onboardingBodyS
     const [taken] = await db
       .select({ clerkId: users.clerkId })
       .from(users)
-      .where(eq(users.username, uname))
+      .where(eq(sql`lower(${users.username})`, uname))
       .limit(1);
     if (taken && taken.clerkId !== clerkUserId) {
       res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
@@ -602,17 +616,29 @@ router.patch("/onboarding", requireAuth, validateRequest({ body: onboardingBodyS
     updates.username = uname;
   }
 
-  const [updated] = await db
-    .update(users)
-    .set(updates)
-    .where(eq(users.clerkId, clerkUserId))
-    .returning();
+  try {
+    const [updated] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.clerkId, clerkUserId))
+      .returning();
 
-  if (!updated) {
-    res.status(404).json({ error: "User not found — call POST /auth/sync first" });
-    return;
+    if (!updated) {
+      res.status(404).json({ error: "User not found — call POST /auth/sync first" });
+      return;
+    }
+    res.json(updated);
+  } catch (err) {
+    // The pre-check above has a race window (two requests picking the same
+    // free username concurrently); the DB's own unique index is the real
+    // guarantee. Map its violation to the same 409 the pre-check gives.
+    if (isUniqueViolation(err) && violatedConstraint(err) === "users_username_ci_unique") {
+      res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
+      return;
+    }
+    req.log.error({ err, clerkUserId }, "Failed to save onboarding");
+    res.status(500).json({ error: "Failed to save onboarding" });
   }
-  res.json(updated);
 });
 
 // ─── POST /api/auth/onboarding/complete ───────────────────────────────────────
@@ -860,7 +886,7 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
       const [taken] = await db
         .select({ clerkId: users.clerkId })
         .from(users)
-        .where(eq(users.username, uname))
+        .where(eq(sql`lower(${users.username})`, uname))
         .limit(1);
       if (taken && taken.clerkId !== clerkId) {
         res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
@@ -870,17 +896,28 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
     }
   }
 
-  const [updated] = await db
-    .update(users)
-    .set(updates)
-    .where(eq(users.clerkId, clerkId))
-    .returning();
+  try {
+    const [updated] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.clerkId, clerkId))
+      .returning();
 
-  if (!updated) {
-    res.status(404).json({ error: "User not found" });
-    return;
+    if (!updated) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    res.json(updated);
+  } catch (err) {
+    // The pre-check above has a race window; the DB's own unique index is
+    // the real guarantee. Map its violation to the same 409 the pre-check gives.
+    if (isUniqueViolation(err) && violatedConstraint(err) === "users_username_ci_unique") {
+      res.status(409).json({ error: "Username is already taken.", code: "USERNAME_TAKEN" });
+      return;
+    }
+    req.log.error({ err, clerkId }, "Failed to update profile");
+    res.status(500).json({ error: "Failed to update profile" });
   }
-  res.json(updated);
 });
 
 // ─── GET /api/auth/username/check ─────────────────────────────────────────────
@@ -899,7 +936,7 @@ router.get("/username/check", requireAuth, async (req, res) => {
   const [existing] = await db
     .select({ clerkId: users.clerkId })
     .from(users)
-    .where(eq(users.username, raw))
+    .where(eq(sql`lower(${users.username})`, raw))
     .limit(1);
 
   if (existing && existing.clerkId !== clerkUserId) {
@@ -907,6 +944,66 @@ router.get("/username/check", requireAuth, async (req, res) => {
   } else {
     res.json({ available: true });
   }
+});
+
+// ─── GET /api/auth/email/check ────────────────────────────────────────────────
+// Proactive, case-insensitive email-availability check — used before starting
+// a new account's signup (e.g. the account switcher's "Create new account"),
+// so the person sees "An account with this email already exists. Log in
+// instead." before burning a Clerk signup attempt, rather than only after.
+// This never reveals which account owns the email, only that one does.
+router.get("/email/check", requireAuth, async (req, res) => {
+  const raw = (req.query.email as string || "").trim().toLowerCase();
+  const parsed = requestPrimitives.email.safeParse(raw);
+  if (!parsed.success) {
+    res.json({ available: false, error: "Enter a valid email address." });
+    return;
+  }
+
+  const [existing] = await db
+    .select({ clerkId: users.clerkId })
+    .from(users)
+    .where(eq(sql`lower(${users.email})`, raw))
+    .limit(1);
+
+  if (existing) {
+    res.json({
+      available: false,
+      error: "An account with this email already exists. Log in instead.",
+      code: "EMAIL_TAKEN",
+    });
+  } else {
+    res.json({ available: true });
+  }
+});
+
+// ─── GET /api/auth/account-types ──────────────────────────────────────────────
+// Bulk accountType lookup by Clerk user id, for the account switcher: Clerk's
+// own session/user object carries no buyer/seller signal (that's local to
+// this app), so an inactive signed-in session can't otherwise show its real
+// role. Returns only the ids that exist locally; unknown ids are omitted.
+router.get("/account-types", requireAuth, async (req, res) => {
+  const raw = (req.query.clerkIds as string || "").split(",").map((id) => id.trim()).filter(Boolean);
+  if (raw.length === 0) {
+    res.json({ accountTypes: {} });
+    return;
+  }
+  const rows = await db
+    .select({ clerkId: users.clerkId, accountType: users.accountType, username: users.username, avatarUrl: users.avatarUrl, displayName: users.displayName, name: users.name })
+    .from(users)
+    .where(inArray(users.clerkId, raw.slice(0, 8)));
+
+  const accountTypes: Record<string, { accountType: string | null; username: string | null; avatarUrl: string | null; displayName: string | null; name: string }> = {};
+  for (const row of rows) {
+    accountTypes[row.clerkId] = {
+      accountType: row.accountType,
+      username: row.username,
+      avatarUrl: row.avatarUrl,
+      displayName: row.displayName,
+      name: row.name,
+    };
+  }
+  res.json({ accountTypes });
 });
 
 // ─── GET /api/auth/privacy ────────────────────────────────────────────────────
