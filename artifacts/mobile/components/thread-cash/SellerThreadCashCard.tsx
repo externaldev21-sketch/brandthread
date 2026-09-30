@@ -82,15 +82,27 @@ export function SellerThreadCashCard({
         disabled={loading || error || !balanceCents}
         style={[
           styles.cashOutBtn,
-          { backgroundColor: theme.text },
-          (loading || error || !balanceCents) && styles.cashOutBtnDisabled,
+          (loading || error || !balanceCents)
+            ? [styles.cashOutBtnDisabled, { borderColor: theme.border }]
+            : { backgroundColor: theme.text },
         ]}
         accessibilityRole="button"
         accessibilityLabel="Cash out Thread Cash"
         testID="seller-thread-cash-cash-out-button"
       >
-        <Feather name="arrow-down-circle" size={16} color={theme.background} />
-        <Text style={[styles.cashOutBtnText, { color: theme.background }]}>Cash out</Text>
+        <Feather
+          name="arrow-down-circle"
+          size={16}
+          color={(loading || error || !balanceCents) ? theme.muted : theme.background}
+        />
+        <Text
+          style={[
+            styles.cashOutBtnText,
+            { color: (loading || error || !balanceCents) ? theme.muted : theme.background },
+          ]}
+        >
+          Cash out
+        </Text>
       </Pressable>
     </View>
   );
@@ -115,6 +127,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, borderRadius: RADIUS.pill, marginTop: SP.md,
   },
-  cashOutBtnDisabled: { opacity: 0.4 },
+  cashOutBtnDisabled: { borderWidth: 1, backgroundColor: 'transparent' },
   cashOutBtnText: { fontFamily: FONT.bold, fontSize: FS.sm },
 });
