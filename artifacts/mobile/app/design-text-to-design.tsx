@@ -28,6 +28,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   generateDesignFromText, applyPromptEdit, createBrandAsset,
 } from '@/services/designService';
+import { useHideTabBar } from '@/lib/tabBarVisibility';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,7 @@ let seq = 0;
 const uid = (prefix: string) => `${prefix}_${Date.now()}_${seq++}`;
 
 export default function AiDesignChatScreen() {
+  useHideTabBar();
   const { theme } = useAppTheme();
   const colors = useColors();
   const s = useMemo(() => createStyles(colors), [colors]);
