@@ -14,7 +14,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/hooks/useApi';
 import { BrandthreadCard, LoadingSkeleton, SkeletonText, HapticSwitch} from '@/components/BrandthreadUI';
-import { COMP } from '@/lib/theme';
+import { COMP, FS } from '@/lib/theme';
 
 export default function ShopifyFulfillmentScreen() {
   const colors = useColors();
@@ -167,8 +167,8 @@ export default function ShopifyFulfillmentScreen() {
 
 const styles = StyleSheet.create({
   rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, minHeight: COMP.minTouchTarget },
-  iconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  iconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { fontSize: FS.base, fontFamily: 'Inter_600SemiBold' },
   cardSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
   label: { fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 6, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
