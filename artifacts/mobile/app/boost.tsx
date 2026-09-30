@@ -99,6 +99,36 @@ function daysRemaining(endsAt: string): number {
   return Math.max(0, Math.ceil(ms / 86_400_000));
 }
 
+// ── Stable empty-state constants ────────────────────────────────────────────
+// Module-level, not computed inline during render: an inline `[]`/`{}` is a
+// brand-new reference every render, which breaks any effect/memo/callback
+// keyed on it (its deps never stabilize, so it fires every render — see
+// EMPTY_TARGETS's own comment below, and the "Maximum update depth exceeded"
+// crash that produced). Every fixed-shape empty/default value this screen
+// hands to useState/setState lives here once, reused everywhere.
+const EMPTY_BOOSTS: Boost[] = [];
+const FRESH_SUMMARY: Summary = { totalImpressions: 0, spentCentsThisMonth: 0, activeCount: 0 };
+
+// Shallow equality guards — defense in depth for setState calls inside an
+// effect: even if an upstream value becomes reference-unstable again in the
+// future (a fresh literal reintroduced somewhere), these stop a no-op
+// "change" from re-triggering state updates and re-render loop. Sufficient
+// here because every value these guard is a flat array of primitives/ids or
+// a flat plain object of primitives — never nested.
+function shallowArrayEqual<T>(a: readonly T[], b: readonly T[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+  return true;
+}
+function shallowObjectEqual<T extends Record<string, unknown>>(a: T, b: T): boolean {
+  if (a === b) return true;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  return aKeys.every((key) => a[key] === b[key]);
+}
+
 // Monochrome only: status is told apart by weight/opacity and its own
 // label text, never by hue (this screen has none of the app's 3 allowed
 // color accents — LIVE-red, end-call-red, Thread Cash green).
@@ -354,6 +384,15 @@ const tc = StyleSheet.create({
 // isPreviewFreshMode/isPreviewDemoMode doc comment, and PR #373/#374).
 // No fake business metrics — just clearly-labeled placeholders for UI review.
 
+// Stable module-level reference — a `[]` literal computed inline during
+// render is a NEW array every render, which broke an effect keyed on it
+// (see previewTargets below): the effect's deps never stabilized, so it
+// fired every render, called setTargets/setSummary, triggered a re-render,
+// fired again — an infinite "Maximum update depth exceeded" loop, visible
+// as a red error toast in the fresh (non-demo) seller preview. Never
+// construct the empty-targets fallback inline again; reuse this constant.
+const EMPTY_TARGETS: BoostTarget[] = [];
+
 const PREVIEW_BOOST_TARGETS: BoostTarget[] = [
   {
     id:         'preview-video-1',
@@ -411,14 +450,19 @@ export default function BoostScreen() {
   // real `&demo=1` query param / its persisted mirror, same as every other
   // already-fixed screen (e.g. SellerHomeCommerceDashboard.tsx).
   const inSellerPreviewDemo = inSellerPreview && isPreviewDemoMode();
-  const previewTargets = inSellerPreviewDemo ? PREVIEW_BOOST_TARGETS : [];
+  // Both branches are stable module-level references (never a fresh `[]`
+  // literal computed here) — this value feeds a useEffect dependency array
+  // below, and a non-stable reference there is exactly what caused the
+  // "Maximum update depth exceeded" infinite loop. See EMPTY_TARGETS/
+  // PREVIEW_BOOST_TARGETS's own comments.
+  const previewTargets = inSellerPreviewDemo ? PREVIEW_BOOST_TARGETS : EMPTY_TARGETS;
 
   // ── State ─────────────────────────────────────────────────────────────────
 
   const [step,             setStep]             = useState<0 | 1 | 2>(0);
   const [selectedTarget,   setSelectedTarget]   = useState<BoostTarget | null>(null);
   const [targets,          setTargets]          = useState<BoostTarget[]>(
-    inSellerPreview ? previewTargets : [],
+    inSellerPreview ? previewTargets : EMPTY_TARGETS,
   );
   const [loadingTargets,   setLoadingTargets]   = useState(!inSellerPreview);
   const [targetsError,     setTargetsError]     = useState(false);
@@ -436,12 +480,10 @@ export default function BoostScreen() {
   const [activeBoost,      setActiveBoost]      = useState<Boost | null>(null);
 
   // History
-  const [existing,         setExisting]         = useState<Boost[]>([]);
+  const [existing,         setExisting]         = useState<Boost[]>(EMPTY_BOOSTS);
   const [loadingExisting,  setLoadingExisting]  = useState(!inSellerPreview);
   const [summary,          setSummary]          = useState<Summary | null>(
-    inSellerPreview
-      ? { totalImpressions: 0, spentCentsThisMonth: 0, activeCount: 0 }
-      : null,
+    inSellerPreview ? FRESH_SUMMARY : null,
   );
   const [pausingId,        setPausingId]        = useState<string | null>(null);
 
@@ -477,18 +519,20 @@ export default function BoostScreen() {
   // Direct Expo web navigation can render before a focus event is delivered.
   // Seed preview state explicitly so the screen never remains on its initial
   // loading flags while waiting for authenticated API calls it cannot make.
+  //
+  // previewTargets is now always a stable module-level reference (see its
+  // own comment above), so this effect's deps stop changing once settled —
+  // but every setState call below is ALSO guarded against a no-op update
+  // (current value already equal to the new one), so this stays inert even
+  // if a future change makes previewTargets reference-unstable again.
   useEffect(() => {
     if (!inSellerPreview) return;
-    setTargets(previewTargets);
+    setTargets((prev) => (shallowArrayEqual(prev, previewTargets) ? prev : previewTargets));
     setTargetsError(false);
     setLoadingTargets(false);
-    setExisting([]);
+    setExisting((prev) => (shallowArrayEqual(prev, EMPTY_BOOSTS) ? prev : EMPTY_BOOSTS));
     setLoadingExisting(false);
-    setSummary({
-      totalImpressions: 0,
-      spentCentsThisMonth: 0,
-      activeCount: 0,
-    });
+    setSummary((prev) => (prev && shallowObjectEqual(prev, FRESH_SUMMARY) ? prev : FRESH_SUMMARY));
   }, [inSellerPreview, previewTargets]);
 
   const loadTargets = useCallback(async () => {
@@ -510,7 +554,7 @@ export default function BoostScreen() {
         // Production / native / buyer preview: preserve real error state.
         // Show a clear auth message for 401 rather than a generic connection error.
         setTargetsError(true);
-        setTargets([]);
+        setTargets(EMPTY_TARGETS);
         // Suppress the unused-variable warning — is401 is referenced here for
         // future per-code branching if needed.
         void is401;
@@ -529,7 +573,7 @@ export default function BoostScreen() {
       setExisting((rows ?? []) as Boost[]);
     } catch {
       // In preview, 401 is expected — honest empty history (no fake data).
-      setExisting([]);
+      setExisting(EMPTY_BOOSTS);
     } finally {
       setLoadingExisting(false);
     }
@@ -546,13 +590,9 @@ export default function BoostScreen() {
       setTargets(previewTargetsRef.current);
       setTargetsError(false);
       setLoadingTargets(false);
-      setExisting([]);
+      setExisting(EMPTY_BOOSTS);
       setLoadingExisting(false);
-      setSummary({
-        totalImpressions: 0,
-        spentCentsThisMonth: 0,
-        activeCount: 0,
-      });
+      setSummary(FRESH_SUMMARY);
       return;
     }
     loadTargets();

@@ -12,6 +12,11 @@
  * This is intentionally generic over the post shape (`T`) so it has no
  * dependency on `app/(tabs)/feed.tsx`'s locally-defined `SpotlightItem` type
  * and can be imported from there without a cycle.
+ *
+ * Scoped by Clerk userId (same pattern as tabDataCache.ts /
+ * services/productService.ts) — different accounts follow different people,
+ * so a "For You"/"Following" page cached for one account must never paint
+ * on another's feed after a switch.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -20,11 +25,22 @@ const STORAGE_PREFIX = 'bt_feed_posts_cache_v1_';
 // warm-start cache, not a full offline store, so it stays small on disk.
 const MAX_CACHED_POSTS = 12;
 
+let _scopeUserId = 'anon';
+
+/** Call on sign-in/sign-out/account switch, before any screen reads/writes this cache. */
+export function initFeedPostsCache(userId: string | null): void {
+  _scopeUserId = userId ?? 'anon';
+}
+
+function scopedTab(tab: string): string {
+  return `${_scopeUserId}:${tab}`;
+}
+
 const memoryCache = new Map<string, unknown[]>();
 
 /** Synchronous — returns whatever is already in memory for this tab, or undefined. */
 export function getCachedFeedPosts<T>(tab: string): T[] | undefined {
-  return memoryCache.get(tab) as T[] | undefined;
+  return memoryCache.get(scopedTab(tab)) as T[] | undefined;
 }
 
 /**
@@ -33,14 +49,15 @@ export function getCachedFeedPosts<T>(tab: string): T[] | undefined {
  * synchronous. Resolves to undefined when there is nothing cached.
  */
 export async function hydrateFeedPostsCache<T>(tab: string): Promise<T[] | undefined> {
-  const inMemory = memoryCache.get(tab);
+  const scoped = scopedTab(tab);
+  const inMemory = memoryCache.get(scoped);
   if (inMemory) return inMemory as T[];
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_PREFIX + tab);
+    const raw = await AsyncStorage.getItem(STORAGE_PREFIX + scoped);
     if (!raw) return undefined;
     const parsed = JSON.parse(raw) as T[];
     if (Array.isArray(parsed) && parsed.length > 0) {
-      memoryCache.set(tab, parsed);
+      memoryCache.set(scoped, parsed);
       return parsed;
     }
   } catch {
@@ -52,7 +69,8 @@ export async function hydrateFeedPostsCache<T>(tab: string): Promise<T[] | undef
 /** Called after every successful feed load so the next cold start/tab switch is instant. */
 export function setCachedFeedPosts<T>(tab: string, posts: T[]): void {
   if (!Array.isArray(posts) || posts.length === 0) return;
-  memoryCache.set(tab, posts);
+  const scoped = scopedTab(tab);
+  memoryCache.set(scoped, posts);
   const toPersist = posts.slice(0, MAX_CACHED_POSTS);
-  AsyncStorage.setItem(STORAGE_PREFIX + tab, JSON.stringify(toPersist)).catch(() => {});
+  AsyncStorage.setItem(STORAGE_PREFIX + scoped, JSON.stringify(toPersist)).catch(() => {});
 }

@@ -25,6 +25,7 @@ import {
 } from './aiTypes';
 import { getEnabledMemorySummary } from './aiBrandMemory';
 import { addAuditEntry } from './aiAuditLog';
+import { getPreviewAiReply } from '../lib/previewAiBrain';
 
 // ─── ID helper ────────────────────────────────────────────────────────────────
 
@@ -488,6 +489,39 @@ export async function sendMessageStream(
   }
 
   const { newSession, aiMsg } = await finalizeTurn(session, userText, response, userId, storeContext);
+  return { session: newSession, response: aiMsg };
+}
+
+/**
+ * Preview-only counterpart to sendMessageStream() — same contract and
+ * return shape, but never calls the real (paid, auth-gated) AI endpoint.
+ * The reply comes from lib/previewAiBrain.ts's template answers over the
+ * same seeded preview data every other dev-preview screen uses. Callers
+ * must gate on isSellerDevPreview()/isBuyerDevPreview() before using this;
+ * it does not re-check that itself so the gate stays visible at the call
+ * site (see app/ai-brain.tsx).
+ */
+export async function sendPreviewMessageStream(
+  params: Pick<SendMessageParams, 'userText' | 'session' | 'userId' | 'storeContext'>,
+  onDelta: (textSoFar: string) => void,
+): Promise<SendMessageResult> {
+  const { userText, session, userId, storeContext } = params;
+
+  const fullReply = getPreviewAiReply(userText);
+
+  // A light word-by-word reveal so the preview exercises the same streaming
+  // UI (typing dots → live text) a real reply would, instead of popping in
+  // instantly — without any network round-trip.
+  const words = fullReply.split(' ');
+  let shown = '';
+  for (const word of words) {
+    shown = shown ? `${shown} ${word}` : word;
+    onDelta(shown);
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => setTimeout(resolve, 18));
+  }
+
+  const { newSession, aiMsg } = await finalizeTurn(session, userText, { content: fullReply }, userId, storeContext);
   return { session: newSession, response: aiMsg };
 }
 
