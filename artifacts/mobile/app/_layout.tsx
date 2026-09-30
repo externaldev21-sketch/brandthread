@@ -313,6 +313,21 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // a global, default-on overlay gated by this deny-list instead, and this
   // route was simply missing from it.
   'seller-conversation',
+  // ── Every other full-screen-modal-presentation route below ──
+  // Regression guard: tests/tab-bar-full-screen-slide.test.ts asserts every
+  // Stack.Screen registered as a full-screen modal presentation in this
+  // file is in this Set, so a future camera/capture/full-bleed screen can't
+  // ship without being added here (and, via SellerBarGate below, without the
+  // slide-off/on animation). The four below are buyer routes a seller can
+  // still land on (buyer-facing preview, a seller opening a buyer link,
+  // etc.) — real camera/live UI with its own bottom controls, same category
+  // as camera-capture/seller-go-live above; this is the actual fresh-install
+  // bug a seller hit: 'buyer-story-create' was missing, so the floating
+  // seller tab bar rendered on top of the story camera's shutter row.
+  'buyer-story-create',
+  'buyer-story-viewer',
+  'buyer-live',
+  'live-feed',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
@@ -346,12 +361,17 @@ function SellerBarGate() {
   const firstSegment = (segments[0] as string | undefined) ?? '';
   const isFullScreenRoute = SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment);
 
-  if (!showBar || isFullScreenRoute) return null;
+  if (!showBar) return null;
 
+  // The bar itself stays mounted through a full-screen route so it can
+  // slide fully off screen and back (see SellerGlobalTabBar's `hidden`
+  // prop) instead of instantly popping in/out — only the Studio radial menu
+  // (which has no slide affordance of its own) unmounts immediately, same
+  // as before.
   return (
     <>
-      <SellerGlobalTabBar onOpenStudio={() => setStudioOpenRequestKey((k) => k + 1)} />
-      <SellerStudioRadialMenu hideTrigger openRequestKey={studioOpenRequestKey} />
+      <SellerGlobalTabBar hidden={isFullScreenRoute} onOpenStudio={() => setStudioOpenRequestKey((k) => k + 1)} />
+      {!isFullScreenRoute && <SellerStudioRadialMenu hideTrigger openRequestKey={studioOpenRequestKey} />}
     </>
   );
 }

@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
-  ActivityIndicator, Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Modal, PanResponder, Platform,
+  ActivityIndicator, Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Linking, Modal, PanResponder, Platform,
   Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -50,6 +50,16 @@ import { ModalSafeArea } from '@/components/ModalSafeArea';
 const { width: W, height: H } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 const MAX_VIDEO_SECONDS = 15;
+
+// expo-media-library has no web implementation — imported lazily (require)
+// only on native, same convention as components/create-post/MediaGrid.tsx.
+// The imperative getAssetsAsync/SortBy API used below lives under the
+// `/legacy` subpath in expo-media-library 57.
+let MediaLibrary: typeof import('expo-media-library/legacy') | null = null;
+if (!IS_WEB) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  MediaLibrary = require('expo-media-library/legacy');
+}
 
 type Step = 'camera' | 'create' | 'edit';
 type CaptureMode = 'story' | 'post' | 'live';
@@ -468,6 +478,28 @@ export default function StoryComposer() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordProgress, setRecordProgress] = useState(0);
   const [lastGalleryUri, setLastGalleryUri] = useState<string | null>(null);
+  // Instagram-style latest-photo thumbnail on the gallery button — read-only
+  // (no permission prompt of its own): only checks an already-granted
+  // permission so it never surprises the user with a second prompt before
+  // they've tapped anything. Falls back to the icon glyph until granted or
+  // if the library is empty.
+  useEffect(() => {
+    if (IS_WEB || !MediaLibrary) return;
+    void (async () => {
+      try {
+        const perm = await MediaLibrary.getPermissionsAsync();
+        if (!perm.granted) return;
+        const page = await MediaLibrary.getAssetsAsync({
+          mediaType: ['photo', 'video'],
+          sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+          first: 1,
+        });
+        if (page.assets[0]) setLastGalleryUri(page.assets[0].uri);
+      } catch {
+        // No access / no assets — keep the icon fallback.
+      }
+    })();
+  }, []);
   const cameraRef = useRef<CameraView>(null);
   const recordingRef = useRef(false);
   const recordTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -939,12 +971,23 @@ export default function StoryComposer() {
           <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} flash={flash} mode={isRecording ? 'video' : 'picture'} />
         ) : (
           <View style={[styles.root, styles.webFallback]}>
-            <Feather name="camera-off" size={40} color="rgba(255,255,255,0.4)" />
+            <Feather name="camera-off" size={40} color={ON_DARK} />
             <Text style={styles.webFallbackText}>
-              {IS_WEB ? 'Allow camera access in your browser to capture a story here, or choose from your library.' : 'Camera access is required to post a story.'}
+              {IS_WEB ? 'Allow camera access in your browser to capture a story here, or choose from your library.' : 'Allow camera access to post a story.'}
             </Text>
-            <TouchableOpacity style={[styles.permBtn, { backgroundColor: theme.accent }]} onPress={() => { requestCameraPermission(); requestMicPermission(); }}>
-              <Text style={[styles.permBtnText, getOnAccentTextStyle(theme)]}>Grant access</Text>
+            <TouchableOpacity
+              style={[styles.permBtn, { backgroundColor: theme.accent }]}
+              onPress={() => {
+                // On native, once the OS prompt has already been declined
+                // it can't be re-shown — the only way back in is Settings.
+                if (!IS_WEB && cameraPermission?.canAskAgain === false) { Linking.openSettings(); return; }
+                requestCameraPermission();
+                requestMicPermission();
+              }}
+            >
+              <Text style={[styles.permBtnText, getOnAccentTextStyle(theme)]}>
+                {!IS_WEB && cameraPermission?.canAskAgain === false ? 'Open Settings' : 'Grant access'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1048,15 +1091,17 @@ export default function StoryComposer() {
 
         {/* Bottom controls */}
         <View style={[styles.camBottom, { paddingBottom: insets.bottom + SP.md }]}>
-          {/* Mode carousel: STORY / POST / LIVE */}
+          {/* Mode carousel: STORY / POST / LIVE. LIVE is a real, working
+              destination for sellers (routes to the Go Live flow) — never a
+              disabled "coming soon" item. Buyers can't go live at all, so
+              the item isn't rendered for them rather than shown dead. */}
           <View style={styles.modeRow}>
-            {(['post', 'story', 'live'] as CaptureMode[]).map((m) => {
+            {(isSeller ? (['post', 'story', 'live'] as CaptureMode[]) : (['post', 'story'] as CaptureMode[])).map((m) => {
               const active = mode === m;
               return (
                 <TouchableOpacity
                   key={m}
                   style={styles.modeItem}
-                  disabled={m === 'live'}
                   onLayout={(e) => {
                     const { x, width } = e.nativeEvent.layout;
                     setModeLayouts((prev) => ({ ...prev, [m]: { x, width } }));
@@ -1064,13 +1109,14 @@ export default function StoryComposer() {
                   onPress={() => {
                     hapticToggle();
                     if (m === 'post') { router.push({ pathname: '/create-post', params: { accountType: params.accountType ?? 'buyer' } } as any); return; }
+                    if (m === 'live') { router.push('/seller-go-live' as never); return; }
                     setMode(m);
                   }}
                   accessibilityLabel={`${m} mode`}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                 >
-                  <Text style={[styles.modeText, active && styles.modeTextActive, m === 'live' && styles.modeTextDisabled]}>
+                  <Text style={[styles.modeText, active && styles.modeTextActive]}>
                     {m.toUpperCase()}
                   </Text>
                 </TouchableOpacity>
@@ -1923,7 +1969,7 @@ function renderOverlayContent(ov: StoryOverlay) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   webFallback: { alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: 32 },
-  webFallbackText: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
+  webFallbackText: { color: ON_DARK, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
   permBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: RADIUS.md },
   permBtnText: { fontFamily: FONT.semibold, fontSize: FS.base },
 
@@ -1969,15 +2015,17 @@ const styles = StyleSheet.create({
   modeIndicator: { position: 'absolute', left: 0, bottom: -6, height: 2, borderRadius: 1, backgroundColor: ON_DARK },
   modeText: { color: 'rgba(255,255,255,0.5)', fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.5 },
   modeTextActive: { color: ON_DARK, fontSize: FS.base },
-  modeTextDisabled: { color: 'rgba(255,255,255,0.25)' },
 
   controlsRow: {
     width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: SP.xl, marginBottom: SP.sm,
   },
+  // Instagram-style latest-photo thumbnail: a thin solid white border, no
+  // grey fill. The icon fallback (no permission / no photos yet) is on a
+  // plain black background, not a translucent grey box.
   galleryThumb: {
     width: 44, height: 44, borderRadius: RADIUS.sm, overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: '#000', borderWidth: 1, borderColor: ON_DARK,
     alignItems: 'center', justifyContent: 'center',
   },
   galleryThumbImg: { width: '100%', height: '100%' },
