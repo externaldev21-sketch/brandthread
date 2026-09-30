@@ -87,7 +87,10 @@ export default function LoginMethods() {
       sublabel: hasGoogle
         ? (googleAccount?.emailAddress ?? 'Connected')
         : 'Not connected',
-      icon: <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: FONT.bold, fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text></View>,
+      // Google's brand blue only clears WCAG AA (4.5:1) against a dark "G",
+      // not white — the audit's own contrast check confirmed white here
+      // was 3.56:1.
+      icon: <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: FONT.bold, fontSize: 12, color: '#0A0A0B', lineHeight: 14 }}>G</Text></View>,
       connected: hasGoogle,
     },
     {
@@ -585,7 +588,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
 
   body: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg },
   desc: {
-    ...TYPE_SCALE.callout,
+    ...TYPE_SCALE.footnote,
     color: colors.mutedForeground, marginBottom: SPACING.lg,
   },
 
@@ -614,7 +617,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   iconWrapActive: {
   },
 
-  methodLabel: { ...TYPE_SCALE.callout, fontFamily: FONT.semibold, color: colors.foreground },
+  methodLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: colors.foreground },
   methodSub:   { fontSize: 11, fontFamily: FONT.regular, color: colors.mutedForeground },
 
   activeBadge: {
@@ -652,7 +655,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   modal: { flex: 1, backgroundColor: colors.background },
   modalBody: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg, paddingBottom: 40 },
   modalStep: {
-    ...TYPE_SCALE.callout, color: colors.foreground,
+    ...TYPE_SCALE.footnote, color: colors.foreground,
     lineHeight: 22, marginBottom: SPACING.md,
   },
   qrWrap: {
@@ -689,7 +692,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
 
   passwordSetupBody: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg, paddingBottom: 40 },
   passwordSetupIntro: {
-    ...TYPE_SCALE.callout, color: colors.mutedForeground,
+    ...TYPE_SCALE.footnote, color: colors.mutedForeground,
     lineHeight: 21, marginBottom: SPACING.lg,
   },
   passwordSetupLabel: {
@@ -703,13 +706,13 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   },
   passwordInput: {
     flex: 1, paddingHorizontal: SPACING.md, paddingVertical: 14,
-    ...TYPE_SCALE.callout, color: colors.foreground,
+    ...TYPE_SCALE.footnote, color: colors.foreground,
   },
   passwordInputStandalone: {
     backgroundColor: colors.card, borderRadius: RADII.chip,
     borderWidth: 1, borderColor: colors.border,
     paddingHorizontal: SPACING.md, paddingVertical: 14,
-    ...TYPE_SCALE.callout, color: colors.foreground,
+    ...TYPE_SCALE.footnote, color: colors.foreground,
   },
   passwordVisibilityButton: {},
   passwordErrorBox: {

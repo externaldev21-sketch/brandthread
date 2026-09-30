@@ -298,7 +298,12 @@ export default function ProductImportScreen() {
         <View style={{ flex: 1, backgroundColor: BG, padding: 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <Text style={{ fontSize: 18, fontFamily: FONT.bold, color: FG }}>Paste CSV Data</Text>
-            <TouchableOpacity onPress={() => setShowCsvModal(false)} style={{ width: 36, height: 36, backgroundColor: SURFACE, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity
+              onPress={() => setShowCsvModal(false)}
+              style={{ width: 44, height: 44, backgroundColor: SURFACE, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' }}
+              accessibilityRole="button"
+              accessibilityLabel="Close paste CSV data"
+            >
               <Feather name="x" size={18} color={FG} />
             </TouchableOpacity>
           </View>

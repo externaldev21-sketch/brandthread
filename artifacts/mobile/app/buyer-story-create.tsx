@@ -1923,7 +1923,7 @@ function renderOverlayContent(ov: StoryOverlay) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   webFallback: { alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: 32 },
-  webFallbackText: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
+  webFallbackText: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
   permBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: RADIUS.md },
   permBtnText: { fontFamily: FONT.semibold, fontSize: FS.base },
 

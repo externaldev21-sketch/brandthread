@@ -1965,6 +1965,7 @@ export default function AddProductScreen() {
           <TouchableOpacity
             style={s.statusPill}
             onPress={openStatusPicker}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel={`Product status: ${currentStatus === 'active' ? 'Active' : 'Draft'}`}
             testID="add-product-status-pill"
@@ -2231,7 +2232,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   // A collapsed "+ Add X" row (description, category, size chart) —
   // Shopify's own pattern for an optional field that isn't set yet.
-  plusRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.xs },
+  plusRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 44, paddingVertical: SP.xs },
   plusRowText: { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
   priceRow: { flexDirection: 'row', gap: SP.sm },
 

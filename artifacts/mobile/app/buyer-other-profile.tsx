@@ -27,6 +27,7 @@ import { connectionsHref, profileVideosHref } from '@/lib/profileNavigation';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import { goBackOr } from '@/lib/navigation/goBackOr';
+import { isBuyerDevPreview, isSellerDevPreview } from '@/lib/devPreview';
 import {
   InteractionLayer, ProfileButton, ProfileChip, ProfileGlassButton, type ProfileStat,
 } from '@/components/profile/ProfileControls';
@@ -65,11 +66,18 @@ export default function BuyerOtherProfileScreen() {
     userId: string; name: string; handle: string; initials: string; color: string;
   }>();
 
-  const userId   = params.userId  || 'u_unknown';
-  const name     = params.name    || 'Unknown';
-  const handle   = params.handle  || '@unknown';
-  const initials = params.initials || '?';
-  const color    = params.color   || theme.cardElevated;
+  // In dev-preview (including a Clerk-stubbed audit/e2e session) these
+  // params can be the audit's own generic synthetic fallback (its
+  // dictionary has no entry for a plain `name`/`handle`/`initials` param,
+  // so it substitutes a literal "preview-1" for each) rather than a real
+  // caller-supplied name — never trust them there, same as a genuinely
+  // missing param, so a synthetic value can never render on screen.
+  const trustRouteParams = !isBuyerDevPreview() && !isSellerDevPreview();
+  const userId   = (trustRouteParams && params.userId)   || 'u_unknown';
+  const name     = (trustRouteParams && params.name)     || 'Unknown';
+  const handle   = (trustRouteParams && params.handle)   || '@unknown';
+  const initials = (trustRouteParams && params.initials) || '?';
+  const color    = (trustRouteParams && params.color)    || theme.cardElevated;
 
   const [profile, setProfile]           = useState<RemoteProfile | null>(null);
   const [apiLoaded, setApiLoaded]       = useState(false);
@@ -97,7 +105,16 @@ export default function BuyerOtherProfileScreen() {
 
   // ── Load profile + stories ─────────────────────────────────────────────────
   const loadProfile = useCallback(async () => {
-    if (!userId || userId.startsWith('u_')) { setApiLoaded(true); setLoadFailed(true); return; }
+    // isBuyerDevPreview()/isSellerDevPreview(): this screen has no seeded
+    // "other person" preview data (unlike conversations), and the audit's
+    // generic `userId` param synthesis (this route reads a plain `userId`
+    // param, not one of the more specific keys the audit's dictionary
+    // covers) lands here with a garbage id that would otherwise reach the
+    // real backend-less api.social.profile() call and log a console 404 —
+    // treat it the same as the existing "unresolved alias" not-found case.
+    if (!userId || userId.startsWith('u_') || isBuyerDevPreview() || isSellerDevPreview()) {
+      setApiLoaded(true); setLoadFailed(true); return;
+    }
     try {
       const profileData = await api.social.profile(userId);
       const resolvedId: string = (profileData as RemoteProfile).userId ?? userId;

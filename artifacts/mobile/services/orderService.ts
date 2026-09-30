@@ -7,6 +7,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { centsAtPercent, formatCents } from '@/lib/money';
+import { isSellerDevPreview, isBuyerDevPreview } from '@/lib/devPreview';
 import {
   Order, OrderLineItem, OrderCustomer, OrderAddress, PaymentSummary,
   HeldFundsRecord, PayoutMilestone, Fulfillment, FulfillmentGroup,
@@ -721,18 +722,22 @@ export async function getBuyerOrdersWithStatus(
 }
 
 export async function getBuyerOrder(id: string): Promise<BuyerOrderView | undefined> {
-  // Try real API first for a single order fetch
-  try {
-    const apiOrder = await serviceRequest(`/api/buyer/orders/${encodeURIComponent(id)}`) as any;
-    if (apiOrder?.id) {
-      const mapped = mapApiBuyerOrder(apiOrder);
-      // Update in-memory cache
-      const idx = _buyerOrders.findIndex(o => o.id === id);
-      if (idx >= 0) _buyerOrders[idx] = mapped; else _buyerOrders.push(mapped);
-      return mapped;
+  // Try real API first for a single order fetch (skipped in dev-preview,
+  // where a made-up preview order id has nothing real to fetch and would
+  // only ever 404).
+  if (!isSellerDevPreview() && !isBuyerDevPreview()) {
+    try {
+      const apiOrder = await serviceRequest(`/api/buyer/orders/${encodeURIComponent(id)}`) as any;
+      if (apiOrder?.id) {
+        const mapped = mapApiBuyerOrder(apiOrder);
+        // Update in-memory cache
+        const idx = _buyerOrders.findIndex(o => o.id === id);
+        if (idx >= 0) _buyerOrders[idx] = mapped; else _buyerOrders.push(mapped);
+        return mapped;
+      }
+    } catch {
+      // Fall through to local cache
     }
-  } catch {
-    // Fall through to local cache
   }
   await ensureInitialized();
   return _buyerOrders.find(o => o.id === id);

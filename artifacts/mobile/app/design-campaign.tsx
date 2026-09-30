@@ -246,7 +246,10 @@ export default function CreateAdScreen() {
   const colors    = useColors();
   const { user }  = useUser();
 
-  const bottomPad = insets.bottom + 96;
+  // Sticky bottom bar is two rows now (the Meta-ads link above the Launch
+  // button) — this must clear both rows plus the bar's own padding, or the
+  // last section's content sits underneath it instead of scrolling clear.
+  const bottomPad = insets.bottom + 144;
 
   // ── Campaign state ────────────────────────────────────────────────────────
   const [campaign,  setCampaign]  = useState<AdCampaign | null>(null);
@@ -1007,7 +1010,7 @@ const styles = StyleSheet.create({
   reachRange:      { fontSize: FS.lg, fontFamily: FONT.bold },
   reachDisclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, lineHeight: 16 },
   stickyBottom:    { borderTopWidth: 1, paddingHorizontal: SP.md, paddingTop: SP.sm },
-  metaAdsLink:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: RADIUS.md, paddingVertical: SP.sm },
+  metaAdsLink:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: RADIUS.md, paddingVertical: SP.sm, minHeight: 44 },
   metaAdsLinkText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   primaryBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderRadius: RADIUS.md, paddingVertical: SP.md, paddingHorizontal: SP.lg, minHeight: 52 },
   primaryBtnText:  { fontSize: FS.base, fontFamily: FONT.bold },
