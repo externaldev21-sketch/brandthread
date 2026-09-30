@@ -85,7 +85,6 @@ export default function PayoutsScreen() {
   const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
   const [connectLoading, setConnectLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [previewNotice, setPreviewNotice] = useState('');
   const connectRequestRef = useRef(false);
   const onboardingOpenRef = useRef(false);
   const threadCash = useSellerThreadCashBalance();
@@ -176,10 +175,7 @@ export default function PayoutsScreen() {
   }, [refreshConnectStatus]);
 
   const openConnectOnboarding = useCallback(async () => {
-    if (isPreview) {
-      setPreviewNotice('Stripe onboarding and bank changes are disabled in this read-only preview.');
-      return;
-    }
+    if (isPreview) return;
     if (onboardingOpenRef.current) return;
     onboardingOpenRef.current = true;
     setIsConnecting(true);
@@ -278,14 +274,7 @@ export default function PayoutsScreen() {
         </View>
       </View>
 
-      {isPreview ? (
-        <View style={styles.previewNotice}>
-          <Feather name="info" size={16} color={theme.warning} />
-          <Text accessibilityLiveRegion="polite" style={styles.devBannerText}>
-            {previewNotice || 'Read-only preview. Balances show $0.00 and no live payout, bank, or Stripe data is loaded.'}
-          </Text>
-        </View>
-      ) : (
+      {!isPreview && (
         <StripeConnectWarning
           connectStatus={connectStatus}
           onConnect={openConnectOnboarding}
@@ -325,16 +314,19 @@ export default function PayoutsScreen() {
           ) : loadError ? (
             <ErrorState message="Couldn't load your payouts." onRetry={() => { haptic(); void load(); }} />
           ) : payouts.length === 0 ? (
-            <EmptyState
-              icon="inbox"
-              title={isPreview ? 'No payout history in this preview' : balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
-              message={isPreview
-                ? 'This read-only preview does not load live payouts.'
-                : balance?.connected === false
+            <View style={{ alignItems: 'center' }}>
+              <EmptyState
+                icon="inbox"
+                title={!isPreview && balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
+                message=""
+                compact
+              />
+              <Text style={styles.payoutsEmptyMessage}>
+                {!isPreview && balance?.connected === false
                   ? 'Add a bank account under Bank account to start receiving payouts.'
                   : 'Payouts show up here once your available balance clears.'}
-              compact
-            />
+              </Text>
+            </View>
           ) : (
             payouts.map((p) => {
               const cfg = statusConfig(p.status, theme);
@@ -370,7 +362,7 @@ export default function PayoutsScreen() {
                </Text>
                <Text style={styles.bankSub}>
                   {isPreview
-                    ? 'This read-only preview does not check Stripe account status.'
+                    ? 'Account information unavailable'
                     : connectLoading
                    ? 'Checking Stripe account status…'
                    : connectStatus?.verified
@@ -405,22 +397,15 @@ export default function PayoutsScreen() {
              <TouchableOpacity
                 testID="seller-payouts-bank-account"
                style={styles.addBankBtn}
-                onPress={() => {
-                  haptic();
-                  if (isPreview) {
-                    setPreviewNotice('Bank account changes are disabled in this read-only preview.');
-                    return;
-                  }
-                  void openConnectOnboarding();
-                }}
-               disabled={isConnecting}
+                onPress={() => { haptic(); void openConnectOnboarding(); }}
+               disabled={isConnecting || isPreview}
                accessibilityRole="button"
                accessibilityLabel="Add bank account with Stripe"
              >
                 <Feather name="plus" size={16} color={theme.accent} />
                 <Text style={styles.addBankText}>
                   {isPreview
-                    ? 'Bank setup unavailable in preview'
+                    ? 'Bank setup unavailable'
                     : isConnecting ? 'Opening Stripe…' : connectStatus?.connected ? 'Update bank account' : 'Add bank account'}
                 </Text>
              </TouchableOpacity>
@@ -503,16 +488,13 @@ export default function PayoutsScreen() {
 }
 
 const createStyles = (theme: AppThemePreset) => {
-  const { accent, text, muted, subtle, card, border, warning } = theme;
+  const { accent, text, muted, subtle, card, border } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   accessLoading:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: border },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, textAlign: 'center', color: text, fontSize: FS.lg, fontFamily: FONT.semibold },
-  devBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${warning}15`, paddingHorizontal: SP.md, paddingVertical: 8 },
-  devBannerText:{ color: warning, fontSize: FS.xs, fontFamily: FONT.medium },
-  previewNotice:{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: `${warning}15`, marginHorizontal: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md },
   balanceHero:  { margin: SP.md, backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, padding: SP.lg, alignItems: 'center' },
   balanceHeroLabel: { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
   balanceHeroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5, marginTop: 6, marginBottom: 2 },
@@ -530,6 +512,10 @@ const createStyles = (theme: AppThemePreset) => {
   tabText:      { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
    tabTextActive:{ color: accent },
   list:         { padding: SP.md },
+  payoutsEmptyMessage: {
+    color: muted, fontSize: FS.sm, fontFamily: FONT.medium, textAlign: 'center',
+    maxWidth: 280, marginTop: -4,
+  },
   payoutRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: border },
   payoutLeft:   {},
   payoutRight:  { alignItems: 'flex-end', gap: 4 },
