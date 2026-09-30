@@ -8,7 +8,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { goBackOr } from '@/lib/navigation/goBackOr';
-import { isProductionPreviewHost } from '@/lib/devPreview';
+import { isBuyerDevPreview, isProductionPreviewHost, isSellerDevPreview } from '@/lib/devPreview';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -667,7 +667,24 @@ function AuthGate() {
       ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
 
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
-    const devRole = PREVIEW_ROLE ?? DEV_BYPASS_ROLE;
+    // PREVIEW_ROLE only reads the query string once, at module load — it
+    // deliberately does NOT fall back to the persisted role (see its own
+    // comment: an explicit ?bt_preview= on a real reload must reset state).
+    // But isSellerDevPreview/isBuyerDevPreview (same gates: __DEV__ ||
+    // NAVIGATION_ISOLATION_TEST, web only, never on a production host) DO
+    // fall back to the persisted role for exactly the case that matters
+    // here — a full-page reload of a deep link (e.g. "/design", query
+    // string dropped by earlier in-app navigation, or simply not repeated
+    // on every reload) while a preview session is already active. Without
+    // this fallback, AuthGate stopped recognizing preview mode on such a
+    // reload and fell through into the real Clerk/onboarding gate below,
+    // which requires a genuinely signed-in account this bypass never sets
+    // up — leaving the deep link stuck rather than rendering the route it
+    // was pointed at.
+    const webPreviewRole = Platform.OS === 'web'
+      ? (isSellerDevPreview() ? 'seller' : isBuyerDevPreview() ? 'buyer' : null)
+      : null;
+    const devRole = PREVIEW_ROLE ?? webPreviewRole ?? DEV_BYPASS_ROLE;
     if (devRole) {
       // The index route handles the preview redirect after the root Stack has
       // mounted. Redirecting from this root-level effect races Expo Router's
