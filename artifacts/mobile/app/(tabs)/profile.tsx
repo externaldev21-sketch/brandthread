@@ -38,7 +38,7 @@ import { getSellerShopPage, type ShopProduct } from '@/services/profileService';
 import { formatCompactCount } from '@/lib/compactFormat';
 import { ProfileShell, ProfileMeta } from '@/components/profile/ProfileShell';
 import {
-  ProfileButton, ProfileChip, ShopPill, type ProfileStat, type ProfileTab,
+  ProfileChip, ProfileEditMessagesRow, ShopPill, type ProfileStat, type ProfileTab,
 } from '@/components/profile/ProfileControls';
 import { ProfileAccountSwitcher, ProfileTopBarIcon, ProfileTopBarIconRow } from '@/components/profile/ProfileTopBar';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
@@ -153,6 +153,7 @@ export default function ProfileScreen() {
   });
   const [socialCounts, setSocialCounts] = useState<SocialCounts>({ followers: 0, following: 0, likes: 0 });
   const [productsCount, setProductsCount] = useState<number | null>(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [profileEditorVisible, setProfileEditorVisible] = useState(false);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
@@ -277,6 +278,23 @@ export default function ProfileScreen() {
     } catch { /* zero counts remain visible */ }
   }, [api, authLoaded, userId]);
 
+  const loadUnreadMessages = useCallback(async () => {
+    // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
+    // Clerk session (this app's own audit/e2e harnesses fake a signed-in
+    // user so protected screens render at all) still reports a truthy
+    // userId, which would otherwise fall through to the real backend-less
+    // endpoints below and log a console 404 — see the identical
+    // isSellerDevPreview() fix in app/seller-inbox.tsx.
+    if (!authLoaded || !userId || isSellerDevPreview()) return;
+    try {
+      const list = await api.conversations.list();
+      const total = (list as Array<{ unreadCount?: number; type?: string }>)
+        .filter((c) => c.type !== 'buyer_to_buyer')
+        .reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
+      setUnreadMessages(total);
+    } catch { /* badge just stays at its last known count */ }
+  }, [api, authLoaded, userId]);
+
   const loadShopCount = useCallback(async () => {
     // isSellerDevPreview() (not just !userId): a stubbed/fake-signed-in
     // Clerk session (this app's own audit/e2e harnesses fake a signed-in
@@ -336,7 +354,8 @@ export default function ProfileScreen() {
   useFocusEffect(useCallback(() => {
     void loadShopCount();
     void loadSocialCounts();
-  }, [loadShopCount, loadSocialCounts]));
+    void loadUnreadMessages();
+  }, [loadShopCount, loadSocialCounts, loadUnreadMessages]));
 
   // Following someone from the feed or a list moves "Following" immediately.
   useEffect(() => subscribeProfileEvents((event) => {
@@ -612,22 +631,17 @@ export default function ProfileScreen() {
             {/* Instagram's own business-profile shape (mobbin.com/screens/
                 7b7b7c39-39a7-4ba6-bf3a-45c009a4769d, same reference used for
                 the visited /seller-profile route in PR #232): a full-width
-                "Professional dashboard" row above one row of buttons —
-                Edit profile / Share profile / Contact — nothing else. Real
-                Instagram's own-profile row is only Edit profile + Share
-                profile plus an icon-only "suggest to others" control; there
-                is no labeled "Contact" text button on your OWN profile in
-                the reference (that only appears on a business profile you're
-                VISITING). Built as asked anyway, mapped to the seller inbox
-                — the nearest real destination for "how buyers reach me".
-                Go Live and Create Post move into the Studio control center's
-                Sell section (the "+" grid button in the tab bar) — Create
-                Post was already there as "Post video"; Go Live is added
-                alongside it. Settings was already duplicated in the
-                top-right gear above. My Profile pointed at the same
-                /edit-profile route as Edit Profile; Messages duplicated the
-                header's own Inbox icon. Removing all four cuts the wall from
-                six buttons to three. */}
+                "Professional dashboard" row above the action row below.
+                Dev's call: drop Share and Contact from the action row
+                entirely (Share stays reachable from the top-bar share
+                icon above) and replace the old three-button row with just
+                Edit (compact, left) + one long Messages button (fills the
+                rest of the row) — the nearest real destination for "how
+                buyers reach me". Go Live and Create Post live in the Studio
+                control center's Sell section (the "+" grid button in the
+                tab bar) — Create Post was already there as "Post video";
+                Go Live is added alongside it. Settings was already
+                duplicated in the top-right gear above. */}
             <ListRow
               icon="bar-chart-2"
               title="Professional dashboard"
@@ -638,39 +652,11 @@ export default function ProfileScreen() {
               testID="profile-dashboard-row"
             />
             <View style={s.actionRow}>
-              {/* Three buttons across a 390pt row leave no room for an icon
-                  plus "Edit profile" / "Share profile" / "Contact" without
-                  truncating (confirmed live) — real Instagram's own row is
-                  text-only here too (its icon is a separate, unlabeled
-                  fourth control). Full wording stays in accessibilityLabel.
-                  All three are `variant="neutral"` (solid cardElevated, no
-                  accent standout) to match the buyer own-profile's equally
-                  weighted Edit/Share row instead of promoting "Edit" above
-                  the other two. */}
-              <ProfileButton
-                label="Edit"
-                variant="neutral"
-                onPress={() => nav('/edit-profile')}
-                onLongPress={openProfileEditor}
-                accessibilityLabel="Edit profile"
-                accessibilityHint="Opens your full profile editor. Long press to quickly edit brand name and bio."
-                testID="profile-edit-details"
-              />
-              <ProfileButton
-                label="Share"
-                variant="neutral"
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShareSheetVisible(true); }}
-                accessibilityLabel="Share profile"
-                accessibilityHint="Opens a shareable profile card, QR code, and link"
-                testID="profile-share-btn"
-              />
-              <ProfileButton
-                label="Contact"
-                variant="neutral"
-                onPress={() => nav('/seller-inbox')}
-                accessibilityLabel="Contact"
-                accessibilityHint="Opens your buyer messages"
-                testID="profile-contact-btn"
+              <ProfileEditMessagesRow
+                onEdit={() => nav('/edit-profile')}
+                onEditLongPress={openProfileEditor}
+                onMessages={() => nav('/seller-inbox')}
+                unreadCount={unreadMessages}
               />
             </View>
           </>

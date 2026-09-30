@@ -1,0 +1,2275 @@
+{
+  "generatedAt": "2026-09-30T05:23:30.621Z",
+  "interrupted": false,
+  "routesDiscovered": 266,
+  "results": [
+    {
+      "route": "/design-campaign",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-campaign.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Add media to see your ad preview\"",
+          "text": "Add media to see your ad preview"
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Photos\" overlaps \"Run as a Meta ad (Facebook & Instagram)\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Video\" overlaps \"Run as a Meta ad (Facebook & Instagram)\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Create Ad\"",
+          "text": "Create Ad"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x33px control \"Run as a Meta ad (Facebook & Instagram)\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-campaign/seller"
+    },
+    {
+      "route": "/design-campaign",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-campaign.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Add media to see your ad preview\"",
+          "text": "Add media to see your ad preview"
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Photos\" overlaps \"Run as a Meta ad (Facebook & Instagram)\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Video\" overlaps \"Run as a Meta ad (Facebook & Instagram)\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Create Ad\"",
+          "text": "Create Ad"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x33px control \"Run as a Meta ad (Facebook & Instagram)\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-campaign/seller"
+    },
+    {
+      "route": "/design-campaign",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-campaign.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Add media to see your ad preview\"",
+          "text": "Add media to see your ad preview"
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Photos\" overlaps \"Run as a Meta ad (Facebook & Instagram)\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Video\" overlaps \"Run as a Meta ad (Facebook & Instagram)\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Create Ad\"",
+          "text": "Create Ad"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x33px control \"Run as a Meta ad (Facebook & Instagram)\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-campaign/buyer"
+    },
+    {
+      "route": "/design-campaign",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-campaign.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Add media to see your ad preview\"",
+          "text": "Add media to see your ad preview"
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Photos\" overlaps \"Run as a Meta ad (Facebook & Instagram)\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Video\" overlaps \"Run as a Meta ad (Facebook & Instagram)\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Create Ad\"",
+          "text": "Create Ad"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x33px control \"Run as a Meta ad (Facebook & Instagram)\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-campaign/buyer"
+    },
+    {
+      "route": "/design-canvas",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-canvas.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Design Studio store context changed during sync."
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-canvas/seller"
+    },
+    {
+      "route": "/design-canvas",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-canvas.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Design Studio store context changed during sync."
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-canvas/seller"
+    },
+    {
+      "route": "/design-canvas",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-canvas.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Design Studio store context changed during sync."
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-canvas/buyer"
+    },
+    {
+      "route": "/design-canvas",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-canvas.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Design Studio store context changed during sync."
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-canvas/buyer"
+    },
+    {
+      "route": "/design-export",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-export.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Size\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Export\"",
+          "text": "Export"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-export/seller"
+    },
+    {
+      "route": "/design-export",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-export.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Size\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Export\"",
+          "text": "Export"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-export/seller"
+    },
+    {
+      "route": "/design-export",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-export.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Export\"",
+          "text": "Export"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-export/buyer"
+    },
+    {
+      "route": "/design-export",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-export.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Export\"",
+          "text": "Export"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-export/buyer"
+    },
+    {
+      "route": "/design-garment",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-garment.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "error-boundary",
+          "severity": "hard",
+          "detail": "Error-boundary fallback UI rendered",
+          "text": "\nSomething went wrong\nPlease reload the app to continue.\nTry Again\nGo back\nGo home"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"Something went wrong\"",
+          "text": "Something went wrong"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "119x24px control \"Go back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "123x24px control \"Go home\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "TypeError: Cannot read properties of undefined (reading 'views')\n    at E (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:3569:2006)\n    at co (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:53709)\n    at ri (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:76687)\n    at ki (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:86948)\n    at P"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-garment/seller"
+    },
+    {
+      "route": "/design-garment",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-garment.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "error-boundary",
+          "severity": "hard",
+          "detail": "Error-boundary fallback UI rendered",
+          "text": "\nSomething went wrong\nPlease reload the app to continue.\nTry Again\nGo back\nGo home"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"Something went wrong\"",
+          "text": "Something went wrong"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "119x24px control \"Go back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "123x24px control \"Go home\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "TypeError: Cannot read properties of undefined (reading 'views')\n    at E (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:3569:2006)\n    at co (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:53709)\n    at ri (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:76687)\n    at ki (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:86948)\n    at P"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-garment/seller"
+    },
+    {
+      "route": "/design-garment",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-garment.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "error-boundary",
+          "severity": "hard",
+          "detail": "Error-boundary fallback UI rendered",
+          "text": "\nSomething went wrong\nPlease reload the app to continue.\nTry Again\nGo back\nGo home"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"Something went wrong\"",
+          "text": "Something went wrong"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "119x24px control \"Go back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "123x24px control \"Go home\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "TypeError: Cannot read properties of undefined (reading 'views')\n    at E (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:3569:2006)\n    at co (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:53709)\n    at ri (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:76687)\n    at ki (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:86948)\n    at P"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-garment/buyer"
+    },
+    {
+      "route": "/design-garment",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-garment.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "error-boundary",
+          "severity": "hard",
+          "detail": "Error-boundary fallback UI rendered",
+          "text": "\nSomething went wrong\nPlease reload the app to continue.\nTry Again\nGo back\nGo home"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"Something went wrong\"",
+          "text": "Something went wrong"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "119x24px control \"Go back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "123x24px control \"Go home\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "TypeError: Cannot read properties of undefined (reading 'views')\n    at E (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:3569:2006)\n    at co (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:53709)\n    at ri (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:76687)\n    at ki (http://127.0.0.1:44759/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:86948)\n    at P"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-garment/buyer"
+    },
+    {
+      "route": "/design-mockup-preview",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-mockup-preview.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Mockup Preview\"",
+          "text": "Mockup Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Open a garment project to see the mockup preview.\"",
+          "text": "Open a garment project to see the mockup preview."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Mockup Preview\"",
+          "text": "Mockup Preview"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-mockup-preview/seller"
+    },
+    {
+      "route": "/design-mockup-preview",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-mockup-preview.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Mockup Preview\"",
+          "text": "Mockup Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Open a garment project to see the mockup preview.\"",
+          "text": "Open a garment project to see the mockup preview."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Mockup Preview\"",
+          "text": "Mockup Preview"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-mockup-preview/seller"
+    },
+    {
+      "route": "/design-mockup-preview",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-mockup-preview.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Mockup Preview\"",
+          "text": "Mockup Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Open a garment project to see the mockup preview.\"",
+          "text": "Open a garment project to see the mockup preview."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Mockup Preview\"",
+          "text": "Mockup Preview"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-mockup-preview/buyer"
+    },
+    {
+      "route": "/design-mockup-preview",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-mockup-preview.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Mockup Preview\"",
+          "text": "Mockup Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Open a garment project to see the mockup preview.\"",
+          "text": "Open a garment project to see the mockup preview."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Mockup Preview\"",
+          "text": "Mockup Preview"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-mockup-preview/buyer"
+    },
+    {
+      "route": "/design-mockup-to-model",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-mockup-to-model.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-mockup-to-model/seller"
+    },
+    {
+      "route": "/design-mockup-to-model",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-mockup-to-model.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-mockup-to-model/seller"
+    },
+    {
+      "route": "/design-mockup-to-model",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-mockup-to-model.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-mockup-to-model/buyer"
+    },
+    {
+      "route": "/design-mockup-to-model",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-mockup-to-model.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-mockup-to-model/buyer"
+    },
+    {
+      "route": "/design-project",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-project.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-project/seller"
+    },
+    {
+      "route": "/design-project",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-project.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-project/seller"
+    },
+    {
+      "route": "/design-project",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-project.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-project/buyer"
+    },
+    {
+      "route": "/design-project",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-project.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-project/buyer"
+    },
+    {
+      "route": "/design-prompt-edit",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-prompt-edit.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Upload image\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Upload image"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-prompt-edit/seller"
+    },
+    {
+      "route": "/design-prompt-edit",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-prompt-edit.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Upload image\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Upload image"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-prompt-edit/seller"
+    },
+    {
+      "route": "/design-prompt-edit",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-prompt-edit.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Upload image\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Upload image"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-prompt-edit/buyer"
+    },
+    {
+      "route": "/design-prompt-edit",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-prompt-edit.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Upload image\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Upload image"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-prompt-edit/buyer"
+    },
+    {
+      "route": "/design-templates",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-templates.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Templates\"",
+          "text": "Templates"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-templates/seller"
+    },
+    {
+      "route": "/design-templates",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-templates.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Templates\"",
+          "text": "Templates"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-templates/seller"
+    },
+    {
+      "route": "/design-templates",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-templates.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Templates\"",
+          "text": "Templates"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-templates/buyer"
+    },
+    {
+      "route": "/design-templates",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-templates.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Templates\"",
+          "text": "Templates"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-templates/buyer"
+    },
+    {
+      "route": "/design-text-to-design",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-text-to-design.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-text-to-design/seller"
+    },
+    {
+      "route": "/design-text-to-design",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-text-to-design.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-text-to-design/seller"
+    },
+    {
+      "route": "/design-text-to-design",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-text-to-design.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-text-to-design/buyer"
+    },
+    {
+      "route": "/design-text-to-design",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-text-to-design.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-text-to-design/buyer"
+    },
+    {
+      "route": "/design-upload-sketch",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-upload-sketch.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-upload-sketch/seller"
+    },
+    {
+      "route": "/design-upload-sketch",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-upload-sketch.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-upload-sketch/seller"
+    },
+    {
+      "route": "/design-upload-sketch",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-upload-sketch.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-upload-sketch/buyer"
+    },
+    {
+      "route": "/design-upload-sketch",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-upload-sketch.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "36x44px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-upload-sketch/buyer"
+    },
+    {
+      "route": "/design-versions",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design-versions.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Version History\"",
+          "text": "Version History"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save now\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save now"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-versions/seller"
+    },
+    {
+      "route": "/design-versions",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design-versions.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Version History\"",
+          "text": "Version History"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save now\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save now"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-versions/seller"
+    },
+    {
+      "route": "/design-versions",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design-versions.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Version History\"",
+          "text": "Version History"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save now\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save now"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-versions/buyer"
+    },
+    {
+      "route": "/design-versions",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design-versions.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Version History\"",
+          "text": "Version History"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save now\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save now"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design-versions/buyer"
+    },
+    {
+      "route": "/design",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/design.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (130px into 111px): \"Product Launch Mockup\"",
+          "text": "Product Launch Mockup"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"←\"",
+          "text": "←"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "46x27px control \"Select\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "46x27px control \"Import\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "42x27px control \"Photo\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Spring Drop Hoodie1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Product Launch Mockup1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Campaign Assets1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design/seller"
+    },
+    {
+      "route": "/design",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/design.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (130px into 111px): \"Product Launch Mockup\"",
+          "text": "Product Launch Mockup"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"←\"",
+          "text": "←"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "46x27px control \"Select\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "46x27px control \"Import\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "42x27px control \"Photo\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Spring Drop Hoodie1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Product Launch Mockup1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Campaign Assets1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design/seller"
+    },
+    {
+      "route": "/design",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/design.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (130px into 111px): \"Product Launch Mockup\"",
+          "text": "Product Launch Mockup"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"←\"",
+          "text": "←"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "46x27px control \"Select\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "46x27px control \"Import\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "42x27px control \"Photo\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Spring Drop Hoodie1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Product Launch Mockup1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Campaign Assets1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design/buyer"
+    },
+    {
+      "route": "/design",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/design.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (130px into 111px): \"Product Launch Mockup\"",
+          "text": "Product Launch Mockup"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"←\"",
+          "text": "←"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "46x27px control \"Select\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "46x27px control \"Import\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "42x27px control \"Photo\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Spring Drop Hoodie1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Product Launch Mockup1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x41px control \"Campaign Assets1080 × 1080px\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/design/buyer"
+    },
+    {
+      "route": "/discounts",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/discounts.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Discounts\"",
+          "text": "Discounts"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/discounts/seller"
+    },
+    {
+      "route": "/discounts",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/discounts.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Discounts\"",
+          "text": "Discounts"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/discounts/seller"
+    },
+    {
+      "route": "/discounts",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/discounts.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Discounts\"",
+          "text": "Discounts"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/discounts/buyer"
+    },
+    {
+      "route": "/discounts",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/discounts.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Discounts\"",
+          "text": "Discounts"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/discounts/buyer"
+    },
+    {
+      "route": "/dispute-detail",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/dispute-detail.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/dispute-detail/seller"
+    },
+    {
+      "route": "/dispute-detail",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/dispute-detail.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/dispute-detail/seller"
+    },
+    {
+      "route": "/dispute-detail",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/dispute-detail.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "265x36px control \"Couldn't load dispute — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/dispute-detail/buyer"
+    },
+    {
+      "route": "/dispute-detail",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/dispute-detail.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "265x36px control \"Couldn't load dispute — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/dispute-detail/buyer"
+    },
+    {
+      "route": "/drafts",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/drafts.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"In-progress drafts\"",
+          "text": "In-progress drafts"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Create product\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Create product"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/drafts/seller"
+    },
+    {
+      "route": "/drafts",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/drafts.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"In-progress drafts\"",
+          "text": "In-progress drafts"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Create product\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Create product"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/drafts/seller"
+    },
+    {
+      "route": "/drafts",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/drafts.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"In-progress drafts\"",
+          "text": "In-progress drafts"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Create product\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Create product"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/drafts/buyer"
+    },
+    {
+      "route": "/drafts",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/drafts.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"In-progress drafts\"",
+          "text": "In-progress drafts"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Create product\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Create product"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/drafts/buyer"
+    },
+    {
+      "route": "/drops/drop_nl_04",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/drops/[dropId].tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 39px not on declared FS scale (nearest 36) on \"Drop 04 — Ember Season\"",
+          "text": "Drop 04 — Ember Season"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/drops-drop_nl_04/seller"
+    },
+    {
+      "route": "/drops/drop_nl_04",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/drops/[dropId].tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 39px not on declared FS scale (nearest 36) on \"Drop 04 — Ember Season\"",
+          "text": "Drop 04 — Ember Season"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/drops-drop_nl_04/seller"
+    },
+    {
+      "route": "/drops/drop_nl_04",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/drops/[dropId].tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 39px not on declared FS scale (nearest 36) on \"Drop 04 — Ember Season\"",
+          "text": "Drop 04 — Ember Season"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/drops-drop_nl_04/buyer"
+    },
+    {
+      "route": "/drops/drop_nl_04",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/drops/[dropId].tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 39px not on declared FS scale (nearest 36) on \"Drop 04 — Ember Season\"",
+          "text": "Drop 04 — Ember Season"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/drops-drop_nl_04/buyer"
+    },
+    {
+      "route": "/edit-profile",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/edit-profile.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Storefront preview\"",
+          "text": "Storefront preview"
+        },
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (243px into 190px): \"brandthread.app/u/northlinestudio\"",
+          "text": "brandthread.app/u/northlinestudio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Edit profile\"",
+          "text": "Edit profile"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/edit-profile/seller"
+    },
+    {
+      "route": "/edit-profile",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/edit-profile.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Storefront preview\"",
+          "text": "Storefront preview"
+        },
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (243px into 190px): \"brandthread.app/u/northlinestudio\"",
+          "text": "brandthread.app/u/northlinestudio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Edit profile\"",
+          "text": "Edit profile"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/edit-profile/seller"
+    },
+    {
+      "route": "/edit-profile",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/edit-profile.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Storefront preview\"",
+          "text": "Storefront preview"
+        },
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (243px into 190px): \"brandthread.app/u/northlinestudio\"",
+          "text": "brandthread.app/u/northlinestudio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Edit profile\"",
+          "text": "Edit profile"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/edit-profile/buyer"
+    },
+    {
+      "route": "/edit-profile",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/edit-profile.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Storefront preview\"",
+          "text": "Storefront preview"
+        },
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (243px into 190px): \"brandthread.app/u/northlinestudio\"",
+          "text": "brandthread.app/u/northlinestudio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Edit profile\"",
+          "text": "Edit profile"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/edit-profile/buyer"
+    },
+    {
+      "route": "/finance",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/finance.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Finance\"",
+          "text": "Finance"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Download Statement (CSV)\"",
+          "text": "Download Statement (CSV)"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Tax Report / 1099-K\"",
+          "text": "Tax Report / 1099-K"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "91x34px control \"Try again\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "268x36px control \"Couldn't load balance — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "277x36px control \"Couldn't load summary — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "295x36px control \"Couldn't load transactions — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/finance/seller"
+    },
+    {
+      "route": "/finance",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/finance.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Finance\"",
+          "text": "Finance"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Download Statement (CSV)\"",
+          "text": "Download Statement (CSV)"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Tax Report / 1099-K\"",
+          "text": "Tax Report / 1099-K"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "91x34px control \"Try again\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "268x36px control \"Couldn't load balance — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "277x36px control \"Couldn't load summary — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "295x36px control \"Couldn't load transactions — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/finance/seller"
+    },
+    {
+      "route": "/finance",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/finance.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Finance\"",
+          "text": "Finance"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Download Statement (CSV)\"",
+          "text": "Download Statement (CSV)"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Tax Report / 1099-K\"",
+          "text": "Tax Report / 1099-K"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "91x34px control \"Try again\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "268x36px control \"Couldn't load balance — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "277x36px control \"Couldn't load summary — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "295x36px control \"Couldn't load transactions — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/finance/buyer"
+    },
+    {
+      "route": "/finance",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/finance.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Finance\"",
+          "text": "Finance"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Download Statement (CSV)\"",
+          "text": "Download Statement (CSV)"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Tax Report / 1099-K\"",
+          "text": "Tax Report / 1099-K"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "91x34px control \"Try again\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "268x36px control \"Couldn't load balance — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "277x36px control \"Couldn't load summary — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "295x36px control \"Couldn't load transactions — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/finance/buyer"
+    },
+    {
+      "route": "/forgot-password",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/forgot-password.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 32px not on declared FS scale (nearest 30) on \"Reset your password.\"",
+          "text": "Reset your password."
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Send reset code\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Send reset code"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/forgot-password/seller"
+    },
+    {
+      "route": "/forgot-password",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/forgot-password.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 32px not on declared FS scale (nearest 30) on \"Reset your password.\"",
+          "text": "Reset your password."
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Send reset code\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Send reset code"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/forgot-password/seller"
+    },
+    {
+      "route": "/forgot-password",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/forgot-password.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 32px not on declared FS scale (nearest 30) on \"Reset your password.\"",
+          "text": "Reset your password."
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Send reset code\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Send reset code"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/forgot-password/buyer"
+    },
+    {
+      "route": "/forgot-password",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/forgot-password.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 32px not on declared FS scale (nearest 30) on \"Reset your password.\"",
+          "text": "Reset your password."
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Send reset code\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Send reset code"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/forgot-password/buyer"
+    }
+  ]
+}

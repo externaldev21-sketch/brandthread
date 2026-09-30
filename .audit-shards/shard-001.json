@@ -1,0 +1,2697 @@
+{
+  "generatedAt": "2026-09-30T03:54:29.958Z",
+  "interrupted": false,
+  "routesDiscovered": 266,
+  "results": [
+    {
+      "route": "/(tabs)/profile",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/profile.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "22x22px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "60x38px control \"1,280Followers\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "59x38px control \"340Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-profile/seller"
+    },
+    {
+      "route": "/(tabs)/profile",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/profile.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "22x22px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "60x38px control \"1,280Followers\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "59x38px control \"340Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-profile/seller"
+    },
+    {
+      "route": "/(tabs)/profile",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/profile.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "22x22px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "60x38px control \"1,280Followers\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "59x38px control \"340Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-profile/buyer"
+    },
+    {
+      "route": "/(tabs)/profile",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/profile.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 18px not on declared FS scale (nearest 17) on \"Northline Studio\"",
+          "text": "Northline Studio"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "24x24px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "22x22px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "60x38px control \"1,280Followers\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "59x38px control \"340Following\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-profile/buyer"
+    },
+    {
+      "route": "/(tabs)/studio",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/(tabs)/studio.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(249, 115, 22) on \"Open →\"",
+          "text": "Open →"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(16, 185, 129) on \"Open →\"",
+          "text": "Open →"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Studio\"",
+          "text": "Studio"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-studio/seller"
+    },
+    {
+      "route": "/(tabs)/studio",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/(tabs)/studio.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(249, 115, 22) on \"Open →\"",
+          "text": "Open →"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(16, 185, 129) on \"Open →\"",
+          "text": "Open →"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Studio\"",
+          "text": "Studio"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-studio/seller"
+    },
+    {
+      "route": "/(tabs)/studio",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/(tabs)/studio.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(249, 115, 22) on \"Open →\"",
+          "text": "Open →"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(16, 185, 129) on \"Open →\"",
+          "text": "Open →"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Studio\"",
+          "text": "Studio"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-studio/buyer"
+    },
+    {
+      "route": "/(tabs)/studio",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/(tabs)/studio.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(249, 115, 22) on \"Open →\"",
+          "text": "Open →"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(16, 185, 129) on \"Open →\"",
+          "text": "Open →"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Studio\"",
+          "text": "Studio"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/-tabs-studio/buyer"
+    },
+    {
+      "route": "/account-type-settings",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/account-type-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Account type\"",
+          "text": "Account type"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/account-type-settings/seller"
+    },
+    {
+      "route": "/account-type-settings",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/account-type-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Account type\"",
+          "text": "Account type"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/account-type-settings/seller"
+    },
+    {
+      "route": "/account-type-settings",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/account-type-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Account type\"",
+          "text": "Account type"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/account-type-settings/buyer"
+    },
+    {
+      "route": "/account-type-settings",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/account-type-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Account type\"",
+          "text": "Account type"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/account-type-settings/buyer"
+    },
+    {
+      "route": "/account-type",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/account-type.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "error-boundary",
+          "severity": "hard",
+          "detail": "Error-boundary fallback UI rendered",
+          "text": "\nSomething went wrong\nPlease reload the app to continue.\nTry Again\nGo back\nGo home"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"Something went wrong\"",
+          "text": "Something went wrong"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "119x24px control \"Go back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "123x24px control \"Go home\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "TypeError: t.__internal_state.signUpSignal is not a function\n    at http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:1626:25684\n    at Object.useSyncExternalStore (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:67382)\n    at e.useSyncExternalStore (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:288:7291)\n    at qe (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/account-type/seller"
+    },
+    {
+      "route": "/account-type",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/account-type.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "error-boundary",
+          "severity": "hard",
+          "detail": "Error-boundary fallback UI rendered",
+          "text": "\nSomething went wrong\nPlease reload the app to continue.\nTry Again\nGo back\nGo home"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"Something went wrong\"",
+          "text": "Something went wrong"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "119x24px control \"Go back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "123x24px control \"Go home\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "TypeError: t.__internal_state.signUpSignal is not a function\n    at http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:1626:25684\n    at Object.useSyncExternalStore (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:67382)\n    at e.useSyncExternalStore (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:288:7291)\n    at qe (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/account-type/seller"
+    },
+    {
+      "route": "/account-type",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/account-type.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "error-boundary",
+          "severity": "hard",
+          "detail": "Error-boundary fallback UI rendered",
+          "text": "\nSomething went wrong\nPlease reload the app to continue.\nTry Again\nGo back\nGo home"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"Something went wrong\"",
+          "text": "Something went wrong"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "119x24px control \"Go back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "123x24px control \"Go home\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "TypeError: t.__internal_state.signUpSignal is not a function\n    at http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:1626:25684\n    at Object.useSyncExternalStore (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:67382)\n    at e.useSyncExternalStore (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:288:7291)\n    at qe (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/account-type/buyer"
+    },
+    {
+      "route": "/account-type",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/account-type.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "error-boundary",
+          "severity": "hard",
+          "detail": "Error-boundary fallback UI rendered",
+          "text": "\nSomething went wrong\nPlease reload the app to continue.\nTry Again\nGo back\nGo home"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 28px not on declared FS scale (nearest 26) on \"Something went wrong\"",
+          "text": "Something went wrong"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "119x24px control \"Go back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "123x24px control \"Go home\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "TypeError: t.__internal_state.signUpSignal is not a function\n    at http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:1626:25684\n    at Object.useSyncExternalStore (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:749:67382)\n    at e.useSyncExternalStore (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f4b2b060ac91a17.js:288:7291)\n    at qe (http://127.0.0.1:35589/_expo/static/js/web/index-ab1ce630793543d05f"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/account-type/buyer"
+    },
+    {
+      "route": "/activity-center",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/activity-center.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Priya Shah\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"6h\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Marcus Webb\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"1d\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Activity\"",
+          "text": "Activity"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "41x34px control \"All\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "74x34px control \"Follows\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "58x34px control \"Likes\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "95x34px control \"Comments\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "69x34px control \"Orders\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"PSPriya Shah started following you  6h\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"MWMarcus Webb started following you  1d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "305x40px control \"JLJordan Lee liked your post  3d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/activity-center/seller"
+    },
+    {
+      "route": "/activity-center",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/activity-center.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Priya Shah\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"6h\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Marcus Webb\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"1d\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Activity\"",
+          "text": "Activity"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "41x34px control \"All\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "74x34px control \"Follows\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "58x34px control \"Likes\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "95x34px control \"Comments\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "69x34px control \"Orders\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"PSPriya Shah started following you  6h\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"MWMarcus Webb started following you  1d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "305x40px control \"JLJordan Lee liked your post  3d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/activity-center/seller"
+    },
+    {
+      "route": "/activity-center",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/activity-center.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Priya Shah\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"6h\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Marcus Webb\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"1d\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Activity\"",
+          "text": "Activity"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "41x34px control \"All\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "74x34px control \"Follows\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "58x34px control \"Likes\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "95x34px control \"Comments\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "69x34px control \"Orders\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"PSPriya Shah started following you  6h\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"MWMarcus Webb started following you  1d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "305x40px control \"JLJordan Lee liked your post  3d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/activity-center/buyer"
+    },
+    {
+      "route": "/activity-center",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/activity-center.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Priya Shah\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"6h\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Marcus Webb\" overlaps \"started following you\""
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"started following you\" overlaps \"1d\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Activity\"",
+          "text": "Activity"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Follow back\"",
+          "text": "Follow back"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "41x34px control \"All\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "74x34px control \"Follows\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "58x34px control \"Likes\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "95x34px control \"Comments\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "69x34px control \"Orders\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"PSPriya Shah started following you  6h\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "234x40px control \"MWMarcus Webb started following you  1d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "115x32px control \"Follow back\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "305x40px control \"JLJordan Lee liked your post  3d\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/activity-center/buyer"
+    },
+    {
+      "route": "/activity-people",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/activity-people.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"People\"",
+          "text": "People"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/activity-people/seller"
+    },
+    {
+      "route": "/activity-people",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/activity-people.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"People\"",
+          "text": "People"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/activity-people/seller"
+    },
+    {
+      "route": "/activity-people",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/activity-people.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"People\"",
+          "text": "People"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/activity-people/buyer"
+    },
+    {
+      "route": "/activity-people",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/activity-people.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"People\"",
+          "text": "People"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/activity-people/buyer"
+    },
+    {
+      "route": "/add-product",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/add-product.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "placeholder-copy",
+          "severity": "hard",
+          "detail": "Text matches placeholder pattern: \"Title\"",
+          "text": "Title"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Cancel\"",
+          "text": "Cancel"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Save\"",
+          "text": "Save"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "96x36px control \"Cancel\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "66x30px control \"Draft\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "81x36px control \"Save\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x27px control \"Add description\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x27px control \"Select category\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "86x16px control \"+ Add options\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/add-product/seller"
+    },
+    {
+      "route": "/add-product",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/add-product.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "placeholder-copy",
+          "severity": "hard",
+          "detail": "Text matches placeholder pattern: \"Title\"",
+          "text": "Title"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Cancel\"",
+          "text": "Cancel"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Save\"",
+          "text": "Save"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "96x36px control \"Cancel\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "66x30px control \"Draft\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "81x36px control \"Save\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x27px control \"Add description\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x27px control \"Select category\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "86x16px control \"+ Add options\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/add-product/seller"
+    },
+    {
+      "route": "/add-product",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/add-product.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "placeholder-copy",
+          "severity": "hard",
+          "detail": "Text matches placeholder pattern: \"Title\"",
+          "text": "Title"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Cancel\"",
+          "text": "Cancel"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Save\"",
+          "text": "Save"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "96x36px control \"Cancel\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "66x30px control \"Draft\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "81x36px control \"Save\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x27px control \"Add description\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x27px control \"Select category\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "86x16px control \"+ Add options\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/add-product/buyer"
+    },
+    {
+      "route": "/add-product",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/add-product.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "placeholder-copy",
+          "severity": "hard",
+          "detail": "Text matches placeholder pattern: \"Title\"",
+          "text": "Title"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Cancel\"",
+          "text": "Cancel"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Save\"",
+          "text": "Save"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "96x36px control \"Cancel\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "66x30px control \"Draft\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "81x36px control \"Save\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x27px control \"Add description\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x27px control \"Select category\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "86x16px control \"+ Add options\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/add-product/buyer"
+    },
+    {
+      "route": "/admin-reports",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/admin-reports.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Review queue\"",
+          "text": "Review queue"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "176x36px control \"Open\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "176x36px control \"Resolved\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/admin-reports/seller"
+    },
+    {
+      "route": "/admin-reports",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/admin-reports.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Review queue\"",
+          "text": "Review queue"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "176x36px control \"Open\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "176x36px control \"Resolved\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/admin-reports/seller"
+    },
+    {
+      "route": "/admin-reports",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/admin-reports.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Review queue\"",
+          "text": "Review queue"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "176x36px control \"Open\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "176x36px control \"Resolved\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/admin-reports/buyer"
+    },
+    {
+      "route": "/admin-reports",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/admin-reports.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Review queue\"",
+          "text": "Review queue"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "176x36px control \"Open\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "176x36px control \"Resolved\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/admin-reports/buyer"
+    },
+    {
+      "route": "/ai-assistant",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/ai-assistant.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brandthread AI\"",
+          "text": "Brandthread AI"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-assistant/seller"
+    },
+    {
+      "route": "/ai-assistant",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/ai-assistant.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brandthread AI\"",
+          "text": "Brandthread AI"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-assistant/seller"
+    },
+    {
+      "route": "/ai-assistant",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/ai-assistant.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brandthread AI\"",
+          "text": "Brandthread AI"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-assistant/buyer"
+    },
+    {
+      "route": "/ai-assistant",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/ai-assistant.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brandthread AI\"",
+          "text": "Brandthread AI"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-assistant/buyer"
+    },
+    {
+      "route": "/ai-brain",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/ai-brain.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brandthread AI\"",
+          "text": "Brandthread AI"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-brain/seller"
+    },
+    {
+      "route": "/ai-brain",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/ai-brain.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brandthread AI\"",
+          "text": "Brandthread AI"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-brain/seller"
+    },
+    {
+      "route": "/ai-brain",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/ai-brain.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brandthread AI\"",
+          "text": "Brandthread AI"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-brain/buyer"
+    },
+    {
+      "route": "/ai-brain",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/ai-brain.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brandthread AI\"",
+          "text": "Brandthread AI"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "40x40px control \"\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-brain/buyer"
+    },
+    {
+      "route": "/ai-brand-memory",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/ai-brand-memory.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brand Memory\"",
+          "text": "Brand Memory"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-brand-memory/seller"
+    },
+    {
+      "route": "/ai-brand-memory",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/ai-brand-memory.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brand Memory\"",
+          "text": "Brand Memory"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-brand-memory/seller"
+    },
+    {
+      "route": "/ai-brand-memory",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/ai-brand-memory.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brand Memory\"",
+          "text": "Brand Memory"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-brand-memory/buyer"
+    },
+    {
+      "route": "/ai-brand-memory",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/ai-brand-memory.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Brand Memory\"",
+          "text": "Brand Memory"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-brand-memory/buyer"
+    },
+    {
+      "route": "/ai-mockup-chat",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/ai-mockup-chat.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Clothing Mockups\"",
+          "text": "AI Clothing Mockups"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Describe the garment, your brand and the design — I'll turn it into a photo-real mockup.\"",
+          "text": "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup."
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-mockup-chat/seller"
+    },
+    {
+      "route": "/ai-mockup-chat",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/ai-mockup-chat.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Clothing Mockups\"",
+          "text": "AI Clothing Mockups"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Describe the garment, your brand and the design — I'll turn it into a photo-real mockup.\"",
+          "text": "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup."
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-mockup-chat/seller"
+    },
+    {
+      "route": "/ai-mockup-chat",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/ai-mockup-chat.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Clothing Mockups\"",
+          "text": "AI Clothing Mockups"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Describe the garment, your brand and the design — I'll turn it into a photo-real mockup.\"",
+          "text": "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup."
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-mockup-chat/buyer"
+    },
+    {
+      "route": "/ai-mockup-chat",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/ai-mockup-chat.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Clothing Mockups\"",
+          "text": "AI Clothing Mockups"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Describe the garment, your brand and the design — I'll turn it into a photo-real mockup.\"",
+          "text": "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup."
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-mockup-chat/buyer"
+    },
+    {
+      "route": "/ai-photography-chat",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/ai-photography-chat.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Tap the camera icon to add product or reference photos first.\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Product Photography\"",
+          "text": "AI Product Photography"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio.\"",
+          "text": "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio."
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-photography-chat/seller"
+    },
+    {
+      "route": "/ai-photography-chat",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/ai-photography-chat.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Tap the camera icon to add product or reference photos first.\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Product Photography\"",
+          "text": "AI Product Photography"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio.\"",
+          "text": "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio."
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-photography-chat/seller"
+    },
+    {
+      "route": "/ai-photography-chat",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/ai-photography-chat.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Product Photography\"",
+          "text": "AI Product Photography"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio.\"",
+          "text": "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio."
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-photography-chat/buyer"
+    },
+    {
+      "route": "/ai-photography-chat",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/ai-photography-chat.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Product Photography\"",
+          "text": "AI Product Photography"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio.\"",
+          "text": "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio."
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-photography-chat/buyer"
+    },
+    {
+      "route": "/ai-settings",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/ai-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Settings\"",
+          "text": "AI Settings"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-settings/seller"
+    },
+    {
+      "route": "/ai-settings",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/ai-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Settings\"",
+          "text": "AI Settings"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-settings/seller"
+    },
+    {
+      "route": "/ai-settings",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/ai-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Settings\"",
+          "text": "AI Settings"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-settings/buyer"
+    },
+    {
+      "route": "/ai-settings",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/ai-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"AI Settings\"",
+          "text": "AI Settings"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-settings/buyer"
+    },
+    {
+      "route": "/ai-studio",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/ai-studio.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Design Studio\"",
+          "text": "Design Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"AI Clothing Mockups\"",
+          "text": "AI Clothing Mockups"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"AI Product Photography\"",
+          "text": "AI Product Photography"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Background Removal\"",
+          "text": "Background Removal"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Lifestyle Images\"",
+          "text": "Lifestyle Images"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Tech Pack Generator\"",
+          "text": "Tech Pack Generator"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-studio/seller"
+    },
+    {
+      "route": "/ai-studio",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/ai-studio.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Design Studio\"",
+          "text": "Design Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"AI Clothing Mockups\"",
+          "text": "AI Clothing Mockups"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"AI Product Photography\"",
+          "text": "AI Product Photography"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Background Removal\"",
+          "text": "Background Removal"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Lifestyle Images\"",
+          "text": "Lifestyle Images"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Tech Pack Generator\"",
+          "text": "Tech Pack Generator"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-studio/seller"
+    },
+    {
+      "route": "/ai-studio",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/ai-studio.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Design Studio\"",
+          "text": "Design Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"AI Clothing Mockups\"",
+          "text": "AI Clothing Mockups"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"AI Product Photography\"",
+          "text": "AI Product Photography"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Background Removal\"",
+          "text": "Background Removal"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Lifestyle Images\"",
+          "text": "Lifestyle Images"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Tech Pack Generator\"",
+          "text": "Tech Pack Generator"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-studio/buyer"
+    },
+    {
+      "route": "/ai-studio",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/ai-studio.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Design Studio\"",
+          "text": "Design Studio"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"AI Clothing Mockups\"",
+          "text": "AI Clothing Mockups"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"AI Product Photography\"",
+          "text": "AI Product Photography"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Background Removal\"",
+          "text": "Background Removal"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Lifestyle Images\"",
+          "text": "Lifestyle Images"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Tech Pack Generator\"",
+          "text": "Tech Pack Generator"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/ai-studio/buyer"
+    },
+    {
+      "route": "/analytics-content",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/analytics-content.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Content Analytics\"",
+          "text": "Content Analytics"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-content/seller"
+    },
+    {
+      "route": "/analytics-content",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/analytics-content.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Content Analytics\"",
+          "text": "Content Analytics"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-content/seller"
+    },
+    {
+      "route": "/analytics-content",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/analytics-content.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Content Analytics\"",
+          "text": "Content Analytics"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-content/buyer"
+    },
+    {
+      "route": "/analytics-content",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/analytics-content.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Content Analytics\"",
+          "text": "Content Analytics"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-content/buyer"
+    },
+    {
+      "route": "/analytics-customers",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/analytics-customers.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Customer Analytics\"",
+          "text": "Customer Analytics"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-customers/seller"
+    },
+    {
+      "route": "/analytics-customers",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/analytics-customers.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Customer Analytics\"",
+          "text": "Customer Analytics"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-customers/seller"
+    },
+    {
+      "route": "/analytics-customers",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/analytics-customers.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Customer Analytics\"",
+          "text": "Customer Analytics"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-customers/buyer"
+    },
+    {
+      "route": "/analytics-customers",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/analytics-customers.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Customer Analytics\"",
+          "text": "Customer Analytics"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-customers/buyer"
+    },
+    {
+      "route": "/analytics-marketing",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/analytics-marketing.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Marketing Analytics\"",
+          "text": "Marketing Analytics"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "80x36px control \"Marketing\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-marketing/seller"
+    },
+    {
+      "route": "/analytics-marketing",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/analytics-marketing.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Marketing Analytics\"",
+          "text": "Marketing Analytics"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "80x36px control \"Marketing\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-marketing/seller"
+    },
+    {
+      "route": "/analytics-marketing",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/analytics-marketing.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Marketing Analytics\"",
+          "text": "Marketing Analytics"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "80x36px control \"Marketing\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-marketing/buyer"
+    },
+    {
+      "route": "/analytics-marketing",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/analytics-marketing.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Marketing Analytics\"",
+          "text": "Marketing Analytics"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "80x36px control \"Marketing\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-marketing/buyer"
+    },
+    {
+      "route": "/analytics-production",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/analytics-production.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Production Analytics\"",
+          "text": "Production Analytics"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "72x36px control \"Mfr. Hub\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-production/seller"
+    },
+    {
+      "route": "/analytics-production",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/analytics-production.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Production Analytics\"",
+          "text": "Production Analytics"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "72x36px control \"Mfr. Hub\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-production/seller"
+    },
+    {
+      "route": "/analytics-production",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/analytics-production.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Production Analytics\"",
+          "text": "Production Analytics"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "72x36px control \"Mfr. Hub\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-production/buyer"
+    },
+    {
+      "route": "/analytics-production",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/analytics-production.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Production Analytics\"",
+          "text": "Production Analytics"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "72x36px control \"Mfr. Hub\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-production/buyer"
+    },
+    {
+      "route": "/analytics-products",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/analytics-products.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Product Analytics\"",
+          "text": "Product Analytics"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-products/seller"
+    },
+    {
+      "route": "/analytics-products",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/analytics-products.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Product Analytics\"",
+          "text": "Product Analytics"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-products/seller"
+    },
+    {
+      "route": "/analytics-products",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/analytics-products.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Product Analytics\"",
+          "text": "Product Analytics"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-products/buyer"
+    },
+    {
+      "route": "/analytics-products",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/analytics-products.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Product Analytics\"",
+          "text": "Product Analytics"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/analytics-products/buyer"
+    }
+  ]
+}

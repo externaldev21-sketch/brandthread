@@ -1,0 +1,2861 @@
+{
+  "generatedAt": "2026-09-30T06:59:43.580Z",
+  "interrupted": false,
+  "routesDiscovered": 266,
+  "results": [
+    {
+      "route": "/store-from-social",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-from-social.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate from Social\"",
+          "text": "Generate from Social"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-from-social/seller"
+    },
+    {
+      "route": "/store-from-social",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-from-social.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate from Social\"",
+          "text": "Generate from Social"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-from-social/seller"
+    },
+    {
+      "route": "/store-from-social",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-from-social.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate from Social\"",
+          "text": "Generate from Social"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-from-social/buyer"
+    },
+    {
+      "route": "/store-from-social",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-from-social.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate from Social\"",
+          "text": "Generate from Social"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-from-social/buyer"
+    },
+    {
+      "route": "/store-generate",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-generate.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate My Store\"",
+          "text": "Generate My Store"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Continue\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Continue"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-generate/seller"
+    },
+    {
+      "route": "/store-generate",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-generate.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate My Store\"",
+          "text": "Generate My Store"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Continue\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Continue"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-generate/seller"
+    },
+    {
+      "route": "/store-generate",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-generate.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate My Store\"",
+          "text": "Generate My Store"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Continue\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Continue"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-generate/buyer"
+    },
+    {
+      "route": "/store-generate",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-generate.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate My Store\"",
+          "text": "Generate My Store"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Continue\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Continue"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-generate/buyer"
+    },
+    {
+      "route": "/store-generating",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-generating.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate My Store\"",
+          "text": "Generate My Store"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Continue\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Continue"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-generating/seller"
+    },
+    {
+      "route": "/store-generating",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-generating.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate My Store\"",
+          "text": "Generate My Store"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Continue\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Continue"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-generating/seller"
+    },
+    {
+      "route": "/store-generating",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-generating.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate My Store\"",
+          "text": "Generate My Store"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Continue\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Continue"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-generating/buyer"
+    },
+    {
+      "route": "/store-generating",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-generating.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Generate My Store\"",
+          "text": "Generate My Store"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Continue\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Continue"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-generating/buyer"
+    },
+    {
+      "route": "/store-nav",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-nav.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Navigation\"",
+          "text": "Navigation"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"+ Add Item\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "+ Add Item"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-nav/seller"
+    },
+    {
+      "route": "/store-nav",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-nav.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Navigation\"",
+          "text": "Navigation"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"+ Add Item\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "+ Add Item"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-nav/seller"
+    },
+    {
+      "route": "/store-nav",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-nav.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Navigation\"",
+          "text": "Navigation"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"+ Add Item\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "+ Add Item"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-nav/buyer"
+    },
+    {
+      "route": "/store-nav",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-nav.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Navigation\"",
+          "text": "Navigation"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"+ Add Item\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "+ Add Item"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-nav/buyer"
+    },
+    {
+      "route": "/store-pages",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-pages.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Pages\"",
+          "text": "Pages"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Create Page\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Create Page"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-pages/seller"
+    },
+    {
+      "route": "/store-pages",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-pages.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Pages\"",
+          "text": "Pages"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Create Page\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Create Page"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-pages/seller"
+    },
+    {
+      "route": "/store-pages",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-pages.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Pages\"",
+          "text": "Pages"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Create Page\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Create Page"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-pages/buyer"
+    },
+    {
+      "route": "/store-pages",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-pages.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Pages\"",
+          "text": "Pages"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Create Page\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Create Page"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-pages/buyer"
+    },
+    {
+      "route": "/store-policies",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-policies.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Store policies\"",
+          "text": "Store policies"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Shipping Policy\"",
+          "text": "Shipping Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Return Policy\"",
+          "text": "Return Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Refund Policy\"",
+          "text": "Refund Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Privacy Policy\"",
+          "text": "Privacy Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Terms of Service\"",
+          "text": "Terms of Service"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Pre-order Policy\"",
+          "text": "Pre-order Policy"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-policies/seller"
+    },
+    {
+      "route": "/store-policies",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-policies.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Store policies\"",
+          "text": "Store policies"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Shipping Policy\"",
+          "text": "Shipping Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Return Policy\"",
+          "text": "Return Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Refund Policy\"",
+          "text": "Refund Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Privacy Policy\"",
+          "text": "Privacy Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Terms of Service\"",
+          "text": "Terms of Service"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Pre-order Policy\"",
+          "text": "Pre-order Policy"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-policies/seller"
+    },
+    {
+      "route": "/store-policies",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-policies.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Store policies\"",
+          "text": "Store policies"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Shipping Policy\"",
+          "text": "Shipping Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Return Policy\"",
+          "text": "Return Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Refund Policy\"",
+          "text": "Refund Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Privacy Policy\"",
+          "text": "Privacy Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Terms of Service\"",
+          "text": "Terms of Service"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Pre-order Policy\"",
+          "text": "Pre-order Policy"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-policies/buyer"
+    },
+    {
+      "route": "/store-policies",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-policies.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Store policies\"",
+          "text": "Store policies"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Shipping Policy\"",
+          "text": "Shipping Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Return Policy\"",
+          "text": "Return Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Refund Policy\"",
+          "text": "Refund Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Privacy Policy\"",
+          "text": "Privacy Policy"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Terms of Service\"",
+          "text": "Terms of Service"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Pre-order Policy\"",
+          "text": "Pre-order Policy"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-policies/buyer"
+    },
+    {
+      "route": "/store-preview",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-preview.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Couldn't load your store preview.\"",
+          "text": "Couldn't load your store preview."
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-preview/seller"
+    },
+    {
+      "route": "/store-preview",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-preview.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Couldn't load your store preview.\"",
+          "text": "Couldn't load your store preview."
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-preview/seller"
+    },
+    {
+      "route": "/store-preview",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-preview.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Couldn't load your store preview.\"",
+          "text": "Couldn't load your store preview."
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-preview/buyer"
+    },
+    {
+      "route": "/store-preview",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-preview.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Couldn't load your store preview.\"",
+          "text": "Couldn't load your store preview."
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-preview/buyer"
+    },
+    {
+      "route": "/store-publish",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-publish.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Share a preview link\"",
+          "text": "Share a preview link"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Copy preview link\"",
+          "text": "Copy preview link"
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Generate a private link to your unpublished store — good for showing a partner or manufacturer before you publish. Valid for 24 hours.\" overlaps \"2\""
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(255, 213, 128) on \"No logo uploaded. Add a logo for a professional storefront.\"",
+          "text": "No logo uploaded. Add a logo for a professional storefront."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Publish Store\"",
+          "text": "Publish Store"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-publish/seller"
+    },
+    {
+      "route": "/store-publish",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-publish.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Share a preview link\"",
+          "text": "Share a preview link"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Copy preview link\"",
+          "text": "Copy preview link"
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Generate a private link to your unpublished store — good for showing a partner or manufacturer before you publish. Valid for 24 hours.\" overlaps \"2\""
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(255, 213, 128) on \"No logo uploaded. Add a logo for a professional storefront.\"",
+          "text": "No logo uploaded. Add a logo for a professional storefront."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Publish Store\"",
+          "text": "Publish Store"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-publish/seller"
+    },
+    {
+      "route": "/store-publish",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-publish.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Share a preview link\"",
+          "text": "Share a preview link"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Copy preview link\"",
+          "text": "Copy preview link"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(255, 213, 128) on \"No logo uploaded. Add a logo for a professional storefront.\"",
+          "text": "No logo uploaded. Add a logo for a professional storefront."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Publish Store\"",
+          "text": "Publish Store"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-publish/buyer"
+    },
+    {
+      "route": "/store-publish",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-publish.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Share a preview link\"",
+          "text": "Share a preview link"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Copy preview link\"",
+          "text": "Copy preview link"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(255, 213, 128) on \"No logo uploaded. Add a logo for a professional storefront.\"",
+          "text": "No logo uploaded. Add a logo for a professional storefront."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Publish Store\"",
+          "text": "Publish Store"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-publish/buyer"
+    },
+    {
+      "route": "/store-sections",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-sections.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Content\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Add Section\"",
+          "text": "Add Section"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-sections/seller"
+    },
+    {
+      "route": "/store-sections",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-sections.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Content\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Add Section\"",
+          "text": "Add Section"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-sections/seller"
+    },
+    {
+      "route": "/store-sections",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-sections.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Add Section\"",
+          "text": "Add Section"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-sections/buyer"
+    },
+    {
+      "route": "/store-sections",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-sections.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Add Section\"",
+          "text": "Add Section"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-sections/buyer"
+    },
+    {
+      "route": "/store-seo",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-seo.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"GOOGLE PREVIEW\"",
+          "text": "GOOGLE PREVIEW"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(66, 133, 244) on \"Your Store Name\"",
+          "text": "Your Store Name"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"SEO\"",
+          "text": "SEO"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-seo/seller"
+    },
+    {
+      "route": "/store-seo",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-seo.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"GOOGLE PREVIEW\"",
+          "text": "GOOGLE PREVIEW"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(66, 133, 244) on \"Your Store Name\"",
+          "text": "Your Store Name"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"SEO\"",
+          "text": "SEO"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-seo/seller"
+    },
+    {
+      "route": "/store-seo",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-seo.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"GOOGLE PREVIEW\"",
+          "text": "GOOGLE PREVIEW"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(66, 133, 244) on \"Your Store Name\"",
+          "text": "Your Store Name"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"SEO\"",
+          "text": "SEO"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-seo/buyer"
+    },
+    {
+      "route": "/store-seo",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-seo.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"GOOGLE PREVIEW\"",
+          "text": "GOOGLE PREVIEW"
+        },
+        {
+          "type": "color-rule-violation",
+          "severity": "warn",
+          "detail": "Non-monochrome, non-allowed color rgb(66, 133, 244) on \"Your Store Name\"",
+          "text": "Your Store Name"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"SEO\"",
+          "text": "SEO"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-seo/buyer"
+    },
+    {
+      "route": "/store-settings",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"French\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Store Settings\"",
+          "text": "Store Settings"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-settings/seller"
+    },
+    {
+      "route": "/store-settings",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"French\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Store Settings\"",
+          "text": "Store Settings"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-settings/seller"
+    },
+    {
+      "route": "/store-settings",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Store Settings\"",
+          "text": "Store Settings"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-settings/buyer"
+    },
+    {
+      "route": "/store-settings",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-settings.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Store Settings\"",
+          "text": "Store Settings"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-settings/buyer"
+    },
+    {
+      "route": "/store-theme-picker",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-theme-picker.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (393px into 375px): \"Independent fashion labels, elevated essentials, and image-led collections\"",
+          "text": "Independent fashion labels, elevated essentials, and image-led collections"
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Luxury, high fashion, and limited drops\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Storefront Theme\"",
+          "text": "Storefront Theme"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Active\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Active"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-theme-picker/seller"
+    },
+    {
+      "route": "/store-theme-picker",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-theme-picker.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (393px into 375px): \"Independent fashion labels, elevated essentials, and image-led collections\"",
+          "text": "Independent fashion labels, elevated essentials, and image-led collections"
+        },
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Luxury, high fashion, and limited drops\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Storefront Theme\"",
+          "text": "Storefront Theme"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Active\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Active"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-theme-picker/seller"
+    },
+    {
+      "route": "/store-theme-picker",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-theme-picker.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (393px into 375px): \"Independent fashion labels, elevated essentials, and image-led collections\"",
+          "text": "Independent fashion labels, elevated essentials, and image-led collections"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Storefront Theme\"",
+          "text": "Storefront Theme"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Active\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Active"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-theme-picker/buyer"
+    },
+    {
+      "route": "/store-theme-picker",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-theme-picker.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "preview-demo-wording",
+          "severity": "hard",
+          "detail": "Visible text announces preview/demo mode: \"Preview\"",
+          "text": "Preview"
+        },
+        {
+          "type": "clipped-text",
+          "severity": "warn",
+          "detail": "Text clipped (393px into 375px): \"Independent fashion labels, elevated essentials, and image-led collections\"",
+          "text": "Independent fashion labels, elevated essentials, and image-led collections"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Storefront Theme\"",
+          "text": "Storefront Theme"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Active\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Active"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-theme-picker/buyer"
+    },
+    {
+      "route": "/store-versions",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/store-versions.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Version History\"",
+          "text": "Version History"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save Current Version\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save Current Version"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-versions/seller"
+    },
+    {
+      "route": "/store-versions",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/store-versions.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Version History\"",
+          "text": "Version History"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save Current Version\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save Current Version"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-versions/seller"
+    },
+    {
+      "route": "/store-versions",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/store-versions.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Version History\"",
+          "text": "Version History"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save Current Version\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save Current Version"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-versions/buyer"
+    },
+    {
+      "route": "/store-versions",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/store-versions.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Version History\"",
+          "text": "Version History"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Save Current Version\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Save Current Version"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/store-versions/buyer"
+    },
+    {
+      "route": "/subscription",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/subscription.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Subscription\"",
+          "text": "Subscription"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Current plan\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Current plan"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 3:1) for \"Growth\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Growth"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Renews Oct 14, 2026 · $29.00/mo\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Renews Oct 14, 2026 · $29.00/mo"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"+ 5% platform commission on sales\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "+ 5% platform commission on sales"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/subscription/seller"
+    },
+    {
+      "route": "/subscription",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/subscription.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Subscription\"",
+          "text": "Subscription"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Current plan\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Current plan"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 3:1) for \"Growth\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Growth"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Renews Oct 14, 2026 · $29.00/mo\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Renews Oct 14, 2026 · $29.00/mo"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"+ 5% platform commission on sales\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "+ 5% platform commission on sales"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/subscription/seller"
+    },
+    {
+      "route": "/subscription",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/subscription.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Subscription\"",
+          "text": "Subscription"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Current plan\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Current plan"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 3:1) for \"Growth\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Growth"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Renews Oct 14, 2026 · $29.00/mo\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Renews Oct 14, 2026 · $29.00/mo"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"+ 5% platform commission on sales\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "+ 5% platform commission on sales"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/subscription/buyer"
+    },
+    {
+      "route": "/subscription",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/subscription.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Subscription\"",
+          "text": "Subscription"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Current plan\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Current plan"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 3:1) for \"Growth\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Growth"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"Renews Oct 14, 2026 · $29.00/mo\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "Renews Oct 14, 2026 · $29.00/mo"
+        },
+        {
+          "type": "contrast-violation",
+          "severity": "warn",
+          "detail": "contrast 1.00:1 (need 4.5:1) for \"+ 5% platform commission on sales\" — rgb(0, 0, 0) on rgb(0, 0, 0)",
+          "text": "+ 5% platform commission on sales"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/subscription/buyer"
+    },
+    {
+      "route": "/taxes-duties",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/taxes-duties.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Adding, removing, or reviewing where you're registered to collect tax (your nexus) is managed in your Stripe Tax dashboard, not in Brandthread. Tap \"Open Stripe\" to manage it there.\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Taxes and duties\"",
+          "text": "Taxes and duties"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Automatic tax at checkout\"",
+          "text": "Automatic tax at checkout"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Charge tax on shipping cost\"",
+          "text": "Charge tax on shipping cost"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Not available directly in-app yet\"",
+          "text": "Not available directly in-app yet"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/taxes-duties/seller"
+    },
+    {
+      "route": "/taxes-duties",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/taxes-duties.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "overlapping-text",
+          "severity": "warn",
+          "detail": "\"Adding, removing, or reviewing where you're registered to collect tax (your nexus) is managed in your Stripe Tax dashboard, not in Brandthread. Tap \"Open Stripe\" to manage it there.\" overlaps \"2\""
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Taxes and duties\"",
+          "text": "Taxes and duties"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Automatic tax at checkout\"",
+          "text": "Automatic tax at checkout"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Charge tax on shipping cost\"",
+          "text": "Charge tax on shipping cost"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Not available directly in-app yet\"",
+          "text": "Not available directly in-app yet"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/taxes-duties/seller"
+    },
+    {
+      "route": "/taxes-duties",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/taxes-duties.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Taxes and duties\"",
+          "text": "Taxes and duties"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Automatic tax at checkout\"",
+          "text": "Automatic tax at checkout"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Charge tax on shipping cost\"",
+          "text": "Charge tax on shipping cost"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Not available directly in-app yet\"",
+          "text": "Not available directly in-app yet"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/taxes-duties/buyer"
+    },
+    {
+      "route": "/taxes-duties",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/taxes-duties.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Taxes and duties\"",
+          "text": "Taxes and duties"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Automatic tax at checkout\"",
+          "text": "Automatic tax at checkout"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Charge tax on shipping cost\"",
+          "text": "Charge tax on shipping cost"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Not available directly in-app yet\"",
+          "text": "Not available directly in-app yet"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/taxes-duties/buyer"
+    },
+    {
+      "route": "/team-invite",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/team-invite.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Invite not available\"",
+          "text": "Invite not available"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"This invite link is missing its token.\"",
+          "text": "This invite link is missing its token."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Back to Brandthread\"",
+          "text": "Back to Brandthread"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/team-invite/seller"
+    },
+    {
+      "route": "/team-invite",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/team-invite.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Invite not available\"",
+          "text": "Invite not available"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"This invite link is missing its token.\"",
+          "text": "This invite link is missing its token."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Back to Brandthread\"",
+          "text": "Back to Brandthread"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/team-invite/seller"
+    },
+    {
+      "route": "/team-invite",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/team-invite.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Invite not available\"",
+          "text": "Invite not available"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"This invite link is missing its token.\"",
+          "text": "This invite link is missing its token."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Back to Brandthread\"",
+          "text": "Back to Brandthread"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/team-invite/buyer"
+    },
+    {
+      "route": "/team-invite",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/team-invite.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Invite not available\"",
+          "text": "Invite not available"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"This invite link is missing its token.\"",
+          "text": "This invite link is missing its token."
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Back to Brandthread\"",
+          "text": "Back to Brandthread"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/team-invite/buyer"
+    },
+    {
+      "route": "/team",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/team.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"No activity yet\"",
+          "text": "No activity yet"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Team Management\"",
+          "text": "Team Management"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Couldn't load your team\"",
+          "text": "Couldn't load your team"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Product Publishing\"",
+          "text": "Product Publishing"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Refunds > $100\"",
+          "text": "Refunds > $100"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Discount Codes\"",
+          "text": "Discount Codes"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Manufacturer Orders\"",
+          "text": "Manufacturer Orders"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "70x36px control \"Retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/team/seller"
+    },
+    {
+      "route": "/team",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/team.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"No activity yet\"",
+          "text": "No activity yet"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Team Management\"",
+          "text": "Team Management"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Couldn't load your team\"",
+          "text": "Couldn't load your team"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Product Publishing\"",
+          "text": "Product Publishing"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Refunds > $100\"",
+          "text": "Refunds > $100"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Discount Codes\"",
+          "text": "Discount Codes"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Manufacturer Orders\"",
+          "text": "Manufacturer Orders"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "70x36px control \"Retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/team/seller"
+    },
+    {
+      "route": "/team",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/team.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"No activity yet\"",
+          "text": "No activity yet"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Team Management\"",
+          "text": "Team Management"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Couldn't load your team\"",
+          "text": "Couldn't load your team"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Product Publishing\"",
+          "text": "Product Publishing"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Refunds > $100\"",
+          "text": "Refunds > $100"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Discount Codes\"",
+          "text": "Discount Codes"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Manufacturer Orders\"",
+          "text": "Manufacturer Orders"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "70x36px control \"Retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/team/buyer"
+    },
+    {
+      "route": "/team",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/team.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "font-family",
+          "severity": "warn",
+          "detail": "Non-Inter font-family \"-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif\" on \"No activity yet\"",
+          "text": "No activity yet"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Team Management\"",
+          "text": "Team Management"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Couldn't load your team\"",
+          "text": "Couldn't load your team"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Product Publishing\"",
+          "text": "Product Publishing"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Refunds > $100\"",
+          "text": "Refunds > $100"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Discount Codes\"",
+          "text": "Discount Codes"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Manufacturer Orders\"",
+          "text": "Manufacturer Orders"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "70x36px control \"Retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/team/buyer"
+    },
+    {
+      "route": "/tech-pack-generator",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/tech-pack-generator.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Tech Pack Generator\"",
+          "text": "Tech Pack Generator"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Step 1 · Product info\"",
+          "text": "Step 1 · Product info"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Next: add photos\"",
+          "text": "Next: add photos"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/tech-pack-generator/seller"
+    },
+    {
+      "route": "/tech-pack-generator",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/tech-pack-generator.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Tech Pack Generator\"",
+          "text": "Tech Pack Generator"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Step 1 · Product info\"",
+          "text": "Step 1 · Product info"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Next: add photos\"",
+          "text": "Next: add photos"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/tech-pack-generator/seller"
+    },
+    {
+      "route": "/tech-pack-generator",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/tech-pack-generator.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Tech Pack Generator\"",
+          "text": "Tech Pack Generator"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Step 1 · Product info\"",
+          "text": "Step 1 · Product info"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Next: add photos\"",
+          "text": "Next: add photos"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/tech-pack-generator/buyer"
+    },
+    {
+      "route": "/tech-pack-generator",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/tech-pack-generator.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Tech Pack Generator\"",
+          "text": "Tech Pack Generator"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 16px not on declared FS scale (nearest 15) on \"Step 1 · Product info\"",
+          "text": "Step 1 · Product info"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 14px not on declared FS scale (nearest 13) on \"Next: add photos\"",
+          "text": "Next: add photos"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/tech-pack-generator/buyer"
+    },
+    {
+      "route": "/terms",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/terms.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 42px not on declared FS scale (nearest 36) on \"Terms of Service\"",
+          "text": "Terms of Service"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "146x34px control \"Brandthread\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "72x34px control \"Terms\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "98x34px control \"Guidelines\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "79x34px control \"Privacy\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/terms/seller"
+    },
+    {
+      "route": "/terms",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/terms.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 42px not on declared FS scale (nearest 36) on \"Terms of Service\"",
+          "text": "Terms of Service"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "146x34px control \"Brandthread\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "72x34px control \"Terms\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "98x34px control \"Guidelines\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "79x34px control \"Privacy\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/terms/seller"
+    },
+    {
+      "route": "/terms",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/terms.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 42px not on declared FS scale (nearest 36) on \"Terms of Service\"",
+          "text": "Terms of Service"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "146x34px control \"Brandthread\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "72x34px control \"Terms\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "98x34px control \"Guidelines\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "79x34px control \"Privacy\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/terms/buyer"
+    },
+    {
+      "route": "/terms",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/terms.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 42px not on declared FS scale (nearest 36) on \"Terms of Service\"",
+          "text": "Terms of Service"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "146x34px control \"Brandthread\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "72x34px control \"Terms\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "98x34px control \"Guidelines\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "79x34px control \"Privacy\" under 44x44 (hitSlop not verifiable from DOM)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/terms/buyer"
+    },
+    {
+      "route": "/thread-cash",
+      "role": "seller",
+      "dataState": "fresh",
+      "file": "app/thread-cash.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Thread Cash\"",
+          "text": "Thread Cash"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"History\"",
+          "text": "History"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"How it works\"",
+          "text": "How it works"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "268x36px control \"Couldn't load balance — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x36px control \"Couldn't load history — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/thread-cash/seller"
+    },
+    {
+      "route": "/thread-cash",
+      "role": "seller",
+      "dataState": "demo",
+      "file": "app/thread-cash.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Thread Cash\"",
+          "text": "Thread Cash"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"History\"",
+          "text": "History"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"How it works\"",
+          "text": "How it works"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "268x36px control \"Couldn't load balance — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "hit-target-too-small",
+          "severity": "warn",
+          "detail": "361x36px control \"Couldn't load history — Tap to retry\" under 44x44 (hitSlop not verifiable from DOM)"
+        },
+        {
+          "type": "console-error",
+          "severity": "hard",
+          "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/thread-cash/seller"
+    },
+    {
+      "route": "/thread-cash",
+      "role": "buyer",
+      "dataState": "fresh",
+      "file": "app/thread-cash.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Thread Cash\"",
+          "text": "Thread Cash"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 44px not on declared FS scale (nearest 36) on \"$0.00\"",
+          "text": "$0.00"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"History\"",
+          "text": "History"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"How it works\"",
+          "text": "How it works"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/thread-cash/buyer"
+    },
+    {
+      "route": "/thread-cash",
+      "role": "buyer",
+      "dataState": "demo",
+      "file": "app/thread-cash.tsx",
+      "reachable": true,
+      "unreachableReason": null,
+      "findings": [
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"Thread Cash\"",
+          "text": "Thread Cash"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 44px not on declared FS scale (nearest 36) on \"$18.45\"",
+          "text": "$18.45"
+        },
+        {
+          "type": "type-scale-drift",
+          "severity": "warn",
+          "detail": "font-size 20px not on declared FS scale (nearest 19) on \"History\"",
+          "text": "History"
+        }
+      ],
+      "shotDir": "docs/audit/screenshots/thread-cash/buyer"
+    }
+  ]
+}

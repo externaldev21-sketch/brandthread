@@ -117,6 +117,71 @@ export function ProfileButton({
   );
 }
 
+/**
+ * Own-profile action row (seller): a compact "Edit" button on the left
+ * (black + 1pt silver border, white text) and one long white "Messages"
+ * button filling the rest of the row (black text, unread badge) — Dev's
+ * call replacing the previous three-button Edit/Share/Contact row. Both
+ * controls are 38-40pt tall with a 10pt radius and a 44pt hit area (padded
+ * via hitSlop rather than growing the visible pill), Inter 600 labels.
+ */
+export function ProfileEditMessagesRow({
+  onEdit,
+  onEditLongPress,
+  onMessages,
+  unreadCount = 0,
+}: {
+  onEdit: () => void;
+  onEditLongPress?: () => void;
+  onMessages: () => void;
+  unreadCount?: number;
+}) {
+  const { theme } = useAppTheme();
+  const hitSlop = { top: 3, bottom: 3, left: 3, right: 3 };
+  return (
+    <View style={styles.editMessagesRow}>
+      <PressableScale
+        onPress={() => { hapticLight(); onEdit(); }}
+        onLongPress={onEditLongPress ? () => { hapticLight(); onEditLongPress(); } : undefined}
+        accessibilityRole="button"
+        accessibilityLabel="Edit profile"
+        accessibilityHint="Opens your full profile editor. Long press to quickly edit brand name and bio."
+        testID="profile-edit-details"
+        hitSlop={hitSlop}
+        style={[styles.editBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+      >
+        {(state) => (
+          <>
+            <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
+            <Text style={[styles.editMessagesLabel, { color: theme.text }]} numberOfLines={1}>Edit</Text>
+          </>
+        )}
+      </PressableScale>
+      <PressableScale
+        onPress={() => { hapticLight(); onMessages(); }}
+        accessibilityRole="button"
+        accessibilityLabel={unreadCount > 0 ? `Messages, ${unreadCount} unread` : 'Messages'}
+        accessibilityHint="Opens your buyer messages"
+        testID="profile-messages-btn"
+        hitSlop={hitSlop}
+        style={[styles.messagesBtn, { backgroundColor: theme.accent }]}
+      >
+        {(state) => (
+          <>
+            <InteractionLayer state={state as PressState} radius={RADIUS.sm} theme={theme} />
+            <Text style={[styles.editMessagesLabel, { color: theme.onAccent }]} numberOfLines={1}>Messages</Text>
+            {unreadCount > 0 && (
+              <View style={[styles.messagesBadge, { backgroundColor: theme.card }]}>
+                <Text style={[styles.messagesBadgeText, { color: theme.text }]}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            )}
+          </>
+        )}
+      </PressableScale>
+    </View>
+  );
+}
+
 /** Round glass control floating over the hero media (back, share, more…). */
 export function ProfileGlassButton({
   icon,
@@ -498,6 +563,24 @@ const styles = StyleSheet.create({
   },
   buttonText: { fontFamily: FONT.bold, fontSize: FS.base, flexShrink: 1 },
   disabled: { opacity: 0.5 },
+
+  editMessagesRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  editBtn: {
+    height: 39, borderRadius: RADIUS.sm, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: SP.lg, overflow: 'hidden',
+  },
+  messagesBtn: {
+    flex: 1, height: 39, borderRadius: RADIUS.sm,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, overflow: 'hidden',
+  },
+  editMessagesLabel: { fontFamily: FONT.semibold, fontSize: FS.base },
+  messagesBadge: {
+    minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  messagesBadgeText: { fontFamily: FONT.bold, fontSize: 10 },
 
   glass: {
     width: 44, height: 44, borderRadius: 22, borderWidth: 1,
